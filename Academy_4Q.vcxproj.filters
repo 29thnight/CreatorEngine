@@ -15,10 +15,6 @@
     <Filter Include="Dx11Main">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="vcpkg에 추가할 파일">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{b05c0c36-6745-41d0-bcfd-e137476215b7}</UniqueIdentifier>
     </Filter>
@@ -104,9 +100,6 @@
     </ClInclude>
     <ClInclude Include="InputManager.h">
       <Filter>Manager\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="Dependancies\Geometry.h">
-      <Filter>vcpkg에 추가할 파일</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Component</Filter>
@@ -239,9 +232,6 @@
     <ClCompile Include="InputManager.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
-    <ClCompile Include="Dependancies\Geometry.cpp">
-      <Filter>vcpkg에 추가할 파일</Filter>
-    </ClCompile>
     <ClCompile Include="World.cpp">
       <Filter>World</Filter>
     </ClCompile>
@@ -253,15 +243,6 @@
     </ClCompile>
     <ClCompile Include="PathFinding.cpp">
       <Filter>Utill\PathFinding</Filter>
-    </ClCompile>
-    <ClCompile Include="BoxColliderComponent.cpp">
-      <Filter>vcpkg에 추가할 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="ColliderComponent.cpp">
-      <Filter>vcpkg에 추가할 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="RigidbodyComponent.cpp">
-      <Filter>vcpkg에 추가할 파일</Filter>
     </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>

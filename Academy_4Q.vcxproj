@@ -152,10 +152,6 @@
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
-    <ClInclude Include="Dependancies\Geometry.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClInclude>
     <ClInclude Include="Dx11Main.h" />
     <ClInclude Include="EventSystem.h" />
     <ClInclude Include="framework.h" />
@@ -185,15 +181,9 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="BehaviorTree.cpp" />
     <ClCompile Include="BehaviorTreeComponent.cpp" />
-    <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="BT_Editor.cpp" />
     <ClCompile Include="CharacterController.cpp" />
-    <ClCompile Include="ColliderComponent.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
-    <ClCompile Include="Dependancies\Geometry.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="Dx11Main.cpp" />
     <ClCompile Include="EventSystem.cpp" />
     <ClCompile Include="GameManager.cpp" />
@@ -204,7 +194,6 @@
     <ClCompile Include="ObjectFactory.cpp" />
     <ClCompile Include="PathFinding.cpp" />
     <ClCompile Include="RenderComponent.cpp" />
-    <ClCompile Include="RigidbodyComponent.cpp" />
     <ClCompile Include="SphereColliderComponent.cpp" />
     <ClCompile Include="StairColliderComponent.cpp" />
     <ClCompile Include="TestComponent.cpp" />
