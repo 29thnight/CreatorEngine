@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Item_Drum_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Item_Drum",
+    "Normal": "Item_Drum_Normal.png",
+    "OcclusionRoughnessMetallic": "Item_Drum_OcclusionRoughnessMetallic.png"
+}

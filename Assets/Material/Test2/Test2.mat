@@ -1,0 +1,6 @@
+{
+    "BaseColor": "Test2_BaseColor.png",
+    "Bitmask": 3,
+    "Name": "Test2",
+    "OcclusionRoughnessMetallic": "Test2_OcclusionRoughnessMetallic.png"
+}

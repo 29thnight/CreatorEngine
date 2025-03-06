@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Wall_2_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Wall_2",
+    "Normal": "Prop_Wall_2_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Wall_2_OcclusionRoughnessMetallic.png"
+}

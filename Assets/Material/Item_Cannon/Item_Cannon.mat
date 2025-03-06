@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Item_Cannon_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Item_Cannon",
+    "Normal": "Item_Cannon_Normal.png",
+    "OcclusionRoughnessMetallic": "Item_Cannon_OcclusionRoughnessMetallic.png"
+}

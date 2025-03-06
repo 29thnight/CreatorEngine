@@ -1,0 +1,3606 @@
+{
+    "Canvas": [
+        {
+            "Name": "",
+            "ObjList": [
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "vignetting_01.png",
+                    "Name": "vignetting",
+                    "Opacity": 1.0,
+                    "PosLock": false,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": -100
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Bongsu_Far_back.png",
+                    "Name": "IG_Bongsu_Far_Back",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            820.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": -2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile11.png",
+                    "Name": "IG_1P_icon_idle",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile21.png",
+                    "Name": "IG_2P_icon_idle",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1630.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            40.5,
+                            438.375
+                        ],
+                        "Size": [
+                            81.0,
+                            876.75
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "gauge_empty_01.png",
+                    "Name": "IG_Total_Gauge_Empty",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1812.52001953125,
+                            65.80999755859375
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.8999999761581421,
+                            0.875
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            648.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire02",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            786.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            648.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire03",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            920.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire04",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1055.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            50.0,
+                            50.0
+                        ],
+                        "Size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_FarBongsuFire.png",
+                    "Name": "FarBongsuFire05",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1190.0,
+                            823.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            36.0,
+                            432.3999938964844
+                        ],
+                        "Size": [
+                            72.0,
+                            864.7999877929688
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "gauge_Lem.png",
+                    "Name": "IG_Total_GaugeYellow",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1816.31005859375,
+                            69.87000274658203
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.800000011920929,
+                            0.800000011920929
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            45.0,
+                            540.5
+                        ],
+                        "Size": [
+                            90.0,
+                            1081.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "gauge_Orn.png",
+                    "Name": "IG_Total_Gauge_Orange",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1820.0,
+                            50.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            45.0,
+                            540.5
+                        ],
+                        "Size": [
+                            90.0,
+                            1081.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_gauge_Drbl.png",
+                    "Name": "IG_Total_Gauge_Blue",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1820.0,
+                            50.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile22.png",
+                    "Name": "IG_2P_icon_cold_over_50_1",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1630.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profil12_1.png",
+                    "Name": "IG_1P_icon_cold_over_50_1",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            45.0,
+                            540.5
+                        ],
+                        "Size": [
+                            90.0,
+                            1081.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "gauge_Red.png",
+                    "Name": "IG_Total_Gauge_Red",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1820.0,
+                            50.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            45.0,
+                            675.0
+                        ],
+                        "Size": [
+                            90.0,
+                            1350.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_gauge_01_ruler.png",
+                    "Name": "IG_Gauge_Ruler",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1820.0,
+                            -100.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.5
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile22_1.png",
+                    "Name": "IG_2P_icon_cold_over_50_2",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1630.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profil12.png",
+                    "Name": "IG_1P_icon_cold_over_50_2",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            18.0,
+                            17.9689998626709
+                        ],
+                        "Size": [
+                            36.0,
+                            35.9379997253418
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "gauge_Moon.png",
+                    "Name": "IG_Gauge_Moon",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1833.56005859375,
+                            872.3099975585938
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.23999999463558197,
+                            0.23800000548362732
+                        ],
+                        "ZOrder": 3
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            21.0,
+                            21.420000076293945
+                        ],
+                        "Size": [
+                            42.0,
+                            42.84000015258789
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_gauge_Sun.png",
+                    "Name": "IG_Gauge_Sun",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1830.8599853515625,
+                            85.33000183105469
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.2800000011920929,
+                            0.2800000011920929
+                        ],
+                        "ZOrder": 3
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile23.png",
+                    "Name": "IG_2P_Frozen",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1630.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 3
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_UI_Profile13.png",
+                    "Name": "IG_1P_Frozen",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 3
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_VFX_playerStun2.png",
+                    "Name": "IG_2P_Stun",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1630.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            100.0,
+                            100.0
+                        ],
+                        "Size": [
+                            200.0,
+                            200.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_VFX_playerStun.png",
+                    "Name": "IG_1P_Stun",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            880.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            -87.125,
+                            38.875
+                        ],
+                        "Size": [
+                            -174.25,
+                            77.75
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ui_Cold_Bar_Final.png",
+                    "Name": "2P_coldBar",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1627.6199951171875,
+                            971.1099853515625
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            -0.25,
+                            0.25
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            87.125,
+                            38.875
+                        ],
+                        "Size": [
+                            174.25,
+                            77.75
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ui_Cold_Bar_Final.png",
+                    "Name": "1P_coldBar",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            274.6400146484375,
+                            972.3699951171875
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.25,
+                            0.25
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Wood.png",
+                    "Name": "Interaction_2P_Wood",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Swing.png",
+                    "Name": "Interaction_2P_Swing",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Box.png",
+                    "Name": "Interaction_2P_Box",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_119.png",
+                    "Name": "Interaction_2P_119",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Water.png",
+                    "Name": "Interaction_2P_Water",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Burn.png",
+                    "Name": "Interaction_2P_Burn",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Burn.png",
+                    "Name": "Interaction_1P_Burn",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Wood.png",
+                    "Name": "Interaction_1P_Wood",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_119.png",
+                    "Name": "Interaction_1P_119",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Get.png",
+                    "Name": "Interaction_1P_Get",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Swing.png",
+                    "Name": "Interaction_1P_Swing",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Water.png",
+                    "Name": "Interaction_1P_Water",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Box.png",
+                    "Name": "Interaction_1P_Box",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "1P_Interaction_Drum.png",
+                    "Name": "Interaction_1P_Drum",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            266.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Get.png",
+                    "Name": "Interaction_2P_Get",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            178.22999572753906,
+                            65.12999725341797
+                        ],
+                        "Size": [
+                            356.4599914550781,
+                            130.25999450683594
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "2P_Interaction_Drum.png",
+                    "Name": "Interaction_2P_Drum",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1298.0,
+                            850.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.7799999713897705,
+                            0.7799999713897705
+                        ],
+                        "ZOrder": 8
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            540.0,
+                            250.0
+                        ],
+                        "Size": [
+                            1080.0,
+                            500.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "stage4_manduk_startText.png",
+                    "Name": "Stage4_manduk_startText",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            370.6400146484375,
+                            153.13999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 50
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            540.0,
+                            250.0
+                        ],
+                        "Size": [
+                            1080.0,
+                            500.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "stage3_manduk_startText.png",
+                    "Name": "Stage3_manduk_startText",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            370.6400146484375,
+                            153.13999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 50
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            540.0,
+                            250.0
+                        ],
+                        "Size": [
+                            1080.0,
+                            500.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "stage2_manduk_startText.png",
+                    "Name": "Stage2_manduk_startText",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            370.6400146484375,
+                            153.13999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 50
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            540.0,
+                            250.0
+                        ],
+                        "Size": [
+                            1080.0,
+                            500.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "stage1_manduk_startText.png",
+                    "Name": "Stage1_maduk_startText",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            370.6400146484375,
+                            153.13999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 50
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            648.4500122070313,
+                            192.14999389648438
+                        ],
+                        "Size": [
+                            1296.9000244140625,
+                            384.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_textGameStart.png",
+                    "Name": "StartImage",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            262.989990234375,
+                            231.88999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.8999999761581421,
+                            0.8999999761581421
+                        ],
+                        "ZOrder": 51
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            648.4500122070313,
+                            192.14999389648438
+                        ],
+                        "Size": [
+                            1296.9000244140625,
+                            384.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_textGameEnd.png",
+                    "Name": "EndImage",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            262.989990234375,
+                            231.88999938964844
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.8999999761581421,
+                            0.8999999761581421
+                        ],
+                        "ZOrder": 52
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            540.5,
+                            45.0
+                        ],
+                        "Size": [
+                            1081.0,
+                            90.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_waveGauge_3.png",
+                    "Name": "IG_waveGauge",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            1065.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 100
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "GameResult.png",
+                    "Name": "Result",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 130
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            35.0,
+                            35.0
+                        ],
+                        "Size": [
+                            70.0,
+                            70.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ResultPopups_img_stamp.png",
+                    "Name": "Result_CleanStamp01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1444.0,
+                            381.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 131
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            35.0,
+                            35.0
+                        ],
+                        "Size": [
+                            70.0,
+                            70.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ResultPopups_img_stamp.png",
+                    "Name": "Result_TempStamp01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1224.0,
+                            381.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 131
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            35.0,
+                            35.0
+                        ],
+                        "Size": [
+                            70.0,
+                            70.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ResultPopups_img_stamp.png",
+                    "Name": "Result_4GoStamp01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1004.0,
+                            381.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 131
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            35.0,
+                            35.0
+                        ],
+                        "Size": [
+                            70.0,
+                            70.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ResultPopups_img_stamp.png",
+                    "Name": "Result_82Stam01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            784.0,
+                            381.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 131
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            35.0,
+                            35.0
+                        ],
+                        "Size": [
+                            70.0,
+                            70.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_ResultPopups_img_stamp.png",
+                    "Name": "Result_SuccessStamp01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            564.0,
+                            381.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 131
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            92.0,
+                            138.0
+                        ],
+                        "Size": [
+                            184.0,
+                            276.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "img_score05.png",
+                    "Name": "Result_Score05",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1524.0,
+                            591.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 132
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            92.0,
+                            138.0
+                        ],
+                        "Size": [
+                            184.0,
+                            276.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "img_score04.png",
+                    "Name": "Result_Score04",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1524.0,
+                            591.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 132
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            92.0,
+                            138.0
+                        ],
+                        "Size": [
+                            184.0,
+                            276.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "img_score03.png",
+                    "Name": "Result_Score03",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1524.0,
+                            591.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 132
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            92.0,
+                            138.0
+                        ],
+                        "Size": [
+                            184.0,
+                            276.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "img_score02.png",
+                    "Name": "Result_Score02",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1524.0,
+                            591.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 132
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            92.0,
+                            138.0
+                        ],
+                        "Size": [
+                            184.0,
+                            276.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "img_score01.png",
+                    "Name": "Result_Score01",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1524.0,
+                            591.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 132
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            315.0,
+                            315.0
+                        ],
+                        "Size": [
+                            630.0,
+                            630.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_MandukAngry.png",
+                    "Name": "Result_AngryManduk",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            -11.0,
+                            449.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 133
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            315.0,
+                            315.0
+                        ],
+                        "Size": [
+                            630.0,
+                            630.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_MandukRage.png",
+                    "Name": "Result_RageManduk",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            -11.0,
+                            449.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 133
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            315.0,
+                            315.0
+                        ],
+                        "Size": [
+                            630.0,
+                            630.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_Manduk.png",
+                    "Name": "Result_IdleManduk",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            -11.0,
+                            449.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 133
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            315.0,
+                            315.0
+                        ],
+                        "Size": [
+                            630.0,
+                            630.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_img_MandukHappy.png",
+                    "Name": "Result_HappyManduk",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            -11.0,
+                            449.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 133
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            341.25,
+                            182.64999389648438
+                        ],
+                        "Size": [
+                            682.5,
+                            365.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Result_Score05Msg.png",
+                    "Name": "Result_BultongMsg",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            500.0,
+                            400.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.2999999523162842,
+                            1.2999999523162842
+                        ],
+                        "ZOrder": 140
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            341.25,
+                            182.64999389648438
+                        ],
+                        "Size": [
+                            682.5,
+                            365.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Result_Score04Msg.png",
+                    "Name": "Result_JotongMsg",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            500.0,
+                            400.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.2999999523162842,
+                            1.2999999523162842
+                        ],
+                        "ZOrder": 140
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            341.25,
+                            182.64999389648438
+                        ],
+                        "Size": [
+                            682.5,
+                            365.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Result_Score02Msg.png",
+                    "Name": "Result_KetongMsg",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            500.0,
+                            400.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.2999999523162842,
+                            1.2999999523162842
+                        ],
+                        "ZOrder": 140
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            341.25,
+                            182.64999389648438
+                        ],
+                        "Size": [
+                            682.5,
+                            365.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Result_Score01Msg.png",
+                    "Name": "Result_DaetongMsg",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            500.0,
+                            400.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.2999999523162842,
+                            1.2999999523162842
+                        ],
+                        "ZOrder": 140
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            341.25,
+                            182.64999389648438
+                        ],
+                        "Size": [
+                            682.5,
+                            365.29998779296875
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Result_Score03Msg.png",
+                    "Name": "Result_YaktongMsg",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            500.0,
+                            400.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.2999999523162842,
+                            1.2999999523162842
+                        ],
+                        "ZOrder": 140
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            212.0,
+                            24.5
+                        ],
+                        "Size": [
+                            424.0,
+                            49.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_Pause_Popup_03_pause.png",
+                    "Name": "Pause",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 150
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            98.5,
+                            25.0
+                        ],
+                        "Size": [
+                            197.0,
+                            50.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_Pause_Button_Pause_Resume1.png",
+                    "Name": "Pause_button_Resume",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "IG_Pause_Button_Pause_Resume2.png",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            500.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 150
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            212.0,
+                            24.5
+                        ],
+                        "Size": [
+                            424.0,
+                            49.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "IG_Pause_Button_Pause_toMain1.png",
+                    "Name": "Pause_button_toMain",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "IG_Pause_Button_Pause_Resume2.png",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            650.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 150
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                }
+            ],
+            "TextList": []
+        }
+    ],
+    "World": {
+        "Camera": {
+            "Exposure": 1.0,
+            "Far": 1000.0,
+            "Fov": 70.0,
+            "MouseSensitivity": 0.0,
+            "Near": 0.10000000149011612,
+            "Position": [
+                5.723082065582275,
+                150.15846252441406,
+                232.1063995361328
+            ],
+            "Speed": 0.0,
+            "YawPitchRoll": [
+                271.04010009765625,
+                -44.273929595947266,
+                0.0
+            ]
+        },
+        "Canvas": [],
+        "Grid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        "GridX": 15,
+        "GridY": 15,
+        "Scene": {
+            "suncolor": [
+                1.0,
+                1.0,
+                0.9599999785423279
+            ],
+            "sunpos": [
+                3.0,
+                10.0,
+                3.0
+            ]
+        },
+        "name": "jsonTestWorld",
+        "objectCount": 0,
+        "objects": []
+    }
+}

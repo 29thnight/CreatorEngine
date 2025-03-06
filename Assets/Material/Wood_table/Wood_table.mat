@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Wood_table_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Wood_table",
+    "Normal": "Wood_table_Normal.png",
+    "OcclusionRoughnessMetallic": "Wood_table_OcclusionRoughnessMetallic.png"
+}

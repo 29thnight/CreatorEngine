@@ -1,0 +1,89 @@
+{
+    "PrefebType": "Monster",
+    "componentCount": 3,
+    "components": [
+        {
+            "CharacterController": {
+                "contactOffset": [
+                    0.0010000000474974513
+                ],
+                "gravity": [
+                    -9.800000190734863
+                ],
+                "height": [
+                    0.5
+                ],
+                "jumpVelocity": [
+                    5.0
+                ],
+                "maxJumpHeight": [
+                    1.0
+                ],
+                "moveSpeed": [
+                    0.20000000298023224
+                ],
+                "radius": [
+                    0.4000000059604645
+                ],
+                "rotationSpeed": [
+                    2000.0
+                ],
+                "slopeLimit": [
+                    0.699999988079071
+                ],
+                "stepOffset": [
+                    0.0010000000474974513
+                ]
+            },
+            "Type": "CharacterController"
+        },
+        {
+            "AxeInstancedName": "",
+            "InstancedName": "char_hyina_low3",
+            "ModelName": "char_hyina_low",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "SubInstancedName": "",
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        0.0,
+        90.0000228881836,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

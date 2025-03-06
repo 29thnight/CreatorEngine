@@ -1,0 +1,52 @@
+{
+    "PrefebType": "Object",
+    "componentCount": 1,
+    "components": [
+        {
+            "InstancedName": "Prop_Flag2",
+            "ModelName": "Prop_Flag",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.10000000149011612,
+                    0.30000001192092896,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    0.003000000026077032,
+                    0.003000000026077032,
+                    0.003000000026077032
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

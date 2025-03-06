@@ -1,0 +1,116 @@
+{
+    "PrefebType": "FlagObject",
+    "componentCount": 3,
+    "components": [
+        {
+            "RigidbodyInfo": {
+                "angularDrag": [
+                    0.05000000074505806
+                ],
+                "centerOfMass": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "drag": [
+                    0.0
+                ],
+                "freezePosition": [
+                    false,
+                    false,
+                    false
+                ],
+                "freezeRotation": [
+                    false,
+                    false,
+                    false
+                ],
+                "isKinematic": [
+                    true
+                ],
+                "mass": [
+                    1.0
+                ],
+                "useGravity": [
+                    false
+                ]
+            },
+            "Type": "RigidbodyComponent"
+        },
+        {
+            "ColliderInfo": {
+                "enable": [
+                    true
+                ],
+                "flag": [
+                    255
+                ],
+                "isTrigger": [
+                    false
+                ],
+                "localpos": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "localrot": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    0.25,
+                    0.5,
+                    0.25
+                ]
+            },
+            "Type": "BoxColliderComponent"
+        },
+        {
+            "InstancedName": "Prop_wallTorch_l1",
+            "ModelName": "Prop_wallTorch_l",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    1.5700000524520874,
+                    0.0
+                ],
+                "Scale": [
+                    0.004000000189989805,
+                    0.004000000189989805,
+                    0.004000000189989805
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        -0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

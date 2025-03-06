@@ -1,0 +1,191 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Core.definition">
+      <UniqueIdentifier>{45cff361-ee34-40e2-9569-c2ba7b8f04d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX11Common">
+      <UniqueIdentifier>{21614411-27dc-43d0-baf6-806027afc35d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="WindowsApplication">
+      <UniqueIdentifier>{e45d8173-5cd0-4c14-93c8-f109ead57c31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="WindowsApplication\CoreWindow">
+      <UniqueIdentifier>{eec97127-ce4f-42bb-b91d-0f8e870e58f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utility">
+      <UniqueIdentifier>{059fcb1a-79fa-4d01-82ee-2821d77a9a57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Assert">
+      <UniqueIdentifier>{db8ea0c4-5a20-4af8-861d-271ee6c424fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Console">
+      <UniqueIdentifier>{cd58958c-be03-425c-ba98-25fff4128742}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Mathf">
+      <UniqueIdentifier>{77365139-821f-44e0-b873-c56013b686fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Random">
+      <UniqueIdentifier>{8c9f5eac-4cca-420e-ac7f-6ad68780f9e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Thread">
+      <UniqueIdentifier>{bea73a02-d831-429d-a1b7-4a02b675965b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Memory">
+      <UniqueIdentifier>{2b89a087-a940-4951-bf45-1cca8ced71d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.LinkedList">
+      <UniqueIdentifier>{ac1a3691-9e70-4a2f-853d-512eca7f7692}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Memory\MemoryPool">
+      <UniqueIdentifier>{114114a8-7d3c-419c-a79f-4a099cebcd00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Memory\SpinLock">
+      <UniqueIdentifier>{4584675b-2578-4d75-a537-a62df1b1dc49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX11Common\DirectXHelper">
+      <UniqueIdentifier>{190416e9-a93a-4ee9-bd80-ab672916a61b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX11Common\DeviceResources">
+      <UniqueIdentifier>{2a34f36f-291f-4ad7-a8f2-591b7a0c90e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX11Common\TimeSystem">
+      <UniqueIdentifier>{9fb06a54-84b4-4fb5-9427-2e590b30f9e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX11Common\HLSLCompiler">
+      <UniqueIdentifier>{39dfc371-3946-477a-9148-ec3212f87486}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interface">
+      <UniqueIdentifier>{c673a744-35c9-4d79-88f8-78a26f4c00b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Logger">
+      <UniqueIdentifier>{680961e0-282d-49b5-b66c-942eed35b315}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CSVLoader">
+      <UniqueIdentifier>{471bdf77-bd33-4ff1-a11b-d26228ed2f45}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="INILoader">
+      <UniqueIdentifier>{10a74b62-715e-498d-8216-efd46b990009}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ClassProperty.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Definition.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="TypeDefinition.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreWindow.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="Banchmark.hpp">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Assert.hpp">
+      <Filter>Core.Assert</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Console.hpp">
+      <Filter>Core.Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Mathf.h">
+      <Filter>Core.Mathf</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Random.h">
+      <Filter>Core.Random</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Thread.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Memory.hpp">
+      <Filter>Core.Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkedListLib.hpp">
+      <Filter>Core.LinkedList</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryPool.h">
+      <Filter>Core.Memory\MemoryPool</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Minimal.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="SpinLock.h">
+      <Filter>Core.Memory\SpinLock</Filter>
+    </ClInclude>
+    <ClInclude Include="DumpHandler.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="DeviceResources.h">
+      <Filter>DirectX11Common\DeviceResources</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXHelper.h">
+      <Filter>DirectX11Common\DirectXHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="TimeSystem.h">
+      <Filter>DirectX11Common\TimeSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="HLSLCompiler.h">
+      <Filter>DirectX11Common\HLSLCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="PathFinder.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="IWorld.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="IObject.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="IComponent.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="sqlite_modern_cpp.h">
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="LogIOWriter.h">
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="LogMessage.h">
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="CSVLoader.h">
+      <Filter>CSVLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="SimpleIniFile.h">
+      <Filter>INILoader</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CoreWindow.cpp">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="Core.Thread.cpp">
+      <Filter>Core.Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceResources.cpp">
+      <Filter>DirectX11Common\DeviceResources</Filter>
+    </ClCompile>
+    <ClCompile Include="HLSLCompiler.cpp">
+      <Filter>DirectX11Common\HLSLCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>Core.Logger</Filter>
+    </ClCompile>
+    <ClCompile Include="LogIOWriter.cpp">
+      <Filter>Core.Logger</Filter>
+    </ClCompile>
+    <ClCompile Include="LogMessage.cpp">
+      <Filter>Core.Logger</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MemoryPool.inl">
+      <Filter>Core.Memory\MemoryPool</Filter>
+    </None>
+  </ItemGroup>
+</Project>

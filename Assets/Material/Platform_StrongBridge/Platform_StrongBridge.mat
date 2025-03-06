@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Platform_StrongBridge_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Platform_StrongBridge",
+    "Normal": "Platform_StrongBridge_Normal.png",
+    "OcclusionRoughnessMetallic": "Platform_StrongBridge_OcclusionRoughnessMetallic.png"
+}

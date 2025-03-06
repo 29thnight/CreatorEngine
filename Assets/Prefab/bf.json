@@ -1,0 +1,52 @@
+{
+    "PrefebType": "FloorBox",
+    "componentCount": 1,
+    "components": [
+        {
+            "InstancedName": "Prop_BongsuDae_Floor1",
+            "ModelName": "Prop_BongsuDae_Floor",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    0.550000011920929,
+                    0.30000001192092896,
+                    0.6000000238418579
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

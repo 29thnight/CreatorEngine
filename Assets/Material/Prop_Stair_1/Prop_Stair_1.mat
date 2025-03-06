@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Stair_1_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Stair_1",
+    "Normal": "Prop_Stair_1_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Stair_1_OcclusionRoughnessMetallic.png"
+}

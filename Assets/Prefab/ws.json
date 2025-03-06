@@ -1,0 +1,113 @@
+{
+    "PrefebType": "FloorBox",
+    "componentCount": 3,
+    "components": [
+        {
+            "RigidbodyInfo": {
+                "angularDrag": [
+                    0.05000000074505806
+                ],
+                "centerOfMass": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "drag": [
+                    0.0
+                ],
+                "freezePosition": [
+                    false,
+                    false,
+                    false
+                ],
+                "freezeRotation": [
+                    false,
+                    false,
+                    false
+                ],
+                "isKinematic": [
+                    true
+                ],
+                "mass": [
+                    1.0
+                ],
+                "useGravity": [
+                    false
+                ]
+            },
+            "Type": "RigidbodyComponent"
+        },
+        {
+            "InstancedName": "SM_woodstack1",
+            "ModelName": "SM_woodstack",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "RenderComponent"
+        },
+        {
+            "ColliderInfo": {
+                "enable": [
+                    true
+                ],
+                "isTrigger": [
+                    false
+                ],
+                "localpos": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "localrot": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "BoxColliderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        9.059935554599566e-14,
+        180.0,
+        180.0
+    ],
+    "scale": [
+        0.15000000596046448,
+        0.15000000596046448,
+        0.15000000596046448
+    ]
+}

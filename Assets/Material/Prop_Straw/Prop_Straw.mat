@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Straw_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Straw",
+    "Normal": "Prop_Straw_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Straw_OcclusionRoughnessMetallic.png"
+}

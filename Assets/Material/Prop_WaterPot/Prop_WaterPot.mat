@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_WaterPot_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_WaterPot",
+    "Normal": "Prop_WaterPot_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_WaterPot_OcclusionRoughnessMetallic.png"
+}

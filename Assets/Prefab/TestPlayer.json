@@ -1,0 +1,87 @@
+{
+    "PrefebType": "Player",
+    "componentCount": 2,
+    "components": [
+        {
+            "CharacterController": {
+                "contactOffset": [
+                    0.10000000149011612
+                ],
+                "gravity": [
+                    -9.800000190734863
+                ],
+                "height": [
+                    1.0
+                ],
+                "jumpVelocity": [
+                    5.0
+                ],
+                "maxJumpHeight": [
+                    1.0
+                ],
+                "moveSpeed": [
+                    1.0
+                ],
+                "radius": [
+                    0.4000000059604645
+                ],
+                "rotationSpeed": [
+                    2000.0
+                ],
+                "slopeLimit": [
+                    0.699999988079071
+                ],
+                "stepOffset": [
+                    0.10000000149011612
+                ]
+            },
+            "Type": "CharacterController"
+        },
+        {
+            "InstancedName": "Player1_idle1",
+            "ModelName": "Player1_idle",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

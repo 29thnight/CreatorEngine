@@ -1,0 +1,14 @@
+EventList 목록
+
+전역 이벤트 목록 입니다.
+
+//dxmain
+ChangeScene,std::string SceneName : 씬 전환 이벤트 //test
+Pause	: 게임 일시정지 이벤트 //todo
+Resume	: 게임 재개 이벤트	//todo
+
+
+//SpawnerComponent 특수
+MonsterDead + 몬스터ID : 몬스터 사망 이벤트
+WoodReturn + 나무ID : 나무 회수 이벤트
+TorchReturn + 횃불ID : 횃불 회수 이벤트

@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_WallTorch_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_WallTorch",
+    "Normal": "Prop_WallTorch_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_WallTorch_OcclusionRoughnessMetallic.png"
+}

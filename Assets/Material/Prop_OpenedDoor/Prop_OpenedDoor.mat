@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_OpenedDoor_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_OpenedDoor",
+    "Normal": "Prop_OpenedDoor_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_OpenedDoor_OcclusionRoughnessMetallic.png"
+}

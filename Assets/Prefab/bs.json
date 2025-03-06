@@ -1,0 +1,116 @@
+{
+    "PrefebType": "Bongsu",
+    "componentCount": 3,
+    "components": [
+        {
+            "ColliderInfo": {
+                "enable": [
+                    true
+                ],
+                "flag": [
+                    255
+                ],
+                "isTrigger": [
+                    false
+                ],
+                "localpos": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "localrot": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "BoxColliderComponent"
+        },
+        {
+            "RigidbodyInfo": {
+                "angularDrag": [
+                    0.05000000074505806
+                ],
+                "centerOfMass": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "drag": [
+                    0.0
+                ],
+                "freezePosition": [
+                    false,
+                    false,
+                    false
+                ],
+                "freezeRotation": [
+                    false,
+                    false,
+                    false
+                ],
+                "isKinematic": [
+                    true
+                ],
+                "mass": [
+                    1.0
+                ],
+                "useGravity": [
+                    false
+                ]
+            },
+            "Type": "RigidbodyComponent"
+        },
+        {
+            "InstancedName": "Prop_BongsuDae4",
+            "ModelName": "Prop_BongsuDae",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    0.800000011920929,
+                    0.800000011920929,
+                    0.800000011920929
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        -0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

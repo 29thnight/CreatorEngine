@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Platform_WeakBridge02_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Platform_WeakBridge02",
+    "Normal": "Platform_WeakBridge02_Normal.png",
+    "OcclusionRoughnessMetallic": "Platform_WeakBridge02_OcclusionRoughnessMetallic.png"
+}

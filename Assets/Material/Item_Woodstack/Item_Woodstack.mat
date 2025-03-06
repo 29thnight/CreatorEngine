@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Item_Woodstack_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Item_Woodstack",
+    "Normal": "Item_Woodstack_Normal.png",
+    "OcclusionRoughnessMetallic": "Item_Woodstack_OcclusionRoughnessMetallic.png"
+}

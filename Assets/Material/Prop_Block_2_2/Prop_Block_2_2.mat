@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Block_2_2_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Block_2_2",
+    "Normal": "Prop_Block_2_2_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Block_2_2_OcclusionRoughnessMetallic.png"
+}

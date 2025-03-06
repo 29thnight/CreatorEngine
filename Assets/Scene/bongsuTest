@@ -1,0 +1,998 @@
+{
+    "World": {
+        "Camera": {
+            "Exposure": 1.0,
+            "Far": 1000.0,
+            "Fov": 70.0,
+            "MouseSensitivity": 50.0,
+            "Near": 0.10000000149011612,
+            "Position": [
+                3.762514114379883,
+                15.322823524475098,
+                23.34518814086914
+            ],
+            "Speed": 50.0,
+            "YawPitchRoll": [
+                268.3702087402344,
+                -36.565582275390625,
+                0.0
+            ]
+        },
+        "Canvas": [],
+        "Grid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        "GridX": 15,
+        "GridY": 15,
+        "Scene": {
+            "suncolor": [
+                1.0,
+                1.0,
+                0.9599999785423279
+            ],
+            "sunpos": [
+                3.0,
+                10.0,
+                3.0
+            ]
+        },
+        "name": "jsonTestWorld",
+        "objectCount": 6,
+        "objects": [
+            {
+                "componentCount": 3,
+                "components": [
+                    {
+                        "RigidbodyInfo": {
+                            "angularDrag": [
+                                0.05000000074505806
+                            ],
+                            "centerOfMass": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "drag": [
+                                0.0
+                            ],
+                            "freezePosition": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "freezeRotation": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "isKinematic": [
+                                true
+                            ],
+                            "mass": [
+                                1.0
+                            ],
+                            "useGravity": [
+                                false
+                            ]
+                        },
+                        "Type": "RigidbodyComponent"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Prop_Block_3_11",
+                        "ModelName": "Prop_Block_3_1",
+                        "Outline": {
+                            "Color": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "Thickness": 0.00800000037997961
+                        },
+                        "SubInstancedName": "",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                -0.05000000074505806,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                20.0,
+                                1.0,
+                                20.0
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    },
+                    {
+                        "ColliderInfo": {
+                            "enable": [
+                                true
+                            ],
+                            "flag": [
+                                255
+                            ],
+                            "isTrigger": [
+                                false
+                            ],
+                            "localpos": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localrot": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "size": [
+                                10.0,
+                                0.5,
+                                10.0
+                            ]
+                        },
+                        "Type": "BoxColliderComponent"
+                    }
+                ],
+                "name": "plane",
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    -0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "Object"
+            },
+            {
+                "componentCount": 3,
+                "components": [
+                    {
+                        "ColliderInfo": {
+                            "enable": [
+                                true
+                            ],
+                            "flag": [
+                                255
+                            ],
+                            "isTrigger": [
+                                false
+                            ],
+                            "localpos": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localrot": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "size": [
+                                0.5,
+                                0.5,
+                                0.5
+                            ]
+                        },
+                        "Type": "BoxColliderComponent"
+                    },
+                    {
+                        "RigidbodyInfo": {
+                            "angularDrag": [
+                                0.05000000074505806
+                            ],
+                            "centerOfMass": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "drag": [
+                                0.0
+                            ],
+                            "freezePosition": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "freezeRotation": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "isKinematic": [
+                                false
+                            ],
+                            "mass": [
+                                1.0
+                            ],
+                            "useGravity": [
+                                true
+                            ]
+                        },
+                        "Type": "RigidbodyComponent"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Prop_Block_1_34",
+                        "ModelName": "Prop_Block_1_3",
+                        "Outline": {
+                            "Color": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "Thickness": 0.00800000037997961
+                        },
+                        "SubInstancedName": "",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                -0.05000000074505806,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    }
+                ],
+                "name": "wood",
+                "position": [
+                    0.5159949660301208,
+                    0.1000000610947609,
+                    0.3718387484550476
+                ],
+                "rotation": [
+                    0.0034065288491547108,
+                    57.389095306396484,
+                    -0.001562301884405315
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "Wood"
+            },
+            {
+                "BongsuID": 0,
+                "componentCount": 4,
+                "components": [
+                    {
+                        "ColliderInfo": {
+                            "enable": [
+                                true
+                            ],
+                            "flag": [
+                                255
+                            ],
+                            "isTrigger": [
+                                false
+                            ],
+                            "localpos": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localrot": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "size": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "Type": "BoxColliderComponent"
+                    },
+                    {
+                        "Billboard": {
+                            "Begin": {
+                                "InstancedName": "VFX_BongSuFire01",
+                                "Key": "VFX_BongSuFire0"
+                            },
+                            "Center": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "FrameRate": 0.009999999776482582,
+                            "Loop": {
+                                "InstancedName": "VFX_BongSuFire12",
+                                "Key": "VFX_BongSuFire1"
+                            }
+                        },
+                        "StateDuration": 0.0,
+                        "Type": "FireComponent"
+                    },
+                    {
+                        "RigidbodyInfo": {
+                            "angularDrag": [
+                                0.05000000074505806
+                            ],
+                            "centerOfMass": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "drag": [
+                                0.0
+                            ],
+                            "freezePosition": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "freezeRotation": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "isKinematic": [
+                                true
+                            ],
+                            "mass": [
+                                1.0
+                            ],
+                            "useGravity": [
+                                false
+                            ]
+                        },
+                        "Type": "RigidbodyComponent"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Prop_BongsuDae4",
+                        "ModelName": "Prop_BongsuDae",
+                        "Outline": {
+                            "Color": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "Thickness": 0.00800000037997961
+                        },
+                        "SubInstancedName": "",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                0.800000011920929,
+                                0.800000011920929,
+                                0.800000011920929
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    }
+                ],
+                "name": "3123",
+                "position": [
+                    0.0,
+                    0.11999999731779099,
+                    -0.6300000548362732
+                ],
+                "rotation": [
+                    -0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "Bongsu"
+            },
+            {
+                "componentCount": 4,
+                "components": [
+                    {
+                        "SpawnerComponent": {
+                            "InitSpawnTime": 50.0,
+                            "MaxSpawnCount": 10,
+                            "PrefabName": "WoodTemp",
+                            "SpawnObjectName": "Wood"
+                        },
+                        "Type": "SpawnerComponent"
+                    },
+                    {
+                        "ColliderInfo": {
+                            "enable": [
+                                true
+                            ],
+                            "flag": [
+                                255
+                            ],
+                            "isTrigger": [
+                                true
+                            ],
+                            "localpos": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localrot": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "size": [
+                                0.5,
+                                0.5,
+                                0.5
+                            ]
+                        },
+                        "Type": "BoxColliderComponent"
+                    },
+                    {
+                        "RigidbodyInfo": {
+                            "angularDrag": [
+                                0.05000000074505806
+                            ],
+                            "centerOfMass": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "drag": [
+                                0.0
+                            ],
+                            "freezePosition": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "freezeRotation": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "isKinematic": [
+                                true
+                            ],
+                            "mass": [
+                                1.0
+                            ],
+                            "useGravity": [
+                                false
+                            ]
+                        },
+                        "Type": "RigidbodyComponent"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Prop_Block_2_11",
+                        "ModelName": "Prop_Block_2_1",
+                        "Outline": {
+                            "Color": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "Thickness": 0.00800000037997961
+                        },
+                        "SubInstancedName": "",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                -0.05000000074505806,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    }
+                ],
+                "name": "spawner",
+                "position": [
+                    -0.3799999952316284,
+                    0.10000000149011612,
+                    0.0
+                ],
+                "rotation": [
+                    -0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "WoodPile"
+            },
+            {
+                "componentCount": 3,
+                "components": [
+                    {
+                        "CharacterController": {
+                            "contactOffset": [
+                                0.10000000149011612
+                            ],
+                            "gravity": [
+                                -9.800000190734863
+                            ],
+                            "height": [
+                                1.0
+                            ],
+                            "jumpVelocity": [
+                                5.0
+                            ],
+                            "maxJumpHeight": [
+                                1.0
+                            ],
+                            "moveSpeed": [
+                                0.5
+                            ],
+                            "radius": [
+                                0.4000000059604645
+                            ],
+                            "rotationSpeed": [
+                                2000.0
+                            ],
+                            "slopeLimit": [
+                                0.699999988079071
+                            ],
+                            "stepOffset": [
+                                0.10000000149011612
+                            ]
+                        },
+                        "Type": "CharacterController"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Player1_idle1",
+                        "ModelName": "Player1_idle",
+                        "Outline": {
+                            "Color": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "Thickness": 0.00800000037997961
+                        },
+                        "SubInstancedName": "Player_Torch_ani_001",
+                        "SubModelName": "Player_Torch_ani_001",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                -0.10000000149011612,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    }
+                ],
+                "name": "Player",
+                "player": {
+                    "deseaseSpeed": 0.5,
+                    "playerID": 0,
+                    "speed": 1.0
+                },
+                "position": [
+                    0.4228856861591339,
+                    0.14999999105930328,
+                    0.006921140477061272
+                ],
+                "rotation": [
+                    0.0,
+                    128.1933135986328,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "Player"
+            },
+            {
+                "componentCount": 4,
+                "components": [
+                    {
+                        "RigidbodyInfo": {
+                            "angularDrag": [
+                                0.05000000074505806
+                            ],
+                            "centerOfMass": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "drag": [
+                                0.0
+                            ],
+                            "freezePosition": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "freezeRotation": [
+                                false,
+                                false,
+                                false
+                            ],
+                            "isKinematic": [
+                                true
+                            ],
+                            "mass": [
+                                1.0
+                            ],
+                            "useGravity": [
+                                false
+                            ]
+                        },
+                        "Type": "RigidbodyComponent"
+                    },
+                    {
+                        "ColliderInfo": {
+                            "enable": [
+                                true
+                            ],
+                            "flag": [
+                                255
+                            ],
+                            "isTrigger": [
+                                true
+                            ],
+                            "localpos": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localrot": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "size": [
+                                0.5,
+                                0.5,
+                                0.5
+                            ]
+                        },
+                        "Type": "BoxColliderComponent"
+                    },
+                    {
+                        "SpawnerComponent": {
+                            "InitSpawnTime": 50.0,
+                            "MaxSpawnCount": 10,
+                            "PrefabName": "",
+                            "SpawnObjectName": "Torch"
+                        },
+                        "Type": "SpawnerComponent"
+                    },
+                    {
+                        "AxeInstancedName": "",
+                        "InstancedName": "Prop_Block_3_11",
+                        "ModelName": "Prop_Block_3_1",
+                        "Outline": {
+                            "Color": [
+                                1.0,
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "Thickness": 0.10000000149011612
+                        },
+                        "SubInstancedName": "",
+                        "Transform": {
+                            "Position": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "Type": "RenderComponent"
+                    }
+                ],
+                "name": "spawin",
+                "position": [
+                    0.5099999904632568,
+                    0.14900000393390656,
+                    0.0
+                ],
+                "rotation": [
+                    -0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "TorchBox"
+            }
+        ]
+    }
+}

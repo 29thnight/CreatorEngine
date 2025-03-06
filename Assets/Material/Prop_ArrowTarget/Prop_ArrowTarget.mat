@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_ArrowTarget_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_ArrowTarget",
+    "Normal": "Prop_ArrowTarget_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_ArrowTarget_OcclusionRoughnessMetallic.png"
+}

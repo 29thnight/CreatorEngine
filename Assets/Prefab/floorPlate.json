@@ -1,0 +1,113 @@
+{
+    "PrefebType": "FloorBox",
+    "componentCount": 3,
+    "components": [
+        {
+            "InstancedName": "Prop_StageRoom022",
+            "ModelName": "Prop_StageRoom02",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "Transform": {
+                "Position": [
+                    1.100000023841858,
+                    0.0,
+                    0.800000011920929
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "RenderComponent"
+        },
+        {
+            "RigidbodyInfo": {
+                "angularDrag": [
+                    0.05000000074505806
+                ],
+                "centerOfMass": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "drag": [
+                    0.0
+                ],
+                "freezePosition": [
+                    false,
+                    false,
+                    false
+                ],
+                "freezeRotation": [
+                    false,
+                    false,
+                    false
+                ],
+                "isKinematic": [
+                    true
+                ],
+                "mass": [
+                    1.0
+                ],
+                "useGravity": [
+                    false
+                ]
+            },
+            "Type": "RigidbodyComponent"
+        },
+        {
+            "ColliderInfo": {
+                "enable": [
+                    true
+                ],
+                "isTrigger": [
+                    false
+                ],
+                "localpos": [
+                    0.0,
+                    -0.5,
+                    0.0
+                ],
+                "localrot": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    11.5,
+                    0.5,
+                    7.5
+                ]
+            },
+            "Type": "BoxColliderComponent"
+        }
+    ],
+    "position": [
+        0,
+        0,
+        0
+    ],
+    "rotation": [
+        -0.0,
+        0.0,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

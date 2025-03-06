@@ -1,0 +1,89 @@
+{
+    "PrefebType": "Player",
+    "componentCount": 3,
+    "components": [
+        {
+            "CharacterController": {
+                "contactOffset": [
+                    0.0010000000474974513
+                ],
+                "gravity": [
+                    -42.0
+                ],
+                "height": [
+                    0.5
+                ],
+                "jumpVelocity": [
+                    10.0
+                ],
+                "maxJumpHeight": [
+                    1.0
+                ],
+                "moveSpeed": [
+                    5.0
+                ],
+                "radius": [
+                    0.4000000059604645
+                ],
+                "rotationSpeed": [
+                    2000.0
+                ],
+                "slopeLimit": [
+                    0.699999988079071
+                ],
+                "stepOffset": [
+                    0.0010000000474974513
+                ]
+            },
+            "Type": "CharacterController"
+        },
+        {
+            "AxeInstancedName": "",
+            "InstancedName": "Player1_idle1",
+            "ModelName": "Player1_idle",
+            "Outline": {
+                "Color": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Thickness": 0.00800000037997961
+            },
+            "SubInstancedName": "",
+            "Transform": {
+                "Position": [
+                    0.0,
+                    -0.05000000074505806,
+                    0.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Type": "RenderComponent"
+        }
+    ],
+    "position": [
+        0.5,
+        0,
+        0.5
+    ],
+    "rotation": [
+        0.0,
+        175.99156188964844,
+        0.0
+    ],
+    "scale": [
+        1.0,
+        1.0,
+        1.0
+    ]
+}

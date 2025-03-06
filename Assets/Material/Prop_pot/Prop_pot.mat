@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_pot_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_pot",
+    "Normal": "Prop_pot_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_pot_OcclusionRoughnessMetallic.png"
+}

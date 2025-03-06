@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_StageRoom_2_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_StageRoom_2",
+    "Normal": "Prop_StageRoom_2_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_StageRoom_2_OcclusionRoughnessMetallic.png"
+}

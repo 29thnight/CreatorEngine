@@ -1,0 +1,209 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="RenderPass">
+      <UniqueIdentifier>{230947ab-b02d-49f2-aefe-e05ef6691e9c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{8b8366c0-580e-4d7e-99ec-036acc7e136b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects">
+      <UniqueIdentifier>{36a2a674-df76-4d7a-b8ab-1374e79bdb88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset">
+      <UniqueIdentifier>{4a8a014e-3971-482b-bafe-54c2f3c2ff33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{43457a39-f45f-4571-954c-51bf0970db5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\Loader">
+      <UniqueIdentifier>{108407a5-4069-4f4b-a9ec-e212562003f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiContext">
+      <UniqueIdentifier>{e2195028-e63b-4bde-aba4-9da379d592c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer">
+      <UniqueIdentifier>{64405519-d391-4dd8-b09b-35b0cab9a4af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ManagerSystem">
+      <UniqueIdentifier>{8bbf4fbb-c1dd-4b3f-9ee0-a4c84b9e19bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiContext\NodeEditorHelper">
+      <UniqueIdentifier>{99c991f0-4fbe-4b1a-b488-e7ded18fbe3e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RenderEngine.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceState.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="PSO.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GBufferPass.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Light.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ShadowMapPass.cpp">
+      <Filter>RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneRenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Texture.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Material.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Skeleton.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="AnimationLoader.cpp">
+      <Filter>Asset\Loader</Filter>
+    </ClCompile>
+    <ClCompile Include="SkeletonLoader.cpp">
+      <Filter>Asset\Loader</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiRenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="DataSystem.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="FontManager.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="UI_DataSystem.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="drawing.cpp">
+      <Filter>ImGuiContext\NodeEditorHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="widgets.cpp">
+      <Filter>ImGuiContext\NodeEditorHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetSystem.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderType.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DeviceState.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="PSO.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DeferredPass.h">
+      <Filter>RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ForwardPass.h">
+      <Filter>RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="GBufferPass.h">
+      <Filter>RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="IRenderPass.h">
+      <Filter>RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneRenderer.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.h">
+      <Filter>Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowMapPass.h">
+      <Filter>RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="Model.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Skeleton.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationLoader.h">
+      <Filter>Asset\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelLoader.h">
+      <Filter>Asset\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="SkeletonLoader.h">
+      <Filter>Asset\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiRenderer.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUiRegisterClass.h">
+      <Filter>ImGuiContext</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiRegister.h">
+      <Filter>ImGuiContext</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiContext.h">
+      <Filter>ImGuiContext</Filter>
+    </ClInclude>
+    <ClInclude Include="DataSystem.h">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="FontManager.h">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="UI_DataSystem.h">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="drawing.h">
+      <Filter>ImGuiContext\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="widgets.h">
+      <Filter>ImGuiContext\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetSystem.h">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

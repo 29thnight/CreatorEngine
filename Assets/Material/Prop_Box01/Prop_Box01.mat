@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Box01_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Box01",
+    "Normal": "Prop_Box01_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Box01_OcclusionRoughnessMetallic.png"
+}

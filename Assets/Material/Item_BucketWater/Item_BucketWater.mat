@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Item_BucketWater_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Item_BucketWater",
+    "Normal": "Item_BucketWater_Normal.png",
+    "OcclusionRoughnessMetallic": "Item_BucketWater_OcclusionRoughnessMetallic.png"
+}

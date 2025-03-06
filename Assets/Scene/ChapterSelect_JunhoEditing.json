@@ -1,0 +1,1445 @@
+{
+    "Canvas": [
+        {
+            "Name": "",
+            "ObjList": [
+                {
+                    "AABB": {
+                        "Center": [
+                            71.5,
+                            64.0
+                        ],
+                        "Size": [
+                            143.0,
+                            128.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Bongsudae2.png",
+                    "Name": "ScaleTest",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1920.0,
+                            20.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": -2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "CS_img_Chapter_BackGround.png",
+                    "Name": "CS_Background",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": -1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            34.0,
+                            54.0
+                        ],
+                        "Size": [
+                            68.0,
+                            108.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Bongsudae.png",
+                    "Name": "Stage1_Bongsu_button",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Map_UI_Bongsudae2.png",
+                    "Transform": {
+                        "Pos": [
+                            334.0,
+                            883.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            34.0,
+                            54.0
+                        ],
+                        "Size": [
+                            68.0,
+                            108.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Bongsudae.png",
+                    "Name": "Stage2_Bongsu_button",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Map_UI_Bongsudae2.png",
+                    "Transform": {
+                        "Pos": [
+                            208.0,
+                            688.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            34.0,
+                            54.0
+                        ],
+                        "Size": [
+                            68.0,
+                            108.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Bongsudae.png",
+                    "Name": "Stage3_Bongsu_button",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Map_UI_Bongsudae2.png",
+                    "Transform": {
+                        "Pos": [
+                            250.0,
+                            460.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            34.0,
+                            54.0
+                        ],
+                        "Size": [
+                            68.0,
+                            108.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Bongsudae.png",
+                    "Name": "Stage4_Bongsu_button",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Map_UI_Bongsudae2.png",
+                    "Transform": {
+                        "Pos": [
+                            400.0,
+                            250.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            124.5,
+                            13.5
+                        ],
+                        "Size": [
+                            249.0,
+                            27.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageCheckList_03.png",
+                    "Name": "Stage3_Tip",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1350.0,
+                            650.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            169.39999389648438,
+                            23.100000381469727
+                        ],
+                        "Size": [
+                            338.79998779296875,
+                            46.20000076293945
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "ui_indicater_B_back.png",
+                    "Name": "CS_Press_B_to_Back_UI",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            -97.0,
+                            60.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.699999988079071,
+                            0.699999988079071
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            278.8000183105469,
+                            204.60000610351563
+                        ],
+                        "Size": [
+                            557.6000366210938,
+                            409.20001220703125
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "CS_for_screenshot.png",
+                    "Name": "CS_preview",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "CS_for_screenshot.png",
+                    "Transform": {
+                        "Pos": [
+                            1230.0,
+                            220.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.4000000059604645,
+                            0.4000000059604645
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            242.0,
+                            33.0
+                        ],
+                        "Size": [
+                            484.0,
+                            66.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "ui_indicater_A_go.png",
+                    "Name": "CS_Press_A_to_Start_UI",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1560.0,
+                            950.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            278.8000183105469,
+                            204.60000610351563
+                        ],
+                        "Size": [
+                            557.6000366210938,
+                            409.20001220703125
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageImg04.png",
+                    "Name": "Stage4_Img",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1230.0,
+                            220.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.4000000059604645,
+                            0.4000000059604645
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            278.8000183105469,
+                            204.60000610351563
+                        ],
+                        "Size": [
+                            557.6000366210938,
+                            409.20001220703125
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageImg03.png",
+                    "Name": "Stage3_Img",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1230.0,
+                            220.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.4000000059604645,
+                            0.4000000059604645
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            278.8000183105469,
+                            204.60000610351563
+                        ],
+                        "Size": [
+                            557.6000366210938,
+                            409.20001220703125
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageImg02.png",
+                    "Name": "Stage2_Img",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1230.0,
+                            220.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.4000000059604645,
+                            0.4000000059604645
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            278.8000183105469,
+                            204.60000610351563
+                        ],
+                        "Size": [
+                            557.6000366210938,
+                            409.20001220703125
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageImg01.png",
+                    "Name": "Stage1_Img",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1230.0,
+                            220.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.4000000059604645,
+                            0.4000000059604645
+                        ],
+                        "ZOrder": 2
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            193.0,
+                            50.5
+                        ],
+                        "Size": [
+                            386.0,
+                            101.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageTitle04.png",
+                    "Name": "Stage4_Title",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1325.0,
+                            80.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            146.0,
+                            50.0
+                        ],
+                        "Size": [
+                            292.0,
+                            100.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageTitle03.png",
+                    "Name": "Stage3_Title",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1365.0,
+                            80.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            190.5,
+                            50.5
+                        ],
+                        "Size": [
+                            381.0,
+                            101.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageTitle02.png",
+                    "Name": "Stage2_Title",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1325.0,
+                            80.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            202.0,
+                            51.0
+                        ],
+                        "Size": [
+                            404.0,
+                            102.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageTitle01.png",
+                    "Name": "Stage1_Title",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1300.0,
+                            80.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 4
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            279.0,
+                            46.5
+                        ],
+                        "Size": [
+                            558.0,
+                            93.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageDesc04.png",
+                    "Name": "Stage4_Desc",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1257.31005859375,
+                            770.3200073242188
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            291.0,
+                            64.0
+                        ],
+                        "Size": [
+                            582.0,
+                            128.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageDesc03.png",
+                    "Name": "Stage3_Desc",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1244.4599609375,
+                            759.8699951171875
+                        ],
+                        "Rotation": 0.12999999523162842,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            222.0,
+                            46.5
+                        ],
+                        "Size": [
+                            444.0,
+                            93.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageDesc01.png",
+                    "Name": "Stage1_Desc",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1280.18994140625,
+                            769.4000244140625
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            264.0,
+                            63.5
+                        ],
+                        "Size": [
+                            528.0,
+                            127.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageDesc02.png",
+                    "Name": "Stage2_Desc",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1262.4200439453125,
+                            763.47998046875
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 5
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            126.0,
+                            28.0
+                        ],
+                        "Size": [
+                            252.0,
+                            56.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageCheckList_02.png",
+                    "Name": "Stage2_Tip",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1350.0,
+                            650.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 6
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            161.0,
+                            28.0
+                        ],
+                        "Size": [
+                            322.0,
+                            56.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "StageCheckList_01.png",
+                    "Name": "Stage1_Tip",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            1350.0,
+                            650.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 6
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Ending_Image.png",
+                    "Name": "After_ClearThe4thStage",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 100
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            52.75,
+                            44.75
+                        ],
+                        "Size": [
+                            105.5,
+                            89.5
+                        ]
+                    },
+                    "Animation": false,
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": true,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Map_UI_Character.png",
+                    "Name": "CS_Cursor",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            348.0,
+                            919.5
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.5,
+                            0.5
+                        ],
+                        "ZOrder": 100
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                }
+            ],
+            "TextList": []
+        }
+    ],
+    "World": {
+        "Camera": {
+            "Exposure": 1.0,
+            "Far": 1000.0,
+            "Fov": 70.0,
+            "MouseSensitivity": 50.0,
+            "Near": 0.10000000149011612,
+            "Position": [
+                315.13372802734375,
+                431.824951171875,
+                37.83615493774414
+            ],
+            "Speed": 50.0,
+            "YawPitchRoll": [
+                155.9603271484375,
+                -21.675533294677734,
+                0.0
+            ]
+        },
+        "Canvas": [],
+        "Grid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        "GridX": 15,
+        "GridY": 15,
+        "Scene": {
+            "suncolor": [
+                1.0,
+                1.0,
+                0.9599999785423279
+            ],
+            "sunpos": [
+                3.0,
+                10.0,
+                3.0
+            ]
+        },
+        "name": "jsonTestWorld",
+        "objectCount": 0,
+        "objects": []
+    }
+}

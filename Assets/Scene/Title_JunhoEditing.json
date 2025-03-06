@@ -1,0 +1,689 @@
+{
+    "Canvas": [
+        {
+            "Name": "",
+            "ObjList": [
+                {
+                    "AABB": {
+                        "Center": [
+                            931.2000122070313,
+                            523.7999877929688
+                        ],
+                        "Size": [
+                            1862.4000244140625,
+                            1047.5999755859375
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_illust_Title.png",
+                    "Name": "Title_Background",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": -1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            160.0,
+                            58.400001525878906
+                        ],
+                        "Size": [
+                            320.0,
+                            116.80000305175781
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_Button_01_Credit1.png",
+                    "Name": "Credit_Button",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Main_Button_01_Credit2.png",
+                    "Transform": {
+                        "Pos": [
+                            1080.0,
+                            920.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.800000011920929,
+                            0.800000011920929
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            160.0,
+                            58.400001525878906
+                        ],
+                        "Size": [
+                            320.0,
+                            116.80000305175781
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_Button_01_Exit1.png",
+                    "Name": "Title_ExitButton",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Main_Button_01_Exit2.png",
+                    "Transform": {
+                        "Pos": [
+                            1450.0,
+                            920.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.800000011920929,
+                            0.800000011920929
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            200.0,
+                            73.0
+                        ],
+                        "Size": [
+                            400.0,
+                            146.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_Button_01_howToPlay1.png",
+                    "Name": "Title_HowToPlayButton",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            600.0,
+                            890.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "",
+                    "Name": "",
+                    "Opacity": 1.0,
+                    "PosLock": false,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            200.0,
+                            73.0
+                        ],
+                        "Size": [
+                            400.0,
+                            146.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_Button_01_selectChapter1.png",
+                    "Name": "Title_GameStartButton",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "Main_Button_01_selectChapter2.png",
+                    "Transform": {
+                        "Pos": [
+                            140.0,
+                            890.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 0
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            502.47003173828125,
+                            176.33250427246094
+                        ],
+                        "Size": [
+                            1004.9400634765625,
+                            352.6650085449219
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Img_GameTitleLogo.png",
+                    "Name": "Title_GameTitle",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            80.0,
+                            500.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            0.09000000357627869,
+                            0.08500000089406967
+                        ],
+                        "ZOrder": 1
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": true
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Title_Credit.png",
+                    "Name": "Title_Credit_Popups",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 10
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                },
+                {
+                    "AABB": {
+                        "Center": [
+                            0.0,
+                            0.0
+                        ],
+                        "Size": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Animation": false,
+                    "BitmapKeys": [],
+                    "Button": 0,
+                    "ClippingID": 0,
+                    "EventDelayTime": 0.0,
+                    "EventKey": "",
+                    "FloatValue": 0.0,
+                    "FrameSpeed": 1.0,
+                    "H_Clipping": false,
+                    "ID": -1,
+                    "IntValue": 0,
+                    "Key": "Main_ManualPopup_howto_play_edited.png",
+                    "Name": "Title_HowToPlay_Popups",
+                    "Opacity": 1.0,
+                    "PosLock": true,
+                    "SelectExcute": false,
+                    "SelectKey": "",
+                    "Transform": {
+                        "Pos": [
+                            0.0,
+                            0.0
+                        ],
+                        "Rotation": 0.0,
+                        "Scale": [
+                            1.0,
+                            1.0
+                        ],
+                        "ZOrder": 10
+                    },
+                    "UIEvent": [],
+                    "UILayer": 0,
+                    "V_Clipping": false,
+                    "ViewPercentage": 1.0,
+                    "Visible": false
+                }
+            ],
+            "TextList": []
+        }
+    ],
+    "World": {
+        "Camera": {
+            "Exposure": 1.0,
+            "Far": 1000.0,
+            "Fov": 70.0,
+            "MouseSensitivity": 50.0,
+            "Near": 0.10000000149011612,
+            "Position": [
+                -34.65264892578125,
+                102.18864440917969,
+                375.77154541015625
+            ],
+            "Speed": 50.0,
+            "YawPitchRoll": [
+                187.34584045410156,
+                -89.0,
+                0.0
+            ]
+        },
+        "Canvas": [],
+        "Grid": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        "GridX": 15,
+        "GridY": 15,
+        "Scene": {
+            "suncolor": [
+                1.0,
+                1.0,
+                0.9599999785423279
+            ],
+            "sunpos": [
+                3.0,
+                10.0,
+                3.0
+            ]
+        },
+        "name": "jsonTestWorld",
+        "objectCount": 0,
+        "objects": []
+    }
+}

@@ -1,0 +1,395 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="App">
+      <UniqueIdentifier>{7966f049-6a6f-4755-8982-91de26816bc2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dx11Main">
+      <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vcpkg에 추가할 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{b05c0c36-6745-41d0-bcfd-e137476215b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="World">
+      <UniqueIdentifier>{42edb744-1cea-4370-a9ab-72718c228651}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component">
+      <UniqueIdentifier>{fc2dbd22-3b0c-4c7e-8568-e2191847c1bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Object">
+      <UniqueIdentifier>{6b46322a-7d3c-441d-80c0-3c052cf0b9fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\PhysicsComponent">
+      <UniqueIdentifier>{ea0716e9-c58b-409f-aba5-b75e23b9f114}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\RenderComponent">
+      <UniqueIdentifier>{30638d1b-8e64-4c8d-82e0-485279d1ad98}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utill">
+      <UniqueIdentifier>{bd2f311f-ba6c-4f45-a21a-ac8cec09e5b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utill\PathFinding">
+      <UniqueIdentifier>{143b7f16-18a2-42f5-9b31-421f24f57cce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utill\BT">
+      <UniqueIdentifier>{c114c291-5ed0-48e5-8886-2d770a7c424e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager">
+      <UniqueIdentifier>{086e457e-5e4e-4007-9861-dc1d5f8a73d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager\GameManager">
+      <UniqueIdentifier>{08708c0e-973e-40a6-b702-32d299964432}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager\InputManager">
+      <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\BTComponent">
+      <UniqueIdentifier>{516dcc2c-8146-4689-9c11-f64684768236}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\ActionComponent">
+      <UniqueIdentifier>{92c6d2ec-5bcf-494d-8160-a2f65f316d33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Event">
+      <UniqueIdentifier>{43573d9f-1cf5-4d87-b278-0f135a468ba4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Factory">
+      <UniqueIdentifier>{66773a7c-4614-474b-81f0-83cfb2001f3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager\SoundManager">
+      <UniqueIdentifier>{21879e33-f24e-493c-a98a-6d47f4562738}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\Interact">
+      <UniqueIdentifier>{b5c7a05e-49c9-4a74-ac3c-250ef1bcb371}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component\Interact\Test">
+      <UniqueIdentifier>{35ba2124-0562-4724-9270-8f9965b614b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utill\MeshEditor">
+      <UniqueIdentifier>{8f159f87-7be6-4ff8-a6ec-29e5c00c47ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MD">
+      <UniqueIdentifier>{c2a723ce-99f1-49c0-82bf-f2f7a9dafbb8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utill\GridEditor">
+      <UniqueIdentifier>{691bb130-1694-4038-9f18-04da55c06bfa}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="App.h">
+      <Filter>App</Filter>
+    </ClInclude>
+    <ClInclude Include="Dx11Main.h">
+      <Filter>Dx11Main</Filter>
+    </ClInclude>
+    <ClInclude Include="InputManager.h">
+      <Filter>Manager\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="Dependancies\Geometry.h">
+      <Filter>vcpkg에 추가할 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Component.h">
+      <Filter>Component</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>World</Filter>
+    </ClInclude>
+    <ClInclude Include="Object.h">
+      <Filter>Object</Filter>
+    </ClInclude>
+    <ClInclude Include="BehaviorTree.h">
+      <Filter>Utill\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="PathFinding.h">
+      <Filter>Utill\PathFinding</Filter>
+    </ClInclude>
+    <ClInclude Include="BoxColliderComponent.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ColliderComponent.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidbodyComponent.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="BoxColliderComponent.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="ColliderComponent.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidbodyComponent.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderComponent.h">
+      <Filter>Component\RenderComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="GameManager.h">
+      <Filter>Manager\GameManager</Filter>
+    </ClInclude>
+    <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Component\BTComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="ActionComponent.h">
+      <Filter>Component\ActionComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="EventSystem.h">
+      <Filter>Event</Filter>
+    </ClInclude>
+    <ClInclude Include="ComponentFactory.h">
+      <Filter>Factory</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundManager.h">
+      <Filter>Manager\SoundManager</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectTypeMeta.h">
+      <Filter>Object</Filter>
+    </ClInclude>
+    <ClInclude Include="BT_Editor.h">
+      <Filter>Utill\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectFactory.h">
+      <Filter>Factory</Filter>
+    </ClInclude>
+    <ClInclude Include="TestComponent.h">
+      <Filter>Component\Interact\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="TestInteractableComponent.h">
+      <Filter>Component\Interact\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="InteractableComponent.h">
+      <Filter>Component\Interact</Filter>
+    </ClInclude>
+    <ClInclude Include="SphereColliderComponent.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshEditor.h">
+      <Filter>Utill\MeshEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="GridEditor.h">
+      <Filter>Utill\GridEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="MonoBehavior.h">
+      <Filter>Utill</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterController.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="StairColliderComponent.h">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Academy_4Q.rc">
+      <Filter>리소스 파일</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="small.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="Academy_4Q.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="x64\Assets\Shaders\common.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="x64\Assets\Shaders\lighting.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="x64\Assets\Shaders\pbr.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Prefab.md">
+      <Filter>MD</Filter>
+    </None>
+    <None Include="README.md">
+      <Filter>MD</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="App.cpp">
+      <Filter>App</Filter>
+    </ClCompile>
+    <ClCompile Include="Dx11Main.cpp">
+      <Filter>Dx11Main</Filter>
+    </ClCompile>
+    <ClCompile Include="InputManager.cpp">
+      <Filter>Manager\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="Dependancies\Geometry.cpp">
+      <Filter>vcpkg에 추가할 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>World</Filter>
+    </ClCompile>
+    <ClCompile Include="Object.cpp">
+      <Filter>Object</Filter>
+    </ClCompile>
+    <ClCompile Include="BehaviorTree.cpp">
+      <Filter>Utill\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="PathFinding.cpp">
+      <Filter>Utill\PathFinding</Filter>
+    </ClCompile>
+    <ClCompile Include="BoxColliderComponent.cpp">
+      <Filter>vcpkg에 추가할 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ColliderComponent.cpp">
+      <Filter>vcpkg에 추가할 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="RigidbodyComponent.cpp">
+      <Filter>vcpkg에 추가할 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="BoxColliderComponent.cpp">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="ColliderComponent.cpp">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RigidbodyComponent.cpp">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderComponent.cpp">
+      <Filter>Component\RenderComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="GameManager.cpp">
+      <Filter>Manager\GameManager</Filter>
+    </ClCompile>
+    <ClCompile Include="BehaviorTreeComponent.cpp">
+      <Filter>Component\BTComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="ActionComponent.cpp">
+      <Filter>Component\ActionComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="EventSystem.cpp">
+      <Filter>Event</Filter>
+    </ClCompile>
+    <ClCompile Include="ComponentFactory.cpp">
+      <Filter>Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="SoundManager.cpp">
+      <Filter>Manager\SoundManager</Filter>
+    </ClCompile>
+    <ClCompile Include="BT_Editor.cpp">
+      <Filter>Utill\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectFactory.cpp">
+      <Filter>Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="TestComponent.cpp">
+      <Filter>Component\Interact\Test</Filter>
+    </ClCompile>
+    <ClCompile Include="TestInteractableComponent.cpp">
+      <Filter>Component\Interact\Test</Filter>
+    </ClCompile>
+    <ClCompile Include="SphereColliderComponent.cpp">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="GridEditor.cpp">
+      <Filter>Utill\GridEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterController.cpp">
+      <Filter>Utill</Filter>
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshEditor.cpp">
+      <Filter>Utill\MeshEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="StairColliderComponent.cpp">
+      <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="x64\Assets\Shaders\blend-gs.cs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\cubemap.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\cubemap.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\fxaa.cs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\mesh.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\mesh.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\shadow.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\shadow.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\shadowblur-x.cs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\shadowblur-y.cs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\mesh-anime.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\shadow-anime.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\outline.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\outline.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\billboard.gs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\billboard.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\billboard-basic.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\canvas-edit.cs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\outline-anime.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\wireframe.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\wireframe.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ObjectLIst.txt">
+      <Filter>Object</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

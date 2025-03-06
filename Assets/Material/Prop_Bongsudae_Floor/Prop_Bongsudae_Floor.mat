@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_Bongsudae_Floor_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_Bongsudae_Floor",
+    "Normal": "Prop_Bongsudae_Floor_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_Bongsudae_Floor_OcclusionRoughnessMetallic.png"
+}

@@ -1,0 +1,7 @@
+{
+    "BaseColor": "Prop_woodenDrum_BaseColor.png",
+    "Bitmask": 11,
+    "Name": "Prop_woodenDrum",
+    "Normal": "Prop_woodenDrum_Normal.png",
+    "OcclusionRoughnessMetallic": "Prop_woodenDrum_OcclusionRoughnessMetallic.png"
+}
