@@ -23,8 +23,10 @@ public:
 
 private:
 	std::unique_ptr<Texture> m_NoiseTexture;
-	ComPtr<ID3D11Buffer> m_SSAOBuffer;
+	SSAOBuffer m_SSAOBuffer;
+	ComPtr<ID3D11Buffer> m_Buffer;
 	ID3D11ShaderResourceView* m_DepthSRV;
+
 	Texture* m_NormalTexture;
 	Texture* m_RenderTarget;
 };
