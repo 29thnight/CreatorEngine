@@ -15,4 +15,9 @@ void PipelineStateObject::Apply()
 	DeviceState::g_pDeviceContext->RSSetState(m_rasterizerState);
 	DeviceState::g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
 	DeviceState::g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
+
+	for (uint32 i = 0; i < m_samplers.size(); ++i)
+	{
+		m_samplers[i].Use(i);
+	}
 }

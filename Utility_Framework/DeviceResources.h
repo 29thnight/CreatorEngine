@@ -78,6 +78,7 @@ namespace DirectX11
 		ComPtr<ID3D11Texture2D1> m_backBuffer;
 		ComPtr<ID3D11ShaderResourceView> m_backBufferSRV;
 		ComPtr<ID3D11DepthStencilView> m_d3dDepthStencilView;
+		ComPtr<ID3D11ShaderResourceView> m_DepthStencilViewSRV;
 		D3D11_VIEWPORT m_screenViewport;
 
 		ComPtr<ID2D1Factory3> m_d2dFactory;

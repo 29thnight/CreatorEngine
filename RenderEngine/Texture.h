@@ -59,3 +59,20 @@ public:
 private:
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
 };
+
+namespace TextureHelper
+{
+	inline std::unique_ptr<Texture> CreateRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
+	{
+		Texture* tex = Texture::Create(
+			width, 
+			height, 
+			name, 
+			format, 
+			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+		);
+		tex->CreateRTV(format);
+		tex->CreateSRV(format);
+		return std::unique_ptr<Texture>(tex);
+	}
+}

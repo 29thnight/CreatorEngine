@@ -145,6 +145,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetSystem.cpp" />
     <ClCompile Include="Camera.cpp" />
@@ -157,18 +158,24 @@
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="PSO.cpp" />
-    <ClCompile Include="RenderEngine.cpp" />
+    <ClCompile Include="Sampler.cpp" />
+    <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SceneObject.cpp" />
     <ClCompile Include="SceneRenderer.cpp" />
     <ClCompile Include="ShadowMapPass.cpp" />
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
+    <ClCompile Include="SSAOPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="UI_DataSystem.cpp" />
     <ClCompile Include="widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetSystem.h" />
     <ClInclude Include="Camera.h" />
@@ -189,14 +196,18 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
+    <ClInclude Include="ObjectRenderers.h" />
     <ClInclude Include="PSO.h" />
     <ClInclude Include="RenderType.h" />
+    <ClInclude Include="Sampler.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="SceneObject.h" />
     <ClInclude Include="SceneRenderer.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMapPass.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkeletonLoader.h" />
+    <ClInclude Include="SSAOPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="UI_DataSystem.h" />

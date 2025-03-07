@@ -2,7 +2,7 @@
 
 Mathf::xMatrix Camera::CalculateView() const
 {
-	return XMMatrixLookAtRH(m_eyePosition, m_lookAt, m_up);
+	return XMMatrixLookAtLH(m_eyePosition, m_lookAt, m_up);
 }
 
 void Camera::HandleMovement(float deltaTime)
@@ -14,10 +14,10 @@ void Camera::HandleMovement(float deltaTime)
 
 Mathf::xMatrix PerspacetiveCamera::CalculateProjection()
 {
-	return XMMatrixPerspectiveFovRH(XMConvertToRadians(m_fov), m_aspectRatio, 0.1f, 200.f);
+	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, 0.1f, 200.f);
 }
 
 Mathf::xMatrix OrthographicCamera::CalculateProjection()
 {
-	return XMMatrixOrthographicRH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
+	return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
 }

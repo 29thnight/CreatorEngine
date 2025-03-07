@@ -1,10 +1,11 @@
 #include "ShadowMapPass.h"
 #include "AssetSystem.h"
+#include "Scene.h"
+#include "Mesh.h"
+#include "Sampler.h"
 
-ShadowMapPass::ShadowMapPass(LightController* controller)
+ShadowMapPass::ShadowMapPass()
 {
-	m_lightController = controller;
-
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
@@ -32,7 +33,6 @@ ShadowMapPass::ShadowMapPass(LightController* controller)
 	);
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-	rasterizerDesc.FrontCounterClockwise = TRUE;
 
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateRasterizerState(
@@ -40,9 +40,33 @@ ShadowMapPass::ShadowMapPass(LightController* controller)
 			&m_pso->m_rasterizerState
 		)
 	);
+
+	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 }
 
 void ShadowMapPass::Execute(Scene& scene)
 {
 	m_pso->Apply();
+
+	auto desc = scene.m_LightController.m_shadowMapRenderDesc;
+
+	OrthographicCamera shadowMapCamera;
+	shadowMapCamera.m_eyePosition = desc.m_eyePosition;
+	shadowMapCamera.m_lookAt = desc.m_lookAt;
+	shadowMapCamera.m_nearPlane = desc.m_nearPlane;
+	shadowMapCamera.m_farPlane = desc.m_farPlane;
+	shadowMapCamera.m_viewHeight = desc.m_viewHeight;
+	shadowMapCamera.m_viewWidth = desc.m_viewWidth;
+
+	scene.UseCamera(shadowMapCamera);
+	scene.UseModel();
+
+	for (auto& obj : scene.m_SceneObjects)
+	{
+		if (!obj->m_meshRenderer.m_IsEnabled) continue;
+
+		scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+		obj->m_meshRenderer.m_Mesh->Draw();
+	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Shader.h"
+#include "Sampler.h"
 
 class PipelineStateObject
 {
@@ -18,6 +19,8 @@ public:
 	ID3D11DepthStencilState* m_depthStencilState{ nullptr };
 
 	D3D11_PRIMITIVE_TOPOLOGY m_primitiveTopology{ D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST };
+
+	std::vector<Sampler> m_samplers;
 
 public:
 	void Apply();

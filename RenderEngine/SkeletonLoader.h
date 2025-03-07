@@ -9,6 +9,7 @@ public:
 	std::map<std::string, Bone*> m_boneMap;
 	std::vector<Bone*> m_bones;
 
+	SkeletonLoader() = default;
 	SkeletonLoader(const aiScene* scene);
 	~SkeletonLoader();
 	Skeleton* GenerateSkeleton(aiNode* root);

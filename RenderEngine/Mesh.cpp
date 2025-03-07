@@ -45,8 +45,8 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 		vertex2.bitangent = bitangent;
 	}
 
-	m_vertexBuffer = CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	m_indexBuffer = CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
+	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
+	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
 }
 
 Mesh::Mesh(Mesh&& _other) noexcept :
@@ -55,4 +55,12 @@ Mesh::Mesh(Mesh&& _other) noexcept :
 	m_vertexBuffer(std::move(_other.m_vertexBuffer)),
 	m_indexBuffer(std::move(_other.m_indexBuffer))
 {
+}
+
+void Mesh::Draw()
+{
+	UINT offset = 0;
+	DirectX11::IASetVertexBuffers(0, 1, &m_vertexBuffer, &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
 }

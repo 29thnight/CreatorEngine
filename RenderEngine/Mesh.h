@@ -44,6 +44,8 @@ public:
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
+	void Draw();
+
 private:
 	std::string m_name;
 	std::vector<Vertex> m_vertices;

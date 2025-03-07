@@ -29,9 +29,6 @@ struct ShadowMapRenderDesc
 class ShadowMapPass final : public IRenderPass
 {
 public:
-	ShadowMapPass(LightController* controller);
+	ShadowMapPass();
 	void Execute(Scene& scene) override;
-
-private:
-	LightController* m_lightController{};
 };

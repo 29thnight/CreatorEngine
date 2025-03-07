@@ -46,8 +46,8 @@ struct alignas(16) LightProperties
 class Texture;
 class Scene;
 class ForwardPass;
+class GBufferPass;
 struct ShadowMapRenderDesc;
-
 class LightController
 {
 public:
@@ -65,11 +65,14 @@ public:
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
 	void RenderAnyShadowMap(Scene& scene);
 
+	Texture* GetShadowMapTexture();
+
 	uint32 m_lightCount{ 0 };
 
 private:
 	friend class ForwardPass;
 	friend class DeferredPass;
+	friend class GBufferPass;
 	friend class ShadowMapPass;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };

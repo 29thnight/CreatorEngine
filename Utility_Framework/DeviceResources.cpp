@@ -450,12 +450,12 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         // 필요한 경우 3D 렌더링에 사용할 깊이 스텐실 뷰를 만듭니다.
         CD3D11_TEXTURE2D_DESC1 depthStencilDesc(
-            DXGI_FORMAT_D24_UNORM_S8_UINT,
+            DXGI_FORMAT_R24G8_TYPELESS,
             lround(m_d3dRenderTargetSize.width),
             lround(m_d3dRenderTargetSize.height),
             1, // 이 깊이 스텐실 뷰는 하나의 질감만 가지고 있습니다.
             1, // 단일 MIP 맵 수준을 사용합니다.
-            D3D11_BIND_DEPTH_STENCIL
+            D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE
         );
 
         ComPtr<ID3D11Texture2D1> depthStencil;
@@ -468,6 +468,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 
         CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc(D3D11_DSV_DIMENSION_TEXTURE2D);
+        depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         DirectX11::ThrowIfFailed(
             m_d3dDevice->CreateDepthStencilView(
                 depthStencil.Get(),
@@ -475,8 +476,23 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
                 &m_d3dDepthStencilView
             )
         );
-
 		DirectX::SetName(depthStencil.Get(), "DepthStencil");
+
+		CD3D11_SHADER_RESOURCE_VIEW_DESC depthStencilSRVDesc(
+            D3D11_SRV_DIMENSION_TEXTURE2D, 
+            DXGI_FORMAT_R24_UNORM_X8_TYPELESS
+        );
+
+		DirectX11::ThrowIfFailed(
+			m_d3dDevice->CreateShaderResourceView(
+				depthStencil.Get(),
+				&depthStencilSRVDesc,
+				&m_DepthStencilViewSRV
+			)
+		);
+
+		DirectX::SetName(m_DepthStencilViewSRV.Get(), "RenderTargetViewSRV");
+
 
         m_screenViewport = CD3D11_VIEWPORT(
             0.0f,
