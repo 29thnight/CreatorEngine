@@ -6,7 +6,7 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 	m_vertices(_vertices),
 	m_indices(_indices)
 {
-	for (int i = 0; i < m_indices.size(); i += 3)
+	/*for (int i = 0; i < m_indices.size(); i += 3)
 	{
 		uint32 index0 = m_indices[i];
 		uint32 index1 = m_indices[i + 1];
@@ -43,7 +43,7 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 		vertex0.bitangent = bitangent;
 		vertex1.bitangent = bitangent;
 		vertex2.bitangent = bitangent;
-	}
+	}*/
 
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");

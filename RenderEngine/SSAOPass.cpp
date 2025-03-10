@@ -26,7 +26,7 @@ SSAOPass::SSAOPass()
     DirectX11::ThrowIfFailed(
         DeviceState::g_pDevice->CreateInputLayout(
             vertexLayoutDesc,
-            ARRAYSIZE(vertexLayoutDesc),
+            _countof(vertexLayoutDesc),
             m_pso->m_vertexShader->GetBufferPointer(),
             m_pso->m_vertexShader->GetBufferSize(),
             &m_pso->m_inputLayout

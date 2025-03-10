@@ -10,6 +10,7 @@
 
 class ModelLoader;
 class DataSystem;
+class SceneRenderer;
 class Model
 {
 public:
@@ -30,6 +31,7 @@ public:
 	bool m_hasBones{ false };
 
 private:
+	friend class SceneRenderer;
     friend class ModelLoader;
 	friend class DataSystem;
 

@@ -14,7 +14,7 @@ public:
 	LightController m_LightController;
 	std::vector<std::shared_ptr<SceneObject>> m_SceneObjects;
 
-	void AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject);
+	std::shared_ptr<SceneObject> AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject);
 	std::shared_ptr<SceneObject> CreateSceneObject(const std::string_view& name, SceneObject::Index parentIndex = 0);
 	std::shared_ptr<SceneObject> GetSceneObject(SceneObject::Index index);
 

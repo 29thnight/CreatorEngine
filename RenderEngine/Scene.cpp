@@ -10,9 +10,11 @@ Scene::~Scene()
 	//TODO : ComPtr이라 자동 해제 -> default로 변경할 것
 }
 
-void Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
+std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
 {
 	m_SceneObjects.push_back(sceneObject);
+
+	return sceneObject;
 }
 
 std::shared_ptr<SceneObject> Scene::CreateSceneObject(const std::string_view& name, SceneObject::Index parentIndex)

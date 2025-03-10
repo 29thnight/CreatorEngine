@@ -66,8 +66,8 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		Vertex vertex;
 		vertex.position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 		vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-		//vertex.tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
-		//vertex.bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
+		vertex.tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+		vertex.bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
 		if (hasTexCoords)
 		{
 			vertex.uv = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
@@ -87,6 +87,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	ProcessBones(mesh, vertices);
 	Mesh* meshObj = new Mesh(mesh->mName.C_Str(), vertices, indices);
 	m_model->m_Meshes.push_back(meshObj);
+	m_model->m_Materials.push_back(new Material());
 
 	return meshObj;
 }
@@ -125,13 +126,17 @@ void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int pa
 		for (UINT i = 0; i < node->mNumMeshes; ++i)
 		{
 			std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), parentIndex);
+			if (false == isRoot)
+			{
+				m_model->m_SceneObject = object;
+			}
 			unsigned int meshId = node->mMeshes[i];
 			Mesh* mesh = m_model->m_Meshes[meshId];
-			//Material* material = m_model->m_Materials[meshId];
+			Material* material = m_model->m_Materials[meshId];
 			MeshRenderer& meshRenderer = object->m_meshRenderer;
 			meshRenderer.m_IsEnabled = true;
 			meshRenderer.m_Mesh = mesh;
-			//meshRenderer.m_Material = material;
+			meshRenderer.m_Material = material;
 			object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
 
 			if (m_hasBones)

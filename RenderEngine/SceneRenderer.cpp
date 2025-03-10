@@ -214,6 +214,7 @@ void SceneRenderer::Update(float deltaTime)
 
 void SceneRenderer::Render()
 {
+	model->m_SceneObject->m_transform.SetScale({ 0.01f, 0.01f, 0.01f });
 	//[1] ShadowMapPass
 	{
 		Texture& shadowMapTexture = (*m_currentScene->m_LightController.GetShadowMapTexture());

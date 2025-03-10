@@ -26,7 +26,7 @@ GBufferPass::GBufferPass()
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateInputLayout(
 			vertexLayoutDesc,
-			ARRAYSIZE(vertexLayoutDesc),
+			_countof(vertexLayoutDesc),
 			m_pso->m_vertexShader->GetBufferPointer(),
 			m_pso->m_vertexShader->GetBufferSize(),
 			&m_pso->m_inputLayout
@@ -99,29 +99,29 @@ void GBufferPass::Execute(Scene& scene)
 			}
 		}
 
-		//Material* mat = meshRenderer.m_Material;
-		//DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
+		Material* mat = meshRenderer.m_Material;
+		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 
-		//if (mat->m_pBaseColor)
-		//{
-		//	DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
-		//}
-		//if (mat->m_pNormal)
-		//{
-		//	DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
-		//}
-		//if (mat->m_pOccRoughMetal)
-		//{
-		//	DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-		//}
-		//if (mat->m_AOMap)
-		//{
-		//	DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
-		//}
-		//if (mat->m_pEmissive)
-		//{
-		//	DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
-		//}
+		if (mat->m_pBaseColor)
+		{
+			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
+		}
+		if (mat->m_pNormal)
+		{
+			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
+		}
+		if (mat->m_pOccRoughMetal)
+		{
+			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+		}
+		if (mat->m_AOMap)
+		{
+			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
+		}
+		if (mat->m_pEmissive)
+		{
+			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+		}
 
 		meshRenderer.m_Mesh->Draw();
 	}
