@@ -1,7 +1,0 @@
-{
-    "BaseColor": "Prop_Flag_BaseColor.png",
-    "Bitmask": 11,
-    "Name": "Prop_Flag",
-    "Normal": "Prop_Flag_Normal.png",
-    "OcclusionRoughnessMetallic": "Prop_Flag_OcclusionRoughnessMetallic.png"
-}
