@@ -186,6 +186,9 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
+
+		model = Model::LoadModel("sphere.fbx");
+		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
 	{
@@ -202,6 +205,11 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+}
+
+void SceneRenderer::Update(float deltaTime)
+{
+	m_currentScene->Update(deltaTime);
 }
 
 void SceneRenderer::Render()

@@ -9,7 +9,7 @@ struct alignas(16) MaterialInfomation
 {
 	Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
 	float		  m_metallic{ 0.0f };
-	float		  m_roughness{ 0.0f };
+	float		  m_roughness{ 1.0f };
 	bool32		  m_useBaseColor{};
 	bool32		  m_useOccRoughMetal{};
 	bool32		  m_useAOMap{};

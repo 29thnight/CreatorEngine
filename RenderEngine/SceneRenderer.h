@@ -9,6 +9,7 @@
 #include "ToneMapPass.h"
 #include "SpritePass.h"
 #include "BlitPass.h"
+#include "Model.h"
 
 #include "Light.h"
 
@@ -19,6 +20,7 @@ public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 
 	void Initialize(Scene* _pScene = nullptr);
+	void Update(float deltaTime);
 	void Render();
 
 private:
@@ -55,4 +57,7 @@ private:
 
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
+
+
+	Model* model{};
 };

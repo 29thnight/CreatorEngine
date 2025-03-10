@@ -19,6 +19,7 @@ public:
     Model(std::shared_ptr<SceneObject>& sceneObject);
 
     static Model* LoadModelToScene(Model* model, Scene& Scene);
+    static Model* LoadModel(const std::string_view& filePath);
 
 public:
     std::string	name{};
@@ -32,7 +33,6 @@ private:
     friend class ModelLoader;
 	friend class DataSystem;
 
-    static Model* LoadModel(const std::string_view& filePath);
 
     std::vector<Mesh*>      m_Meshes;
     std::vector<Material*>  m_Materials;

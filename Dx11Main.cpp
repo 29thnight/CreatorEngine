@@ -144,6 +144,7 @@ void DirectX11::Dx11Main::Update()
 
 		SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
+		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_world->Update((float)m_timeSystem.GetElapsedSeconds());
 		m_D2DRenderer->SetCurCanvas(m_world->GetCurCanvas());
 		GameManagement->PlayUpdate((float)m_timeSystem.GetElapsedSeconds() * GameManagement->GetTimeScale()); //게임 시스템 업데이트

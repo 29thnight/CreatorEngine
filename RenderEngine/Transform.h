@@ -4,9 +4,9 @@
 struct Transform
 {
 public:
-	Mathf::xVector position;
-	Mathf::xVector rotation;
-	Mathf::xVector scale;
+	Mathf::xVector position{ 0.f, 0.f, 0.f, 1.f };
+	Mathf::xVector rotation{ 0.f, 0.f, 0.f, 1.f };
+	Mathf::xVector scale{ 1.f, 1.f, 1.f, 1.f };
 
 	Transform& SetScale(Mathf::Vector3 scale);
 	Transform& SetPosition(Mathf::Vector3 pos);
@@ -27,11 +27,11 @@ public:
 private:
 	friend class Scene;
 	bool32 m_dirty{};
-	Mathf::xMatrix m_worldMatrix{};
-	Mathf::xMatrix m_localMatrix{};
-	Mathf::xMatrix m_inverseMatrix{};
+	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
+	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };
+	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };
 
-	Mathf::xVector m_worldScale{};
-	Mathf::xVector m_worldQuaternion{};
-	Mathf::xVector m_worldPosition{};
+	Mathf::xVector m_worldScale{ 1.f, 1.f, 1.f, 1.f };
+	Mathf::xVector m_worldQuaternion{ 0.f, 0.f, 0.f, 0.f };
+	Mathf::xVector m_worldPosition{ 0.f, 0.f, 0.f, 0.f };
 };

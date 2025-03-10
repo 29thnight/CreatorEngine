@@ -60,7 +60,15 @@ Model* Model::LoadModel(const std::string_view& filePath)
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 {
 	ModelLoader loader = ModelLoader(model, &Scene);
-	loader.GenerateSceneObjectHierarchy(model->m_node, true, model->m_SceneObject->m_index);
+	file::path path_ = model->path;
+	Assimp::Importer importer;
+	const aiScene* assimpScene = importer.ReadFile(path_.string(),
+		aiProcess_Triangulate |
+		aiProcess_GenSmoothNormals |
+		aiProcess_CalcTangentSpace |
+		aiProcess_ConvertToLeftHanded
+	);
+	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, model->m_SceneObject->m_index);
 
 	return model;
 }

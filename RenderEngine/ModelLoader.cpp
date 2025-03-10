@@ -127,11 +127,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int pa
 			std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), parentIndex);
 			unsigned int meshId = node->mMeshes[i];
 			Mesh* mesh = m_model->m_Meshes[meshId];
-			Material* material = m_model->m_Materials[meshId];
+			//Material* material = m_model->m_Materials[meshId];
 			MeshRenderer& meshRenderer = object->m_meshRenderer;
 			meshRenderer.m_IsEnabled = true;
 			meshRenderer.m_Mesh = mesh;
-			meshRenderer.m_Material = material;
+			//meshRenderer.m_Material = material;
 			object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
 
 			if (m_hasBones)

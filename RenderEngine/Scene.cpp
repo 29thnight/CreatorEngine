@@ -99,7 +99,7 @@ void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix mod
 {
 	auto obj = GetSceneObject(objIndex);
 	model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-	obj->m_transform.SetLocalMatrix(model);
+	obj->m_transform.SetAndDecomposeMatrix(model);
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
 		UpdateModelRecursive(childIndex, model);

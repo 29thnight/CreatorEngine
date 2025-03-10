@@ -72,7 +72,7 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 	}
 	else
 	{
-		throw std::exception("Inverse Matrix does not exist");
+		//throw std::exception("Inverse Matrix does not exist");
 	}
 }
 
