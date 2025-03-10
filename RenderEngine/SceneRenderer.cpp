@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
+#include "AssetSystem.h"
 #include "Scene.h"
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -8,8 +9,20 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
 	DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
 	DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
+	DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
+	DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
+	DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
+	DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
+	DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
+	DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
 	DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
 	DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
+
+	//sampler 생성
+	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+	AssetsSystems->LoadShaders();
 
 	//RTV's 생성
 	m_colorTexture = TextureHelper::CreateRenderTexture(
@@ -63,7 +76,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
 	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
-	m_ambientOcclusionTexture = std::make_unique<Texture>(ao);
+	m_ambientOcclusionTexture = std::unique_ptr<Texture>(std::move(ao));
 
 	//Buffer 생성
 	XMMATRIX identity = XMMatrixIdentity();
@@ -73,8 +86,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 
     //pass 생성
-    //shadowMapPass
-    m_pShadowMapPass = std::make_unique<ShadowMapPass>();
+    //shadowMapPass 는 Scene에 종속
+    //m_pShadowMapPass = std::make_unique<ShadowMapPass>();
 
     //gBufferPass
     m_pGBufferPass = std::make_unique<GBufferPass>();
@@ -103,6 +116,28 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
         m_normalTexture.get(),
         m_emissiveTexture.get()
     );
+
+	//skyBoxPass
+	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
+	m_pSkyBoxPass->SetRenderTarget(m_colorTexture.get());
+	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/Malibu_Overlook_3k.hdr").string());
+	//
+
+	//toneMapPass
+	m_pToneMapPass = std::make_unique<ToneMapPass>();
+	m_pToneMapPass->Initialize(
+		m_colorTexture.get(),
+		m_toneMappedColourTexture.get()
+	);
+
+	//spritePass
+	m_pSpritePass = std::make_unique<SpritePass>();
+	m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
+
+	//blitPass
+	m_pBlitPass = std::make_unique<BlitPass>();
+	m_pBlitPass->Initialize(m_toneMappedColourTexture.get(), 
+		m_deviceResources->GetBackBufferRenderTargetView());
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -110,6 +145,44 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	if (!_pScene)
 	{
 		m_currentScene = new Scene();
+
+		auto lightColour = XMFLOAT4(5.0f, 5.0f, 5.0f, 1.0f);
+		
+		Light pointLight;
+		pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
+		pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
+		pointLight.m_lightType = LightType::PointLight;
+
+		Light dirLight;
+		dirLight.m_color = lightColour;
+		dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
+		dirLight.m_lightType = LightType::DirectionalLight;
+
+		Light spotLight;
+		spotLight.m_color = XMFLOAT4(Colors::Magenta);
+		spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
+		spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
+		spotLight.m_lightType = LightType::SpotLight;
+		spotLight.m_spotLightAngle = 3.142 / 4.0;
+
+		m_currentScene->m_LightController
+			.AddLight(dirLight)
+			.AddLight(pointLight)
+			.AddLight(spotLight)
+			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+
+		ShadowMapRenderDesc desc;
+		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
+		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
+		desc.m_viewWidth = 16;
+		desc.m_viewHeight = 12;
+		desc.m_nearPlane = 1.f;
+		desc.m_farPlane = 20.f;
+		desc.m_textureWidth = DeviceState::g_ClientRect.width;
+		desc.m_textureHeight = DeviceState::g_ClientRect.height;
+
+		m_currentScene->m_LightController.Initialize();
+		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 	}
 	else
 	{
@@ -117,7 +190,15 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	}
 
 	m_currentScene->SetBuffers(m_ModelBuffer.Get(), m_ViewBuffer.Get(), m_ProjBuffer.Get());
-	m_currentScene->m_LightController.Initialize();
+
+	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
+	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
+
+	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_currentScene);
+	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_currentScene);
+	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
+
+	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
 void SceneRenderer::Render()
@@ -146,15 +227,25 @@ void SceneRenderer::Render()
         m_pDeferredPass->Execute(*m_currentScene);
     }
 
-    //[5]
+	//[5] skyBoxPass
     {
-
+		m_pSkyBoxPass->Execute(*m_currentScene);
     }
 
     //[6] ToneMapPass
     {
         m_pToneMapPass->Execute(*m_currentScene);
     }
+
+	//[7] SpritePass
+	{
+		m_pSpritePass->Execute(*m_currentScene);
+	}
+
+	//[8] BlitPass
+	{
+		m_pBlitPass->Execute(*m_currentScene);
+	}
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

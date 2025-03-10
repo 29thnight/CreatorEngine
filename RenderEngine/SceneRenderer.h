@@ -5,7 +5,10 @@
 #include "GBufferPass.h"
 #include "SSAOPass.h"
 #include "DeferredPass.h"
+#include "SkyBoxPass.h"
 #include "ToneMapPass.h"
+#include "SpritePass.h"
+#include "BlitPass.h"
 
 #include "Light.h"
 
@@ -31,7 +34,10 @@ private:
 	std::unique_ptr<GBufferPass> m_pGBufferPass{};
     std::unique_ptr<SSAOPass> m_pSSAOPass{};
     std::unique_ptr<DeferredPass> m_pDeferredPass{};
+	std::unique_ptr<SkyBoxPass> m_pSkyBoxPass{};
     std::unique_ptr<ToneMapPass> m_pToneMapPass{};
+	std::unique_ptr<SpritePass> m_pSpritePass{};
+	std::unique_ptr<BlitPass> m_pBlitPass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
@@ -46,4 +52,7 @@ private:
 	std::unique_ptr<Texture> m_emissiveTexture;
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
+
+	Sampler* m_linearSampler{};
+	Sampler* m_pointSampler{};
 };

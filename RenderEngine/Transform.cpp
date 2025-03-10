@@ -75,3 +75,18 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 		throw std::exception("Inverse Matrix does not exist");
 	}
 }
+
+Mathf::xVector Transform::GetWorldPosition() const
+{
+	return m_worldPosition;
+}
+
+Mathf::xVector Transform::GetWorldScale() const
+{
+	return m_worldScale;
+}
+
+Mathf::xVector Transform::GetWorldQuaternion() const
+{
+	return m_worldQuaternion;
+}

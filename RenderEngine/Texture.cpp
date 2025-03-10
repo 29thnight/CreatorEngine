@@ -256,3 +256,8 @@ void Texture::CreateUAV(DXGI_FORMAT textureFormat)
 
 	DirectX::SetName(m_pUAV, m_name + "UAV");
 }
+
+ID3D11RenderTargetView* Texture::GetRTV(uint32 index)
+{
+	return m_pRTVs[index];
+}

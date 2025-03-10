@@ -7,6 +7,12 @@ namespace DeviceState
 	extern ID3D11Device3* g_pDevice;
 	extern ID3D11DeviceContext3* g_pDeviceContext;
 	extern ID3D11DepthStencilView* g_pDepthStencilView;
+	extern ID3D11DepthStencilState* g_pDepthStencilState;
+	extern ID3D11RasterizerState* g_pRasterizerState;
+	extern ID3D11BlendState* g_pBlendState;
+	extern D3D11_VIEWPORT g_Viewport;
+	extern ID3D11RenderTargetView* g_backBufferRTV;
+	extern ID3D11ShaderResourceView* g_depthStancilSRV;
 	extern DirectX11::Sizef g_ClientRect;
 	extern float g_aspectRatio;
 }
@@ -217,4 +223,85 @@ namespace DirectX11
         DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
     }
 
+	//[unsafe]
+	inline void VSSetShader(ID3D11VertexShader* vertexShader, ID3D11ClassInstance* const* classInstances, uint32 numClassInstances)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->VSSetShader(vertexShader, classInstances, numClassInstances);
+	}
+
+	//[unsafe]
+	inline void PSSetShader(ID3D11PixelShader* pixelShader, ID3D11ClassInstance* const* classInstances, uint32 numClassInstances)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->PSSetShader(pixelShader, classInstances, numClassInstances);
+	}
+
+	//[unsafe]
+	inline void IASetInputLayout(ID3D11InputLayout* inputLayout)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->IASetInputLayout(inputLayout);
+	}
+
+	//[unsafe]
+	inline void IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY topology)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->IASetPrimitiveTopology(topology);
+	}
+
+	//[unsafe]
+	inline void OMSetDepthStencilState(ID3D11DepthStencilState* depthStencilState, uint32 stencilRef)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->OMSetDepthStencilState(depthStencilState, stencilRef);
+	}
+
+	//[unsafe]
+	inline void OMSetBlendState(ID3D11BlendState* blendState, const float blendFactor[4], uint32 sampleMask)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->OMSetBlendState(blendState, blendFactor, sampleMask);
+	}
+
+	//[unsafe]
+	inline void InitSetUp()
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->RSSetState(DeviceState::g_pRasterizerState);
+		DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
+		ID3D11RenderTargetView* rtv = DeviceState::g_backBufferRTV;
+		DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
+		DeviceState::g_pDeviceContext->OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
+		DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+	}
 }

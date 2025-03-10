@@ -148,6 +148,7 @@
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetSystem.cpp" />
+    <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -170,6 +171,7 @@
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
     <ClCompile Include="SkyBoxPass.cpp" />
+    <ClCompile Include="SpritePass.cpp" />
     <ClCompile Include="SSAOPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
@@ -181,6 +183,7 @@
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetSystem.h" />
+    <ClInclude Include="BlitPass.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />
@@ -211,6 +214,7 @@
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkeletonLoader.h" />
     <ClInclude Include="SkyBoxPass.h" />
+    <ClInclude Include="SpritePass.h" />
     <ClInclude Include="SSAOPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />

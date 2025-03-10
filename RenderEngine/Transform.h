@@ -20,6 +20,10 @@ public:
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
 	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
 
+	Mathf::xVector GetWorldPosition() const;
+	Mathf::xVector GetWorldScale() const;
+	Mathf::xVector GetWorldQuaternion() const;
+
 private:
 	friend class Scene;
 	bool32 m_dirty{};

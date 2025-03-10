@@ -26,8 +26,5 @@ public:
 	void OnCollisionExit(ICollider* other) override;
 
 	uint32 ID() override { return 0; }
-	// InteractableComponent을(를) 통해 상속됨
-	void BurnOut() override;
-
 };
 

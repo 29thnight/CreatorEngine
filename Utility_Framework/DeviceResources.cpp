@@ -478,6 +478,15 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 		DirectX::SetName(depthStencil.Get(), "DepthStencil");
 
+		CD3D11_DEPTH_STENCIL_DESC depthStencilDesc2(D3D11_DEFAULT);
+
+		DirectX11::ThrowIfFailed(
+			m_d3dDevice->CreateDepthStencilState(
+				&depthStencilDesc2,
+				&m_depthStencilState
+			)
+		);
+
 		CD3D11_SHADER_RESOURCE_VIEW_DESC depthStencilSRVDesc(
             D3D11_SRV_DIMENSION_TEXTURE2D, 
             DXGI_FORMAT_R24_UNORM_X8_TYPELESS
@@ -493,6 +502,30 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
 		DirectX::SetName(m_DepthStencilViewSRV.Get(), "RenderTargetViewSRV");
 
+        CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC( D3D11_DEFAULT );
+		DirectX11::ThrowIfFailed(
+			m_d3dDevice->CreateRasterizerState(
+				&rasterizerDesc,
+				&m_rasterizerState
+			)
+		);
+
+		CD3D11_BLEND_DESC blendDesc = CD3D11_BLEND_DESC(CD3D11_DEFAULT());
+		blendDesc.RenderTarget[0].BlendEnable = TRUE;
+		blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+		blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+		blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+		blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+		DirectX11::ThrowIfFailed(
+			m_d3dDevice->CreateBlendState(
+				&blendDesc,
+				&m_blendState
+			)
+		);
 
         m_screenViewport = CD3D11_VIEWPORT(
             0.0f,

@@ -1,5 +1,6 @@
 ﻿#include "ImGuiRenderer.h"
 #include "CoreWindow.h"
+#include "DeviceState.h"
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -87,6 +88,7 @@ ImGuiRenderer::~ImGuiRenderer()
 
 void ImGuiRenderer::BeginRender()
 {
+	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;

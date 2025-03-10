@@ -6,7 +6,6 @@
 #include "SphereColliderComponent.h"
 #include "StairColliderComponent.h"
 #include "RigidbodyComponent.h"
-#include "InteractFirewood.h"
 #include "RenderEngine/UI_DataSystem.h"
 #include "RenderEngine/FontManager.h"
 #include "InputManager.h"
@@ -496,17 +495,6 @@ void World::Initialize()
 					}
 
 					obj->AddComponent<RigidbodyComponent>();
-				}
-
-				if (ImGui::MenuItem("InteractFirewood"))
-				{
-					if (!_scene)
-					{
-						Log::Error("Scene is not set");
-						return;
-					}
-
-					obj->AddComponent<InteractFirewood>();
 				}
 
 				if (ImGui::MenuItem("TestComponent"))

@@ -16,7 +16,7 @@ int CurrentKeyIndex(std::vector<T> keys, double time)
     float duration = time;
     for (UINT i = 0; i < keys.size() - 1; ++i)
     {
-        if (duration < keys[i + 1].m_Time)
+        if (duration < keys[i + 1].m_time)
         {
             return i;
         }

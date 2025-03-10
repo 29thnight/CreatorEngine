@@ -1,23 +1,71 @@
 #include "PSO.h"
 
+namespace PSOHelper
+{
+	inline void VSSetShader(VertexShader* shader)
+	{
+		if (!shader) return;
+
+		DeviceState::g_pDeviceContext->VSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void PSSetShader(PixelShader* shader)
+	{
+		if (!shader) return;
+		DeviceState::g_pDeviceContext->PSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void HSSetShader(HullShader* shader)
+	{
+		if (!shader) return;
+		DeviceState::g_pDeviceContext->HSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void DSSetShader(DomainShader* shader)
+	{
+		if (!shader) return;
+		DeviceState::g_pDeviceContext->DSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void GSSetShader(GeometryShader* shader)
+	{
+		if (!shader) return;
+		DeviceState::g_pDeviceContext->GSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void CSSetShader(ComputeShader* shader)
+	{
+		if (!shader) return;
+		DeviceState::g_pDeviceContext->CSSetShader(shader->GetShader(), nullptr, 0);
+	}
+
+	inline void IASetInputLayout(ID3D11InputLayout* inputLayout)
+	{
+		if (!inputLayout) return;
+		DeviceState::g_pDeviceContext->IASetInputLayout(inputLayout);
+	}
+}
+
 void PipelineStateObject::Apply()
 {
 	DeviceState::g_pDeviceContext->IASetInputLayout(m_inputLayout);
 	DeviceState::g_pDeviceContext->IASetPrimitiveTopology(m_primitiveTopology);
 
-	DeviceState::g_pDeviceContext->VSSetShader(m_vertexShader->GetShader(), nullptr, 0);
-	DeviceState::g_pDeviceContext->PSSetShader(m_pixelShader->GetShader(), nullptr, 0);
-	DeviceState::g_pDeviceContext->HSSetShader(m_hullShader->GetShader(), nullptr, 0);
-	DeviceState::g_pDeviceContext->DSSetShader(m_domainShader->GetShader(), nullptr, 0);
-	DeviceState::g_pDeviceContext->GSSetShader(m_geometryShader->GetShader(), nullptr, 0);
-	DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+	PSOHelper::VSSetShader(m_vertexShader);
+	PSOHelper::PSSetShader(m_pixelShader);
+	PSOHelper::HSSetShader(m_hullShader);
+	PSOHelper::DSSetShader(m_domainShader);
+	PSOHelper::GSSetShader(m_geometryShader);
+	PSOHelper::CSSetShader(m_computeShader);
 
 	DeviceState::g_pDeviceContext->RSSetState(m_rasterizerState);
 	DeviceState::g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
 	DeviceState::g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
-	for (uint32 i = 0; i < m_samplers.size(); ++i)
-	{
-		m_samplers[i].Use(i);
-	}
+	//for (uint32 i = 0; i < m_samplers.size(); ++i)
+	//{
+	//	//m_samplers[i].Use(i);
+	//	ID3D11SamplerState* sampler = m_samplers[i].m_SamplerState;
+	//	DeviceState::g_pDeviceContext->PSSetSamplers(i, 1, &sampler);
+	//}
 }

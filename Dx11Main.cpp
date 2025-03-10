@@ -20,8 +20,8 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	m_D2DRenderer = std::make_unique<D2DRenderer>(m_deviceResources);
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
-    AssetsSystem->LoadShaders();
-	AssetsSystem->Initialize();
+    AssetsSystem2->LoadShaders();
+	AssetsSystem2->Initialize();
 	UISystem->Initialize(m_deviceResources);
 	Sound->initialize((int)ChannelType::MaxChannel);
 	FontSystem->Initialize();
@@ -315,7 +315,7 @@ bool DirectX11::Dx11Main::Render()
 	GameManager::GameState state = GameManagement->GetGameState();
 	if (state == GameManager::GameState::Loading)
 	{
-		m_D2DRenderer->LoadSceneRender(loadlevel);
+	/*	m_D2DRenderer->LoadSceneRender(loadlevel);*/
 	}
 	else
 	{
@@ -327,21 +327,23 @@ bool DirectX11::Dx11Main::Render()
 		//m_sceneRenderer->UpdateDrawBillboards();
 		//m_sceneRenderer->StageDrawBillboards();
 
-		m_D2DRenderer->UpdateDrawModel();
-		m_D2DRenderer->Render();
-		m_D2DRenderer->SetCanvasEditorStage();
-		m_D2DRenderer->ComputeCanvasEditorStage();
+		m_sceneRenderer->Render();
+
+		//m_D2DRenderer->UpdateDrawModel();
+		//m_D2DRenderer->Render();
+		//m_D2DRenderer->SetCanvasEditorStage();
+		//m_D2DRenderer->ComputeCanvasEditorStage();
 	}
 
 #if defined(EDITOR)
 	if(!m_isGameView)
 	{
 		m_imguiRenderer->BeginRender();
-		m_D2DRenderer->ImGuiRenderStage();
+		//m_D2DRenderer->ImGuiRenderStage();
 		m_imguiRenderer->Render();
-		MeshEditorSystem->ShowMainUI();
-		m_btEditor.ShowMainUI();
-		GridEditorSystem->ShowGridEditor();
+		//MeshEditorSystem->ShowMainUI();
+		//m_btEditor.ShowMainUI();
+		//GridEditorSystem->ShowGridEditor();
 		m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR

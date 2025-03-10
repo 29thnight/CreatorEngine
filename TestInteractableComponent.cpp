@@ -58,10 +58,6 @@ void TestInteractableComponent::OnCollisionExit(ICollider* other)
 {
 }
 
-void TestInteractableComponent::BurnOut()
-{
-}
-
 void TestInteractableComponent::Interact(Object* obj)
 {
     auto pos = obj->GetLocalPosition();

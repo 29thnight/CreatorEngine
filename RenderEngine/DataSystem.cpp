@@ -32,7 +32,7 @@ DataSystem::~DataSystem()
 
 void DataSystem::Initialize()
 {
-	m_DataThread = std::thread(&DataSystem::MonitorFiles, this);
+	/*m_DataThread = std::thread(&DataSystem::MonitorFiles, this);
 	m_DataThread.detach();
 	RenderForEditer();
 	LoadShaders();
@@ -41,7 +41,7 @@ void DataSystem::Initialize()
 	LoadBillboards();
 	LoadModels();
 	AddModel(PathFinder::Relative("Models\\plane\\plane.fbx"), 
-		PathFinder::Relative("Models\\plane"));
+		PathFinder::Relative("Models\\plane"));*/
 }
 
 void DataSystem::RenderForEditer()

@@ -41,13 +41,13 @@ void MeshEditor::ShowMainUI()
 
 	ReadyToEdit();
 
-	auto material = AssetsSystem->GetPayloadMaterial();
+	auto material = AssetsSystem2->GetPayloadMaterial();
 
 	if (material && InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
 		dragDropMaterial = material;
 		HandleConnection();
-		AssetsSystem->ClearPayloadMaterial();
+		AssetsSystem2->ClearPayloadMaterial();
 	}
 
 	//ImGui::Begin("ModelViewer");

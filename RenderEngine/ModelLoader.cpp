@@ -42,6 +42,8 @@ Model* ModelLoader::LoadModel()
 		animator.m_Skeleton = skeleton;
 		m_animator = &animator;
 	}
+
+	return m_model;
 }
 
 void ModelLoader::ProcessMeshes()

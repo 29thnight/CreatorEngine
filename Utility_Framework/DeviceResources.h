@@ -48,6 +48,9 @@ namespace DirectX11
 		ID3D11ShaderResourceView* GetBackBufferSRV() const { return m_backBufferSRV.Get(); }
 		ID3D11DepthStencilView* GetDepthStencilView() const { return m_d3dDepthStencilView.Get(); }
         ID3D11ShaderResourceView* GetDepthStencilViewSRV() const { return m_DepthStencilViewSRV.Get(); }
+		ID3D11RasterizerState* GetRasterizerState() const { return m_rasterizerState.Get(); }
+		ID3D11DepthStencilState* GetDepthStencilState() const { return m_depthStencilState.Get(); }
+		ID3D11BlendState* GetBlendState() const { return m_blendState.Get(); }
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
 
 		ID2D1Factory3* GetD2DFactory() const { return m_d2dFactory.Get(); }
@@ -80,6 +83,9 @@ namespace DirectX11
 		ComPtr<ID3D11ShaderResourceView> m_backBufferSRV;
 		ComPtr<ID3D11DepthStencilView> m_d3dDepthStencilView;
 		ComPtr<ID3D11ShaderResourceView> m_DepthStencilViewSRV;
+		ComPtr<ID3D11RasterizerState> m_rasterizerState;
+		ComPtr<ID3D11DepthStencilState> m_depthStencilState;
+		ComPtr<ID3D11BlendState> m_blendState;
 		D3D11_VIEWPORT m_screenViewport;
 
 		ComPtr<ID2D1Factory3> m_d2dFactory;

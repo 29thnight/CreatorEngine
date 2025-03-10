@@ -52,7 +52,7 @@ void DirectX11::UIDataSystem::RenderForEditer()
 		int count = 0;
 		for (const auto& [key, bitmap] : m_BitmapMap)
 		{
-			if (!AssetsSystem->filter.PassFilter(key.c_str()))
+			if (!AssetsSystem2->filter.PassFilter(key.c_str()))
 				continue;
 
 			ImGui::BeginGroup();
@@ -97,7 +97,7 @@ void DirectX11::UIDataSystem::RenderForEditer()
 		int count = 0;
 		for (const auto& [key, animationClip] : m_AnimationMap)
 		{
-			if (!AssetsSystem->filter.PassFilter(key.c_str()))
+			if (!AssetsSystem2->filter.PassFilter(key.c_str()))
 				continue;
 
 			ImGui::BeginGroup();

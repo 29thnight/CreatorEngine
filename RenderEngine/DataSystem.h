@@ -66,4 +66,4 @@ private:
 	std::shared_ptr<Material> dragDropMaterial{};
 };
 
-static inline auto& AssetsSystem = DataSystem::GetInstance();
+static inline auto& AssetsSystem2 = DataSystem::GetInstance();
