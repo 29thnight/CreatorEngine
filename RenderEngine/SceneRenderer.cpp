@@ -11,7 +11,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
 	DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
 
-	//RTV's 积己
+	//RTV's 靸濎劚
 	m_colorTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -65,24 +65,44 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
 	m_ambientOcclusionTexture = std::make_unique<Texture>(ao);
 
-	//Buffer 积己
+	//Buffer 靸濎劚
 	XMMATRIX identity = XMMatrixIdentity();
 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 
-	m_pShadowMapPass = std::make_unique<ShadowMapPass>();
-	m_pGBufferPass = std::make_unique<GBufferPass>();
+    //pass 靸濎劚
+    //shadowMapPass
+    m_pShadowMapPass = std::make_unique<ShadowMapPass>();
 
+    //gBufferPass
+    m_pGBufferPass = std::make_unique<GBufferPass>();
 	ID3D11RenderTargetView* views[]{
 		m_diffuseTexture->GetRTV(),
 		m_metalRoughTexture->GetRTV(),
 		m_normalTexture->GetRTV(),
 		m_emissiveTexture->GetRTV()
 	};
-
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+
+    //ssaoPass
+    m_pSSAOPass = std::make_unique<SSAOPass>();
+    m_pSSAOPass->Initialize(
+        ao,
+        m_deviceResources->GetDepthStencilViewSRV(),
+        m_normalTexture.get()
+    );
+
+    //deferredPass
+    m_pDeferredPass = std::make_unique<DeferredPass>();
+    m_pDeferredPass->Initialize(
+        m_colorTexture.get(),
+        m_diffuseTexture.get(),
+        m_metalRoughTexture.get(),
+        m_normalTexture.get(),
+        m_emissiveTexture.get()
+    );
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -118,8 +138,23 @@ void SceneRenderer::Render()
 
 	//[3] SSAOPass
 	{
-
+        m_pSSAOPass->Execute(*m_currentScene);
 	}
+
+    //[4] DeferredPass
+    {
+        m_pDeferredPass->Execute(*m_currentScene);
+    }
+
+    //[5]
+    {
+
+    }
+
+    //[6] ToneMapPass
+    {
+        m_pToneMapPass->Execute(*m_currentScene);
+    }
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

@@ -3,6 +3,9 @@
 #include "DeviceResources.h"
 #include "ShadowMapPass.h"
 #include "GBufferPass.h"
+#include "SSAOPass.h"
+#include "DeferredPass.h"
+#include "ToneMapPass.h"
 
 #include "Light.h"
 
@@ -26,6 +29,9 @@ private:
 	//pass
 	std::unique_ptr<ShadowMapPass> m_pShadowMapPass{};
 	std::unique_ptr<GBufferPass> m_pGBufferPass{};
+    std::unique_ptr<SSAOPass> m_pSSAOPass{};
+    std::unique_ptr<DeferredPass> m_pDeferredPass{};
+    std::unique_ptr<ToneMapPass> m_pToneMapPass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;

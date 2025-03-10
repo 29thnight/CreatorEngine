@@ -150,6 +150,7 @@
     <ClCompile Include="AssetSystem.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DataSystem.cpp" />
+    <ClCompile Include="DeferredPass.cpp" />
     <ClCompile Include="DeviceState.cpp" />
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="FontManager.cpp" />
@@ -168,8 +169,10 @@
     <ClCompile Include="ShadowMapPass.cpp" />
     <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="SkeletonLoader.cpp" />
+    <ClCompile Include="SkyBoxPass.cpp" />
     <ClCompile Include="SSAOPass.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="ToneMapPass.cpp" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="UI_DataSystem.cpp" />
     <ClCompile Include="widgets.cpp" />
@@ -207,8 +210,10 @@
     <ClInclude Include="ShadowMapPass.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkeletonLoader.h" />
+    <ClInclude Include="SkyBoxPass.h" />
     <ClInclude Include="SSAOPass.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="ToneMapPass.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="UI_DataSystem.h" />
     <ClInclude Include="widgets.h" />

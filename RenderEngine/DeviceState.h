@@ -194,5 +194,27 @@ namespace DirectX11
 		DeviceState::g_pDeviceContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
 	}
 
+    //[unsafe]
+    inline void Draw(uint32 vertexCount, uint32 startVertexLocation)
+    {
+        if (!DeviceState::g_pDeviceContext)
+        {
+            Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+            return;
+        }
+        DeviceState::g_pDeviceContext->Draw(vertexCount, startVertexLocation);
+    }
+
+    //[unsafe]
+    inline void UnbindRenderTargets()
+    {
+        if (!DeviceState::g_pDeviceContext)
+        {
+            Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+            return;
+        }
+        ID3D11RenderTargetView* nullRTV = nullptr;
+        DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
+    }
 
 }

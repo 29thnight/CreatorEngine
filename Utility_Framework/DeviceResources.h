@@ -47,6 +47,7 @@ namespace DirectX11
 		ID3D11Texture2D1* GetBackBuffer() const { return m_backBuffer.Get(); }
 		ID3D11ShaderResourceView* GetBackBufferSRV() const { return m_backBufferSRV.Get(); }
 		ID3D11DepthStencilView* GetDepthStencilView() const { return m_d3dDepthStencilView.Get(); }
+        ID3D11ShaderResourceView* GetDepthStencilViewSRV() const { return m_DepthStencilViewSRV.Get(); }
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
 
 		ID2D1Factory3* GetD2DFactory() const { return m_d2dFactory.Get(); }

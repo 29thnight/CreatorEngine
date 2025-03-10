@@ -84,6 +84,21 @@
     <Filter Include="RenderPass\ShadowMapPass">
       <UniqueIdentifier>{68d10abe-49ad-40e4-b4d3-7b4ed104ec5b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\ToneMapPass">
+      <UniqueIdentifier>{5a48ad2d-de4c-445a-9f4b-9b928e25d855}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\SkyBoxPass">
+      <UniqueIdentifier>{3a3fdb30-70e0-44a6-95ab-a8ebc84cbb19}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\SpritePass">
+      <UniqueIdentifier>{0bed34a0-f208-4fc6-a002-1e37dceda11a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\BlitPass">
+      <UniqueIdentifier>{ad87c5d3-f4f1-40e4-8ec6-7115cb2f02df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\ForwardPass">
+      <UniqueIdentifier>{64b7272b-de19-484c-9d60-13b87909eb48}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -170,11 +185,17 @@
     <ClCompile Include="ShadowMapPass.cpp">
       <Filter>RenderPass\ShadowMapPass</Filter>
     </ClCompile>
+    <ClCompile Include="DeferredPass.cpp">
+      <Filter>RenderPass\DeferredPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ToneMapPass.cpp">
+      <Filter>RenderPass\ToneMapPass</Filter>
+    </ClCompile>
+    <ClCompile Include="SkyBoxPass.cpp">
+      <Filter>RenderPass\SkyBoxPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ForwardPass.h">
-      <Filter>RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="IRenderPass.h">
       <Filter>RenderPass</Filter>
     </ClInclude>
@@ -282,6 +303,15 @@
     </ClInclude>
     <ClInclude Include="ShadowMapPass.h">
       <Filter>RenderPass\ShadowMapPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ForwardPass.h">
+      <Filter>RenderPass\ForwardPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ToneMapPass.h">
+      <Filter>RenderPass\ToneMapPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SkyBoxPass.h">
+      <Filter>RenderPass\SkyBoxPass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
