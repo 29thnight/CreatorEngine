@@ -89,8 +89,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	DirectX::SetName(m_ProjBuffer.Get(), "ProjBuffer");
 
     //pass 생성
-    //shadowMapPass 는 Scene에 종속
-    //m_pShadowMapPass = std::make_unique<ShadowMapPass>();
+    //shadowMapPass 는 Scene의 맴버
 
     //gBufferPass
     m_pGBufferPass = std::make_unique<GBufferPass>();
@@ -124,7 +123,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
 	m_pSkyBoxPass->SetRenderTarget(m_colorTexture.get());
 	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/Malibu_Overlook_3k.hdr").string());
-	//
 
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
@@ -187,7 +185,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("sphere.fbx");
+		model = Model::LoadModel("Prop_Block.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
@@ -200,11 +198,13 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
+	m_pSkyBoxPass->GenerateCubeMap(*m_currentScene);
 	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_currentScene);
 	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_currentScene);
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+
 }
 
 void SceneRenderer::Update(float deltaTime)
@@ -214,7 +214,12 @@ void SceneRenderer::Update(float deltaTime)
 
 void SceneRenderer::Render()
 {
-	model->m_SceneObject->m_transform.SetScale({ 0.01f, 0.01f, 0.01f });
+	model->m_SceneObject->m_transform
+		//.SetScale({ 0.01f, 0.01f, 0.01f })
+		.SetPosition({ 2.f, 0.5f, -2.f });
+
+	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic = 0.5f;
+	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness = 0.5f;
 	//[1] ShadowMapPass
 	{
 		Texture& shadowMapTexture = (*m_currentScene->m_LightController.GetShadowMapTexture());
@@ -236,13 +241,14 @@ void SceneRenderer::Render()
 
     //[4] DeferredPass
     {
+		m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
         m_pDeferredPass->Execute(*m_currentScene);
     }
 
 	//[5] skyBoxPass
-    {
+	{
 		m_pSkyBoxPass->Execute(*m_currentScene);
-    }
+	}
 
     //[6] ToneMapPass
     {

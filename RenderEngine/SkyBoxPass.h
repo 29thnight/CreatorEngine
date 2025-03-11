@@ -28,6 +28,7 @@ private:
 	PixelShader* m_irradiancePS{};
 	PixelShader* m_prefilterPS{};
 	PixelShader* m_brdfPS{};
+	ID3D11RasterizerState* m_skyBoxRasterizerState{};
 
 	PixelShader* m_rectToCubeMapPS{};
 

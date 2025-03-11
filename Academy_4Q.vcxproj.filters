@@ -336,9 +336,6 @@
     <FxCompile Include="x64\Assets\Shaders\IrradianceMap.ps.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\PixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="x64\Assets\Shaders\RectToCubeMap.ps.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>

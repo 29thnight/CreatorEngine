@@ -33,7 +33,7 @@ SkyBoxPass::SkyBoxPass()
 	m_pso = std::make_unique<PipelineStateObject>();
 	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Skybox"];
 	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Skybox"];
-	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	m_fullscreenVS = &AssetsSystems->VertexShaders["Fullscreen"];
 	m_irradiancePS = &AssetsSystems->PixelShaders["IrradianceMap"];
@@ -91,7 +91,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
        20, 21, 22, 20, 22, 23
     };
 
-    m_skyBoxMesh = std::make_unique<Mesh>("skyBoxMesh",PrimitiveCreator::CubeVertices(), std::move(skyboxIndices));
+    m_skyBoxMesh = std::make_unique<Mesh>("skyBoxMesh", PrimitiveCreator::CubeVertices(), std::move(skyboxIndices));
 	m_scaleMatrix = XMMatrixScaling(size, size, size);
 
 	file::path path = file::path(fileName);
@@ -104,6 +104,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
         }
         else
         {
+			m_skyBoxTexture = std::unique_ptr<Texture>(Texture::LoadFormPath(fileName));
             m_skyBoxCubeMap = std::unique_ptr<Texture>(Texture::CreateCube(
                 m_cubeMapSize,
                 "CubeMap",
@@ -148,6 +149,14 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 
 	m_BRDFLUT->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BRDFLUT->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	//CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
+	//rasterizerDesc.CullMode = D3D11_CULL_NONE;
+
+	//DeviceState::g_pDevice->CreateRasterizerState(
+	//	&rasterizerDesc,
+	//	&m_skyBoxRasterizerState
+	//);
 
 }
 
@@ -200,7 +209,8 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
     }
 
     DirectX11::InitSetUp();
-	DirectX11::PSSetShaderResources(0, 1, nullptr);
+	ID3D11ShaderResourceView* nullSRV = nullptr;
+	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
     m_cubeMapGenerationRequired = false;
 
@@ -348,21 +358,24 @@ void SkyBoxPass::Execute(Scene& scene)
 {
 	m_pso->Apply();
 
+	/*auto deviceContext = DeviceState::g_pDeviceContext;
+	deviceContext->RSSetState(m_skyBoxRasterizerState);*/
+
 	ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+	DirectX11::OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
 
 	scene.UseCamera(scene.m_MainCamera);
 	scene.UseModel();
 
-	auto modelMatrix = XMMatrixMultiply(
-		XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition), m_scaleMatrix);
+	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
 
 	scene.UpdateModel(modelMatrix);
-	/*m_skyBoxCubeMap*/
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
 	m_skyBoxMesh->Draw();
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
+
+	//deviceContext->RSSetState(DeviceState::g_pRasterizerState);
 }
