@@ -2,6 +2,8 @@
 #include "DeviceResources.h"
 #include "CoreWindow.h"
 #include "DirectXMath.h"
+#include "Core.Memory.hpp"
+
 using namespace DirectX;
 
 namespace DisplayMetrics
@@ -357,7 +359,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             2,
             lround(m_d3dRenderTargetSize.width),
             lround(m_d3dRenderTargetSize.height),
-            DXGI_FORMAT_B8G8R8A8_UNORM,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
             0
         );
 
@@ -385,7 +387,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.Stereo = false;
         swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
         swapChainDesc.SampleDesc.Quality = 0;
-        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
         swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;	// 모든 Microsoft Store 앱은 이 SwapEffect를 사용해야 합니다.
         swapChainDesc.Flags = 0;
@@ -521,7 +523,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
 		blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
 		blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-		blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+		blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
 		blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 		blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
@@ -593,4 +595,7 @@ void DirectX11::DeviceResources::UpdateRenderTargetSize()
 
     m_outputSize.width = std::max(1.f, m_outputSize.width);
     m_outputSize.height = std::max(1.f, m_outputSize.height);
+
+	m_d3dRenderTargetSize.width = m_outputSize.width;
+	m_d3dRenderTargetSize.height = m_outputSize.height;
 }

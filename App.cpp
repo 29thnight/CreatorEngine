@@ -60,6 +60,7 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 	coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
 	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
+	//coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
 }
 
 void Core::App::Load()
@@ -113,6 +114,13 @@ LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	{
 		io.AddInputCharacter(wch);
 	}
+
+	return 0;
+}
+
+LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	m_main->CreateWindowSizeDependentResources();
 
 	return 0;
 }
