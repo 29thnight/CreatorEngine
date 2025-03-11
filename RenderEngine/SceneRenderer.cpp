@@ -2,6 +2,7 @@
 #include "DeviceState.h"
 #include "AssetSystem.h"
 #include "Scene.h"
+#include "ImGuiRegister.h"
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
@@ -192,6 +193,12 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		//model = Model::LoadModel("Prop_Block.fbx");
 		model = Model::LoadModel("Sphere.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
+		ImGui::ContextRegister("TestModelMaterial", [&]()
+		{
+			ImGui::SliderFloat4("BaseColor", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_baseColor.x, 0.0f, 1.0f);
+			ImGui::SliderFloat("Metallic", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic, 0.0f, 1.0f);
+			ImGui::SliderFloat("Roughness", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness, 0.1f, 1.0f);
+		});
 	}
 	else
 	{
@@ -223,8 +230,6 @@ void SceneRenderer::Render()
 		.SetScale({ 0.1f, 0.1f, 0.1f });
 		//.SetPosition({ 2.f, 0.5f, -2.f });
 
-	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic = 0.5f;
-	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness = 0.5f;
 	//[1] ShadowMapPass
 	{
 		Texture& shadowMapTexture = (*m_currentScene->m_LightController.GetShadowMapTexture());

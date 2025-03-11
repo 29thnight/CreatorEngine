@@ -20,6 +20,7 @@ namespace Core
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;

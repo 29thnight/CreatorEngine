@@ -114,7 +114,7 @@ void SSAOPass::Execute(Scene& scene)
 	PerspacetiveCamera& camera = scene.m_MainCamera;
 	Mathf::xMatrix view = camera.CalculateView();
 	Mathf::xMatrix proj = camera.CalculateProjection();
-    m_SSAOBuffer.m_ViewProjection = view * proj;
+    m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
     m_SSAOBuffer.m_InverseViewProjection = XMMatrixInverse(nullptr, m_SSAOBuffer.m_ViewProjection);
     m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
     m_SSAOBuffer.m_Radius = 0.1f;

@@ -42,6 +42,8 @@ GBufferPass::GBufferPass()
 		)
 	);
 
+	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
+
 	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
@@ -78,8 +80,8 @@ void GBufferPass::Execute(Scene& scene)
 	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
 	scene.UseModel();
 
-	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
 
