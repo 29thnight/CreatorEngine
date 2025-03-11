@@ -21,7 +21,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	AssetsSystems->LoadShaders();
 
@@ -186,7 +186,10 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("Prop_Block.fbx");
+		//model = Model::LoadModel("Prop_Block.fbx");
+		model = Model::LoadModel("IcoSphere.fbx");
+		//model = Model::LoadModel("zeldaPosed001.fbx");
+		
 		Model::LoadModelToScene(model, *m_currentScene);
 		ImGui::ContextRegister("TestModelMaterial", [&]()
 		{

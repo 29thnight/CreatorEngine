@@ -81,6 +81,9 @@
     <Filter Include="Utill\GridEditor">
       <UniqueIdentifier>{691bb130-1694-4038-9f18-04da55c06bfa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="수정필요한것들">
+      <UniqueIdentifier>{c809e3c7-9035-405e-b886-515ba0168a6d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -190,6 +193,9 @@
     </ClInclude>
     <ClInclude Include="StairColliderComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneLoader.h">
+      <Filter>수정필요한것들</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -307,6 +313,9 @@
     </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneLoader.cpp">
+      <Filter>수정필요한것들</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
