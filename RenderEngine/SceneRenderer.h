@@ -9,6 +9,7 @@
 #include "ToneMapPass.h"
 #include "SpritePass.h"
 #include "BlitPass.h"
+#include "WireFramePass.h"
 #include "Model.h"
 
 #include "Light.h"
@@ -40,6 +41,7 @@ private:
     std::unique_ptr<ToneMapPass> m_pToneMapPass{};
 	std::unique_ptr<SpritePass> m_pSpritePass{};
 	std::unique_ptr<BlitPass> m_pBlitPass{};
+	std::unique_ptr<WireFramePass> m_pWireFramePass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
@@ -60,4 +62,10 @@ private:
 
 
 	Model* model{};
+
+//Debug
+public:
+	void SetWireFrame() { useWireFrame = !useWireFrame; }
+private:
+	bool useWireFrame = false;
 };

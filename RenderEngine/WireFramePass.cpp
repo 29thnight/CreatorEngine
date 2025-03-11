@@ -1,0 +1,91 @@
+#include "WireFramePass.h"
+#include "Scene.h"
+#include "Camera.h"
+#include "Mesh.h"
+#include "AssetSystem.h"
+
+WireFramePass::WireFramePass()
+{
+    m_pso = std::make_unique<PipelineStateObject>();
+    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["WireFrame"];
+    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["WireFrame"];
+    m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+
+    m_Buffer = DirectX11::CreateBuffer(sizeof(CameraBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
+    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    };
+
+    DirectX11::ThrowIfFailed(
+        DeviceState::g_pDevice->CreateInputLayout(
+            vertexLayoutDesc,
+            _countof(vertexLayoutDesc),
+            m_pso->m_vertexShader->GetBufferPointer(),
+            m_pso->m_vertexShader->GetBufferSize(),
+            &m_pso->m_inputLayout
+        )
+    );
+
+    CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
+    rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
+    //rasterizerDesc.FrontCounterClockwise = TRUE;
+    rasterizerDesc.AntialiasedLineEnable = TRUE;
+    rasterizerDesc.CullMode = D3D11_CULL_NONE;
+
+    DirectX11::ThrowIfFailed(
+        DeviceState::g_pDevice->CreateRasterizerState(
+            &rasterizerDesc,
+            &m_pso->m_rasterizerState
+        )
+    );
+
+    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+}
+
+WireFramePass::~WireFramePass()
+{
+}
+
+void WireFramePass::SetRenderTarget(Texture* renderTarget)
+{
+    m_RenderTarget = renderTarget;
+}
+
+void WireFramePass::Execute(Scene& scene)
+{
+    m_pso->Apply();
+
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+    ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
+    //DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+
+	scene.UseCamera(scene.m_MainCamera);
+	scene.UseModel();
+
+    m_CameraBuffer.m_CameraPosition = scene.m_MainCamera.m_eyePosition;
+
+    DirectX11::UpdateBuffer(m_Buffer.Get(), &m_CameraBuffer);
+    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
+
+	Animator* currentAnimator = nullptr;
+
+	for (auto& sceneObject : scene.m_SceneObjects)
+	{
+		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
+
+		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
+		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+
+		meshRenderer.m_Mesh->Draw();
+	}
+}

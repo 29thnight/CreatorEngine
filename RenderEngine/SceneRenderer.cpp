@@ -139,6 +139,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBlitPass = std::make_unique<BlitPass>();
 	m_pBlitPass->Initialize(m_toneMappedColourTexture.get(), 
 		m_deviceResources->GetBackBufferRenderTargetView());
+
+	//WireFramePass
+	m_pWireFramePass = std::make_unique<WireFramePass>();
+	m_pWireFramePass->SetRenderTarget(m_colorTexture.get());
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -185,7 +189,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("Prop_Block.fbx");
+		//model = Model::LoadModel("Prop_Block.fbx");
+		model = Model::LoadModel("Sphere.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
@@ -215,8 +220,8 @@ void SceneRenderer::Update(float deltaTime)
 void SceneRenderer::Render()
 {
 	model->m_SceneObject->m_transform
-		//.SetScale({ 0.01f, 0.01f, 0.01f })
-		.SetPosition({ 2.f, 0.5f, -2.f });
+		.SetScale({ 0.1f, 0.1f, 0.1f });
+		//.SetPosition({ 2.f, 0.5f, -2.f });
 
 	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic = 0.5f;
 	model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness = 0.5f;
@@ -244,6 +249,11 @@ void SceneRenderer::Render()
 		m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
         m_pDeferredPass->Execute(*m_currentScene);
     }
+
+	//[*] WireFramePass
+	if(useWireFrame){
+		m_pWireFramePass->Execute(*m_currentScene);
+	}
 
 	//[5] skyBoxPass
 	{

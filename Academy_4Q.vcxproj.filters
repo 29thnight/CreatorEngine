@@ -363,5 +363,8 @@
     <FxCompile Include="x64\Assets\Shaders\VertexShader.vs.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\WireFrame.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

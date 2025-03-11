@@ -164,6 +164,9 @@ void DirectX11::Dx11Main::Update()
 		loadlevel = 0;
 		Event->Publish("ChangeScene", &loadlevel);
 	}
+	if (InputManagement->IsKeyDown(VK_F11)) {
+		m_sceneRenderer->SetWireFrame();
+	}
 #endif // !EDITOR
 	if (InputManagement->IsKeyReleased(VK_F8))
 	{
