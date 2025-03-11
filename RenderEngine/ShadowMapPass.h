@@ -19,7 +19,7 @@ struct ShadowMapRenderDesc
 	Mathf::xVector m_eyePosition{};
 	Mathf::xVector m_lookAt{};
 	float m_nearPlane{ 0.1f };
-	float m_farPlane{ 1000.f };
+	float m_farPlane{ 200.f };
 	float m_viewWidth{ 1.f };
 	float m_viewHeight{ 1.f };
 	float m_textureWidth{ 8192.f };

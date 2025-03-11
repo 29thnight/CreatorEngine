@@ -182,16 +182,16 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 1.f;
-		desc.m_farPlane = 20.f;
-		desc.m_textureWidth = DeviceState::g_ClientRect.width;
-		desc.m_textureHeight = DeviceState::g_ClientRect.height;
+		desc.m_nearPlane = 0.1f;
+		desc.m_farPlane = 1000.f;
+		desc.m_textureWidth = 8192.f;
+		desc.m_textureHeight = 8192.f;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		//model = Model::LoadModel("Prop_Block.fbx");
-		model = Model::LoadModel("Sphere.fbx");
+		model = Model::LoadModel("Prop_Block.fbx");
+		//model = Model::LoadModel("Sphere.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 		ImGui::ContextRegister("TestModelMaterial", [&]()
 		{
@@ -227,8 +227,8 @@ void SceneRenderer::Update(float deltaTime)
 void SceneRenderer::Render()
 {
 	model->m_SceneObject->m_transform
-		.SetScale({ 0.1f, 0.1f, 0.1f });
-		//.SetPosition({ 2.f, 0.5f, -2.f });
+		//.SetScale({ 0.1f, 0.1f, 0.1f })
+		.SetPosition({ 2.f, 0.5f, -2.f });
 
 	//[1] ShadowMapPass
 	{
