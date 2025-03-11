@@ -381,7 +381,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         swapChainDesc.Width = lround(m_d3dRenderTargetSize.width);		// 창의 크기를 맞춥니다.
         swapChainDesc.Height = lround(m_d3dRenderTargetSize.height);
-        swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
+        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
         swapChainDesc.Stereo = false;
         swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
         swapChainDesc.SampleDesc.Quality = 0;
@@ -434,10 +434,15 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))
         );
 
+		D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
+		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+		renderTargetViewDesc.Texture2D.MipSlice = 0;
+
         DirectX11::ThrowIfFailed(
             m_d3dDevice->CreateRenderTargetView1(
                 backBuffer.Get(),
-                nullptr,
+                &renderTargetViewDesc,
                 &m_d3dRenderTargetView
             )
         );

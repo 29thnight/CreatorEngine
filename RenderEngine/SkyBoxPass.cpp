@@ -181,10 +181,10 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
         ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
         ortho.m_lookAt = forward[i];
         ortho.m_up = up[i];
-        ortho.m_nearPlane = 0;
-        ortho.m_farPlane = 10;
-        ortho.m_viewHeight = 2;
-        ortho.m_viewWidth = 2;
+        ortho.m_nearPlane = 0.f;
+        ortho.m_farPlane = 10.f;
+        ortho.m_viewHeight = 2.f;
+        ortho.m_viewWidth = 2.f;
 
 		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
         DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
@@ -224,13 +224,13 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(Scene& scene)
 		ID3D11RenderTargetView* rtv = m_EnvironmentMap->GetRTV(i);
 		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 		OrthographicCamera ortho;
-		ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
+		ortho.m_eyePosition = XMVectorSet(0.f, 0.f, 0.f, 0.f);
 		ortho.m_lookAt = forward[i];
 		ortho.m_up = up[i];
-		ortho.m_nearPlane = 0;
-		ortho.m_farPlane = 10;
-		ortho.m_viewHeight = 2;
-		ortho.m_viewWidth = 2;
+		ortho.m_nearPlane = 0.f;
+		ortho.m_farPlane = 10.f;
+		ortho.m_viewHeight = 2.f;
+		ortho.m_viewWidth = 2.f;
 
 		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
 		DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
