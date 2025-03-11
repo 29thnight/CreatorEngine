@@ -25,7 +25,10 @@ namespace Memory
 		using PtrType = std::remove_pointer_t<std::remove_reference_t<decltype(ptr)>>;  // 참조 제거한 타입
 		if constexpr (std::derived_from<PtrType, IUnknown>)
 		{
-			ptr->Release();
+			if(ptr)
+			{
+				ptr->Release();
+			}
 		}
 		else
 		{
