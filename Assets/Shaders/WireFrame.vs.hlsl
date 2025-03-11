@@ -35,6 +35,7 @@ struct VertexShaderOutput
     float4 color : COLOR;
     float3 cameraDir : TEXCOORD0;
     float3 noraml : TEXCOORD1;
+    float3 pos : TEXCOORD2;
 };
 
 VertexShaderOutput main(AppData IN)
@@ -42,11 +43,12 @@ VertexShaderOutput main(AppData IN)
     VertexShaderOutput OUT;
     
     matrix vp = mul(projection, view);
-    OUT.position = mul(float4(IN.position, 1.0f), model);
-    OUT.position = mul(OUT.position, vp);
+    OUT.pos = mul(model, float4(IN.position, 1.0f));
+    OUT.position = mul(vp, float4(OUT.pos, 1.0f));
+    OUT.pos = OUT.position.xyz;
     OUT.color = float4(0, 1, 0, 1);
     OUT.noraml = IN.normal;
-    OUT.cameraDir = normalize(cameraPos - OUT.position.xyz);
+    OUT.cameraDir = normalize(cameraPos - OUT.pos.xyz);
     
     return OUT;
 }
