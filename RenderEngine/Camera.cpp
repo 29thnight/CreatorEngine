@@ -1,6 +1,9 @@
 #include "Camera.h"
 #include "../InputManager.h"
 
+const static float pi = XM_PIDIV2 - 0.01f;
+const static float pi2 = XM_PI * 2.f;
+
 Mathf::xMatrix Camera::CalculateView() const
 {
 	return XMMatrixLookAtLH(m_eyePosition, m_lookAt, m_up);
@@ -38,7 +41,10 @@ void Camera::HandleMovement(float deltaTime)
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
 		m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
+		m_pitch = fmax(-pi, fmin(m_pitch, pi));
 		m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
+		if (m_yaw > XM_PI) m_yaw -= pi2;
+		if (m_yaw < -XM_PI) m_yaw += pi2;
 
 		Mathf::xVector viewRotation = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.f);
 		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, viewRotation));
