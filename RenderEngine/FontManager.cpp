@@ -44,8 +44,8 @@ void FontManager::Initialize()
 		m_Fonts["DefaultFont"] = _pDefaultFont;
 	}
 
-	m_LoadThread = std::thread(&FontManager::MonitorFiles, this);
-	m_LoadThread.detach();
+	//m_LoadThread = std::thread(&FontManager::MonitorFiles, this);
+	//m_LoadThread.detach();
 }
 
 void FontManager::LoadFonts()

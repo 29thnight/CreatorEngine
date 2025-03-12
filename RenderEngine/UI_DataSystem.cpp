@@ -11,8 +11,8 @@ DirectX11::UIDataSystem::~UIDataSystem()
 void DirectX11::UIDataSystem::Initialize(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources)
 {
 	m_DeviceResources = deviceResources;
-	m_LoadThread = std::thread(&UIDataSystem::MonitorFiles, this);
-	m_LoadThread.detach();
+	//m_LoadThread = std::thread(&UIDataSystem::MonitorFiles, this);
+	//m_LoadThread.detach();
 
 	icon = Texture::LoadFormPath(PathFinder::Relative("Icon\\Model.png"));
 
