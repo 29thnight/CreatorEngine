@@ -19,7 +19,8 @@ float2 IntegrateBRDF(float NdotV, float roughness)
     float B = 0.0;
 
     float3 N = float3(0.0, 0.0, 1.0);
-
+    
+    [unroll(35)]
     for (uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
         float2 st = Hammersley(i, SAMPLE_COUNT);

@@ -18,55 +18,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Banchmark.hpp" />
-    <ClInclude Include="ClassProperty.h" />
-    <ClInclude Include="Core.Assert.hpp" />
-    <ClInclude Include="Core.Console.hpp" />
-    <ClInclude Include="Core.Definition.h" />
-    <ClInclude Include="Core.Mathf.h" />
-    <ClInclude Include="Core.Memory.hpp" />
-    <ClInclude Include="Core.Minimal.h" />
-    <ClInclude Include="Core.Random.h" />
-    <ClInclude Include="Core.Thread.h" />
-    <ClInclude Include="CoreWindow.h" />
-    <ClInclude Include="CSVLoader.h" />
-    <ClInclude Include="DeviceResources.h" />
-    <ClInclude Include="DirectXHelper.h" />
-    <ClInclude Include="DumpHandler.h" />
-    <ClInclude Include="HLSLCompiler.h" />
-    <ClInclude Include="IObject.h" />
-    <ClInclude Include="IWorld.h" />
-    <ClInclude Include="LinkedListLib.hpp" />
-    <ClInclude Include="Logger.h" />
-    <ClInclude Include="LogIOWriter.h" />
-    <ClInclude Include="LogMessage.h" />
-    <ClInclude Include="MemoryPool.h" />
-    <ClInclude Include="PathFinder.h" />
-    <ClInclude Include="Serializer.h" />
-    <ClInclude Include="SimpleIniFile.h" />
-    <ClInclude Include="SpinLock.h" />
-    <ClInclude Include="sqlite_modern_cpp.h" />
-    <ClInclude Include="TimeSystem.h" />
-    <ClInclude Include="TypeDefinition.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Core.Thread.cpp" />
-    <ClCompile Include="CoreWindow.cpp" />
-    <ClCompile Include="DeviceResources.cpp" />
-    <ClCompile Include="HLSLCompiler.cpp" />
-    <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="LogIOWriter.cpp" />
-    <ClCompile Include="LogMessage.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="MemoryPool.inl" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</ProjectGuid>
-    <RootNamespace>UtilityFramework</RootNamespace>
+    <ProjectGuid>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</ProjectGuid>
+    <RootNamespace>ScriptBinder</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -155,12 +111,9 @@
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>
-      </AdditionalIncludeDirectories>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -177,10 +130,9 @@
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -190,6 +142,24 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="Transform.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Component.h" />
+    <ClInclude Include="GameObject.h" />
+    <ClInclude Include="IComponent.h" />
+    <ClInclude Include="IObject.h" />
+    <ClInclude Include="MonoBehavior.h" />
+    <ClInclude Include="Transform.h" />
+    <ClInclude Include="TypeTrait.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

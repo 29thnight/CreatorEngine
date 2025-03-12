@@ -1,6 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Transform.h"
+#include "../ScriptBinder/Transform.h"
 #include "ObjectRenderers.h"
 
 class SceneObject

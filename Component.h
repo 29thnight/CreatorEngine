@@ -1,8 +1,9 @@
 #pragma once
-#include "Utility_Framework/IComponent.h"
+#include "ScriptBinder/IComponent.h"
+#include "Utility_Framework/Serializer.h"
 
 class Object;
-class Component : public IComponent
+class Component : public IComponent, public Serializer
 {
 public:
 	Component() = default;
@@ -11,7 +12,7 @@ public:
 	virtual void FixedUpdate(float fixedTick) override = 0;
 	virtual void Update(float tick) override = 0;
 	virtual void LateUpdate(float tick) override = 0;
-	virtual void EditorContext() override = 0;
+	virtual void EditorContext() = 0;
 	virtual void Serialize(_inout json& out) override = 0;
 	virtual void DeSerialize(_in json& in) override = 0;
 

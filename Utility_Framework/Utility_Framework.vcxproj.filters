@@ -138,9 +138,6 @@
     <ClInclude Include="IObject.h">
       <Filter>Interface</Filter>
     </ClInclude>
-    <ClInclude Include="IComponent.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
     <ClInclude Include="sqlite_modern_cpp.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>
@@ -158,6 +155,9 @@
     </ClInclude>
     <ClInclude Include="SimpleIniFile.h">
       <Filter>INILoader</Filter>
+    </ClInclude>
+    <ClInclude Include="Serializer.h">
+      <Filter>Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

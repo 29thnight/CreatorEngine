@@ -160,7 +160,6 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="InteractableComponent.h" />
     <ClInclude Include="MeshEditor.h" />
-    <ClInclude Include="MonoBehavior.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="ObjectFactory.h" />
     <ClInclude Include="ObjectTypeMeta.h" />
@@ -221,6 +220,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
+    <None Include="x64\Assets\Shaders\Lighting.hlsli">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
     <None Include="x64\Assets\Shaders\Material.hlsli">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -247,6 +250,9 @@
     </ProjectReference>
     <ProjectReference Include="RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
+    </ProjectReference>
+    <ProjectReference Include="ScriptBinder\ScriptBinder.vcxproj">
+      <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
     </ProjectReference>
     <ProjectReference Include="Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
