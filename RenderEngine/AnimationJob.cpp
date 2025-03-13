@@ -36,7 +36,10 @@ void AnimationJob::Update(Scene& scene, float deltaTime)
 
         animator.m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
         animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, animation.m_duration);
-        UpdateBone(skeleton->m_rootBone, animator, skeleton->m_rootTransform, animator.m_TimeElapsed);
+		XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
+
+		XMMATRIX rootTransform = sceneObjMatrix * skeleton->m_rootTransform;
+        UpdateBone(skeleton->m_rootBone, animator, rootTransform, animator.m_TimeElapsed);
     }
 }
 
@@ -48,15 +51,10 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
     float t = 0;
 
-	if (nodeAnim.m_positionKeys.size() == 0 || nodeAnim.m_rotationKeys.size() == 0 || nodeAnim.m_scaleKeys.size() == 0)
-	{
-		return;
-	}
-
-    // Translation
-    XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
+	XMVECTOR interpPos{ 0, 0, 0, 1 };
     if (nodeAnim.m_positionKeys.size() > 1)
     {
+        interpPos = nodeAnim.m_positionKeys[0].m_position;
         int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
         int nPosKeyIdx = posKeyIdx + 1;
 
@@ -69,9 +67,10 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     XMMATRIX translation = XMMatrixTranslationFromVector(interpPos);
 
     // Rotation
-    XMVECTOR interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
+    XMVECTOR interpQuat{};
     if (nodeAnim.m_rotationKeys.size() > 1)
     {
+		interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
         int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
         int nRotKeyIdx = rotKeyIdx + 1;
 
@@ -85,10 +84,10 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     XMMATRIX rotation = XMMatrixRotationQuaternion(interpQuat);
 
     // Scaling
-    float interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
-
+    float interpScale{ 1.f };
     if (nodeAnim.m_scaleKeys.size() > 1)
     {
+		interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
         int scalKeyIdx = CurrentKeyIndex<NodeAnimation::ScaleKey>(nodeAnim.m_scaleKeys, time);
         int nScalKeyIdx = scalKeyIdx + 1;
 
