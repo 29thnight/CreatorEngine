@@ -13,7 +13,12 @@ cbuffer PerApplication : register(b2)
     matrix projection;
 }
 
-cbuffer CameraPos : register(b3)
+cbuffer BoneTransformation : register(b3)
+{
+    matrix BoneTransforms[50];
+}
+
+cbuffer CameraPos : register(b4)
 {
     float3 cameraPos;
 }
@@ -41,6 +46,16 @@ struct VertexShaderOutput
 VertexShaderOutput main(AppData IN)
 {
     VertexShaderOutput OUT;
+    
+    if (IN.boneWeight[0] > 0)
+    {
+        matrix boneTransform = IN.boneWeight[0] * BoneTransforms[IN.boneIds[0]];
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += IN.boneWeight[i] * BoneTransforms[IN.boneIds[i]];
+        }
+        IN.position = mul(boneTransform, float4(IN.position, 1.0f));
+    }
     
     matrix vp = mul(projection, view);
     OUT.pos = mul(model, float4(IN.position, 1.0f));
