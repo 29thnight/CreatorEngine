@@ -21,6 +21,7 @@ public:
 private:
 	CameraBuffer m_CameraBuffer;
 	ComPtr<ID3D11Buffer> m_Buffer;
+	ComPtr<ID3D11Buffer> m_boneBuffer;
 
 	Texture* m_RenderTarget{};
 };

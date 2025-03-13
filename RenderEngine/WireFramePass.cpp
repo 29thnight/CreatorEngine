@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "Skeleton.h"
 #include "AssetSystem.h"
 
 WireFramePass::WireFramePass()
@@ -49,6 +50,9 @@ WireFramePass::WireFramePass()
 
     m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
     m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+    m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
 }
 
 WireFramePass::~WireFramePass()
@@ -72,10 +76,12 @@ void WireFramePass::Execute(Scene& scene)
 	scene.UseCamera(scene.m_MainCamera);
 	scene.UseModel();
 
+    DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
+
     m_CameraBuffer.m_CameraPosition = scene.m_MainCamera.m_eyePosition;
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_CameraBuffer);
-    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
+    DirectX11::PSSetConstantBuffer(4, 1, m_Buffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
 
@@ -85,6 +91,15 @@ void WireFramePass::Execute(Scene& scene)
 
 		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+        Animator* animator = meshRenderer.m_Animator;
+        if (nullptr != animator && animator->m_IsEnabled)
+        {
+            if (animator != currentAnimator)
+            {
+                DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
+                currentAnimator = animator;
+            }
+        }
 
 		meshRenderer.m_Mesh->Draw();
 	}
