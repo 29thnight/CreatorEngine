@@ -197,6 +197,9 @@
     <ClInclude Include="SceneLoader.h">
       <Filter>수정필요한것들</Filter>
     </ClInclude>
+    <ClInclude Include="QuadTree.h">
+      <Filter>수정필요한것들</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">
@@ -315,6 +318,9 @@
       <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
     <ClCompile Include="SceneLoader.cpp">
+      <Filter>수정필요한것들</Filter>
+    </ClCompile>
+    <ClCompile Include="QuadTree.cpp">
       <Filter>수정필요한것들</Filter>
     </ClCompile>
   </ItemGroup>
