@@ -165,7 +165,6 @@
     <ClInclude Include="ObjectFactory.h" />
     <ClInclude Include="ObjectTypeMeta.h" />
     <ClInclude Include="PathFinding.h" />
-    <ClInclude Include="QuadTree.h" />
     <ClInclude Include="RenderComponent.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RigidbodyComponent.h" />
@@ -199,7 +198,6 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="ObjectFactory.cpp" />
     <ClCompile Include="PathFinding.cpp" />
-    <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="RenderComponent.cpp" />
     <ClCompile Include="RigidbodyComponent.cpp" />
     <ClCompile Include="SceneLoader.cpp">
