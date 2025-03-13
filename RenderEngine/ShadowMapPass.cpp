@@ -45,9 +45,51 @@ ShadowMapPass::ShadowMapPass()
 	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 }
 
+void ShadowMapPass::Initialize(uint32 width, uint32 height)
+{
+	Texture* shadowMapTexture = Texture::Create(width, height, "Shadow Map",
+		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+	shadowMapTexture->CreateRTV(DXGI_FORMAT_R32_FLOAT);
+	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT);
+
+	m_shadowMapTexture = std::unique_ptr<Texture>(shadowMapTexture);
+
+	CD3D11_TEXTURE2D_DESC1 depthStencilDesc(
+		DXGI_FORMAT_R24G8_TYPELESS,
+		width,
+		height,
+		1,
+		1,
+		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE
+	);
+
+	ComPtr<ID3D11Texture2D1> depthStencil;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D1(
+			&depthStencilDesc,
+			nullptr,
+			&depthStencil
+		)
+	);
+
+	CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc(D3D11_DSV_DIMENSION_TEXTURE2D);
+	depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateDepthStencilView(
+			depthStencil.Get(),
+			&depthStencilViewDesc,
+			&m_shadowMapDSV
+		)
+	);
+}
+
 void ShadowMapPass::Execute(Scene& scene)
 {
 	m_pso->Apply();
+
+	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 
 	auto desc = scene.m_LightController.m_shadowMapRenderDesc;
 

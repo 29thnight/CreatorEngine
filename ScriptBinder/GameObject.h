@@ -20,18 +20,18 @@ public:
 	T* AddComponent()
 	{
 		T* component = new T();
-		_components.push_back(component);
+		m_components.push_back(component);
 		component->SetOwner(this);
-		_componentIds[component->GetId()] = _components.size();
+		m_componentIds[component->GetId()] = m_components.size();
 
-		std::ranges::sort(_components, [&](Component* a, Component* b)
+		std::ranges::sort(m_components, [&](Component* a, Component* b)
 		{
 			return a->ID() < b->ID();
 		});
 
-		foreach(iota(0, static_cast<int>(_components.size())), [&](int i)
+		foreach(iota(0, static_cast<int>(m_components.size())), [&](int i)
 		{
-			_componentIds[_components[i]->GetId()] = i;
+				m_componentIds[m_components[i]->GetId()] = i;
 		});
 
 		component->Initialize();
@@ -43,17 +43,17 @@ public:
 	T* AddComponent(Args&&... args)
 	{
 		T* component = new T(std::forward<Args>(args)...);
-		_components.push_back(component);
+		m_components.push_back(component);
 		component->SetOwner(this);
-		_componentIds[component->ID()] = _components.size();
-		std::ranges::sort(_components, [&](Component* a, Component* b)
+		m_componentIds[component->ID()] = m_components.size();
+		std::ranges::sort(m_components, [&](Component* a, Component* b)
 		{
 			return a->ID() < b->ID();
 		});
 
-		foreach(iota(0, static_cast<int>(_components.size())), [&](int i)
+		foreach(iota(0, static_cast<int>(m_components.size())), [&](int i)
 		{
-			_componentIds[_components[i]->ID()] = i;
+			m_componentIds[m_components[i]->ID()] = i;
 		});
 
 		component->Initialize();
@@ -64,16 +64,16 @@ public:
 	template<typename T>
 	T* GetComponent(uint32 id)
 	{
-		auto it = _componentIds.find(id);
-		if (it == _componentIds.end())
+		auto it = m_componentIds.find(id);
+		if (it == m_componentIds.end())
 			return nullptr;
-		return static_cast<T*>(&_components[it->second]);
+		return static_cast<T*>(&m_components[it->second]);
 	}
 
 	template<typename T>
 	T* GetComponent()
 	{
-		for (auto& component : _components)
+		for (auto& component : m_components)
 		{
 			if (T* castedComponent = dynamic_cast<T*>(component))
 				return castedComponent;
@@ -84,7 +84,7 @@ public:
 	template<typename T>
 	std::vector<T*> GetComponents() {
 		std::vector<T*> comps;
-		for (auto& component : _components)
+		for (auto& component : m_components)
 		{
 			if (T* castedComponent = dynamic_cast<T*>(component))
 				comps.push_back(castedComponent);
@@ -99,7 +99,7 @@ public:
 	}
 
 private:
-	const unsigned int m_instanceID{ GENERATE_ID };
+	const size_t m_instanceID{ GENERATE_ID };
 	std::string m_name{};
 	Scene* m_pScene{};
 	Transform m_transform{};

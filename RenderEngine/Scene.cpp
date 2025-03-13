@@ -1,8 +1,22 @@
 #include "Scene.h"
+#include "ImGuiRegister.h"
 
 Scene::Scene()
 {
 	CreateSceneObject("Root", 0);
+
+	ImGui::ContextRegister("Models", [&]() 
+	{	
+		ImGui::Text("Models");
+		ImGui::Separator();
+		for (auto& obj : m_SceneObjects)
+		{
+			ImGui::Text(obj->m_name.c_str());
+		}
+		ImGui::Separator();
+
+	});
+
 }
 
 Scene::~Scene()
@@ -13,6 +27,10 @@ Scene::~Scene()
 std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
 {
 	m_SceneObjects.push_back(sceneObject);
+
+    const_cast<SceneObject::Index&>(sceneObject->m_index) = m_SceneObjects.size() - 1;
+
+	m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
 
 	return sceneObject;
 }

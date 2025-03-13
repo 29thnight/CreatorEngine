@@ -27,7 +27,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	m_model = new Model();
 	m_model->m_node = m_AIScene->mRootNode;
 	m_model->m_SceneObject = std::make_shared<SceneObject>(
-		m_model->m_node->mName.C_Str(), 0, 0);
+		filepath.filename().string(), false, 0);
 }
 
 Model* ModelLoader::LoadModel()
@@ -52,6 +52,23 @@ void ModelLoader::ProcessMeshes()
 	{
 		aiMesh* aimesh = m_AIScene->mMeshes[i];
 		GenerateMesh(aimesh);
+	}
+
+	//ProcessMeshRecursive(m_AIScene->mRootNode);
+
+}
+
+void ModelLoader::ProcessMeshRecursive(aiNode* node)
+{
+	for (uint32 i = 0; i < node->mNumMeshes; i++)
+	{
+		aiMesh* mesh = m_AIScene->mMeshes[node->mMeshes[i]];
+		GenerateMesh(mesh);
+	}
+
+	for (uint32 i = 0; i < node->mNumChildren; i++)
+	{
+		ProcessMeshRecursive(node->mChildren[i]);
 	}
 }
 
@@ -110,8 +127,8 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 				Vertex& vertex = vertices[vertexId];
 				if (Mathf::GetFloatAtIndex(vertex.boneWeights, k) == 0.0f)
 				{
-					Mathf::SetFloatAtIndex(vertex.boneWeights, k, weightValue);
 					Mathf::SetFloatAtIndex(vertex.boneIndices, k, boneIndex);
+					Mathf::SetFloatAtIndex(vertex.boneWeights, k, weightValue);
 					break;
 				}
 			}
@@ -121,15 +138,19 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 
 void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int parentIndex)
 {
+	int nextIndex = parentIndex;
+	if (true == isRoot)
+	{
+		m_model->m_SceneObject = m_scene->AddSceneObject(m_model->m_SceneObject);
+		nextIndex = m_model->m_SceneObject->m_index;
+	}
+
 	if (node->mNumMeshes > 0)
 	{
 		for (UINT i = 0; i < node->mNumMeshes; ++i)
 		{
-			std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), parentIndex);
-			if (false == isRoot)
-			{
-				m_model->m_SceneObject = object;
-			}
+			std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), nextIndex);
+
 			unsigned int meshId = node->mMeshes[i];
 			Mesh* mesh = m_model->m_Meshes[meshId];
 			Material* material = m_model->m_Materials[meshId];
@@ -144,12 +165,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int pa
 				meshRenderer.m_Animator = m_animator;
 			}
 			isRoot = false;
-			parentIndex = object->m_index;
+			nextIndex = object->m_index;
 		}
 	}
 
 	for (UINT i = 0; i < node->mNumChildren; ++i)
 	{
-		GenerateSceneObjectHierarchy(node->mChildren[i], false, parentIndex);
+		GenerateSceneObjectHierarchy(node->mChildren[i], false, nextIndex);
 	}
 }

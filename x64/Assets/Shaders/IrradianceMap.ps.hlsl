@@ -22,10 +22,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     up = cross(normal, right);
 
     float nrSamples = 0.0;
-    [unroll(35)]
+
     for (float phi = 0.0; phi < 2.0 * PI; phi += SAMPLE_DELTA)
     {
-        [unroll]
         for (float theta = 0.0; theta < 0.5 * PI; theta += SAMPLE_DELTA)
         {
             // spherical to cartesian (in tangent space)

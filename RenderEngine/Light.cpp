@@ -114,11 +114,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	m_shadowMapRenderDesc = desc;
 	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &shadowMapConstant);
 
-	Texture* shadowMapTexture = Texture::Create(desc.m_textureWidth, desc.m_textureHeight, "Shadow Map", 
-		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
-	shadowMapTexture->CreateRTV(DXGI_FORMAT_R32_FLOAT);
-	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT);
-	m_shadowMapTexture = std::unique_ptr<Texture>(shadowMapTexture);
+	m_shadowMapPass->Initialize(desc.m_viewWidth, desc.m_viewHeight);
 	hasLightWithShadows = true;
 }
 
@@ -132,5 +128,5 @@ void LightController::RenderAnyShadowMap(Scene& scene)
 
 Texture* LightController::GetShadowMapTexture()
 {
-	return m_shadowMapTexture.get();
+	return m_shadowMapPass->m_shadowMapTexture.get();
 }

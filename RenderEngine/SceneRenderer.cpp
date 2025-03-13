@@ -184,21 +184,15 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_viewHeight = 12;
 		desc.m_nearPlane = 0.1f;
 		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = DeviceState::g_ClientRect.width;
-		desc.m_textureHeight = DeviceState::g_ClientRect.height;
+		desc.m_textureWidth = 8192;//DeviceState::g_ClientRect.width; 
+		desc.m_textureHeight = 8192;//DeviceState::g_ClientRect.height;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		//model = Model::LoadModel("Prop_Block.fbx");
-		model = Model::LoadModel("Sphere.fbx");
+		model = Model::LoadModel("SkinningTest.fbx");
+		//model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		ImGui::ContextRegister("TestModelMaterial", [&]()
-		{
-			ImGui::SliderFloat4("BaseColor", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_baseColor.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Metallic", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic, 0.0f, 1.0f);
-			ImGui::SliderFloat("Roughness", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness, 0.1f, 1.0f);
-		});
 	}
 	else
 	{
@@ -222,18 +216,16 @@ void SceneRenderer::Initialize(Scene* _pScene)
 void SceneRenderer::Update(float deltaTime)
 {
 	m_currentScene->Update(deltaTime);
+	PrepareRender();
 }
 
 void SceneRenderer::Render()
 {
 	model->m_SceneObject->m_transform
-		.SetScale({ 0.1f, 0.1f, 0.1f })
-		.SetPosition({ 2.f, 0.5f, -2.f });
+		.SetScale({ 1.01f, 1.01f, 1.01f });
 
 	//[1] ShadowMapPass
 	{
-		Texture& shadowMapTexture = (*m_currentScene->m_LightController.GetShadowMapTexture());
-		SetRenderTargets(shadowMapTexture);
 		m_currentScene->ShadowStage();
 		Clear(DirectX::Colors::Transparent, 1.0f, 0);
 		UnbindRenderTargets();
@@ -256,7 +248,8 @@ void SceneRenderer::Render()
     }
 
 	//[*] WireFramePass
-	if(useWireFrame){
+	if(useWireFrame)
+	{
 		m_pWireFramePass->Execute(*m_currentScene);
 	}
 
@@ -278,6 +271,26 @@ void SceneRenderer::Render()
 	//[8] BlitPass
 	{
 		m_pBlitPass->Execute(*m_currentScene);
+	}
+}
+
+void SceneRenderer::PrepareRender()
+{
+	for (auto& obj : m_currentScene->m_SceneObjects)
+	{
+		if (!obj->m_meshRenderer.m_IsEnabled) continue;
+
+		Material* mat = obj->m_meshRenderer.m_Material;
+
+		switch (mat->m_renderingMode)
+		{
+		case Material::RenderingMode::Opaque:
+			m_pGBufferPass->PushDeferredQueue(obj.get());
+			break;
+		case Material::RenderingMode::Transparent:
+			break;
+		}
+
 	}
 }
 

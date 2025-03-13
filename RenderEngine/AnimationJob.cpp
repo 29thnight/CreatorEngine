@@ -48,6 +48,11 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
     float t = 0;
 
+	if (nodeAnim.m_positionKeys.size() == 0 || nodeAnim.m_rotationKeys.size() == 0 || nodeAnim.m_scaleKeys.size() == 0)
+	{
+		return;
+	}
+
     // Translation
     XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
     if (nodeAnim.m_positionKeys.size() > 1)

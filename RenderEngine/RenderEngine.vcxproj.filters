@@ -107,9 +107,6 @@
     <ClCompile Include="SceneRenderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Transform.cpp">
-      <Filter>Objects</Filter>
-    </ClCompile>
     <ClCompile Include="AnimationLoader.cpp">
       <Filter>Asset\Loader</Filter>
     </ClCompile>
@@ -197,14 +194,14 @@
     <ClCompile Include="SkyBoxPass.cpp">
       <Filter>RenderPass\SkyBoxPass</Filter>
     </ClCompile>
-    <ClCompile Include="BlitPass.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="SpritePass.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="WireFramePass.cpp">
       <Filter>RenderPass\WireFramePass</Filter>
+    </ClCompile>
+    <ClCompile Include="SpritePass.cpp">
+      <Filter>RenderPass\SpritePass</Filter>
+    </ClCompile>
+    <ClCompile Include="BlitPass.cpp">
+      <Filter>RenderPass\BlitPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -218,9 +215,6 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
-      <Filter>Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="AnimationLoader.h">
@@ -325,14 +319,14 @@
     <ClInclude Include="SkyBoxPass.h">
       <Filter>RenderPass\SkyBoxPass</Filter>
     </ClInclude>
-    <ClInclude Include="BlitPass.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="SpritePass.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="WireFramePass.h">
       <Filter>RenderPass\WireFramePass</Filter>
+    </ClInclude>
+    <ClInclude Include="SpritePass.h">
+      <Filter>RenderPass\SpritePass</Filter>
+    </ClInclude>
+    <ClInclude Include="BlitPass.h">
+      <Filter>RenderPass\BlitPass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

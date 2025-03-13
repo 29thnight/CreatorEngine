@@ -3,6 +3,7 @@
 #include "CoreWindow.h"
 #include "DirectXMath.h"
 #include "Core.Memory.hpp"
+#include "DirectXColors.h"
 
 using namespace DirectX;
 
@@ -448,6 +449,8 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
                 &m_d3dRenderTargetView
             )
         );
+
+        m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), Colors::SlateGray);
 
 		DirectX::SetName(backBuffer.Get(), "BackBuffer");
         //백버퍼 텍스쳐 받아오기

@@ -25,6 +25,7 @@ private:
 	
 	Model* LoadModel();
 	void ProcessMeshes();
+	void ProcessMeshRecursive(aiNode* node);
 	Mesh* GenerateMesh(aiMesh* mesh);
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
 	void GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int parentIndex);

@@ -58,7 +58,8 @@ Mathf::xMatrix Transform::GetInverseMatrix() const
 void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 {
 	m_localMatrix = matrix;
-	m_dirty = true;
+	DirectX::XMMatrixDecompose(&scale, &rotation, &position, m_localMatrix);
+	m_dirty = false;
 }
 
 void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)

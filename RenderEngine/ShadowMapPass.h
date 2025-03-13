@@ -30,5 +30,10 @@ class ShadowMapPass final : public IRenderPass
 {
 public:
 	ShadowMapPass();
+
+	void Initialize(uint32 width, uint32 height);
 	void Execute(Scene& scene) override;
+
+	std::unique_ptr<Texture> m_shadowMapTexture{};
+	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
 };

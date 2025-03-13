@@ -76,13 +76,16 @@ void InputManager::SetMousePos(POINT pos)
     _mousePos = pos;
 }
 
-POINT InputManager::GetMousePos() const
+float2 InputManager::GetMousePos() const
 {
     POINT mousePos;
     ::GetCursorPos(&mousePos);
     ScreenToClient(_hWnd, &mousePos);
     //return _mousePos;
-	return mousePos;
+
+	float2 mousePosFloat = { static_cast<float>(mousePos.x), static_cast<float>(mousePos.y) };
+
+	return mousePosFloat;
 }
 
 float2 InputManager::GetMouseDelta() const
