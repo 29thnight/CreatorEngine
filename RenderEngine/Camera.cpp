@@ -91,17 +91,22 @@ void Camera::HandleMovement(float deltaTime)
 		y += 1.f;
 	}
 
+	//Change the Camera Rotaition Quaternion
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
-		m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
-		m_pitch = fmax(-pi, fmin(m_pitch, pi));
-		m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
-		if (m_yaw > XM_PI) m_yaw -= pi2;
-		if (m_yaw < -XM_PI) m_yaw += pi2;
+		Mathf::Quaternion rotation = m_rotation;
+		rotation.x += InputManagement->GetMouseDelta().y * 0.01f;
+		rotation.y += InputManagement->GetMouseDelta().x * 0.01f;
 
-		Mathf::xVector viewRotation = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.f);
-		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, viewRotation));
-		m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
+		m_rotation = rotation;
+
+		Mathf::xMatrix rotationMatrix = XMMatrixRotationQuaternion(m_rotation);
+		m_forward = XMVector3Transform(FORWARD, rotationMatrix);
+		m_right = XMVector3Transform(RIGHT, rotationMatrix);
+		m_up = XMVector3Transform(UP, rotationMatrix);
+
+		m_pitch = asin(XMVectorGetY(m_forward));
+		m_yaw = atan2(XMVectorGetX(m_forward), XMVectorGetZ(m_forward));
 	}
 
 	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))

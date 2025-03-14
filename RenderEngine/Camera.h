@@ -14,6 +14,7 @@ public:
 	Mathf::xVector m_right{ RIGHT };
 	Mathf::xVector m_up{ UP };
 	Mathf::xVector m_lookAt{ m_eyePosition + m_forward };
+	Mathf::xVector m_rotation{ 0.f, 0.f, 0.f, 1.f };
 
 	float m_pitch{ 0.f };
 	float m_yaw{ 0.f };
