@@ -44,10 +44,10 @@ public:
 		while (_parent->right - _parent->left > nodeSize)
 		{
 
-			QuadNode* leftTopNode = new Node({ _parent->left, (_parent->left + _parent->right) / 2, _parent->top, (_parent->top + _parent->bottom) / 2 }, nodeSize);
-			QuadNode* rightTopNode = new Node({ (_parent->left + _parent->right) / 2, _parent->right, _parent->top, (_parent->top + _parent->bottom) / 2 }, nodeSize);
-			QuadNode* leftBottomNode = new Node({ _parent->left, (_parent->left + _parent->right) / 2, (_parent->top + _parent->bottom) / 2, _parent->bottom }, nodeSize);
-			QuadNode* rightBottomNode = new Node({ (_parent->left + _parent->right) / 2, _parent->right, (_parent->top + _parent->bottom) / 2, _parent->bottom }, nodeSize);
+			QuadNode* leftTopNode = new QuadNode({ _parent->left, (_parent->left + _parent->right) / 2, _parent->top, (_parent->top + _parent->bottom) / 2 }, nodeSize);
+			QuadNode* rightTopNode = new QuadNode({ (_parent->left + _parent->right) / 2, _parent->right, _parent->top, (_parent->top + _parent->bottom) / 2 }, nodeSize);
+			QuadNode* leftBottomNode = new QuadNode({ _parent->left, (_parent->left + _parent->right) / 2, (_parent->top + _parent->bottom) / 2, _parent->bottom }, nodeSize);
+			QuadNode* rightBottomNode = new QuadNode({ (_parent->left + _parent->right) / 2, _parent->right, (_parent->top + _parent->bottom) / 2, _parent->bottom }, nodeSize);
 
 			AddChild(leftTopNode);
 			AddChild(rightTopNode);
