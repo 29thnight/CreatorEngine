@@ -83,6 +83,7 @@ public:
 class QuadTree
 {
 public:
+	QuadTree();
 	QuadTree(Mathf::Vector4 _size, int _nodeSize);
 	~QuadTree();
 	//루트노드부터 크기를 받아서 계속 나눈다  
