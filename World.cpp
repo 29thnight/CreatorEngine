@@ -19,6 +19,7 @@
 #include "../GridEditor.h"
 #include "GameManager.h"
 #include "EventSystem.h"
+#include "ImGuizmo.h"
 
 static char nameBuffer[256] = ""; // 입력된 이름을 저장할 임시 버퍼
 static char scenePath[256] = "SampleScene.json";
@@ -32,6 +33,9 @@ static bool createObject = false; // 오브젝트 생성 플래그
 static std::string userName = ""; // 최종 입력된 이름 저장
 static std::string objType = "Object";  //생성할 오브젝트의 타입의 number Flag
 static int openStep = 0;          // 팝업 단계
+
+
+
 
 std::wstring ConvertToWString(const char* charArray)
 {

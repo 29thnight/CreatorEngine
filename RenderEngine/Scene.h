@@ -30,6 +30,7 @@ public:
 	void EditorSceneObjectHierarchy();
 	void EditorSceneObjectInspector();
 
+	SceneObject* GetSelectSceneObject() { return m_selectedSceneObject; }
 private:
 	void UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model);
 	

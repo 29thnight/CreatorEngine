@@ -1,8 +1,166 @@
 #include "SceneRenderer.h"
+#include "SceneRenderer.h"
 #include "DeviceState.h"
 #include "AssetSystem.h"
 #include "Scene.h"
 #include "ImGuiRegister.h"
+
+
+// imguizmo 
+#include "ImGuizmo.h"
+static const float identityMatrix[16] =
+{ 1.f, 0.f, 0.f, 0.f,
+	0.f, 1.f, 0.f, 0.f,
+	0.f, 0.f, 1.f, 0.f,
+	0.f, 0.f, 0.f, 1.f };
+bool useWindow = true;
+bool editWindow = true;
+int gizmoCount = 1;
+float camDistance = 8.f;
+static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
+void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam)
+{
+	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
+	static bool useSnap = false;
+	static float snap[3] = { 1.f, 1.f, 1.f };
+	static float bounds[] = { -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f };
+	static float boundsSnap[] = { 0.1f, 0.1f, 0.1f };
+	static bool boundSizing = false;
+	static bool boundSizingSnap = false;
+
+
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::BeginFrame();
+
+	if (editTransformDecomposition)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_T))
+			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+		if (ImGui::IsKeyPressed(ImGuiKey_G))
+			mCurrentGizmoOperation = ImGuizmo::ROTATE;
+		if (ImGui::IsKeyPressed(ImGuiKey_R)) // r Key
+			mCurrentGizmoOperation = ImGuizmo::SCALE;
+		if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))
+			mCurrentGizmoOperation = ImGuizmo::ROTATE;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+			mCurrentGizmoOperation = ImGuizmo::SCALE;
+		if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
+			mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+		float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+		ImGuizmo::DecomposeMatrixToComponents(matrix, matrixTranslation, matrixRotation, matrixScale);
+		ImGui::InputFloat3("Tr", matrixTranslation);
+		ImGui::InputFloat3("Rt", matrixRotation);
+		ImGui::InputFloat3("Sc", matrixScale);
+		ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation, matrixScale, matrix);
+
+		if (mCurrentGizmoOperation != ImGuizmo::SCALE)
+		{
+			if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+				mCurrentGizmoMode = ImGuizmo::LOCAL;
+			ImGui::SameLine();
+			if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+				mCurrentGizmoMode = ImGuizmo::WORLD;
+		}
+		if (ImGui::IsKeyPressed(ImGuiKey_F))
+			useSnap = !useSnap;
+		ImGui::Checkbox("##UseSnap", &useSnap);
+		ImGui::SameLine();
+
+		switch (mCurrentGizmoOperation)
+		{
+		case ImGuizmo::TRANSLATE:
+			ImGui::InputFloat3("Snap", &snap[0]);
+			break;
+		case ImGuizmo::ROTATE:
+			ImGui::InputFloat("Angle Snap", &snap[0]);
+			break;
+		case ImGuizmo::SCALE:
+			ImGui::InputFloat("Scale Snap", &snap[0]);
+			break;
+		}
+		ImGui::Checkbox("Bound Sizing", &boundSizing);
+		if (boundSizing)
+		{
+			ImGui::PushID(3);
+			ImGui::Checkbox("##BoundSizing", &boundSizingSnap);
+			ImGui::SameLine();
+			ImGui::InputFloat3("Snap", boundsSnap);
+			ImGui::PopID();
+		}
+	}
+
+	ImGuiIO& io = ImGui::GetIO();
+	float viewManipulateRight = io.DisplaySize.x;
+	float viewManipulateTop = 0;
+	static ImGuiWindowFlags gizmoWindowFlags = 0;
+	if (useWindow)
+	{
+		ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
+		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
+		ImGuizmo::SetDrawlist();
+
+		//std::cout << ImGui::GetMousePos().x <<", " << ImGui::GetMousePos().y<< std::endl;
+
+		float windowWidth = (float)ImGui::GetWindowWidth();
+		float windowHeight = (float)ImGui::GetWindowHeight();
+		ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
+		viewManipulateTop = ImGui::GetWindowPos().y;
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		gizmoWindowFlags = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
+
+		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
+		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
+
+		ImGui::Image((ImTextureID)m_colorTexture->m_pSRV, ImVec2(x, y));
+		//ImGui::Image((ImTextureID)sceneRenderer->GetMeshEditorTarget()->GetSRV(),
+		//	ImVec2(450, 560));
+		//ImGui::End();
+
+		//std::cout << window->InnerRect.Min.x <<", " << window->InnerRect.Min.y << std::endl;
+	}
+	else
+	{
+		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+	}
+
+
+	//ImGuizmo::DrawCubes(cameraView, cameraProjection, &objectMatrix[0][0], gizmoCount);
+	ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
+
+	{
+		XMVECTOR poss;
+		XMVECTOR rots;
+		XMVECTOR scales;
+		XMMatrixDecompose(&scales, &rots, &poss, XMMATRIX(cameraView));
+		//cam->m_eyePosition = poss;
+		//cam->m_rotation = rot;
+	}
+
+	XMVECTOR pos;
+	XMVECTOR rot;
+	XMVECTOR scale;
+	XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
+	obj->m_transform.SetPosition(pos * 0.1f);
+	//obj->SetRotation(rot.ToEuler() * 57.295779513f);
+	obj->m_transform.SetScale(scale);
+
+	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
+
+	if (useWindow)
+	{
+		ImGui::End();
+		ImGui::PopStyleColor(1);
+	}
+}
+// end
+
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
@@ -319,4 +477,23 @@ void SceneRenderer::UnbindRenderTargets()
 	ID3D11RenderTargetView* nullRTV = nullptr;
 	ID3D11DepthStencilView* nullDSV = nullptr;
 	DirectX11::OMSetRenderTargets(1, &nullRTV, nullDSV);
+}
+
+void SceneRenderer::EditorView()
+{
+	auto obj = m_currentScene->GetSelectSceneObject();
+	if (obj) {
+		auto mat = obj->m_transform.GetLocalMatrix();
+		XMFLOAT4X4 objMat;
+		XMStoreFloat4x4(&objMat, mat);
+		auto view = m_currentScene->m_MainCamera.CalculateView();
+		XMFLOAT4X4 floatMatrix;
+		XMStoreFloat4x4(&floatMatrix, view);
+		auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		XMFLOAT4X4 projMatrix;
+		XMStoreFloat4x4(&projMatrix, proj);
+
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, &m_currentScene->m_MainCamera);
+
+	}
 }

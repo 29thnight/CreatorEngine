@@ -81,7 +81,7 @@ void WireFramePass::Execute(Scene& scene)
     m_CameraBuffer.m_CameraPosition = scene.m_MainCamera.m_eyePosition;
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_CameraBuffer);
-    DirectX11::PSSetConstantBuffer(4, 1, m_Buffer.GetAddressOf());
+    DirectX11::VSSetConstantBuffer(4, 1, m_Buffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
 
