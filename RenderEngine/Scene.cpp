@@ -1,6 +1,10 @@
 #include "Scene.h"
 #include "ImGuiRegister.h"
 
+
+
+
+
 Scene::Scene()
 {
 	CreateSceneObject("Root", 0);
@@ -168,8 +172,6 @@ void Scene::EditorSceneObjectInspector()
 			m_selectedSceneObject->m_transform.rotation = rotation;
 			m_selectedSceneObject->m_transform.scale = scale;
 			m_selectedSceneObject->m_transform.m_dirty = true;
-
-			m_selectedSceneObject->m_transform.GetLocalMatrix();
 		}
 	});
 }

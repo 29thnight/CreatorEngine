@@ -72,4 +72,8 @@ public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }
 private:
 	bool useWireFrame = false;
+
+public:
+	void EditorView();
+	void EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam);
 };

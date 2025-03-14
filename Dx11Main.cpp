@@ -223,7 +223,12 @@ bool DirectX11::Dx11Main::Render()
 	{
 		m_imguiRenderer->BeginRender();
 		//m_D2DRenderer->ImGuiRenderStage();
+		m_sceneRenderer->EditorView();
 		m_imguiRenderer->Render();
+
+
+		// editor only
+
 		LoggerSystem->Draw("Logger");
 		//MeshEditorSystem->ShowMainUI();
 		//m_btEditor.ShowMainUI();
