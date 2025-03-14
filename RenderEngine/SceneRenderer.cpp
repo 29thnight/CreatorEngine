@@ -147,7 +147,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	XMVECTOR rot;
 	XMVECTOR scale;
 	XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
-	obj->m_transform.SetPosition(pos * 0.1f);
+	obj->m_transform.SetPosition(pos);
 	//obj->SetRotation(rot.ToEuler() * 57.295779513f);
 	obj->m_transform.SetScale(scale);
 
