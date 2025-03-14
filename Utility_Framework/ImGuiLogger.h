@@ -52,7 +52,7 @@ public:
     {
         ImGui::Begin(title);
 
-        if (ImGui::Button("Clear"))
+        if (ImGui::Button("Clear") || logs.size() > 2000)
         {
             logs.clear();
         }

@@ -8,7 +8,7 @@ struct Vertex
 	Mathf::Vector2 uv;
 	Mathf::Vector3 tangent;
 	Mathf::Vector3 bitangent;
-	Mathf::Vector4 boneIndices;
+	Mathf::Vector4 boneIndices{ -1, -1, -1, -1 };
 	Mathf::Vector4 boneWeights;
 
 	Vertex() = default;

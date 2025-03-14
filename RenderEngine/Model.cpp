@@ -40,6 +40,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
     Assimp::Importer importer;
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+	importer.SetPropertyBool(AI_CONFIG_FBX_CONVERT_TO_M, true);
 
     const aiScene* assimpScene = importer.ReadFile(filePath.data(),
 		aiProcess_LimitBoneWeights |
@@ -66,6 +67,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	Assimp::Importer importer;
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+	importer.SetPropertyBool(AI_CONFIG_FBX_CONVERT_TO_M, true);
 
 	const aiScene* assimpScene = importer.ReadFile(path_.string(),
 		aiProcess_LimitBoneWeights |

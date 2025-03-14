@@ -57,6 +57,8 @@ void SceneObject::RenderBoneEditor()
 			ImGui::DragFloat3("##Rotation", &selectedBone->m_globalTransform.r[0].m128_f32[0], -3.14f, 3.14f);
 			ImGui::Text("Scale");
 			ImGui::DragFloat3("##Scale", &selectedBone->m_globalTransform.r[0].m128_f32[1], 0.1f, 10);
+			ImGui::Text("Bone Index");
+			ImGui::InputInt("##Bone Index", &selectedBone->m_index);
 		}
 	});
 }

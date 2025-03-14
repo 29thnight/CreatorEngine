@@ -49,30 +49,39 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     Skeleton* skeleton = animator.m_Skeleton;
     Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
     std::string& boneName = bone->m_name;
-    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
-    float t = 0;
 
 	XMMATRIX transform = XMMatrixIdentity();
 
-	if (nodeAnim.m_scaleKeys.size() > 0)
+	// 애니메이션 데이터가 없으면 기본값(identity) 사용
+	if (animation.m_nodeAnimations.find(boneName) != animation.m_nodeAnimations.end())
 	{
-		XMMATRIX scale = InterpolateScale(nodeAnim, time);
-		transform *= scale;
-	}
-	if (nodeAnim.m_rotationKeys.size() > 0)
-	{
-		XMMATRIX rot = InterpolateRotation(nodeAnim, time);
-		transform *= rot;
-	}
-	if (nodeAnim.m_positionKeys.size() > 0)
-	{
-		XMMATRIX pos = InterpolatePosition(nodeAnim, time);
-		transform *= pos;
+		NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
+
+		if (nodeAnim.m_scaleKeys.size() > 0)
+		{
+			XMMATRIX scale = InterpolateScale(nodeAnim, time);
+			transform *= scale;
+		}
+		if (nodeAnim.m_rotationKeys.size() > 0)
+		{
+			XMMATRIX rot = InterpolateRotation(nodeAnim, time);
+			transform *= rot;
+		}
+		if (nodeAnim.m_positionKeys.size() > 0)
+		{
+			XMMATRIX pos = InterpolatePosition(nodeAnim, time);
+			transform *= pos;
+		}
 	}
 
 	XMMATRIX globalTransform = transform * parentTransform;
 	animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
 	bone->m_globalTransform = globalTransform;
+
+	if ("mixamorig:RightToe_End" == bone->m_name)
+	{
+		LoggerSystem->AddMatrixLog(animator.m_FinalTransforms[bone->m_index], std::string(bone->m_name + "Final").c_str());
+	}
 
 	for (auto child : bone->m_children)
 	{
