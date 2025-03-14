@@ -7,8 +7,8 @@ bool SoundManager::initialize(int maxChannels)
     _inputMaxChannels = maxChannels;
     Initialize();
 
-    _soundLoaderThread = std::thread(&SoundManager::SoundLoaderThread, this);
-    _soundLoaderThread.detach();
+    //_soundLoaderThread = std::thread(&SoundManager::SoundLoaderThread, this);
+    //_soundLoaderThread.detach();
 
     return true;
 }

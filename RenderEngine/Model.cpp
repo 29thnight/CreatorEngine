@@ -38,10 +38,12 @@ Model* Model::LoadModel(const std::string_view& filePath)
 {
 	file::path path_ = filePath.data();
     Assimp::Importer importer;
+	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+
     const aiScene* assimpScene = importer.ReadFile(filePath.data(),
-        aiProcess_Triangulate |
-        aiProcess_GenSmoothNormals |
-        aiProcess_CalcTangentSpace |
+		aiProcess_LimitBoneWeights |
+		aiProcessPreset_TargetRealtime_Quality |
         aiProcess_ConvertToLeftHanded
     );
 
@@ -62,10 +64,12 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
 	Assimp::Importer importer;
+	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+
 	const aiScene* assimpScene = importer.ReadFile(path_.string(),
-		aiProcess_Triangulate |
-		aiProcess_GenSmoothNormals |
-		aiProcess_CalcTangentSpace |
+		aiProcess_LimitBoneWeights |
+		aiProcessPreset_TargetRealtime_Quality |
 		aiProcess_ConvertToLeftHanded
 	);
 	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, model->m_SceneObject->m_index);

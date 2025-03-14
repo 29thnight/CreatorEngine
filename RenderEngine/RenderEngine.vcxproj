@@ -113,7 +113,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -133,7 +133,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -173,11 +173,12 @@
     <ClCompile Include="SkyBoxPass.cpp" />
     <ClCompile Include="SpritePass.cpp" />
     <ClCompile Include="SSAOPass.cpp" />
+    <ClCompile Include="TAAPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
-    <ClCompile Include="Transform.cpp" />
     <ClCompile Include="UI_DataSystem.cpp" />
     <ClCompile Include="widgets.cpp" />
+    <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnimationJob.h" />
@@ -216,11 +217,12 @@
     <ClInclude Include="SkyBoxPass.h" />
     <ClInclude Include="SpritePass.h" />
     <ClInclude Include="SSAOPass.h" />
+    <ClInclude Include="TAAPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
-    <ClInclude Include="Transform.h" />
     <ClInclude Include="UI_DataSystem.h" />
     <ClInclude Include="widgets.h" />
+    <ClInclude Include="WireFramePass.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

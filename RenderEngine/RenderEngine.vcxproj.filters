@@ -99,13 +99,16 @@
     <Filter Include="RenderPass\ForwardPass">
       <UniqueIdentifier>{64b7272b-de19-484c-9d60-13b87909eb48}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\WireFramePass">
+      <UniqueIdentifier>{f2f829c8-d1db-42f3-bd42-058d669c1e6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\TAAPass">
+      <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
       <Filter>Renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="Transform.cpp">
-      <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="AnimationLoader.cpp">
       <Filter>Asset\Loader</Filter>
@@ -194,6 +197,18 @@
     <ClCompile Include="SkyBoxPass.cpp">
       <Filter>RenderPass\SkyBoxPass</Filter>
     </ClCompile>
+    <ClCompile Include="WireFramePass.cpp">
+      <Filter>RenderPass\WireFramePass</Filter>
+    </ClCompile>
+    <ClCompile Include="SpritePass.cpp">
+      <Filter>RenderPass\SpritePass</Filter>
+    </ClCompile>
+    <ClCompile Include="BlitPass.cpp">
+      <Filter>RenderPass\BlitPass</Filter>
+    </ClCompile>
+    <ClCompile Include="TAAPass.cpp">
+      <Filter>RenderPass\TAAPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -206,9 +221,6 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
-      <Filter>Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="AnimationLoader.h">
@@ -312,6 +324,18 @@
     </ClInclude>
     <ClInclude Include="SkyBoxPass.h">
       <Filter>RenderPass\SkyBoxPass</Filter>
+    </ClInclude>
+    <ClInclude Include="WireFramePass.h">
+      <Filter>RenderPass\WireFramePass</Filter>
+    </ClInclude>
+    <ClInclude Include="SpritePass.h">
+      <Filter>RenderPass\SpritePass</Filter>
+    </ClInclude>
+    <ClInclude Include="BlitPass.h">
+      <Filter>RenderPass\BlitPass</Filter>
+    </ClInclude>
+    <ClInclude Include="TAAPass.h">
+      <Filter>RenderPass\TAAPass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -67,6 +67,12 @@
     <Filter Include="INILoader">
       <UniqueIdentifier>{10a74b62-715e-498d-8216-efd46b990009}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Profiler">
+      <UniqueIdentifier>{8e625e3d-b297-4292-84e1-24290e648c3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGuiLogger">
+      <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -138,9 +144,6 @@
     <ClInclude Include="IObject.h">
       <Filter>Interface</Filter>
     </ClInclude>
-    <ClInclude Include="IComponent.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
     <ClInclude Include="sqlite_modern_cpp.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>
@@ -158,6 +161,12 @@
     </ClInclude>
     <ClInclude Include="SimpleIniFile.h">
       <Filter>INILoader</Filter>
+    </ClInclude>
+    <ClInclude Include="Serializer.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiLogger.h">
+      <Filter>ImGuiLogger</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

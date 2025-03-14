@@ -55,6 +55,7 @@ void BlitPass::Initialize(Texture* src, ID3D11RenderTargetView* backBufferRTV)
 void BlitPass::Execute(Scene& scene)
 {
     m_pso->Apply();
+
 	ID3D11RenderTargetView* rtv = m_backBufferRTV;
 	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 

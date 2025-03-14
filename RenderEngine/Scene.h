@@ -27,10 +27,15 @@ public:
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UseCamera(Camera& camera);
 
+	void EditorSceneObjectHierarchy();
+	void EditorSceneObjectInspector();
+
 private:
 	void UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model);
 	
 	AnimationJob m_animationJob{};
+
+	SceneObject* m_selectedSceneObject = nullptr;
 
 	ID3D11Buffer* m_ModelBuffer;
 	ID3D11Buffer* m_ViewBuffer;

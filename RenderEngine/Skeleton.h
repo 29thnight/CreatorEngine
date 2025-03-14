@@ -13,7 +13,7 @@ public:
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;
 	~Skeleton();
-	static constexpr uint32 MAX_BONES{ 50 };
+	static constexpr uint32 MAX_BONES{ 512 };
 };
 
 class Bone
@@ -31,6 +31,7 @@ public:
 		m_offset(_offset),
 		m_globalTransform(XMMatrixIdentity())
 	{
+
 	}
 };
 

@@ -10,6 +10,7 @@
 #include "GridEditor.h"
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/ImGuiLogger.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -164,6 +165,9 @@ void DirectX11::Dx11Main::Update()
 		loadlevel = 0;
 		Event->Publish("ChangeScene", &loadlevel);
 	}
+	if (InputManagement->IsKeyDown(VK_F11)) {
+		m_sceneRenderer->SetWireFrame();
+	}
 #endif // !EDITOR
 	if (InputManagement->IsKeyReleased(VK_F8))
 	{
@@ -179,128 +183,6 @@ void DirectX11::Dx11Main::Update()
 	}
 
 #if defined(EDITOR)
-	if(m_isSelectUI)
-	{
-		if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-		{
-			float mouseX = InputManagement->GetMouseDelta().x;
-			float mouseY = InputManagement->GetMouseDelta().y;
-			auto canvas = m_D2DRenderer->GetCurCanvas();
-			if (canvas != nullptr)
-			{
-				auto& objlist = canvas->getObjList();
-				for (auto& obj : objlist)
-				{
-					if (obj->m_IsSelected && !obj->m_IsPosLock)
-					{
-						InputManagement->HideCursor();
-						obj->Pos += { mouseX, mouseY };
-					}
-				}
-			}
-		}
-	}
-
-	if (m_isSelectText)
-	{
-		if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-		{
-			float mouseX = InputManagement->GetMouseDelta().x;
-			float mouseY = InputManagement->GetMouseDelta().y;
-			auto canvas = m_D2DRenderer->GetCurCanvas();
-			if (canvas != nullptr)
-			{
-				auto& textlist = canvas->getTextList();
-				for (auto& text : textlist)
-				{
-					if (text->m_IsSelected)
-					{
-						InputManagement->HideCursor();
-						text->Pos += { mouseX, mouseY };
-					}
-				}
-			}
-		}
-	}
-
-	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
-	{
-		if (m_isSelectUI)
-		{
-			auto canvas = m_D2DRenderer->GetCurCanvas();
-			if (canvas != nullptr)
-			{
-				auto& objlist = canvas->getObjList();
-				for (auto& obj : objlist)
-				{
-					if (obj->m_IsSelected)
-					{
-						InputManagement->ShowCursor();
-						obj->m_IsSelected = false;
-					}
-				}
-			}
-			m_isSelectUI = false;
-		}
-
-		if (m_isSelectText)
-		{
-			auto canvas = m_D2DRenderer->GetCurCanvas();
-			if (canvas != nullptr)
-			{
-				auto& textlist = canvas->getTextList();
-				for (auto& text : textlist)
-				{
-					if (text->m_IsSelected)
-					{
-						InputManagement->ShowCursor();
-						text->m_IsSelected = false;
-					}
-				}
-			}
-			m_isSelectText = false;
-		}
-	}
-
-	if (InputManagement->IsMouseButtonPressed(MouseKey::LEFT)) 
-	{ //클릭 이벤트 처리
-		float mouseX = InputManagement->GetMousePos().x;
-		float mouseY = InputManagement->GetMousePos().y;
-
-		auto canvas = m_D2DRenderer->GetCurCanvas();
-		if (canvas!=nullptr)
-		{
-			auto& objlist = canvas->getObjList();
-			for (auto& obj : objlist)
-			{
-				if (!m_isSelectUI && !m_isSelectText && obj->m_Visible && obj->m_IsDeSerialize)
-				{
-					AABB aabb = { obj->Pos.x, obj->Pos.y, obj->m_Size.x, obj->m_Size.y };
-					if (aabb.Contains(mouseX, mouseY))
-					{
-						std::cout << "click : " << obj->m_Name << std::endl;
-						obj->m_IsSelected = true;
-						m_isSelectUI = true;
-					}
-				}
-			}
-
-			auto& textlist = canvas->getTextList();
-			for (auto& text : textlist)
-			{
-				if (!m_isSelectUI && !m_isSelectText && text->m_Visible && text->m_IsDeSerialize)
-				{
-					AABB aabb = { text->Pos.x, text->Pos.y, text->m_AABBSize.x, text->m_AABBSize.y };
-					if (aabb.Contains(mouseX, mouseY))
-					{
-						std::cout << "click : " << text->m_Name << std::endl;
-						text->m_IsSelected = true;
-						m_isSelectText = true;
-					}
-				}
-			}
-		}
-	}
 #endif // !Editor
 	m_world->Destroy();
 }
@@ -342,6 +224,7 @@ bool DirectX11::Dx11Main::Render()
 		m_imguiRenderer->BeginRender();
 		//m_D2DRenderer->ImGuiRenderStage();
 		m_imguiRenderer->Render();
+		LoggerSystem->Draw("Logger");
 		//MeshEditorSystem->ShowMainUI();
 		//m_btEditor.ShowMainUI();
 		//GridEditorSystem->ShowGridEditor();

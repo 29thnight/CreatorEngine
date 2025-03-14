@@ -21,7 +21,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
+	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	AssetsSystems->LoadShaders();
 
@@ -140,6 +140,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBlitPass = std::make_unique<BlitPass>();
 	m_pBlitPass->Initialize(m_toneMappedColourTexture.get(), 
 		m_deviceResources->GetBackBufferRenderTargetView());
+
+	//WireFramePass
+	m_pWireFramePass = std::make_unique<WireFramePass>();
+	m_pWireFramePass->SetRenderTarget(m_colorTexture.get());
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -178,25 +182,17 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 1.f;
-		desc.m_farPlane = 20.f;
-		desc.m_textureWidth = DeviceState::g_ClientRect.width;
-		desc.m_textureHeight = DeviceState::g_ClientRect.height;
+		desc.m_nearPlane = 0.1f;
+		desc.m_farPlane = 1000.f;
+		desc.m_textureWidth = 8192;//DeviceState::g_ClientRect.width; 
+		desc.m_textureHeight = 8192;//DeviceState::g_ClientRect.height;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		//model = Model::LoadModel("Prop_Block.fbx");
-		model = Model::LoadModel("IcoSphere.fbx");
-		//model = Model::LoadModel("zeldaPosed001.fbx");
-		
+		model = Model::LoadModel("SkinningTest.fbx");
+		//model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		ImGui::ContextRegister("TestModelMaterial", [&]()
-		{
-			ImGui::SliderFloat4("BaseColor", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_baseColor.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Metallic", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_metallic, 0.0f, 1.0f);
-			ImGui::SliderFloat("Roughness", &model->m_SceneObject->m_meshRenderer.m_Material->m_materialInfo.m_roughness, 0.1f, 1.0f);
-		});
 	}
 	else
 	{
@@ -220,18 +216,14 @@ void SceneRenderer::Initialize(Scene* _pScene)
 void SceneRenderer::Update(float deltaTime)
 {
 	m_currentScene->Update(deltaTime);
+	PrepareRender();
 }
 
 void SceneRenderer::Render()
 {
-	model->m_SceneObject->m_transform
-		//.SetScale({ 0.01f, 0.01f, 0.01f })
-		.SetPosition({ 2.f, 0.5f, -2.f });
 
 	//[1] ShadowMapPass
 	{
-		Texture& shadowMapTexture = (*m_currentScene->m_LightController.GetShadowMapTexture());
-		SetRenderTargets(shadowMapTexture);
 		m_currentScene->ShadowStage();
 		Clear(DirectX::Colors::Transparent, 1.0f, 0);
 		UnbindRenderTargets();
@@ -253,6 +245,12 @@ void SceneRenderer::Render()
         m_pDeferredPass->Execute(*m_currentScene);
     }
 
+	//[*] WireFramePass
+	if(useWireFrame)
+	{
+		m_pWireFramePass->Execute(*m_currentScene);
+	}
+
 	//[5] skyBoxPass
 	{
 		m_pSkyBoxPass->Execute(*m_currentScene);
@@ -271,6 +269,25 @@ void SceneRenderer::Render()
 	//[8] BlitPass
 	{
 		m_pBlitPass->Execute(*m_currentScene);
+	}
+}
+
+void SceneRenderer::PrepareRender()
+{
+	for (auto& obj : m_currentScene->m_SceneObjects)
+	{
+		if (!obj->m_meshRenderer.m_IsEnabled) continue;
+
+		Material* mat = obj->m_meshRenderer.m_Material;
+
+		switch (mat->m_renderingMode)
+		{
+		case Material::RenderingMode::Opaque:
+			m_pGBufferPass->PushDeferredQueue(obj.get());
+			break;
+		case Material::RenderingMode::Transparent:
+			break;
+		}
 	}
 }
 

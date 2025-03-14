@@ -110,7 +110,7 @@ void DeferredPass::Execute(Scene& scene)
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
         m_NormalTexture->m_pSRV,
-        lightManager.hasLightWithShadows ? lightManager.m_shadowMapTexture->m_pSRV : nullptr,
+        lightManager.hasLightWithShadows ? lightManager.GetShadowMapTexture()->m_pSRV : nullptr,
         m_UseAmbientOcclusion ? m_AmbientOcclusionTexture->m_pSRV : nullptr,
         m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
         m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,

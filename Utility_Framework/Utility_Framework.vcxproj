@@ -35,7 +35,7 @@
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="HLSLCompiler.h" />
-    <ClInclude Include="IComponent.h" />
+    <ClInclude Include="ImGuiLogger.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IWorld.h" />
     <ClInclude Include="LinkedListLib.hpp" />
@@ -44,6 +44,7 @@
     <ClInclude Include="LogMessage.h" />
     <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="PathFinder.h" />
+    <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="sqlite_modern_cpp.h" />

@@ -85,13 +85,13 @@ void GBufferPass::Execute(Scene& scene)
 
 	Animator* currentAnimator = nullptr;
 
-	for (auto& sceneObject : scene.m_SceneObjects)
+	for (auto& sceneObject : m_deferredQueue)
 	{
 		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
 
 		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-		Animator* animator = meshRenderer.m_Animator;
+		Animator* animator = &scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
 		if (nullptr != animator && animator->m_IsEnabled)
 		{
 			if (animator != currentAnimator)
@@ -128,6 +128,8 @@ void GBufferPass::Execute(Scene& scene)
 		meshRenderer.m_Mesh->Draw();
 	}
 
+	m_deferredQueue.clear();
+
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	for (uint32 i = 0; i < 5; i++)
 	{
@@ -137,4 +139,9 @@ void GBufferPass::Execute(Scene& scene)
 	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
 	ZeroMemory(nullRTV, sizeof(nullRTV));
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+}
+
+void GBufferPass::PushDeferredQueue(SceneObject* sceneObject)
+{
+	m_deferredQueue.push_back(sceneObject);
 }

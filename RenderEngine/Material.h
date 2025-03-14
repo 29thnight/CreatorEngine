@@ -21,6 +21,13 @@ struct alignas(16) MaterialInfomation
 class Material
 {
 public:
+	enum class RenderingMode
+	{
+		Opaque,
+		Transparent,
+	};
+
+public:
 	Material() = default;
 	Material(const Material& material) = delete;
 	Material(Material&& material) noexcept;
@@ -49,4 +56,5 @@ public:
 	Texture* m_pEmissive{ nullptr };
 
 	MaterialInfomation m_materialInfo;
+	RenderingMode m_renderingMode{ RenderingMode::Opaque };
 };

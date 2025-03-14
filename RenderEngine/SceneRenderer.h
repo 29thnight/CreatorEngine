@@ -9,6 +9,7 @@
 #include "ToneMapPass.h"
 #include "SpritePass.h"
 #include "BlitPass.h"
+#include "WireFramePass.h"
 #include "Model.h"
 
 #include "Light.h"
@@ -24,6 +25,7 @@ public:
 	void Render();
 
 private:
+	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
 	void UnbindRenderTargets();
@@ -40,6 +42,7 @@ private:
     std::unique_ptr<ToneMapPass> m_pToneMapPass{};
 	std::unique_ptr<SpritePass> m_pSpritePass{};
 	std::unique_ptr<BlitPass> m_pBlitPass{};
+	std::unique_ptr<WireFramePass> m_pWireFramePass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
@@ -58,6 +61,15 @@ private:
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
+	//render queue
+
+	std::queue<SceneObject*> m_forwardQueue;
 
 	Model* model{};
+
+//Debug
+public:
+	void SetWireFrame() { useWireFrame = !useWireFrame; }
+private:
+	bool useWireFrame = false;
 };

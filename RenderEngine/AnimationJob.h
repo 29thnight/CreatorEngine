@@ -5,6 +5,7 @@ class Scene;
 class Bone;
 class Animator;
 class Animation;
+class NodeAnimation;
 
 class AnimationJob
 {
@@ -13,5 +14,9 @@ public:
 private:
     void UpdateBones(Animator& animator);
     void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& transform, float time);
+
+	XMMATRIX InterpolatePosition(NodeAnimation& nodeAnim, float time);
+	XMMATRIX InterpolateRotation(NodeAnimation& nodeAnim, float time);
+	XMMATRIX InterpolateScale(NodeAnimation& nodeAnim, float time);
 };
 

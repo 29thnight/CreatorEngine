@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DeviceResources.h"
 
 class Camera
 {
@@ -20,8 +21,17 @@ public:
 	float m_farPlane{ 1000.f };
 	float m_speed{ 10.f };
 
+	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
+
 	virtual Mathf::xMatrix CalculateProjection() = 0;
+	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
+	Mathf::Vector4 RayCast(Mathf::Vector2 screenPosition);
 	Mathf::xMatrix CalculateView() const;
+	Mathf::xMatrix CalculateInverseView() const;
+	Mathf::xMatrix CalculateInverseProjection();
+	DirectX11::Sizef GetScreenSize() const;
+	DirectX::BoundingFrustum GetFrustum();
+
 	void HandleMovement(float deltaTime);
 };
 

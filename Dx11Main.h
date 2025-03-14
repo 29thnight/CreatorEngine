@@ -50,8 +50,8 @@ namespace DirectX11
 		std::unique_ptr<D2DRenderer>   m_D2DRenderer;
 
 		std::unique_ptr<PerspacetiveCamera> m_camera;
-		//std::unique_ptr<Scene> m_scene;
 
+		//std::unique_ptr<Scene> m_scene;
 		BT_Editor m_btEditor;
 		bool m_isGameView = false;
 		std::thread m_loadingScene;

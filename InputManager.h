@@ -34,7 +34,7 @@ public:
 
 public:
 	void SetMousePos(POINT pos);
-	POINT GetMousePos() const;
+	float2 GetMousePos() const;
 	float2 GetMouseDelta() const;
 	void SetCursorPos(int x, int y);
 	void GetCursorPos(LPPOINT lpPoint);

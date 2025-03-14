@@ -80,6 +80,5 @@ private:
 	LightProperties m_lightProperties;
 	bool hasLightWithShadows{ false };
 	ID3D11Buffer* m_shadowMapBuffer{ nullptr };
-	std::unique_ptr<Texture> m_shadowMapTexture;
 	std::unique_ptr<ShadowMapPass> m_shadowMapPass;
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <DirectXMath.h>
+#include "Skeleton.h"
 
 class Mesh;
 class Material;
@@ -30,5 +31,5 @@ struct Animator : public Renderable
     Skeleton* m_Skeleton = nullptr;
     float m_TimeElapsed = 0;
     uint32_t m_AnimIndexChosen = 0;
-    DirectX::XMMATRIX m_FinalTransforms[50];
+    DirectX::XMMATRIX m_FinalTransforms[Skeleton::MAX_BONES];
 };

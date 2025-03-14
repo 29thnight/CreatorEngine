@@ -1,12 +1,14 @@
 #include "ToneMapPass.h"
 #include "AssetSystem.h"
+#include "ImGuiRegister.h"
+#include "DeviceState.h"
 
 ToneMapPass::ToneMapPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
 
     m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapReinhard"];
+    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -41,6 +43,39 @@ ToneMapPass::ToneMapPass()
 
     m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
     m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+	m_pACESConstantBuffer = DirectX11::CreateBuffer(
+        sizeof(ToneMapACESConstant), 
+        D3D11_BIND_CONSTANT_BUFFER, 
+        &m_toneMapACESConstant
+    );
+
+	DirectX::SetName(m_pACESConstantBuffer, "ToneMapACESConstantBuffer");
+
+	m_pReinhardConstantBuffer = DirectX11::CreateBuffer(
+		sizeof(ToneMapReinhardConstant),
+		D3D11_BIND_CONSTANT_BUFFER,
+		&m_toneMapReinhardConstant
+	);
+
+	DirectX::SetName(m_pReinhardConstantBuffer, "ToneMapReinhardConstantBuffer");
+
+	ImGui::ContextRegister("ToneMap", [&]()
+	{
+		ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
+		ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
+		ImGui::Separator();
+        if (m_toneMapType == ToneMapType::ACES)
+        {
+			ImGui::SliderFloat("Shoulder Strength", &m_toneMapACESConstant.shoulderStrength, 0.0f, 1.0f);
+			ImGui::SliderFloat("Linear Strength", &m_toneMapACESConstant.linearStrength, 0.0f, 1.0f);
+			ImGui::SliderFloat("Linear Angle", &m_toneMapACESConstant.linearAngle, 0.0f, 1.0f);
+			ImGui::SliderFloat("Toe Strength", &m_toneMapACESConstant.toeStrength, 0.0f, 1.0f);
+			ImGui::SliderFloat("Toe Numerator", &m_toneMapACESConstant.toeNumerator, 0.0f, 1.0f);
+			ImGui::SliderFloat("Toe Denominator", &m_toneMapACESConstant.toeDenominator, 0.0f, 1.0f);
+        }
+	});
+
 }
 
 ToneMapPass::~ToneMapPass()
@@ -53,8 +88,30 @@ void ToneMapPass::Initialize(Texture* color, Texture* dest)
     m_DestTexture = dest;
 }
 
+void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
+{
+	m_isAbleToneMap = isAbleToneMap;
+	m_toneMapType = type;
+}
+
 void ToneMapPass::Execute(Scene& scene)
 {
+
+	if (m_toneMapType == ToneMapType::Reinhard)
+	{
+        m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapReinhard"];
+		m_toneMapReinhardConstant.m_bUseToneMap = m_isAbleToneMap;
+		DirectX11::UpdateBuffer(m_pReinhardConstantBuffer, &m_toneMapReinhardConstant);
+		DirectX11::PSSetConstantBuffer(0, 1, &m_pReinhardConstantBuffer);
+	}
+	else if (m_toneMapType == ToneMapType::ACES)
+	{
+        m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
+		m_toneMapACESConstant.m_bUseToneMap = m_isAbleToneMap;
+		DirectX11::UpdateBuffer(m_pACESConstantBuffer, &m_toneMapACESConstant);
+		DirectX11::PSSetConstantBuffer(0, 1, &m_pACESConstantBuffer);
+	}
+
     m_pso->Apply();
 
     ID3D11RenderTargetView* renderTargets[] = { m_DestTexture->GetRTV() };

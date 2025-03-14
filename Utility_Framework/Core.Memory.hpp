@@ -13,6 +13,18 @@ std::derived_from<T, IUnknown>;
 
 namespace Memory
 {
+	inline ulong GetReferanceCounter(IUnknown* pUnknown)
+	{
+		ulong refCount = 0;
+		if (pUnknown)
+		{
+			refCount = pUnknown->AddRef();
+			pUnknown->Release();
+			refCount--;
+		}
+		return refCount;
+	}
+
 	//메모리 할당 및 복사
 	inline void AllocateAndCopy(void* pDst, const void* pSrc, uint32 size)
 	{
@@ -25,7 +37,10 @@ namespace Memory
 		using PtrType = std::remove_pointer_t<std::remove_reference_t<decltype(ptr)>>;  // 참조 제거한 타입
 		if constexpr (std::derived_from<PtrType, IUnknown>)
 		{
-			ptr->Release();
+			if(0 != GetReferanceCounter(ptr))
+			{
+				ptr->Release();
+			}
 		}
 		else
 		{
