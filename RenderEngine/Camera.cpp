@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include "../InputManager.h"
 #include "DeviceState.h"
+#include "ImGuiRegister.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -91,22 +92,47 @@ void Camera::HandleMovement(float deltaTime)
 		y += 1.f;
 	}
 
-	//Change the Camera Rotaition Quaternion
+	//if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
+	//{
+	//	m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
+	//	m_pitch = fmax(-pi, fmin(m_pitch, pi));
+	//	m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
+	//	if (m_yaw > XM_PI) m_yaw -= pi2;
+	//	if (m_yaw < -XM_PI) m_yaw += pi2;
+
+	//	Mathf::xVector viewRotation = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.f);
+	//	m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, viewRotation));
+	//	m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
+	//}
+	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
+
+	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
-		Mathf::Quaternion rotation = m_rotation;
-		rotation.x += InputManagement->GetMouseDelta().y * 0.01f;
-		rotation.y += InputManagement->GetMouseDelta().x * 0.01f;
+		// 마우스 이동량 가져오기
+		m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
+		m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
 
-		m_rotation = rotation;
+		// 현재 회전 기준 축을 얻음
+		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(UP, m_forward));
 
-		Mathf::xMatrix rotationMatrix = XMMatrixRotationQuaternion(m_rotation);
-		m_forward = XMVector3Transform(FORWARD, rotationMatrix);
-		m_right = XMVector3Transform(RIGHT, rotationMatrix);
-		m_up = XMVector3Transform(UP, rotationMatrix);
+		// 쿼터니언 회전 생성
+		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, m_pitch);
+		XMVECTOR yawQuat = XMQuaternionRotationAxis(UP, m_yaw);
 
-		m_pitch = asin(XMVectorGetY(m_forward));
-		m_yaw = atan2(XMVectorGetX(m_forward), XMVectorGetZ(m_forward));
+		// 누적 회전 적용 (기존 회전에 새로운 회전 적용)
+		XMVECTOR newRotation = XMQuaternionMultiply(m_rotationQuat, yawQuat);
+		newRotation = XMQuaternionMultiply(newRotation, pitchQuat);
+
+		// 슬러핑(SLERP) 적용하여 부드러운 회전
+		m_rotationQuat = XMQuaternionSlerp(m_rotationQuat, newRotation, 0.9f);
+		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
+
+		// 새로운 방향 벡터 계산
+		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
+
+		// Up 벡터와 교차하여 Right 벡터 보정
+		m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
 	}
 
 	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
@@ -120,9 +146,35 @@ void Camera::HandleMovement(float deltaTime)
 	m_lookAt = m_eyePosition + m_forward;
 }
 
+PerspacetiveCamera::PerspacetiveCamera()
+{
+	ImGui::ContextRegister("Perspacetive Camera", [&]()
+	{
+		ImGui::DragFloat("FOV", &m_fov, 1.f, 1.f, 179.f);
+		ImGui::DragFloat("Aspect Ratio", &m_aspectRatio, 0.1f, 0.1f, 10.f);
+		ImGui::DragFloat("Near Plane", &m_nearPlane, 0.1f, 0.1f, 100.f);
+		ImGui::DragFloat("Far Plane", &m_farPlane, 1.f, 1.f, 1000.f);
+		ImGui::DragFloat("Speed", &m_speed, 1.f, 1.f, 100.f);
+		ImGui::DragFloat("Pitch", &m_pitch, 0.01f, -pi, pi);
+		ImGui::DragFloat("Yaw", &m_yaw, 0.01f, -pi, pi);
+		ImGui::DragFloat("Roll", &m_roll, 0.01f, -pi, pi);
+
+		ImGui::Text("Eye Position");
+		ImGui::DragFloat3("##Eye Position", &m_eyePosition.m128_f32[0], -1000, 1000);
+		ImGui::Text("Forward");
+		ImGui::DragFloat3("##Forward", &m_forward.m128_f32[0], -1000, 1000);
+		ImGui::Text("Right");
+		ImGui::DragFloat3("##Right", &m_right.m128_f32[0], -1000, 1000);
+	});
+}
+
 Mathf::xMatrix PerspacetiveCamera::CalculateProjection()
 {
 	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, 0.1f, 200.f);
+}
+
+OrthographicCamera::OrthographicCamera()
+{
 }
 
 Mathf::xMatrix OrthographicCamera::CalculateProjection()
