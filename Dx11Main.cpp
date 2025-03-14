@@ -10,6 +10,7 @@
 #include "GridEditor.h"
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/ImGuiLogger.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -223,6 +224,7 @@ bool DirectX11::Dx11Main::Render()
 		m_imguiRenderer->BeginRender();
 		//m_D2DRenderer->ImGuiRenderStage();
 		m_imguiRenderer->Render();
+		LoggerSystem->Draw("Logger");
 		//MeshEditorSystem->ShowMainUI();
 		//m_btEditor.ShowMainUI();
 		//GridEditorSystem->ShowGridEditor();

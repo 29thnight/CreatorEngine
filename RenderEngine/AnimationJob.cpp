@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Skeleton.h"
 #include "ObjectRenderers.h"
+#include "../Utility_Framework/ImGuiLogger.h"
 
 using namespace DirectX;
 
@@ -37,8 +38,8 @@ void AnimationJob::Update(Scene& scene, float deltaTime)
         animator.m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
         animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, animation.m_duration);
 		XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
-
 		XMMATRIX rootTransform = sceneObjMatrix * skeleton->m_rootTransform;
+
         UpdateBone(skeleton->m_rootBone, animator, rootTransform, animator.m_TimeElapsed);
     }
 }
@@ -51,64 +52,103 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
     float t = 0;
 
-	XMVECTOR interpPos{ 0, 0, 0, 1 };
-    if (nodeAnim.m_positionKeys.size() > 1)
-    {
-        interpPos = nodeAnim.m_positionKeys[0].m_position;
-        int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
-        int nPosKeyIdx = posKeyIdx + 1;
+	XMMATRIX transform = XMMatrixIdentity();
 
-        NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
-        NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
+	if (nodeAnim.m_scaleKeys.size() > 0)
+	{
+		XMMATRIX scale = InterpolateScale(nodeAnim, time);
+		transform *= scale;
+	}
+	if (nodeAnim.m_rotationKeys.size() > 0)
+	{
+		XMMATRIX rot = InterpolateRotation(nodeAnim, time);
+		transform *= rot;
+	}
+	if (nodeAnim.m_positionKeys.size() > 0)
+	{
+		XMMATRIX pos = InterpolatePosition(nodeAnim, time);
+		transform *= pos;
+	}
 
-        t = (time - posKey.m_time) / (nPosKey.m_time - posKey.m_time);
-        interpPos = XMVectorLerp(posKey.m_position, nPosKey.m_position, t);
-    }
-    XMMATRIX translation = XMMatrixTranslationFromVector(interpPos);
+	XMMATRIX globalTransform = transform * parentTransform;
+	animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+	bone->m_globalTransform = globalTransform;
 
-    // Rotation
-    XMVECTOR interpQuat{};
-    if (nodeAnim.m_rotationKeys.size() > 1)
-    {
-		interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
-        int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
-        int nRotKeyIdx = rotKeyIdx + 1;
+	for (auto child : bone->m_children)
+	{
+		UpdateBone(child, animator, globalTransform, time);
+	}
+}
 
-        NodeAnimation::RotationKey rotKey = nodeAnim.m_rotationKeys[rotKeyIdx];
-        NodeAnimation::RotationKey nRotKey = nodeAnim.m_rotationKeys[nRotKeyIdx];
+XMMATRIX AnimationJob::InterpolatePosition(NodeAnimation& nodeAnim, float time)
+{
+    if(nodeAnim.m_positionKeys.size() == 0)
+	{
+		return XMMatrixIdentity();
+	}
 
-        t = (time - rotKey.m_time) / (nRotKey.m_time - rotKey.m_time);
-        interpQuat = XMQuaternionSlerp(rotKey.m_rotation, nRotKey.m_rotation, t);
+	if (nodeAnim.m_positionKeys.size() == 1)
+	{
+		return XMMatrixTranslationFromVector(nodeAnim.m_positionKeys[0].m_position);
+	}
 
-    }
-    XMMATRIX rotation = XMMatrixRotationQuaternion(interpQuat);
+	int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
+	int nPosKeyIdx = posKeyIdx + 1;
 
-    // Scaling
-    float interpScale{ 1.f };
-    if (nodeAnim.m_scaleKeys.size() > 1)
-    {
-		interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
-        int scalKeyIdx = CurrentKeyIndex<NodeAnimation::ScaleKey>(nodeAnim.m_scaleKeys, time);
-        int nScalKeyIdx = scalKeyIdx + 1;
+	NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
+	NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
 
-        NodeAnimation::ScaleKey scalKey = nodeAnim.m_scaleKeys[scalKeyIdx];
-        NodeAnimation::ScaleKey nScalKey = nodeAnim.m_scaleKeys[nScalKeyIdx];
+	float t = (time - posKey.m_time) / (nPosKey.m_time - posKey.m_time);
+	XMVECTOR interpPos = XMVectorLerp(posKey.m_position, nPosKey.m_position, t);
 
-        t = (time - scalKey.m_time) / (nScalKey.m_time - scalKey.m_time);
-        interpScale = lerp(scalKey.m_scale.x, nScalKey.m_scale.x, t);
-    }
+	return XMMatrixTranslationFromVector(interpPos);
+}
 
-    XMMATRIX scale = XMMatrixScaling(interpScale, interpScale, interpScale);
+XMMATRIX AnimationJob::InterpolateRotation(NodeAnimation& nodeAnim, float time)
+{
+	if (nodeAnim.m_rotationKeys.size() == 0)
+	{
+		return XMMatrixIdentity();
+	}
 
-    XMMATRIX nodeTransform = scale * rotation * translation;
-    XMMATRIX globalTransform = nodeTransform * parentTransform;
+	if (nodeAnim.m_rotationKeys.size() == 1)
+	{
+		return XMMatrixRotationQuaternion(nodeAnim.m_rotationKeys[0].m_rotation);
+	}
 
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    bone->m_globalTransform = globalTransform;
+	int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
+	int nRotKeyIdx = rotKeyIdx + 1;
 
-    for (Bone* child : bone->m_children)
-    {
-        UpdateBone(child, animator, globalTransform, time);
-    }
+	NodeAnimation::RotationKey rotKey = nodeAnim.m_rotationKeys[rotKeyIdx];
+	NodeAnimation::RotationKey nRotKey = nodeAnim.m_rotationKeys[nRotKeyIdx];
+
+	float t = (time - rotKey.m_time) / (nRotKey.m_time - rotKey.m_time);
+	XMVECTOR interpQuat = XMQuaternionSlerp(rotKey.m_rotation, nRotKey.m_rotation, t);
+
+	return XMMatrixRotationQuaternion(interpQuat);
+}
+
+XMMATRIX AnimationJob::InterpolateScale(NodeAnimation& nodeAnim, float time)
+{
+	if (nodeAnim.m_scaleKeys.size() == 0)
+	{
+		return XMMatrixIdentity();
+	}
+
+	if (nodeAnim.m_scaleKeys.size() == 1)
+	{
+		return XMMatrixScaling(nodeAnim.m_scaleKeys[0].m_scale.x, nodeAnim.m_scaleKeys[0].m_scale.y, nodeAnim.m_scaleKeys[0].m_scale.z);
+	}
+
+	int scalKeyIdx = CurrentKeyIndex<NodeAnimation::ScaleKey>(nodeAnim.m_scaleKeys, time);
+	int nScalKeyIdx = scalKeyIdx + 1;
+
+	NodeAnimation::ScaleKey scalKey = nodeAnim.m_scaleKeys[scalKeyIdx];
+	NodeAnimation::ScaleKey nScalKey = nodeAnim.m_scaleKeys[nScalKeyIdx];
+
+	float t = (time - scalKey.m_time) / (nScalKey.m_time - scalKey.m_time);
+	float interpScale = lerp(scalKey.m_scale.x, nScalKey.m_scale.x, t);
+
+	return XMMatrixScaling(interpScale, interpScale, interpScale);
 }
 

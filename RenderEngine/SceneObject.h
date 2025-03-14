@@ -14,12 +14,17 @@ public:
 	SceneObject& operator=(SceneObject&) = delete;
 
 	void ShowBoneHierarchy(Bone* bone);
+	void RenderBoneEditor();
+	void EditorMeshRenderer();
 
 	std::string m_name;
 	Transform m_transform;
 	const Index m_index;
 	const Index m_parentIndex;
 	std::vector<SceneObject::Index> m_childrenIndices;
+
+	//debug layer
+	Bone* selectedBone = nullptr;
 
 	MeshRenderer m_meshRenderer;
 	SpriteRenderer m_spriteRenderer;

@@ -204,21 +204,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
-	ImGui::ContextRegister("Model Transform", [&]() 
-	{
-		Mathf::Vector3 position = model->m_SceneObject->m_transform.position;
-		Mathf::Vector3 rotation = model->m_SceneObject->m_transform.rotation;
-		Mathf::Vector3 scale = model->m_SceneObject->m_transform.scale;
-
-		ImGui::SliderFloat3("Position", &position.x, -10, 10);
-		ImGui::SliderFloat3("Rotation", &rotation.x, -3.14f, 3.14f);
-		ImGui::SliderFloat3("Scale", &scale.x, 0.1f, 10);
-		
-		model->m_SceneObject->m_transform.SetPosition(position);
-		model->m_SceneObject->m_transform.SetRotation(rotation);
-		model->m_SceneObject->m_transform.SetScale(scale);
-	});
-
 	m_pSkyBoxPass->GenerateCubeMap(*m_currentScene);
 	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_currentScene);
 	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_currentScene);

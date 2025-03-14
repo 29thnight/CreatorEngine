@@ -31,6 +31,7 @@ public:
 		m_offset(_offset),
 		m_globalTransform(XMMatrixIdentity())
 	{
+
 	}
 };
 

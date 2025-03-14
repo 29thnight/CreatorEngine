@@ -102,6 +102,9 @@
     <Filter Include="RenderPass\WireFramePass">
       <UniqueIdentifier>{f2f829c8-d1db-42f3-bd42-058d669c1e6c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\TAAPass">
+      <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -202,6 +205,9 @@
     </ClCompile>
     <ClCompile Include="BlitPass.cpp">
       <Filter>RenderPass\BlitPass</Filter>
+    </ClCompile>
+    <ClCompile Include="TAAPass.cpp">
+      <Filter>RenderPass\TAAPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -327,6 +333,9 @@
     </ClInclude>
     <ClInclude Include="BlitPass.h">
       <Filter>RenderPass\BlitPass</Filter>
+    </ClInclude>
+    <ClInclude Include="TAAPass.h">
+      <Filter>RenderPass\TAAPass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

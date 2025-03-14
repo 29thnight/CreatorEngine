@@ -6,7 +6,6 @@
 #include "LogIOWriter.h"
 #include "LogMessage.h"
 
-
 namespace Log
 {
     class Logger
