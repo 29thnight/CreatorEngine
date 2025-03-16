@@ -348,7 +348,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("SkinningTest.fbx");
+		model = Model::LoadModel("boblampclean.md5mesh");
 		//model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
