@@ -15,7 +15,7 @@ cbuffer PerApplication : register(b2)
 
 cbuffer BoneTransformation : register(b3)
 {
-    matrix BoneTransforms[50];
+    matrix BoneTransforms[512];
 }
 
 cbuffer CameraPos : register(b4)

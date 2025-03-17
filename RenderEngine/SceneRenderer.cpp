@@ -358,6 +358,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("boblampclean.md5mesh");
 		//model = Model::LoadModel("BoxHuman.fbx");
+		//model = Model::LoadModel("sphere.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
