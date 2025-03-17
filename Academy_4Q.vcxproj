@@ -152,6 +152,7 @@
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
+    <ClInclude Include="CustomWindowDefine.h" />
     <ClInclude Include="Dx11Main.h" />
     <ClInclude Include="EventSystem.h" />
     <ClInclude Include="framework.h" />
@@ -164,6 +165,7 @@
     <ClInclude Include="ObjectFactory.h" />
     <ClInclude Include="ObjectTypeMeta.h" />
     <ClInclude Include="PathFinding.h" />
+    <ClInclude Include="ProjectSetting.h" />
     <ClInclude Include="RenderComponent.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RigidbodyComponent.h" />

@@ -98,7 +98,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
 	float viewManipulateTop = 0;
-	static ImGuiWindowFlags gizmoWindowFlags = 0;
+	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
 	if (useWindow)
 	{
 		//ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
@@ -358,7 +358,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("boblampclean.md5mesh");
+		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
@@ -525,7 +525,7 @@ void SceneRenderer::EditorView()
 		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, &m_currentScene->m_MainCamera);
 	}
 
-	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove);
+	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	{
 		ImVec2 size = ImGui::GetContentRegionAvail();
 		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, size);

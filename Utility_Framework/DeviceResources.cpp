@@ -438,7 +438,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 
 		D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
-		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 		renderTargetViewDesc.Texture2D.MipSlice = 0;
 

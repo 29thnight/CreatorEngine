@@ -81,6 +81,9 @@
     <Filter Include="Utill\GridEditor">
       <UniqueIdentifier>{691bb130-1694-4038-9f18-04da55c06bfa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window">
+      <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -187,6 +190,12 @@
     </ClInclude>
     <ClInclude Include="StairColliderComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectSetting.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomWindowDefine.h">
+      <Filter>Window</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

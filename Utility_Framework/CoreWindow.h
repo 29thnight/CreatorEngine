@@ -103,6 +103,11 @@ public:
     {
         return s_instance;
     }
+    
+	static void RegisterCreateEventHandler(MessageHandler handler)
+	{
+		m_CreateEventHandler = handler;
+	}
 
 private:
     static CoreWindow* s_instance;
@@ -112,6 +117,7 @@ private:
     int m_width = 800;
     int m_height = 600;
     std::unordered_map<UINT, MessageHandler> m_handlers;
+	static MessageHandler m_CreateEventHandler;
 
     void RegisterWindowClass() const
     {
@@ -146,7 +152,7 @@ private:
             WS_OVERLAPPEDWINDOW,
             x, y,
             rect.right - rect.left,
-            rect.bottom - rect.top/* + titleBarHeight + borderHeight*/,
+            rect.bottom - rect.top + titleBarHeight + borderHeight,
             nullptr,
             nullptr,
             m_hInstance,
@@ -159,6 +165,7 @@ private:
         }
     }
 
+public:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         CoreWindow* self = nullptr;
@@ -180,6 +187,11 @@ private:
             self = reinterpret_cast<CoreWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
         }
 
+        if (message == WM_CREATE)
+        {
+			m_CreateEventHandler(hWnd, wParam, lParam);
+        }
+
         if (self)
         {
             return self->HandleMessage(hWnd, message, wParam, lParam);
@@ -188,6 +200,7 @@ private:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
 
+private:
     LRESULT HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))

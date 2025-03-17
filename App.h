@@ -4,6 +4,7 @@
 #include "Utility_Framework/CoreWindow.h"
 #include "Utility_Framework/Core.Minimal.h"
 #include "Dx11Main.h"
+#include "ProjectSetting.h"
 #include <memory>
 
 namespace Core
@@ -21,10 +22,12 @@ namespace Core
 		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
 		std::unique_ptr<DirectX11::Dx11Main> m_main;
+		std::unique_ptr<ProjectSetting> m_projectSetting;
 		bool m_windowClosed{ false };
 		bool m_windowVisible{ true };
 	};

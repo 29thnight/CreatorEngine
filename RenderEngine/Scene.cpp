@@ -113,7 +113,8 @@ void Scene::EditorSceneObjectHierarchy()
 			if (obj.get() == m_selectedSceneObject)
 				flags |= ImGuiTreeNodeFlags_Selected;
 
-			bool opened = ImGui::TreeNodeEx(obj->m_name.c_str(), flags);
+			std::string uniqueLabel = obj->m_name + "##" + std::to_string(obj->m_index);
+			bool opened = ImGui::TreeNodeEx(uniqueLabel.c_str(), flags);
 
 			if (ImGui::IsItemClicked()) // 클릭 시 선택된 객체 변경
 			{
@@ -130,7 +131,8 @@ void Scene::EditorSceneObjectHierarchy()
 					if (child.get() == m_selectedSceneObject)
 						childFlags |= ImGuiTreeNodeFlags_Selected;
 
-					if (ImGui::TreeNodeEx(child->m_name.c_str(), childFlags))
+					std::string childUniqueLabel = child->m_name + "##" + std::to_string(child->m_index);
+					if (ImGui::TreeNodeEx(childUniqueLabel.c_str(), childFlags))
 					{
 						if (ImGui::IsItemClicked()) // 자식 객체 클릭 시 선택
 						{
@@ -142,7 +144,7 @@ void Scene::EditorSceneObjectHierarchy()
 				ImGui::TreePop();
 			}
 		}
-	}, ImGuiWindowFlags_NoMove);
+	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 }
 
 void Scene::EditorSceneObjectInspector()
@@ -171,7 +173,7 @@ void Scene::EditorSceneObjectInspector()
 
 			m_selectedSceneObject->m_transform.GetLocalMatrix();
 		}
-	}, ImGuiWindowFlags_NoMove);
+	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 }
 
 void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model)

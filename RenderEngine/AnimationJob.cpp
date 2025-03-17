@@ -91,7 +91,17 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     Skeleton* skeleton = animator.m_Skeleton;
     Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
     std::string& boneName = bone->m_name;
-    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
+	auto it = animation.m_nodeAnimations.find(boneName);
+	if (it == animation.m_nodeAnimations.end())
+	{
+		for (Bone* child : bone->m_children)
+		{
+			UpdateBone(child, animator, parentTransform, time);
+		}
+		return;
+	}
+
+	NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
     float t = 0;
 
     // Translation

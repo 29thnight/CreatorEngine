@@ -138,7 +138,7 @@ void DirectX11::Dx11Main::Update()
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
 		std::wostringstream woss;
 		woss.precision(6);
-		woss << L"[4Q Project] Bongsu Rabbit - "
+		woss << L"Creator Editor - "
 			<< L"Width: "
 			<< m_deviceResources->GetOutputSize().width
 			<< L" Height: "

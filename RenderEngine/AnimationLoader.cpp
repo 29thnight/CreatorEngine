@@ -1,7 +1,12 @@
 #include "AnimationLoader.h"
 
-Animation AnimationLoader::LoadAnimation(aiAnimation* _pAnimation)
+std::optional<Animation> AnimationLoader::LoadAnimation(aiAnimation* _pAnimation)
 {
+    if (_pAnimation->mName.length <= 0 || strstr(_pAnimation->mName.C_Str(), "ik") != nullptr)
+    {
+        return std::nullopt;
+    }
+
     Animation animation;
     animation.m_name = _pAnimation->mName.data;
     animation.m_duration = _pAnimation->mDuration;
@@ -10,17 +15,39 @@ Animation AnimationLoader::LoadAnimation(aiAnimation* _pAnimation)
     for (uint32 i = 0; i < _pAnimation->mNumChannels; ++i)
     {
         aiNodeAnim* ainodeAnim = _pAnimation->mChannels[i];
-        NodeAnimation nodeAnim = LoadNodeAnimation(ainodeAnim);
-        animation.m_nodeAnimations.emplace(ainodeAnim->mNodeName.data, nodeAnim);
+        std::optional<NodeAnimation> nodeAnim = LoadNodeAnimation(ainodeAnim);
+
+		if (nodeAnim.has_value())
+        {
+            animation.m_nodeAnimations.emplace(ainodeAnim->mNodeName.data, nodeAnim.value());
+        }
+        else
+        {
+			return std::nullopt;
+        }
     }
 
     return animation;
 }
 
-NodeAnimation AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNodeAnim)
+std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNodeAnim)
 {
+	if (_pNodeAnim->mNodeName.length <= 0
+		|| _pNodeAnim->mNumPositionKeys <= 0
+		|| _pNodeAnim->mNumRotationKeys <= 0
+		|| _pNodeAnim->mNumScalingKeys <= 0
+    )
+	{
+		return std::nullopt;
+	}
+
     NodeAnimation nodeAnim;
     nodeAnim.m_name = _pNodeAnim->mNodeName.data;
+
+    if (nodeAnim.m_name == "Armature")
+    {
+        __debugbreak();
+    }
 
     for (uint32 i = 0; i < _pNodeAnim->mNumPositionKeys; ++i)
     {

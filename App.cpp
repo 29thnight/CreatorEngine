@@ -3,6 +3,8 @@
 #include "Utility_Framework/PathFinder.h"
 #include "Utility_Framework/DumpHandler.h"
 #include "Utility_Framework/Core.Console.hpp"
+#include "Utility_Framework/CoreWindow.h"
+#include "CustomWindowDefine.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -33,10 +35,24 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return std::string("SUCCESS");
 	});
 	std::string initResult = init.get();
-	//Console.WriteLine("Multithreaded initialization: {}", initResult);
+
 	//시작
+	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
+	{
+		// 메뉴바와 "Edit" 메뉴 생성
+		HMENU hMenuBar = CreateMenu();
+		HMENU hEditMenu = CreatePopupMenu();
+		// "ProjectSetting" 메뉴 항목 추가
+		AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PROJECTSETTING, L"ProjectSetting");
+		AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"Edit");
+		// 메뉴를 윈도우에 설정
+		SetMenu(hWnd, hMenuBar);
+
+		return 0;
+	});
+
 	Core::App app;
-	app.Initialize(hInstance, L"Bongsu Rabbit", 1920, 1080);
+	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
 
 	return 0;
 }
@@ -119,6 +135,14 @@ LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	m_main->CreateWindowSizeDependentResources();
+
+	return 0;
+}
+
+LRESULT Core::App::HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	WNDCLASS wcSetting = { sizeof(WNDCLASS) };
+	wcSetting.lpfnWndProc = CoreWindow::WndProc;
 
 	return 0;
 }

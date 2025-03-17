@@ -66,8 +66,12 @@ void SkeletonLoader::LoadAnimations(Skeleton* skeleton)
 {
     for (UINT i = 0; i < m_scene->mNumAnimations; ++i)
     {
-        Animation anim = m_animationLoader.LoadAnimation(m_scene->mAnimations[i]);
-        skeleton->m_animations.push_back(anim);
+        std::optional<Animation> anim = m_animationLoader.LoadAnimation(m_scene->mAnimations[i]);
+
+		if (anim.has_value())
+        {
+            skeleton->m_animations.push_back(anim.value());
+        }
     }
 }
 

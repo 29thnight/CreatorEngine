@@ -5,7 +5,7 @@
 class AnimationLoader
 {
 public:
-	Animation LoadAnimation(aiAnimation* _pAnimation);
-	NodeAnimation LoadNodeAnimation(aiNodeAnim* _pNodeAnim);
+	std::optional<Animation> LoadAnimation(aiAnimation* _pAnimation);
+	std::optional<NodeAnimation> LoadNodeAnimation(aiNodeAnim* _pNodeAnim);
 };
 
