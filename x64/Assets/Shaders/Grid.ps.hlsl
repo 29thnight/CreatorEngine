@@ -6,10 +6,10 @@ cbuffer UniformBuffer : register(b0)
     float fadeEnd;
     float unitSize;
     int subdivisions;
+    float3 centerOffset;
     float majorLineThickness;
     float minorLineThickness;
     float minorLineAlpha;
-    float3 centerOffset;
 };
 // 출력 구조체: 클립 좌표와 함께 월드 좌표를 TEXCOORD0로 전달합니다.
 struct VS_OUTPUT

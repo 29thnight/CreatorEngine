@@ -13,6 +13,20 @@ struct alignas(16) GridVertex
     XMFLOAT3 pos;
 };
 
+struct alignas(16) GridUniformBuffer
+{
+    float4 gridColor;
+    float4 checkerColor;
+    float fadeStart;
+    float fadeEnd;
+    float unitSize;
+    int subdivisions;
+    float3 centerOffset;
+    float majorLineThickness;
+    float minorLineThickness;
+    float minorLineAlpha;
+};
+
 class GridPass final : public IRenderPass
 {
 public:
