@@ -91,7 +91,8 @@ void WireFramePass::Execute(Scene& scene)
 
 		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-        Animator* animator = meshRenderer.m_Animator;
+
+        Animator* animator = &scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
         if (nullptr != animator && animator->m_IsEnabled)
         {
             if (animator != currentAnimator)
