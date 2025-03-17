@@ -31,7 +31,7 @@ public:
 	float m_yaw{ 0.f };
 	float m_roll{ 0.f };
 	float m_nearPlane{ 0.1f };
-	float m_farPlane{ 1000.f };
+	float m_farPlane{ 10000.f };
 	float m_speed{ 10.f };
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };

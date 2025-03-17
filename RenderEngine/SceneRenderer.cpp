@@ -120,7 +120,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
 
-		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, ImVec2(x, y));
+		ImGui::Image((ImTextureID)m_gridTexture->m_pSRV, ImVec2(x, y));
 		//ImGui::Image((ImTextureID)sceneRenderer->GetMeshEditorTarget()->GetSRV(),
 		//	ImVec2(450, 560));
 		//ImGui::End();
@@ -236,6 +236,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
+    m_gridTexture = TextureHelper::CreateRenderTexture(
+        DeviceState::g_ClientRect.width,
+        DeviceState::g_ClientRect.height,
+        "GridRTV",
+        DXGI_FORMAT_R16G16B16A16_FLOAT
+    );
+
 	Texture* ao = Texture::Create(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -312,6 +319,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//WireFramePass
 	m_pWireFramePass = std::make_unique<WireFramePass>();
 	m_pWireFramePass->SetRenderTarget(m_colorTexture.get());
+
+    m_pGridPass = std::make_unique<GridPass>();
+    m_pGridPass->Initialize(m_toneMappedColourTexture.get(), m_gridTexture.get());
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -352,8 +362,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_viewHeight = 12;
 		desc.m_nearPlane = 0.1f;
 		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = 8192;//DeviceState::g_ClientRect.width; 
-		desc.m_textureHeight = 8192;//DeviceState::g_ClientRect.height;
+		desc.m_textureWidth = 8192;
+		desc.m_textureHeight = 8192;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
@@ -379,7 +389,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
-
 }
 
 void SceneRenderer::Update(float deltaTime)
@@ -390,7 +399,6 @@ void SceneRenderer::Update(float deltaTime)
 
 void SceneRenderer::Render()
 {
-
 	//[1] ShadowMapPass
 	{
 		m_currentScene->ShadowStage();
@@ -432,6 +440,7 @@ void SceneRenderer::Render()
 	
 	//[*] GridPass
 	{
+        m_pGridPass->Execute(*m_currentScene);
 	}
 
 	//[7] SpritePass
@@ -443,6 +452,7 @@ void SceneRenderer::Render()
 	{
 		m_pBlitPass->Execute(*m_currentScene);
 	}
+
 }
 
 void SceneRenderer::PrepareRender()

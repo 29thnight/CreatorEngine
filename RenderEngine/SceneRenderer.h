@@ -10,8 +10,9 @@
 #include "SpritePass.h"
 #include "BlitPass.h"
 #include "WireFramePass.h"
-#include "Model.h"
+#include "GridPass.h"
 
+#include "Model.h"
 #include "Light.h"
 
 class Scene;
@@ -43,6 +44,7 @@ private:
 	std::unique_ptr<SpritePass> m_pSpritePass{};
 	std::unique_ptr<BlitPass> m_pBlitPass{};
 	std::unique_ptr<WireFramePass> m_pWireFramePass{};
+    std::unique_ptr<GridPass> m_pGridPass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
@@ -57,12 +59,13 @@ private:
 	std::unique_ptr<Texture> m_emissiveTexture;
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
+    std::unique_ptr<Texture> m_gridTexture;
 
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
-	PerspacetiveCamera* m_persEditCamera{};
-	OrthographicCamera* m_orthoEditCamera{};
+	PerspacetiveCamera m_perspacetiveEditCamera{};
+	OrthographicCamera m_orthographicEditCamera{};
 
 	//render queue
 
