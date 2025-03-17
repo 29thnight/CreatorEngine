@@ -105,44 +105,57 @@ void Camera::HandleMovement(float deltaTime)
 	//	m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
 	//}
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
-
+	static XMVECTOR rotate = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
 		// 마우스 이동량 가져오기
-		m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
-		m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
+		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
+		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
 
+		// Pitch 제한 적용
+		m_pitch += deltaPitch;
+		
 		// 현재 회전 기준 축을 얻음
-		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(UP, m_forward));
+		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
 
-		// 쿼터니언 회전 생성
-		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, m_pitch);
-		XMVECTOR yawQuat = XMQuaternionRotationAxis(UP, m_yaw);
+		// 프레임당 변화량만 적용
+		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
+		XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
 
-		// 누적 회전 적용 (기존 회전에 새로운 회전 적용)
-		XMVECTOR newRotation = XMQuaternionMultiply(m_rotationQuat, yawQuat);
-		newRotation = XMQuaternionMultiply(newRotation, pitchQuat);
-
-		// 슬러핑(SLERP) 적용하여 부드러운 회전
-		m_rotationQuat = XMQuaternionSlerp(m_rotationQuat, newRotation, 0.9f);
+		// Yaw를 먼저 적용 -> Pitch를 적용
+		XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
+		m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
+		m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
 		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
+
 
 		// 새로운 방향 벡터 계산
 		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
 
-		// Up 벡터와 교차하여 Right 벡터 보정
-		m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
+		// Right 벡터 업데이트 (UP을 기준으로 다시 계산)
+		m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+
+		m_up = XMVector3Cross(m_forward, m_right);
+
+			float sign = XMVectorGetY(m_up) > 0 ? 1.0f : -1.0f;
+			m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
+			m_up = XMQuaternionNormalize(m_up);
+
+
+		std::cout << XMVectorGetX(rightAxis) << ", " << XMVectorGetY(rightAxis) << ", " << XMVectorGetZ(rightAxis) << std::endl;
+
+		rotate = m_rotationQuat;
 	}
 
 	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
 	{
 		m_rayDirection = RayCast(InputManagement->GetMousePos());
-		std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
-		std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
+		//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
+		//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
 	}
 
-	m_eyePosition += ((z * m_forward) + (y * UP) + (x * m_right)) * m_speed * deltaTime;
+	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
 	m_lookAt = m_eyePosition + m_forward;
 }
 
