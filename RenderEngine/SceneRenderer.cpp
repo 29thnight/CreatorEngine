@@ -153,8 +153,12 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		XMVECTOR rots;
 		XMVECTOR scales;
 		XMMatrixDecompose(&scales, &rots, &poss, XMMatrixInverse(nullptr, XMMATRIX(cameraView)));
-		//cam->m_eyePosition = poss;
-		//cam->m_rotation = rots;
+		cam->m_eyePosition = poss;
+		cam->m_rotation = rots;
+
+		XMVECTOR rotDir = XMVector3Rotate(cam->FORWARD, rots);
+
+		cam->m_forward = rotDir;
 	}
 
 	if (useWindow)
