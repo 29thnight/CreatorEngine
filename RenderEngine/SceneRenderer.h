@@ -61,6 +61,9 @@ private:
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
+	PerspacetiveCamera* m_persEditCamera{};
+	OrthographicCamera* m_orthoEditCamera{};
+
 	//render queue
 
 	std::queue<SceneObject*> m_forwardQueue;

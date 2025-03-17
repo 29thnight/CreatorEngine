@@ -142,7 +142,7 @@ void Scene::EditorSceneObjectHierarchy()
 				ImGui::TreePop();
 			}
 		}
-	});
+	}, ImGuiWindowFlags_NoMove);
 }
 
 void Scene::EditorSceneObjectInspector()
@@ -171,7 +171,7 @@ void Scene::EditorSceneObjectInspector()
 
 			m_selectedSceneObject->m_transform.GetLocalMatrix();
 		}
-	});
+	}, ImGuiWindowFlags_NoMove);
 }
 
 void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model)

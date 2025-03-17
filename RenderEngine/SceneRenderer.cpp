@@ -28,7 +28,6 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	static bool boundSizing = false;
 	static bool boundSizingSnap = false;
 
-
 	ImGuizmo::SetOrthographic(false);
 	ImGuizmo::BeginFrame();
 
@@ -99,8 +98,8 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	static ImGuiWindowFlags gizmoWindowFlags = 0;
 	if (useWindow)
 	{
-		ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
-		ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
+		//ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
+		//ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
 		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
 		ImGuizmo::SetDrawlist();
@@ -118,7 +117,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
 
-		ImGui::Image((ImTextureID)m_colorTexture->m_pSRV, ImVec2(x, y));
+		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, ImVec2(x, y));
 		//ImGui::Image((ImTextureID)sceneRenderer->GetMeshEditorTarget()->GetSRV(),
 		//	ImVec2(450, 560));
 		//ImGui::End();
@@ -132,7 +131,6 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 
 	//ImGuizmo::DrawCubes(cameraView, cameraProjection, &objectMatrix[0][0], gizmoCount);
-	ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
 
 	{
 		XMVECTOR poss;
@@ -147,9 +145,14 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	XMVECTOR rot;
 	XMVECTOR scale;
 	XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
-	obj->m_transform.SetPosition(pos);
-	//obj->SetRotation(rot.ToEuler() * 57.295779513f);
-	obj->m_transform.SetScale(scale);
+
+	if (obj)
+	{
+		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
+		obj->m_transform.SetPosition(pos);
+		//obj->SetRotation(rot.ToEuler() * 57.295779513f);
+		obj->m_transform.SetScale(scale);
+	}
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
 
@@ -482,7 +485,8 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::EditorView()
 {
 	auto obj = m_currentScene->GetSelectSceneObject();
-	if (obj) {
+	if (obj) 
+	{
 		auto mat = obj->m_transform.GetLocalMatrix();
 		XMFLOAT4X4 objMat;
 		XMStoreFloat4x4(&objMat, mat);
@@ -496,4 +500,24 @@ void SceneRenderer::EditorView()
 		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, &m_currentScene->m_MainCamera);
 
 	}
+	else
+	{
+		auto view = m_currentScene->m_MainCamera.CalculateView();
+		XMFLOAT4X4 floatMatrix;
+		XMStoreFloat4x4(&floatMatrix, view);
+		auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		XMFLOAT4X4 projMatrix;
+		XMStoreFloat4x4(&projMatrix, proj);
+		XMFLOAT4X4 identityMatrix;
+		XMStoreFloat4x4(&identityMatrix, XMMatrixIdentity());
+
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, &m_currentScene->m_MainCamera);
+	}
+
+	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove);
+	{
+		ImVec2 size = ImGui::GetContentRegionAvail();
+		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, size);
+	}
+	ImGui::End();
 }

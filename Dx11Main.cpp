@@ -46,6 +46,11 @@ DirectX11::Dx11Main::~Dx11Main()
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
 {
+	ImGui::ContextRegister("DockSpace", [&]()
+	{
+		ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+	});
+
 	//m_camera = std::make_unique<PerspacetiveCamera>();
 	////m_camera->SetPosition(10.0f, 140.0f, 220.0f);
 	////m_camera->pitch = -40.f;
@@ -228,8 +233,6 @@ bool DirectX11::Dx11Main::Render()
 
 
 		// editor only
-
-		LoggerSystem->Draw("Logger");
 		//MeshEditorSystem->ShowMainUI();
 		//m_btEditor.ShowMainUI();
 		//GridEditorSystem->ShowGridEditor();

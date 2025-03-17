@@ -1,6 +1,7 @@
 ﻿#include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
+#include "imgui_internal.h"
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -96,8 +97,90 @@ void ImGuiRenderer::BeginRender()
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
 	ImGui::NewFrame();
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+
+    // Beginning of main loop
+
+// 1. DockBuilder functions only need to run once to take effect.
+// This state variable will let us check for the first frame of the app.
+    static bool firstLoop = true;
+
+    // Only run DockBuilder functions on the first frame of the app:
+    if (firstLoop) {
+
+        // We'll need to halve the size, then add those resultant values to the top-left corner to get to the middle point on both X and Y.
+        ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
+
+        // 3. Now we'll need to create our dock node:
+        ImGuiID id = ImGui::GetID("MainWindowGroup"); // The string chosen here is arbitrary (it just gives us something to work with)
+        ImGui::DockBuilderRemoveNode(id);             // Clear any preexisting layouts associated with the ID we just chose
+        ImGui::DockBuilderAddNode(id);                // Create a new dock node to use
+
+        // 4. Set the dock node's size and position:
+        ImVec2 size{ ImGui::GetMainViewport()->Size }; // A decently large dock node size (600x300px) so everything displays clearly
+
+        // Calculate the position of the dock node
+        //
+        // `DockBuilderSetNodePos()` will position the top-left corner of the node to the coordinate given.
+        // This means that the node itself won't actually be in the center of the window; its top-left corner will.
+        //
+        // To fix this, we'll need to subtract half the node size from both the X and Y dimensions to move it left and up.
+        // This new coordinate will be the position of the node's top-left corner that will center the node in the window.
+        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
+
+        // Set the size and position:
+        ImGui::DockBuilderSetNodeSize(id, size);
+        ImGui::DockBuilderSetNodePos(id, nodePos);
+
+        // 5. Split the dock node to create spaces to put our windows in:
+
+        // Split the dock node in the left direction to create our first docking space. This will be on the left side of the node.
+        // (The 0.5f means that the new space will take up 50% of its parent - the dock node.)
+        ImGuiID dock1 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Left, 0.5f, nullptr, &id);
+        // +-----------+
+        // |           |
+        // |     1     |
+        // |           |
+        // +-----------+
+
+		ImGuiID dock_gameView = ImGui::DockBuilderSplitNode(dock1, ImGuiDir_Down, 0.5f, nullptr, &dock1);
+
+        // Split the same dock node in the right direction to create our second docking space.
+        // At this point, the dock node has two spaces, one on the left and one on the right.
+        ImGuiID dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.5f, nullptr, &id);
+        // +-----+-----+
+        // |     |     |
+        // |  1  |  2  |
+        // |     |     |
+        // +-----+-----+
+        //    split ->
+
+        // For our last docking space, we want it to be under the second one but not under the first.
+        // Split the second space in the down direction so that we now have an additional space under it.
+        //
+        // Notice how "dock2" is now passed rather than "id".
+        // The new space takes up 50% of the second space rather than 50% of the original dock node.
+        ImGuiID dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
+        // +-----+-----+
+        // |     |  2  |  split
+        // |  1  +-----+    |
+        // |     |  3  |    V
+        // +-----+-----+
+
+        // 6. Add windows to each docking space:
+        ImGui::DockBuilderDockWindow("Gizmo", dock1);
+        ImGui::DockBuilderDockWindow("GameView", dock_gameView);
+        ImGui::DockBuilderDockWindow("SceneObject Hierarchy", dock2);
+        ImGui::DockBuilderDockWindow("SceneObject Inspector", dock3);
+
+        // 7. We're done setting up our docking configuration:
+        ImGui::DockBuilderFinish(id);
+    }
+
+    // 9. At this point, we're at the end of the loop iteration.
+    // If this is our first one, set the state variable to false so the DockBuilder functions don't run again:
+    if (firstLoop) firstLoop = false;
+
 }
 
 void ImGuiRenderer::Render()

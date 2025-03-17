@@ -170,7 +170,7 @@ PerspacetiveCamera::PerspacetiveCamera()
 
 Mathf::xMatrix PerspacetiveCamera::CalculateProjection()
 {
-	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, 0.1f, 200.f);
+	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
 }
 
 OrthographicCamera::OrthographicCamera()
