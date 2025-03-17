@@ -36,16 +36,6 @@ float checker(float2 pos, float unit)
     return max(square1, square2) - square1 * square2;
 }
 
-
-// gridFactor 함수: 주어진 2D 좌표에서 grid line의 강도를 계산합니다.
-// scale 값에 따라 1m (scale=1.0) 또는 10m (scale=0.1) 배수 선을 구분할 수 있습니다.
-float gridFactor(float2 coord, float scale)
-{
-    float2 grid = abs(frac(coord * scale - 0.5f) - 0.5f) / fwidth(coord * scale);
-    float lineValue = min(grid.x, grid.y);
-    return 1.0f - smoothstep(0.0f, 1.0f, lineValue);
-}
-
 // Pixel Shader: XZ 평면상의 worldPos.xy 대신 worldPos.xz를 사용하여 grid를 계산합니다.
 float4 main(VS_OUTPUT input) : SV_TARGET
 {
