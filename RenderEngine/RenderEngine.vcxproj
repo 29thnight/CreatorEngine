@@ -156,6 +156,7 @@
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="FontManager.cpp" />
     <ClCompile Include="GBufferPass.cpp" />
+    <ClCompile Include="GridPass.cpp" />
     <ClCompile Include="ImGuiRenderer.cpp" />
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -223,6 +224,7 @@
     <ClInclude Include="UI_DataSystem.h" />
     <ClInclude Include="widgets.h" />
     <ClInclude Include="WireFramePass.h" />
+    <ClInclude Include="GridPass.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

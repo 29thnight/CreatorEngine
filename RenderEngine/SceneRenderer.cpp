@@ -5,19 +5,22 @@
 #include "Scene.h"
 #include "ImGuiRegister.h"
 
-
-// imguizmo 
+#pragma region ImGuizmo
 #include "ImGuizmo.h"
-static const float identityMatrix[16] =
-{ 1.f, 0.f, 0.f, 0.f,
+
+static const float identityMatrix[16] = { 
+	1.f, 0.f, 0.f, 0.f,
 	0.f, 1.f, 0.f, 0.f,
 	0.f, 0.f, 1.f, 0.f,
-	0.f, 0.f, 0.f, 1.f };
+	0.f, 0.f, 0.f, 1.f 
+};
 bool useWindow = true;
 bool editWindow = true;
 int gizmoCount = 1;
 float camDistance = 8.f;
 static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
+
+
 void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam)
 {
 	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
@@ -162,8 +165,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImGui::PopStyleColor(1);
 	}
 }
-// end
-
+#pragma endregion
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
@@ -421,6 +423,10 @@ void SceneRenderer::Render()
     {
         m_pToneMapPass->Execute(*m_currentScene);
     }
+	
+	//[*] GridPass
+	{
+	}
 
 	//[7] SpritePass
 	{

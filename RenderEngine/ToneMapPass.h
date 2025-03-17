@@ -16,12 +16,11 @@ struct alignas(16) ToneMapReinhardConstant
 struct alignas(16) ToneMapACESConstant
 {
 	bool m_bUseToneMap{ true };
-    float shoulderStrength{ 0.22f };
-	float linearStrength{ 0.30f };
-	float linearAngle{ 0.10f };
-	float toeStrength{ 0.20f };
-	float toeNumerator{ 0.02f };
-	float toeDenominator{ 0.30f };
+    float filmSlope{ 2.51f };
+    float filmToe{ 0.03f };
+    float filmShoulder{ 2.43f };
+    float filmBlackClip{ 0.59f };
+    float filmWhiteClip{ 0.14f };
 };
 
 class ToneMapPass final : public IRenderPass

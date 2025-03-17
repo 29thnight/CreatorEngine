@@ -105,6 +105,9 @@
     <Filter Include="RenderPass\TAAPass">
       <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\GridPass">
+      <UniqueIdentifier>{283179e7-32f1-4427-a1dd-c816135e2518}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -208,6 +211,9 @@
     </ClCompile>
     <ClCompile Include="TAAPass.cpp">
       <Filter>RenderPass\TAAPass</Filter>
+    </ClCompile>
+    <ClCompile Include="GridPass.cpp">
+      <Filter>RenderPass\GridPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -336,6 +342,9 @@
     </ClInclude>
     <ClInclude Include="TAAPass.h">
       <Filter>RenderPass\TAAPass</Filter>
+    </ClInclude>
+    <ClInclude Include="GridPass.h">
+      <Filter>RenderPass\GridPass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

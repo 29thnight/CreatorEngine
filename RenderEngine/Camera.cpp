@@ -92,18 +92,6 @@ void Camera::HandleMovement(float deltaTime)
 		y += 1.f;
 	}
 
-	//if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
-	//{
-	//	m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
-	//	m_pitch = fmax(-pi, fmin(m_pitch, pi));
-	//	m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
-	//	if (m_yaw > XM_PI) m_yaw -= pi2;
-	//	if (m_yaw < -XM_PI) m_yaw += pi2;
-
-	//	Mathf::xVector viewRotation = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.f);
-	//	m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, viewRotation));
-	//	m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
-	//}
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
 	static XMVECTOR rotate = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw

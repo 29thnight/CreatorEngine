@@ -6,27 +6,16 @@ Texture2D Colour : register(t0);
 cbuffer UseTonemap : register(b0)
 {
     bool useTonemap;
-    float shoulderStrength;
-    float linearStrength;
-    float linearAngle;
-    float teoStrength;
-    float toeNumerator;
-    float toeDenominator;
+    float filmSlope;
+    float filmToe;
+    float filmShoulder;
+    float filmBlackClip;
+    float filmWhiteClip;
 }
 
-float3 Tonemap_Curve(float3 color, 
-                     float ShoulderStrength, 
-                     float LinearStrength, 
-                     float LinearAngle, 
-                     float TeoStrength, 
-                     float ToeNumerator, 
-                     float ToeDenominator
-)
+float3 AcesToneMap_UE4(float3 acesColour)
 {
-    return saturate((color.rgb * 
-    (ShoulderStrength * color.rgb + LinearStrength * LinearAngle) + TeoStrength * ToeNumerator) 
-    / (color.rgb * (ShoulderStrength * color.rgb + LinearStrength) + TeoStrength * ToeDenominator) - 
-    ToeNumerator / ToeDenominator);
+    return saturate((acesColour * (filmSlope * acesColour + filmToe)) / (acesColour * (filmShoulder * acesColour + filmBlackClip) + filmWhiteClip));
 }
 
 struct PixelShaderInput // see Fullscreen.vs.hlsl
@@ -37,19 +26,14 @@ struct PixelShaderInput // see Fullscreen.vs.hlsl
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
+
+    
     float3 colour = Colour.Sample(PointSampler, IN.texCoord).rgb;
     float3 toneMapped = 0;
     [branch]
     if (useTonemap)
     {
-        toneMapped = Tonemap_Curve(colour, 
-                                   shoulderStrength, 
-                                   linearStrength, 
-                                   linearAngle, 
-                                   teoStrength, 
-                                   toeNumerator, 
-                                   toeDenominator
-        );
+        toneMapped = AcesToneMap_UE4(colour);
     }
     else
     {
