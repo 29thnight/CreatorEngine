@@ -135,29 +135,34 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 	//ImGuizmo::DrawCubes(cameraView, cameraProjection, &objectMatrix[0][0], gizmoCount);
 
-	{
-		XMVECTOR poss;
-		XMVECTOR rots;
-		XMVECTOR scales;
-		XMMatrixDecompose(&scales, &rots, &poss, XMMATRIX(cameraView));
-		//cam->m_eyePosition = poss;
-		//cam->m_rotation = rot;
-	}
-
-	XMVECTOR pos;
-	XMVECTOR rot;
-	XMVECTOR scale;
-	XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
 
 	if (obj)
 	{
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
+
+		XMVECTOR pos;
+		XMVECTOR rot;
+		XMVECTOR scale;
+		XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
 		obj->m_transform.SetPosition(pos);
-		//obj->SetRotation(rot.ToEuler() * 57.295779513f);
+		//obj->m_transform.SetRotation(rot);
 		obj->m_transform.SetScale(scale);
 	}
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
+
+	{
+		XMVECTOR poss;
+		XMVECTOR rots;
+		XMVECTOR scales;
+		XMMatrixDecompose(&scales, &rots, &poss, XMMatrixInverse(nullptr, XMMATRIX(cameraView)));
+		cam->m_eyePosition = poss;
+		cam->m_rotation = rots;
+
+		XMVECTOR rotDir = XMVector3Rotate(cam->FORWARD, rots);
+
+		cam->m_forward = rotDir;
+	}
 
 	if (useWindow)
 	{
