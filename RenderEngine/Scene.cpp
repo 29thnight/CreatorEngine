@@ -157,7 +157,7 @@ void Scene::EditorSceneObjectInspector()
 
 			ImGui::Text(m_selectedSceneObject->m_name.c_str());
 			ImGui::Separator();
-			ImGui::Text("Position");
+			ImGui::Text("Position");	
 			ImGui::DragFloat3("##Position", &position.x, -1000, 1000);
 			ImGui::Text("Rotation");
 			ImGui::DragFloat3("##Rotation", &rotation.x, -3.14f, 3.14f);
