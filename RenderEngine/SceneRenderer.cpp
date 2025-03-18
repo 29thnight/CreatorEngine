@@ -298,7 +298,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
 	m_pSkyBoxPass->SetRenderTarget(m_colorTexture.get());
-	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/Malibu_Overlook_3k.hdr").string());
+	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
+	
 
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();

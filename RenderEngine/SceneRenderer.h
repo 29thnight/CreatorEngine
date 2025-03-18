@@ -64,8 +64,8 @@ private:
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
-	PerspacetiveCamera m_perspacetiveEditCamera{};
-	OrthographicCamera m_orthographicEditCamera{};
+	//PerspacetiveCamera m_perspacetiveEditCamera{};
+	//OrthographicCamera m_orthographicEditCamera{};
 
 	//render queue
 

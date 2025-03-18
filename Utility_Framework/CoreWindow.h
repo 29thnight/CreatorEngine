@@ -51,6 +51,7 @@ public:
     CoreWindow InitializeTask(Initializer fn_initializer)
     {
         fn_initializer();
+
         return *this;
     }
 

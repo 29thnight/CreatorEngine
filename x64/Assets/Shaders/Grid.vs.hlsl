@@ -1,7 +1,9 @@
 // 상수 버퍼: 카메라의 뷰-프로젝션 행렬을 전달합니다.
 cbuffer GridConstantBuffer : register(b0)
 {
-    float4x4 viewProj;
+    matrix world;
+    matrix view;
+    matrix projection;
 }
 
 // 입력 정점 구조체: 간단히 월드 좌표상의 위치만 전달
@@ -21,8 +23,14 @@ struct VS_OUTPUT
 VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
-    float4 worldPos = float4(input.pos, 1.0);
-    output.worldPos = input.pos;
-    output.pos = mul(worldPos, viewProj);
+    
+    // 입력 정점을 월드 공간으로 변환
+    float4 worldPos = mul(world, float4(input.pos, 1.0));
+    output.worldPos = worldPos.xyz;
+    
+    // 월드 좌표를 뷰, 프로젝션을 거쳐 클립 공간으로 변환
+    float4 viewPos = mul(view, worldPos);
+    output.pos = mul(projection, viewPos);
+    
     return output;
 }

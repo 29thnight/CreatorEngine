@@ -2,18 +2,20 @@
 #include "AssetSystem.h"
 #include "DeviceState.h"
 #include "Scene.h"
+#include "ImGuiRegister.h"
 
-// XZ 평면에 위치한 쿼드 (예: -100 ~ +100 범위)
-// (원하는 영역만큼 확장할 수 있습니다.)
 GridVertex vertices[] =
 {
-    { XMFLOAT3(-100.0f, 0.0f, -100.0f) },
-    { XMFLOAT3(-100.0f, 0.0f,  100.0f) },
-    { XMFLOAT3(100.0f, 0.0f,  100.0f) },
+    { XMFLOAT3(-10000.0f, 0.0f, -10000.0f) },
+    { XMFLOAT3(-10000.0f, 0.0f, 10000.0f) },
+    { XMFLOAT3(10000.0f, 0.0f, 10000.0f) },
+    { XMFLOAT3(10000.0f, 0.0f, -10000.0f) },
+};
 
-    { XMFLOAT3(-100.0f, 0.0f, -100.0f) },
-    { XMFLOAT3(100.0f, 0.0f,  100.0f) },
-    { XMFLOAT3(100.0f, 0.0f, -100.0f) },
+uint32 indices[] =
+{
+	0, 1, 2,
+	0, 2, 3,
 };
 
 GridPass::GridPass()
@@ -59,12 +61,42 @@ GridPass::GridPass()
     DirectX::SetName(m_pGridConstantBuffer, "GridConstantBuffer");
 
     m_pVertexBuffer = DirectX11::CreateBuffer(
-        sizeof(vertices),
+        sizeof(GridVertex) * 4,
         D3D11_BIND_VERTEX_BUFFER,
         vertices
     );
 
     DirectX::SetName(m_pVertexBuffer, "GridVertexBuffer");
+
+	m_pIndexBuffer = DirectX11::CreateBuffer(
+		sizeof(uint32) * 6,
+		D3D11_BIND_INDEX_BUFFER,
+		indices
+	);
+
+	DirectX::SetName(m_pIndexBuffer, "GridIndexBuffer");
+
+	m_pUniformBuffer = DirectX11::CreateBuffer(
+		sizeof(GridUniformBuffer),
+		D3D11_BIND_CONSTANT_BUFFER,
+		&m_gridUniform
+	);
+
+	DirectX::SetName(m_pUniformBuffer, "GridUniformBuffer");
+
+    ImGui::ContextRegister("Uniform Setting", [&]()
+    {
+        ImGui::ColorEdit4("Grid Color", &m_gridUniform.gridColor.x);
+        ImGui::ColorEdit4("Checker Color", &m_gridUniform.checkerColor.x);
+        ImGui::DragFloat("Unit Size", &m_gridUniform.unitSize, 1.f, 100.f);
+        ImGui::DragFloat("Major Line Thickness", &m_gridUniform.majorLineThickness, 0.1f, 10.f);
+        ImGui::DragFloat("Minor Line Thickness", &m_gridUniform.minorLineThickness, 0.1f, 10.f);
+        ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
+		ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
+		ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
+        ImGui::DragFloat("Fade Start", &m_gridUniform.fadeStart, 0.f, 1.f);
+        ImGui::DragFloat("Fade End", &m_gridUniform.fadeEnd, 0.f, 1000.f);
+    });
 }
 
 GridPass::~GridPass()
@@ -83,12 +115,18 @@ void GridPass::Execute(Scene& scene)
     //copyResource
     deviceContext->CopyResource(m_gridTexture->m_pTexture, m_colorTexture->m_pTexture);
 
-    XMMATRIX viewProj = scene.m_MainCamera.CalculateView() * scene.m_MainCamera.CalculateProjection();
+	m_gridConstant.world = XMMatrixIdentity();
+	m_gridConstant.view = scene.m_MainCamera.CalculateView();
+	m_gridConstant.projection = scene.m_MainCamera.CalculateProjection();
 
-    m_gridConstant.m_viewProj = XMMatrixTranspose(viewProj);
+    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f }; // 블렌드 팩터 (사용되지 않음)
+    UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)
+	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, blendFactor, sampleMask);
 
     DirectX11::VSSetConstantBuffer(0, 1, m_pGridConstantBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(0, 1, m_pUniformBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_pGridConstantBuffer.Get(), &m_gridConstant);
+	DirectX11::UpdateBuffer(m_pUniformBuffer.Get(), &m_gridUniform);
 
     m_pso->Apply();
 
@@ -101,9 +139,14 @@ void GridPass::Execute(Scene& scene)
     deviceContext->IASetVertexBuffers(0, 1,
         m_pVertexBuffer.GetAddressOf(), &stride, &offset);
 
-    DirectX11::Draw(6, 0);
+	deviceContext->IASetIndexBuffer(m_pIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+
+	deviceContext->DrawIndexed(6, 0, 0);
 
     ID3D11ShaderResourceView* nullSRV[3] = { nullptr, nullptr, nullptr };
     DirectX11::PSSetShaderResources(0, 3, nullSRV);
     DirectX11::UnbindRenderTargets();
+
+    DirectX11::OMSetBlendState(nullptr, nullptr, sampleMask);
+
 }
