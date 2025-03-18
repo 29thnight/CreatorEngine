@@ -81,6 +81,8 @@ SkyBoxPass::~SkyBoxPass()
 
 void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 {
+	m_size = size;
+
     std::vector<uint32> skyboxIndices =
     {
         0,  1,  2,  0,  2,  3,
@@ -92,7 +94,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
     };
 
     m_skyBoxMesh = std::make_unique<Mesh>("skyBoxMesh", PrimitiveCreator::CubeVertices(), std::move(skyboxIndices));
-	m_scaleMatrix = XMMatrixScaling(size, size, size);
+	m_scaleMatrix = XMMatrixScaling(m_size, m_size, m_size);
 
 	file::path path = file::path(fileName);
     if (file::exists(path))
@@ -165,12 +167,19 @@ void SkyBoxPass::SetRenderTarget(Texture* renderTarget)
 	m_RenderTarget = renderTarget;
 }
 
+void SkyBoxPass::SetBackBuffer(ID3D11RenderTargetView* backBuffer)
+{
+	m_backBuffer = backBuffer;
+}
+
 void SkyBoxPass::GenerateCubeMap(Scene& scene)
 {
 	if (!m_cubeMapGenerationRequired)
 	{
 		return;
 	}
+
+	m_scaleMatrix = XMMatrixScaling(m_size, m_size, m_size);
 
     auto deviceContext = DeviceState::g_pDeviceContext;
     D3D11_VIEWPORT viewport = { 0 };

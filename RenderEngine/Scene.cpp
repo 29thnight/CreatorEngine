@@ -144,7 +144,7 @@ void Scene::EditorSceneObjectHierarchy()
 				ImGui::TreePop();
 			}
 		}
-	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void Scene::EditorSceneObjectInspector()
@@ -173,7 +173,7 @@ void Scene::EditorSceneObjectInspector()
 
 			m_selectedSceneObject->m_transform.GetLocalMatrix();
 		}
-	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model)
