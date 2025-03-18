@@ -97,12 +97,14 @@ void Camera::HandleMovement(float deltaTime)
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
+
+
 		// 마우스 이동량 가져오기
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
 		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
 
 		// Pitch 제한 적용
-		m_pitch += deltaPitch;
+		//m_pitch += deltaPitch;
 		
 		// 현재 회전 기준 축을 얻음
 		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
