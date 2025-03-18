@@ -15,7 +15,8 @@ cbuffer UseTonemap : register(b0)
 
 float3 AcesToneMap_UE4(float3 acesColour)
 {
-    return saturate((acesColour * (filmSlope * acesColour + filmToe)) / (acesColour * (filmShoulder * acesColour + filmBlackClip) + filmWhiteClip));
+    return saturate((acesColour * (filmSlope * acesColour + filmToe)) / 
+    (acesColour * (filmShoulder * acesColour + filmBlackClip) + filmWhiteClip));
 }
 
 struct PixelShaderInput // see Fullscreen.vs.hlsl

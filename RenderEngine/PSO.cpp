@@ -69,3 +69,19 @@ void PipelineStateObject::Apply()
 	//	DeviceState::g_pDeviceContext->PSSetSamplers(i, 1, &sampler);
 	//}
 }
+
+void PipelineStateObject::Reset()
+{
+
+    DeviceState::g_pDeviceContext->IASetInputLayout(nullptr);
+    DeviceState::g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    PSOHelper::VSSetShader(nullptr);
+    PSOHelper::PSSetShader(nullptr);
+    PSOHelper::HSSetShader(nullptr);
+    PSOHelper::DSSetShader(nullptr);
+    PSOHelper::GSSetShader(nullptr);
+    PSOHelper::CSSetShader(nullptr);
+    DeviceState::g_pDeviceContext->RSSetState(nullptr);
+    DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+    DeviceState::g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
+}

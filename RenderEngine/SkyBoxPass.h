@@ -9,8 +9,9 @@ public:
     SkyBoxPass();
     ~SkyBoxPass();
 
-    void Initialize(const std::string_view& fileName, float size = 50.f);
+    void Initialize(const std::string_view& fileName, float size = 1000.f);
 	void SetRenderTarget(Texture* renderTarget);
+	void SetBackBuffer(ID3D11RenderTargetView* backBuffer);
     void GenerateCubeMap(Scene& scene);
     Texture* GenerateEnvironmentMap(Scene& scene);
     Texture* GeneratePrefilteredMap(Scene& scene);
@@ -29,6 +30,7 @@ private:
 	PixelShader* m_prefilterPS{};
 	PixelShader* m_brdfPS{};
 	ID3D11RasterizerState* m_skyBoxRasterizerState{};
+	ID3D11RenderTargetView* m_backBuffer{};
 
 	PixelShader* m_rectToCubeMapPS{};
 
@@ -40,5 +42,6 @@ private:
 	Mathf::xMatrix m_scaleMatrix{};
 	Texture* m_RenderTarget{};
 	bool m_cubeMapGenerationRequired{ true };
+	float m_size{ 1000.f };
 	int m_cubeMapSize{ 512 };
 };
