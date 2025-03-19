@@ -83,20 +83,6 @@ GridPass::GridPass()
 	);
 
 	DirectX::SetName(m_pUniformBuffer, "GridUniformBuffer");
-
-    ImGui::ContextRegister("Uniform Setting", [&]()
-    {
-        ImGui::ColorEdit4("Grid Color", &m_gridUniform.gridColor.x);
-        ImGui::ColorEdit4("Checker Color", &m_gridUniform.checkerColor.x);
-        ImGui::DragFloat("Unit Size", &m_gridUniform.unitSize, 1.f, 100.f);
-        ImGui::DragFloat("Major Line Thickness", &m_gridUniform.majorLineThickness, 0.1f, 10.f);
-        ImGui::DragFloat("Minor Line Thickness", &m_gridUniform.minorLineThickness, 0.1f, 10.f);
-        ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
-		ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
-		ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
-        ImGui::DragFloat("Fade Start", &m_gridUniform.fadeStart, 0.f, 1.f);
-        ImGui::DragFloat("Fade End", &m_gridUniform.fadeEnd, 0.f, 1000.f);
-    });
 }
 
 GridPass::~GridPass()
@@ -149,4 +135,18 @@ void GridPass::Execute(Scene& scene)
 
     DirectX11::OMSetBlendState(nullptr, nullptr, sampleMask);
 
+}
+
+void GridPass::ControlPanel()
+{
+    ImGui::ColorEdit4("Grid Color", &m_gridUniform.gridColor.x);
+    ImGui::ColorEdit4("Checker Color", &m_gridUniform.checkerColor.x);
+    ImGui::DragFloat("Unit Size", &m_gridUniform.unitSize, 1.f, 100.f);
+    ImGui::DragFloat("Major Line Thickness", &m_gridUniform.majorLineThickness, 0.1f, 10.f);
+    ImGui::DragFloat("Minor Line Thickness", &m_gridUniform.minorLineThickness, 0.1f, 10.f);
+    ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
+    ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
+    ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
+    ImGui::DragFloat("Fade Start", &m_gridUniform.fadeStart, 0.f, 1.f);
+    ImGui::DragFloat("Fade End", &m_gridUniform.fadeEnd, 0.f, 1000.f);
 }

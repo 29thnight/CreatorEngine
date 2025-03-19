@@ -95,14 +95,12 @@ void ImGuiRenderer::BeginRender()
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
 	ImGui::NewFrame();
 
-
-    // Beginning of main loop
-
-// 1. DockBuilder functions only need to run once to take effect.
-// This state variable will let us check for the first frame of the app.
     static bool firstLoop = true;
 
     // Only run DockBuilder functions on the first frame of the app:
@@ -189,6 +187,10 @@ void ImGuiRenderer::Render()
 
     for (auto& [name, context] : container)
     {
+        if(!context.IsPopup())
+        {
+           
+        }
         context.Render();
     }
 }
@@ -197,6 +199,10 @@ void ImGuiRenderer::EndRender()
 {
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
+
 }
 
 void ImGuiRenderer::Shutdown()

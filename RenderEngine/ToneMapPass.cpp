@@ -60,21 +60,6 @@ ToneMapPass::ToneMapPass()
 
 	DirectX::SetName(m_pReinhardConstantBuffer, "ToneMapReinhardConstantBuffer");
 
-	ImGui::ContextRegister("ToneMap", [&]()
-	{
-		ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
-		ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
-		ImGui::Separator();
-        if (m_toneMapType == ToneMapType::ACES)
-        {
-			ImGui::SliderFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.0f, 1.0f);
-			ImGui::SliderFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.0f, 1.0f);
-			ImGui::SliderFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.0f, 1.0f);
-			ImGui::SliderFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.0f, 1.0f);
-			ImGui::SliderFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.0f, 1.0f);
-        }
-	});
-
 }
 
 ToneMapPass::~ToneMapPass()
@@ -122,4 +107,19 @@ void ToneMapPass::Execute(Scene& scene)
     ID3D11ShaderResourceView* nullSRV = nullptr;
     DirectX11::PSSetShaderResources(0, 1, &nullSRV);
     DirectX11::UnbindRenderTargets();
+}
+
+void ToneMapPass::ControlPanel()
+{
+    ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
+    ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
+    ImGui::Separator();
+    if (m_toneMapType == ToneMapType::ACES)
+    {
+        ImGui::SliderFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.0f, 1.0f);
+    }
 }

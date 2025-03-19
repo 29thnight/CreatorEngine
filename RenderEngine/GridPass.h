@@ -38,6 +38,7 @@ public:
 	~GridPass();
 	void Initialize(Texture* color, Texture* grid);
 	void Execute(Scene& scene) override;
+	void ControlPanel() override;
 
     ID3D11ShaderResourceView* GetGridSRV() const { return m_gridTexture->m_pSRV; }
 

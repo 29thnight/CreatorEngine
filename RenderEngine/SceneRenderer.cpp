@@ -98,12 +98,13 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
 	float viewManipulateTop = 0;
-	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
+	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 	if (useWindow)
 	{
 		//ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
 		//ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
 		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
 		ImGuizmo::SetDrawlist();
 
@@ -115,12 +116,13 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
 		viewManipulateTop = ImGui::GetWindowPos().y;
 		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		gizmoWindowFlags = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
+		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
 
 		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
 
 		ImGui::Image((ImTextureID)m_gridTexture->m_pSRV, ImVec2(x, y));
+		ImGui::PopStyleVar();
 		//ImGui::Image((ImTextureID)sceneRenderer->GetMeshEditorTarget()->GetSRV(),
 		//	ImVec2(450, 560));
 		//ImGui::End();
@@ -372,7 +374,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("untitled.gltf");
-		//model = Model::LoadModel("sphere.fbx");
+		//model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
@@ -391,6 +393,74 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+
+	ImGui::ContextRegister("RenderPass", true, [&]()
+	{
+		if (ImGui::BeginTabBar("RenderPass Control Panel"))
+		{
+			if (ImGui::BeginTabItem("ShadowPass"))
+			{
+				m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("GBufferPass"))
+			{
+				m_pGBufferPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SSAOPass"))
+			{
+				m_pSSAOPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("DeferredPass"))
+			{
+				m_pDeferredPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SkyBoxPass"))
+			{
+				m_pSkyBoxPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("ToneMapPass"))
+			{
+				m_pToneMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SpritePass"))
+			{
+				m_pSpritePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("BlitPass"))
+			{
+				m_pBlitPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("WireFramePass"))
+			{
+				m_pWireFramePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("GridPass"))
+			{
+				m_pGridPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			ImGui::EndTabBar();
+		}
+	});
 }
 
 void SceneRenderer::Update(float deltaTime)
@@ -538,10 +608,16 @@ void SceneRenderer::EditorView()
 		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, &m_currentScene->m_MainCamera);
 	}
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	{
 		ImVec2 size = ImGui::GetContentRegionAvail();
+
+		float convert = DeviceState::g_aspectRatio;
+		size.x = size.y * convert;
+
 		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, size);
 	}
 	ImGui::End();
+	ImGui::PopStyleVar();
 }

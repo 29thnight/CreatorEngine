@@ -2,6 +2,7 @@
 #include "AssetSystem.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "ImGuiRegister.h"
 
 Mathf::xVector forward[6] =
 {
@@ -151,15 +152,6 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 
 	m_BRDFLUT->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BRDFLUT->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-	//CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
-	//rasterizerDesc.CullMode = D3D11_CULL_NONE;
-
-	//DeviceState::g_pDevice->CreateRasterizerState(
-	//	&rasterizerDesc,
-	//	&m_skyBoxRasterizerState
-	//);
-
 }
 
 void SkyBoxPass::SetRenderTarget(Texture* renderTarget)
@@ -365,6 +357,11 @@ Texture* SkyBoxPass::GenerateBRDFLUT(Scene& scene)
 
 void SkyBoxPass::Execute(Scene& scene)
 {
+	if (!m_abled)
+	{
+		return;
+	}
+
 	m_pso->Apply();
 
 	/*auto deviceContext = DeviceState::g_pDeviceContext;
@@ -376,6 +373,7 @@ void SkyBoxPass::Execute(Scene& scene)
 	scene.UseCamera(scene.m_MainCamera);
 	scene.UseModel();
 
+	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
 	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
 
 	scene.UpdateModel(modelMatrix);
@@ -387,4 +385,11 @@ void SkyBoxPass::Execute(Scene& scene)
 	DirectX11::UnbindRenderTargets();
 
 	//deviceContext->RSSetState(DeviceState::g_pRasterizerState);
+}
+
+void SkyBoxPass::ControlPanel()
+{
+	ImGui::Text("SkyBoxPass");
+	ImGui::Checkbox("Enable", &m_abled);
+	ImGui::SliderFloat("scale", &m_scale, 1.f, 1000.f);
 }

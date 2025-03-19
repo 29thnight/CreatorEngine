@@ -47,6 +47,7 @@ class Texture;
 class Scene;
 class ForwardPass;
 class GBufferPass;
+class SceneRenderer;
 struct ShadowMapRenderDesc;
 class LightController
 {
@@ -74,6 +75,7 @@ private:
 	friend class DeferredPass;
 	friend class GBufferPass;
 	friend class ShadowMapPass;
+	friend class SceneRenderer;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
 	ShadowMapRenderDesc m_shadowMapRenderDesc;

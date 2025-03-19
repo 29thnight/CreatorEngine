@@ -12,6 +12,7 @@ public:
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
     void Execute(Scene& scene) override;
+	void ControlPanel() override;
 
 private:
     Texture* m_RenderTarget{};

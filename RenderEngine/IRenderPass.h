@@ -20,7 +20,9 @@ public:
 	virtual ~IRenderPass() = default;
 
 	virtual void Execute(Scene& scene) abstract;
+	virtual void ControlPanel() {};
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
+	bool m_abled{ true };
 };

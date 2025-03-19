@@ -72,6 +72,8 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 {
 	m_deviceResources->SetWindow(coreWindow);
 	coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
+	//coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::ImGuiKeyDownHandler);
+	//coreWindow.RegisterHandler(WM_KEYUP, this, &App::ImGuiKeyUpHandler);
 	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
 	//coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
@@ -112,6 +114,24 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	InputManagement->ProcessRawInput(lParam);
+
+	return 0;
+}
+
+LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	io.AddKeyEvent(ImGuiKey(wParam), true);
+
+	return 0;
+}
+
+LRESULT Core::App::ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	io.AddKeyEvent(ImGuiKey(wParam), false);
 
 	return 0;
 }

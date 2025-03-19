@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Light.h"
 #include "AssetSystem.h"
+#include "ImGuiRegister.h"
 
 struct alignas(16) DeferredBuffer
 {
@@ -61,7 +62,7 @@ void DeferredPass::Initialize(Texture* renderTarget, Texture* diffuse, Texture* 
 void DeferredPass::UseAmbientOcclusion(Texture* aoMap)
 {
     m_AmbientOcclusionTexture = aoMap;
-    m_UseAmbientOcclusion = true;
+    //m_UseAmbientOcclusion = true;
 }
 
 void DeferredPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut)
@@ -69,7 +70,7 @@ void DeferredPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Textur
     m_EnvironmentMap = envMap;
     m_PreFilter = preFilter;
     m_BrdfLut = brdfLut;
-    m_UseEnvironmentMap = true;
+    //m_UseEnvironmentMap = true;
 }
 
 void DeferredPass::DisableAmbientOcclusion()
@@ -137,4 +138,10 @@ void DeferredPass::Execute(Scene& scene)
 
     DirectX11::PSSetShaderResources(0, 10, nullSRV);
     DirectX11::UnbindRenderTargets();
+}
+
+void DeferredPass::ControlPanel()
+{
+	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
+	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 }

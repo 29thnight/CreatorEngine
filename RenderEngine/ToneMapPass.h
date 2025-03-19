@@ -31,6 +31,7 @@ public:
     void Initialize(Texture* color, Texture* dest);
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
     void Execute(Scene& scene) override;
+	void ControlPanel() override;
 
 private:
     Texture* m_ColorTexture{};
