@@ -143,33 +143,20 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 	if (obj)
 	{
+		// 기즈모로 변환 후 오브젝트에 적용.
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
 
-		//XMVECTOR pos;
-		//XMVECTOR rot;
-		//XMVECTOR scale;
-		//XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
+		auto parentMat = m_currentScene->GetSceneObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 
-		obj->m_transform.SetLocalMatrix(XMMATRIX(matrix));
-
-		//XMMATRIX parentWorldMatrix = XMMatrixMultiply(
-		//	XMMatrixInverse(nullptr, obj->m_transform.GetLocalMatrix()),
-		//	obj->m_transform.GetWorldMatrix()
-		//);
-
-		//XMMatrixDecompose(&scale, &rot, &pos, XMMatrixMultiply(
-		//	XMMatrixInverse(nullptr, parentWorldMatrix),
-		//	XMMATRIX(matrix))
-		//);
-
-		//obj->m_transform.SetPosition(pos);
-		//obj->m_transform.SetRotation(rot);
-		//obj->m_transform.SetScale(scale);
+		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+		obj->m_transform.SetLocalMatrix(newLocalMatrix);
 	}
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
 
 	{
+		// 기즈모로 변환된 카메라 위치, 회전 적용
 		XMVECTOR poss;
 		XMVECTOR rots;
 		XMVECTOR scales;
@@ -373,6 +360,44 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.AddLight(pointLight)
 			.AddLight(spotLight)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+
+#pragma region lightImguiTest;
+		static int lightIndex = 0;
+
+		ImGui::ContextRegister("Light", true, [&]()
+			{
+				if(ImGui::Button("Add Light")) {
+					Light light;
+					light.m_color = XMFLOAT4(1, 1, 1, 1);
+					pointLight.m_position = XMFLOAT4(0, 0, 0, 0);
+					pointLight.m_lightType = LightType::PointLight;
+
+					m_currentScene->m_LightController.AddLight(light);
+				}
+				if (ImGui::Button("Light index + ")) {
+					lightIndex++;
+					if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
+				}
+				if (ImGui::Button("Light index - ")) {
+					lightIndex--;
+					if (lightIndex < 0) lightIndex = 0;
+				}
+				if (ImGui::Button("Light On")) {
+					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
+				}
+				if (ImGui::Button("Light Off")) {
+					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
+				}
+
+				ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+				ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
+				ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
+				ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
+				ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
+				ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+
+			});
+#pragma endregion
 
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
@@ -599,7 +624,7 @@ void SceneRenderer::EditorView()
 	auto obj = m_currentScene->GetSelectSceneObject();
 	if (obj) 
 	{
-		auto mat = obj->m_transform.GetLocalMatrix();
+		auto mat = obj->m_transform.GetWorldMatrix();
 		XMFLOAT4X4 objMat;
 		XMStoreFloat4x4(&objMat, mat);
 		auto view = m_currentScene->m_MainCamera.CalculateView();
