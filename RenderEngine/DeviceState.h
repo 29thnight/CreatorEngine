@@ -7,12 +7,14 @@ namespace DeviceState
 	extern ID3D11Device3* g_pDevice;
 	extern ID3D11DeviceContext3* g_pDeviceContext;
 	extern ID3D11DepthStencilView* g_pDepthStencilView;
+	extern ID3D11DepthStencilView* g_pEditorDepthStencilView;
 	extern ID3D11DepthStencilState* g_pDepthStencilState;
 	extern ID3D11RasterizerState* g_pRasterizerState;
 	extern ID3D11BlendState* g_pBlendState;
 	extern D3D11_VIEWPORT g_Viewport;
 	extern ID3D11RenderTargetView* g_backBufferRTV;
 	extern ID3D11ShaderResourceView* g_depthStancilSRV;
+	extern ID3D11ShaderResourceView* g_editorDepthStancilSRV;
 	extern DirectX11::Sizef g_ClientRect;
 	extern float g_aspectRatio;
 }
@@ -205,7 +207,7 @@ namespace DirectX11
     {
         if (!DeviceState::g_pDeviceContext)
         {
-            Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+           Log::Error("[RenderEngine] -> DeviceContext is not initialized");
             return;
         }
         DeviceState::g_pDeviceContext->Draw(vertexCount, startVertexLocation);

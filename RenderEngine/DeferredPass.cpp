@@ -59,6 +59,15 @@ void DeferredPass::Initialize(Texture* renderTarget, Texture* diffuse, Texture* 
     m_EmissiveTexture = emissive;
 }
 
+void DeferredPass::EditorInitialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
+{
+	m_EditorRenderTarget = renderTarget;
+	m_EditorDiffuseTexture = diffuse;
+	m_EditorMetalRoughTexture = metalRough;
+	m_EditorNormalTexture = normals;
+	m_EditorEmissiveTexture = emissive;
+}
+
 void DeferredPass::UseAmbientOcclusion(Texture* aoMap)
 {
     m_AmbientOcclusionTexture = aoMap;
@@ -134,6 +143,65 @@ void DeferredPass::Execute(Scene& scene)
         nullptr,
 		nullptr,
 		nullptr
+    };
+
+    DirectX11::PSSetShaderResources(0, 10, nullSRV);
+    DirectX11::UnbindRenderTargets();
+}
+
+void DeferredPass::ExecuteEditor(Scene& scene, Camera& camera)
+{
+    m_pso->Apply();
+
+    DirectX11::ClearRenderTargetView(m_EditorRenderTarget->GetRTV(), Colors::Transparent);
+    ID3D11RenderTargetView* view = m_EditorRenderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &view, nullptr);
+
+    auto& lightManager = scene.m_LightController;
+
+    DirectX11::PSSetConstantBuffer(1, 1, &lightManager.m_pLightBuffer);
+    if (lightManager.hasLightWithShadows)
+    {
+        DirectX11::PSSetConstantBuffer(2, 1, &lightManager.m_shadowMapBuffer);
+    }
+
+    DeferredBuffer buffer{};
+    buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    buffer.m_InverseView = XMMatrixInverse(nullptr, camera.CalculateView());
+    buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
+    buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
+
+    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
+    DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
+
+    ID3D11ShaderResourceView* srvs[10] = {
+        DeviceState::g_depthStancilSRV,
+        m_EditorDiffuseTexture->m_pSRV,
+        m_EditorMetalRoughTexture->m_pSRV,
+        m_EditorNormalTexture->m_pSRV,
+        lightManager.hasLightWithShadows ? lightManager.GetShadowMapTexture()->m_pSRV : nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        m_EditorEmissiveTexture->m_pSRV
+    };
+
+    DirectX11::PSSetShaderResources(0, 10, srvs);
+
+    DirectX11::Draw(4, 0);
+
+    ID3D11ShaderResourceView* nullSRV[10] = {
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr
     };
 
     DirectX11::PSSetShaderResources(0, 10, nullSRV);

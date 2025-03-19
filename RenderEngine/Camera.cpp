@@ -151,24 +151,24 @@ void Camera::HandleMovement(float deltaTime)
 
 PerspacetiveCamera::PerspacetiveCamera()
 {
-	ImGui::ContextRegister("Perspacetive Camera", [&]()
-	{
-		ImGui::DragFloat("FOV", &m_fov, 1.f, 1.f, 179.f);
-		ImGui::DragFloat("Aspect Ratio", &m_aspectRatio, 0.1f, 0.1f, 10.f);
-		ImGui::DragFloat("Near Plane", &m_nearPlane, 0.1f, 0.1f, 100.f);
-		ImGui::DragFloat("Far Plane", &m_farPlane, 1.f, 1.f, 100000.f);
-		ImGui::DragFloat("Speed", &m_speed, 1.f, 1.f, 100.f);
-		ImGui::DragFloat("Pitch", &m_pitch, 0.01f, -pi, pi);
-		ImGui::DragFloat("Yaw", &m_yaw, 0.01f, -pi, pi);
-		ImGui::DragFloat("Roll", &m_roll, 0.01f, -pi, pi);
+	//ImGui::ContextRegister("Perspacetive Camera", [&]()
+	//{
+	//	ImGui::DragFloat("FOV", &m_fov, 1.f, 1.f, 179.f);
+	//	ImGui::DragFloat("Aspect Ratio", &m_aspectRatio, 0.1f, 0.1f, 10.f);
+	//	ImGui::DragFloat("Near Plane", &m_nearPlane, 0.1f, 0.1f, 100.f);
+	//	ImGui::DragFloat("Far Plane", &m_farPlane, 1.f, 1.f, 100000.f);
+	//	ImGui::DragFloat("Speed", &m_speed, 1.f, 1.f, 100.f);
+	//	ImGui::DragFloat("Pitch", &m_pitch, 0.01f, -pi, pi);
+	//	ImGui::DragFloat("Yaw", &m_yaw, 0.01f, -pi, pi);
+	//	ImGui::DragFloat("Roll", &m_roll, 0.01f, -pi, pi);
 
-		ImGui::Text("Eye Position");
-		ImGui::DragFloat3("##Eye Position", &m_eyePosition.m128_f32[0], -1000, 1000);
-		ImGui::Text("Forward");
-		ImGui::DragFloat3("##Forward", &m_forward.m128_f32[0], -1000, 1000);
-		ImGui::Text("Right");
-		ImGui::DragFloat3("##Right", &m_right.m128_f32[0], -1000, 1000);
-	});
+	//	ImGui::Text("Eye Position");
+	//	ImGui::DragFloat3("##Eye Position", &m_eyePosition.m128_f32[0], -1000, 1000);
+	//	ImGui::Text("Forward");
+	//	ImGui::DragFloat3("##Forward", &m_forward.m128_f32[0], -1000, 1000);
+	//	ImGui::Text("Right");
+	//	ImGui::DragFloat3("##Right", &m_right.m128_f32[0], -1000, 1000);
+	//});
 }
 
 Mathf::xMatrix PerspacetiveCamera::CalculateProjection()

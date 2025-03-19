@@ -81,6 +81,11 @@ public:
         m_opened = true;
 	}
 
+	bool IsOpened() const
+	{
+		return m_opened;
+	}
+
 	bool IsPopup() const
 	{
 		return m_isPopup;

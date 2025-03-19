@@ -35,6 +35,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	GameManagement->Initialize();
 	EventInitialize();
 	SceneInitialize();
+
+	//m_renderThread = std::thread([&]
+	//{
+	//	RenderThread();
+	//});
+	//m_renderThread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -46,11 +52,6 @@ DirectX11::Dx11Main::~Dx11Main()
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
 {
-	ImGui::ContextRegister("DockSpace", [&]()
-	{
-		ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-	});
-
 	//m_camera = std::make_unique<PerspacetiveCamera>();
 	////m_camera->SetPosition(10.0f, 140.0f, 220.0f);
 	////m_camera->pitch = -40.f;
@@ -150,7 +151,6 @@ void DirectX11::Dx11Main::Update()
 
 		SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
-		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_world->Update((float)m_timeSystem.GetElapsedSeconds());
 		m_D2DRenderer->SetCurCanvas(m_world->GetCurCanvas());
 		GameManagement->PlayUpdate((float)m_timeSystem.GetElapsedSeconds() * GameManagement->GetTimeScale()); //게임 시스템 업데이트
@@ -190,6 +190,7 @@ void DirectX11::Dx11Main::Update()
 #if defined(EDITOR)
 #endif // !Editor
 	m_world->Destroy();
+
 }
 
 bool DirectX11::Dx11Main::Render()
@@ -214,7 +215,7 @@ bool DirectX11::Dx11Main::Render()
 		//m_sceneRenderer->StageBillboardsPrepare();
 		//m_sceneRenderer->UpdateDrawBillboards();
 		//m_sceneRenderer->StageDrawBillboards();
-
+		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_sceneRenderer->Render();
 
 		//m_D2DRenderer->UpdateDrawModel();
@@ -231,7 +232,6 @@ bool DirectX11::Dx11Main::Render()
 		m_sceneRenderer->EditorView();
 		m_imguiRenderer->Render();
 
-
 		// editor only
 		//MeshEditorSystem->ShowMainUI();
 		//m_btEditor.ShowMainUI();
@@ -239,9 +239,8 @@ bool DirectX11::Dx11Main::Render()
 		m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR
-	
-	InputManagement->Update();
 
+	InputManagement->Update();
 	return true;
 }
 

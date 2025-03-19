@@ -95,6 +95,11 @@ void GridPass::Initialize(Texture* color, Texture* grid)
     m_gridTexture = grid;
 }
 
+void GridPass::PrepareCameraType(Camera* camera)
+{
+	m_pEditorCamera = camera;
+}
+
 void GridPass::Execute(Scene& scene)
 {
     auto deviceContext = DeviceState::g_pDeviceContext;
@@ -102,8 +107,8 @@ void GridPass::Execute(Scene& scene)
     deviceContext->CopyResource(m_gridTexture->m_pTexture, m_colorTexture->m_pTexture);
 
 	m_gridConstant.world = XMMatrixIdentity();
-	m_gridConstant.view = scene.m_MainCamera.CalculateView();
-	m_gridConstant.projection = scene.m_MainCamera.CalculateProjection();
+	m_gridConstant.view = m_pEditorCamera->CalculateView();
+	m_gridConstant.projection = m_pEditorCamera->CalculateProjection();
 
     float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f }; // 블렌드 팩터 (사용되지 않음)
     UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)

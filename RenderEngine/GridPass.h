@@ -30,19 +30,21 @@ struct alignas(16) GridUniformBuffer
     float minorLineAlpha{ 1.f };
 };
 
-
+class Camera;
 class GridPass final : public IRenderPass
 {
 public:
 	GridPass();
 	~GridPass();
 	void Initialize(Texture* color, Texture* grid);
+	void PrepareCameraType(Camera* camera);
 	void Execute(Scene& scene) override;
 	void ControlPanel() override;
 
     ID3D11ShaderResourceView* GetGridSRV() const { return m_gridTexture->m_pSRV; }
 
 private:
+	Camera* m_pEditorCamera;
     Texture* m_colorTexture;
     Texture* m_gridTexture;
     GridConstantBuffer m_gridConstant{};

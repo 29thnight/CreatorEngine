@@ -62,7 +62,10 @@ void Scene::Start()
 
 void Scene::Update(float deltaSecond)
 {
-	m_MainCamera.HandleMovement(deltaSecond);
+	if (m_isPlaying)
+	{
+		m_MainCamera.HandleMovement(deltaSecond);
+	}
 	m_animationJob.Update(*this, deltaSecond);
 
 	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)

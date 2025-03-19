@@ -14,6 +14,35 @@
 
 #include "Model.h"
 #include "Light.h"
+#include "Camera.h"
+
+const static float pi = XM_PIDIV2 - 0.01f;
+const static float pi2 = XM_PI * 2.f;
+
+struct EditorCamera
+{
+	bool isOrthographic = false;
+	Camera* m_perspacetiveEditCamera{};
+	Camera* m_orthographicEditCamera{};
+
+	EditorCamera();
+	~EditorCamera()
+	{
+		delete m_perspacetiveEditCamera;
+		delete m_orthographicEditCamera;
+	}
+
+	bool ToggleCamera()
+	{
+		isOrthographic = !isOrthographic;
+		return isOrthographic;
+	}
+
+	Camera* GetCamera()
+	{
+		return isOrthographic ? m_orthographicEditCamera : m_perspacetiveEditCamera;
+	}
+};
 
 class Scene;
 class SceneRenderer
@@ -26,6 +55,7 @@ public:
 	void Render();
 
 private:
+	void InitializeTextures();
 	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
@@ -33,6 +63,9 @@ private:
 
 	Scene* m_currentScene{};
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
+
+	ID3D11DepthStencilView* m_depthStencilView{};
+	ID3D11ShaderResourceView* m_depthStencilSRV{};
 
 	//pass
 	std::unique_ptr<ShadowMapPass> m_pShadowMapPass{};
@@ -53,10 +86,19 @@ private:
 
 	//textures
 	std::unique_ptr<Texture> m_colorTexture;
+	std::unique_ptr<Texture> m_editColorTexture;
+
+	//game view
 	std::unique_ptr<Texture> m_diffuseTexture;
 	std::unique_ptr<Texture> m_metalRoughTexture;
 	std::unique_ptr<Texture> m_normalTexture;
 	std::unique_ptr<Texture> m_emissiveTexture;
+	//editor view
+	std::unique_ptr<Texture> m_editDiffuseTexture;
+	std::unique_ptr<Texture> m_editMetalRoughTexture;
+	std::unique_ptr<Texture> m_editNormalTexture;
+	std::unique_ptr<Texture> m_editEmissiveTexture;
+
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
     std::unique_ptr<Texture> m_gridTexture;
@@ -64,8 +106,7 @@ private:
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
-	//PerspacetiveCamera m_perspacetiveEditCamera{};
-	//OrthographicCamera m_orthographicEditCamera{};
+	EditorCamera m_editorCamera{};
 
 	//render queue
 

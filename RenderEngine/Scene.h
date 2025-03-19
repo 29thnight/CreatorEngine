@@ -41,4 +41,6 @@ private:
 	ID3D11Buffer* m_ModelBuffer;
 	ID3D11Buffer* m_ViewBuffer;
 	ID3D11Buffer* m_ProjBuffer;
+
+	bool m_isPlaying = false;
 };

@@ -39,15 +39,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	//시작
 	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
 	{
-		// 메뉴바와 "Edit" 메뉴 생성
-		HMENU hMenuBar = CreateMenu();
-		HMENU hEditMenu = CreatePopupMenu();
-		// "ProjectSetting" 메뉴 항목 추가
-		AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PROJECTSETTING, L"ProjectSetting");
-		AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"Edit");
-		// 메뉴를 윈도우에 설정
-		SetMenu(hWnd, hMenuBar);
-
 		return 0;
 	});
 
