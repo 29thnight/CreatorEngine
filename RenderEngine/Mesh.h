@@ -8,7 +8,7 @@ struct Vertex
 	Mathf::Vector2 uv;
 	Mathf::Vector3 tangent;
 	Mathf::Vector3 bitangent;
-	Mathf::Vector4 boneIndices{ -1, -1, -1, -1 };
+	Mathf::Vector4 boneIndices;
 	Mathf::Vector4 boneWeights;
 
 	Vertex() = default;
@@ -50,6 +50,8 @@ private:
 	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
+	Mathf::Matrix m_transform{ XMMatrixIdentity() };
+
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 	static constexpr uint32 m_stride = sizeof(Vertex);

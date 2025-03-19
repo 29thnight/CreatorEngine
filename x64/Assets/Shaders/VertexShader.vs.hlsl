@@ -42,7 +42,7 @@ struct VertexShaderOutput
 
 VertexShaderOutput main(AppData IN)
 {
-    if (IN.boneWeight[0] > -1)
+    if (IN.boneWeight[0] > 0)
     {
         matrix boneTransform = IN.boneWeight[0] * BoneTransforms[IN.boneIds[0]];
         for (int i = 1; i < 4; ++i)

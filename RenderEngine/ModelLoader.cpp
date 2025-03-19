@@ -48,18 +48,16 @@ Model* ModelLoader::LoadModel()
 
 void ModelLoader::ProcessMeshes()
 {
-	for (uint32 i = 0; i < m_AIScene->mNumMeshes; i++)
-	{
-		aiMesh* aimesh = m_AIScene->mMeshes[i];
-		GenerateMesh(aimesh);
-	}
-
-	//ProcessMeshRecursive(m_AIScene->mRootNode);
-
+	ProcessMeshRecursive(m_AIScene->mRootNode);
 }
 
 void ModelLoader::ProcessMeshRecursive(aiNode* node)
 {
+	//if (node->mNumMeshes == 0)
+	//{
+	//	m_transform = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
+	//}
+
 	for (uint32 i = 0; i < node->mNumMeshes; i++)
 	{
 		aiMesh* mesh = m_AIScene->mMeshes[node->mMeshes[i]];
@@ -145,28 +143,25 @@ void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int pa
 		nextIndex = m_model->m_SceneObject->m_index;
 	}
 
-	if (node->mNumMeshes > 0)
+	for (UINT i = 0; i < node->mNumMeshes; ++i)
 	{
-		for (UINT i = 0; i < node->mNumMeshes; ++i)
+		std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), nextIndex);
+
+		unsigned int meshId = node->mMeshes[i];
+		Mesh* mesh = m_model->m_Meshes[meshId];
+		Material* material = m_model->m_Materials[meshId];
+		MeshRenderer& meshRenderer = object->m_meshRenderer;
+		meshRenderer.m_IsEnabled = true;
+		meshRenderer.m_Mesh = mesh;
+		meshRenderer.m_Material = material;
+		object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
+
+		if (m_hasBones)
 		{
-			std::shared_ptr<SceneObject> object = isRoot ? m_model->m_SceneObject : m_scene->CreateSceneObject(node->mName.C_Str(), nextIndex);
-
-			unsigned int meshId = node->mMeshes[i];
-			Mesh* mesh = m_model->m_Meshes[meshId];
-			Material* material = m_model->m_Materials[meshId];
-			MeshRenderer& meshRenderer = object->m_meshRenderer;
-			meshRenderer.m_IsEnabled = true;
-			meshRenderer.m_Mesh = mesh;
-			meshRenderer.m_Material = material;
-			object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
-
-			if (m_hasBones)
-			{
-				meshRenderer.m_Animator = m_animator;
-			}
-			isRoot = false;
-			nextIndex = object->m_index;
+			meshRenderer.m_Animator = m_animator;
 		}
+		isRoot = false;
+		nextIndex = object->m_index;
 	}
 
 	for (UINT i = 0; i < node->mNumChildren; ++i)

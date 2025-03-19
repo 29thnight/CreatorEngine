@@ -44,11 +44,6 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
     NodeAnimation nodeAnim;
     nodeAnim.m_name = _pNodeAnim->mNodeName.data;
 
-    if (nodeAnim.m_name == "Armature")
-    {
-        __debugbreak();
-    }
-
     for (uint32 i = 0; i < _pNodeAnim->mNumPositionKeys; ++i)
     {
         aiVectorKey& aiPosKey = _pNodeAnim->mPositionKeys[i];

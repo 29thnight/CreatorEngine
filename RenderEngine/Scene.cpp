@@ -165,6 +165,10 @@ void Scene::EditorSceneObjectInspector()
 			ImGui::DragFloat3("##Rotation", &rotation.x, -3.14f, 3.14f);
 			ImGui::Text("Scale");
 			ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
+			ImGui::Text("Index");
+			ImGui::InputInt("##Index", const_cast<int*>(&m_selectedSceneObject->m_index), 0, 0, ImGuiInputTextFlags_ReadOnly);
+			ImGui::Text("Parent Index");
+			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
 
 			m_selectedSceneObject->m_transform.position = position;
 			m_selectedSceneObject->m_transform.rotation = rotation;

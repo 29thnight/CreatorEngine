@@ -36,6 +36,7 @@ private:
 
 	Model* m_model;
 	Scene* m_scene;
+	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
 	Animator* m_animator;
 
