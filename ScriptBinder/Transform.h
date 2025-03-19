@@ -34,5 +34,5 @@ private:
 
 	Mathf::xVector m_worldScale{ 1.f, 1.f, 1.f, 1.f };
 	Mathf::xVector m_worldQuaternion{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::xVector m_worldPosition{ 0.f, 0.f, 0.f, 0.f };
+	Mathf::xVector m_worldPosition{ 0.f, 0.f, 0.f, 1.f };
 };

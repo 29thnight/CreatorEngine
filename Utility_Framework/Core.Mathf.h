@@ -192,4 +192,25 @@ namespace Mathf
 		return Mathf::Color4(j[0].get<float>(), j[1].get<float>(), j[2].get<float>(), j[3].get<float>());
 	}
 
+    //Mathf::QuaternionToEular 함수는 쿼터니언을 입력으로 받아서 피치, 요, 롤 각도를 계산하여 참조로 전달합니다.
+	inline void QuaternionToEular(const Quaternion& quaternion, float& pitch, float& yaw, float& roll)
+	{
+        // 1. 쿼터니언을 회전 행렬로 변환
+        XMMATRIX rotationMatrix = XMMatrixRotationQuaternion(quaternion);
+
+        // 2. 행렬에서 Euler 각 추출
+        pitch = asinf(-rotationMatrix.r[2].m128_f32[1]);  // -m21 (Z 축 Y 값)
+
+        if (cosf(pitch) > 0.0001f) // Gimbal Lock 방지
+        {
+            yaw = atan2f(rotationMatrix.r[2].m128_f32[0], rotationMatrix.r[2].m128_f32[2]); // m11, m31
+            roll = atan2f(rotationMatrix.r[0].m128_f32[1], rotationMatrix.r[1].m128_f32[1]); // m12, m22
+        }
+        else
+        {
+            // Gimbal Lock 상태일 때 yaw와 roll을 단순 계산
+            yaw = 0.0f;
+            roll = atan2f(-rotationMatrix.r[0].m128_f32[2], rotationMatrix.r[0].m128_f32[0]); // -m13, m11
+        }
+	}
 }

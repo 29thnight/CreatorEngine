@@ -133,7 +133,7 @@ void Camera::HandleMovement(float deltaTime)
 			m_up = XMQuaternionNormalize(m_up);
 
 
-		std::cout << XMVectorGetX(rightAxis) << ", " << XMVectorGetY(rightAxis) << ", " << XMVectorGetZ(rightAxis) << std::endl;
+		//std::cout << XMVectorGetX(rightAxis) << ", " << XMVectorGetY(rightAxis) << ", " << XMVectorGetZ(rightAxis) << std::endl;
 
 		rotate = m_rotationQuat;
 	}
