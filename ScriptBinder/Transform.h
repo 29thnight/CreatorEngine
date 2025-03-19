@@ -11,7 +11,8 @@ public:
 	Transform& SetScale(Mathf::Vector3 scale);
 	Transform& SetPosition(Mathf::Vector3 pos);
 	Transform& AddPosition(Mathf::Vector3 pos);
-	Transform& SetRotation(Mathf::Vector3 eulerAngles);
+	Transform& SetRotation(Mathf::Quaternion quaternion);
+	Transform& AddRotation(Mathf::Quaternion quaternion);
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
@@ -32,6 +33,6 @@ private:
 	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };
 
 	Mathf::xVector m_worldScale{ 1.f, 1.f, 1.f, 1.f };
-	Mathf::xVector m_worldQuaternion{ 0.f, 0.f, 0.f, 0.f };
+	Mathf::xVector m_worldQuaternion{ 0.f, 0.f, 0.f, 1.f };
 	Mathf::xVector m_worldPosition{ 0.f, 0.f, 0.f, 0.f };
 };

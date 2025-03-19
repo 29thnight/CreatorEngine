@@ -24,10 +24,18 @@ Transform& Transform::AddPosition(Mathf::Vector3 pos)
 	return *this;
 }
 
-Transform& Transform::SetRotation(Mathf::Vector3 eulerAngles)
+Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 {
 	m_dirty = true;
-	rotation = DirectX::XMVectorAdd(rotation, eulerAngles);
+	rotation = quaternion;
+
+	return *this;
+}
+
+Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
+{
+	m_dirty = true;
+	DirectX::XMQuaternionMultiply(rotation, quaternion);
 
 	return *this;
 }
@@ -37,7 +45,7 @@ Mathf::xMatrix Transform::GetLocalMatrix()
 	if (m_dirty)
 	{
 		m_localMatrix = DirectX::XMMatrixScalingFromVector(scale);
-		m_localMatrix *= DirectX::XMMatrixRotationRollPitchYawFromVector(rotation);
+		m_localMatrix *= DirectX::XMMatrixRotationQuaternion(rotation);
 		m_localMatrix *= DirectX::XMMatrixTranslationFromVector(position);
 		m_dirty = false;
 	}
