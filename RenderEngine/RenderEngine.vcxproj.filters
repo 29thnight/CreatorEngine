@@ -108,6 +108,9 @@
     <Filter Include="RenderPass\GridPass">
       <UniqueIdentifier>{283179e7-32f1-4427-a1dd-c816135e2518}</UniqueIdentifier>
     </Filter>
+    <Filter Include="LightMap">
+      <UniqueIdentifier>{1202166f-c121-4ed7-ac41-85133bf5bfab}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -214,6 +217,9 @@
     </ClCompile>
     <ClCompile Include="GridPass.cpp">
       <Filter>RenderPass\GridPass</Filter>
+    </ClCompile>
+    <ClCompile Include="LightMap.cpp">
+      <Filter>LightMap</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -345,6 +351,9 @@
     </ClInclude>
     <ClInclude Include="GridPass.h">
       <Filter>RenderPass\GridPass</Filter>
+    </ClInclude>
+    <ClInclude Include="LightMap.h">
+      <Filter>LightMap</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

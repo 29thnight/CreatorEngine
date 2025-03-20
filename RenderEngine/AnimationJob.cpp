@@ -36,8 +36,8 @@ void AnimationJob::Update(Scene& scene, float deltaTime)
 
         animator.m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
         animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, animation.m_duration);
-		XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
-		XMMATRIX rootTransform = sceneObjMatrix * skeleton->m_rootTransform;
+		//XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
+		XMMATRIX rootTransform = /*sceneObjMatrix **/ skeleton->m_rootTransform;
 
         UpdateBone(skeleton->m_rootBone, animator, rootTransform, animator.m_TimeElapsed);
     }

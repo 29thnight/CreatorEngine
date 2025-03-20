@@ -159,6 +159,7 @@
     <ClCompile Include="GridPass.cpp" />
     <ClCompile Include="ImGuiRenderer.cpp" />
     <ClCompile Include="Light.cpp" />
+    <ClCompile Include="LightMap.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -200,6 +201,7 @@
     <ClInclude Include="ImGuiRenderer.h" />
     <ClInclude Include="IRenderPass.h" />
     <ClInclude Include="Light.h" />
+    <ClInclude Include="LightMap.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
