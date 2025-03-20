@@ -27,6 +27,7 @@ std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneOb
 std::shared_ptr<SceneObject> Scene::CreateSceneObject(const std::string_view& name, SceneObject::Index parentIndex)
 {
     SceneObject::Index index = m_SceneObjects.size();
+
 	m_SceneObjects.push_back(std::make_shared<SceneObject>(name, index, parentIndex));
 	auto parentObj = GetSceneObject(parentIndex);
 	if(parentObj->m_index != index)

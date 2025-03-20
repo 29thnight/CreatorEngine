@@ -40,5 +40,5 @@ private:
 	SkeletonLoader m_skeletonLoader;
 	Animator* m_animator;
 
-	bool m_hasBones{ false };
+	bool m_isInitialized{ false };
 };

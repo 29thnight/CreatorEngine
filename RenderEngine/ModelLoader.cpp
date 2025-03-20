@@ -33,7 +33,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 Model* ModelLoader::LoadModel()
 {
 	ProcessMeshes();
-	if (m_hasBones)
+	if (m_model->m_hasBones)
 	{
 		Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 		m_model->m_Skeleton = skeleton;
@@ -111,7 +111,7 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 {
 	for (uint32 i = 0; i < mesh->mNumBones; ++i)
 	{
-		m_hasBones = true;
+		m_model->m_hasBones = true;
 		aiBone* bone = mesh->mBones[i];
 		int boneIndex = m_skeletonLoader.AddBone(bone);
 		for (uint32 j = 0; j < bone->mNumWeights; ++j)
@@ -156,9 +156,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int pa
 		meshRenderer.m_Material = material;
 		object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
 
-		if (m_hasBones)
+		if (m_model->m_hasBones && false == m_isInitialized)
 		{
-			meshRenderer.m_Animator = m_animator;
+			meshRenderer.m_Animator = new Animator();
+			meshRenderer.m_Animator->m_IsEnabled = true;
+			meshRenderer.m_Animator->m_Skeleton = m_model->m_Skeleton;
+			m_isInitialized = true;
 		}
 		isRoot = false;
 		nextIndex = object->m_index;

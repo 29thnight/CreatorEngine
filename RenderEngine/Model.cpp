@@ -75,6 +75,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 		aiProcess_ConvertToLeftHanded
 	);
 	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, model->m_SceneObject->m_index);
+	loader.m_isInitialized = false;
 
 	return model;
 }

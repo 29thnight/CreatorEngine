@@ -408,9 +408,13 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
+		Model::LoadModelToScene(model, *m_currentScene);
 
 		model = Model::LoadModel("BoxHuman.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
+
+		//model = Model::LoadModel("bangbooExport.fbx");
+		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 	}
 	else
 	{
