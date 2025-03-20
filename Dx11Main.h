@@ -51,7 +51,6 @@ namespace DirectX11
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
 		std::unique_ptr<D2DRenderer>   m_D2DRenderer;
 
-		std::unique_ptr<PerspacetiveCamera> m_camera;
 		std::thread m_renderThread;
 
 		//std::unique_ptr<Scene> m_scene;

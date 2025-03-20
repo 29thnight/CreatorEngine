@@ -98,7 +98,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 
 	light.m_lightStatus = LightStatus::StaticShadows;
 
-	OrthographicCamera shadowCamera;
+	Camera shadowCamera;
 	shadowCamera.m_eyePosition = desc.m_eyePosition;
 	shadowCamera.m_lookAt = desc.m_lookAt;
 	shadowCamera.m_nearPlane = desc.m_nearPlane;
@@ -118,11 +118,11 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	hasLightWithShadows = true;
 }
 
-void LightController::RenderAnyShadowMap(Scene& scene)
+void LightController::RenderAnyShadowMap(Scene& scene, Camera& camera)
 {
-	if (hasLightWithShadows)
+	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
 	{
-		m_shadowMapPass->Execute(scene);
+		m_shadowMapPass->Execute(scene, camera);
 	}
 }
 

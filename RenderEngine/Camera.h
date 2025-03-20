@@ -1,11 +1,28 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "DeviceResources.h"
+#include "Texture.h"
+
+struct ApplyRenderPipelinePass
+{
+	bool m_ShadowPass{ true };
+	bool m_GBufferPass{ true };
+	bool m_SSAOPass{ true };
+	bool m_DeferredPass{ true };
+	bool m_SkyBoxPass{ true };
+	bool m_ToneMapPass{ true };
+	bool m_SpritePass{ true };
+	bool m_WireFramePass{ true };
+	bool m_GridPass{ false };
+	bool m_BlitPass{ false };
+};
 
 class Camera
 {
 public:
-	virtual Mathf::xMatrix CalculateProjection() = 0;
+	Camera();
+	~Camera();
+	Mathf::xMatrix CalculateProjection();
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
 	Mathf::Vector4 RayCast(Mathf::Vector2 screenPosition);
 	Mathf::xMatrix CalculateView() const;
@@ -14,7 +31,9 @@ public:
 	DirectX11::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum();
 
+	void RegisterContainer();
 	void HandleMovement(float deltaTime);
+	void UpdateBuffer();
 
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
@@ -34,26 +53,72 @@ public:
 	float m_farPlane{ 10000.f };
 	float m_speed{ 10.f };
 
-	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
-
-};
-
-class PerspacetiveCamera : public Camera
-{
-public:
-	float m_aspectRatio{ 1.777f };
+	float m_aspectRatio{};
 	float m_fov{ 45.f };
 
-	PerspacetiveCamera();
-	Mathf::xMatrix CalculateProjection() override;
-};
-
-class OrthographicCamera : public Camera
-{
-public:
 	float m_viewWidth{ 1.f };
 	float m_viewHeight{ 1.f };
 
-	OrthographicCamera();
-	Mathf::xMatrix CalculateProjection() override;
+	int m_monitorIndex{ 0 };
+	int m_cameraIndex{ -1 };
+
+	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
+
+	bool m_isActive{ true };
+	bool m_isOrthographic{ false };
+	ApplyRenderPipelinePass m_applyRenderPipelinePass{};
+
+	ComPtr<ID3D11Buffer> m_ViewBuffer;
+	ComPtr<ID3D11Buffer> m_ProjBuffer;
+	std::unique_ptr<Texture> m_renderTarget{};
+	std::unique_ptr<Texture> m_depthStencil{};
 };
+
+class SceneRenderer;
+class CameraContainer : public Singleton<CameraContainer>
+{
+private:
+	CameraContainer()
+	{
+		m_cameras.resize(10);
+	}
+	~CameraContainer() = default;
+	friend class Singleton<CameraContainer>;
+
+public:
+	int AddCamera(Camera* camera)
+	{
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			if (nullptr == m_cameras[i])
+			{
+				m_cameras[i] = camera;
+				return i;
+			}
+		}
+	}
+
+	void DeleteCamera(uint32 index)
+	{
+		if (index < m_cameras.size())
+		{
+			m_cameras[index] = nullptr;
+		}
+	}
+
+	Camera* GetCamera(uint32 index)
+	{
+		if (index < m_cameras.size())
+		{
+			return m_cameras[index];
+		}
+
+		return nullptr;
+	}
+
+private:
+	friend class SceneRenderer;
+	std::vector<Camera*> m_cameras;
+};
+
+inline auto& CameraManagement = CameraContainer::GetInstance();

@@ -19,31 +19,6 @@
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
-struct EditorCamera
-{
-	bool isOrthographic = false;
-	Camera* m_perspacetiveEditCamera{};
-	Camera* m_orthographicEditCamera{};
-
-	EditorCamera();
-	~EditorCamera()
-	{
-		delete m_perspacetiveEditCamera;
-		delete m_orthographicEditCamera;
-	}
-
-	bool ToggleCamera()
-	{
-		isOrthographic = !isOrthographic;
-		return isOrthographic;
-	}
-
-	Camera* GetCamera()
-	{
-		return isOrthographic ? m_orthographicEditCamera : m_perspacetiveEditCamera;
-	}
-};
-
 class Scene;
 class SceneRenderer
 {
@@ -81,8 +56,6 @@ private:
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
-	ComPtr<ID3D11Buffer> m_ViewBuffer;
-	ComPtr<ID3D11Buffer> m_ProjBuffer;
 
 	//textures
 	std::unique_ptr<Texture> m_colorTexture;
@@ -94,10 +67,10 @@ private:
 	std::unique_ptr<Texture> m_normalTexture;
 	std::unique_ptr<Texture> m_emissiveTexture;
 	//editor view
-	std::unique_ptr<Texture> m_editDiffuseTexture;
-	std::unique_ptr<Texture> m_editMetalRoughTexture;
-	std::unique_ptr<Texture> m_editNormalTexture;
-	std::unique_ptr<Texture> m_editEmissiveTexture;
+	//std::unique_ptr<Texture> m_editDiffuseTexture;
+	//std::unique_ptr<Texture> m_editMetalRoughTexture;
+	//std::unique_ptr<Texture> m_editNormalTexture;
+	//std::unique_ptr<Texture> m_editEmissiveTexture;
 
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
@@ -106,7 +79,7 @@ private:
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
-	EditorCamera m_editorCamera{};
+	std::unique_ptr<Camera> m_pEditorCamera{};
 
 	//render queue
 

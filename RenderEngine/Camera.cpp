@@ -6,6 +6,56 @@
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
+Camera::Camera()
+{
+	m_aspectRatio = DeviceState::g_aspectRatio;
+
+	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+
+	m_renderTarget = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		cameraRTVName,
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+
+	m_depthStencil = TextureHelper::CreateDepthTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"Camera_" + std::to_string(m_cameraIndex) + "_DSV"
+	);
+
+	XMMATRIX identity = XMMatrixIdentity();
+
+	std::string viewBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ViewBuffer";
+	std::string projBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ProjBuffer";
+
+	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+}
+
+Camera::~Camera()
+{
+	if (m_cameraIndex != -1)
+	{
+		CameraManagement->DeleteCamera(m_cameraIndex);
+	}
+}
+
+Mathf::xMatrix Camera::CalculateProjection()
+{
+	if (m_isOrthographic)
+	{
+		return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
+	}
+	else
+	{
+		return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
+	}
+}
+
 Mathf::Vector4 Camera::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth)
 {
 	// 1. 스크린 좌표를 NDC 좌표로 변환
@@ -61,6 +111,11 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 	frustum.CreateFromMatrix(frustum, CalculateProjection());
 	frustum.Transform(frustum, CalculateView());
 	return frustum;
+}
+
+void Camera::RegisterContainer()
+{
+	m_cameraIndex = CameraManagement->AddCamera(this);
 }
 
 void Camera::HandleMovement(float deltaTime)
@@ -149,38 +204,13 @@ void Camera::HandleMovement(float deltaTime)
 	m_lookAt = m_eyePosition + m_forward;
 }
 
-PerspacetiveCamera::PerspacetiveCamera()
+void Camera::UpdateBuffer()
 {
-	//ImGui::ContextRegister("Perspacetive Camera", [&]()
-	//{
-	//	ImGui::DragFloat("FOV", &m_fov, 1.f, 1.f, 179.f);
-	//	ImGui::DragFloat("Aspect Ratio", &m_aspectRatio, 0.1f, 0.1f, 10.f);
-	//	ImGui::DragFloat("Near Plane", &m_nearPlane, 0.1f, 0.1f, 100.f);
-	//	ImGui::DragFloat("Far Plane", &m_farPlane, 1.f, 1.f, 100000.f);
-	//	ImGui::DragFloat("Speed", &m_speed, 1.f, 1.f, 100.f);
-	//	ImGui::DragFloat("Pitch", &m_pitch, 0.01f, -pi, pi);
-	//	ImGui::DragFloat("Yaw", &m_yaw, 0.01f, -pi, pi);
-	//	ImGui::DragFloat("Roll", &m_roll, 0.01f, -pi, pi);
+	Mathf::xMatrix view = CalculateView();
+	Mathf::xMatrix proj = CalculateProjection();
+	DirectX11::UpdateBuffer(m_ViewBuffer.Get(), &view);
+	DirectX11::UpdateBuffer(m_ProjBuffer.Get(), &proj);
 
-	//	ImGui::Text("Eye Position");
-	//	ImGui::DragFloat3("##Eye Position", &m_eyePosition.m128_f32[0], -1000, 1000);
-	//	ImGui::Text("Forward");
-	//	ImGui::DragFloat3("##Forward", &m_forward.m128_f32[0], -1000, 1000);
-	//	ImGui::Text("Right");
-	//	ImGui::DragFloat3("##Right", &m_right.m128_f32[0], -1000, 1000);
-	//});
-}
-
-Mathf::xMatrix PerspacetiveCamera::CalculateProjection()
-{
-	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
-}
-
-OrthographicCamera::OrthographicCamera()
-{
-}
-
-Mathf::xMatrix OrthographicCamera::CalculateProjection()
-{
-	return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
+	DirectX11::VSSetConstantBuffer(1, 1, m_ViewBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }

@@ -19,7 +19,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_D2DRenderer = std::make_unique<D2DRenderer>(m_deviceResources);
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+	//m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
     AssetsSystem2->LoadShaders();
 	AssetsSystem2->Initialize();
@@ -208,13 +208,6 @@ bool DirectX11::Dx11Main::Render()
 	}
 	else
 	{
-		//m_sceneRenderer->StagePrepare();
-		//m_sceneRenderer->UpdateDrawModel();
-		//m_sceneRenderer->StageDrawModels();
-		//m_sceneRenderer->EndStage();
-		//m_sceneRenderer->StageBillboardsPrepare();
-		//m_sceneRenderer->UpdateDrawBillboards();
-		//m_sceneRenderer->StageDrawBillboards();
 		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_sceneRenderer->Render();
 
@@ -227,16 +220,12 @@ bool DirectX11::Dx11Main::Render()
 #if defined(EDITOR)
 	if(!m_isGameView)
 	{
-		m_imguiRenderer->BeginRender();
-		//m_D2DRenderer->ImGuiRenderStage();
-		m_sceneRenderer->EditorView();
-		m_imguiRenderer->Render();
+		//m_imguiRenderer->BeginRender();
+		//m_sceneRenderer->EditorView();
+		//m_imguiRenderer->Render();
 
-		// editor only
-		//MeshEditorSystem->ShowMainUI();
-		//m_btEditor.ShowMainUI();
-		//GridEditorSystem->ShowGridEditor();
-		m_imguiRenderer->EndRender();
+		//// editor only
+		//m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR
 

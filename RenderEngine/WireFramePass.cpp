@@ -64,21 +64,20 @@ void WireFramePass::SetRenderTarget(Texture* renderTarget)
     m_RenderTarget = renderTarget;
 }
 
-void WireFramePass::Execute(Scene& scene)
+void WireFramePass::Execute(Scene& scene, Camera& camera)
 {
     m_pso->Apply();
 
 	auto& deviceContext = DeviceState::g_pDeviceContext;
-    ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
-    //DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
 
-	scene.UseCamera(scene.m_MainCamera);
+	camera.UpdateBuffer();
 	scene.UseModel();
 
     DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 
-    m_CameraBuffer.m_CameraPosition = scene.m_MainCamera.m_eyePosition;
+    m_CameraBuffer.m_CameraPosition = camera.m_eyePosition;
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_CameraBuffer);
     DirectX11::VSSetConstantBuffer(4, 1, m_Buffer.GetAddressOf());

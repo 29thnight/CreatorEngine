@@ -100,7 +100,7 @@ void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth
     m_NoiseTexture = std::unique_ptr<Texture>(tex);
 }
 
-void SSAOPass::Execute(Scene& scene)
+void SSAOPass::Execute(Scene& scene, Camera& camera)
 {
     m_pso->Apply();
 
@@ -111,7 +111,6 @@ void SSAOPass::Execute(Scene& scene)
 	ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-	PerspacetiveCamera& camera = scene.m_MainCamera;
 	Mathf::xMatrix view = camera.CalculateView();
 	Mathf::xMatrix proj = camera.CalculateProjection();
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);

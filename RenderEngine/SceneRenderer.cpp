@@ -122,7 +122,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
 
-		ImGui::Image((ImTextureID)m_gridTexture->m_pSRV, ImVec2(x, y));
+		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
 		ImGui::PopStyleVar();
 	}
 	else
@@ -210,54 +210,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
-	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ViewBuffer.Get(), "ViewBuffer");
-	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ProjBuffer.Get(), "ProjBuffer");
 
-	CD3D11_TEXTURE2D_DESC1 depthStencilDesc(
-		DXGI_FORMAT_R24G8_TYPELESS,
-		lround(DeviceState::g_ClientRect.width),
-		lround(DeviceState::g_ClientRect.height),
-		1,
-		1,
-		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE
-	);
-
-	ComPtr<ID3D11Texture2D1> depthStencil;
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateTexture2D1(
-			&depthStencilDesc,
-			nullptr,
-			&depthStencil
-		)
-	);
-
-	CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc(D3D11_DSV_DIMENSION_TEXTURE2D);
-	depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateDepthStencilView(
-			depthStencil.Get(),
-			&depthStencilViewDesc,
-			&m_depthStencilView
-		)
-	);
-	DirectX::SetName(depthStencil.Get(), "DepthStencil");
-
-	DeviceState::g_pEditorDepthStencilView = m_depthStencilView;
-
-	CD3D11_SHADER_RESOURCE_VIEW_DESC depthStencilSRVDesc(D3D11_SRV_DIMENSION_TEXTURE2D);
-	depthStencilSRVDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-	depthStencilSRVDesc.Texture2D.MipLevels = 1;
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateShaderResourceView(
-			depthStencil.Get(),
-			&depthStencilSRVDesc,
-			&m_depthStencilSRV
-		)
-	);
-
-	DeviceState::g_depthStancilSRV = m_depthStencilSRV;
+	//m_pEditorCamera = std::make_unique<Camera>();
+	//m_pEditorCamera->RegisterContainer();
 
     //pass 생성
     //shadowMapPass 는 Scene의 맴버
@@ -271,14 +226,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 
-	ID3D11RenderTargetView* editorViews[]{
-		m_editDiffuseTexture->GetRTV(),
-		m_editMetalRoughTexture->GetRTV(),
-		m_editNormalTexture->GetRTV(),
-		m_editEmissiveTexture->GetRTV()
-	};
-	m_pGBufferPass->SetEditorRenderTargetViews(editorViews, ARRAYSIZE(editorViews));
-
     //ssaoPass
     m_pSSAOPass = std::make_unique<SSAOPass>();
     m_pSSAOPass->Initialize(
@@ -290,20 +237,11 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     //deferredPass
     m_pDeferredPass = std::make_unique<DeferredPass>();
     m_pDeferredPass->Initialize(
-        m_colorTexture.get(),
         m_diffuseTexture.get(),
         m_metalRoughTexture.get(),
         m_normalTexture.get(),
         m_emissiveTexture.get()
     );
-
-	m_pDeferredPass->EditorInitialize(
-		m_editColorTexture.get(),
-		m_editDiffuseTexture.get(),
-		m_editMetalRoughTexture.get(),
-		m_editNormalTexture.get(),
-		m_editEmissiveTexture.get()
-	);
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
@@ -314,7 +252,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
 	m_pToneMapPass->Initialize(
-		m_colorTexture.get(),
 		m_toneMappedColourTexture.get()
 	);
 
@@ -324,8 +261,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//blitPass
 	m_pBlitPass = std::make_unique<BlitPass>();
-	m_pBlitPass->Initialize(m_toneMappedColourTexture.get(), 
-		m_deviceResources->GetBackBufferRenderTargetView());
+	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
 
 	//WireFramePass
 	m_pWireFramePass = std::make_unique<WireFramePass>();
@@ -346,24 +282,10 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
-	m_editColorTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"EditColorRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
 	m_diffuseTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"DiffuseRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
-	m_editDiffuseTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"EditDiffuseRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
@@ -374,13 +296,6 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
-	m_editMetalRoughTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"EditMetalRoughRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
 	m_normalTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -388,24 +303,10 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
-	m_editNormalTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"EditNormalRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
 	m_emissiveTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"EmissiveRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
-	m_editEmissiveTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"EditEmissiveRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
@@ -462,8 +363,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_viewHeight = 12;
 		desc.m_nearPlane = 0.1f;
 		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = 1920;
-		desc.m_textureHeight = 1080;
+		desc.m_textureWidth = 8192.f;
+		desc.m_textureHeight = 8192.f;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
@@ -478,7 +379,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene = _pScene;
 	}
 
-	m_currentScene->SetBuffers(m_ModelBuffer.Get(), m_ViewBuffer.Get(), m_ProjBuffer.Get());
+	m_currentScene->SetBuffers(m_ModelBuffer.Get());
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
@@ -562,100 +463,104 @@ void SceneRenderer::Initialize(Scene* _pScene)
 void SceneRenderer::Update(float deltaTime)
 {
 	m_currentScene->Update(deltaTime);
-	m_editorCamera.GetCamera()->HandleMovement(deltaTime);
+	//m_pEditorCamera->HandleMovement(deltaTime);
+	m_currentScene->m_MainCamera.HandleMovement(deltaTime);
 	PrepareRender();
 }
 
 void SceneRenderer::Render()
 {
-	//[1] ShadowMapPass
+	for(auto& camera : CameraManagement->m_cameras)
 	{
-		Banchmark banch;
-		m_currentScene->ShadowStage();
-		Clear(DirectX::Colors::Transparent, 1.0f, 0);
-		UnbindRenderTargets();
+		if (nullptr == camera) continue;
+		//[1] ShadowMapPass
+		{
+			Banchmark banch;
+			m_currentScene->ShadowStage(*camera);
+			Clear(DirectX::Colors::Transparent, 1.0f, 0);
+			UnbindRenderTargets();
 
-		std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
+			std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[2] GBufferPass
+		{
+			Banchmark banch;
+			m_pGBufferPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[3] SSAOPass
+		{
+			Banchmark banch;
+			m_pSSAOPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[4] DeferredPass
+		{
+			Banchmark banch;
+			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+			m_pDeferredPass->Execute(*m_currentScene, *camera);
+
+
+			std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[*] WireFramePass
+		if (useWireFrame)
+		{
+			Banchmark banch;
+			m_pWireFramePass->Execute(*m_currentScene, *camera);
+
+			std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[5] skyBoxPass
+		{
+			Banchmark banch;
+			m_pSkyBoxPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[6] ToneMapPass
+		{
+			Banchmark banch;
+			m_pToneMapPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[*] GridPass
+		{
+			Banchmark banch;
+			m_pGridPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[7] SpritePass
+		{
+			Banchmark banch;
+			m_pSpritePass->Execute(*m_currentScene, *camera);
+
+			std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[8] BlitPass
+		{
+			Banchmark banch;
+			m_pBlitPass->Execute(*m_currentScene, *camera);
+
+			std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
+		}
 	}
 
-	//[2] GBufferPass
-	{
-		Banchmark banch;
-		m_pGBufferPass->Execute(*m_currentScene);
+	m_pGBufferPass->ClearDeferredQueue();
 
-		std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-	//[3] SSAOPass
-	{
-		Banchmark banch;
-        m_pSSAOPass->Execute(*m_currentScene);
-
-		std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-    //[4] DeferredPass
-    {
-		Banchmark banch;
-		m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-        m_pDeferredPass->Execute(*m_currentScene);
-
-
-		std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
-    }
-
-	//[*] WireFramePass
-	if(useWireFrame)
-	{
-		Banchmark banch;
-		m_pWireFramePass->Execute(*m_currentScene);
-
-		std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-	//[5] skyBoxPass
-	{
-		Banchmark banch;
-		m_pSkyBoxPass->Execute(*m_currentScene);
-
-		std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-    //[6] ToneMapPass
-    {
-		Banchmark banch;
-        m_pToneMapPass->Execute(*m_currentScene);
-
-		std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
-    }
-	
-	//[*] GridPass
-	{
-		Banchmark banch;
-		m_pGridPass->PrepareCameraType(m_editorCamera.GetCamera());
-        m_pGridPass->Execute(*m_currentScene);
-
-		std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-	//[7] SpritePass
-	{
-		Banchmark banch;
-		m_pSpritePass->Execute(*m_currentScene);
-
-		std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-	//[8] BlitPass
-	{
-		Banchmark banch;
-		m_pBlitPass->Execute(*m_currentScene);
-
-		std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
-	}
-
-	m_pGBufferPass->ExecuteEditor(*m_currentScene, *m_editorCamera.GetCamera());
-	m_pDeferredPass->ExecuteEditor(*m_currentScene, *m_editorCamera.GetCamera());
 
 }
 
@@ -692,12 +597,12 @@ void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)
 		0
 	);
 
-	DirectX11::ClearDepthStencilView(
-		m_depthStencilView,
-		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
-		1.0f,
-		0
-	);
+	//DirectX11::ClearDepthStencilView(
+	//	m_depthStencilView,
+	//	D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+	//	1.0f,
+	//	0
+	//);
 }
 
 void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
@@ -739,12 +644,6 @@ void SceneRenderer::EditorView()
 					ImGui::GetContext("RenderPass").Open();
 				}
 			}
-			//if(ImGui::MenuItem("Edit Plane"))
-			//{
-			//	static bool isEdit = true;
-			//	isEdit = !isEdit;
-			//	_scene->SetEditorMode(isEdit);
-			//}
 
 			ImGui::EndMenu();
 		}
@@ -758,28 +657,28 @@ void SceneRenderer::EditorView()
 		auto mat = obj->m_transform.GetLocalMatrix();
 		XMFLOAT4X4 objMat;
 		XMStoreFloat4x4(&objMat, mat);
-		auto view = m_currentScene->m_MainCamera.CalculateView();
+		auto view = m_pEditorCamera->CalculateView();
 		XMFLOAT4X4 floatMatrix;
 		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		auto proj = m_pEditorCamera->CalculateProjection();
 		XMFLOAT4X4 projMatrix;
 		XMStoreFloat4x4(&projMatrix, proj);
 
-		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_editorCamera.GetCamera());
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_pEditorCamera.get());
 
 	}
 	else
 	{
-		auto view = m_currentScene->m_MainCamera.CalculateView();
+		auto view = m_pEditorCamera->CalculateView();
 		XMFLOAT4X4 floatMatrix;
 		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		auto proj = m_pEditorCamera->CalculateProjection();
 		XMFLOAT4X4 projMatrix;
 		XMStoreFloat4x4(&projMatrix, proj);
 		XMFLOAT4X4 identityMatrix;
 		XMStoreFloat4x4(&identityMatrix, XMMatrixIdentity());
 
-		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_editorCamera.GetCamera());
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_pEditorCamera.get());
 	}
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -790,64 +689,8 @@ void SceneRenderer::EditorView()
 		float convert = DeviceState::g_aspectRatio;
 		size.x = size.y * convert;
 
-		ImGui::Image((ImTextureID)m_toneMappedColourTexture->m_pSRV, size);
+		ImGui::Image((ImTextureID)m_currentScene->m_MainCamera.m_renderTarget->m_pSRV, size);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();
-}
-
-EditorCamera::EditorCamera()
-{
-	m_perspacetiveEditCamera = new PerspacetiveCamera();
-	m_orthographicEditCamera = new OrthographicCamera();
-
-	ImGui::ContextRegister("Editor Camera", true, [&]()
-	{
-		const char* cameraTypes[] = { "Perspective Camera", "Orthographic Camera" };
-		int cameraType = isOrthographic;  // 0: Perspective, 1: Orthographic
-		ImGui::Combo("Camera Type", &cameraType, cameraTypes, 2);
-		isOrthographic = cameraType;  // 선택된 값 업데이트
-
-		PerspacetiveCamera* perspacetiveCamera = reinterpret_cast<PerspacetiveCamera*>(m_perspacetiveEditCamera);
-		OrthographicCamera* orthographicCamera = reinterpret_cast<OrthographicCamera*>(m_orthographicEditCamera);
-
-		if (isOrthographic)
-		{
-			ImGui::DragFloat("View Width", &orthographicCamera->m_viewWidth, 0.1f, 0.1f, 100.f);
-			ImGui::DragFloat("View Height", &orthographicCamera->m_viewHeight, 0.1f, 0.1f, 100.f);
-			ImGui::DragFloat("Near Plane", &orthographicCamera->m_nearPlane, 0.1f, 0.1f, 100.f);
-			ImGui::DragFloat("Far Plane", &orthographicCamera->m_farPlane, 1.f, 1.f, 100000.f);
-			ImGui::DragFloat("Speed", &orthographicCamera->m_speed, 1.f, 1.f, 100.f);
-			ImGui::DragFloat("Pitch", &orthographicCamera->m_pitch, 0.01f, -pi, pi);
-			ImGui::DragFloat("Yaw", &orthographicCamera->m_yaw, 0.01f, -pi, pi);
-			ImGui::DragFloat("Roll", &orthographicCamera->m_roll, 0.01f, -pi, pi);
-
-			ImGui::Text("Eye Position");
-			ImGui::DragFloat3("##Eye Position", &orthographicCamera->m_eyePosition.m128_f32[0], -1000, 1000);
-			ImGui::Text("Forward");
-			ImGui::DragFloat3("##Forward", &orthographicCamera->m_forward.m128_f32[0], -1000, 1000);
-			ImGui::Text("Right");
-			ImGui::DragFloat3("##Right", &orthographicCamera->m_right.m128_f32[0], -1000, 1000);
-		}
-		else
-		{
-			ImGui::DragFloat("FOV", &perspacetiveCamera->m_fov, 1.f, 1.f, 179.f);
-			ImGui::DragFloat("Aspect Ratio", &perspacetiveCamera->m_aspectRatio, 0.1f, 0.1f, 10.f);
-			ImGui::DragFloat("Near Plane", &perspacetiveCamera->m_nearPlane, 0.1f, 0.1f, 100.f);
-			ImGui::DragFloat("Far Plane", &perspacetiveCamera->m_farPlane, 1.f, 1.f, 100000.f);
-			ImGui::DragFloat("Speed", &perspacetiveCamera->m_speed, 1.f, 1.f, 100.f);
-			ImGui::DragFloat("Pitch", &perspacetiveCamera->m_pitch, 0.01f, -pi, pi);
-			ImGui::DragFloat("Yaw", &perspacetiveCamera->m_yaw, 0.01f, -pi, pi);
-			ImGui::DragFloat("Roll", &perspacetiveCamera->m_roll, 0.01f, -pi, pi);
-
-			ImGui::Text("Eye Position");
-			ImGui::DragFloat3("##Eye Position", &perspacetiveCamera->m_eyePosition.m128_f32[0], -1000, 1000);
-			ImGui::Text("Forward");
-			ImGui::DragFloat3("##Forward", &perspacetiveCamera->m_forward.m128_f32[0], -1000, 1000);
-			ImGui::Text("Right");
-			ImGui::DragFloat3("##Right", &perspacetiveCamera->m_right.m128_f32[0], -1000, 1000);
-		}
-
-
-	});
 }

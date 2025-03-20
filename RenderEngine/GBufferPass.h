@@ -12,9 +12,10 @@ public:
 
 	void SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size);
 	void SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size);
-	void Execute(Scene& scene) override;
+	void Execute(Scene& scene, Camera& camera) override;
 	void ExecuteEditor(Scene& scene, Camera& camera);
 	void PushDeferredQueue(SceneObject* sceneObject);
+	void ClearDeferredQueue();
 
 private:
 	ComPtr<ID3D11Buffer> m_materialBuffer;

@@ -28,13 +28,12 @@ class ToneMapPass final : public IRenderPass
 public:
     ToneMapPass();
     ~ToneMapPass();
-    void Initialize(Texture* color, Texture* dest);
+    void Initialize(Texture* dest);
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
-    void Execute(Scene& scene) override;
+    void Execute(Scene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:
-    Texture* m_ColorTexture{};
     Texture* m_DestTexture{};
 	bool m_isAbleToneMap{ true };
 	ToneMapType m_toneMapType{ ToneMapType::ACES };

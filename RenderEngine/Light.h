@@ -64,7 +64,7 @@ public:
 	LightController& SetGlobalAmbient(Mathf::Color4 color);
 	LightController& SetEyePosition(Mathf::xVector eyePosition);
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
-	void RenderAnyShadowMap(Scene& scene);
+	void RenderAnyShadowMap(Scene& scene, Camera& camera);
 
 	Texture* GetShadowMapTexture();
 

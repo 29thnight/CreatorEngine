@@ -21,7 +21,7 @@ public:
     std::unique_ptr<Texture> m_SpecularMap{};
     std::unique_ptr<Texture> m_BRDFLUT{};
 
-    void Execute(Scene& scene) override;
+    void Execute(Scene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:

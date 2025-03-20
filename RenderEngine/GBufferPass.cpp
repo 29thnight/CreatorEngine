@@ -49,6 +49,7 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
 }
 
 GBufferPass::~GBufferPass()
@@ -72,7 +73,7 @@ void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTarg
 	}
 }
 
-void GBufferPass::Execute(Scene& scene)
+void GBufferPass::Execute(Scene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
@@ -82,9 +83,9 @@ void GBufferPass::Execute(Scene& scene)
 		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
 	}
 
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, DeviceState::g_pDepthStencilView);
+	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
 
-	scene.UseCamera(scene.m_MainCamera);
+	camera.UpdateBuffer();
 	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
 	scene.UseModel();
 
@@ -161,7 +162,7 @@ void GBufferPass::ExecuteEditor(Scene& scene, Camera& camera)
 
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_editorRTV, DeviceState::g_pEditorDepthStencilView);
 
-	scene.UseCamera(camera);
+	camera.UpdateBuffer();
 	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
 	scene.UseModel();
 
@@ -229,4 +230,9 @@ void GBufferPass::ExecuteEditor(Scene& scene, Camera& camera)
 void GBufferPass::PushDeferredQueue(SceneObject* sceneObject)
 {
 	m_deferredQueue.push_back(sceneObject);
+}
+
+void GBufferPass::ClearDeferredQueue()
+{
+	m_deferredQueue.clear();
 }

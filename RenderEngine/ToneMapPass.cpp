@@ -2,6 +2,7 @@
 #include "AssetSystem.h"
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
+#include "Camera.h"
 
 ToneMapPass::ToneMapPass()
 {
@@ -66,9 +67,8 @@ ToneMapPass::~ToneMapPass()
 {
 }
 
-void ToneMapPass::Initialize(Texture* color, Texture* dest)
+void ToneMapPass::Initialize(Texture* dest)
 {
-    m_ColorTexture = color;
     m_DestTexture = dest;
 }
 
@@ -78,7 +78,7 @@ void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
 	m_toneMapType = type;
 }
 
-void ToneMapPass::Execute(Scene& scene)
+void ToneMapPass::Execute(Scene& scene, Camera& camera)
 {
 
 	if (m_toneMapType == ToneMapType::Reinhard)
@@ -101,8 +101,11 @@ void ToneMapPass::Execute(Scene& scene)
     ID3D11RenderTargetView* renderTargets[] = { m_DestTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(1, renderTargets, nullptr);
 
-    DirectX11::PSSetShaderResources(0, 1, &m_ColorTexture->m_pSRV);
+    DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
+
+	//auto context = DeviceState::g_pDeviceContext;
+	//context->CopyResource(camera.m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
 
     ID3D11ShaderResourceView* nullSRV = nullptr;
     DirectX11::PSSetShaderResources(0, 1, &nullSRV);

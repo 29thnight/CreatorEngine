@@ -71,12 +71,24 @@ void SpritePass::Initialize(Texture* renderTarget)
 	m_RenderTarget = renderTarget;
 }
 
-void SpritePass::Execute(Scene& scene)
+void SpritePass::Execute(Scene& scene, Camera& camera)
 {
-	m_pso->Apply();
+	if (false == camera.m_applyRenderPipelinePass.m_SpritePass)
+	{
+		return;
+	}
 
 	auto deviceContext = DeviceState::g_pDeviceContext;
-	scene.UseCamera(scene.m_MainCamera);
+	m_pso->Apply();
+
+	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+
+	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+
+
+	camera.UpdateBuffer();
     scene.UseModel();
 
     std::vector<std::shared_ptr<SceneObject>> sprites;
@@ -91,7 +103,7 @@ void SpritePass::Execute(Scene& scene)
 	);
 
 	std::vector<std::tuple<Transform*, SpriteRenderer*, float>> spriteInfos;
-	Mathf::xVector& eyePosition = scene.m_MainCamera.m_eyePosition;
+	Mathf::xVector& eyePosition = camera.m_eyePosition;
 	std::transform(
 		sprites.begin(),
 		sprites.end(),

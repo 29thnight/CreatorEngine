@@ -82,9 +82,11 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 			&m_shadowMapDSV
 		)
 	);
+
+	m_shadowCamera.m_isOrthographic = true;
 }
 
-void ShadowMapPass::Execute(Scene& scene)
+void ShadowMapPass::Execute(Scene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
@@ -93,15 +95,14 @@ void ShadowMapPass::Execute(Scene& scene)
 
 	auto desc = scene.m_LightController.m_shadowMapRenderDesc;
 
-	OrthographicCamera shadowMapCamera;
-	shadowMapCamera.m_eyePosition = desc.m_eyePosition;
-	shadowMapCamera.m_lookAt = desc.m_lookAt;
-	shadowMapCamera.m_nearPlane = desc.m_nearPlane;
-	shadowMapCamera.m_farPlane = desc.m_farPlane;
-	shadowMapCamera.m_viewHeight = desc.m_viewHeight;
-	shadowMapCamera.m_viewWidth = desc.m_viewWidth;
+	m_shadowCamera.m_eyePosition = desc.m_eyePosition;
+	m_shadowCamera.m_lookAt = desc.m_lookAt;
+	m_shadowCamera.m_nearPlane = desc.m_nearPlane;
+	m_shadowCamera.m_farPlane = desc.m_farPlane;
+	m_shadowCamera.m_viewHeight = desc.m_viewHeight;
+	m_shadowCamera.m_viewWidth = desc.m_viewWidth;
 
-	scene.UseCamera(shadowMapCamera);
+	m_shadowCamera.UpdateBuffer();
 	scene.UseModel();
 
 	for (auto& obj : scene.m_SceneObjects)

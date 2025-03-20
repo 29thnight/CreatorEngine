@@ -124,7 +124,7 @@ void ImGuiRenderer::BeginRender()
         //
         // To fix this, we'll need to subtract half the node size from both the X and Y dimensions to move it left and up.
         // This new coordinate will be the position of the node's top-left corner that will center the node in the window.
-        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
+        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f + 10.f };
 
         // Set the size and position:
         ImGui::DockBuilderSetNodeSize(id, size);

@@ -8,12 +8,12 @@ class DeferredPass final : public IRenderPass
 public:
     DeferredPass();
     ~DeferredPass();
-    void Initialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
-	void EditorInitialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
+    void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
+	//void EditorInitialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
     void UseAmbientOcclusion(Texture* aoMap);
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
-    void Execute(Scene& scene) override;
+    void Execute(Scene& scene, Camera& camera) override;
 	void ExecuteEditor(Scene& scene, Camera& camera);
 	void ControlPanel() override;
 

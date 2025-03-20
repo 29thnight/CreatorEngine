@@ -7,6 +7,9 @@ Scene::Scene()
 
 	EditorSceneObjectHierarchy();
 	EditorSceneObjectInspector();
+
+	m_MainCamera.RegisterContainer();
+	m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
 }
 
 Scene::~Scene()
@@ -46,41 +49,26 @@ std::shared_ptr<SceneObject> Scene::GetSceneObject(SceneObject::Index index)
 	return m_SceneObjects[0];
 }
 
-void Scene::SetBuffers(ID3D11Buffer* modelBuffer, ID3D11Buffer* viewBuffer, ID3D11Buffer* projBuffer)
+void Scene::SetBuffers(ID3D11Buffer* modelBuffer)
 {
 	m_ModelBuffer = modelBuffer;
-	m_ViewBuffer = viewBuffer;
-	m_ProjBuffer = projBuffer;
-}
-
-void Scene::Start()
-{
-	m_LightController.
-		SetEyePosition(m_MainCamera.m_eyePosition)
-		.Update();
 }
 
 void Scene::Update(float deltaSecond)
 {
-	if (m_isPlaying)
-	{
-		m_MainCamera.HandleMovement(deltaSecond);
-	}
 	m_animationJob.Update(*this, deltaSecond);
 
 	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
 	}
-
-
 }
 
-void Scene::ShadowStage()
+void Scene::ShadowStage(Camera& camera)
 {
-	m_LightController.SetEyePosition(m_MainCamera.m_eyePosition);
+	m_LightController.SetEyePosition(camera.m_eyePosition);
 	m_LightController.Update();
-	m_LightController.RenderAnyShadowMap(*this);
+	m_LightController.RenderAnyShadowMap(*this, camera);
 }
 
 void Scene::UseModel()
@@ -91,17 +79,6 @@ void Scene::UseModel()
 void Scene::UpdateModel(const Mathf::xMatrix& model)
 {
 	DirectX11::UpdateBuffer(m_ModelBuffer, &model);
-}
-
-void Scene::UseCamera(Camera& camera)
-{
-	Mathf::xMatrix view = camera.CalculateView();
-	Mathf::xMatrix proj = camera.CalculateProjection();
-	DirectX11::UpdateBuffer(m_ViewBuffer, &view);
-	DirectX11::UpdateBuffer(m_ProjBuffer, &proj);
-
-	DirectX11::VSSetConstantBuffer(1, 1, &m_ViewBuffer);
-	DirectX11::VSSetConstantBuffer(2, 1, &m_ProjBuffer);
 }
 
 void Scene::EditorSceneObjectHierarchy()

@@ -11,11 +11,10 @@ public:
 	~SpritePass();
 
 	void Initialize(Texture* renderTarget);
-	void Execute(Scene& scene) override;
+	void Execute(Scene& scene, Camera& camera) override;
 
 private:
 	Texture* m_RenderTarget{};
 	std::unique_ptr<Mesh> m_QuadMesh{};
 	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
-	OrthographicCamera m_OrthoCamera{};
 };
