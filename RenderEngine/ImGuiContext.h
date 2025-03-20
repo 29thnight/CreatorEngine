@@ -45,19 +45,15 @@ public:
 		}
 
         ImGuiIO& io = ImGui::GetIO();
-        if (m_isPopup)
-        {
-            //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-            ImGui::SetNextWindowViewport(0);
-            
-        }
-        else
-        {
-            ImGui::SetNextWindowViewport(0);
-        }
+        ImGui::SetNextWindowViewport(0);
 
         if (ImGui::Begin(m_name.data(), m_isPopup? &m_opened : 0, m_flags))
         {
+            if (m_isPopup)
+            {
+                ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+            }
+
             for (auto& context : m_contexts)
             {
                 context();

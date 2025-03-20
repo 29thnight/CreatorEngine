@@ -352,50 +352,55 @@ void SceneRenderer::Initialize(Scene* _pScene)
 #pragma region lightImguiTest;
 		static int lightIndex = 0;
 
-		ImGui::ContextRegister("Light", true, [&]()
-			{
-				if(ImGui::Button("Add Light")) {
-					Light light;
-					light.m_color = XMFLOAT4(1, 1, 1, 1);
-					pointLight.m_position = XMFLOAT4(0, 0, 0, 0);
-					pointLight.m_lightType = LightType::PointLight;
+		ImGui::ContextRegister("Light", false, [&]()
+		{
+			ImGui::Text("Light Index : %d", lightIndex);
+			if(ImGui::Button("Add Light")) {
+				Light light;
+				light.m_color = XMFLOAT4(1, 1, 1, 1);
+				pointLight.m_position = XMFLOAT4(0, 0, 0, 0);
+				pointLight.m_lightType = LightType::PointLight;
 
-					m_currentScene->m_LightController.AddLight(light);
-				}
-				if (ImGui::Button("Light index + ")) {
-					lightIndex++;
-					if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
-				}
-				if (ImGui::Button("Light index - ")) {
-					lightIndex--;
-					if (lightIndex < 0) lightIndex = 0;
-				}
-				if (ImGui::Button("Light On")) {
-					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
-				}
-				if (ImGui::Button("Light Off")) {
-					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
-				}
+				m_currentScene->m_LightController.AddLight(light);
+			}
+			if (ImGui::Button("Light index + ")) {
+				lightIndex++;
+				if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
+			}
+			if (ImGui::Button("Light index - ")) {
+				lightIndex--;
+				if (lightIndex < 0) lightIndex = 0;
+			}
+			if (ImGui::Button("Light On")) {
+				m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
+			}
+			if (ImGui::Button("Light Off")) {
+				m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
+			}
 
-				ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
-				ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
-				ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
-				ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
-				ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
-				ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+			ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+			ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
+			ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
+			ImGui::SliderFloat3("Light W", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
+			ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
+			ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
+			ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
 
-			});
+		});
 #pragma endregion
+
+		m_currentScene->EditorSceneObjectHierarchy();
+		m_currentScene->EditorSceneObjectInspector();
 
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 1.f;
-		desc.m_farPlane = 20.f;
-		desc.m_textureWidth = DeviceState::g_ClientRect.width;
-		desc.m_textureHeight = DeviceState::g_ClientRect.height;
+		desc.m_nearPlane = 0.1f;
+		desc.m_farPlane = 1000.f;
+		desc.m_textureWidth = 8192;
+		desc.m_textureHeight = 8192;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
@@ -403,11 +408,9 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		//model = Model::LoadModel("BoxHuman.fbx");
-		Model::LoadModelToScene(model, *m_currentScene);
 
-		testModel = Model::LoadModel("BoxHuman.fbx");
-		Model::LoadModelToScene(testModel, *m_currentScene);
+		model = Model::LoadModel("BoxHuman.fbx");
+		Model::LoadModelToScene(model, *m_currentScene);
 	}
 	else
 	{

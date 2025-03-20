@@ -179,6 +179,9 @@ void DirectX11::DeviceResources::Present()
     {
         DirectX11::ThrowIfFailed(hr);
     }
+
+	m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), DirectX::Colors::Transparent);
+	m_d3dContext->ClearDepthStencilView(m_d3dDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
 void DirectX11::DeviceResources::ResizeResources()

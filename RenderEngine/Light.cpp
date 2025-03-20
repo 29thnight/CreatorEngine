@@ -105,6 +105,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	shadowCamera.m_farPlane = desc.m_farPlane;
 	shadowCamera.m_viewWidth = desc.m_viewWidth;
 	shadowCamera.m_viewHeight = desc.m_viewHeight;
+	shadowCamera.m_isOrthographic = true;
 	
 	ShadowMapConstant shadowMapConstant{
 		desc.m_textureWidth,
@@ -114,7 +115,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	m_shadowMapRenderDesc = desc;
 	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &shadowMapConstant);
 
-	m_shadowMapPass->Initialize(desc.m_textureWidth, desc.m_viewHeight);
+	m_shadowMapPass->Initialize(desc.m_textureWidth, desc.m_textureHeight);
 	hasLightWithShadows = true;
 }
 

@@ -19,7 +19,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_D2DRenderer = std::make_unique<D2DRenderer>(m_deviceResources);
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
     AssetsSystem2->LoadShaders();
 	AssetsSystem2->Initialize();
@@ -29,6 +28,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	m_D2DRenderer->SetEditorComputeShader();
 	m_sceneRenderer->Initialize();
+	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
 	m_world = new World();
 

@@ -72,7 +72,6 @@ void SceneObject::EditorMeshRenderer()
 		ImGui::ColorEdit3("Base Color", &m_meshRenderer.m_Material->m_materialInfo.m_baseColor.x);
 		ImGui::SliderFloat("Metallic", &m_meshRenderer.m_Material->m_materialInfo.m_metallic, 0, 1);
 		ImGui::SliderFloat("Roughness", &m_meshRenderer.m_Material->m_materialInfo.m_roughness, 0, 1);
-		//ImGui::SliderFloat("Emissive", &m_meshRenderer.m_Material->m_materialInfo.emissive, 0, 1);
 	});
 }
 

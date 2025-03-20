@@ -58,15 +58,6 @@ void DeferredPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* no
     m_EmissiveTexture = emissive;
 }
 
-//void DeferredPass::EditorInitialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
-//{
-//	m_EditorRenderTarget = renderTarget;
-//	m_EditorDiffuseTexture = diffuse;
-//	m_EditorMetalRoughTexture = metalRough;
-//	m_EditorNormalTexture = normals;
-//	m_EditorEmissiveTexture = emissive;
-//}
-
 void DeferredPass::UseAmbientOcclusion(Texture* aoMap)
 {
     m_AmbientOcclusionTexture = aoMap;

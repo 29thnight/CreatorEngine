@@ -4,12 +4,8 @@
 Scene::Scene()
 {
 	CreateSceneObject("Root", 0);
-
-	EditorSceneObjectHierarchy();
-	EditorSceneObjectInspector();
-
 	m_MainCamera.RegisterContainer();
-	m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
+	//m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
 }
 
 Scene::~Scene()
@@ -66,7 +62,7 @@ void Scene::Update(float deltaSecond)
 
 void Scene::ShadowStage(Camera& camera)
 {
-	m_LightController.SetEyePosition(camera.m_eyePosition);
+	m_LightController.SetEyePosition(m_MainCamera.m_eyePosition);
 	m_LightController.Update();
 	m_LightController.RenderAnyShadowMap(*this, camera);
 }
@@ -124,7 +120,7 @@ void Scene::EditorSceneObjectHierarchy()
 				ImGui::TreePop();
 			}
 		}
-	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
+	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void Scene::EditorSceneObjectInspector()
