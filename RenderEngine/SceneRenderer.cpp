@@ -39,61 +39,61 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	{
 		if (ImGui::IsKeyPressed(ImGuiKey_T))
 			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_G))
+		if (ImGui::IsKeyPressed(ImGuiKey_R))
 			mCurrentGizmoOperation = ImGuizmo::ROTATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) // r Key
+		if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
 			mCurrentGizmoOperation = ImGuizmo::SCALE;
-		if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))
-			mCurrentGizmoOperation = ImGuizmo::ROTATE;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-			mCurrentGizmoOperation = ImGuizmo::SCALE;
-		if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
-			mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-		float matrixTranslation[3], matrixRotation[3], matrixScale[3];
-		ImGuizmo::DecomposeMatrixToComponents(matrix, matrixTranslation, matrixRotation, matrixScale);
-		ImGui::InputFloat3("Tr", matrixTranslation);
-		ImGui::InputFloat3("Rt", matrixRotation);
-		ImGui::InputFloat3("Sc", matrixScale);
-		ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation, matrixScale, matrix);
+		//if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+		//	mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+		//ImGui::SameLine();
+		//if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))
+		//	mCurrentGizmoOperation = ImGuizmo::ROTATE;
+		//ImGui::SameLine();
+		//if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+		//	mCurrentGizmoOperation = ImGuizmo::SCALE;
+		//if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
+		//	mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+		//float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+		//ImGuizmo::DecomposeMatrixToComponents(matrix, matrixTranslation, matrixRotation, matrixScale);
+		//ImGui::InputFloat3("Tr", matrixTranslation);
+		//ImGui::InputFloat3("Rt", matrixRotation);
+		//ImGui::InputFloat3("Sc", matrixScale);
+		//ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation, matrixScale, matrix);
 
-		if (mCurrentGizmoOperation != ImGuizmo::SCALE)
-		{
-			if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
-				mCurrentGizmoMode = ImGuizmo::LOCAL;
-			ImGui::SameLine();
-			if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
-				mCurrentGizmoMode = ImGuizmo::WORLD;
-		}
+		//if (mCurrentGizmoOperation != ImGuizmo::SCALE)
+		//{
+		//	if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+		//		mCurrentGizmoMode = ImGuizmo::LOCAL;
+		//	ImGui::SameLine();
+		//	if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+		//		mCurrentGizmoMode = ImGuizmo::WORLD;
+		//}
 		if (ImGui::IsKeyPressed(ImGuiKey_F))
 			useSnap = !useSnap;
-		ImGui::Checkbox("##UseSnap", &useSnap);
-		ImGui::SameLine();
-
-		switch (mCurrentGizmoOperation)
-		{
-		case ImGuizmo::TRANSLATE:
-			ImGui::InputFloat3("Snap", &snap[0]);
-			break;
-		case ImGuizmo::ROTATE:
-			ImGui::InputFloat("Angle Snap", &snap[0]);
-			break;
-		case ImGuizmo::SCALE:
-			ImGui::InputFloat("Scale Snap", &snap[0]);
-			break;
-		}
-		ImGui::Checkbox("Bound Sizing", &boundSizing);
-		if (boundSizing)
-		{
-			ImGui::PushID(3);
-			ImGui::Checkbox("##BoundSizing", &boundSizingSnap);
-			ImGui::SameLine();
-			ImGui::InputFloat3("Snap", boundsSnap);
-			ImGui::PopID();
-		}
+		//ImGui::Checkbox("##UseSnap", &useSnap);
+		//ImGui::SameLine();
+		//
+		//switch (mCurrentGizmoOperation)
+		//{
+		//case ImGuizmo::TRANSLATE:
+		//	ImGui::InputFloat3("Snap", &snap[0]);
+		//	break;
+		//case ImGuizmo::ROTATE:
+		//	ImGui::InputFloat("Angle Snap", &snap[0]);
+		//	break;
+		//case ImGuizmo::SCALE:
+		//	ImGui::InputFloat("Scale Snap", &snap[0]);
+		//	break;
+		//}
+		//ImGui::Checkbox("Bound Sizing", &boundSizing);
+		//if (boundSizing)
+		//{
+		//	ImGui::PushID(3);
+		//	ImGui::Checkbox("##BoundSizing", &boundSizingSnap);
+		//	ImGui::SameLine();
+		//	ImGui::InputFloat3("Snap", boundsSnap);
+		//	ImGui::PopID();
+		//}
 	}
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -104,7 +104,8 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	{
 		//ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
 		//ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 0.f));
+		//ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
 		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
 		ImGuizmo::SetDrawlist();
@@ -119,8 +120,10 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImGuiWindow* window = ImGui::GetCurrentWindow();
 		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
 
-		float x = window->InnerRect.Max.x - window->InnerRect.Min.x;
-		float y = window->InnerRect.Max.y - window->InnerRect.Min.y;
+		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
+		//auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		//float ratio = proj.r[0].m128_f32[0] / proj.r[1].m128_f32[1];
+		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
 
 		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
 		ImGui::PopStyleVar();
@@ -136,21 +139,20 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 	if (obj)
 	{
+		// 기즈모로 변환 후 오브젝트에 적용.
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
 
-		XMVECTOR pos;
-		XMVECTOR rot;
-		XMVECTOR scale;
-		XMMatrixDecompose(&scale, &rot, &pos, XMMATRIX(matrix));
+		auto parentMat = m_currentScene->GetSceneObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 
-		obj->m_transform.SetPosition(pos);
-		obj->m_transform.SetRotation(rot);
-		obj->m_transform.SetScale(scale);
+		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+		obj->m_transform.SetLocalMatrix(newLocalMatrix);
 	}
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
 
 	{
+		// 기즈모로 변환된 카메라 위치, 회전 적용
 		XMVECTOR poss;
 		XMVECTOR rots;
 		XMVECTOR scales;
@@ -347,6 +349,44 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.AddLight(spotLight)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
+#pragma region lightImguiTest;
+		static int lightIndex = 0;
+
+		ImGui::ContextRegister("Light", true, [&]()
+			{
+				if(ImGui::Button("Add Light")) {
+					Light light;
+					light.m_color = XMFLOAT4(1, 1, 1, 1);
+					pointLight.m_position = XMFLOAT4(0, 0, 0, 0);
+					pointLight.m_lightType = LightType::PointLight;
+
+					m_currentScene->m_LightController.AddLight(light);
+				}
+				if (ImGui::Button("Light index + ")) {
+					lightIndex++;
+					if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
+				}
+				if (ImGui::Button("Light index - ")) {
+					lightIndex--;
+					if (lightIndex < 0) lightIndex = 0;
+				}
+				if (ImGui::Button("Light On")) {
+					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
+				}
+				if (ImGui::Button("Light Off")) {
+					m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
+				}
+
+				ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+				ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
+				ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
+				ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
+				ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
+				ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+
+			});
+#pragma endregion
+
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -364,6 +404,10 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 		//model = Model::LoadModel("BoxHuman.fbx");
+		Model::LoadModelToScene(model, *m_currentScene);
+
+		testModel = Model::LoadModel("BoxHuman.fbx");
+		Model::LoadModelToScene(testModel, *m_currentScene);
 	}
 	else
 	{
@@ -645,7 +689,7 @@ void SceneRenderer::EditorView()
 	auto obj = m_currentScene->GetSelectSceneObject();
 	if (obj) 
 	{
-		auto mat = obj->m_transform.GetLocalMatrix();
+		auto mat = obj->m_transform.GetWorldMatrix();
 		XMFLOAT4X4 objMat;
 		XMStoreFloat4x4(&objMat, mat);
 		auto view = m_pEditorCamera->CalculateView();

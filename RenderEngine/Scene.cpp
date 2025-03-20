@@ -137,18 +137,31 @@ void Scene::EditorSceneObjectInspector()
 			Mathf::Vector4 rotation = m_selectedSceneObject->m_transform.rotation;
 			Mathf::Vector4 scale = m_selectedSceneObject->m_transform.scale;
 
+			float pyr[3]; // pitch yaw roll
+			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+			for (int i = 0; i < 3; i++) {
+				pyr[i] = XMConvertToDegrees(pyr[i]);
+			}
+
 			ImGui::Text(m_selectedSceneObject->m_name.c_str());
 			ImGui::Separator();
 			ImGui::Text("Position");	
-			ImGui::DragFloat3("##Position", &position.x, -1000, 1000);
+			ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000);
 			ImGui::Text("Rotation");
-			ImGui::DragFloat3("##Rotation", &rotation.x, -3.14f, 3.14f);
+			ImGui::DragFloat3("##Rotation", &pyr[0], 0.1f);
 			ImGui::Text("Scale");
 			ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
 			ImGui::Text("Index");
 			ImGui::InputInt("##Index", const_cast<int*>(&m_selectedSceneObject->m_index), 0, 0, ImGuiInputTextFlags_ReadOnly);
 			ImGui::Text("Parent Index");
 			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
+
+			for (int i = 0; i < 3; i++) {
+				pyr[i] = XMConvertToRadians(pyr[i]);
+			}
+
+			rotation = XMQuaternionRotationRollPitchYaw(pyr[0], pyr[1], pyr[2]);
 
 			m_selectedSceneObject->m_transform.position = position;
 			m_selectedSceneObject->m_transform.rotation = rotation;

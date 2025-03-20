@@ -76,6 +76,7 @@ private:
 	std::queue<SceneObject*> m_forwardQueue;
 
 	Model* model{};
+	Model* testModel{};
 
 //Debug
 public:
