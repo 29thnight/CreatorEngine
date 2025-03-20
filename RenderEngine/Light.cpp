@@ -114,7 +114,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	m_shadowMapRenderDesc = desc;
 	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &shadowMapConstant);
 
-	m_shadowMapPass->Initialize(desc.m_viewWidth, desc.m_viewHeight);
+	m_shadowMapPass->Initialize(desc.m_textureWidth, desc.m_viewHeight);
 	hasLightWithShadows = true;
 }
 

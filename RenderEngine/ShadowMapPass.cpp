@@ -91,6 +91,9 @@ void ShadowMapPass::Execute(Scene& scene, Camera& camera)
 	m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
+	
+	DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);
+	DirectX11::ClearDepthStencilView(m_shadowMapDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 
 	auto desc = scene.m_LightController.m_shadowMapRenderDesc;

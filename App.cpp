@@ -63,8 +63,6 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 {
 	m_deviceResources->SetWindow(coreWindow);
 	coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
-	//coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::ImGuiKeyDownHandler);
-	//coreWindow.RegisterHandler(WM_KEYUP, this, &App::ImGuiKeyUpHandler);
 	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
 	//coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);

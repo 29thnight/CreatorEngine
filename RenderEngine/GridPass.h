@@ -36,7 +36,6 @@ class GridPass final : public IRenderPass
 public:
 	GridPass();
 	~GridPass();
-	void Initialize(Texture* color, Texture* grid);
 	void PrepareCameraType(Camera* camera);
 	void Execute(Scene& scene, Camera& camera) override;
 	void ControlPanel() override;

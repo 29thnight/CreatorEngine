@@ -214,3 +214,9 @@ void Camera::UpdateBuffer()
 	DirectX11::VSSetConstantBuffer(1, 1, m_ViewBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }
+
+void Camera::ClearRenderTarget()
+{
+	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
+	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+}

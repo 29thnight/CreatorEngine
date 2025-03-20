@@ -89,12 +89,6 @@ GridPass::~GridPass()
 {
 }
 
-void GridPass::Initialize(Texture* color, Texture* grid)
-{
-    m_colorTexture = color;
-    m_gridTexture = grid;
-}
-
 void GridPass::PrepareCameraType(Camera* camera)
 {
 	m_pEditorCamera = camera;
@@ -108,8 +102,6 @@ void GridPass::Execute(Scene& scene, Camera& camera)
 	}
 
     auto deviceContext = DeviceState::g_pDeviceContext;
-    //copyResource
-    deviceContext->CopyResource(m_gridTexture->m_pTexture, m_colorTexture->m_pTexture);
 
 	m_gridConstant.world = XMMatrixIdentity();
 	m_gridConstant.view = camera.CalculateView();
@@ -126,8 +118,8 @@ void GridPass::Execute(Scene& scene, Camera& camera)
 
     m_pso->Apply();
 
-    ID3D11RenderTargetView* rtv = m_gridTexture->GetRTV();
-    DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, DeviceState::g_pEditorDepthStencilView);
+    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+    DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
 
     UINT stride = sizeof(GridVertex);
     UINT offset = 0;

@@ -59,11 +59,6 @@ WireFramePass::~WireFramePass()
 {
 }
 
-void WireFramePass::SetRenderTarget(Texture* renderTarget)
-{
-    m_RenderTarget = renderTarget;
-}
-
 void WireFramePass::Execute(Scene& scene, Camera& camera)
 {
     m_pso->Apply();

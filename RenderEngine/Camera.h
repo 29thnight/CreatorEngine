@@ -34,6 +34,7 @@ public:
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer();
+	void ClearRenderTarget();
 
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };

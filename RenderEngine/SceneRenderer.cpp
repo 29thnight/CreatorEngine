@@ -211,8 +211,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
 
-	//m_pEditorCamera = std::make_unique<Camera>();
-	//m_pEditorCamera->RegisterContainer();
+	m_pEditorCamera = std::make_unique<Camera>();
+	m_pEditorCamera->RegisterContainer();
+	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
 
     //pass 생성
     //shadowMapPass 는 Scene의 맴버
@@ -245,7 +246,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_pSkyBoxPass->SetRenderTarget(m_colorTexture.get());
 	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
 	
 
@@ -265,23 +265,14 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//WireFramePass
 	m_pWireFramePass = std::make_unique<WireFramePass>();
-	m_pWireFramePass->SetRenderTarget(m_colorTexture.get());
 
+	//GridPass
     m_pGridPass = std::make_unique<GridPass>();
-    m_pGridPass->Initialize(m_editColorTexture.get(), m_gridTexture.get());
 }
 
 
 void SceneRenderer::InitializeTextures()
 {
-	//RTV's 생성
-	m_colorTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"ColorRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-
 	m_diffuseTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -361,16 +352,16 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 0.1f;
-		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = 8192.f;
-		desc.m_textureHeight = 8192.f;
+		desc.m_nearPlane = 1.f;
+		desc.m_farPlane = 20.f;
+		desc.m_textureWidth = DeviceState::g_ClientRect.width;
+		desc.m_textureHeight = DeviceState::g_ClientRect.height;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
 		model = Model::LoadModel("bangbooExport.fbx");
-		//model = Model::LoadModel("untitled.gltf");
+		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 		//model = Model::LoadModel("BoxHuman.fbx");
 	}
@@ -463,8 +454,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 void SceneRenderer::Update(float deltaTime)
 {
 	m_currentScene->Update(deltaTime);
-	//m_pEditorCamera->HandleMovement(deltaTime);
-	m_currentScene->m_MainCamera.HandleMovement(deltaTime);
+	m_pEditorCamera->HandleMovement(deltaTime);
 	PrepareRender();
 }
 
@@ -476,6 +466,7 @@ void SceneRenderer::Render()
 		//[1] ShadowMapPass
 		{
 			Banchmark banch;
+			camera->ClearRenderTarget();
 			m_currentScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
@@ -639,7 +630,7 @@ void SceneRenderer::EditorView()
 		{
 			if (ImGui::MenuItem("Pipeline Setting"))
 			{
-				if (ImGui::GetContext("RenderPass").IsOpened())
+				if (!ImGui::GetContext("RenderPass").IsOpened())
 				{
 					ImGui::GetContext("RenderPass").Open();
 				}

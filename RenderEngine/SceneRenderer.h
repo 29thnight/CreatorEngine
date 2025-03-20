@@ -57,32 +57,22 @@ private:
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
 
-	//textures
-	std::unique_ptr<Texture> m_colorTexture;
-	std::unique_ptr<Texture> m_editColorTexture;
-
-	//game view
+	//Textures
 	std::unique_ptr<Texture> m_diffuseTexture;
 	std::unique_ptr<Texture> m_metalRoughTexture;
 	std::unique_ptr<Texture> m_normalTexture;
 	std::unique_ptr<Texture> m_emissiveTexture;
-	//editor view
-	//std::unique_ptr<Texture> m_editDiffuseTexture;
-	//std::unique_ptr<Texture> m_editMetalRoughTexture;
-	//std::unique_ptr<Texture> m_editNormalTexture;
-	//std::unique_ptr<Texture> m_editEmissiveTexture;
-
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
     std::unique_ptr<Texture> m_gridTexture;
-
+	//sampler
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
+	//Editor Camera
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
 	//render queue
-
 	std::queue<SceneObject*> m_forwardQueue;
 
 	Model* model{};

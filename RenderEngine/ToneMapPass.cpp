@@ -104,8 +104,8 @@ void ToneMapPass::Execute(Scene& scene, Camera& camera)
     DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
 
-	//auto context = DeviceState::g_pDeviceContext;
-	//context->CopyResource(camera.m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
+	auto context = DeviceState::g_pDeviceContext;
+	context->CopyResource(camera.m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
 
     ID3D11ShaderResourceView* nullSRV = nullptr;
     DirectX11::PSSetShaderResources(0, 1, &nullSRV);

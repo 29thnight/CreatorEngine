@@ -95,7 +95,7 @@ void ImGuiRenderer::BeginRender()
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
@@ -115,7 +115,7 @@ void ImGuiRenderer::BeginRender()
         ImGui::DockBuilderAddNode(id);                // Create a new dock node to use
 
         // 4. Set the dock node's size and position:
-        ImVec2 size{ ImGui::GetMainViewport()->Size }; // A decently large dock node size (600x300px) so everything displays clearly
+        ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - 50.f };
 
         // Calculate the position of the dock node
         //
@@ -124,7 +124,7 @@ void ImGuiRenderer::BeginRender()
         //
         // To fix this, we'll need to subtract half the node size from both the X and Y dimensions to move it left and up.
         // This new coordinate will be the position of the node's top-left corner that will center the node in the window.
-        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f + 10.f };
+        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
 
         // Set the size and position:
         ImGui::DockBuilderSetNodeSize(id, size);
@@ -200,8 +200,8 @@ void ImGuiRenderer::EndRender()
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    ImGui::UpdatePlatformWindows();
-    ImGui::RenderPlatformWindowsDefault();
+    //ImGui::UpdatePlatformWindows();
+   // ImGui::RenderPlatformWindowsDefault();
 
 }
 
