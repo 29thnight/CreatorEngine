@@ -352,7 +352,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 #pragma region lightImguiTest;
 		static int lightIndex = 0;
 
-		ImGui::ContextRegister("Light", false, [&]()
+		ImGui::ContextRegister("Light", true, [&]()
 		{
 			ImGui::Text("Light Index : %d", lightIndex);
 			if(ImGui::Button("Add Light")) {
