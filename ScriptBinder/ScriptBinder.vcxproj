@@ -151,6 +151,7 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="IComponent.h" />
     <ClInclude Include="IObject.h" />
+    <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="MonoBehavior.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />

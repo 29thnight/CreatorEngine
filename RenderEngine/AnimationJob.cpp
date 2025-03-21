@@ -28,18 +28,18 @@ void AnimationJob::Update(Scene& scene, float deltaTime)
 {
     for (auto sceneObj : scene.m_SceneObjects)
     {
-        if (!sceneObj->m_animator.m_IsEnabled) continue;
+        if (nullptr == sceneObj->m_animator || !sceneObj->m_animator->m_IsEnabled) continue;
 
-        Animator& animator = sceneObj->m_animator;
-        Skeleton* skeleton = animator.m_Skeleton;
-        Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
+        Animator* animator = sceneObj->m_animator;
+        Skeleton* skeleton = animator->m_Skeleton;
+        Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
 
-        animator.m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
-        animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, animation.m_duration);
+        animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+        animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
 		//XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
 		XMMATRIX rootTransform = /*sceneObjMatrix **/ skeleton->m_rootTransform;
 
-        UpdateBone(skeleton->m_rootBone, animator, rootTransform, animator.m_TimeElapsed);
+        UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
     }
 }
 

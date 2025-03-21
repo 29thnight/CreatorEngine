@@ -25,7 +25,6 @@ public:
 public:
     std::string	name{};
     file::path	path{};
-    aiNode*     m_node{};
 
     Skeleton*   m_Skeleton{};
 	bool m_hasBones{ false };
@@ -34,7 +33,6 @@ private:
 	friend class SceneRenderer;
     friend class ModelLoader;
 	friend class DataSystem;
-
 
     std::vector<Mesh*>      m_Meshes;
     std::vector<Material*>  m_Materials;

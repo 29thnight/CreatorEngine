@@ -151,7 +151,7 @@ private:
             WS_OVERLAPPEDWINDOW,
             x, y,
             rect.right - rect.left,
-            rect.bottom - rect.top + titleBarHeight + borderHeight,
+            rect.bottom - rect.top /*+ titleBarHeight + borderHeight*/,
             nullptr,
             nullptr,
             m_hInstance,

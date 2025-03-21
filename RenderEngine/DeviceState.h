@@ -148,6 +148,17 @@ namespace DirectX11
 	}
 
 	//[unsafe]
+	inline void DrawIndexedInstanced(uint32 indexCountPerInstance, uint32 instanceCount, uint32 startIndexLocation, int baseVertexLocation, uint32 startInstanceLocation)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+	}
+
+	//[unsafe]
 	inline void ClearRenderTargetView(ID3D11RenderTargetView* renderTargetView, const float color[4])
 	{
 		if (!DeviceState::g_pDeviceContext)

@@ -90,7 +90,8 @@ void Scene::EditorSceneObjectHierarchy()
 			if (obj.get() == m_selectedSceneObject)
 				flags |= ImGuiTreeNodeFlags_Selected;
 
-			std::string uniqueLabel = obj->m_name + "##" + std::to_string(obj->m_index);
+			ImGui::PushID((int)&obj);
+			std::string uniqueLabel = obj->m_name;
 			bool opened = ImGui::TreeNodeEx(uniqueLabel.c_str(), flags);
 
 			if (ImGui::IsItemClicked()) // 클릭 시 선택된 객체 변경
@@ -108,7 +109,7 @@ void Scene::EditorSceneObjectHierarchy()
 					if (child.get() == m_selectedSceneObject)
 						childFlags |= ImGuiTreeNodeFlags_Selected;
 
-					std::string childUniqueLabel = child->m_name + "##" + std::to_string(child->m_index);
+					std::string childUniqueLabel = child->m_name + "(" + std::to_string(child->m_index) + ")";
 					if (ImGui::TreeNodeEx(childUniqueLabel.c_str(), childFlags))
 					{
 						if (ImGui::IsItemClicked()) // 자식 객체 클릭 시 선택
@@ -120,6 +121,8 @@ void Scene::EditorSceneObjectHierarchy()
 				}
 				ImGui::TreePop();
 			}
+
+			ImGui::PopID();
 		}
 	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }

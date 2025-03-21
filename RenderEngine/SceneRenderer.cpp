@@ -410,8 +410,31 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		Model::LoadModelToScene(model, *m_currentScene);
 		Model::LoadModelToScene(model, *m_currentScene);
 
-		model = Model::LoadModel("BoxHuman.fbx");
-		Model::LoadModelToScene(model, *m_currentScene);
+		ImGui::ContextRegister("Test Add Model", true, [&]()
+		{
+			if (ImGui::Button("Add Model"))
+			{
+				Model::LoadModelToScene(model, *m_currentScene);
+			}
+		});
+
+		ImGui::ContextRegister("EditCamera", true, [&]()
+		{
+				ImGui::Checkbox("Camera Type", &m_pEditorCamera->m_isOrthographic);
+				ImGui::DragFloat("Camera Speed", &m_pEditorCamera->m_speed, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera FOV", &m_pEditorCamera->m_fov, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera Near", &m_pEditorCamera->m_nearPlane, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera Far", &m_pEditorCamera->m_farPlane, 0.1f, 0.1f, 10000.0f);
+
+				if (m_pEditorCamera->m_isOrthographic)
+				{
+					ImGui::DragFloat("Orthographic Width", &m_pEditorCamera->m_viewWidth, 0.1f, 0.1f, 1000.0f);
+					ImGui::DragFloat("Orthographic Height", &m_pEditorCamera->m_viewHeight, 0.1f, 0.1f, 1000.0f);
+				}
+				else
+				{
+				}
+		});
 
 		//model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
@@ -516,88 +539,88 @@ void SceneRenderer::Render()
 		if (nullptr == camera) continue;
 		//[1] ShadowMapPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			camera->ClearRenderTarget();
 			m_currentScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
 
-			std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[2] GBufferPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pGBufferPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[3] SSAOPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pSSAOPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[4] DeferredPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->Execute(*m_currentScene, *camera);
 
 
-			std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] WireFramePass
 		if (useWireFrame)
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pWireFramePass->Execute(*m_currentScene, *camera);
 
-			std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[5] skyBoxPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pSkyBoxPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[6] ToneMapPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pToneMapPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] GridPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pGridPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[7] SpritePass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pSpritePass->Execute(*m_currentScene, *camera);
 
-			std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[8] BlitPass
 		{
-			Banchmark banch;
+			//Banchmark banch;
 			m_pBlitPass->Execute(*m_currentScene, *camera);
 
-			std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
+			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 

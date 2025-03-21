@@ -35,7 +35,7 @@ struct Vertex
 
 class Texture;
 class Material;
-
+class ModelLoader;
 class Mesh
 {
 public:
@@ -47,6 +47,7 @@ public:
 	void Draw();
 
 private:
+	friend class ModelLoader;
 	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
