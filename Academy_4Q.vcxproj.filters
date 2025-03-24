@@ -236,6 +236,12 @@
     <None Include="x64\Assets\Shaders\Lighting.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="x64\Assets\Shaders\GammaCorrectionCommon.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="x64\Assets\Shaders\ACES.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp">

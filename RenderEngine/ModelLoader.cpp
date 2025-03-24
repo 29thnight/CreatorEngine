@@ -242,7 +242,7 @@ void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
 
 void ModelLoader::LoadNode(std::fstream& infile, Node* node)
 {
-	size_t size;
+    size_t size{};
 	std::string name;
 	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
 	infile.read(reinterpret_cast<char*>(name.data()), size);

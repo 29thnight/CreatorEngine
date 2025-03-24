@@ -365,9 +365,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.AddLight(spotLight)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
-		m_currentScene->EditorSceneObjectHierarchy();
-		m_currentScene->EditorSceneObjectInspector();
-
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -381,7 +378,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("bangbooExport.asset");
+		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 
 		ImGui::ContextRegister("Test Add Model", true, [&]()

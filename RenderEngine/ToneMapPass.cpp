@@ -119,10 +119,10 @@ void ToneMapPass::ControlPanel()
     ImGui::Separator();
     if (m_toneMapType == ToneMapType::ACES)
     {
-        ImGui::SliderFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.0f, 1.0f);
-        ImGui::SliderFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.0f, 1.0f);
-        ImGui::SliderFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.0f, 1.0f);
-        ImGui::SliderFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.0f, 1.0f);
-        ImGui::SliderFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.0f, 1.0f);
+        ImGui::DragFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.01f, 0.0f, 1.0f);
     }
 }

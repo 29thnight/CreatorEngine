@@ -122,6 +122,7 @@ LightingInfo EvalLightingInfo(SurfaceInfo surf, Light light)
         default:
             break;
     }
+    light.color = light.color * 5.f; // color.w is intensity
     return li;
 }
 
@@ -136,6 +137,11 @@ float3 LINEARtoSRGB(float3 color)
 float4 SRGBtoLINEAR(float4 srgbIn)
 {
     return float4(pow(srgbIn.xyz, GAMMA), srgbIn.w);
+}
+
+float Square(float x)
+{
+    return x * x;
 }
 
 #endif
