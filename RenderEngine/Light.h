@@ -47,6 +47,7 @@ class Texture;
 class Scene;
 class ForwardPass;
 class GBufferPass;
+class SceneRenderer;
 struct ShadowMapRenderDesc;
 class LightController
 {
@@ -63,7 +64,7 @@ public:
 	LightController& SetGlobalAmbient(Mathf::Color4 color);
 	LightController& SetEyePosition(Mathf::xVector eyePosition);
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
-	void RenderAnyShadowMap(Scene& scene);
+	void RenderAnyShadowMap(Scene& scene, Camera& camera);
 
 	Texture* GetShadowMapTexture();
 
@@ -74,6 +75,7 @@ private:
 	friend class DeferredPass;
 	friend class GBufferPass;
 	friend class ShadowMapPass;
+	friend class SceneRenderer;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
 	ShadowMapRenderDesc m_shadowMapRenderDesc;

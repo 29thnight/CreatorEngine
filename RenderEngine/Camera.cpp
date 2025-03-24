@@ -1,9 +1,60 @@
 #include "Camera.h"
 #include "../InputManager.h"
 #include "DeviceState.h"
+#include "ImGuiRegister.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
+
+Camera::Camera()
+{
+	m_aspectRatio = DeviceState::g_aspectRatio;
+
+	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+
+	m_renderTarget = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		cameraRTVName,
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+
+	m_depthStencil = TextureHelper::CreateDepthTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"Camera_" + std::to_string(m_cameraIndex) + "_DSV"
+	);
+
+	XMMATRIX identity = XMMatrixIdentity();
+
+	std::string viewBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ViewBuffer";
+	std::string projBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ProjBuffer";
+
+	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+}
+
+Camera::~Camera()
+{
+	if (m_cameraIndex != -1)
+	{
+		CameraManagement->DeleteCamera(m_cameraIndex);
+	}
+}
+
+Mathf::xMatrix Camera::CalculateProjection()
+{
+	if (m_isOrthographic)
+	{
+		return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
+	}
+	else
+	{
+		return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
+	}
+}
 
 Mathf::Vector4 Camera::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth)
 {
@@ -62,6 +113,11 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 	return frustum;
 }
 
+void Camera::RegisterContainer()
+{
+	m_cameraIndex = CameraManagement->AddCamera(this);
+}
+
 void Camera::HandleMovement(float deltaTime)
 {
 	float x = 0.f, y = 0.f, z = 0.f;
@@ -91,36 +147,76 @@ void Camera::HandleMovement(float deltaTime)
 		y += 1.f;
 	}
 
+	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
+	static XMVECTOR rotate = XMQuaternionIdentity();
+	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
-		m_pitch += InputManagement->GetMouseDelta().y * 0.01f;
-		m_pitch = fmax(-pi, fmin(m_pitch, pi));
-		m_yaw += InputManagement->GetMouseDelta().x * 0.01f;
-		if (m_yaw > XM_PI) m_yaw -= pi2;
-		if (m_yaw < -XM_PI) m_yaw += pi2;
 
-		Mathf::xVector viewRotation = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.f);
-		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, viewRotation));
-		m_right = XMVector3Normalize(XMVector3Cross(UP, m_forward));
+
+		// 마우스 이동량 가져오기
+		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
+		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
+
+		// Pitch 제한 적용
+		//m_pitch += deltaPitch;
+		
+		// 현재 회전 기준 축을 얻음
+		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+
+		// 프레임당 변화량만 적용
+		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
+		XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
+
+		// Yaw를 먼저 적용 -> Pitch를 적용
+		XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
+		m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
+		m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
+		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
+
+
+		// 새로운 방향 벡터 계산
+		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
+
+		// Right 벡터 업데이트 (UP을 기준으로 다시 계산)
+		m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+
+		m_up = XMVector3Cross(m_forward, m_right);
+
+			float sign = XMVectorGetY(m_up) > 0 ? 1.0f : -1.0f;
+			m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
+			m_up = XMQuaternionNormalize(m_up);
+
+
+		//std::cout << XMVectorGetX(rightAxis) << ", " << XMVectorGetY(rightAxis) << ", " << XMVectorGetZ(rightAxis) << std::endl;
+
+		rotate = m_rotationQuat;
 	}
 
 	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
 	{
 		m_rayDirection = RayCast(InputManagement->GetMousePos());
-		std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
-		std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
+		//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
+		//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
 	}
 
-	m_eyePosition += ((z * m_forward) + (y * UP) + (x * m_right)) * m_speed * deltaTime;
+	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
 	m_lookAt = m_eyePosition + m_forward;
 }
 
-Mathf::xMatrix PerspacetiveCamera::CalculateProjection()
+void Camera::UpdateBuffer()
 {
-	return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, 0.1f, 200.f);
+	Mathf::xMatrix view = CalculateView();
+	Mathf::xMatrix proj = CalculateProjection();
+	DirectX11::UpdateBuffer(m_ViewBuffer.Get(), &view);
+	DirectX11::UpdateBuffer(m_ProjBuffer.Get(), &proj);
+
+	DirectX11::VSSetConstantBuffer(1, 1, m_ViewBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-Mathf::xMatrix OrthographicCamera::CalculateProjection()
+void Camera::ClearRenderTarget()
 {
-	return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
+	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
+	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }

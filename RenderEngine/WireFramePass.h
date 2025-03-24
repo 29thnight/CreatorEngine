@@ -12,11 +12,8 @@ class WireFramePass : public IRenderPass
 public:
 	WireFramePass();
 	~WireFramePass();
-
-	void SetRenderTarget(Texture* renderTarget);
-
 	// IRenderPass을(를) 통해 상속됨
-	void Execute(Scene& scene) override;
+	void Execute(Scene& scene, Camera& camera) override;
 
 private:
 	CameraBuffer m_CameraBuffer;

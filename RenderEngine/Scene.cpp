@@ -4,9 +4,8 @@
 Scene::Scene()
 {
 	CreateSceneObject("Root", 0);
-
-	EditorSceneObjectHierarchy();
-	EditorSceneObjectInspector();
+	m_MainCamera.RegisterContainer();
+	//m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
 }
 
 Scene::~Scene()
@@ -28,6 +27,7 @@ std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneOb
 std::shared_ptr<SceneObject> Scene::CreateSceneObject(const std::string_view& name, SceneObject::Index parentIndex)
 {
     SceneObject::Index index = m_SceneObjects.size();
+
 	m_SceneObjects.push_back(std::make_shared<SceneObject>(name, index, parentIndex));
 	auto parentObj = GetSceneObject(parentIndex);
 	if(parentObj->m_index != index)
@@ -46,38 +46,26 @@ std::shared_ptr<SceneObject> Scene::GetSceneObject(SceneObject::Index index)
 	return m_SceneObjects[0];
 }
 
-void Scene::SetBuffers(ID3D11Buffer* modelBuffer, ID3D11Buffer* viewBuffer, ID3D11Buffer* projBuffer)
+void Scene::SetBuffers(ID3D11Buffer* modelBuffer)
 {
 	m_ModelBuffer = modelBuffer;
-	m_ViewBuffer = viewBuffer;
-	m_ProjBuffer = projBuffer;
-}
-
-void Scene::Start()
-{
-	m_LightController.
-		SetEyePosition(m_MainCamera.m_eyePosition)
-		.Update();
 }
 
 void Scene::Update(float deltaSecond)
 {
-	m_MainCamera.HandleMovement(deltaSecond);
 	m_animationJob.Update(*this, deltaSecond);
 
 	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
 	}
-
-
 }
 
-void Scene::ShadowStage()
+void Scene::ShadowStage(Camera& camera)
 {
 	m_LightController.SetEyePosition(m_MainCamera.m_eyePosition);
 	m_LightController.Update();
-	m_LightController.RenderAnyShadowMap(*this);
+	m_LightController.RenderAnyShadowMap(*this, camera);
 }
 
 void Scene::UseModel()
@@ -88,17 +76,6 @@ void Scene::UseModel()
 void Scene::UpdateModel(const Mathf::xMatrix& model)
 {
 	DirectX11::UpdateBuffer(m_ModelBuffer, &model);
-}
-
-void Scene::UseCamera(Camera& camera)
-{
-	Mathf::xMatrix view = camera.CalculateView();
-	Mathf::xMatrix proj = camera.CalculateProjection();
-	DirectX11::UpdateBuffer(m_ViewBuffer, &view);
-	DirectX11::UpdateBuffer(m_ProjBuffer, &proj);
-
-	DirectX11::VSSetConstantBuffer(1, 1, &m_ViewBuffer);
-	DirectX11::VSSetConstantBuffer(2, 1, &m_ProjBuffer);
 }
 
 void Scene::EditorSceneObjectHierarchy()
@@ -113,7 +90,9 @@ void Scene::EditorSceneObjectHierarchy()
 			if (obj.get() == m_selectedSceneObject)
 				flags |= ImGuiTreeNodeFlags_Selected;
 
-			bool opened = ImGui::TreeNodeEx(obj->m_name.c_str(), flags);
+			ImGui::PushID((int)&obj);
+			std::string uniqueLabel = obj->m_name;
+			bool opened = ImGui::TreeNodeEx(uniqueLabel.c_str(), flags);
 
 			if (ImGui::IsItemClicked()) // 클릭 시 선택된 객체 변경
 			{
@@ -130,7 +109,8 @@ void Scene::EditorSceneObjectHierarchy()
 					if (child.get() == m_selectedSceneObject)
 						childFlags |= ImGuiTreeNodeFlags_Selected;
 
-					if (ImGui::TreeNodeEx(child->m_name.c_str(), childFlags))
+					std::string childUniqueLabel = child->m_name + "(" + std::to_string(child->m_index) + ")";
+					if (ImGui::TreeNodeEx(childUniqueLabel.c_str(), childFlags))
 					{
 						if (ImGui::IsItemClicked()) // 자식 객체 클릭 시 선택
 						{
@@ -141,8 +121,10 @@ void Scene::EditorSceneObjectHierarchy()
 				}
 				ImGui::TreePop();
 			}
+
+			ImGui::PopID();
 		}
-	});
+	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void Scene::EditorSceneObjectInspector()
@@ -155,14 +137,31 @@ void Scene::EditorSceneObjectInspector()
 			Mathf::Vector4 rotation = m_selectedSceneObject->m_transform.rotation;
 			Mathf::Vector4 scale = m_selectedSceneObject->m_transform.scale;
 
+			float pyr[3]; // pitch yaw roll
+			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+			for (int i = 0; i < 3; i++) {
+				pyr[i] = XMConvertToDegrees(pyr[i]);
+			}
+
 			ImGui::Text(m_selectedSceneObject->m_name.c_str());
 			ImGui::Separator();
-			ImGui::Text("Position");
-			ImGui::DragFloat3("##Position", &position.x, -1000, 1000);
+			ImGui::Text("Position");	
+			ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000);
 			ImGui::Text("Rotation");
-			ImGui::DragFloat3("##Rotation", &rotation.x, -3.14f, 3.14f);
+			ImGui::DragFloat3("##Rotation", &pyr[0], 0.1f);
 			ImGui::Text("Scale");
 			ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
+			ImGui::Text("Index");
+			ImGui::InputInt("##Index", const_cast<int*>(&m_selectedSceneObject->m_index), 0, 0, ImGuiInputTextFlags_ReadOnly);
+			ImGui::Text("Parent Index");
+			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
+
+			for (int i = 0; i < 3; i++) {
+				pyr[i] = XMConvertToRadians(pyr[i]);
+			}
+
+			rotation = XMQuaternionRotationRollPitchYaw(pyr[0], pyr[1], pyr[2]);
 
 			m_selectedSceneObject->m_transform.position = position;
 			m_selectedSceneObject->m_transform.rotation = rotation;
@@ -171,7 +170,7 @@ void Scene::EditorSceneObjectInspector()
 
 			m_selectedSceneObject->m_transform.GetLocalMatrix();
 		}
-	});
+	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model)

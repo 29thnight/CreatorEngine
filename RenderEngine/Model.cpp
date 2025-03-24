@@ -1,6 +1,8 @@
 #include "Model.h"
 #include "AssetSystem.h"
 #include "ModelLoader.h"
+#include "Banchmark.hpp"
+#include "PathFinder.h"
 
 Model::Model()
 {
@@ -37,24 +39,37 @@ Model::~Model()
 Model* Model::LoadModel(const std::string_view& filePath)
 {
 	file::path path_ = filePath.data();
-    Assimp::Importer importer;
-	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+	Model* model{};
+	file::path test = PathFinder::Relative("Models\\").string() + path_.filename().string() + ".model";
+	/*if (file::exists(test))
+	{
+		ModelLoader loader;
+		loader.LoadModelBinary(path_.filename().string() + ".model");
+		model = loader.m_model;
+	}
+	else*/
+	{
+		Assimp::Importer importer;
+		importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+		importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
-    const aiScene* assimpScene = importer.ReadFile(filePath.data(),
-		aiProcess_LimitBoneWeights |
-		aiProcessPreset_TargetRealtime_Quality |
-        aiProcess_ConvertToLeftHanded
-    );
+		const aiScene* assimpScene = importer.ReadFile(filePath.data(),
+			aiProcess_LimitBoneWeights |
+			aiProcessPreset_TargetRealtime_Quality |
+			aiProcess_ConvertToLeftHanded
+		);
 
-    if (nullptr == assimpScene)
-    {
-        throw std::exception("ModelLoader::Model file not found");
-    }
+		if (nullptr == assimpScene)
+		{
+			throw std::exception("ModelLoader::Model file not found");
+		}
 
-    ModelLoader loader = ModelLoader(assimpScene, path_.string());
-    Model* model = loader.LoadModel();
-	model->path = path_;
+		ModelLoader loader = ModelLoader(assimpScene, path_.string());
+		model = loader.LoadModel();
+		model->path = path_;
+
+		loader.SaveModelBinary(path_.filename().string() + ".model");
+	}
 
 	return model;
 }
@@ -67,12 +82,18 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
-	const aiScene* assimpScene = importer.ReadFile(path_.string(),
-		aiProcess_LimitBoneWeights |
-		aiProcessPreset_TargetRealtime_Quality |
-		aiProcess_ConvertToLeftHanded
-	);
-	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, model->m_SceneObject->m_index);
+	const aiScene* assimpScene;
+	{
+		Banchmark banch;
+		assimpScene = importer.ReadFile(path_.string(),
+			aiProcess_LimitBoneWeights |
+			aiProcessPreset_TargetRealtime_Quality |
+			aiProcess_ConvertToLeftHanded
+		);
+
+		std::cout << "LoadModelToScene : " << banch.GetElapsedTime() << std::endl;
+	}
+	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, 0);
 
 	return model;
 }

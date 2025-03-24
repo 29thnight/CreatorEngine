@@ -13,6 +13,12 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Classes\Components">
+      <UniqueIdentifier>{4066272c-d665-4b3e-8e0d-5bb9cba950aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources">
+      <UniqueIdentifier>{f51a4962-46e7-4e5a-ab83-bc10bfdfed21}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Transform.cpp">
@@ -42,7 +48,10 @@
       <Filter>Classes</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
-      <Filter>Classes</Filter>
+      <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRenderer.h">
+      <Filter>Classes\Components</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

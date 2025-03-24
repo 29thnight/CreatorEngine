@@ -1,6 +1,7 @@
 ﻿#include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
+#include "imgui_internal.h"
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -94,10 +95,40 @@ void ImGuiRenderer::BeginRender()
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
 	ImGui::NewFrame();
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    static bool firstLoop = true;
+    if (firstLoop) 
+	{
+        ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
+        ImGuiID id = ImGui::GetID("MainWindowGroup");
+        ImGui::DockBuilderRemoveNode(id);
+        ImGui::DockBuilderAddNode(id);
+
+        ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - 50.f };
+        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
+
+        // Set the size and position:
+        ImGui::DockBuilderSetNodeSize(id, size);
+        ImGui::DockBuilderSetNodePos(id, nodePos);
+
+        ImGuiID dock1 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Left, 0.5f, nullptr, &id);
+		ImGuiID dock_gameView = ImGui::DockBuilderSplitNode(dock1, ImGuiDir_Down, 0.5f, nullptr, &dock1);
+        ImGuiID dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.5f, nullptr, &id);
+        ImGuiID dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
+
+        ImGui::DockBuilderDockWindow("Gizmo", dock1);
+        ImGui::DockBuilderDockWindow("GameView", dock_gameView);
+        ImGui::DockBuilderDockWindow("SceneObject Hierarchy", dock2);
+        ImGui::DockBuilderDockWindow("SceneObject Inspector", dock3);
+        ImGui::DockBuilderFinish(id);
+    }
+
+    if (firstLoop) firstLoop = false;
 }
 
 void ImGuiRenderer::Render()
@@ -114,6 +145,15 @@ void ImGuiRenderer::EndRender()
 {
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		ImGui::UpdatePlatformWindows();
+		ImGui::RenderPlatformWindowsDefault();
+	}
+
 }
 
 void ImGuiRenderer::Shutdown()

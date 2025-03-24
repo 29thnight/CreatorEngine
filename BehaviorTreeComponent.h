@@ -29,6 +29,7 @@ public:
 	}
 	uint32 ID() override { return _ID; }
 	bool _isSuccess{ false };
+	bool Test() { return _isSuccess; }
 private:
 	static constexpr uint32 _ID{ 5004 };
 	std::unique_ptr<BaseBehaviorTree> _behaviorTree;

@@ -27,6 +27,8 @@ namespace DirectX11
 		void Update();
 		bool Render();
 
+		void RenderThread();
+
 		// IDeviceNotify
 		virtual void OnDeviceLost() override;
 		virtual void OnDeviceRestored() override;
@@ -49,7 +51,7 @@ namespace DirectX11
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
 		std::unique_ptr<D2DRenderer>   m_D2DRenderer;
 
-		std::unique_ptr<PerspacetiveCamera> m_camera;
+		std::thread m_renderThread;
 
 		//std::unique_ptr<Scene> m_scene;
 		BT_Editor m_btEditor;

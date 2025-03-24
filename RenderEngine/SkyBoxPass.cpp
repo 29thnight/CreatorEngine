@@ -2,6 +2,7 @@
 #include "AssetSystem.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "ImGuiRegister.h"
 
 Mathf::xVector forward[6] =
 {
@@ -81,6 +82,8 @@ SkyBoxPass::~SkyBoxPass()
 
 void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 {
+	m_size = size;
+
     std::vector<uint32> skyboxIndices =
     {
         0,  1,  2,  0,  2,  3,
@@ -92,7 +95,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
     };
 
     m_skyBoxMesh = std::make_unique<Mesh>("skyBoxMesh", PrimitiveCreator::CubeVertices(), std::move(skyboxIndices));
-	m_scaleMatrix = XMMatrixScaling(size, size, size);
+	m_scaleMatrix = XMMatrixScaling(m_size, m_size, m_size);
 
 	file::path path = file::path(fileName);
     if (file::exists(path))
@@ -149,20 +152,16 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 
 	m_BRDFLUT->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BRDFLUT->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-	//CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
-	//rasterizerDesc.CullMode = D3D11_CULL_NONE;
-
-	//DeviceState::g_pDevice->CreateRasterizerState(
-	//	&rasterizerDesc,
-	//	&m_skyBoxRasterizerState
-	//);
-
 }
 
 void SkyBoxPass::SetRenderTarget(Texture* renderTarget)
 {
 	m_RenderTarget = renderTarget;
+}
+
+void SkyBoxPass::SetBackBuffer(ID3D11RenderTargetView* backBuffer)
+{
+	m_backBuffer = backBuffer;
 }
 
 void SkyBoxPass::GenerateCubeMap(Scene& scene)
@@ -171,6 +170,8 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
 	{
 		return;
 	}
+
+	m_scaleMatrix = XMMatrixScaling(m_size, m_size, m_size);
 
     auto deviceContext = DeviceState::g_pDeviceContext;
     D3D11_VIEWPORT viewport = { 0 };
@@ -186,7 +187,8 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
     {
 		ID3D11RenderTargetView* rtv = m_skyBoxCubeMap->GetRTV(i);
         DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-        OrthographicCamera ortho;
+
+        Camera ortho;
         ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
         ortho.m_lookAt = forward[i];
         ortho.m_up = up[i];
@@ -194,6 +196,7 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
         ortho.m_farPlane = 10.f;
         ortho.m_viewHeight = 2.f;
         ortho.m_viewWidth = 2.f;
+		ortho.m_isOrthographic = true;
 
 		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
         DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
@@ -202,7 +205,7 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
 		DirectX11::PSSetShaderResources(0, 1, &m_skyBoxTexture->m_pSRV);
 
         scene.UseModel();
-        scene.UseCamera(ortho);
+		ortho.UpdateBuffer();
         scene.UpdateModel(XMMatrixIdentity());
 
         m_skyBoxMesh->Draw();
@@ -233,7 +236,7 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(Scene& scene)
 	{
 		ID3D11RenderTargetView* rtv = m_EnvironmentMap->GetRTV(i);
 		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-		OrthographicCamera ortho;
+		Camera ortho;
 		ortho.m_eyePosition = XMVectorSet(0.f, 0.f, 0.f, 0.f);
 		ortho.m_lookAt = forward[i];
 		ortho.m_up = up[i];
@@ -241,13 +244,15 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(Scene& scene)
 		ortho.m_farPlane = 10.f;
 		ortho.m_viewHeight = 2.f;
 		ortho.m_viewWidth = 2.f;
+		ortho.m_isOrthographic = true;
 
 		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
 		DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 		DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
 		DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
+
 		scene.UseModel();
-		scene.UseCamera(ortho);
+		ortho.UpdateBuffer();
 		scene.UpdateModel(XMMatrixIdentity());
 		m_skyBoxMesh->Draw();
 		deviceContext->Flush();
@@ -294,7 +299,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(Scene& scene)
 		{
 			ID3D11RenderTargetView* rtv = m_SpecularMap->GetRTV(i * 6 + j);
 			DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-			OrthographicCamera ortho;
+			Camera ortho;
 			ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
 			ortho.m_lookAt = forward[j];
 			ortho.m_up = up[j];
@@ -302,6 +307,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(Scene& scene)
 			ortho.m_farPlane = 10;
 			ortho.m_viewHeight = 2;
 			ortho.m_viewWidth = 2;
+			ortho.m_isOrthographic = true;
 
 			DirectX11::IASetInputLayout(m_pso->m_inputLayout);
 			DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
@@ -309,7 +315,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(Scene& scene)
 			DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
 
 			scene.UseModel();
-			scene.UseCamera(ortho);
+			ortho.UpdateBuffer();
 			scene.UpdateModel(XMMatrixIdentity());
 			m_skyBoxMesh->Draw();
 		}
@@ -354,19 +360,22 @@ Texture* SkyBoxPass::GenerateBRDFLUT(Scene& scene)
 	return m_BRDFLUT.get();
 }
 
-void SkyBoxPass::Execute(Scene& scene)
+void SkyBoxPass::Execute(Scene& scene, Camera& camera)
 {
+	if (!m_abled)
+	{
+		return;
+	}
+
 	m_pso->Apply();
 
-	/*auto deviceContext = DeviceState::g_pDeviceContext;
-	deviceContext->RSSetState(m_skyBoxRasterizerState);*/
+	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
 
-	ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
-
-	scene.UseCamera(scene.m_MainCamera);
+	camera.UpdateBuffer();
 	scene.UseModel();
 
+	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
 	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
 
 	scene.UpdateModel(modelMatrix);
@@ -376,6 +385,11 @@ void SkyBoxPass::Execute(Scene& scene)
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
+}
 
-	//deviceContext->RSSetState(DeviceState::g_pRasterizerState);
+void SkyBoxPass::ControlPanel()
+{
+	ImGui::Text("SkyBoxPass");
+	ImGui::Checkbox("Enable", &m_abled);
+	ImGui::SliderFloat("scale", &m_scale, 1.f, 1000.f);
 }

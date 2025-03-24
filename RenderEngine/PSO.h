@@ -24,6 +24,7 @@ public:
 
 public:
 	void Apply();
+    void Reset();
 };
 
 //how to apply change to deffered context -> command list -> immediate context logic
@@ -33,6 +34,6 @@ public:
 //4. draw
 //5. reset the PSO
 //6. repeat 2-5
-// ÀÌ°É Æí¸®ÇÏ°Ô ÇÏ·Á¸é Ä¿¸àµå ¸®½ºÆ®¸¦ °ü¸®ÇÒ Å¬·¡½º°¡ ÇÊ¿äÇÏ°í, imidiate context¸¦ ½º·¹µå·Î »©¼­ °ü¸®ÇÒ Å¬·¡½º°¡ ÇÊ¿äÇÏ´Ù.
-// ¾ÈÇÒ°Å´Ù. ±×³É ±ú´ÞÀ½À» ¾ò¾úÀ¸¹Ç·Î ÁÖ¼®À¸·Î ÀÛ¼ºÇÑ´Ù.
-// °á±¹ ÀÌ ·ÎÁ÷Àº 1ÇÁ·¹ÀÓ¾¿ Áö¿¬µÈ ·»´õ¸µÀ» ÇÏ°Ô µÈ´Ù.
+// ì´ê±¸ íŽ¸ë¦¬í•˜ê²Œ í•˜ë ¤ë©´ ì»¤ë©˜ë“œ ë¦¬ìŠ¤íŠ¸ë¥¼ ê´€ë¦¬í•  í´ëž˜ìŠ¤ê°€ í•„ìš”í•˜ê³ , imidiate contextë¥¼ ìŠ¤ë ˆë“œë¡œ ë¹¼ì„œ ê´€ë¦¬í•  í´ëž˜ìŠ¤ê°€ í•„ìš”í•˜ë‹¤.
+// ì•ˆí• ê±°ë‹¤. ê·¸ëƒ¥ ê¹¨ë‹¬ìŒì„ ì–»ì—ˆìœ¼ë¯€ë¡œ ì£¼ì„ìœ¼ë¡œ ìž‘ì„±í•œë‹¤.
+// ê²°êµ­ ì´ ë¡œì§ì€ 1í”„ë ˆìž„ì”© ì§€ì—°ëœ ë Œë”ë§ì„ í•˜ê²Œ ëœë‹¤.

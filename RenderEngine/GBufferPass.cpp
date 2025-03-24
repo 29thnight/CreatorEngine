@@ -49,6 +49,7 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
 }
 
 GBufferPass::~GBufferPass()
@@ -64,7 +65,15 @@ void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetView
 	}
 }
 
-void GBufferPass::Execute(Scene& scene)
+void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
+{
+	for (uint32 i = 0; i < size; i++)
+	{
+		m_editorRTV[i] = renderTargetViews[i];
+	}
+}
+
+void GBufferPass::Execute(Scene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
@@ -74,9 +83,9 @@ void GBufferPass::Execute(Scene& scene)
 		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
 	}
 
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, DeviceState::g_pDepthStencilView);
+	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
 
-	scene.UseCamera(scene.m_MainCamera);
+	camera.UpdateBuffer();
 	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
 	scene.UseModel();
 
@@ -91,7 +100,84 @@ void GBufferPass::Execute(Scene& scene)
 
 		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-		Animator* animator = &scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
+		Animator* animator = scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
+		if (nullptr != animator && animator->m_IsEnabled)
+		{
+			if (animator != currentAnimator)
+			{
+				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
+				currentAnimator = animator;
+			}
+		}
+
+		Material* mat = meshRenderer.m_Material;
+		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
+
+		if (mat->m_pBaseColor)
+		{
+			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
+		}
+		if (mat->m_pNormal)
+		{
+			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
+		}
+		if (mat->m_pOccRoughMetal)
+		{
+			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+		}
+		if (mat->m_AOMap)
+		{
+			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
+		}
+		if (mat->m_pEmissive)
+		{
+			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+		}
+
+		meshRenderer.m_Mesh->Draw();
+	}
+
+	//m_deferredQueue.clear();
+
+	ID3D11ShaderResourceView* nullSRV = nullptr;
+	for (uint32 i = 0; i < 5; i++)
+	{
+		DirectX11::PSSetShaderResources(i, 1, &nullSRV);
+	}
+
+	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
+	ZeroMemory(nullRTV, sizeof(nullRTV));
+	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+}
+
+void GBufferPass::ExecuteEditor(Scene& scene, Camera& camera)
+{
+	m_pso->Apply();
+
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+	for (auto& RTV : m_editorRTV)
+	{
+		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
+	}
+
+	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_editorRTV, DeviceState::g_pEditorDepthStencilView);
+
+	camera.UpdateBuffer();
+	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
+	scene.UseModel();
+
+	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
+
+	Animator* currentAnimator = nullptr;
+
+	for (auto& sceneObject : m_deferredQueue)
+	{
+		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
+
+		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
+		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+		Animator* animator = scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
 		if (nullptr != animator && animator->m_IsEnabled)
 		{
 			if (animator != currentAnimator)
@@ -144,4 +230,9 @@ void GBufferPass::Execute(Scene& scene)
 void GBufferPass::PushDeferredQueue(SceneObject* sceneObject)
 {
 	m_deferredQueue.push_back(sceneObject);
+}
+
+void GBufferPass::ClearDeferredQueue()
+{
+	m_deferredQueue.clear();
 }

@@ -1,8 +1,177 @@
 #include "SceneRenderer.h"
+#include "SceneRenderer.h"
 #include "DeviceState.h"
 #include "AssetSystem.h"
 #include "Scene.h"
 #include "ImGuiRegister.h"
+#include "Banchmark.hpp"
+
+#pragma region ImGuizmo
+#include "ImGuizmo.h"
+
+static const float identityMatrix[16] = { 
+	1.f, 0.f, 0.f, 0.f,
+	0.f, 1.f, 0.f, 0.f,
+	0.f, 0.f, 1.f, 0.f,
+	0.f, 0.f, 0.f, 1.f 
+};
+bool useWindow = true;
+bool editWindow = true;
+int gizmoCount = 1;
+float camDistance = 8.f;
+static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
+
+
+void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam)
+{
+	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
+	static bool useSnap = false;
+	static float snap[3] = { 1.f, 1.f, 1.f };
+	static float bounds[] = { -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f };
+	static float boundsSnap[] = { 0.1f, 0.1f, 0.1f };
+	static bool boundSizing = false;
+	static bool boundSizingSnap = false;
+
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::BeginFrame();
+
+	if (editTransformDecomposition)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_T))
+			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+		if (ImGui::IsKeyPressed(ImGuiKey_R))
+			mCurrentGizmoOperation = ImGuizmo::ROTATE;
+		if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
+			mCurrentGizmoOperation = ImGuizmo::SCALE;
+		//if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+		//	mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+		//ImGui::SameLine();
+		//if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))
+		//	mCurrentGizmoOperation = ImGuizmo::ROTATE;
+		//ImGui::SameLine();
+		//if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+		//	mCurrentGizmoOperation = ImGuizmo::SCALE;
+		//if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
+		//	mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+		//float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+		//ImGuizmo::DecomposeMatrixToComponents(matrix, matrixTranslation, matrixRotation, matrixScale);
+		//ImGui::InputFloat3("Tr", matrixTranslation);
+		//ImGui::InputFloat3("Rt", matrixRotation);
+		//ImGui::InputFloat3("Sc", matrixScale);
+		//ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation, matrixScale, matrix);
+
+		//if (mCurrentGizmoOperation != ImGuizmo::SCALE)
+		//{
+		//	if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+		//		mCurrentGizmoMode = ImGuizmo::LOCAL;
+		//	ImGui::SameLine();
+		//	if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+		//		mCurrentGizmoMode = ImGuizmo::WORLD;
+		//}
+		if (ImGui::IsKeyPressed(ImGuiKey_F))
+			useSnap = !useSnap;
+		//ImGui::Checkbox("##UseSnap", &useSnap);
+		//ImGui::SameLine();
+		//
+		//switch (mCurrentGizmoOperation)
+		//{
+		//case ImGuizmo::TRANSLATE:
+		//	ImGui::InputFloat3("Snap", &snap[0]);
+		//	break;
+		//case ImGuizmo::ROTATE:
+		//	ImGui::InputFloat("Angle Snap", &snap[0]);
+		//	break;
+		//case ImGuizmo::SCALE:
+		//	ImGui::InputFloat("Scale Snap", &snap[0]);
+		//	break;
+		//}
+		//ImGui::Checkbox("Bound Sizing", &boundSizing);
+		//if (boundSizing)
+		//{
+		//	ImGui::PushID(3);
+		//	ImGui::Checkbox("##BoundSizing", &boundSizingSnap);
+		//	ImGui::SameLine();
+		//	ImGui::InputFloat3("Snap", boundsSnap);
+		//	ImGui::PopID();
+		//}
+	}
+
+	ImGuiIO& io = ImGui::GetIO();
+	float viewManipulateRight = io.DisplaySize.x;
+	float viewManipulateTop = 0;
+	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+	if (useWindow)
+	{
+		//ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_Appearing);
+		//ImGui::SetNextWindowPos(ImVec2(400, 20), ImGuiCond_Appearing);
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 0.f));
+		//ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.35f, 0.3f, 0.3f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
+		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
+		ImGuizmo::SetDrawlist();
+
+		//std::cout << ImGui::GetMousePos().x <<", " << ImGui::GetMousePos().y<< std::endl;
+
+		float windowWidth = (float)ImGui::GetWindowWidth();
+		float windowHeight = (float)ImGui::GetWindowHeight();
+		ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
+		viewManipulateTop = ImGui::GetWindowPos().y;
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
+
+		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
+		//auto proj = m_currentScene->m_MainCamera.CalculateProjection();
+		//float ratio = proj.r[0].m128_f32[0] / proj.r[1].m128_f32[1];
+		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
+
+		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
+		ImGui::PopStyleVar();
+	}
+	else
+	{
+		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+	}
+
+
+	//ImGuizmo::DrawCubes(cameraView, cameraProjection, &objectMatrix[0][0], gizmoCount);
+
+
+	if (obj)
+	{
+		// 기즈모로 변환 후 오브젝트에 적용.
+		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
+
+		auto parentMat = m_currentScene->GetSceneObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+
+		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+		obj->m_transform.SetLocalMatrix(newLocalMatrix);
+	}
+
+	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
+
+	{
+		// 기즈모로 변환된 카메라 위치, 회전 적용
+		XMVECTOR poss;
+		XMVECTOR rots;
+		XMVECTOR scales;
+		XMMatrixDecompose(&scales, &rots, &poss, XMMatrixInverse(nullptr, XMMATRIX(cameraView)));
+		cam->m_eyePosition = poss;
+		cam->m_rotation = rots;
+
+		XMVECTOR rotDir = XMVector3Rotate(cam->FORWARD, rots);
+
+		cam->m_forward = rotDir;
+	}
+
+	if (useWindow)
+	{
+		ImGui::End();
+		ImGui::PopStyleColor(1);
+	}
+}
+#pragma endregion
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
@@ -25,14 +194,87 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	AssetsSystems->LoadShaders();
 
-	//RTV's 생성
-	m_colorTexture = TextureHelper::CreateRenderTexture(
+	InitializeTextures();
+
+	Texture* ao = Texture::Create(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
-		"ColorRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
+		"AmbientOcclusion",
+		DXGI_FORMAT_R16_UNORM,
+		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+	);
+	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
+	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
+	m_ambientOcclusionTexture = std::unique_ptr<Texture>(std::move(ao));
+
+	//Buffer 생성
+	XMMATRIX identity = XMMatrixIdentity();
+
+	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
+
+	m_pEditorCamera = std::make_unique<Camera>();
+	m_pEditorCamera->RegisterContainer();
+	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
+
+    //pass 생성
+    //shadowMapPass 는 Scene의 맴버
+    //gBufferPass
+    m_pGBufferPass = std::make_unique<GBufferPass>();
+	ID3D11RenderTargetView* views[]{
+		m_diffuseTexture->GetRTV(),
+		m_metalRoughTexture->GetRTV(),
+		m_normalTexture->GetRTV(),
+		m_emissiveTexture->GetRTV()
+	};
+	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+
+    //ssaoPass
+    m_pSSAOPass = std::make_unique<SSAOPass>();
+    m_pSSAOPass->Initialize(
+        ao,
+        m_deviceResources->GetDepthStencilViewSRV(),
+        m_normalTexture.get()
+    );
+
+    //deferredPass
+    m_pDeferredPass = std::make_unique<DeferredPass>();
+    m_pDeferredPass->Initialize(
+        m_diffuseTexture.get(),
+        m_metalRoughTexture.get(),
+        m_normalTexture.get(),
+        m_emissiveTexture.get()
+    );
+
+	//skyBoxPass
+	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
+	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
+	
+
+	//toneMapPass
+	m_pToneMapPass = std::make_unique<ToneMapPass>();
+	m_pToneMapPass->Initialize(
+		m_toneMappedColourTexture.get()
 	);
 
+	//spritePass
+	m_pSpritePass = std::make_unique<SpritePass>();
+	m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
+
+	//blitPass
+	m_pBlitPass = std::make_unique<BlitPass>();
+	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
+
+	//WireFramePass
+	m_pWireFramePass = std::make_unique<WireFramePass>();
+
+	//GridPass
+    m_pGridPass = std::make_unique<GridPass>();
+}
+
+
+void SceneRenderer::InitializeTextures()
+{
 	m_diffuseTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -68,82 +310,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 
-	Texture* ao = Texture::Create(
+	m_gridTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
-		"AmbientOcclusion",
-		DXGI_FORMAT_R16_UNORM,
-		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+		"GridRTV",
+		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
-	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
-	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
-	m_ambientOcclusionTexture = std::unique_ptr<Texture>(std::move(ao));
-
-	//Buffer 생성
-	XMMATRIX identity = XMMatrixIdentity();
-
-	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
-	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ViewBuffer.Get(), "ViewBuffer");
-	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
-	DirectX::SetName(m_ProjBuffer.Get(), "ProjBuffer");
-
-    //pass 생성
-    //shadowMapPass 는 Scene의 맴버
-
-    //gBufferPass
-    m_pGBufferPass = std::make_unique<GBufferPass>();
-	ID3D11RenderTargetView* views[]{
-		m_diffuseTexture->GetRTV(),
-		m_metalRoughTexture->GetRTV(),
-		m_normalTexture->GetRTV(),
-		m_emissiveTexture->GetRTV()
-	};
-	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
-
-    //ssaoPass
-    m_pSSAOPass = std::make_unique<SSAOPass>();
-    m_pSSAOPass->Initialize(
-        ao,
-        m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture.get()
-    );
-
-    //deferredPass
-    m_pDeferredPass = std::make_unique<DeferredPass>();
-    m_pDeferredPass->Initialize(
-        m_colorTexture.get(),
-        m_diffuseTexture.get(),
-        m_metalRoughTexture.get(),
-        m_normalTexture.get(),
-        m_emissiveTexture.get()
-    );
-
-	//skyBoxPass
-	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_pSkyBoxPass->SetRenderTarget(m_colorTexture.get());
-	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/Malibu_Overlook_3k.hdr").string());
-
-	//toneMapPass
-	m_pToneMapPass = std::make_unique<ToneMapPass>();
-	m_pToneMapPass->Initialize(
-		m_colorTexture.get(),
-		m_toneMappedColourTexture.get()
-	);
-
-	//spritePass
-	m_pSpritePass = std::make_unique<SpritePass>();
-	m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
-
-	//blitPass
-	m_pBlitPass = std::make_unique<BlitPass>();
-	m_pBlitPass->Initialize(m_toneMappedColourTexture.get(), 
-		m_deviceResources->GetBackBufferRenderTargetView());
-
-	//WireFramePass
-	m_pWireFramePass = std::make_unique<WireFramePass>();
-	m_pWireFramePass->SetRenderTarget(m_colorTexture.get());
 }
 
 void SceneRenderer::Initialize(Scene* _pScene)
@@ -177,6 +349,49 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.AddLight(spotLight)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
+#pragma region lightImguiTest;
+		static int lightIndex = 0;
+
+		ImGui::ContextRegister("Light", true, [&]()
+		{
+			ImGui::Text("Light Index : %d", lightIndex);
+			if(ImGui::Button("Add Light")) {
+				Light light;
+				light.m_color = XMFLOAT4(1, 1, 1, 1);
+				pointLight.m_position = XMFLOAT4(0, 0, 0, 0);
+				pointLight.m_lightType = LightType::PointLight;
+
+				m_currentScene->m_LightController.AddLight(light);
+			}
+			if (ImGui::Button("Light index + ")) {
+				lightIndex++;
+				if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
+			}
+			if (ImGui::Button("Light index - ")) {
+				lightIndex--;
+				if (lightIndex < 0) lightIndex = 0;
+			}
+			if (ImGui::Button("Light On")) {
+				m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
+			}
+			if (ImGui::Button("Light Off")) {
+				m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
+			}
+
+			ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+			ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
+			ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
+			ImGui::SliderFloat3("Light W", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
+			ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
+			ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
+			ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+
+		});
+#pragma endregion
+
+		m_currentScene->EditorSceneObjectHierarchy();
+		m_currentScene->EditorSceneObjectInspector();
+
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -184,23 +399,52 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_viewHeight = 12;
 		desc.m_nearPlane = 0.1f;
 		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = 8192;//DeviceState::g_ClientRect.width; 
-		desc.m_textureHeight = 8192;//DeviceState::g_ClientRect.height;
+		desc.m_textureWidth = 8192;
+		desc.m_textureHeight = 8192;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		//model = Model::LoadModel("SkinningTest.fbx");
-		 model = Model::LoadModel("Prop_Block.fbx");
-		//model = Model::LoadModel("BoxHuman.fbx");
+		model = Model::LoadModel("bangbooExport.fbx");
+		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
+		Model::LoadModelToScene(model, *m_currentScene);
+
+		ImGui::ContextRegister("Test Add Model", true, [&]()
+		{
+			if (ImGui::Button("Add Model"))
+			{
+				Model::LoadModelToScene(model, *m_currentScene);
+			}
+		});
+
+		ImGui::ContextRegister("EditCamera", true, [&]()
+		{
+				ImGui::Checkbox("Camera Type", &m_pEditorCamera->m_isOrthographic);
+				ImGui::DragFloat("Camera Speed", &m_pEditorCamera->m_speed, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera FOV", &m_pEditorCamera->m_fov, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera Near", &m_pEditorCamera->m_nearPlane, 0.1f, 0.1f, 100.0f);
+				ImGui::DragFloat("Camera Far", &m_pEditorCamera->m_farPlane, 0.1f, 0.1f, 10000.0f);
+
+				if (m_pEditorCamera->m_isOrthographic)
+				{
+					ImGui::DragFloat("Orthographic Width", &m_pEditorCamera->m_viewWidth, 0.1f, 0.1f, 1000.0f);
+					ImGui::DragFloat("Orthographic Height", &m_pEditorCamera->m_viewHeight, 0.1f, 0.1f, 1000.0f);
+				}
+				else
+				{
+				}
+		});
+
+		//model = Model::LoadModel("bangbooExport.fbx");
+		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 	}
 	else
 	{
 		m_currentScene = _pScene;
 	}
 
-	m_currentScene->SetBuffers(m_ModelBuffer.Get(), m_ViewBuffer.Get(), m_ProjBuffer.Get());
+	m_currentScene->SetBuffers(m_ModelBuffer.Get());
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
@@ -212,65 +456,177 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 
+	ImGui::ContextRegister("RenderPass", true, [&]()
+	{
+		if (ImGui::BeginTabBar("RenderPass Control Panel"))
+		{
+			if (ImGui::BeginTabItem("ShadowPass"))
+			{
+				m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("GBufferPass"))
+			{
+				m_pGBufferPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SSAOPass"))
+			{
+				m_pSSAOPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("DeferredPass"))
+			{
+				m_pDeferredPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SkyBoxPass"))
+			{
+				m_pSkyBoxPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("ToneMapPass"))
+			{
+				m_pToneMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SpritePass"))
+			{
+				m_pSpritePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("BlitPass"))
+			{
+				m_pBlitPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("WireFramePass"))
+			{
+				m_pWireFramePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("GridPass"))
+			{
+				m_pGridPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			ImGui::EndTabBar();
+		}
+	});
 }
 
 void SceneRenderer::Update(float deltaTime)
 {
 	m_currentScene->Update(deltaTime);
+	m_pEditorCamera->HandleMovement(deltaTime);
 	PrepareRender();
 }
 
 void SceneRenderer::Render()
 {
-
-	//[1] ShadowMapPass
+	for(auto& camera : CameraManagement->m_cameras)
 	{
-		m_currentScene->ShadowStage();
-		Clear(DirectX::Colors::Transparent, 1.0f, 0);
-		UnbindRenderTargets();
+		if (nullptr == camera) continue;
+		//[1] ShadowMapPass
+		{
+			//Banchmark banch;
+			camera->ClearRenderTarget();
+			m_currentScene->ShadowStage(*camera);
+			Clear(DirectX::Colors::Transparent, 1.0f, 0);
+			UnbindRenderTargets();
+
+			//std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[2] GBufferPass
+		{
+			//Banchmark banch;
+			m_pGBufferPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[3] SSAOPass
+		{
+			//Banchmark banch;
+			m_pSSAOPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[4] DeferredPass
+		{
+			//Banchmark banch;
+			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+			m_pDeferredPass->Execute(*m_currentScene, *camera);
+
+
+			//std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[*] WireFramePass
+		if (useWireFrame)
+		{
+			//Banchmark banch;
+			m_pWireFramePass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[5] skyBoxPass
+		{
+			//Banchmark banch;
+			m_pSkyBoxPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[6] ToneMapPass
+		{
+			//Banchmark banch;
+			m_pToneMapPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[*] GridPass
+		{
+			//Banchmark banch;
+			m_pGridPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[7] SpritePass
+		{
+			//Banchmark banch;
+			m_pSpritePass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[8] BlitPass
+		{
+			//Banchmark banch;
+			m_pBlitPass->Execute(*m_currentScene, *camera);
+
+			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
+		}
 	}
 
-	//[2] GBufferPass
-	{
-		m_pGBufferPass->Execute(*m_currentScene);
-	}
+	m_pGBufferPass->ClearDeferredQueue();
 
-	//[3] SSAOPass
-	{
-        m_pSSAOPass->Execute(*m_currentScene);
-	}
 
-    //[4] DeferredPass
-    {
-		m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-        m_pDeferredPass->Execute(*m_currentScene);
-    }
-
-	//[*] WireFramePass
-	if(useWireFrame)
-	{
-		m_pWireFramePass->Execute(*m_currentScene);
-	}
-
-	//[5] skyBoxPass
-	{
-		m_pSkyBoxPass->Execute(*m_currentScene);
-	}
-
-    //[6] ToneMapPass
-    {
-        m_pToneMapPass->Execute(*m_currentScene);
-    }
-
-	//[7] SpritePass
-	{
-		m_pSpritePass->Execute(*m_currentScene);
-	}
-
-	//[8] BlitPass
-	{
-		m_pBlitPass->Execute(*m_currentScene);
-	}
 }
 
 void SceneRenderer::PrepareRender()
@@ -305,6 +661,13 @@ void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)
 		1.0f,
 		0
 	);
+
+	//DirectX11::ClearDepthStencilView(
+	//	m_depthStencilView,
+	//	D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+	//	1.0f,
+	//	0
+	//);
 }
 
 void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
@@ -320,4 +683,79 @@ void SceneRenderer::UnbindRenderTargets()
 	ID3D11RenderTargetView* nullRTV = nullptr;
 	ID3D11DepthStencilView* nullDSV = nullptr;
 	DirectX11::OMSetRenderTargets(1, &nullRTV, nullDSV);
+}
+
+void SceneRenderer::EditorView()
+{
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Exit"))
+			{
+				// Exit action
+				PostQuitMessage(0);
+			}
+			ImGui::EndMenu();
+
+		}
+
+		if (ImGui::BeginMenu("Edit"))
+		{
+			if (ImGui::MenuItem("Pipeline Setting"))
+			{
+				if (!ImGui::GetContext("RenderPass").IsOpened())
+				{
+					ImGui::GetContext("RenderPass").Open();
+				}
+			}
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
+
+	auto obj = m_currentScene->GetSelectSceneObject();
+	if (obj) 
+	{
+		auto mat = obj->m_transform.GetWorldMatrix();
+		XMFLOAT4X4 objMat;
+		XMStoreFloat4x4(&objMat, mat);
+		auto view = m_pEditorCamera->CalculateView();
+		XMFLOAT4X4 floatMatrix;
+		XMStoreFloat4x4(&floatMatrix, view);
+		auto proj = m_pEditorCamera->CalculateProjection();
+		XMFLOAT4X4 projMatrix;
+		XMStoreFloat4x4(&projMatrix, proj);
+
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_pEditorCamera.get());
+
+	}
+	else
+	{
+		auto view = m_pEditorCamera->CalculateView();
+		XMFLOAT4X4 floatMatrix;
+		XMStoreFloat4x4(&floatMatrix, view);
+		auto proj = m_pEditorCamera->CalculateProjection();
+		XMFLOAT4X4 projMatrix;
+		XMStoreFloat4x4(&projMatrix, proj);
+		XMFLOAT4X4 identityMatrix;
+		XMStoreFloat4x4(&identityMatrix, XMMatrixIdentity());
+
+		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_pEditorCamera.get());
+	}
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	{
+		ImVec2 size = ImGui::GetContentRegionAvail();
+
+		float convert = DeviceState::g_aspectRatio;
+		size.x = size.y * convert;
+
+		ImGui::Image((ImTextureID)m_currentScene->m_MainCamera.m_renderTarget->m_pSRV, size);
+	}
+	ImGui::End();
+	ImGui::PopStyleVar();
 }

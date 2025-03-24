@@ -16,7 +16,7 @@ class LogIOWriter
 private:
     std::mutex ioMutex;
     std::queue<LogMessage>* ioQueue;
-    std::atomic<bool> running{ true };
+    bool running{ true };
     sqlite::database db;
 
 public:

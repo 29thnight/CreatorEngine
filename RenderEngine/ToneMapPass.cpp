@@ -2,6 +2,7 @@
 #include "AssetSystem.h"
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
+#include "Camera.h"
 
 ToneMapPass::ToneMapPass()
 {
@@ -60,31 +61,14 @@ ToneMapPass::ToneMapPass()
 
 	DirectX::SetName(m_pReinhardConstantBuffer, "ToneMapReinhardConstantBuffer");
 
-	ImGui::ContextRegister("ToneMap", [&]()
-	{
-		ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
-		ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
-		ImGui::Separator();
-        if (m_toneMapType == ToneMapType::ACES)
-        {
-			ImGui::SliderFloat("Shoulder Strength", &m_toneMapACESConstant.shoulderStrength, 0.0f, 1.0f);
-			ImGui::SliderFloat("Linear Strength", &m_toneMapACESConstant.linearStrength, 0.0f, 1.0f);
-			ImGui::SliderFloat("Linear Angle", &m_toneMapACESConstant.linearAngle, 0.0f, 1.0f);
-			ImGui::SliderFloat("Toe Strength", &m_toneMapACESConstant.toeStrength, 0.0f, 1.0f);
-			ImGui::SliderFloat("Toe Numerator", &m_toneMapACESConstant.toeNumerator, 0.0f, 1.0f);
-			ImGui::SliderFloat("Toe Denominator", &m_toneMapACESConstant.toeDenominator, 0.0f, 1.0f);
-        }
-	});
-
 }
 
 ToneMapPass::~ToneMapPass()
 {
 }
 
-void ToneMapPass::Initialize(Texture* color, Texture* dest)
+void ToneMapPass::Initialize(Texture* dest)
 {
-    m_ColorTexture = color;
     m_DestTexture = dest;
 }
 
@@ -94,7 +78,7 @@ void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
 	m_toneMapType = type;
 }
 
-void ToneMapPass::Execute(Scene& scene)
+void ToneMapPass::Execute(Scene& scene, Camera& camera)
 {
 
 	if (m_toneMapType == ToneMapType::Reinhard)
@@ -117,10 +101,28 @@ void ToneMapPass::Execute(Scene& scene)
     ID3D11RenderTargetView* renderTargets[] = { m_DestTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(1, renderTargets, nullptr);
 
-    DirectX11::PSSetShaderResources(0, 1, &m_ColorTexture->m_pSRV);
+    DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
+
+	auto context = DeviceState::g_pDeviceContext;
+	context->CopyResource(camera.m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
 
     ID3D11ShaderResourceView* nullSRV = nullptr;
     DirectX11::PSSetShaderResources(0, 1, &nullSRV);
     DirectX11::UnbindRenderTargets();
+}
+
+void ToneMapPass::ControlPanel()
+{
+    ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
+    ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
+    ImGui::Separator();
+    if (m_toneMapType == ToneMapType::ACES)
+    {
+        ImGui::SliderFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.0f, 1.0f);
+        ImGui::SliderFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.0f, 1.0f);
+    }
 }

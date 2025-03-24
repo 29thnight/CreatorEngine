@@ -45,6 +45,7 @@ public:
 
 public:
 	void ProcessRawInput(LPARAM lParam);
+	void ImGuiUpdate(WPARAM wParam);
 	void RegisterRawInputDevices();
 
 	// XInput 컨트롤러 관련 함수

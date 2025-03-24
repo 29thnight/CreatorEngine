@@ -81,8 +81,8 @@
     <Filter Include="Utill\GridEditor">
       <UniqueIdentifier>{691bb130-1694-4038-9f18-04da55c06bfa}</UniqueIdentifier>
     </Filter>
-    <Filter Include="수정필요한것들">
-      <UniqueIdentifier>{c809e3c7-9035-405e-b886-515ba0168a6d}</UniqueIdentifier>
+    <Filter Include="Window">
+      <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -191,11 +191,11 @@
     <ClInclude Include="StairColliderComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="SceneLoader.h">
-      <Filter>수정필요한것들</Filter>
+    <ClInclude Include="ProjectSetting.h">
+      <Filter>Window</Filter>
     </ClInclude>
-    <ClInclude Include="QuadTree.h">
-      <Filter>수정필요한것들</Filter>
+    <ClInclude Include="CustomWindowDefine.h">
+      <Filter>Window</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -317,12 +317,6 @@
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="SceneLoader.cpp">
-      <Filter>수정필요한것들</Filter>
-    </ClCompile>
-    <ClCompile Include="QuadTree.cpp">
-      <Filter>수정필요한것들</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ObjectLIst.txt">
@@ -382,6 +376,15 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="x64\Assets\Shaders\ToneMapACES.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\WireFrame.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\Grid.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

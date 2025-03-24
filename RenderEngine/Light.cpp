@@ -98,13 +98,14 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 
 	light.m_lightStatus = LightStatus::StaticShadows;
 
-	OrthographicCamera shadowCamera;
+	Camera shadowCamera;
 	shadowCamera.m_eyePosition = desc.m_eyePosition;
 	shadowCamera.m_lookAt = desc.m_lookAt;
 	shadowCamera.m_nearPlane = desc.m_nearPlane;
 	shadowCamera.m_farPlane = desc.m_farPlane;
 	shadowCamera.m_viewWidth = desc.m_viewWidth;
 	shadowCamera.m_viewHeight = desc.m_viewHeight;
+	shadowCamera.m_isOrthographic = true;
 	
 	ShadowMapConstant shadowMapConstant{
 		desc.m_textureWidth,
@@ -114,15 +115,15 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	m_shadowMapRenderDesc = desc;
 	m_shadowMapBuffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, &shadowMapConstant);
 
-	m_shadowMapPass->Initialize(desc.m_viewWidth, desc.m_viewHeight);
+	m_shadowMapPass->Initialize(desc.m_textureWidth, desc.m_textureHeight);
 	hasLightWithShadows = true;
 }
 
-void LightController::RenderAnyShadowMap(Scene& scene)
+void LightController::RenderAnyShadowMap(Scene& scene, Camera& camera)
 {
-	if (hasLightWithShadows)
+	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
 	{
-		m_shadowMapPass->Execute(scene);
+		m_shadowMapPass->Execute(scene, camera);
 	}
 }
 

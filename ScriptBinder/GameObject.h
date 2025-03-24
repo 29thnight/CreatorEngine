@@ -6,15 +6,25 @@
 #include "Transform.h"
 
 class Scene;
+class Bone;
 class GameObject : public IObject
 {
 public:
 	using Index = int;
+	GameObject(const std::string_view& name, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(GameObject&) = delete;
+	GameObject(GameObject&&) noexcept = default;
+	GameObject& operator=(GameObject&) = delete;
+
 	virtual void Initialize() {};
 	virtual void FixedUpdate(float fixedTick) {};
 	virtual void Update(float tick) {};
 	virtual void LateUpdate(float tick) {};
 	std::string ToString() const override;
+
+	void ShowBoneHierarchy(Bone* bone);
+	void RenderBoneEditor();
+	void EditorMeshRenderer();
 
 	template<typename T>
 	T* AddComponent()
@@ -31,7 +41,7 @@ public:
 
 		foreach(iota(0, static_cast<int>(m_components.size())), [&](int i)
 		{
-				m_componentIds[m_components[i]->GetId()] = i;
+			m_componentIds[m_components[i]->GetId()] = i;
 		});
 
 		component->Initialize();
@@ -99,11 +109,15 @@ public:
 	}
 
 private:
-	const size_t m_instanceID{ GENERATE_ID };
+	const size_t m_typeID{ GENERATE_CLASS_GUID };
+	const size_t m_instanceID{ GENERATE_GUID };
 	std::string m_name{};
 	Scene* m_pScene{};
 	Transform m_transform{};
 	std::unordered_map<std::type_index, size_t> m_componentIds{};
 	std::vector<Component*> m_components{};
+
+	//debug layer
+	Bone* selectedBone{ nullptr };
 };
 

@@ -156,8 +156,10 @@
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="FontManager.cpp" />
     <ClCompile Include="GBufferPass.cpp" />
+    <ClCompile Include="GridPass.cpp" />
     <ClCompile Include="ImGuiRenderer.cpp" />
     <ClCompile Include="Light.cpp" />
+    <ClCompile Include="LightMap.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -199,6 +201,7 @@
     <ClInclude Include="ImGuiRenderer.h" />
     <ClInclude Include="IRenderPass.h" />
     <ClInclude Include="Light.h" />
+    <ClInclude Include="LightMap.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
@@ -223,6 +226,7 @@
     <ClInclude Include="UI_DataSystem.h" />
     <ClInclude Include="widgets.h" />
     <ClInclude Include="WireFramePass.h" />
+    <ClInclude Include="GridPass.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

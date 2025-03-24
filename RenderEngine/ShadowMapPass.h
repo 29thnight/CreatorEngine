@@ -32,8 +32,9 @@ public:
 	ShadowMapPass();
 
 	void Initialize(uint32 width, uint32 height);
-	void Execute(Scene& scene) override;
+	void Execute(Scene& scene, Camera& camera) override;
 
+	Camera m_shadowCamera{};
 	std::unique_ptr<Texture> m_shadowMapTexture{};
 	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
 };

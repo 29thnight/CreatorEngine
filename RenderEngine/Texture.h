@@ -75,4 +75,18 @@ namespace TextureHelper
 		tex->CreateSRV(format);
 		return std::unique_ptr<Texture>(tex);
 	}
+
+	inline std::unique_ptr<Texture> CreateDepthTexture(int width, int height, const std::string name)
+	{
+		Texture* tex = Texture::Create(
+			width,
+			height,
+			name,
+			DXGI_FORMAT_R24G8_TYPELESS,
+			D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE
+		);
+		tex->CreateDSV(DXGI_FORMAT_D24_UNORM_S8_UINT);
+		tex->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
+		return std::unique_ptr<Texture>(tex);
+	}
 }

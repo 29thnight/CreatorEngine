@@ -5,6 +5,7 @@
 #include <imgui_internal.h>
 #include "Core.Definition.h"
 
+class ImGuiRegister;
 class ImGuiRenderContext
 {
 public:
@@ -38,8 +39,21 @@ public:
     
     void Render()
     {
-        if (ImGui::Begin(m_name.data(), 0, m_flags))
+        if(!m_opened)
+		{
+			return;
+		}
+
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowViewport(0);
+
+        if (ImGui::Begin(m_name.data(), m_isPopup? &m_opened : 0, m_flags))
         {
+            if (m_isPopup)
+            {
+                ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+            }
+
             for (auto& context : m_contexts)
             {
                 context();
@@ -54,12 +68,31 @@ public:
                 }
             }
         }
+
         ImGui::End();
     }
 
+	void Open()
+	{
+        m_opened = true;
+	}
+
+	bool IsOpened() const
+	{
+		return m_opened;
+	}
+
+	bool IsPopup() const
+	{
+		return m_isPopup;
+	}
+
 private:
+	friend class ImGuiRegister;
     std::string m_name;
     std::vector<std::function<void()>> m_contexts;
     std::unordered_map<std::string, std::function<void()>> m_subContexts;
 	ImGuiWindowFlags m_flags = ImGuiWindowFlags_AlwaysAutoResize;
+	bool m_isPopup = false;
+	bool m_opened = true;
 };

@@ -19,7 +19,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_D2DRenderer = std::make_unique<D2DRenderer>(m_deviceResources);
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
     AssetsSystem2->LoadShaders();
 	AssetsSystem2->Initialize();
@@ -29,12 +28,19 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	m_D2DRenderer->SetEditorComputeShader();
 	m_sceneRenderer->Initialize();
+	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
 	m_world = new World();
 
 	GameManagement->Initialize();
 	EventInitialize();
 	SceneInitialize();
+
+	//m_renderThread = std::thread([&]
+	//{
+	//	RenderThread();
+	//});
+	//m_renderThread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -133,7 +139,7 @@ void DirectX11::Dx11Main::Update()
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
 		std::wostringstream woss;
 		woss.precision(6);
-		woss << L"[4Q Project] Bongsu Rabbit - "
+		woss << L"Creator Editor - "
 			<< L"Width: "
 			<< m_deviceResources->GetOutputSize().width
 			<< L" Height: "
@@ -145,7 +151,6 @@ void DirectX11::Dx11Main::Update()
 
 		SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
-		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_world->Update((float)m_timeSystem.GetElapsedSeconds());
 		m_D2DRenderer->SetCurCanvas(m_world->GetCurCanvas());
 		GameManagement->PlayUpdate((float)m_timeSystem.GetElapsedSeconds() * GameManagement->GetTimeScale()); //게임 시스템 업데이트
@@ -185,6 +190,7 @@ void DirectX11::Dx11Main::Update()
 #if defined(EDITOR)
 #endif // !Editor
 	m_world->Destroy();
+
 }
 
 bool DirectX11::Dx11Main::Render()
@@ -202,14 +208,7 @@ bool DirectX11::Dx11Main::Render()
 	}
 	else
 	{
-		//m_sceneRenderer->StagePrepare();
-		//m_sceneRenderer->UpdateDrawModel();
-		//m_sceneRenderer->StageDrawModels();
-		//m_sceneRenderer->EndStage();
-		//m_sceneRenderer->StageBillboardsPrepare();
-		//m_sceneRenderer->UpdateDrawBillboards();
-		//m_sceneRenderer->StageDrawBillboards();
-
+		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
 		m_sceneRenderer->Render();
 
 		//m_D2DRenderer->UpdateDrawModel();
@@ -222,18 +221,15 @@ bool DirectX11::Dx11Main::Render()
 	if(!m_isGameView)
 	{
 		m_imguiRenderer->BeginRender();
-		//m_D2DRenderer->ImGuiRenderStage();
+		m_sceneRenderer->EditorView();
 		m_imguiRenderer->Render();
-		LoggerSystem->Draw("Logger");
-		//MeshEditorSystem->ShowMainUI();
-		//m_btEditor.ShowMainUI();
-		//GridEditorSystem->ShowGridEditor();
+
+		// editor only
 		m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR
-	
-	InputManagement->Update();
 
+	InputManagement->Update();
 	return true;
 }
 

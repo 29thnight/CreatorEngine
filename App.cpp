@@ -3,6 +3,8 @@
 #include "Utility_Framework/PathFinder.h"
 #include "Utility_Framework/DumpHandler.h"
 #include "Utility_Framework/Core.Console.hpp"
+#include "Utility_Framework/CoreWindow.h"
+#include "CustomWindowDefine.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -33,10 +35,15 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return std::string("SUCCESS");
 	});
 	std::string initResult = init.get();
-	//Console.WriteLine("Multithreaded initialization: {}", initResult);
+
 	//시작
+	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
+	{
+		return 0;
+	});
+
 	Core::App app;
-	app.Initialize(hInstance, L"Bongsu Rabbit", 1920, 1080);
+	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
 
 	return 0;
 }
@@ -100,6 +107,24 @@ LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	io.AddKeyEvent(ImGuiKey(wParam), true);
+
+	return 0;
+}
+
+LRESULT Core::App::ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	io.AddKeyEvent(ImGuiKey(wParam), false);
+
+	return 0;
+}
+
 LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	ImGuiIO& io = ImGui::GetIO();
@@ -119,6 +144,14 @@ LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	m_main->CreateWindowSizeDependentResources();
+
+	return 0;
+}
+
+LRESULT Core::App::HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	WNDCLASS wcSetting = { sizeof(WNDCLASS) };
+	wcSetting.lpfnWndProc = CoreWindow::WndProc;
 
 	return 0;
 }

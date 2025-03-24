@@ -35,7 +35,7 @@ struct Vertex
 
 class Texture;
 class Material;
-
+class ModelLoader;
 class Mesh
 {
 public:
@@ -47,9 +47,12 @@ public:
 	void Draw();
 
 private:
+	friend class ModelLoader;
 	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
+	Mathf::Matrix m_transform{ XMMatrixIdentity() };
+
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 	static constexpr uint32 m_stride = sizeof(Vertex);

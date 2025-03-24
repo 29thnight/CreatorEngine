@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Light.h"
 #include "AssetSystem.h"
+#include "ImGuiRegister.h"
 
 struct alignas(16) DeferredBuffer
 {
@@ -49,9 +50,8 @@ DeferredPass::~DeferredPass()
 {
 }
 
-void DeferredPass::Initialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
+void DeferredPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
 {
-    m_RenderTarget = renderTarget;
     m_DiffuseTexture = diffuse;
     m_MetalRoughTexture = metalRough;
     m_NormalTexture = normals;
@@ -61,7 +61,7 @@ void DeferredPass::Initialize(Texture* renderTarget, Texture* diffuse, Texture* 
 void DeferredPass::UseAmbientOcclusion(Texture* aoMap)
 {
     m_AmbientOcclusionTexture = aoMap;
-    m_UseAmbientOcclusion = true;
+    //m_UseAmbientOcclusion = true;
 }
 
 void DeferredPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut)
@@ -69,7 +69,7 @@ void DeferredPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Textur
     m_EnvironmentMap = envMap;
     m_PreFilter = preFilter;
     m_BrdfLut = brdfLut;
-    m_UseEnvironmentMap = true;
+    //m_UseEnvironmentMap = true;
 }
 
 void DeferredPass::DisableAmbientOcclusion()
@@ -78,12 +78,12 @@ void DeferredPass::DisableAmbientOcclusion()
     m_UseAmbientOcclusion = false;
 }
 
-void DeferredPass::Execute(Scene& scene)
+void DeferredPass::Execute(Scene& scene, Camera& camera)
 {
     m_pso->Apply();
 
-    DirectX11::ClearRenderTargetView(m_RenderTarget->GetRTV(), Colors::Transparent);
-    ID3D11RenderTargetView* view = m_RenderTarget->GetRTV();
+    DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
+    ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
     auto& lightManager = scene.m_LightController;
@@ -93,8 +93,6 @@ void DeferredPass::Execute(Scene& scene)
     {
         DirectX11::PSSetConstantBuffer(2, 1, &lightManager.m_shadowMapBuffer);
     }
-
-    auto& camera = scene.m_MainCamera;
 
     DeferredBuffer buffer{};
     buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
@@ -106,7 +104,7 @@ void DeferredPass::Execute(Scene& scene)
     DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
 
     ID3D11ShaderResourceView* srvs[10] = {
-        DeviceState::g_depthStancilSRV,
+        camera.m_depthStencil->m_pSRV,
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
         m_NormalTexture->m_pSRV,
@@ -137,4 +135,69 @@ void DeferredPass::Execute(Scene& scene)
 
     DirectX11::PSSetShaderResources(0, 10, nullSRV);
     DirectX11::UnbindRenderTargets();
+}
+
+void DeferredPass::ExecuteEditor(Scene& scene, Camera& camera)
+{
+    m_pso->Apply();
+
+    DirectX11::ClearRenderTargetView(m_EditorRenderTarget->GetRTV(), Colors::Transparent);
+    ID3D11RenderTargetView* view = m_EditorRenderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &view, nullptr);
+
+    auto& lightManager = scene.m_LightController;
+
+    DirectX11::PSSetConstantBuffer(1, 1, &lightManager.m_pLightBuffer);
+    if (lightManager.hasLightWithShadows)
+    {
+        DirectX11::PSSetConstantBuffer(2, 1, &lightManager.m_shadowMapBuffer);
+    }
+
+    DeferredBuffer buffer{};
+    buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    buffer.m_InverseView = XMMatrixInverse(nullptr, camera.CalculateView());
+    buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
+    buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
+
+    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
+    DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
+
+    ID3D11ShaderResourceView* srvs[10] = {
+        DeviceState::g_editorDepthStancilSRV,
+        m_EditorDiffuseTexture->m_pSRV,
+        m_EditorMetalRoughTexture->m_pSRV,
+        m_EditorNormalTexture->m_pSRV,
+        lightManager.hasLightWithShadows ? lightManager.GetShadowMapTexture()->m_pSRV : nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        m_EditorEmissiveTexture->m_pSRV
+    };
+
+    DirectX11::PSSetShaderResources(0, 10, srvs);
+
+    DirectX11::Draw(4, 0);
+
+    ID3D11ShaderResourceView* nullSRV[10] = {
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr
+    };
+
+    DirectX11::PSSetShaderResources(0, 10, nullSRV);
+    DirectX11::UnbindRenderTargets();
+}
+
+void DeferredPass::ControlPanel()
+{
+	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
+	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 }

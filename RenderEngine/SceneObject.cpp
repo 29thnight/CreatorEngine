@@ -10,9 +10,9 @@ SceneObject::SceneObject(const std::string_view& name, SceneObject::Index index,
 {
 	ImGui::ContextRegister("Bone Hierarchy", [&]()
 	{
-		if (m_animator.m_Skeleton) // Skeleton이 존재하는 경우
+		if (m_animator) // Skeleton이 존재하는 경우
         {
-            ShowBoneHierarchy(m_animator.m_Skeleton->m_rootBone);
+            ShowBoneHierarchy(m_animator->m_Skeleton->m_rootBone);
         }
 	});
 
@@ -57,6 +57,8 @@ void SceneObject::RenderBoneEditor()
 			ImGui::DragFloat3("##Rotation", &selectedBone->m_globalTransform.r[0].m128_f32[0], -3.14f, 3.14f);
 			ImGui::Text("Scale");
 			ImGui::DragFloat3("##Scale", &selectedBone->m_globalTransform.r[0].m128_f32[1], 0.1f, 10);
+			ImGui::Text("Bone Index");
+			ImGui::InputInt("##Bone Index", &selectedBone->m_index);
 		}
 	});
 }
@@ -70,7 +72,6 @@ void SceneObject::EditorMeshRenderer()
 		ImGui::ColorEdit3("Base Color", &m_meshRenderer.m_Material->m_materialInfo.m_baseColor.x);
 		ImGui::SliderFloat("Metallic", &m_meshRenderer.m_Material->m_materialInfo.m_metallic, 0, 1);
 		ImGui::SliderFloat("Roughness", &m_meshRenderer.m_Material->m_materialInfo.m_roughness, 0, 1);
-		//ImGui::SliderFloat("Emissive", &m_meshRenderer.m_Material->m_materialInfo.emissive, 0, 1);
 	});
 }
 

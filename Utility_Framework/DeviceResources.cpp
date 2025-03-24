@@ -179,6 +179,9 @@ void DirectX11::DeviceResources::Present()
     {
         DirectX11::ThrowIfFailed(hr);
     }
+
+	m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), DirectX::Colors::Transparent);
+	m_d3dContext->ClearDepthStencilView(m_d3dDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
 void DirectX11::DeviceResources::ResizeResources()
@@ -390,7 +393,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.SampleDesc.Quality = 0;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
         swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;	// 모든 Microsoft Store 앱은 이 SwapEffect를 사용해야 합니다.
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;	// 모든 Microsoft Store 앱은 이 SwapEffect를 사용해야 합니다.
         swapChainDesc.Flags = 0;
         swapChainDesc.Scaling = scaling;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
@@ -438,7 +441,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 
 		D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
-		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 		renderTargetViewDesc.Texture2D.MipSlice = 0;
 

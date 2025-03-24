@@ -201,6 +201,12 @@ void InputManager::ProcessRawInput(LPARAM lParam)
     }
 }
 
+void InputManager::ImGuiUpdate(WPARAM wParam)
+{
+	ImGuiIO& io = ImGui::GetIO();
+	io.AddKeyEvent(ImGuiKey(wParam), true);
+}
+
 void InputManager::RegisterRawInputDevices()
 {
     _rawInputDevices[0].usUsagePage = HID_USAGE_PAGE_GENERIC;

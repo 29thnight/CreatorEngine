@@ -1,5 +1,6 @@
 #include "BlitPass.h"
 #include "AssetSystem.h"
+#include "Camera.h"
 
 BlitPass::BlitPass()
 {
@@ -46,20 +47,24 @@ BlitPass::~BlitPass()
 {
 }
 
-void BlitPass::Initialize(Texture* src, ID3D11RenderTargetView* backBufferRTV)
+void BlitPass::Initialize(ID3D11RenderTargetView* backBufferRTV)
 {
-	m_srcTexture = src;
 	m_backBufferRTV = backBufferRTV;
 }
 
-void BlitPass::Execute(Scene& scene)
+void BlitPass::Execute(Scene& scene, Camera& camera)
 {
+    if(false == camera.m_applyRenderPipelinePass.m_BlitPass)
+	{
+		return;
+	}
+
     m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = m_backBufferRTV;
 	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-	DirectX11::PSSetShaderResources(0, 1, &m_srcTexture->m_pSRV);
+	DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
 	DirectX11::Draw(4, 0);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
