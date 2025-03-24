@@ -6,11 +6,15 @@ Scene::Scene()
 	CreateSceneObject("Root", 0);
 	m_MainCamera.RegisterContainer();
 	//m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
+    EditorSceneObjectHierarchy();
+    EditorSceneObjectInspector();
 }
 
 Scene::~Scene()
 {
-	//TODO : ComPtrÀÌ¶ó ÀÚµ¿ ÇØÁ¦ -> default·Î º¯°æÇÒ °Í
+	//TODO : ComPtrì´ë¼ ìë™ í•´ì œ -> defaultë¡œ ë³€ê²½í•  ê²ƒ
+    ImGui::ContextUnregister("SceneObject Hierarchy");
+    ImGui::ContextUnregister("SceneObject Inspector");
 }
 
 std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
@@ -94,7 +98,7 @@ void Scene::EditorSceneObjectHierarchy()
 			std::string uniqueLabel = obj->m_name;
 			bool opened = ImGui::TreeNodeEx(uniqueLabel.c_str(), flags);
 
-			if (ImGui::IsItemClicked()) // Å¬¸¯ ½Ã ¼±ÅÃµÈ °´Ã¼ º¯°æ
+			if (ImGui::IsItemClicked()) // í´ë¦­ ì‹œ ì„ íƒëœ ê°ì²´ ë³€ê²½
 			{
 				m_selectedSceneObject = obj.get();
 			}
@@ -112,7 +116,7 @@ void Scene::EditorSceneObjectHierarchy()
 					std::string childUniqueLabel = child->m_name + "(" + std::to_string(child->m_index) + ")";
 					if (ImGui::TreeNodeEx(childUniqueLabel.c_str(), childFlags))
 					{
-						if (ImGui::IsItemClicked()) // ÀÚ½Ä °´Ã¼ Å¬¸¯ ½Ã ¼±ÅÃ
+						if (ImGui::IsItemClicked()) // ìì‹ ê°ì²´ í´ë¦­ ì‹œ ì„ íƒ
 						{
 							m_selectedSceneObject = child.get();
 						}
@@ -140,7 +144,8 @@ void Scene::EditorSceneObjectInspector()
 			float pyr[3]; // pitch yaw roll
 			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
 
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 3; i++)
+            {
 				pyr[i] = XMConvertToDegrees(pyr[i]);
 			}
 
@@ -157,7 +162,8 @@ void Scene::EditorSceneObjectInspector()
 			ImGui::Text("Parent Index");
 			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
 
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 3; i++)
+            {
 				pyr[i] = XMConvertToRadians(pyr[i]);
 			}
 
