@@ -55,7 +55,7 @@ public:
 	float m_speed{ 10.f };
 
 	float m_aspectRatio{};
-	float m_fov{ 45.f };
+	float m_fov{ 60.f };
 
 	float m_viewWidth{ 1.f };
 	float m_viewHeight{ 1.f };

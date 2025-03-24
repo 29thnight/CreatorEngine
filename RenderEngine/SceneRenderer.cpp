@@ -378,13 +378,20 @@ void SceneRenderer::Initialize(Scene* _pScene)
 				m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
 			}
 
-			ImGui::SliderFloat("Light X", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
-			ImGui::SliderFloat("Light Y", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.y, -10, 10);
-			ImGui::SliderFloat("Light Z", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.z, -10, 10);
-			ImGui::SliderFloat3("Light W", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
-			ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
-			ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
-			ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+			if (m_currentScene->m_LightController.GetLight(lightIndex).m_lightType == LightType::PointLight)
+			{
+				ImGui::SliderFloat3("Light Pos", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+			}
+			else if (m_currentScene->m_LightController.GetLight(lightIndex).m_lightType == LightType::SpotLight)
+			{
+				ImGui::SliderFloat3("Light Pos", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
+				ImGui::SliderFloat3("Light Dir", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
+			}
+			else if (m_currentScene->m_LightController.GetLight(lightIndex).m_lightType == LightType::DirectionalLight)
+			{
+				ImGui::SliderFloat3("Light Dir", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
+			}
+			ImGui::ColorEdit4("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x);
 
 		});
 #pragma endregion
@@ -641,6 +648,7 @@ void SceneRenderer::PrepareRender()
 		{
 		case Material::RenderingMode::Opaque:
 			m_pGBufferPass->PushDeferredQueue(obj.get());
+
 			break;
 		case Material::RenderingMode::Transparent:
 			break;

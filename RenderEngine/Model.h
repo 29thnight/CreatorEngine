@@ -14,10 +14,8 @@ class SceneRenderer;
 class Model
 {
 public:
-    std::shared_ptr<SceneObject> m_SceneObject;
 	Model();
     ~Model();
-    Model(std::shared_ptr<SceneObject>& sceneObject);
 
     static Model* LoadModelToScene(Model* model, Scene& Scene);
     static Model* LoadModel(const std::string_view& filePath);
@@ -26,6 +24,7 @@ public:
     std::string	name{};
     file::path	path{};
 
+	Animator*   m_animator{};
     Skeleton*   m_Skeleton{};
 	bool m_hasBones{ false };
 
@@ -34,6 +33,7 @@ private:
     friend class ModelLoader;
 	friend class DataSystem;
 
+    std::vector<Node*>      m_nodes;
     std::vector<Mesh*>      m_Meshes;
     std::vector<Material*>  m_Materials;
     std::vector<Texture*>   m_Textures;

@@ -11,8 +11,8 @@ public:
 	Banchmark() : _start(_clock::now()) {}
 	~Banchmark()
 	{
-		_duration elapsed = _clock::now() - _start;
-		printf("Banchmark Elapsed time: %f ms\n", elapsed.count());
+		//_duration elapsed = _clock::now() - _start;
+		//printf("Banchmark Elapsed time: %f ms\n", elapsed.count());
 	}
 
 	double GetElapsedTime()
