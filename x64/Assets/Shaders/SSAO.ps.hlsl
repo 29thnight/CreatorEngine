@@ -53,8 +53,6 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3x3 tbn = transpose(float3x3(tangent, bitangent, normal));
 
     float occlusion = 0.0;
-    
-    [unroll]
     for (int i = 0; i < 64; ++i)
     {
         // find out a desired world position to sample
@@ -86,8 +84,6 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         occlusion += step(sceneDepth, sampleDepth) * rangeCheck;
     }
     occlusion /= 64.0;
-
-    float factor = 1.0 - occlusion * 0.3;
-    
+    float factor = 1 - occlusion;
     return float4(factor.rrr, 1);
 }

@@ -11,7 +11,7 @@
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
-
+#include "GameInputManager.h"
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
 	m_deviceResources->RegisterDeviceNotify(this);
@@ -228,7 +228,7 @@ bool DirectX11::Dx11Main::Render()
 		m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR
-
+	GInputManagement->Update();
 	InputManagement->Update();
 	return true;
 }

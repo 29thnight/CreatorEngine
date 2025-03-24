@@ -15,7 +15,7 @@ cbuffer PerApplication : register(b2)
 
 cbuffer BoneTransformation : register(b3)
 {
-    matrix BoneTransforms[512];
+    matrix BoneTransforms[50];
 }
 
 struct AppData

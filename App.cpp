@@ -8,7 +8,7 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
-
+#include "GameInputManager.h"
 #ifdef UNICODE
 #pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console")
 #else
@@ -55,6 +55,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
 	SetWindow(coreWindow);
 	InputManagement->Initialize(coreWindow.GetHandle());
+	GInputManagement->Initialize(coreWindow.GetHandle());
 	Load();
 	Run();
 }

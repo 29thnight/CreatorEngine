@@ -24,7 +24,6 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     float totalWeight = 0.0;
     float3 prefilteredColor = float3(0.0, 0.0, 0.0);
-    [unroll(35)]
     for (uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
         float2 st = Hammersley(i, SAMPLE_COUNT);
