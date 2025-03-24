@@ -16,6 +16,10 @@ ModelLoader::ModelLoader(Model* model, Scene* scene) :
 {
 }
 
+ModelLoader::ModelLoader(const std::string_view& fileName)
+{
+}
+
 ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fileName) :
 	m_AIScene(assimpScene),
 	m_skeletonLoader(assimpScene)
@@ -93,16 +97,24 @@ void ModelLoader::ProcessFlatMeshes()
 
 Model* ModelLoader::LoadModel()
 {
-	ProcessNodes();
-	ProcessFlatMeshes();
-	if (m_model->m_hasBones)
+	if (m_loadType == LoadType::ASSET)
 	{
-		Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
-		m_model->m_Skeleton = skeleton;
-		Animator* animator = m_model->m_animator;
-		animator->m_IsEnabled = true;
-		animator->m_Skeleton = skeleton;
-		m_animator = animator;
+		LoadModelFromAsset();
+	}
+	else
+	{
+		ProcessNodes();
+		ProcessFlatMeshes();
+		if (m_model->m_hasBones)
+		{
+			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
+			m_model->m_Skeleton = skeleton;
+			Animator* animator = m_model->m_animator;
+			animator->m_IsEnabled = true;
+			animator->m_Skeleton = skeleton;
+			m_animator = animator;
+		}
+		ParseModel();
 	}
 
 	return m_model;
@@ -149,9 +161,12 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 void ModelLoader::ParseModel()
 {
 	std::fstream file;
-	file.open(m_model->name + ".asset", std::ios::out | std::ios::binary);
+	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
+	file.open(filepath, std::ios::out | std::ios::binary);
 	if (file.is_open())
 	{
+		uint32 size = m_model->m_nodes.size();
+		file.write(reinterpret_cast<char*>(&size), sizeof(uint32));
 		ParseNodes(file);
 		ParseMeshes(file);
 		ParseMaterials(file);
@@ -170,21 +185,16 @@ void ModelLoader::ParseNodes(std::fstream& outfile)
 
 void ModelLoader::ParseNode(std::fstream& outfile, Node* node)
 {
-	outfile.write(reinterpret_cast<const char*>(&node->m_index), sizeof(node->m_index));
-	outfile.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
-	outfile.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
-	outfile.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-	outfile.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(node->m_transform));
-	for (uint32 i = 0; i < node->m_numMeshes; i++)
-	{
-		uint32 meshId = node->m_meshes[i];
-		outfile.write(reinterpret_cast<const char*>(&meshId), sizeof(meshId));
-	}
-	for (uint32 i = 0; i < node->m_numChildren; i++)
-	{
-		uint32 childIndex = node->m_childrenIndex[i];
-		outfile.write(reinterpret_cast<const char*>(&childIndex), sizeof(childIndex));
-	}
+	size_t strSize = node->m_name.size();
+	outfile.write(reinterpret_cast<char*>(&strSize), sizeof(size_t));
+	outfile.write(reinterpret_cast<char*>(node->m_name.data()), strSize);
+	outfile.write(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+	outfile.write(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_meshes.size());
+	outfile.write(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_childrenIndex.size());
 }
 
 void ModelLoader::ParseMeshes(std::fstream& outfile)
@@ -192,14 +202,82 @@ void ModelLoader::ParseMeshes(std::fstream& outfile)
 	for (uint32 i = 0; i < m_model->m_Meshes.size(); i++)
 	{
 		Mesh* mesh = m_model->m_Meshes[i];
-		outfile.write(reinterpret_cast<char*>(&mesh->m_name), sizeof(mesh->m_name));
+		outfile.write(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
 		outfile.write(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
 		outfile.write(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
-
+		//outfile.write(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
+		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
 	}
 }
 
 void ModelLoader::ParseMaterials(std::fstream& outfile)
+{
+}
+
+void ModelLoader::LoadModelFromAsset()
+{
+	std::fstream file;
+	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
+	file.open(filepath, std::ios::in | std::ios::binary);
+	if (file.is_open())
+	{
+		uint32 size;
+		file.read(reinterpret_cast<char*>(&size), sizeof(uint32));
+		m_model->m_nodes.resize(size);
+		LoadNodes(file, size);
+		LoadMesh(file);
+		LoadMaterial(file);
+		file.close();
+	}
+}
+
+void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
+{
+	for (uint32 i = 0; i < size; i++)
+	{
+		LoadNode(infile, m_model->m_nodes[i]);
+	}
+}
+
+void ModelLoader::LoadNode(std::fstream& infile, Node* node)
+{
+	size_t size;
+	std::string name;
+	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+	infile.read(reinterpret_cast<char*>(name.data()), size);
+	node = new Node(name);
+
+	infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+	infile.read(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_numMeshes);
+	infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_numChildren);
+}
+
+void ModelLoader::LoadMesh(std::fstream& infile)
+{
+	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
+	{
+		Node* node = m_model->m_nodes[i];
+		for (uint32 j = 0; j < node->m_numMeshes; j++)
+		{
+			Mesh* mesh = new Mesh();
+			infile.read(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
+			infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
+			infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
+			//infile.read(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
+			infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+			infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+			m_model->m_Meshes.push_back(mesh);
+			m_model->m_Materials.push_back(new Material());
+		}
+	}
+}
+
+void ModelLoader::LoadMaterial(std::fstream& infile)
 {
 }
 

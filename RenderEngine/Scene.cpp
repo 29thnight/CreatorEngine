@@ -86,42 +86,8 @@ void Scene::EditorSceneObjectHierarchy()
 		{
 			if (obj->m_index == 0 || obj->m_parentIndex > 0) continue;
 
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-			if (obj.get() == m_selectedSceneObject)
-				flags |= ImGuiTreeNodeFlags_Selected;
-
 			ImGui::PushID((int)&obj);
-			std::string uniqueLabel = obj->m_name;
-			bool opened = ImGui::TreeNodeEx(uniqueLabel.c_str(), flags);
-
-			if (ImGui::IsItemClicked()) // 클릭 시 선택된 객체 변경
-			{
-				m_selectedSceneObject = obj.get();
-			}
-
-			if (opened)
-			{
-				for (auto& childIndex : obj->m_childrenIndices)
-				{
-					auto child = GetSceneObject(childIndex);
-
-					ImGuiTreeNodeFlags childFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-					if (child.get() == m_selectedSceneObject)
-						childFlags |= ImGuiTreeNodeFlags_Selected;
-
-					std::string childUniqueLabel = child->m_name + "(" + std::to_string(child->m_index) + ")";
-					if (ImGui::TreeNodeEx(childUniqueLabel.c_str(), childFlags))
-					{
-						if (ImGui::IsItemClicked()) // 자식 객체 클릭 시 선택
-						{
-							m_selectedSceneObject = child.get();
-						}
-						ImGui::TreePop();
-					}
-				}
-				ImGui::TreePop();
-			}
-
+			DrawSceneObject(obj);
 			ImGui::PopID();
 		}
 	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
@@ -181,5 +147,28 @@ void Scene::UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix mod
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
 		UpdateModelRecursive(childIndex, model);
+	}
+}
+
+void Scene::DrawSceneObject(const std::shared_ptr<SceneObject>& obj)
+{
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+	if (obj.get() == m_selectedSceneObject)
+		flags |= ImGuiTreeNodeFlags_Selected;
+
+	bool opened = ImGui::TreeNodeEx(obj->m_name.c_str(), flags);
+
+	if (ImGui::IsItemClicked())
+		m_selectedSceneObject = obj.get();
+
+	if (opened)
+	{
+		// 자식 노드를 재귀적으로 그리기
+		for (auto childIndex : obj->m_childrenIndices)
+		{
+			auto child = GetSceneObject(childIndex);
+			DrawSceneObject(child);
+		}
+		ImGui::TreePop();
 	}
 }

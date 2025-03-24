@@ -24,6 +24,7 @@ private:
 	ModelLoader();
 	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);
+	ModelLoader(const std::string_view& fileName);
 	ModelLoader(const aiScene* assimpScene, const std::string_view& fileName);
 
 	//Load From ASSIMP library
@@ -39,6 +40,12 @@ private:
 	void ParseNode(std::fstream& outfile, Node* node);
 	void ParseMeshes(std::fstream& outfile);
 	void ParseMaterials(std::fstream& outfile);
+
+	void LoadModelFromAsset();
+	void LoadNodes(std::fstream& infile, uint32 size);
+	void LoadNode(std::fstream& infile, Node* node);
+	void LoadMesh(std::fstream& infile);
+	void LoadMaterial(std::fstream& infile);
 
 	Model* LoadModel();
 	void GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex);
