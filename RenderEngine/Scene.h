@@ -31,6 +31,7 @@ public:
 	SceneObject* GetSelectSceneObject() { return m_selectedSceneObject; }
 private:
 	void UpdateModelRecursive(SceneObject::Index objIndex, Mathf::xMatrix model);
+	void DrawSceneObject(const std::shared_ptr<SceneObject>& obj);
 	
 	AnimationJob m_animationJob{};
 	SceneObject* m_selectedSceneObject = nullptr;

@@ -35,8 +35,12 @@ Model* Model::LoadModel(const std::string_view& filePath)
 {
 	file::path path_ = filePath.data();
 	Model* model{};
-	file::path test = PathFinder::Relative("Models\\").string() + path_.filename().string() + ".model";
-
+	if (path_.extension() == ".asset")
+	{
+		ModelLoader loader = ModelLoader(nullptr, path_.string());
+		model = loader.LoadModel();
+	}
+	else
 	{
 		Banchmark banch;
 		Assimp::Importer importer;

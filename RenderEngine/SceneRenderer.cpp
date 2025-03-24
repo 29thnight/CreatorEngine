@@ -381,9 +381,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("bangbooExport.fbx");
+		model = Model::LoadModel("bangbooExport.asset");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
-		Model::LoadModelToScene(model, *m_currentScene);
 
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
