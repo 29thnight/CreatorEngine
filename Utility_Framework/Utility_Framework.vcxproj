@@ -28,6 +28,7 @@
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.Random.h" />
+    <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CSVLoader.h" />
@@ -35,6 +36,7 @@
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
+    <ClInclude Include="FileIO.h" />
     <ClInclude Include="HLSLCompiler.h" />
     <ClInclude Include="ImGuiLogger.h" />
     <ClInclude Include="IObject.h" />

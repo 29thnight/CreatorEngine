@@ -597,6 +597,7 @@ void SceneRenderer::PrepareRender()
 		{
 		case Material::RenderingMode::Opaque:
 			m_pGBufferPass->PushDeferredQueue(obj.get());
+
 			break;
 		case Material::RenderingMode::Transparent:
 			break;

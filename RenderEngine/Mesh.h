@@ -1,5 +1,20 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <assimp/Importer.hpp>
+
+struct Node
+{
+	std::string m_name;
+	Mathf::Matrix m_transform{ XMMatrixIdentity() };
+	uint32 m_index{};
+	uint32 m_parentIndex{};
+	std::vector<uint32> m_childrenIndex;
+	uint32 m_numChildren{};
+	uint32 m_numMeshes{};
+	std::vector<uint32> m_meshes;
+
+	Node(const std::string_view& name) : m_name(name) {}
+};
 
 struct Vertex
 {
@@ -52,6 +67,11 @@ private:
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
+
+	std::string m_nodeName;
+
+	DirectX::BoundingBox m_boundingBox;
+	DirectX::BoundingSphere m_boundingSphere;
 
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	ComPtr<ID3D11Buffer> m_indexBuffer{};

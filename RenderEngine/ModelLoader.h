@@ -8,14 +8,6 @@
 #include "SkeletonLoader.h"
 #include "ObjectRenderers.h"
 
-struct BinaryNode
-{
-	std::string name;
-	XMMATRIX localTransform;
-	std::vector<Mesh*> meshes;     // 노드가 포함한 메쉬들
-	std::vector<uint32_t> children;     // 자식 노드 인덱스들
-};
-
 class ModelLoader
 {
 	enum class LoadType
@@ -23,38 +15,50 @@ class ModelLoader
 		UNKNOWN,
 		OBJ,
 		GLTF,
-		FBX
+		FBX,
+		ASSET
 	};
 
 private:
 	friend class Model;
-	ModelLoader() = default;
+	ModelLoader();
+	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);
 	ModelLoader(const aiScene* assimpScene, const std::string_view& fileName);
-	
-	Model* LoadModel();
-	void ProcessMeshes();
-	void ProcessMeshRecursive(aiNode* node);
-	Mesh* GenerateMesh(aiMesh* mesh);
+
+	//Load From ASSIMP library
+	void ProcessNodes();
+	Node* ProcessNode(aiNode* node, int parentIndex);
+	void ProcessFlatMeshes();
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
-	void GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int parentIndex);
+	Mesh* GenerateMesh(aiMesh* mesh);
 
-	void ConvertToAiNode(aiNode* node, int parentIndex);
-	void SaveModelBinary(const std::string_view& filePath);
-	void LoadModelBinary(const std::string_view& filePath);
+	//Save To InHouse Format
+	void ParseModel();
+	void ParseNodes(std::fstream& outfile);
+	void ParseNode(std::fstream& outfile, Node* node);
+	void ParseMeshes(std::fstream& outfile);
+	void ParseMaterials(std::fstream& outfile);
 
+	Model* LoadModel();
+	void GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex);
 
+	std::shared_ptr<Assimp::Importer> m_importer;
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory;
 
 	Model* m_model;
+	Material* m_material;
+	Animator* m_animator;
+
 	Scene* m_scene;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
-	Animator* m_animator;
 
-	std::vector<BinaryNode> nodes;
+	Mathf::Vector3 min;
+	Mathf::Vector3 max;
 
+	bool m_hasBones{ false };
 	bool m_isInitialized{ false };
 };

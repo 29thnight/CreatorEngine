@@ -21,6 +21,7 @@ class Bone
 public:
 	std::string m_name{};
 	int m_index{};
+	int m_parentIndex{};
 	Mathf::xMatrix m_globalTransform;
 	Mathf::xMatrix m_offset;
 	std::vector<Bone*> m_children;
