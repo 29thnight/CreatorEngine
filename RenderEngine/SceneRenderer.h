@@ -30,6 +30,8 @@ public:
 	void Render();
 
 private:
+    void InitializeDeviceState();
+    void InitializeImGui();
 	void InitializeTextures();
 	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);

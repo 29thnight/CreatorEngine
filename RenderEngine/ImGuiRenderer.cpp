@@ -1,4 +1,4 @@
-﻿#include "ImGuiRenderer.h"
+#include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
 #include "imgui_internal.h"

@@ -6,11 +6,15 @@ Scene::Scene()
 	CreateSceneObject("Root", 0);
 	m_MainCamera.RegisterContainer();
 	//m_MainCamera.m_applyRenderPipelinePass.m_BlitPass = true;
+    EditorSceneObjectHierarchy();
+    EditorSceneObjectInspector();
 }
 
 Scene::~Scene()
 {
-	//TODO : ComPtrÀÌ¶ó ÀÚµ¿ ÇØÁ¦ -> default·Î º¯°æÇÒ °Í
+	//TODO : ComPtrì´ë¼ ìžë™ í•´ì œ -> defaultë¡œ ë³€ê²½í•  ê²ƒ
+    ImGui::ContextUnregister("SceneObject Hierarchy");
+    ImGui::ContextUnregister("SceneObject Inspector");
 }
 
 std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
@@ -106,7 +110,8 @@ void Scene::EditorSceneObjectInspector()
 			float pyr[3]; // pitch yaw roll
 			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
 
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 3; i++)
+            {
 				pyr[i] = XMConvertToDegrees(pyr[i]);
 			}
 
@@ -123,7 +128,8 @@ void Scene::EditorSceneObjectInspector()
 			ImGui::Text("Parent Index");
 			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
 
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 3; i++)
+            {
 				pyr[i] = XMConvertToRadians(pyr[i]);
 			}
 
@@ -163,7 +169,7 @@ void Scene::DrawSceneObject(const std::shared_ptr<SceneObject>& obj)
 
 	if (opened)
 	{
-		// ÀÚ½Ä ³ëµå¸¦ Àç±ÍÀûÀ¸·Î ±×¸®±â
+		// ìžì‹ ë…¸ë“œë¥¼ ìž¬ê·€ì ìœ¼ë¡œ ê·¸ë¦¬ê¸°
 		for (auto childIndex : obj->m_childrenIndices)
 		{
 			auto child = GetSceneObject(childIndex);

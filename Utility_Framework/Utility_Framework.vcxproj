@@ -32,6 +32,7 @@
     <ClInclude Include="Core.Thread.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CSVLoader.h" />
+    <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
