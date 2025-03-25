@@ -8,11 +8,6 @@ Model::Model()
 {
 }
 
-Model::Model(std::shared_ptr<SceneObject>& sceneObject) :
-	m_SceneObject(sceneObject)
-{
-}
-
 Model::~Model()
 {
 	for (auto mesh : m_Meshes)
@@ -40,22 +35,21 @@ Model* Model::LoadModel(const std::string_view& filePath)
 {
 	file::path path_ = filePath.data();
 	Model* model{};
-	file::path test = PathFinder::Relative("Models\\").string() + path_.filename().string() + ".model";
-	/*if (file::exists(test))
+	if (path_.extension() == ".asset")
 	{
-		ModelLoader loader;
-		loader.LoadModelBinary(path_.filename().string() + ".model");
-		model = loader.m_model;
+		ModelLoader loader = ModelLoader(nullptr, path_.string());
+		model = loader.LoadModel();
 	}
-	else*/
+	else
 	{
+		Banchmark banch;
 		Assimp::Importer importer;
 		importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 		importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
 		const aiScene* assimpScene = importer.ReadFile(filePath.data(),
 			aiProcess_LimitBoneWeights |
-			aiProcessPreset_TargetRealtime_Quality |
+			aiProcessPreset_TargetRealtime_Fast |
 			aiProcess_ConvertToLeftHanded
 		);
 
@@ -68,7 +62,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 		model = loader.LoadModel();
 		model->path = path_;
 
-		loader.SaveModelBinary(path_.filename().string() + ".model");
+		std::cout << "LoadModel : " << banch.GetElapsedTime() << std::endl;
 	}
 
 	return model;
@@ -78,22 +72,10 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 {
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
-	Assimp::Importer importer;
-	importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
-	const aiScene* assimpScene;
-	{
-		Banchmark banch;
-		assimpScene = importer.ReadFile(path_.string(),
-			aiProcess_LimitBoneWeights |
-			aiProcessPreset_TargetRealtime_Quality |
-			aiProcess_ConvertToLeftHanded
-		);
-
-		std::cout << "LoadModelToScene : " << banch.GetElapsedTime() << std::endl;
-	}
-	loader.GenerateSceneObjectHierarchy(assimpScene->mRootNode, true, 0);
+	Banchmark banch;
+	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
+	std::cout << "LoadModelToScene : " << banch.GetElapsedTime() << std::endl;
 
 	return model;
 }

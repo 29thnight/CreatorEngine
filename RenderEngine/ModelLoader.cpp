@@ -2,9 +2,21 @@
 #include "Banchmark.hpp"
 #include "PathFinder.h"
 
+ModelLoader::ModelLoader()
+{
+}
+
+ModelLoader::~ModelLoader()
+{
+}
+
 ModelLoader::ModelLoader(Model* model, Scene* scene) :
 	m_model(model),
 	m_scene(scene)
+{
+}
+
+ModelLoader::ModelLoader(const std::string_view& fileName)
 {
 }
 
@@ -26,48 +38,86 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	{
 		m_loadType = LoadType::FBX;
 	}
-	m_model = new Model();
-	m_model->name = filepath.filename().string();
-	m_model->m_SceneObject = std::make_shared<SceneObject>(
-		m_model->name, false, 0);
-}
-
-Model* ModelLoader::LoadModel()
-{
-	ProcessMeshes();
-	if (m_model->m_hasBones)
+	else if (filepath.extension() == ".asset")
 	{
-		Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
-		m_model->m_Skeleton = skeleton;
-		Animator* animator = m_model->m_SceneObject->m_animator = new Animator();
-		animator->m_IsEnabled = true;
-		animator->m_Skeleton = skeleton;
-		m_animator = animator;
+		m_loadType = LoadType::ASSET;
 	}
-
-	return m_model;
+	m_model = new Model();
+	m_model->name = filepath.stem().string();
+	m_model->m_animator = new Animator();
 }
 
-void ModelLoader::ProcessMeshes()
+void ModelLoader::ProcessNodes()
 {
-	ProcessMeshRecursive(m_AIScene->mRootNode);
-	ConvertToAiNode(m_AIScene->mRootNode, 0);
-	__debugbreak();
+	ProcessNode(m_AIScene->mRootNode, 0);
 }
 
-void ModelLoader::ProcessMeshRecursive(aiNode* node)
+Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 {
+	Node* nodeObj = new Node(node->mName.C_Str());
+	nodeObj->m_index = m_model->m_nodes.size();
+	nodeObj->m_parentIndex = parentIndex;
+	nodeObj->m_numMeshes = node->mNumMeshes;
+	nodeObj->m_transform = DirectX::SimpleMath::Matrix(node->mTransformation[0]).Transpose();
+	nodeObj->m_numChildren = node->mNumChildren;
+
+	m_model->m_nodes.push_back(nodeObj);
 
 	for (uint32 i = 0; i < node->mNumMeshes; i++)
 	{
-		aiMesh* aimesh = m_AIScene->mMeshes[node->mMeshes[i]];
-		GenerateMesh(aimesh);
+		nodeObj->m_meshes.push_back(node->mMeshes[i]);
 	}
 
 	for (uint32 i = 0; i < node->mNumChildren; i++)
 	{
-		ProcessMeshRecursive(node->mChildren[i]);
+		Node* child = ProcessNode(node->mChildren[i], nodeObj->m_index);
+		nodeObj->m_childrenIndex.push_back(child->m_index);
 	}
+
+	return nodeObj;
+}
+
+void ModelLoader::ProcessFlatMeshes()
+{
+	for (uint32 i = 0; i < m_AIScene->mNumMeshes; i++)
+	{
+		aiMesh* aimesh = m_AIScene->mMeshes[i];
+		Mesh* meshObj = GenerateMesh(aimesh);
+		
+		Mathf::Vector3 meshMin = { aimesh->mAABB.mMin.x, aimesh->mAABB.mMin.y, aimesh->mAABB.mMin.z };
+		Mathf::Vector3 meshMax = { aimesh->mAABB.mMax.x,  aimesh->mAABB.mMax.y,  aimesh->mAABB.mMax.z };
+
+		min = Mathf::Vector3::Min(min, meshMin);
+		max = Mathf::Vector3::Max(max, meshMax);
+
+		DirectX::BoundingBox::CreateFromPoints(meshObj->m_boundingBox, min, max);
+		DirectX::BoundingSphere::CreateFromBoundingBox(meshObj->m_boundingSphere, meshObj->m_boundingBox);
+	}
+}
+
+Model* ModelLoader::LoadModel()
+{
+	if (m_loadType == LoadType::ASSET)
+	{
+		LoadModelFromAsset();
+	}
+	else
+	{
+		ProcessNodes();
+		ProcessFlatMeshes();
+		if (m_model->m_hasBones)
+		{
+			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
+			m_model->m_Skeleton = skeleton;
+			Animator* animator = m_model->m_animator;
+			animator->m_IsEnabled = true;
+			animator->m_Skeleton = skeleton;
+			m_animator = animator;
+		}
+		ParseModel();
+	}
+
+	return m_model;
 }
 
 Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
@@ -87,6 +137,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		{
 			vertex.uv = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
 		}
+
 		vertices.push_back(vertex);
 	}
 
@@ -105,6 +156,129 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	m_model->m_Materials.push_back(new Material());
 
 	return meshObj;
+}
+
+void ModelLoader::ParseModel()
+{
+	std::fstream file;
+	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
+	file.open(filepath, std::ios::out | std::ios::binary);
+	if (file.is_open())
+	{
+		uint32 size = m_model->m_nodes.size();
+		file.write(reinterpret_cast<char*>(&size), sizeof(uint32));
+		ParseNodes(file);
+		ParseMeshes(file);
+		ParseMaterials(file);
+		file.close();
+	}
+}
+
+void ModelLoader::ParseNodes(std::fstream& outfile)
+{
+	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
+	{
+		Node* node = m_model->m_nodes[i];
+		ParseNode(outfile, node);
+	}
+}
+
+void ModelLoader::ParseNode(std::fstream& outfile, Node* node)
+{
+	size_t strSize = node->m_name.size();
+	outfile.write(reinterpret_cast<char*>(&strSize), sizeof(size_t));
+	outfile.write(reinterpret_cast<char*>(node->m_name.data()), strSize);
+	outfile.write(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
+	outfile.write(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+	outfile.write(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_meshes.size());
+	outfile.write(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_childrenIndex.size());
+}
+
+void ModelLoader::ParseMeshes(std::fstream& outfile)
+{
+	for (uint32 i = 0; i < m_model->m_Meshes.size(); i++)
+	{
+		Mesh* mesh = m_model->m_Meshes[i];
+		outfile.write(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
+		outfile.write(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
+		outfile.write(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
+		//outfile.write(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
+		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+	}
+}
+
+void ModelLoader::ParseMaterials(std::fstream& outfile)
+{
+}
+
+void ModelLoader::LoadModelFromAsset()
+{
+	std::fstream file;
+	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
+	file.open(filepath, std::ios::in | std::ios::binary);
+	if (file.is_open())
+	{
+		uint32 size;
+		file.read(reinterpret_cast<char*>(&size), sizeof(uint32));
+		m_model->m_nodes.resize(size);
+		LoadNodes(file, size);
+		LoadMesh(file);
+		LoadMaterial(file);
+		file.close();
+	}
+}
+
+void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
+{
+	for (uint32 i = 0; i < size; i++)
+	{
+		LoadNode(infile, m_model->m_nodes[i]);
+	}
+}
+
+void ModelLoader::LoadNode(std::fstream& infile, Node* node)
+{
+    size_t size{};
+	std::string name;
+	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+	infile.read(reinterpret_cast<char*>(name.data()), size);
+	node = new Node(name);
+
+	infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
+	infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+	infile.read(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_numMeshes);
+	infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_numChildren);
+}
+
+void ModelLoader::LoadMesh(std::fstream& infile)
+{
+	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
+	{
+		Node* node = m_model->m_nodes[i];
+		for (uint32 j = 0; j < node->m_numMeshes; j++)
+		{
+			Mesh* mesh = new Mesh();
+			infile.read(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
+			infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
+			infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
+			//infile.read(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
+			infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+			infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+			m_model->m_Meshes.push_back(mesh);
+			m_model->m_Materials.push_back(new Material());
+		}
+	}
+}
+
+void ModelLoader::LoadMaterial(std::fstream& infile)
+{
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
@@ -134,177 +308,50 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 	}
 }
 
-void ModelLoader::GenerateSceneObjectHierarchy(aiNode* node, bool isRoot, int parentIndex)
+void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
 	if (true == isRoot)
 	{
-		auto rootObject = m_scene->CreateSceneObject(m_model->m_SceneObject->m_name, nextIndex);
+		auto rootObject = m_scene->CreateSceneObject(m_model->name, nextIndex);
 		nextIndex = rootObject->m_index;
-		
+
 		if (m_model->m_hasBones)
 		{
-			Banchmark banch;	
+			Banchmark banch;
 			rootObject->m_animator = new Animator();
 			rootObject->m_animator->m_IsEnabled = true;
 			rootObject->m_animator->m_Skeleton = m_model->m_Skeleton;
-
 			std::cout << "GenerateSceneObjectHierarchy new Animator : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 
-	for (UINT i = 0; i < node->mNumMeshes; ++i)
+	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		Banchmark banch;
-		std::shared_ptr<SceneObject> object = m_scene->CreateSceneObject(node->mName.C_Str(), nextIndex);
+		std::shared_ptr<SceneObject> object = m_scene->CreateSceneObject(node->m_name, nextIndex);
 
-		unsigned int meshId = node->mMeshes[i];
+		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[meshId];
 		MeshRenderer& meshRenderer = object->m_meshRenderer;
 		meshRenderer.m_IsEnabled = true;
 		meshRenderer.m_Mesh = mesh;
 		meshRenderer.m_Material = material;
-		object->m_transform.SetLocalMatrix(XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1)));
-
+		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
-
 		std::cout << "GenerateSceneObjectHierarchy new SceneObject : " << banch.GetElapsedTime() << std::endl;
 	}
 
-	for (UINT i = 0; i < node->mNumChildren; ++i)
+	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		GenerateSceneObjectHierarchy(node->mChildren[i], false, nextIndex);
-	}
-}
-
-void ModelLoader::ConvertToAiNode(aiNode* node, int parentIndex)
-{
-	BinaryNode binaryNode;
-	binaryNode.name = node->mName.C_Str();
-	binaryNode.localTransform = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
-
-	// 메쉬 포함하기
-	for (uint32 i = 0; i < node->mNumMeshes; ++i)
-	{
-		uint32 meshIndex = node->mMeshes[i];
-
-		Mesh* mesh = m_model->m_Meshes[meshIndex];
-
-		binaryNode.meshes.push_back(mesh);
+		std::shared_ptr<SceneObject> object = m_scene->CreateSceneObject(node->m_name, nextIndex);
+		object->m_transform.SetLocalMatrix(node->m_transform);
+		nextIndex = object->m_index;
 	}
 
-	// 현재 노드 인덱스를 기록하고, 자식 정보를 연결
-	uint32_t currentIndex = static_cast<uint32_t>(nodes.size());
-	nodes.push_back(std::move(binaryNode));
-
-	// 자식 순회
-	for (uint32 i = 0; i < node->mNumChildren; ++i)
+	for (uint32 i = 0; i < node->m_numChildren; ++i)
 	{
-		uint32_t childIndex = static_cast<uint32_t>(nodes.size());
-		ConvertToAiNode(node->mChildren[i], currentIndex);
-		nodes[currentIndex].children.push_back(childIndex);
+		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
-}
-
-void ModelLoader::SaveModelBinary(const std::string_view& filePath)
-{
-	std::string modelPath = "Models\\";
-	file::path file = PathFinder::Relative(modelPath + filePath.data());
-	std::ofstream out(file, std::ios::binary);
-
-	if (out.is_open())
-	{
-		for (const auto& node : nodes)
-		{
-			// 이름
-			size_t nameLen = node.name.size();
-			out.write(reinterpret_cast<const char*>(&nameLen), sizeof(size_t));
-			out.write(node.name.c_str(), nameLen);
-
-			// 트랜스폼
-			out.write(reinterpret_cast<const char*>(&node.localTransform), sizeof(XMMATRIX));
-
-			// 자식 노드 인덱스
-			uint32_t childCount = static_cast<uint32_t>(node.children.size());
-			out.write(reinterpret_cast<const char*>(&childCount), sizeof(uint32_t));
-			out.write(reinterpret_cast<const char*>(node.children.data()), childCount * sizeof(uint32_t));
-
-			// 포함된 메쉬
-			uint32_t meshCount = static_cast<uint32_t>(node.meshes.size());
-			out.write(reinterpret_cast<const char*>(&meshCount), sizeof(uint32_t));
-			for (const auto& mesh : m_model->m_Meshes)
-			{
-				// 메쉬 이름
-				size_t meshNameLen = mesh->m_name.size();
-				out.write(reinterpret_cast<const char*>(&meshNameLen), sizeof(size_t));
-				out.write(mesh->m_name.c_str(), meshNameLen);
-				// 정점
-				uint32_t vertexCount = static_cast<uint32_t>(mesh->m_vertices.size());
-				out.write(reinterpret_cast<const char*>(&vertexCount), sizeof(uint32_t));
-				out.write(reinterpret_cast<const char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
-
-				// 인덱스
-				uint32_t indexCount = static_cast<uint32_t>(mesh->m_indices.size());
-				out.write(reinterpret_cast<const char*>(&indexCount), sizeof(uint32_t));
-				out.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
-			}
-		}
-	}
-
-	out.close();
-}
-
-void ModelLoader::LoadModelBinary(const std::string_view& filePath)
-{
-	std::string modelPath = "Models\\";
-	file::path file = PathFinder::Relative(modelPath + filePath.data());
-	std::ifstream in(file, std::ios::binary);
-
-	m_model = new Model();
-
-	if (in.is_open())
-	{
-		while (!in.eof())
-		{
-			BinaryNode node;
-			// 이름
-			size_t nameLen;
-			in.read(reinterpret_cast<char*>(&nameLen), sizeof(size_t));
-			node.name.resize(nameLen);
-			in.read(const_cast<char*>(node.name.c_str()), nameLen);
-			// 트랜스폼
-			in.read(reinterpret_cast<char*>(&node.localTransform), sizeof(XMMATRIX));
-			// 자식 노드 인덱스
-			uint32_t childCount;
-			in.read(reinterpret_cast<char*>(&childCount), sizeof(uint32_t));
-			node.children.resize(childCount);
-			in.read(reinterpret_cast<char*>(node.children.data()), childCount * sizeof(uint32_t));
-			// 포함된 메쉬
-			uint32_t meshCount;
-			in.read(reinterpret_cast<char*>(&meshCount), sizeof(uint32_t));
-			for (uint32_t i = 0; i < meshCount; ++i)
-			{
-				Mesh* mesh = new Mesh();
-				// 메쉬 이름
-				size_t meshNameLen;
-				in.read(reinterpret_cast<char*>(&meshNameLen), sizeof(size_t));
-				mesh->m_name.resize(meshNameLen);
-				in.read(const_cast<char*>(mesh->m_name.c_str()), meshNameLen);
-				// 정점
-				uint32_t vertexCount;
-				in.read(reinterpret_cast<char*>(&vertexCount), sizeof(uint32_t));
-				mesh->m_vertices.resize(vertexCount);
-				in.read(reinterpret_cast<char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
-				// 인덱스
-				uint32_t indexCount;
-				in.read(reinterpret_cast<char*>(&indexCount), sizeof(uint32_t));
-				mesh->m_indices.resize(indexCount);
-				in.read(reinterpret_cast<char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
-				m_model->m_Meshes.push_back(mesh);
-			}
-		}
-	}
-
-	in.close();
 }

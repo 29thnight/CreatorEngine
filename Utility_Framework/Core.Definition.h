@@ -34,6 +34,7 @@ namespace file = std::filesystem;
 #include <mutex>
 #include <unordered_map>
 #include <ranges>
+#include <set>
 using namespace std::views;
 constexpr inline decltype(auto) foreach = std::ranges::for_each;
 #include <stack>

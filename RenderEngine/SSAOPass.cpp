@@ -123,7 +123,7 @@ void SSAOPass::Execute(Scene& scene, Camera& camera)
 
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
 
-    ID3D11ShaderResourceView* srvs[3] = { m_DepthSRV, m_NormalTexture->m_pSRV, m_NoiseTexture->m_pSRV };
+    ID3D11ShaderResourceView* srvs[3] = { camera.m_depthStencil->m_pSRV, m_NormalTexture->m_pSRV, m_NoiseTexture->m_pSRV };
     DirectX11::PSSetShaderResources(0, 3, srvs);
 
     DirectX11::Draw(4, 0);
