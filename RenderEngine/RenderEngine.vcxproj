@@ -175,7 +175,7 @@
     <ClCompile Include="SkyBoxPass.cpp" />
     <ClCompile Include="SpritePass.cpp" />
     <ClCompile Include="SSAOPass.cpp" />
-    <ClCompile Include="TAAPass.cpp" />
+    <ClCompile Include="AAPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
     <ClCompile Include="UI_DataSystem.cpp" />
@@ -220,7 +220,7 @@
     <ClInclude Include="SkyBoxPass.h" />
     <ClInclude Include="SpritePass.h" />
     <ClInclude Include="SSAOPass.h" />
-    <ClInclude Include="TAAPass.h" />
+    <ClInclude Include="AAPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
     <ClInclude Include="UI_DataSystem.h" />

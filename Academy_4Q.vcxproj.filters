@@ -236,9 +236,6 @@
     <None Include="x64\Assets\Shaders\Lighting.hlsli">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="x64\Assets\Shaders\GammaCorrectionCommon.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="x64\Assets\Shaders\ACES.hlsli">
       <Filter>Shaders</Filter>
     </None>
@@ -391,6 +388,9 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="FXAA.cs.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

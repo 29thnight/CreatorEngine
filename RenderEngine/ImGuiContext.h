@@ -45,12 +45,12 @@ public:
 		}
 
         ImGuiIO& io = ImGui::GetIO();
-        ImGui::SetNextWindowViewport(0);
 
         if (ImGui::Begin(m_name.data(), m_isPopup? &m_opened : 0, m_flags))
         {
             if (m_isPopup)
             {
+				ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
                 ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
             }
 

@@ -36,6 +36,7 @@ private:
 
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };
+	bool m_UseLightWithShadows{ true };
 
     ComPtr<ID3D11Buffer> m_Buffer{};
 };

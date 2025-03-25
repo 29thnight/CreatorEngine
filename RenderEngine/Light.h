@@ -79,6 +79,7 @@ private:
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
 	ShadowMapRenderDesc m_shadowMapRenderDesc;
+	ShadowMapConstant m_shadowMapConstant;
 	LightProperties m_lightProperties;
 	bool hasLightWithShadows{ false };
 	ID3D11Buffer* m_shadowMapBuffer{ nullptr };

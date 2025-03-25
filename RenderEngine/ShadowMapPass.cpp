@@ -41,8 +41,11 @@ ShadowMapPass::ShadowMapPass()
 		)
 	);
 
-	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+	m_pso->m_samplers.push_back(linearSampler);
+	m_pso->m_samplers.push_back(pointSampler);
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
@@ -92,18 +95,24 @@ void ShadowMapPass::Execute(Scene& scene, Camera& camera)
 
 	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
 	
-	DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);
-	DirectX11::ClearDepthStencilView(m_shadowMapDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 
 	auto desc = scene.m_LightController.m_shadowMapRenderDesc;
 
-	m_shadowCamera.m_eyePosition = desc.m_eyePosition;
+	m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController.GetLight(0).m_direction)) * -5.f;
 	m_shadowCamera.m_lookAt = desc.m_lookAt;
 	m_shadowCamera.m_nearPlane = desc.m_nearPlane;
 	m_shadowCamera.m_farPlane = desc.m_farPlane;
 	m_shadowCamera.m_viewHeight = desc.m_viewHeight;
 	m_shadowCamera.m_viewWidth = desc.m_viewWidth;
+
+	auto& shadowMapConstant = scene.m_LightController.m_shadowMapConstant;
+
+	shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
+	shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
+	shadowMapConstant.m_lightViewProjection = m_shadowCamera.CalculateView() * m_shadowCamera.CalculateProjection();
+
+	DirectX11::UpdateBuffer(scene.m_LightController.m_shadowMapBuffer, &shadowMapConstant);
 
 	m_shadowCamera.UpdateBuffer();
 	scene.UseModel();
@@ -115,4 +124,8 @@ void ShadowMapPass::Execute(Scene& scene, Camera& camera)
 		scene.UpdateModel(obj->m_transform.GetWorldMatrix());
 		obj->m_meshRenderer.m_Mesh->Draw();
 	}
+
+	//DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);
+	DirectX11::ClearDepthStencilView(m_shadowMapDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	DirectX11::UnbindRenderTargets();
 }

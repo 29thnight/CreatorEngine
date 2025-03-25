@@ -7,6 +7,7 @@ Texture2D Colour : register(t0);
 cbuffer UseTonemap : register(b0)
 {
     bool useTonemap;
+    bool useFilmic;
     float filmSlope;
     float filmToe;
     float filmShoulder;
@@ -100,7 +101,7 @@ float3 AcesToneMap_UE4(float3 LinearColor)
     const float3x3 sRGB_2_AP0 = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, sRGB_2_XYZ_MAT));
 
     float3 aces = mul(sRGB_2_AP0, LinearColor * 1.5);
-    float3 oces = RRT(LinearColor);
+    float3 oces = RRT(aces);
     return ODT(oces);
 }
 
@@ -113,13 +114,19 @@ struct PixelShaderInput // see Fullscreen.vs.hlsl
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    
     float3 colour = Colour.Sample(PointSampler, IN.texCoord).rgb;
     float3 toneMapped = 0;
     [branch]
     if (useTonemap)
     {
-        toneMapped = FilmToneMap(colour);
+        if (useFilmic)
+        {
+            toneMapped = FilmToneMap(colour);
+        }
+        else
+        {
+            toneMapped = AcesToneMap_UE4(colour);
+        }
     }
     else
     {

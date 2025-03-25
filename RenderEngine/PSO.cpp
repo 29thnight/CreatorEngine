@@ -62,12 +62,12 @@ void PipelineStateObject::Apply()
 	DeviceState::g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
 	DeviceState::g_pDeviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
-	//for (uint32 i = 0; i < m_samplers.size(); ++i)
-	//{
-	//	//m_samplers[i].Use(i);
-	//	ID3D11SamplerState* sampler = m_samplers[i].m_SamplerState;
-	//	DeviceState::g_pDeviceContext->PSSetSamplers(i, 1, &sampler);
-	//}
+	for (uint32 i = 0; i < m_samplers.size(); ++i)
+	{
+		//m_samplers[i].Use(i);
+		ID3D11SamplerState* sampler = m_samplers[i]->m_SamplerState;
+		DeviceState::g_pDeviceContext->PSSetSamplers(i, 1, &sampler);
+	}
 }
 
 void PipelineStateObject::Reset()

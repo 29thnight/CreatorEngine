@@ -20,7 +20,7 @@ public:
 
 	D3D11_PRIMITIVE_TOPOLOGY m_primitiveTopology{ D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST };
 
-	std::vector<Sampler> m_samplers;
+	std::vector<std::shared_ptr<Sampler>> m_samplers;
 
 public:
 	void Apply();
