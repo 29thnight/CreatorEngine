@@ -150,6 +150,8 @@
     <ClCompile Include="AssetSystem.cpp" />
     <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Text.cpp" />
+    <ClCompile Include="UI.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -189,6 +191,8 @@
     <ClInclude Include="AssetSystem.h" />
     <ClInclude Include="BlitPass.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="Text.h" />
+    <ClInclude Include="UI.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />

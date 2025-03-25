@@ -114,6 +114,9 @@
     <Filter Include="RenderPass\UIPass">
       <UniqueIdentifier>{a018e513-3344-43ae-bb7e-635430984bda}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\UI">
+      <UniqueIdentifier>{60a7a5f8-681f-4b27-818d-72e922afac5f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -226,6 +229,12 @@
     </ClCompile>
     <ClCompile Include="UIPass.cpp">
       <Filter>RenderPass\UIPass</Filter>
+    </ClCompile>
+    <ClCompile Include="UI.cpp">
+      <Filter>Resources\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Text.cpp">
+      <Filter>Resources\UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -363,6 +372,12 @@
     </ClInclude>
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
+    </ClInclude>
+    <ClInclude Include="UI.h">
+      <Filter>Resources\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Text.h">
+      <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

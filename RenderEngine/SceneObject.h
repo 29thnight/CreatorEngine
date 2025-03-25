@@ -23,10 +23,13 @@ public:
 	const Index m_parentIndex;
 	std::vector<SceneObject::Index> m_childrenIndices;
 
+
 	MeshRenderer m_meshRenderer;
 	SpriteRenderer m_spriteRenderer;
 	Animator* m_animator{ nullptr };
 
+	//ui ÄÄÆ÷³ÍÆ®¿ë
+	UIRenderer m_UiRenderer;
 	//debug layer
 	Bone* selectedBone{ nullptr };
 };
