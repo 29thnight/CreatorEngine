@@ -27,9 +27,6 @@ public:
 	MeshRenderer m_meshRenderer;
 	SpriteRenderer m_spriteRenderer;
 	Animator* m_animator{ nullptr };
-
-	//ui 컴포넌트용
-	UIRenderer m_UiRenderer;
 	//debug layer
 	Bone* selectedBone{ nullptr };
 };

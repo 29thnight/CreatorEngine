@@ -34,7 +34,3 @@ struct Animator : public Renderable
     DirectX::XMMATRIX m_FinalTransforms[Skeleton::MAX_BONES];
 };
 
-struct UIRenderer : public Renderable
-{
-    Texture* m_UISprite = nullptr;
-};

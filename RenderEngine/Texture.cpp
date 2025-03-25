@@ -62,6 +62,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 	ScratchImage image{};
 	TexMetadata metadata{};
 
+	
 	if (path.extension() == ".dds")
 	{
 		//load dds
@@ -120,6 +121,8 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 			&texture->m_pSRV
 		)
 	);
+
+	texture->size = { metadata.width,metadata.height };
 
 	return texture;
 }
@@ -261,3 +264,10 @@ ID3D11RenderTargetView* Texture::GetRTV(uint32 index)
 {
 	return m_pRTVs[index];
 }
+
+float2 Texture::GetImageSize() const
+{
+	return size;
+}
+
+

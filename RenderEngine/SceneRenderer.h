@@ -15,7 +15,8 @@
 #include "Model.h"
 #include "Light.h"
 #include "Camera.h"
-
+#include "UIsprite.h"
+#include "UIPass.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -30,8 +31,8 @@ public:
 	void Render();
 
 private:
-    void InitializeDeviceState();
-    void InitializeImGui();
+	void InitializeDeviceState();
+	void InitializeImGui();
 	void InitializeTextures();
 	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);
@@ -47,15 +48,16 @@ private:
 	//pass
 	std::unique_ptr<ShadowMapPass> m_pShadowMapPass{};
 	std::unique_ptr<GBufferPass> m_pGBufferPass{};
-    std::unique_ptr<SSAOPass> m_pSSAOPass{};
-    std::unique_ptr<DeferredPass> m_pDeferredPass{};
+	std::unique_ptr<SSAOPass> m_pSSAOPass{};
+	std::unique_ptr<DeferredPass> m_pDeferredPass{};
 	std::unique_ptr<SkyBoxPass> m_pSkyBoxPass{};
-    std::unique_ptr<ToneMapPass> m_pToneMapPass{};
+	std::unique_ptr<ToneMapPass> m_pToneMapPass{};
 	std::unique_ptr<SpritePass> m_pSpritePass{};
 	std::unique_ptr<BlitPass> m_pBlitPass{};
 	std::unique_ptr<WireFramePass> m_pWireFramePass{};
-    std::unique_ptr<GridPass> m_pGridPass{};
+	std::unique_ptr<GridPass> m_pGridPass{};
 
+	std::unique_ptr<UIPass> m_pUIPass{};
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
 
@@ -66,7 +68,7 @@ private:
 	std::unique_ptr<Texture> m_emissiveTexture;
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
-    std::unique_ptr<Texture> m_gridTexture;
+	std::unique_ptr<Texture> m_gridTexture;
 	//sampler
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
@@ -79,7 +81,7 @@ private:
 
 	Model* model{};
 	Model* testModel{};
-
+	UIsprite testUI{};
 //Debug
 public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }

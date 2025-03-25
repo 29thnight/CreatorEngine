@@ -380,7 +380,9 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
-
+		testUI.Loadsprite("test.jpg");
+		testUI.SetTexture();
+		m_pUIPass->pushUI(&testUI);
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))

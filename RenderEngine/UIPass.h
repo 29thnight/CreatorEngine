@@ -1,24 +1,11 @@
 #pragma once
 #include "IRenderPass.h"
 #include "SceneObject.h"
-struct UIParameters
-{
-	float time;
-};
+#include "UIsprite.h"
 
-struct alignas(16) CanvasVertex
-{
-	Mathf::Vector4 Position;
-	Mathf::Vector2 Size;
-};
 
-struct alignas(16) ModelConstantBuffer
-{
-	Mathf::Matrix world;
-	Mathf::Matrix view;
-	Mathf::Matrix projection;
-};
 
+class Camera;
 class UIPass : public IRenderPass
 {
 public:
@@ -26,22 +13,23 @@ public:
 	virtual ~UIPass() {}
 
 	void Initialize(Texture* renderTargetView);
+
+	void pushUI(UIsprite* UI);
 	void Update(float delta);
 
 	void DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
-	virtual void Excute(Scene& scene) abstract;
+	virtual void Excute(Scene& scene,Camera& camera) abstract;
 
 
 
-	CanvasVertex* mVertex;
-
-	ID3D11Buffer* canVasVertexBuffer;
-
-	ComPtr<ID3D11Buffer> m_ModelBuffer;
-	ModelConstantBuffer m_ModelConstantBuffer{};
+	
+	ComPtr<ID3D11Buffer> m_UIBuffer;
 
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
 	std::vector<SceneObject*> _2DObjects;
+	//테스트용
+	std::vector<UIsprite*> _testUI;
+	
 };
 

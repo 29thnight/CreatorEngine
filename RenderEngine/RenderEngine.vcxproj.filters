@@ -230,7 +230,7 @@
     <ClCompile Include="UIPass.cpp">
       <Filter>RenderPass\UIPass</Filter>
     </ClCompile>
-    <ClCompile Include="UI.cpp">
+    <ClCompile Include="UIsprite.cpp">
       <Filter>Resources\UI</Filter>
     </ClCompile>
     <ClCompile Include="Text.cpp">
@@ -373,7 +373,7 @@
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
     </ClInclude>
-    <ClInclude Include="UI.h">
+    <ClInclude Include="UIsprite.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>
     <ClInclude Include="Text.h">

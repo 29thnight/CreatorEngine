@@ -405,5 +405,8 @@
     <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\UI.vs.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
