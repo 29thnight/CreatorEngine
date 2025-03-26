@@ -86,6 +86,8 @@ void Scene::EditorSceneObjectHierarchy()
 {
 	ImGui::ContextRegister("SceneObject Hierarchy", [&]()
 	{
+		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
+
 		for (auto& obj : m_SceneObjects)
 		{
 			if (obj->m_index == 0 || obj->m_parentIndex > 0) continue;
@@ -101,6 +103,8 @@ void Scene::EditorSceneObjectInspector()
 {
 	ImGui::ContextRegister("SceneObject Inspector", [&]()
 	{
+		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
+
 		if (m_selectedSceneObject)
 		{
 			Mathf::Vector4 position = m_selectedSceneObject->m_transform.position;

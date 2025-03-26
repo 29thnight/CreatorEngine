@@ -40,8 +40,11 @@ DeferredPass::DeferredPass()
         )
     );
 
-    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+    auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+    m_pso->m_samplers.push_back(linearSampler);
+    m_pso->m_samplers.push_back(pointSampler);
 
     m_Buffer = DirectX11::CreateBuffer(sizeof(DeferredBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
@@ -108,7 +111,7 @@ void DeferredPass::Execute(Scene& scene, Camera& camera)
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
         m_NormalTexture->m_pSRV,
-        lightManager.hasLightWithShadows ? lightManager.GetShadowMapTexture()->m_pSRV : nullptr,
+        (lightManager.hasLightWithShadows && m_UseLightWithShadows) ? lightManager.GetShadowMapTexture()->m_pSRV : nullptr,
         m_UseAmbientOcclusion ? m_AmbientOcclusionTexture->m_pSRV : nullptr,
         m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
         m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
@@ -199,5 +202,6 @@ void DeferredPass::ExecuteEditor(Scene& scene, Camera& camera)
 void DeferredPass::ControlPanel()
 {
 	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
+	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 }

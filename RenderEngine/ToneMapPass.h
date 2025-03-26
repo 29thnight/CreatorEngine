@@ -15,7 +15,8 @@ struct alignas(16) ToneMapReinhardConstant
 
 struct alignas(16) ToneMapACESConstant
 {
-	bool m_bUseToneMap{ true };
+	bool32 m_bUseToneMap{ true };
+	bool32 m_bUseFilmic{ true };
     float filmSlope{ 0.91f };
     float filmToe{ 0.53f };
     float filmShoulder{ 0.23f };
@@ -36,6 +37,7 @@ public:
 private:
     Texture* m_DestTexture{};
 	bool m_isAbleToneMap{ true };
+	bool m_isAbleFilmic{ true };
 	ToneMapType m_toneMapType{ ToneMapType::ACES };
 	ID3D11Buffer* m_pReinhardConstantBuffer{};
 	ID3D11Buffer* m_pACESConstantBuffer{};

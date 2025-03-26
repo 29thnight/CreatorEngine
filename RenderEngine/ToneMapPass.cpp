@@ -42,8 +42,11 @@ ToneMapPass::ToneMapPass()
         )
     );
 
-    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-    m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+    auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+    m_pso->m_samplers.push_back(linearSampler);
+    m_pso->m_samplers.push_back(pointSampler);
 
 	m_pACESConstantBuffer = DirectX11::CreateBuffer(
         sizeof(ToneMapACESConstant), 
@@ -92,6 +95,7 @@ void ToneMapPass::Execute(Scene& scene, Camera& camera)
 	{
         m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
 		m_toneMapACESConstant.m_bUseToneMap = m_isAbleToneMap;
+		m_toneMapACESConstant.m_bUseFilmic = m_isAbleFilmic;
 		DirectX11::UpdateBuffer(m_pACESConstantBuffer, &m_toneMapACESConstant);
 		DirectX11::PSSetConstantBuffer(0, 1, &m_pACESConstantBuffer);
 	}
@@ -114,10 +118,15 @@ void ToneMapPass::Execute(Scene& scene, Camera& camera)
 
 void ToneMapPass::ControlPanel()
 {
-    ImGui::Checkbox("ToneMap", &m_isAbleToneMap);
+    ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap);
+    ImGui::SetNextWindowFocus();
     ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
     ImGui::Separator();
-    if (m_toneMapType == ToneMapType::ACES)
+	if (m_toneMapType == ToneMapType::ACES)
+	{
+		ImGui::Checkbox("Use Filmic", &m_isAbleFilmic);
+	}
+    if (m_toneMapType == ToneMapType::ACES && m_toneMapACESConstant.m_bUseFilmic)
     {
         ImGui::DragFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.01f, 0.0f, 1.0f);
         ImGui::DragFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.01f, 0.0f, 1.0f);

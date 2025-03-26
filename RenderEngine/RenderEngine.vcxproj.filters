@@ -102,20 +102,14 @@
     <Filter Include="RenderPass\WireFramePass">
       <UniqueIdentifier>{f2f829c8-d1db-42f3-bd42-058d669c1e6c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\TAAPass">
-      <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\GridPass">
       <UniqueIdentifier>{283179e7-32f1-4427-a1dd-c816135e2518}</UniqueIdentifier>
     </Filter>
     <Filter Include="LightMap">
       <UniqueIdentifier>{1202166f-c121-4ed7-ac41-85133bf5bfab}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\UIPass">
-      <UniqueIdentifier>{a018e513-3344-43ae-bb7e-635430984bda}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resources\UI">
-      <UniqueIdentifier>{60a7a5f8-681f-4b27-818d-72e922afac5f}</UniqueIdentifier>
+    <Filter Include="RenderPass\AAPass">
+      <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -218,23 +212,14 @@
     <ClCompile Include="BlitPass.cpp">
       <Filter>RenderPass\BlitPass</Filter>
     </ClCompile>
-    <ClCompile Include="TAAPass.cpp">
-      <Filter>RenderPass\TAAPass</Filter>
+    <ClCompile Include="AAPass.cpp">
+      <Filter>RenderPass\AAPass</Filter>
     </ClCompile>
     <ClCompile Include="GridPass.cpp">
       <Filter>RenderPass\GridPass</Filter>
     </ClCompile>
     <ClCompile Include="LightMap.cpp">
       <Filter>LightMap</Filter>
-    </ClCompile>
-    <ClCompile Include="UIPass.cpp">
-      <Filter>RenderPass\UIPass</Filter>
-    </ClCompile>
-    <ClCompile Include="UIsprite.cpp">
-      <Filter>Resources\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="Text.cpp">
-      <Filter>Resources\UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -361,23 +346,14 @@
     <ClInclude Include="BlitPass.h">
       <Filter>RenderPass\BlitPass</Filter>
     </ClInclude>
-    <ClInclude Include="TAAPass.h">
-      <Filter>RenderPass\TAAPass</Filter>
+    <ClInclude Include="AAPass.h">
+      <Filter>RenderPass\AAPass</Filter>
     </ClInclude>
     <ClInclude Include="GridPass.h">
       <Filter>RenderPass\GridPass</Filter>
     </ClInclude>
     <ClInclude Include="LightMap.h">
       <Filter>LightMap</Filter>
-    </ClInclude>
-    <ClInclude Include="UIPass.h">
-      <Filter>RenderPass\UIPass</Filter>
-    </ClInclude>
-    <ClInclude Include="UIsprite.h">
-      <Filter>Resources\UI</Filter>
-    </ClInclude>
-    <ClInclude Include="Text.h">
-      <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

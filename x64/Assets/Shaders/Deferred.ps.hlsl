@@ -94,7 +94,11 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         Lo += (kD * albedo / PI + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);
 
     }
+    
+    
     float3 ambient = globalAmbient.rgb * albedo;
+    
+    
     if (useEnvMap)
     {
         float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);

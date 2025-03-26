@@ -197,12 +197,6 @@
     <ClInclude Include="CustomWindowDefine.h">
       <Filter>Window</Filter>
     </ClInclude>
-    <ClInclude Include="GameInputManager.h">
-      <Filter>Manager\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="KeyState.h">
-      <Filter>Manager\InputManager</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">
@@ -240,9 +234,6 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="x64\Assets\Shaders\Lighting.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\GammaCorrectionCommon.hlsli">
       <Filter>Shaders</Filter>
     </None>
     <None Include="x64\Assets\Shaders\ACES.hlsli">
@@ -329,12 +320,6 @@
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="GameInputManager.cpp">
-      <Filter>Manager\InputManager</Filter>
-    </ClCompile>
-    <ClCompile Include="KeyState.cpp">
-      <Filter>Manager\InputManager</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ObjectLIst.txt">
@@ -405,10 +390,7 @@
     <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\UI.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Assets\Shaders\UI.ps.hlsl">
+    <FxCompile Include="FXAA.cs.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

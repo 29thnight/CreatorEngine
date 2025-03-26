@@ -57,6 +57,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
+		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 		ImGuizmo::SetDrawlist();
 
 		float windowWidth = (float)ImGui::GetWindowWidth();
@@ -238,6 +239,68 @@ void SceneRenderer::InitializeImGui()
 {
     static int lightIndex = 0;
 
+	ImGui::ContextRegister("RenderPass", true, [&]()
+	{
+		if (ImGui::BeginTabBar("RenderPass Control Panel"))
+		{
+			if (ImGui::BeginTabItem("ShadowPass"))
+			{
+				m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SSAOPass"))
+			{
+				m_pSSAOPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("DeferredPass"))
+			{
+				m_pDeferredPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SkyBoxPass"))
+			{
+				m_pSkyBoxPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("ToneMapPass"))
+			{
+				m_pToneMapPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("SpritePass"))
+			{
+				m_pSpritePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("BlitPass"))
+			{
+				m_pBlitPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("WireFramePass"))
+			{
+				m_pWireFramePass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("GridPass"))
+			{
+				m_pGridPass->ControlPanel();
+				ImGui::EndTabItem();
+			}
+
+			ImGui::EndTabBar();
+		}
+	});
+
     ImGui::ContextRegister("Light", true, [&]()
     {
         ImGui::Text("Light Index : %d", lightIndex);
@@ -264,11 +327,11 @@ void SceneRenderer::InitializeImGui()
             m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
         }
 
-        ImGui::SliderFloat3("Light Pos", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, -10, 10);
-        ImGui::SliderFloat3("Light Dir", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, -10, 10);
-        ImGui::SliderFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0, 1);
-        ImGui::SliderFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0, 1);
-        ImGui::SliderFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0, 1);
+        ImGui::DragFloat3("Light Pos", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, 0.1f, -10, 10);
+        ImGui::DragFloat3("Light Dir", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, 0.1f, -1, 1);
+        ImGui::DragFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
+        ImGui::DragFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
+        ImGui::DragFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
 
     });
 
@@ -285,9 +348,6 @@ void SceneRenderer::InitializeImGui()
         {
             ImGui::DragFloat("Orthographic Width", &m_pEditorCamera->m_viewWidth, 0.1f, 0.1f, 1000.0f);
             ImGui::DragFloat("Orthographic Height", &m_pEditorCamera->m_viewHeight, 0.1f, 0.1f, 1000.0f);
-        }
-        else
-        {
         }
     });
 
@@ -374,10 +434,10 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 0.1f;
-		desc.m_farPlane = 1000.f;
-		desc.m_textureWidth = 8192;
-		desc.m_textureHeight = 8192;
+		desc.m_nearPlane = 1.f;
+		desc.m_farPlane = 20.f;
+		desc.m_textureWidth = 1920;
+		desc.m_textureHeight = 1080;
 
 		m_currentScene->m_LightController.Initialize();
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
@@ -395,9 +455,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 				Model::LoadModelToScene(model, *m_currentScene);
 			}
 		});
-
-		//model = Model::LoadModel("bangbooExport.fbx");
-		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 	}
 	else
 	{
@@ -415,74 +472,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
-
-	ImGui::ContextRegister("RenderPass", true, [&]()
-	{
-		if (ImGui::BeginTabBar("RenderPass Control Panel"))
-		{
-			if (ImGui::BeginTabItem("ShadowPass"))
-			{
-				m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("GBufferPass"))
-			{
-				m_pGBufferPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("SSAOPass"))
-			{
-				m_pSSAOPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("DeferredPass"))
-			{
-				m_pDeferredPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("SkyBoxPass"))
-			{
-				m_pSkyBoxPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("ToneMapPass"))
-			{
-				m_pToneMapPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("SpritePass"))
-			{
-				m_pSpritePass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("BlitPass"))
-			{
-				m_pBlitPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("WireFramePass"))
-			{
-				m_pWireFramePass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("GridPass"))
-			{
-				m_pGridPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
-
-			ImGui::EndTabBar();
-		}
-	});
 }
 
 void SceneRenderer::Update(float deltaTime)
@@ -724,6 +713,7 @@ void SceneRenderer::EditorView()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
 		ImVec2 size = ImGui::GetContentRegionAvail();
 
