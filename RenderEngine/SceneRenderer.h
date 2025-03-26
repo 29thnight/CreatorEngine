@@ -82,6 +82,7 @@ private:
 	Model* model{};
 	Model* testModel{};
 	UIsprite testUI{};
+	UIsprite testUI2{};
 //Debug
 public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }

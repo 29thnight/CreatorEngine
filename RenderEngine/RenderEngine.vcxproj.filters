@@ -111,6 +111,12 @@
     <Filter Include="RenderPass\AAPass">
       <UniqueIdentifier>{acc932ee-ade3-4e17-ba66-54ac90e28a6a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\UIPass">
+      <UniqueIdentifier>{ff162c06-b4f9-4ad1-a0c0-8752d1fd6bac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\UI">
+      <UniqueIdentifier>{e871a5a5-bad3-4bfb-828b-c499a68ab3de}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -220,6 +226,15 @@
     </ClCompile>
     <ClCompile Include="LightMap.cpp">
       <Filter>LightMap</Filter>
+    </ClCompile>
+    <ClCompile Include="UIPass.cpp">
+      <Filter>RenderPass\UIPass</Filter>
+    </ClCompile>
+    <ClCompile Include="Text.cpp">
+      <Filter>Resources\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UIsprite.cpp">
+      <Filter>Resources\UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -354,6 +369,15 @@
     </ClInclude>
     <ClInclude Include="LightMap.h">
       <Filter>LightMap</Filter>
+    </ClInclude>
+    <ClInclude Include="UIPass.h">
+      <Filter>RenderPass\UIPass</Filter>
+    </ClInclude>
+    <ClInclude Include="Text.h">
+      <Filter>Resources\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIsprite.h">
+      <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

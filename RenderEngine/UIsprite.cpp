@@ -2,7 +2,7 @@
 #include "Texture.h"
 #include "PathFinder.h"
 #include "DeviceState.h"
-
+#include "ImGuiRegister.h"
 
 UIsprite::UIsprite()
 {
@@ -20,10 +20,21 @@ void UIsprite::Loadsprite(std::string_view filepath)
 	m_indices = UIIndices;
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(UIvertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
+
 	file::path _filepath = PathFinder::Relative("Image\\").string() + filepath.data();
 	std::shared_ptr<Texture> newTexture = std::shared_ptr<Texture>(Texture::LoadFormPath(_filepath));
 	textures.push_back(newTexture);
 
+}
+
+void UIsprite::Update()
+{
+	Mathf::xMatrix world = XMMatrixIdentity();
+
+	world = DirectX::XMMatrixScalingFromVector(scale);
+	world *= DirectX::XMMatrixRotationQuaternion(rotat);
+	world *= DirectX::XMMatrixTranslationFromVector(trans);
+	uiinfo.world = world;
 }
 
 void UIsprite::Draw()
@@ -37,20 +48,29 @@ void UIsprite::Draw()
 
 }
 
-void UIsprite::SetUI(Mathf::Vector2 position)
+void UIsprite::SetUI(Mathf::Vector2 position,int layerorder)
 {
+	_layerorder = layerorder;
 	uiinfo.screenSize = { DirectX11::GetWidth(), DirectX11::GetHeight()};
 
 	float ndcX = (position.x / uiinfo.screenSize.x) * 2.0f - 1.0f;
 	float ndcY = 1.0f - (position.y / uiinfo.screenSize.y) * 2.0f;
-	Mathf::Vector3 trans = { ndcX,ndcY, 0 };
-	Mathf::Vector3 rotat = { 0, 0, 0 };
+	trans = { ndcX,ndcY, 0.f };
 	float scaleX = (uiinfo.size.x / uiinfo.screenSize.x) * 2.0f;
 	float scaleY = (uiinfo.size.y / uiinfo.screenSize.y) * 2.0f;
-	Mathf::Vector3 scale = { scaleX, scaleY, 1 };
-	Mathf::xMatrix world = Mathf::Matrix(trans, rotat, scale);
-	uiinfo.world = world;
+
+
+
+	scale = { scaleX, scaleY, 1 };
+
+
+	Mathf::xMatrix world = XMMatrixIdentity();
 	
+	world = DirectX::XMMatrixScalingFromVector(scale);
+	world *= DirectX::XMMatrixRotationQuaternion(rotat);
+	world *= DirectX::XMMatrixTranslationFromVector(trans);
+	uiinfo.world = world;
+
 }
 
 

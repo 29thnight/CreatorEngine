@@ -217,37 +217,37 @@ void DirectX11::DeviceResources::CreateDeviceIndependentResources()
 
 #if defined(_DEBUG)
     // 프로젝트가 디버그 빌드 중인 경우 SDK 레이어를 통해 Direct2D 디버깅을 사용합니다.
-    options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+   options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
 
     // Direct2D 팩터리를 초기화합니다.
-    DirectX11::ThrowIfFailed(
-        D2D1CreateFactory(
-            D2D1_FACTORY_TYPE_SINGLE_THREADED,
-            __uuidof(ID2D1Factory3),
-            &options,
-            &m_d2dFactory
-        )
-    );
-
-    // DirectWrite 팩터리를 초기화합니다.
-    DirectX11::ThrowIfFailed(
-        DWriteCreateFactory(
-            DWRITE_FACTORY_TYPE_SHARED,
-            __uuidof(IDWriteFactory3),
-            &m_dwriteFactory
-        )
-    );
-
-    // WIC(Windows Imaging Component) 팩터리를 초기화합니다. //이거 왜 터지냐? ㅋㅋㅋ
-    DirectX11::ThrowIfFailed(
-    	CoCreateInstance(
-    		CLSID_WICImagingFactory2,
-    		nullptr,
-    		CLSCTX_INPROC_SERVER,
-    		IID_PPV_ARGS(&m_wicFactory)
-    	)
-    );
+    //DirectX11::ThrowIfFailed(
+    //   D2D1CreateFactory(
+    //       D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    //       __uuidof(ID2D1Factory3),
+    //       &options,
+    //       &m_d2dFactory
+    //   )
+    //;
+    //
+    /// DirectWrite 팩터리를 초기화합니다.
+    //irectX11::ThrowIfFailed(
+    //   DWriteCreateFactory(
+    //       DWRITE_FACTORY_TYPE_SHARED,
+    //       __uuidof(IDWriteFactory3),
+    //       &m_dwriteFactory
+    //   )
+    //;
+    //
+    /// WIC(Windows Imaging Component) 팩터리를 초기화합니다. //이거 왜 터지냐? ㅋㅋㅋ
+    //irectX11::ThrowIfFailed(
+    //	CoCreateInstance(
+    //		CLSID_WICImagingFactory2,
+    //		nullptr,
+    //		CLSCTX_INPROC_SERVER,
+    //		IID_PPV_ARGS(&m_wicFactory)
+    //	)
+    //;
 }
 
 void DirectX11::DeviceResources::CreateDeviceResources()
@@ -332,16 +332,16 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_d3dDevice.As(&dxgiDevice)
     );
 
-    DirectX11::ThrowIfFailed(
-        m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice)
-    );
-
-    DirectX11::ThrowIfFailed(
-        m_d2dDevice->CreateDeviceContext(
-            D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-            &m_d2dContext
-        )
-    );
+   //DirectX11::ThrowIfFailed(
+   //     m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice)
+   // );
+   //
+   // DirectX11::ThrowIfFailed(
+   //     m_d2dDevice->CreateDeviceContext(
+   //         D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+   //         &m_d2dContext
+   //     )
+   // );
 }
 
 void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
@@ -551,34 +551,34 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         // 스왑 체인 백 버퍼에 연결된 Direct2D 대상
         // 비트맵을 만들고 이를 현재 대상으로 설정합니다.
-        D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+       /* D2D1_BITMAP_PROPERTIES1 bitmapProperties =
             D2D1::BitmapProperties1(
                 D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
                 D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
                 m_dpi,
                 m_dpi
-            );
+            );*/
 
         DirectX11::ThrowIfFailed(
             m_swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer))
         );
 
-		D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+		/*D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
 			D2D1_RENDER_TARGET_TYPE_DEFAULT,
 			D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
 			0,
 			0,
 			D2D1_RENDER_TARGET_USAGE_NONE,
 			D2D1_FEATURE_LEVEL_DEFAULT
-		);
+		);*/
 
-		m_d2dFactory->CreateDxgiSurfaceRenderTarget(
+	/*	m_d2dFactory->CreateDxgiSurfaceRenderTarget(
 			dxgiBackBuffer.Get(),
             &props,
 			&m_d2dTarget
 		);
         m_d2dContext->SetDpi(m_effectiveDpi, m_effectiveDpi);
-        m_d2dContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+        m_d2dContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);*/
     }
 }
 

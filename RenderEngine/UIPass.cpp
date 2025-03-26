@@ -43,9 +43,11 @@ UIPass::UIPass()
 		)
 	);
 
-	
-	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pso->m_samplers.emplace_back(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
+	m_pso->m_samplers.push_back(linearSampler);
+	m_pso->m_samplers.push_back(pointSampler);
 
 	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -77,7 +79,10 @@ void UIPass::pushUI(UIsprite* UI)
 
 void UIPass::Update(float delta)
 {
-
+	for (auto& Uiobject : _testUI)
+	{
+		Uiobject->Update();
+	}
 }
 
 void UIPass::Execute(Scene& scene, Camera& camera)
@@ -85,9 +90,8 @@ void UIPass::Execute(Scene& scene, Camera& camera)
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
 
-	//DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, camera.m_depthStencil->m_pDSV);
+	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 	
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
@@ -95,7 +99,8 @@ void UIPass::Execute(Scene& scene, Camera& camera)
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
 
-
+	
+	std::sort(_testUI.begin(), _testUI.end(), compareLayer);
 	for (auto& Uiobject : _testUI)
 	{
 	
@@ -112,6 +117,11 @@ void UIPass::Execute(Scene& scene, Camera& camera)
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
 
+}
+
+bool UIPass::compareLayer(UIsprite* a, UIsprite* b)
+{
+	return a->_layerorder < b->_layerorder;
 }
 
 void UIPass::DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)

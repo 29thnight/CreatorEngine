@@ -92,11 +92,11 @@ public:
 public:
 	void KeyBoardUpdate();
 	//누르고있을떄
-	bool KeyHold(KeyBoard key);
+	bool KeyHold(unsigned int key) const;
 	//한번 눌렀을떄;
-	bool KeyPress(KeyBoard key);
+	bool KeyPress(unsigned int key) const;
 	//똇을떄
-	bool KeyRelease(KeyBoard key);
+	bool KeyRelease(unsigned int key) const;
 
 	//키 세팅 변경용?
 	bool IsAnyKeyPressed();

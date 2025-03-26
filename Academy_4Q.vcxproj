@@ -157,10 +157,12 @@
     <ClInclude Include="Dx11Main.h" />
     <ClInclude Include="EventSystem.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GameInputManager.h" />
     <ClInclude Include="GameManager.h" />
     <ClInclude Include="GridEditor.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="InteractableComponent.h" />
+    <ClInclude Include="KeyState.h" />
     <ClInclude Include="MeshEditor.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="ObjectFactory.h" />
@@ -190,9 +192,11 @@
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Dx11Main.cpp" />
     <ClCompile Include="EventSystem.cpp" />
+    <ClCompile Include="GameInputManager.cpp" />
     <ClCompile Include="GameManager.cpp" />
     <ClCompile Include="GridEditor.cpp" />
     <ClCompile Include="InputManager.cpp" />
+    <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshEditor.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="ObjectFactory.cpp" />
@@ -361,6 +365,12 @@
     <FxCompile Include="x64\Assets\Shaders\ToneMapReinhard.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\UI.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="x64\Assets\Shaders\UI.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="x64\Assets\Shaders\VertexShader.vs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

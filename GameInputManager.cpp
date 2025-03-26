@@ -34,6 +34,10 @@ void GameInputManager::Update()
     }
 
 
+    if (true == KeyPress('A'))
+    {
+        std::cout << "승룡권!!" << std::endl;
+    }
     if (IsPadbtnHold(0, GamePade::BButton))
     {
         std::cout << "초풍!!" << std::endl;
@@ -67,17 +71,17 @@ void GameInputManager::KeyBoardUpdate()
     keyboardstate.Update();
 }
 
-bool GameInputManager::KeyHold(KeyBoard key)
+bool GameInputManager::KeyHold(unsigned int key) const
 {
     return keyboardstate.GetKeyState(key) == KeyState::Hold;
 }
 
-bool GameInputManager::KeyPress(KeyBoard key)
+bool GameInputManager::KeyPress(unsigned int key) const
 {
     return keyboardstate.GetKeyState(key) == KeyState::Pressed;
 }
 
-bool GameInputManager::KeyRelease(KeyBoard key)
+bool GameInputManager::KeyRelease(unsigned int key) const
 {
     return keyboardstate.GetKeyState(key) == KeyState::Released;
 }

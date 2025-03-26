@@ -20,6 +20,7 @@ public:
 	void DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
 	virtual void Execute(Scene& scene,Camera& camera);
 
+	static bool compareLayer(UIsprite* a, UIsprite* b);
 
 
 	

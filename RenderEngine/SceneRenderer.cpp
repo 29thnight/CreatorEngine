@@ -444,10 +444,29 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
-		testUI.Loadsprite("test.jpg");
+		testUI.Loadsprite("test2.png");
 		testUI.SetTexture();
-		testUI.SetUI({ 0,0 });
+		testUI.SetUI({ 200,200 },2);
 		m_pUIPass->pushUI(&testUI);
+
+		ImGui::ContextRegister("Test UI", true, [&]()
+		{
+			ImGui::SliderFloat3("pos", &testUI.trans.x, -1, 1);
+			ImGui::SliderFloat3("scale", &testUI.scale.x, -1, 1);
+
+		});
+
+		testUI2.Loadsprite("test2.png");
+		testUI2.SetTexture();
+		testUI2.SetUI({ 1920,1080 },1);
+		m_pUIPass->pushUI(&testUI2);
+
+		ImGui::ContextRegister("Test U2", true, [&]()
+		{
+			ImGui::SliderFloat3("pos2", &testUI2.trans.x, -1, 1);
+			ImGui::SliderFloat3("scale2", &testUI2.scale.x, -1, 1);
+
+		});
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))
@@ -479,6 +498,7 @@ void SceneRenderer::Update(float deltaTime)
 	m_currentScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
 	PrepareRender();
+	m_pUIPass->Update(deltaTime);
 }
 
 void SceneRenderer::Render()
@@ -565,7 +585,7 @@ void SceneRenderer::Render()
 		}
 
 		{
-
+			
 			m_pUIPass->Execute(*m_currentScene, *camera);
 		}
 		//[8] BlitPass
