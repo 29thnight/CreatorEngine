@@ -408,5 +408,8 @@
     <FxCompile Include="x64\Assets\Shaders\UI.vs.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Assets\Shaders\UI.ps.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

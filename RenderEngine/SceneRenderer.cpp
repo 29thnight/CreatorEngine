@@ -212,6 +212,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//GridPass
     m_pGridPass = std::make_unique<GridPass>();
+
+
+	m_pUIPass = std::make_unique<UIPass>();
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
 }
 
 
@@ -382,6 +386,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		testUI.Loadsprite("test.jpg");
 		testUI.SetTexture();
+		testUI.SetUI({ 0,0 });
 		m_pUIPass->pushUI(&testUI);
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
@@ -570,6 +575,10 @@ void SceneRenderer::Render()
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
+		{
+
+			m_pUIPass->Execute(*m_currentScene, *camera);
+		}
 		//[8] BlitPass
 		{
 			//Banchmark banch;
@@ -577,6 +586,8 @@ void SceneRenderer::Render()
 
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
+
+		
 	}
 
 	m_pGBufferPass->ClearDeferredQueue();

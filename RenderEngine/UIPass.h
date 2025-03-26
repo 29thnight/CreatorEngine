@@ -18,11 +18,13 @@ public:
 	void Update(float delta);
 
 	void DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
-	virtual void Excute(Scene& scene,Camera& camera) abstract;
+	virtual void Execute(Scene& scene,Camera& camera);
 
 
 
 	
+private:
+	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
 	ComPtr<ID3D11Buffer> m_UIBuffer;
 
 	Texture* m_renderTarget = nullptr;

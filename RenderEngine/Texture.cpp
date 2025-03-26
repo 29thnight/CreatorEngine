@@ -122,7 +122,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 		)
 	);
 
-	texture->size = { metadata.width,metadata.height };
+	texture->size = { float(metadata.width),float(metadata.height) };
 
 	return texture;
 }
