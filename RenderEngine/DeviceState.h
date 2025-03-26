@@ -203,6 +203,28 @@ namespace DirectX11
 	}
 
 	//[unsafe]
+	inline void CSSetConstantBuffer(uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CSSetConstantBuffers(slot, numBuffers, buffer);
+	}
+
+	//[unsafe]
+	inline void Dispatch(uint32 threadGroupCountX, uint32 threadGroupCountY, uint32 threadGroupCountZ)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+	}
+
+	//[unsafe]
 	inline void PSSetShaderResources(uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
 	{
 		if (!DeviceState::g_pDeviceContext)
@@ -211,6 +233,28 @@ namespace DirectX11
 			return;
 		}
 		DeviceState::g_pDeviceContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
+	}
+
+	//[unsafe]
+	inline void CSSetShaderResources(uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CSSetShaderResources(startSlot, numViews, shaderResourceViews);
+	}
+
+	//[unsafe]
+	inline void CSSetUnorderedAccessViews(uint32 startSlot, uint32 numUAVs, ID3D11UnorderedAccessView* const* unorderedAccessViews, const uint32* initialCounts)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(startSlot, numUAVs, unorderedAccessViews, initialCounts);
 	}
 
     //[unsafe]
@@ -256,6 +300,16 @@ namespace DirectX11
 			return;
 		}
 		DeviceState::g_pDeviceContext->PSSetShader(pixelShader, classInstances, numClassInstances);
+	}
+
+	inline void CSSetShader(ID3D11ComputeShader* computeShader, ID3D11ClassInstance* const* classInstances, uint32 numClassInstances)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CSSetShader(computeShader, classInstances, numClassInstances);
 	}
 
 	//[unsafe]
@@ -316,5 +370,16 @@ namespace DirectX11
 		DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, DeviceState::g_pDepthStencilView);
 		DeviceState::g_pDeviceContext->OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
 		DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+	}
+
+	//[unsafe]
+	inline void CopyResource(ID3D11Resource* pDstResource, ID3D11Resource* pSrcResource)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->CopyResource(pDstResource, pSrcResource);
 	}
 }

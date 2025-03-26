@@ -8,9 +8,6 @@
 #include "RenderEngine/ImGuiRenderer.h"
 #include "RenderEngine/Model.h"
 #include "BT_Editor.h"
-#include "GridEditor.h"
-#include "World.h"
-#include "D2DLib/D2DRenderer.h"
 #include <memory>
 #include <future>
 
@@ -49,7 +46,6 @@ namespace DirectX11
 		World* m_world;
 		std::shared_ptr<SceneRenderer> m_sceneRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
-		std::unique_ptr<D2DRenderer>   m_D2DRenderer;
 
 		std::thread m_renderThread;
 

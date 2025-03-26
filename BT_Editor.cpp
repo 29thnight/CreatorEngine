@@ -2,7 +2,6 @@
 #include "InputManager.h"
 #include "Utility_Framework/Logger.h"
 #include "Utility_Framework/PathFinder.h"
-#include "World.h"
 #include <regex>
 #include "Utility_Framework/Banchmark.hpp"
 #include "RenderEngine/widgets.h"

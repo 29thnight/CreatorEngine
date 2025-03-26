@@ -25,6 +25,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 colour = Colour.Sample(PointSampler, IN.texCoord).rgb;
     float luminance = CalcLuminance(colour);
     float reinhard = luminance / (luminance + 1);
+    
     float3 toneMapped = 0;
     [branch]
     if(useTonemap)

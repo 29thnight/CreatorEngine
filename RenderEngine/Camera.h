@@ -40,7 +40,7 @@ public:
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
 	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
 
-	Mathf::xVector m_eyePosition{ XMVectorSet(0, 0, -10, 1) };
+	Mathf::xVector m_eyePosition{ XMVectorSet(0, 1, -10, 1) };
 	Mathf::xVector m_forward{ FORWARD };
 	Mathf::xVector m_right{ RIGHT };
 	Mathf::xVector m_up{ UP };

@@ -11,6 +11,7 @@
 #include "BlitPass.h"
 #include "WireFramePass.h"
 #include "GridPass.h"
+#include "AAPass.h"
 
 #include "Model.h"
 #include "Light.h"
@@ -55,6 +56,7 @@ private:
 	std::unique_ptr<BlitPass> m_pBlitPass{};
 	std::unique_ptr<WireFramePass> m_pWireFramePass{};
     std::unique_ptr<GridPass> m_pGridPass{};
+	std::unique_ptr<AAPass> m_pAAPass{};
 
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
@@ -67,6 +69,7 @@ private:
 	std::unique_ptr<Texture> m_ambientOcclusionTexture;
 	std::unique_ptr<Texture> m_toneMappedColourTexture;
     std::unique_ptr<Texture> m_gridTexture;
+
 	//sampler
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};

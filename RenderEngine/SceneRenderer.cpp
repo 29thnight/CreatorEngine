@@ -213,6 +213,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//GridPass
     m_pGridPass = std::make_unique<GridPass>();
+
+	//AAPass
+	m_pAAPass = std::make_unique<AAPass>();
 }
 
 
@@ -237,63 +240,54 @@ void SceneRenderer::InitializeImGui()
 
 	ImGui::ContextRegister("RenderPass", true, [&]()
 	{
-		if (ImGui::BeginTabBar("RenderPass Control Panel"))
+		if (ImGui::CollapsingHeader("ShadowPass"))
 		{
-			if (ImGui::BeginTabItem("ShadowPass"))
-			{
-				m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+			m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("SSAOPass"))
-			{
-				m_pSSAOPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("SSAOPass"))
+		{
+			m_pSSAOPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("DeferredPass"))
-			{
-				m_pDeferredPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("DeferredPass"))
+		{
+			m_pDeferredPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("SkyBoxPass"))
-			{
-				m_pSkyBoxPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("SkyBoxPass"))
+		{
+			m_pSkyBoxPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("ToneMapPass"))
-			{
-				m_pToneMapPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("ToneMapPass"))
+		{
+			m_pToneMapPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("SpritePass"))
-			{
-				m_pSpritePass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("SpritePass"))
+		{
+			m_pSpritePass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("BlitPass"))
-			{
-				m_pBlitPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("AAPass"))
+		{
+			m_pAAPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("WireFramePass"))
-			{
-				m_pWireFramePass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("BlitPass"))
+		{
+			m_pBlitPass->ControlPanel();
+		}
 
-			if (ImGui::BeginTabItem("GridPass"))
-			{
-				m_pGridPass->ControlPanel();
-				ImGui::EndTabItem();
-			}
+		if (ImGui::CollapsingHeader("WireFramePass"))
+		{
+			m_pWireFramePass->ControlPanel();
+		}
 
-			ImGui::EndTabBar();
+		if (ImGui::CollapsingHeader("GridPass"))
+		{
+			m_pGridPass->ControlPanel();
 		}
 	});
 
@@ -328,7 +322,6 @@ void SceneRenderer::InitializeImGui()
         ImGui::DragFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
         ImGui::DragFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
         ImGui::DragFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
-
     });
 
 
@@ -532,6 +525,13 @@ void SceneRenderer::Render()
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
+		//[8] AAPass
+		{
+			//Banchmark banch;
+			m_pAAPass->Execute(*m_currentScene, *camera);
+			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
 		//[6] ToneMapPass
 		{
 			//Banchmark banch;
@@ -556,18 +556,15 @@ void SceneRenderer::Render()
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
-		//[8] BlitPass
+		//[9] BlitPass
 		{
 			//Banchmark banch;
 			m_pBlitPass->Execute(*m_currentScene, *camera);
-
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 
 	m_pGBufferPass->ClearDeferredQueue();
-
-
 }
 
 void SceneRenderer::PrepareRender()

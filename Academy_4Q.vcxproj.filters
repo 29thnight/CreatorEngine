@@ -15,12 +15,6 @@
     <Filter Include="Dx11Main">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{b05c0c36-6745-41d0-bcfd-e137476215b7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="World">
-      <UniqueIdentifier>{42edb744-1cea-4370-a9ab-72718c228651}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Component">
       <UniqueIdentifier>{fc2dbd22-3b0c-4c7e-8568-e2191847c1bd}</UniqueIdentifier>
     </Filter>
@@ -29,9 +23,6 @@
     </Filter>
     <Filter Include="Component\PhysicsComponent">
       <UniqueIdentifier>{ea0716e9-c58b-409f-aba5-b75e23b9f114}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Component\RenderComponent">
-      <UniqueIdentifier>{30638d1b-8e64-4c8d-82e0-485279d1ad98}</UniqueIdentifier>
     </Filter>
     <Filter Include="Utill">
       <UniqueIdentifier>{bd2f311f-ba6c-4f45-a21a-ac8cec09e5b2}</UniqueIdentifier>
@@ -44,9 +35,6 @@
     </Filter>
     <Filter Include="Manager">
       <UniqueIdentifier>{086e457e-5e4e-4007-9861-dc1d5f8a73d7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Manager\GameManager">
-      <UniqueIdentifier>{08708c0e-973e-40a6-b702-32d299964432}</UniqueIdentifier>
     </Filter>
     <Filter Include="Manager\InputManager">
       <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
@@ -78,9 +66,6 @@
     <Filter Include="MD">
       <UniqueIdentifier>{c2a723ce-99f1-49c0-82bf-f2f7a9dafbb8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utill\GridEditor">
-      <UniqueIdentifier>{691bb130-1694-4038-9f18-04da55c06bfa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
@@ -106,9 +91,6 @@
     </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Component</Filter>
-    </ClInclude>
-    <ClInclude Include="World.h">
-      <Filter>World</Filter>
     </ClInclude>
     <ClInclude Include="Object.h">
       <Filter>Object</Filter>
@@ -136,12 +118,6 @@
     </ClInclude>
     <ClInclude Include="RigidbodyComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderComponent.h">
-      <Filter>Component\RenderComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="GameManager.h">
-      <Filter>Manager\GameManager</Filter>
     </ClInclude>
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Component\BTComponent</Filter>
@@ -182,9 +158,6 @@
     <ClInclude Include="MeshEditor.h">
       <Filter>Utill\MeshEditor</Filter>
     </ClInclude>
-    <ClInclude Include="GridEditor.h">
-      <Filter>Utill\GridEditor</Filter>
-    </ClInclude>
     <ClInclude Include="CharacterController.h">
       <Filter>Component\PhysicsComponent</Filter>
     </ClInclude>
@@ -218,27 +191,6 @@
     <None Include="README.md">
       <Filter>MD</Filter>
     </None>
-    <None Include="x64\Assets\Shaders\BRDF.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\Material.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\Phong.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\Sampler.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\Shading.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\Lighting.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="x64\Assets\Shaders\ACES.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp">
@@ -250,9 +202,6 @@
     <ClCompile Include="InputManager.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
-    <ClCompile Include="World.cpp">
-      <Filter>World</Filter>
-    </ClCompile>
     <ClCompile Include="Object.cpp">
       <Filter>Object</Filter>
     </ClCompile>
@@ -261,12 +210,6 @@
     </ClCompile>
     <ClCompile Include="PathFinding.cpp">
       <Filter>Utill\PathFinding</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderComponent.cpp">
-      <Filter>Component\RenderComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="GameManager.cpp">
-      <Filter>Manager\GameManager</Filter>
     </ClCompile>
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Component\BTComponent</Filter>
@@ -298,9 +241,6 @@
     <ClCompile Include="SphereColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="GridEditor.cpp">
-      <Filter>Utill\GridEditor</Filter>
-    </ClCompile>
     <ClCompile Include="CharacterController.cpp">
       <Filter>Utill</Filter>
       <Filter>Component\PhysicsComponent</Filter>
@@ -325,73 +265,5 @@
     <Text Include="ObjectLIst.txt">
       <Filter>Object</Filter>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="x64\Assets\Shaders\Blit.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Deferred.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Forward.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Fullscreen.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\GBuffer.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\IntegrateBRDF.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\IrradianceMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\RectToCubeMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ShadowMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Skybox.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Skybox.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\SpecularPreFilter.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Sprite.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\SSAO.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ToneMapReinhard.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\VertexShader.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\WireFrame.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ToneMapACES.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\WireFrame.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Grid.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="FXAA.cs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>

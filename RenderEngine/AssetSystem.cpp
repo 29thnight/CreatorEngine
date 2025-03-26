@@ -1,5 +1,6 @@
 #include "AssetSystem.h"
 #include "HLSLCompiler.h"
+#include "Banchmark.hpp"
 
 AssetSystem::~AssetSystem()
 {
@@ -13,17 +14,35 @@ void AssetSystem::LoadShaders()
 {
 	try
 	{
+		Banchmark banch;
 		file::path shaderpath = PathFinder::Relative("Shaders\\");
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))
 		{
-			if (dir.is_directory())
+			if (dir.is_directory() || dir.path().extension() != ".hlsl")
 				continue;
 
-			if (dir.path().extension() == ".hlsl")
+			file::path cso = shaderpath.string() + dir.path().stem().string() + ".cso";
+
+			if (file::exists(cso))
+			{
+				auto hlslTime = file::last_write_time(dir.path());
+				auto csoTime = file::last_write_time(cso);
+
+				if (hlslTime > csoTime)
+				{
+					AddShaderFromPath(dir.path());
+				}
+				else
+				{
+					AddShaderFromPath(cso);
+				}
+			}
+			else
 			{
 				AddShaderFromPath(dir.path());
 			}
 		}
+		std::cout << "Shaders loaded in " << banch.GetElapsedTime() << "ms" << std::endl;
 	}
 	catch (const file::filesystem_error& e)
 	{
