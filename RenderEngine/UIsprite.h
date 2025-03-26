@@ -8,6 +8,7 @@ struct alignas(16) UiInfo
 {
 	Mathf::xMatrix world;
 	float2 size;
+	float2 screenSize;
 };
 //이미지 여러장 저장용
 class UIsprite

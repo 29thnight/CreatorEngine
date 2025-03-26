@@ -42,6 +42,7 @@ void UIsprite::SetUI(Mathf::Vector2 position)
 	Mathf::Vector3 scale = { 1, 1, 1 };
 	Mathf::xMatrix world = Mathf::Matrix(trans, rotat, scale);
 	uiinfo.world = world;
+	uiinfo.screenSize =
 }
 
 
