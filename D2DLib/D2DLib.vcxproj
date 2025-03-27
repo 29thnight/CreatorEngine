@@ -143,26 +143,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Canvas.h" />
-    <ClInclude Include="CustomTextRenderer.h" />
-    <ClInclude Include="D2DBitmapScene.h" />
-    <ClInclude Include="D2DRenderer.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="pch.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Canvas.cpp" />
-    <ClCompile Include="CustomTextRenderer.cpp" />
-    <ClCompile Include="D2DBitmapScene.cpp" />
-    <ClCompile Include="D2DRenderer.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>

@@ -19,10 +19,7 @@ using float2 = DirectX::XMFLOAT2;
 using float3 = DirectX::XMFLOAT3;
 using float4 = DirectX::XMFLOAT4;
 
-#define alfloat3 alignas(16) float3
-#define alfloat4 alignas(16) float4
-#define alflag alignas(16) flag
-#define alstruct struct alignas(16) 
+#define cbuffer struct alignas(16) 
 
 using uint8  = uint8_t;
 using int8   = int8_t;

@@ -25,7 +25,6 @@ void InputManager::Update()
     memcpy(_prevControllerButtonState, _controllerButtonState, sizeof(bool) * 16);
     memcpy(_prevControllerState, _controllerState, sizeof(XINPUT_STATE) * MAX_CONTROLLER);
     UpdateControllerState();
-
 }
 
 bool InputManager::IsKeyDown(unsigned int key) const

@@ -117,6 +117,24 @@
     <Filter Include="Resources\UI">
       <UniqueIdentifier>{e871a5a5-bad3-4bfb-828b-c499a68ab3de}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\PostProcessingPass">
+      <UniqueIdentifier>{9f445704-d778-45d0-9458-9df3483a053d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{9ef1f0d4-2fc0-4420-b3e8-ef3f0993bac9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PostProcessShader">
+      <UniqueIdentifier>{30b90f09-5b8f-4b3f-aec4-1768f4c31870}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{a37c6bd8-a67c-4c9c-b2e8-12cd1128d3d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\EditorUseShader">
+      <UniqueIdentifier>{621bea8c-d333-4b90-9e2c-6527e1866ab4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PipelineShader">
+      <UniqueIdentifier>{8e767fa1-c4da-49fb-8661-5c3ac7f2f281}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -235,6 +253,9 @@
     </ClCompile>
     <ClCompile Include="UIsprite.cpp">
       <Filter>Resources\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="PostProcessingPass.cpp">
+      <Filter>RenderPass\PostProcessingPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -370,6 +391,118 @@
     <ClInclude Include="LightMap.h">
       <Filter>LightMap</Filter>
     </ClInclude>
+    <ClInclude Include="PostProcessingPass.h">
+      <Filter>RenderPass\PostProcessingPass</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\x64\Assets\Shaders\BlockFilterDownsample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur6x6_AxisX.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur6x6_AxisY.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur11x11_AxisX.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur11x11_AxisY.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\UpsampleAccumulate.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\SSAO.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\FXAA.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\ToneMapACES.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\ToneMapReinhard.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Grid.ps.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Grid.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\WireFrame.ps.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\WireFrame.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Blit.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Deferred.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Forward.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Fullscreen.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GBuffer.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\IntegrateBRDF.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\IrradianceMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\RectToCubeMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\ShadowMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Skybox.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Skybox.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\SpecularPreFilter.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sprite.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\VertexShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\x64\Assets\Shaders\Lighting.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\Material.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\Phong.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\Sampler.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\Shading.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\BRDF.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\x64\Assets\Shaders\ACES.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
     </ClInclude>

@@ -1,10 +1,14 @@
 #include "HLSLCompiler.h"
+#include "FileIO.h"
+#include "Banchmark.hpp"
 
 std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
 
 ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 {
+	Banchmark banch;
     file::path filePath{ filepath };
+	std::string fileExtension = filePath.extension().string();
 
 	if (m_shaderCache.find(filePath.string()) != m_shaderCache.end())
 	{
@@ -15,6 +19,8 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     ComPtr<ID3DBlob> errorBlob;
 
     flag compileFlag{};
+
+	std::cout << "Find Cache shader: " << filePath.string() << std::endl;
 
 #if defined(_DEBUG)
     compileFlag |= D3DCOMPILE_DEBUG;
@@ -39,25 +45,52 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
         return nullptr;
     }
 
-    HRESULT hResult = S_OK;
-
-    IncludeHandler includeHandler(filePath.parent_path().string());
-
-    hResult = D3DCompileFromFile(
-        filePath.c_str(),
-        NULL,
-        &includeHandler,
-        "main",
-        std::string(shaderExtension + "_5_0").c_str(),
-        compileFlag,
-        NULL,
-        shaderBlob.ReleaseAndGetAddressOf(),
-        errorBlob.ReleaseAndGetAddressOf()
-    );
-    if (!CheckResult(hResult, shaderBlob.Get(), errorBlob.Get()))
+	if (fileExtension == ".hlsl")
     {
-        OutputDebugStringA(static_cast<char*>(errorBlob->GetBufferPointer()));
-        return nullptr;
+        HRESULT hResult = S_OK;
+
+        IncludeHandler includeHandler(filePath.parent_path().string());
+
+        hResult = D3DCompileFromFile(
+            filePath.c_str(),
+            NULL,
+            &includeHandler,
+            "main",
+            std::string(shaderExtension + "_5_0").c_str(),
+            compileFlag,
+            NULL,
+            shaderBlob.ReleaseAndGetAddressOf(),
+            errorBlob.ReleaseAndGetAddressOf()
+        );
+        if (!CheckResult(hResult, shaderBlob.Get(), errorBlob.Get()))
+        {
+            OutputDebugStringA(static_cast<char*>(errorBlob->GetBufferPointer()));
+            return nullptr;
+        }
+
+		if (SUCCEEDED(hResult))
+		{
+			m_shaderCache[filePath.string()] = shaderBlob;
+            std::string csoPath = PathFinder::Relative("Shaders\\").string() + filePath.stem().string() + ".cso";
+			FileWriter writer{ csoPath };
+			writer.write(static_cast<char*>(shaderBlob->GetBufferPointer()), shaderBlob->GetBufferSize());
+			writer.flush();
+		}
+
+    }
+	else if (fileExtension == ".cso")
+    {
+		Banchmark banch;
+		HRESULT hResult = S_OK;
+		hResult = D3DReadFileToBlob(filePath.c_str(), shaderBlob.ReleaseAndGetAddressOf());
+		if (FAILED(hResult))
+		{
+			return nullptr;
+		}
+
+		m_shaderCache[filePath.string()] = shaderBlob;
+
+		std::cout << "Read cso in " << banch.GetElapsedTime() << "ms" << std::endl;
     }
 
     return shaderBlob;

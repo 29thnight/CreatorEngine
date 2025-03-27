@@ -28,7 +28,6 @@ float3 GetColor(int2 pos)
     return pow(Input[pos], 2.2f);
 }
 
-
 [numthreads(N, N, 1)]
 void main(uint3 ThreadID : SV_GroupThreadID, uint3 GroupID : SV_GroupID, uint3 DispatchID : SV_DispatchThreadID)
 {

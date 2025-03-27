@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <memory>
 #include <unordered_map>
-#include "RenderComponent.h"
 #include "BoxColliderComponent.h"
 #include "RigidbodyComponent.h"
 #include "Utility_Framework/Logger.h"
