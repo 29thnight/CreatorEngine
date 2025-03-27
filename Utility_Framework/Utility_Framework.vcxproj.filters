@@ -73,6 +73,9 @@
     <Filter Include="ImGuiLogger">
       <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Logger\NewLogger">
+      <UniqueIdentifier>{e6a02140-6a0b-462d-93c7-29d122b93236}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -177,6 +180,18 @@
     <ClInclude Include="Core.Runtime.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
+    <ClInclude Include="LogEntry.h">
+      <Filter>Core.Logger\NewLogger</Filter>
+    </ClInclude>
+    <ClInclude Include="RingBuffer.h">
+      <Filter>Core.Logger\NewLogger</Filter>
+    </ClInclude>
+    <ClInclude Include="LogSink.h">
+      <Filter>Core.Logger\NewLogger</Filter>
+    </ClInclude>
+    <ClInclude Include="LogSystem.h">
+      <Filter>Core.Logger\NewLogger</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -200,6 +215,7 @@
     <ClCompile Include="LogMessage.cpp">
       <Filter>Core.Logger</Filter>
     </ClCompile>
+    <ClCompile Include="LogSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="MemoryPool.inl">

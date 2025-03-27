@@ -8,3 +8,4 @@
 #include "LogIOWriter.h"
 #include "Logger.h"
 #include "CSVLoader.h"
+#include "LogSystem.h"

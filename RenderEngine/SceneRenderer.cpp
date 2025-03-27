@@ -473,12 +473,13 @@ void SceneRenderer::Render()
 		if (nullptr == camera) continue;
 		//[1] ShadowMapPass
 		{
-			//Banchmark banch;
+			static int count = 0;
+			Banchmark banch;
 			camera->ClearRenderTarget();
 			m_currentScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-
+			Debug->Log("ShadowMapPass : " + std::to_string(count++));
 			//std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
@@ -658,11 +659,41 @@ void SceneRenderer::EditorView()
 
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height, window_flags)) {
         if (ImGui::BeginMenuBar()) {
-            ImGui::Text("Happy status bar");
+            ImGui::Text("Log :");
+
+			ImGui::SameLine();
+
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 255, 255));
+			ImVec2 pos = ImGui::GetCursorScreenPos();
+			ImVec2 size = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str());
+			if (ImGui::InvisibleButton("##last_log_btn", size)) {
+				m_bShowLogWindow = true;
+			}
+			bool hovered = ImGui::IsItemHovered();
+			bool clicked = ImGui::IsItemClicked();
+
+			if (hovered) 
+			{
+				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+			}
+
+			// 텍스트를 그리기
+			ImDrawList* drawList = ImGui::GetWindowDrawList();
+			pos.y += 5;
+			drawList->AddText(pos, IM_COL32(255, 255, 255, 255), Debug->GetBackLogMessage().c_str());
+
+			//ImGui::Text();
+			ImGui::PopStyleColor();
+
             ImGui::EndMenuBar();
         }
         ImGui::End();
     }
+
+	if (m_bShowLogWindow)
+	{
+		ShowLogWindow();
+	}
 
 	auto obj = m_currentScene->GetSelectSceneObject();
 	if (obj) 
@@ -707,4 +738,61 @@ void SceneRenderer::EditorView()
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();
+}
+
+void SceneRenderer::ShowLogWindow()
+{
+	static int levelFilter = spdlog::level::trace;
+	bool isClear = Debug->IsClear();
+
+	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
+	ImGui::Combo("Log Level", &levelFilter,
+		"Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
+	ImGui::SameLine();
+	if (ImGui::Button("Clear"))
+	{
+		Debug->Clear();
+	}
+
+	float sizeX = ImGui::GetContentRegionAvail().x;
+	float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
+
+	if (isClear)
+	{
+		Debug->toggleClear();
+		ImGui::End();
+		return;
+	}
+
+	auto entries = Debug->get_entries();
+	for (size_t i = 0; i < entries.size(); i++)
+	{
+		const auto& entry = entries[i];
+		bool is_selected = (i == selected_log_index);
+
+		ImVec4 color;
+		switch (entry.level)
+		{
+		case spdlog::level::info: color = ImVec4(1, 1, 1, 1); break;
+		case spdlog::level::warn: color = ImVec4(1, 1, 0, 1); break;
+		case spdlog::level::err:  color = ImVec4(1, 0.4f, 0.4f, 1); break;
+		default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+		}
+
+		// 선택 시 배경색
+		if (is_selected)
+			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
+
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
+		if (ImGui::Selectable(entry.message.c_str(), is_selected))
+			selected_log_index = i;
+		ImGui::PopStyleColor(); // Text color
+
+		if (is_selected)
+			ImGui::PopStyleColor(); // Header color
+	}
+
+	ImGui::End();
+
+
 }

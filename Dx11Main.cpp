@@ -134,6 +134,8 @@ bool DirectX11::Dx11Main::Render()
 #endif // !EDITOR
 
 	InputManagement->Update();
+	Debug->Flush();
+
 	return true;
 }
 

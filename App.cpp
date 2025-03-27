@@ -2,7 +2,6 @@
 #include "InputManager.h"
 #include "Utility_Framework/PathFinder.h"
 #include "Utility_Framework/DumpHandler.h"
-#include "Utility_Framework/Core.Console.hpp"
 #include "Utility_Framework/CoreWindow.h"
 #include "CustomWindowDefine.h"
 #include <imgui_impl_win32.h>
@@ -19,6 +18,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	PathFinder::Initialize();
 	Log::startLOG("logs.db");
+	Log::Initialize();
 	Concurrency::SchedulerPolicy policy
 	{
 		3,
@@ -44,6 +44,8 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 	Core::App app;
 	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
+
+	Log::Finalize();
 
 	return 0;
 }

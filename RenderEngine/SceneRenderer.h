@@ -87,9 +87,13 @@ private:
 public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }
 private:
+	int selected_log_index{};
 	bool useWireFrame = false;
+	bool m_bIsClicked{ false };
+	bool m_bShowLogWindow{ false };
 
 public:
 	void EditorView();
+	void ShowLogWindow();
 	void EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam);
 };
