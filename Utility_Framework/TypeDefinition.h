@@ -46,19 +46,22 @@ enum class MouseKey : int
 
 enum class ControllerButton : int
 {
-    A = 0,
+   A = 0,
 	B,
 	X,
-	Y,
+	Y =3,
 	DPAD_UP,
 	DPAD_DOWN,
 	DPAD_LEFT,
 	DPAD_RIGHT,
-	START_BUTTON,
+	START_BUTTON =8,
 	BACK_BUTTON,
-	LEFT_SHOULDER,
+	LEFT_SHOULDER =10,
 	RIGHT_SHOULDER,
-	MAX = 12
+	LEFT_Thumbstick,
+	RIGHT_Thumbstick,
+	None =14,
+	MAX = 15,
 };
 
 struct BitFlag

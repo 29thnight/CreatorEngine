@@ -1,5 +1,5 @@
 #include "KeyState.h"
-#include "GameInputManager.h"
+#include "InputManager.h"
 void KeyboardState::Update()
 {
 
@@ -8,16 +8,16 @@ void KeyboardState::Update()
 		switch (keyboardkeyStates[i])
 		{
 		case KeyState::Pressed:
-			keyboardkeyStates[i] = GInputManagement->curkeyStates[i] ? KeyState::Hold : KeyState::Released;
+			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Hold : KeyState::Released;
 			break;
 		case KeyState::Hold:
-			keyboardkeyStates[i] = GInputManagement->curkeyStates[i] ? KeyState::Hold : KeyState::Released;
+			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Hold : KeyState::Released;
 			break;
 		case KeyState::Released:
-			keyboardkeyStates[i] = GInputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Idle;
+			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Idle;
 			break;
 		case KeyState::Idle:
-			keyboardkeyStates[i] = GInputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Idle;
+			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Idle;
 			break;
 		}
 	}
@@ -31,16 +31,16 @@ void MouseState::Update()
 		switch (mousekeyStates[i])
 		{
 		case KeyState::Pressed:
-			mousekeyStates[i] = GInputManagement->curmouseState[i] ? KeyState::Hold : KeyState::Released;
+			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Hold : KeyState::Released;
 			break;
 		case KeyState::Hold:
-			mousekeyStates[i] = GInputManagement->curmouseState[i] ? KeyState::Hold : KeyState::Released;
+			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Hold : KeyState::Released;
 			break;
 		case KeyState::Released:
-			mousekeyStates[i] = GInputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Idle;
+			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Idle;
 			break;
 		case KeyState::Idle:
-			mousekeyStates[i] = GInputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Idle;
+			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Idle;
 			break;
 		}
 	}
@@ -60,16 +60,16 @@ void PadState::Update()
 			switch (padkeyStates[padnum][i])
 			{
 			case KeyState::Pressed:
-				padkeyStates[padnum][i] = GInputManagement->curpadState[padnum][i] ? KeyState::Hold : KeyState::Released;
+				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Hold : KeyState::Released;
 				break;
 			case KeyState::Hold:
-				padkeyStates[padnum][i] = GInputManagement->curpadState[padnum][i] ? KeyState::Hold : KeyState::Released;
+				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Hold : KeyState::Released;
 				break;
 			case KeyState::Released:
-				padkeyStates[padnum][i] = GInputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Idle;
+				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Idle;
 				break;
 			case KeyState::Idle:
-				padkeyStates[padnum][i] = GInputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Idle;
+				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Idle;
 				break;
 			}
 		}

@@ -157,10 +157,10 @@
     <ClInclude Include="Dx11Main.h" />
     <ClInclude Include="EventSystem.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="GameInputManager.h" />
     <ClInclude Include="GameManager.h" />
     <ClInclude Include="GridEditor.h" />
     <ClInclude Include="InputManager.h" />
+    <ClInclude Include="InputManager2.h" />
     <ClInclude Include="InteractableComponent.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="MeshEditor.h" />
@@ -190,8 +190,8 @@
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Dx11Main.cpp" />
     <ClCompile Include="EventSystem.cpp" />
-    <ClCompile Include="GameInputManager.cpp" />
     <ClCompile Include="InputManager.cpp" />
+    <ClCompile Include="InputManager2.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshEditor.cpp" />
     <ClCompile Include="Object.cpp" />

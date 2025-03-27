@@ -52,14 +52,6 @@ private:
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 
 	
-
-	
-
-
-	float2 m_Size{};
-	float2 m_Center{};
-
-	
 	std::vector<UIvertex> UIQuad
 	{
 		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } }, // аб╩С╢э

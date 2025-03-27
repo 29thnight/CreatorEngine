@@ -1,12 +1,12 @@
 #pragma once
 #include "Utility_Framework/Core.Definition.h"
-#include "InputManager.h"
+
 constexpr DWORD KEYBOARD_COUNT = 255;
 constexpr int mouseCount = 3;
 constexpr int padKeyCount = 15;
-//constexpr DWORD MAX_CONTROLLER = 4;
+constexpr DWORD MAX_CONTROLLER = 4;
 
-class GameInputManager;
+
 
 enum class InputType
 {

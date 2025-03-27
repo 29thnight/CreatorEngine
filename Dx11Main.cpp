@@ -9,7 +9,6 @@
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
-#include "GameInputManager.h"
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
 	m_deviceResources->RegisterDeviceNotify(this);
@@ -77,7 +76,8 @@ void DirectX11::Dx11Main::Update()
 		//렌더러의 업데이트 코드를 여기에 추가합니다.
 	
 		Sound->update();
-		InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트
+		InputManagement->Update(m_timeSystem.GetElapsedSeconds());
+		//InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
 	});
 
 	if (InputManagement->IsKeyReleased(VK_F5))
@@ -132,8 +132,6 @@ bool DirectX11::Dx11Main::Render()
 		m_imguiRenderer->EndRender();
 	}
 #endif // !EDITOR
-	GInputManagement->Update();
-	InputManagement->Update();
 	return true;
 }
 
