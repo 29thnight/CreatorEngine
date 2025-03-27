@@ -15,6 +15,7 @@ cbuffer BloomBuffer
 
 cbuffer DownSampledBuffer
 {
+	//***** float2-> int2
 	int2 inputSize;
 	int2 outputSize;
 };
@@ -45,6 +46,7 @@ private:
 	void BloomPass(Scene& scene, Camera& camera);
 
 private:
+	//***** uint32
 	const uint32 BloomBufferWidth = 240;
 	const uint32 BloomBufferHeight = 135;
 

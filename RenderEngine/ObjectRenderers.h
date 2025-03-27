@@ -33,3 +33,4 @@ struct Animator : public Renderable
     uint32_t m_AnimIndexChosen = 0;
     DirectX::XMMATRIX m_FinalTransforms[Skeleton::MAX_BONES];
 };
+

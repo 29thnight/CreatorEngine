@@ -1,119 +1,154 @@
 #pragma once
+#include <GameInput.h>
 #include "Utility_Framework/Core.Definition.h"
+#include "Utility_Framework/Core.Mathf.h"
+#include "KeyState.h"
 
-#pragma comment(lib, "Xinput.lib")
+//일단 테스트용으로 몇개만 넣어둠
+enum  KeyBoard
+{
+	A = 0x41,
+	B = 0x42,
+	C = 0x43,
+	D = 0x44,
+	E = 0x45,
+	F = 0x46,
+	G = 0x47,
+	H = 0x48,
+	I = 0x49,
+	J = 0x4A,
+	K = 0x4B,
+	L = 0x4C,
+	M = 0x4D,
+	N = 0x4E,
+	O = 0x4F,
+	P = 0x50,
+	Q = 0x51,
+	R = 0x52,
+	S = 0x53,
+	T = 0x54,
+	U = 0x55,
+	V = 0x56,
+	W = 0x57,
+	X = 0x58,
+	Y = 0x59,
+	Z = 0x5A,
+	LeftArrow = 0x25,
+	UpArrow = 0x26,
+	RightArrow = 0x27,
+	DownArrow = 0x28,
 
-constexpr int KEY_COUNT = 256;
-constexpr int MOUSE_BUTTON_COUNT = 3;
-constexpr DWORD MAX_CONTROLLER = 4; // 최대 4개의 컨트롤러를 지원
 
+	None = 9999,
+
+};
+
+
+
+using namespace Microsoft::WRL;
 class InputManager : public Singleton<InputManager>
 {
-private:
 	friend class Singleton;
-
 private:
 	InputManager() = default;
 	~InputManager() = default;
-
+	HWND hwnd{};
 public:
-	void Initialize(HWND hwnd);
-	HWND GetHwnd() const;
-	void Update();
+	bool Initialize(HWND _hwnd);
 
+	void Update(float deltaTime);
+	//void ImGuiUpdate();
+
+
+
+	ComPtr<IGameInput> gameInput;
+
+	//키보드 마우스
 public:
+	void KeyBoardUpdate();
 	bool IsKeyDown(unsigned int key) const;
 	bool IsKeyPressed(unsigned int key) const;
 	bool IsKeyReleased(unsigned int key) const;
-	bool IsCapsLockOn() const;
 
-public:
-	bool IsMouseButtonDown(MouseKey button) const;
-	bool IsMouseButtonPressed(MouseKey button) const;
-	bool IsMouseButtonReleased(MouseKey button) const;
+	//키 세팅 변경용?
+	bool IsAnyKeyPressed();
+	bool changeKeySet(KeyBoard& changekey);
 
-public:
+
+	void MouseUpdate();
+
 	void SetMousePos(POINT pos);
-	float2 GetMousePos() const;
+	float2 GetMousePos();
 	float2 GetMouseDelta() const;
-	void SetCursorPos(int x, int y);
-	void GetCursorPos(LPPOINT lpPoint);
+	bool IsWheelUp();
+	bool IsWheelDown();
+	bool IsMouseButtonDown(MouseKey button);
+	bool IsMouseButtonPressed(MouseKey button);
+	bool IsMouseButtonReleased(MouseKey button);
 	void HideCursor();
 	void ShowCursor();
 	void ResetMouseDelta();
-	short GetMouseWheelDelta() const;
+	short GetWheelDelta() const;
+	KeyboardState keyboardstate{};
+	std::vector<GameInputKeyState> GkeyStates = {};
+	GameInputMouseState GmouseState{};
+	bool  curkeyStates[KEYBOARD_COUNT] = {};
 
-public:
-	void ProcessRawInput(LPARAM lParam);
-	void ImGuiUpdate(WPARAM wParam);
-	void RegisterRawInputDevices();
-
-	// XInput 컨트롤러 관련 함수
-public:
-	void ProcessControllerInput(DWORD controllerIndex);
-	void UpdateControllerState();
-
-public:
-	bool IsControllerConnected(DWORD controllerIndex) const;
-	bool IsControllerButtonDown(DWORD controllerIndex, ControllerButton button) const;
-	bool IsControllerButtonPressed(DWORD controllerIndex, ControllerButton button) const;
-	bool IsControllerButtonReleased(DWORD controllerIndex, ControllerButton button) const;
-	bool IsControllerTriggerL(DWORD controllerIndex) const;
-	bool IsControllerTriggerR(DWORD controllerIndex) const;
-	float2 GetControllerThumbL(DWORD controllerIndex) const;
-	float2 GetControllerThumbR(DWORD controllerIndex) const;
-
-	//컨트롤러 진동
-public:
-	void SetControllerVibration(DWORD controllerIndex, float leftMotorSpeed, float rightMotorSpeed); 
-	void UpdateControllerVibration(float tick);
-	void SetControllerVibrationTime(DWORD controllerIndex, float time);
+	bool curmouseState[mouseCount] = {};
 private:
-	HWND _hWnd{ nullptr };
-	RAWINPUTDEVICE _rawInputDevices[2]{};
 
-private:
-	bool _keyState[KEY_COUNT]{};
-	bool _prevKeyState[KEY_COUNT]{};
-	bool _isCapsLockOn{ false };
+	//키보드
 
-private:
-	bool _mouseState[MOUSE_BUTTON_COUNT]{};
-	bool _prevMouseState[MOUSE_BUTTON_COUNT]{};
+	KeyBoard pressKey = KeyBoard::None;
+	//마우스
 
-private:
-	POINT _prevMousePos{};
-	POINT _mousePos{};
+	MouseState   mousestate;
+
+	float2 _prevMousePos{};
+	float2 _mousePos{};
 	float2 _mouseDelta{};
+	//마우스 휠?
+
 	short _mouseWheelDelta{};
+	short _premouseWheelDelta{};
 
-private:
-	bool _isCursorHidden{ false };
+	bool _isCursorHidden = false;
+	//이 아래는 패드 컨트롤러
+public:
 
 
-	// XInput 컨트롤러 관련 변수
-private:
-	XINPUT_STATE _controllerState[MAX_CONTROLLER]{}; //4개의 컨트롤러 상태를 저장
-	XINPUT_CAPABILITIES _controllerCapabilities[MAX_CONTROLLER]{}; //4개의 컨트롤러 기능을 저장
-	XINPUT_STATE _prevControllerState[MAX_CONTROLLER]{}; //4개의 컨트롤러 이전 상태를 저장
+	void PadUpdate();
+	void GamePadUpdate();
+
+	bool IsControllerConnected(DWORD Index);
+	bool IsControllerButtonDown(DWORD index, ControllerButton btn) const;
+	bool IsControllerButtonPressed(DWORD index, ControllerButton btn) const;
+	bool IsControllerButtonReleased(DWORD index, ControllerButton btn) const;
+
+	bool IsControllerTriggerL(DWORD index) const;
+	bool IsControllerTriggerR(DWORD index) const;
+	Mathf::Vector2 GetControllerThumbL(DWORD index) const;
+	Mathf::Vector2 GetControllerThumbR(DWORD index) const;
+
+	void SetControllerVibration(DWORD Index, float leftMotorSpeed, float rightMotorSpeed,float lowFre,float highFre);
+	void UpdateControllerVibration(float tick);
+	void SetControllerVibrationTime(DWORD Index, float time);
+	GameInputGamepadState GpadState[MAX_CONTROLLER];
+	bool curpadState[MAX_CONTROLLER][padKeyCount]{};
 	
+	//패드 최솟값
+	float deadZone = 0.24f;
+	float triggerdeadZone = 0.1f;
 private:
-	bool _controllerConnected[MAX_CONTROLLER]{}; // 컨트롤러 연결 여부
-	bool _controllerPrevConnected[MAX_CONTROLLER]{}; // 컨트롤러 이전 연결 여부
+	IGameInputDevice* device[4];
 
-private:
-	bool _controllerButtonState[MAX_CONTROLLER][12]{}; // A, B, X, Y / DPad Up, Down, Left, Right / Start, Back / LShoulder, RShoulder
-	bool _prevControllerButtonState[MAX_CONTROLLER][12]{}; // A, B, X, Y / DPad Up, Down, Left, Right / Start, Back / LShoulder, RShoulder
-	short _controllerThumbLX[MAX_CONTROLLER]{}; // 왼쪽 스틱 X
-	short _controllerThumbLY[MAX_CONTROLLER]{}; // 왼쪽 스틱 Y
-	short _controllerThumbRX[MAX_CONTROLLER]{}; // 오른쪽 스틱 X
-	short _controllerThumbRY[MAX_CONTROLLER]{}; // 오른쪽 스틱 Y
-	BYTE _controllerTriggerL[MAX_CONTROLLER]{}; // 왼쪽 트리거
-	BYTE _controllerTriggerR[MAX_CONTROLLER]{}; // 오른쪽 트리거
+	PadState padState{};
+	float2 _controllerThumbL[MAX_CONTROLLER]{};
+	float2 _controllerThumbR[MAX_CONTROLLER]{};
+	float _controllerTriggerL[MAX_CONTROLLER]{}; // 왼쪽 트리거
+	float _controllerTriggerR[MAX_CONTROLLER]{}; // 오른쪽 트리거
 
-private:
 	float _controllerVibrationTime[MAX_CONTROLLER]{};
-	XINPUT_VIBRATION _controllerVibration[MAX_CONTROLLER]{};
 };
 
 inline static auto& InputManagement = InputManager::GetInstance();

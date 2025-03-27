@@ -56,7 +56,10 @@ public:
 
 	std::string m_name;
 
+	float2 GetImageSize() const;
+
 private:
+	float2 size{};
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
 };
 

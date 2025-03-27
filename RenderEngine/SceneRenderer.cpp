@@ -214,6 +214,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//GridPass
     m_pGridPass = std::make_unique<GridPass>();
 
+
+	m_pUIPass = std::make_unique<UIPass>();
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
+
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
 }
@@ -432,7 +436,24 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
 
 		model = Model::LoadModel("bangbooExport.fbx");
+		//model = Model::LoadModel("Link_SwordAnimation.fbx");
+		testUI.Loadsprite("test2.png");
+		testUI.SetTexture();
+		testUI.SetUI({ 200,200 },2);
 
+
+		ImGui::ContextRegister("Test UI", true, [&]()
+		{
+			if (ImGui::Button("Add UI"))
+			{
+				m_pUIPass->pushUI(&testUI);
+			}
+			ImGui::SliderFloat3("pos", &testUI.trans.x, -1, 1);
+			ImGui::SliderFloat3("scale", &testUI.scale.x, -1, 1);
+
+		});
+
+	
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))
@@ -464,6 +485,7 @@ void SceneRenderer::Update(float deltaTime)
 	m_currentScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
 	PrepareRender();
+	m_pUIPass->Update(deltaTime);
 }
 
 void SceneRenderer::Render()
@@ -557,12 +579,19 @@ void SceneRenderer::Render()
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
-		//[9] BlitPass
+		//[]  UIPass
+		{
+			
+			m_pUIPass->Execute(*m_currentScene, *camera);
+		}
+		//[8] BlitPass
 		{
 			//Banchmark banch;
 			m_pBlitPass->Execute(*m_currentScene, *camera);
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
+
+		
 	}
 
 	m_pGBufferPass->ClearDeferredQueue();

@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "Sampler.h"
 
+#pragma warning(disable: 2398)
 PostProcessingPass::PostProcessingPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();

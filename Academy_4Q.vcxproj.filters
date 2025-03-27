@@ -86,7 +86,7 @@
     <ClInclude Include="Dx11Main.h">
       <Filter>Dx11Main</Filter>
     </ClInclude>
-    <ClInclude Include="InputManager.h">
+    <ClInclude Include="InputManager2.h">
       <Filter>Manager\InputManager</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
@@ -170,6 +170,18 @@
     <ClInclude Include="CustomWindowDefine.h">
       <Filter>Window</Filter>
     </ClInclude>
+    <ClInclude Include="KeyState.h">
+      <Filter>Manager\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="GameManager.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="GridEditor.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="InputManager.h">
+      <Filter>Manager\InputManager</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">
@@ -199,7 +211,7 @@
     <ClCompile Include="Dx11Main.cpp">
       <Filter>Dx11Main</Filter>
     </ClCompile>
-    <ClCompile Include="InputManager.cpp">
+    <ClCompile Include="InputManager2.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
     <ClCompile Include="Object.cpp">
@@ -259,6 +271,12 @@
     </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="KeyState.cpp">
+      <Filter>Manager\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="InputManager.cpp">
+      <Filter>Manager\InputManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

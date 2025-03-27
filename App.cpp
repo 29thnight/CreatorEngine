@@ -7,7 +7,6 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
-
 #ifdef UNICODE
 #pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console")
 #else
@@ -104,7 +103,7 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
-	InputManagement->ProcessRawInput(lParam);
+	//InputManagement->ProcessRawInput(lParam); *****
 
 	return 0;
 }
