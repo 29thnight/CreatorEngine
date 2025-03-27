@@ -16,7 +16,7 @@ cbuffer BloomBuffer
 cbuffer DownSampledBuffer
 {
 	//***** float2-> int2
-	float2 inputSize;
+	int2 inputSize;
 	int2 outputSize;
 };
 
@@ -47,8 +47,8 @@ private:
 
 private:
 	//***** uint32
-	const int32 BloomBufferWidth = 240;
-	const int32 BloomBufferHeight = 135;
+	const uint32 BloomBufferWidth = 240;
+	const uint32 BloomBufferHeight = 135;
 
 	PostProcessingApply m_PostProcessingApply;
 	Texture* m_CopiedTexture;
