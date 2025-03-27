@@ -437,9 +437,9 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
-		testUI.Loadsprite("test2.png");
-		testUI.SetTexture();
-		testUI.SetUI({ 200,200 },2);
+		//testUI.Loadsprite("test2.png");
+		//testUI.SetTexture();
+		//testUI.SetUI({ 200,200 },2);
 
 
 		ImGui::ContextRegister("Test UI", true, [&]()
