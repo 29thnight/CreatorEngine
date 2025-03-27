@@ -190,6 +190,7 @@
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Dx11Main.cpp" />
     <ClCompile Include="EventSystem.cpp" />
+    <ClCompile Include="GameInputManager.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshEditor.cpp" />

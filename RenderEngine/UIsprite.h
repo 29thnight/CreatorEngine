@@ -4,8 +4,8 @@ class Texture;
 
 struct UIvertex
 {
-	DirectX::XMFLOAT3 position; // 3D 위치
-	DirectX::XMFLOAT2 texCoord; // 텍스처 좌표
+	DirectX::XMFLOAT3 position; 
+	DirectX::XMFLOAT2 texCoord; 
 };
 
 struct alignas(16) UiInfo
@@ -62,10 +62,10 @@ private:
 	
 	std::vector<UIvertex> UIQuad
 	{
-		{ { -1.0f, 1.0f, 0.2f}, { 0.0f, 0.0f } }, // 좌상단
-		{ { 1.0f,  1.0f, 0.2f}, { 1.0f, 0.0f} }, // 우상단
-		{ { 1.0f, -1.0f, 0.2f}, { 1.0f, 1.0f} }, // 우하단
-		{ {-1.0f, -1.0f, 0.2f}, {0.0f, 1.0f} }, // 좌하단
+		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } }, // 좌상단
+		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} }, // 우상단
+		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} }, // 우하단
+		{ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} }, // 좌하단
 
 	};
 	std::vector<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };

@@ -176,6 +176,12 @@
     <ClInclude Include="KeyState.h">
       <Filter>Manager\InputManager</Filter>
     </ClInclude>
+    <ClInclude Include="GameManager.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="GridEditor.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">
@@ -266,10 +272,10 @@
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="GameInputManager.cpp">
+    <ClCompile Include="KeyState.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
-    <ClCompile Include="KeyState.cpp">
+    <ClCompile Include="GameInputManager.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
   </ItemGroup>
@@ -277,79 +283,5 @@
     <Text Include="ObjectLIst.txt">
       <Filter>Object</Filter>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="x64\Assets\Shaders\Blit.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Deferred.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Forward.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Fullscreen.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\GBuffer.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\IntegrateBRDF.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\IrradianceMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\RectToCubeMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ShadowMap.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Skybox.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Skybox.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\SpecularPreFilter.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Sprite.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\SSAO.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ToneMapReinhard.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\VertexShader.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\WireFrame.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\ToneMapACES.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\WireFrame.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Grid.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\Grid.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="FXAA.cs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\UI.ps.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="x64\Assets\Shaders\UI.vs.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>
