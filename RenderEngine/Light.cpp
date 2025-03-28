@@ -119,7 +119,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 	hasLightWithShadows = true;
 }
 
-void LightController::RenderAnyShadowMap(Scene& scene, Camera& camera)
+void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 {
 	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
 	{

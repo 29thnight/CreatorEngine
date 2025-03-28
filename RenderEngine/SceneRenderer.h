@@ -1,6 +1,6 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "DeviceResources.h"
+#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/DeviceResources.h"
 #include "ShadowMapPass.h"
 #include "GBufferPass.h"
 #include "SSAOPass.h"
@@ -18,6 +18,7 @@
 #include "Camera.h"
 #include "UIsprite.h"
 #include "UIPass.h"
+
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -41,6 +42,7 @@ private:
 	void UnbindRenderTargets();
 
 	Scene* m_currentScene{};
+	RenderScene* m_renderScene{};
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
 
 	ID3D11DepthStencilView* m_depthStencilView{};
@@ -80,7 +82,7 @@ private:
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
 	//render queue
-	std::queue<SceneObject*> m_forwardQueue;
+	std::queue<GameObject*> m_forwardQueue;
 
 	Model* model{};
 	Model* testModel{};
@@ -98,5 +100,5 @@ private:
 public:
 	void EditorView();
 	void ShowLogWindow();
-	void EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam);
+	void EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam);
 };

@@ -1,6 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "DeviceResources.h"
+#include "RenderScene.h"
 #include "PSO.h"
 
 enum RTV_Type
@@ -12,15 +11,13 @@ enum RTV_Type
 	RTV_TypeMax
 };
 
-class Camera;
-class Scene;
 class IRenderPass abstract
 {
 public:
 	IRenderPass() = default;
 	virtual ~IRenderPass() = default;
 
-	virtual void Execute(Scene& scene, Camera& camera) abstract;
+	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
 	virtual void ControlPanel() {};
 
 protected:

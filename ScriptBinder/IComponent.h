@@ -7,8 +7,7 @@
 
 interface IComponent
 {
-	virtual void Initialize() {};
-	virtual void FixedUpdate(float fixedTick) {};
-	virtual void Update(float tick) {};
-	virtual void LateUpdate(float tick) {};
+	virtual std::string ToString() const = 0;
+	virtual uint32_t GetTypeID() const = 0;
+	virtual size_t GetInstanceID() const = 0;
 };

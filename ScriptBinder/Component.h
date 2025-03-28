@@ -1,29 +1,31 @@
 #pragma once
 #include "IComponent.h"
+#include "Transform.h"
+#include "TypeTrait.h"
 
-class Object;
+class GameObject;
 class Component : public IComponent
 {
+public:
 	Component() = default;
 	virtual ~Component() = default;
-	virtual void Initialize() override = 0;
-	virtual void FixedUpdate(float fixedTick) override = 0;
-	virtual void Update(float tick) override = 0;
-	virtual void LateUpdate(float tick) override = 0;
 
-	void SetOwner(Object* owner) { _owner = owner; }
-	Object* GetOwner() const { return _owner; }
+	void SetOwner(GameObject* owner) { m_pOwner = owner; }
+	GameObject* GetOwner() const { return m_pOwner; }
 
-	void SetDestroy() { _destroyMark = true; }
-	bool IsDestroyMark() const { return _destroyMark; }
+	void SetDestroy() { m_destroyMark = true; }
+	bool IsDestroyMark() const { return m_destroyMark; }
 
-	uint32 GetId() const { return _id; }
-	auto operator<=>(const Component& other) const { return _id <=> other._id; }
-
-	virtual uint32 ID() = 0;
+	uint32_t GetOrderID() const { return m_orderID; }
+	uint32_t GetTypeID() const override { return m_typeID; }
+	size_t GetInstanceID() const override { return m_instanceID; }
+	auto operator<=>(const Component& other) const { return m_typeID <=> other.m_typeID; }
 
 protected:
-	Object* _owner{};
-	uint32 _id{};
-	bool _destroyMark{};
+	GameObject* m_pOwner{};
+	Transform m_transform{};
+	size_t m_instanceID{};
+	const uint32_t m_typeID{ GENERATE_CLASS_GUID };
+	uint32_t m_orderID{};
+	bool m_destroyMark{};
 };

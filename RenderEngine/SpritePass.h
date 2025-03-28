@@ -11,7 +11,7 @@ public:
 	~SpritePass();
 
 	void Initialize(Texture* renderTarget);
-	void Execute(Scene& scene, Camera& camera) override;
+	void Execute(RenderScene& scene, Camera& camera) override;
 
 private:
 	Texture* m_RenderTarget{};

@@ -13,14 +13,14 @@ void FontManager::Initialize()
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create DWrite factory");
+		Debug->LogError("Failed to create DWrite factory");
 		throw std::exception("Failed to create DWrite factory");
 	}
 
 	hresult = m_DWriteFactory->CreateFontSetBuilder(&m_FontSetBuilder);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create font set builder");
+		Debug->LogError("Failed to create font set builder");
 		throw std::exception("Failed to create font set builder");
 	}
 
@@ -36,7 +36,7 @@ void FontManager::Initialize()
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create default font");
+		Debug->LogError("Failed to create default font");
 		throw std::exception("Failed to create default font");
 	}
 	else
@@ -65,11 +65,11 @@ void FontManager::LoadFonts()
 	}
 	catch (const file::filesystem_error& e)
 	{
-		Log::Warning("Could not load fonts" + std::string(e.what()));
+		Debug->LogWarning("Could not load fonts" + std::string(e.what()));
 	}
 	catch (const std::exception& e)
 	{
-		Log::Warning("Error" + std::string(e.what()));
+		Debug->LogWarning("Error" + std::string(e.what()));
 	}
 }
 
@@ -93,11 +93,11 @@ void FontManager::MonitorFiles()
 		}
 		catch (const file::filesystem_error& e)
 		{
-			Log::Warning("Could not load fonts" + std::string(e.what()));
+			Debug->LogWarning("Could not load fonts" + std::string(e.what()));
 		}
 		catch (const std::exception& e)
 		{
-			Log::Warning("Error" + std::string(e.what()));
+			Debug->LogWarning("Error" + std::string(e.what()));
 		}
 
 		if (uiFileCount != m_FontCount)
@@ -125,7 +125,7 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	hresult = m_DWriteFactory->CreateFontSetBuilder(&_pFontSetBuilder);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create font set builder");
+		Debug->LogError("Failed to create font set builder");
 		return hresult;
 	}
 
@@ -136,14 +136,14 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create font file reference");
+		Debug->LogError("Failed to create font file reference");
 		return hresult;
 	}
 
 	hresult = _pFontSetBuilder->AddFontFile(_pFontFile);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to add font file");
+		Debug->LogError("Failed to add font file");
 		return hresult;
 	}
 
@@ -153,14 +153,14 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	hresult = _pFontFile->Analyze(&isSupported, &fileType, nullptr, &numberOfFonts);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to analyze font file");
+		Debug->LogError("Failed to analyze font file");
 		return hresult;
 	}
 
 	hresult = _pFontSetBuilder->CreateFontSet(&_pFontSet);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create font set");
+		Debug->LogError("Failed to create font set");
 		return hresult;
 	}
 
@@ -170,7 +170,7 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create font collection from font set");
+		Debug->LogError("Failed to create font collection from font set");
 		return hresult;
 	}
 
@@ -180,14 +180,14 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to get font family");
+		Debug->LogError("Failed to get font family");
 		return hresult;
 	}
 
 	hresult = _pFontFamily->GetFamilyNames(&_pFontFamilyNames);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to get family names");
+		Debug->LogError("Failed to get family names");
 		return hresult;
 	}
 
@@ -195,7 +195,7 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	hresult = _pFontFamilyNames->GetString(0, familyName, MAX_PATH);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to get string");
+		Debug->LogError("Failed to get string");
 		return hresult;
 	}
 
@@ -203,7 +203,7 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	hresult = AddFont(familyName, fontSize, _pFontCollection, &_pNewFont);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to add font");
+		Debug->LogError("Failed to add font");
 		return hresult;
 	}
 	else
@@ -216,7 +216,7 @@ HRESULT FontManager::LoadFontFile(const file::path& fontFilePath, const file::pa
 	_pFontCollection->Release();
 	_pFontFamily->Release();
 
-	Log::Info("Loaded font: " + fontName.string());
+	Debug->Log("Loaded font: " + fontName.string());
 
 	return hresult;
 }
@@ -252,7 +252,7 @@ HRESULT FontManager::AddFont(const file::path& fontName, float fontSize, IDWrite
 	);
 	if (FAILED(hresult))
 	{
-		Log::Error("Failed to create text format");
+		Debug->LogError("Failed to create text format");
 		return hresult;
 	}
 

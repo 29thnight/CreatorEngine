@@ -113,7 +113,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -134,7 +134,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -158,7 +158,6 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
     <ClCompile Include="DeviceState.cpp" />
-    <ClCompile Include="drawing.cpp" />
     <ClCompile Include="FontManager.cpp" />
     <ClCompile Include="GBufferPass.cpp" />
     <ClCompile Include="GridPass.cpp" />
@@ -172,8 +171,7 @@
     <ClCompile Include="PostProcessingPass.cpp" />
     <ClCompile Include="PSO.cpp" />
     <ClCompile Include="Sampler.cpp" />
-    <ClCompile Include="Scene.cpp" />
-    <ClCompile Include="SceneObject.cpp" />
+    <ClCompile Include="RenderScene.cpp" />
     <ClCompile Include="SceneRenderer.cpp" />
     <ClCompile Include="ShadowMapPass.cpp" />
     <ClCompile Include="Skeleton.cpp" />
@@ -185,7 +183,6 @@
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
     <ClCompile Include="UI_DataSystem.cpp" />
-    <ClCompile Include="widgets.cpp" />
     <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -194,19 +191,16 @@
     <ClInclude Include="AssetSystem.h" />
     <ClInclude Include="BlitPass.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="LightProperty.h" />
     <ClInclude Include="Text.h" />
     <ClInclude Include="UIsprite.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />
     <ClInclude Include="DeviceState.h" />
-    <ClInclude Include="drawing.h" />
     <ClInclude Include="FontManager.h" />
     <ClInclude Include="ForwardPass.h" />
     <ClInclude Include="GBufferPass.h" />
-    <ClInclude Include="ImGuiContext.h" />
-    <ClInclude Include="ImGuiRegister.h" />
-    <ClInclude Include="ImGUiRegisterClass.h" />
     <ClInclude Include="ImGuiRenderer.h" />
     <ClInclude Include="IRenderPass.h" />
     <ClInclude Include="Light.h" />
@@ -215,13 +209,11 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
-    <ClInclude Include="ObjectRenderers.h" />
     <ClInclude Include="PostProcessingPass.h" />
     <ClInclude Include="PSO.h" />
     <ClInclude Include="RenderType.h" />
     <ClInclude Include="Sampler.h" />
-    <ClInclude Include="Scene.h" />
-    <ClInclude Include="SceneObject.h" />
+    <ClInclude Include="RenderScene.h" />
     <ClInclude Include="SceneRenderer.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMapPass.h" />
@@ -234,7 +226,6 @@
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
     <ClInclude Include="UI_DataSystem.h" />
-    <ClInclude Include="widgets.h" />
     <ClInclude Include="WireFramePass.h" />
     <ClInclude Include="GridPass.h" />
   </ItemGroup>
@@ -511,6 +502,14 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
+      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
+      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

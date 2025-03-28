@@ -167,7 +167,7 @@ void SkyBoxPass::SetBackBuffer(ID3D11RenderTargetView* backBuffer)
 	m_backBuffer = backBuffer;
 }
 
-void SkyBoxPass::GenerateCubeMap(Scene& scene)
+void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
 {
 	if (!m_cubeMapGenerationRequired)
 	{
@@ -223,7 +223,7 @@ void SkyBoxPass::GenerateCubeMap(Scene& scene)
     GenerateEnvironmentMap(scene);
 }
 
-Texture* SkyBoxPass::GenerateEnvironmentMap(Scene& scene)
+Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 {
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	D3D11_VIEWPORT viewport = { 0 };
@@ -269,7 +269,7 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(Scene& scene)
 	return m_EnvironmentMap.get();
 }
 
-Texture* SkyBoxPass::GeneratePrefilteredMap(Scene& scene)
+Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 {
 	int mapSize = m_cubeMapSize;
 
@@ -335,7 +335,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(Scene& scene)
 	return m_SpecularMap.get();
 }
 
-Texture* SkyBoxPass::GenerateBRDFLUT(Scene& scene)
+Texture* SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 {
 	D3D11_VIEWPORT viewport = { 0 };
 	viewport.Width = 512;
@@ -363,7 +363,7 @@ Texture* SkyBoxPass::GenerateBRDFLUT(Scene& scene)
 	return m_BRDFLUT.get();
 }
 
-void SkyBoxPass::Execute(Scene& scene, Camera& camera)
+void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!m_abled)
 	{

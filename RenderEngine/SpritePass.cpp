@@ -1,5 +1,7 @@
 #include "SpritePass.h"
 #include "AssetSystem.h"
+#include "RenderScene.h"
+#include "Renderer.h"
 #include "Scene.h"
 
 SpritePass::SpritePass()
@@ -74,7 +76,7 @@ void SpritePass::Initialize(Texture* renderTarget)
 	m_RenderTarget = renderTarget;
 }
 
-void SpritePass::Execute(Scene& scene, Camera& camera)
+void SpritePass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (false == camera.m_applyRenderPipelinePass.m_SpritePass)
 	{
@@ -94,14 +96,14 @@ void SpritePass::Execute(Scene& scene, Camera& camera)
 	camera.UpdateBuffer();
     scene.UseModel();
 
-    std::vector<std::shared_ptr<SceneObject>> sprites;
+    std::vector<std::shared_ptr<GameObject>> sprites;
 	std::copy_if(
-		scene.m_SceneObjects.begin(),
-		scene.m_SceneObjects.end(),
+		scene.GetScene()->m_SceneObjects.begin(),
+		scene.GetScene()->m_SceneObjects.end(),
 		std::back_inserter(sprites),
-		[](const std::shared_ptr<SceneObject>& object)
+		[](const std::shared_ptr<GameObject>& object)
 		{
-			return object->m_spriteRenderer.m_IsEnabled;
+			return object->GetComponent<SpriteRenderer>()->IsEnabled();
 		}
 	);
 
@@ -111,12 +113,12 @@ void SpritePass::Execute(Scene& scene, Camera& camera)
 		sprites.begin(),
 		sprites.end(),
 		std::back_inserter(spriteInfos),
-		[&eyePosition](const std::shared_ptr<SceneObject>& object)
+		[&eyePosition](const std::shared_ptr<GameObject>& object)
 		{
 			Transform* pTransform = &(object->m_transform);
 			float squaredLength{};
 			XMVectorGetByIndexPtr(&squaredLength, XMVector3LengthSq(eyePosition - pTransform->GetWorldPosition()), 0);
-			return std::make_tuple(pTransform, &(object->m_spriteRenderer), squaredLength);
+			return std::make_tuple(pTransform, object->GetComponent<SpriteRenderer>(), squaredLength);
 		}
 	);
 

@@ -1,12 +1,16 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Core.Minimal.h"
 #include "IObject.h"
 #include "TypeTrait.h"
 #include "Component.h"
 #include "Transform.h"
+#include "../Utility_Framework/HashingString.h"
+#include <ranges>
 
 class Scene;
 class Bone;
+class RenderScene;
+class ModelLoader;
 class GameObject : public IObject
 {
 public:
@@ -16,10 +20,6 @@ public:
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
 
-	virtual void Initialize() {};
-	virtual void FixedUpdate(float fixedTick) {};
-	virtual void Update(float tick) {};
-	virtual void LateUpdate(float tick) {};
 	std::string ToString() const override;
 
 	void ShowBoneHierarchy(Bone* bone);
@@ -32,19 +32,17 @@ public:
 		T* component = new T();
 		m_components.push_back(component);
 		component->SetOwner(this);
-		m_componentIds[component->GetId()] = m_components.size();
+		m_componentIds[component->GetTypeID()] = m_components.size();
 
 		std::ranges::sort(m_components, [&](Component* a, Component* b)
 		{
-			return a->ID() < b->ID();
+			return a->GetOrderID() < b->GetOrderID();
 		});
 
-		foreach(iota(0, static_cast<int>(m_components.size())), [&](int i)
+		std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
 		{
-			m_componentIds[m_components[i]->GetId()] = i;
+			m_componentIds[m_components[i]->GetTypeID()] = i;
 		});
-
-		component->Initialize();
 
 		return component;
 	}
@@ -55,18 +53,16 @@ public:
 		T* component = new T(std::forward<Args>(args)...);
 		m_components.push_back(component);
 		component->SetOwner(this);
-		m_componentIds[component->ID()] = m_components.size();
+		m_componentIds[component->GetTypeID()] = m_components.size();
 		std::ranges::sort(m_components, [&](Component* a, Component* b)
 		{
-			return a->ID() < b->ID();
+			return a->GetOrderID() < b->GetOrderID();
 		});
 
-		foreach(iota(0, static_cast<int>(m_components.size())), [&](int i)
+		std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
 		{
-			m_componentIds[m_components[i]->ID()] = i;
+			m_componentIds[m_components[i]->GetTypeID()] = i;
 		});
-
-		component->Initialize();
 
 		return component;
 	}
@@ -108,14 +104,23 @@ public:
 		component->SetDestroyMark();
 	}
 
+	Transform m_transform{};
+	const Index m_index;
+	const Index m_parentIndex;
+	std::vector<GameObject::Index> m_childrenIndices;
+
 private:
+	friend class RenderScene;
+	friend class ModelLoader;
 	const size_t m_typeID{ GENERATE_CLASS_GUID };
 	const size_t m_instanceID{ GENERATE_GUID };
-	std::string m_name{};
+	HashingString m_name{};
+	HashingString m_tag{};
 	Scene* m_pScene{};
-	Transform m_transform{};
-	std::unordered_map<std::type_index, size_t> m_componentIds{};
+	std::unordered_map<uint32_t, size_t> m_componentIds{};
 	std::vector<Component*> m_components{};
+
+
 
 	//debug layer
 	Bone* selectedBone{ nullptr };

@@ -3,7 +3,10 @@
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
+#include "Renderer.h"
 #include "Mesh.h"
+#include "Light.h"
+#include "LightProperty.h"
 
 GBufferPass::GBufferPass()
 {
@@ -76,7 +79,7 @@ void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTarg
 	}
 }
 
-void GBufferPass::Execute(Scene& scene, Camera& camera)
+void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
@@ -89,7 +92,7 @@ void GBufferPass::Execute(Scene& scene, Camera& camera)
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
 
 	camera.UpdateBuffer();
-	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
+	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController->m_pLightBuffer);
 	scene.UseModel();
 
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
@@ -99,12 +102,13 @@ void GBufferPass::Execute(Scene& scene, Camera& camera)
 
 	for (auto& sceneObject : m_deferredQueue)
 	{
-		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
+		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
+		if (nullptr == meshRenderer) continue;
+		if (!meshRenderer->IsEnabled()) continue;
 
-		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-		Animator* animator = scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
-		if (nullptr != animator && animator->m_IsEnabled)
+		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
+		if (nullptr != animator && animator->IsEnabled())
 		{
 			if (animator != currentAnimator)
 			{
@@ -113,7 +117,7 @@ void GBufferPass::Execute(Scene& scene, Camera& camera)
 			}
 		}
 
-		Material* mat = meshRenderer.m_Material;
+		Material* mat = meshRenderer->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 
 		if (mat->m_pBaseColor)
@@ -137,7 +141,7 @@ void GBufferPass::Execute(Scene& scene, Camera& camera)
 			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		meshRenderer.m_Mesh->Draw();
+		meshRenderer->m_Mesh->Draw();
 	}
 
 	//m_deferredQueue.clear();
@@ -153,84 +157,7 @@ void GBufferPass::Execute(Scene& scene, Camera& camera)
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
 }
 
-void GBufferPass::ExecuteEditor(Scene& scene, Camera& camera)
-{
-	m_pso->Apply();
-
-	auto& deviceContext = DeviceState::g_pDeviceContext;
-	for (auto& RTV : m_editorRTV)
-	{
-		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
-	}
-
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_editorRTV, DeviceState::g_pEditorDepthStencilView);
-
-	camera.UpdateBuffer();
-	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController.m_pLightBuffer);
-	scene.UseModel();
-
-	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
-
-	Animator* currentAnimator = nullptr;
-
-	for (auto& sceneObject : m_deferredQueue)
-	{
-		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
-
-		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
-		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-		Animator* animator = scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
-		if (nullptr != animator && animator->m_IsEnabled)
-		{
-			if (animator != currentAnimator)
-			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
-				currentAnimator = animator;
-			}
-		}
-
-		Material* mat = meshRenderer.m_Material;
-		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
-
-		if (mat->m_pBaseColor)
-		{
-			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
-		}
-		if (mat->m_pNormal)
-		{
-			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
-		}
-		if (mat->m_pOccRoughMetal)
-		{
-			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-		}
-		if (mat->m_AOMap)
-		{
-			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
-		}
-		if (mat->m_pEmissive)
-		{
-			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
-		}
-
-		meshRenderer.m_Mesh->Draw();
-	}
-
-	m_deferredQueue.clear();
-
-	ID3D11ShaderResourceView* nullSRV = nullptr;
-	for (uint32 i = 0; i < 5; i++)
-	{
-		DirectX11::PSSetShaderResources(i, 1, &nullSRV);
-	}
-
-	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
-	ZeroMemory(nullRTV, sizeof(nullRTV));
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
-}
-
-void GBufferPass::PushDeferredQueue(SceneObject* sceneObject)
+void GBufferPass::PushDeferredQueue(GameObject* sceneObject)
 {
 	m_deferredQueue.push_back(sceneObject);
 }

@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "Skeleton.h"
 #include "AssetSystem.h"
+#include "Renderer.h"
 
 WireFramePass::WireFramePass()
 {
@@ -62,7 +63,7 @@ WireFramePass::~WireFramePass()
 {
 }
 
-void WireFramePass::Execute(Scene& scene, Camera& camera)
+void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
 
@@ -82,15 +83,15 @@ void WireFramePass::Execute(Scene& scene, Camera& camera)
 
 	Animator* currentAnimator = nullptr;
 
-	for (auto& sceneObject : scene.m_SceneObjects)
+	for (auto& sceneObject : scene.GetScene()->m_SceneObjects)
 	{
-		if (!sceneObject->m_meshRenderer.m_IsEnabled) continue;
+		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
+		if (!meshRenderer->IsEnabled()) continue;
 
-		MeshRenderer& meshRenderer = sceneObject->m_meshRenderer;
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
 
-        Animator* animator = scene.m_SceneObjects[sceneObject->m_parentIndex]->m_animator;
-        if (nullptr != animator && animator->m_IsEnabled)
+        Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
+        if (nullptr != animator && animator->IsEnabled())
         {
             if (animator != currentAnimator)
             {
@@ -99,6 +100,6 @@ void WireFramePass::Execute(Scene& scene, Camera& camera)
             }
         }
 
-		meshRenderer.m_Mesh->Draw();
+		meshRenderer->m_Mesh->Draw();
 	}
 }

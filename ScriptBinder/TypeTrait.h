@@ -17,7 +17,7 @@ template<typename T>
 using MetaTypeName = MetaType<MetaRealType<T>>;
 
 #define GENERATE_GUID ConvertGUIDToHash(GenerateGUID())
-#define GENERATE_CLASS_GUID std::type_index(typeid(*this)).hash_code()
+#define GENERATE_CLASS_GUID static_cast<uint32_t>(std::type_index(typeid(*this)).hash_code())
 
 inline GUID GenerateGUID()
 {

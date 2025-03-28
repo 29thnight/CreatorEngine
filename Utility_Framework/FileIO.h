@@ -6,8 +6,7 @@
 class FileReader 
 {
 public:
-	explicit FileReader(const std::filesystem::path& path)
-		: filePath(path), file(nullptr) 
+	explicit FileReader(const std::filesystem::path& path) : filePath(path), file(nullptr) 
 	{
 		if (!std::filesystem::exists(filePath)) 
 		{
@@ -15,9 +14,10 @@ public:
 			throw std::runtime_error(throwMessage);
 		}
 
-		file = std::fopen(filePath.string().c_str(), "rb");
-		if (!file) {
-			std::string throwMessage = "Failed to open file for reading: " + filePath.string();
+		errno_t err = fopen_s(&file, filePath.string().c_str(), "wb");
+		if (err != 0)
+		{
+			std::string throwMessage = "Failed to open file for writing: " + filePath.string();
 			throw std::runtime_error(throwMessage);
 		}
 	}
@@ -52,10 +52,10 @@ private:
 class FileWriter 
 {
 public:
-	explicit FileWriter(const std::filesystem::path& path)
-		: filePath(path), file(nullptr) {
-		file = std::fopen(filePath.string().c_str(), "wb");
-		if (!file) 
+	explicit FileWriter(const std::filesystem::path& path) : filePath(path), file(nullptr) 
+	{
+		errno_t err = fopen_s(&file, filePath.string().c_str(), "wb");
+		if (err != 0)
 		{
 			std::string throwMessage = "Failed to open file for writing: " + filePath.string();
 			throw std::runtime_error(throwMessage);

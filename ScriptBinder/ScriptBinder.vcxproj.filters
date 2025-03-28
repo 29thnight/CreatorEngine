@@ -19,6 +19,15 @@
     <Filter Include="Classes\Resources">
       <UniqueIdentifier>{f51a4962-46e7-4e5a-ab83-bc10bfdfed21}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Resources\Manager">
+      <UniqueIdentifier>{2fb102d8-0475-490d-82b5-9e988cd0f76f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{54eeda4d-ca2e-4bcc-86f3-7f8d04db689f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers">
+      <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Transform.cpp">
@@ -26,6 +35,9 @@
     </ClCompile>
     <ClCompile Include="GameObject.cpp">
       <Filter>Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -50,8 +62,23 @@
     <ClInclude Include="Component.h">
       <Filter>Classes\Components</Filter>
     </ClInclude>
-    <ClInclude Include="MeshRenderer.h">
+    <ClInclude Include="Renderer.h">
       <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="IRenderable.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="JobManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="LightComponent.h">
+      <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="ILifeSycle.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

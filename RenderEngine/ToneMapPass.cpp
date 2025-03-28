@@ -81,7 +81,7 @@ void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
 	m_toneMapType = type;
 }
 
-void ToneMapPass::Execute(Scene& scene, Camera& camera)
+void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 
 	if (m_toneMapType == ToneMapType::Reinhard)

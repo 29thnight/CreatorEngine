@@ -1,6 +1,6 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "DeviceResources.h"
+#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/DeviceResources.h"
 
 namespace DeviceState
 {
@@ -25,7 +25,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDevice)
 		{
-			Log::Error("[RenderEngine] -> Device is not initialized");
+			Debug->LogError("[RenderEngine] -> Device is not initialized");
 			return nullptr;
 		}
 
@@ -63,7 +63,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDevice)
 		{
-			Log::Error("[RenderEngine] -> Device is not initialized");
+			Debug->LogError("[RenderEngine] -> Device is not initialized");
 			return;
 		}
 		DirectX11::ThrowIfFailed(
@@ -94,7 +94,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 
@@ -106,7 +106,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 
@@ -118,7 +118,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 
@@ -130,7 +130,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->IASetIndexBuffer(buffer, format, offset);
@@ -141,7 +141,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->DrawIndexed(indexCount, startIndexLocation, baseVertexLocation);
@@ -152,7 +152,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
@@ -163,7 +163,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->ClearRenderTargetView(renderTargetView, color);
@@ -174,7 +174,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->ClearDepthStencilView(depthStencilView, clearFlags, depth, stencil);
@@ -185,7 +185,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->OMSetRenderTargets(numViews, renderTargetViews, depthStencilView);
@@ -196,7 +196,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->PSSetConstantBuffers(slot, numBuffers, buffer);
@@ -207,7 +207,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->CSSetConstantBuffers(slot, numBuffers, buffer);
@@ -218,7 +218,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
@@ -229,7 +229,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
@@ -240,7 +240,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->CSSetShaderResources(startSlot, numViews, shaderResourceViews);
@@ -251,7 +251,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(startSlot, numUAVs, unorderedAccessViews, initialCounts);
@@ -262,7 +262,7 @@ namespace DirectX11
     {
         if (!DeviceState::g_pDeviceContext)
         {
-           Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+           Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
             return;
         }
         DeviceState::g_pDeviceContext->Draw(vertexCount, startVertexLocation);
@@ -273,7 +273,7 @@ namespace DirectX11
     {
         if (!DeviceState::g_pDeviceContext)
         {
-            Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+            Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
             return;
         }
         ID3D11RenderTargetView* nullRTV = nullptr;
@@ -285,7 +285,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->VSSetShader(vertexShader, classInstances, numClassInstances);
@@ -296,7 +296,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->PSSetShader(pixelShader, classInstances, numClassInstances);
@@ -306,7 +306,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->CSSetShader(computeShader, classInstances, numClassInstances);
@@ -317,7 +317,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->IASetInputLayout(inputLayout);
@@ -328,7 +328,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->IASetPrimitiveTopology(topology);
@@ -339,7 +339,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->OMSetDepthStencilState(depthStencilState, stencilRef);
@@ -350,7 +350,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->OMSetBlendState(blendState, blendFactor, sampleMask);
@@ -361,7 +361,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->RSSetState(DeviceState::g_pRasterizerState);
@@ -377,7 +377,7 @@ namespace DirectX11
 	{
 		if (!DeviceState::g_pDeviceContext)
 		{
-			Log::Error("[RenderEngine] -> DeviceContext is not initialized");
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
 		DeviceState::g_pDeviceContext->CopyResource(pDstResource, pSrcResource);

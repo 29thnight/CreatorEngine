@@ -1,10 +1,8 @@
 #pragma once
 #include "IRenderPass.h"
-#include "SceneObject.h"
 #include "UIsprite.h"
 
-
-
+class GameObject;
 class Camera;
 class UIPass : public IRenderPass
 {
@@ -18,7 +16,7 @@ public:
 	void Update(float delta);
 
 	void DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
-	virtual void Execute(Scene& scene,Camera& camera);
+	virtual void Execute(RenderScene& scene,Camera& camera);
 
 	static bool compareLayer(UIsprite* a, UIsprite* b);
 
@@ -30,7 +28,7 @@ private:
 
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
-	std::vector<SceneObject*> _2DObjects;
+	std::vector<GameObject*> _2DObjects;
 	//테스트용
 	std::vector<UIsprite*> _testUI;
 	

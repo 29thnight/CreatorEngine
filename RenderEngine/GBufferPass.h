@@ -1,7 +1,7 @@
 #pragma once
 #include "IRenderPass.h"
 #include "Texture.h"
-#include "SceneObject.h"
+#include "GameObject.h"
 
 class Camera;
 class GBufferPass final : public IRenderPass
@@ -12,9 +12,8 @@ public:
 
 	void SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size);
 	void SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size);
-	void Execute(Scene& scene, Camera& camera) override;
-	void ExecuteEditor(Scene& scene, Camera& camera);
-	void PushDeferredQueue(SceneObject* sceneObject);
+	void Execute(RenderScene& scene, Camera& camera) override;
+	void PushDeferredQueue(GameObject* sceneObject);
 	void ClearDeferredQueue();
 
 private:
@@ -24,5 +23,5 @@ private:
 	ID3D11RenderTargetView* m_editorRTV[RTV_TypeMax]{}; //0: diffuse, 1: metalRough, 2: normal, 3: emissive
 
 	//deferred render queue
-	std::vector<SceneObject*> m_deferredQueue;
+	std::vector<GameObject*> m_deferredQueue;
 };

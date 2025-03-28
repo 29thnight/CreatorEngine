@@ -38,12 +38,12 @@ public:
 	PostProcessingPass();
 	~PostProcessingPass();
 
-	void Execute(Scene& scene, Camera& camera) override;
+	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:
 	void TextureInitialization();
-	void BloomPass(Scene& scene, Camera& camera);
+	void BloomPass(RenderScene& scene, Camera& camera);
 
 private:
 	//***** uint32

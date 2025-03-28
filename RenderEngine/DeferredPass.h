@@ -13,8 +13,7 @@ public:
     void UseAmbientOcclusion(Texture* aoMap);
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
-    void Execute(Scene& scene, Camera& camera) override;
-	void ExecuteEditor(Scene& scene, Camera& camera);
+    void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:

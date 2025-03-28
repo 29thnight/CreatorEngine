@@ -16,7 +16,6 @@
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	PathFinder::Initialize();
-	Log::startLOG("logs.db");
 	Log::Initialize();
 	Concurrency::SchedulerPolicy policy
 	{

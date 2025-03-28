@@ -40,7 +40,7 @@ PostProcessingPass::~PostProcessingPass()
 	Memory::SafeDelete(m_CopiedTexture);
 }
 
-void PostProcessingPass::Execute(Scene& scene, Camera& camera)
+void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (m_PostProcessingApply.m_Bloom)
 	{
@@ -120,7 +120,7 @@ void PostProcessingPass::TextureInitialization()
 	);
 }
 
-void PostProcessingPass::BloomPass(Scene& scene, Camera& camera)
+void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 {
 	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
 

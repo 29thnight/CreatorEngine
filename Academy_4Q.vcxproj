@@ -108,8 +108,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc;$(SolutionDir)Utility_Framework\</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -130,7 +130,7 @@
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc;$(SolutionDir)Utility_Framework\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -145,66 +145,34 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="ActionComponent.h" />
     <ClInclude Include="App.h" />
     <ClInclude Include="BehaviorTree.h" />
-    <ClInclude Include="BehaviorTreeComponent.h" />
-    <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="BT_Editor.h" />
-    <ClInclude Include="CharacterController.h" />
-    <ClInclude Include="ColliderComponent.h" />
-    <ClInclude Include="Component.h" />
-    <ClInclude Include="ComponentFactory.h" />
     <ClInclude Include="CustomWindowDefine.h" />
     <ClInclude Include="Dx11Main.h" />
-    <ClInclude Include="EventSystem.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GameManager.h" />
     <ClInclude Include="GridEditor.h" />
     <ClInclude Include="InputManager.h" />
-    <ClInclude Include="InputManager2.h" />
-    <ClInclude Include="InteractableComponent.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="MeshEditor.h" />
-    <ClInclude Include="Object.h" />
-    <ClInclude Include="ObjectFactory.h" />
     <ClInclude Include="ObjectTypeMeta.h" />
     <ClInclude Include="PathFinding.h" />
     <ClInclude Include="ProjectSetting.h" />
     <ClInclude Include="Resource.h" />
-    <ClInclude Include="RigidbodyComponent.h" />
     <ClInclude Include="SoundManager.h" />
-    <ClInclude Include="SphereColliderComponent.h" />
-    <ClInclude Include="StairColliderComponent.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="TestComponent.h" />
-    <ClInclude Include="TestInteractableComponent.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ActionComponent.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="BehaviorTree.cpp" />
-    <ClCompile Include="BehaviorTreeComponent.cpp" />
-    <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="BT_Editor.cpp" />
-    <ClCompile Include="CharacterController.cpp" />
-    <ClCompile Include="ColliderComponent.cpp" />
-    <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Dx11Main.cpp" />
-    <ClCompile Include="EventSystem.cpp" />
     <ClCompile Include="InputManager.cpp" />
-    <ClCompile Include="InputManager2.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshEditor.cpp" />
-    <ClCompile Include="Object.cpp" />
-    <ClCompile Include="ObjectFactory.cpp" />
     <ClCompile Include="PathFinding.cpp" />
-    <ClCompile Include="RigidbodyComponent.cpp" />
-    <ClCompile Include="SphereColliderComponent.cpp" />
-    <ClCompile Include="StairColliderComponent.cpp" />
-    <ClCompile Include="TestComponent.cpp" />
     <ClCompile Include="SoundManager.cpp" />
-    <ClCompile Include="TestInteractableComponent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc" />
@@ -221,6 +189,9 @@
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">
+      <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
+    </ProjectReference>
     <ProjectReference Include="Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
     </ProjectReference>
@@ -233,9 +204,6 @@
     <ProjectReference Include="Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="ObjectLIst.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

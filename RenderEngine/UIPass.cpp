@@ -4,8 +4,6 @@
 #include "Mesh.h"
 #include "Scene.h"
 
-
-
 UIPass::UIPass()
 {
 
@@ -22,7 +20,6 @@ UIPass::UIPass()
 		
 	};
 	
-	
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateInputLayout(
 			vertexLayoutDesc,
@@ -32,8 +29,6 @@ UIPass::UIPass()
 			&m_pso->m_inputLayout
 		)
 	);
-
-
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 	DirectX11::ThrowIfFailed(
@@ -62,8 +57,6 @@ UIPass::UIPass()
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
 	m_pso->m_blendState = DeviceState::g_pBlendState;
 
-
-
 	m_UIBuffer = DirectX11::CreateBuffer(sizeof(UiInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
@@ -85,7 +78,7 @@ void UIPass::Update(float delta)
 	}
 }
 
-void UIPass::Execute(Scene& scene, Camera& camera)
+void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
@@ -103,8 +96,6 @@ void UIPass::Execute(Scene& scene, Camera& camera)
 	std::sort(_testUI.begin(), _testUI.end(), compareLayer);
 	for (auto& Uiobject : _testUI)
 	{
-	
-
 		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
 		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
 		Uiobject->Draw();

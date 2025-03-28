@@ -31,7 +31,7 @@ public:
     ~ToneMapPass();
     void Initialize(Texture* dest);
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
-    void Execute(Scene& scene, Camera& camera) override;
+    void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:

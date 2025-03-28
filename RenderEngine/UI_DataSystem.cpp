@@ -250,11 +250,11 @@ void DirectX11::UIDataSystem::MonitorFiles()
 		}
 		catch (const file::filesystem_error& e)
 		{
-			Log::Warning("Could not load textures" + std::string(e.what()));
+			Debug->LogWarning("Could not load textures" + std::string(e.what()));
 		}
 		catch (const std::exception& e)
 		{
-			Log::Warning("Error" + std::string(e.what()));
+			Debug->LogWarning("Error" + std::string(e.what()));
 		}
 
 		if (uiFileCount != currFileCount)
@@ -279,11 +279,11 @@ void DirectX11::UIDataSystem::MonitorFiles()
 		}
 		catch (const file::filesystem_error& e)
 		{
-			Log::Warning("Could not load textures" + std::string(e.what()));
+			Debug->LogWarning("Could not load textures" + std::string(e.what()));
 		}
 		catch (const std::exception& e)
 		{
-			Log::Warning("Error" + std::string(e.what()));
+			Debug->LogWarning("Error" + std::string(e.what()));
 		}
 
 		if (anim2DFileCount != currAnim2DFileCount)

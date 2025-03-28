@@ -3,9 +3,9 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Skeleton.h"
-#include "ObjectRenderers.h"
+#include "Renderer.h"
 #include "Scene.h"
-#include "SceneObject.h"
+#include "GameObject.h"
 #include "Material.h"
 
 class ModelLoader;

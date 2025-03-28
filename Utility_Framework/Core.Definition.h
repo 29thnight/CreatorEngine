@@ -32,11 +32,11 @@ namespace file = std::filesystem;
 #include <new>
 #include <memory>
 #include <mutex>
+#include <queue>
+#include <random>
 #include <unordered_map>
-#include <ranges>
+#include <deque>
 #include <set>
-using namespace std::views;
-constexpr inline decltype(auto) foreach = std::ranges::for_each;
 #include <stack>
 #include <string>
 #include <tuple>

@@ -3,6 +3,8 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
+#include "Renderer.h"
+#include "Light.h"
 
 ShadowMapPass::ShadowMapPass()
 {
@@ -89,40 +91,42 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 	m_shadowCamera.m_isOrthographic = true;
 }
 
-void ShadowMapPass::Execute(Scene& scene, Camera& camera)
+void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
-	
+
 	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 
-	auto desc = scene.m_LightController.m_shadowMapRenderDesc;
+	auto desc = scene.m_LightController->m_shadowMapRenderDesc;
 
-	m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController.GetLight(0).m_direction)) * -5.f;
+	m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController->GetLight(0).m_direction)) * -5.f;
 	m_shadowCamera.m_lookAt = desc.m_lookAt;
 	m_shadowCamera.m_nearPlane = desc.m_nearPlane;
 	m_shadowCamera.m_farPlane = desc.m_farPlane;
 	m_shadowCamera.m_viewHeight = desc.m_viewHeight;
 	m_shadowCamera.m_viewWidth = desc.m_viewWidth;
 
-	auto& shadowMapConstant = scene.m_LightController.m_shadowMapConstant;
+	auto& shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
 
 	shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
 	shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
 	shadowMapConstant.m_lightViewProjection = m_shadowCamera.CalculateView() * m_shadowCamera.CalculateProjection();
 
-	DirectX11::UpdateBuffer(scene.m_LightController.m_shadowMapBuffer, &shadowMapConstant);
+	DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 
 	m_shadowCamera.UpdateBuffer();
 	scene.UseModel();
 
-	for (auto& obj : scene.m_SceneObjects)
+	for (auto& obj : scene.GetScene()->m_SceneObjects)
 	{
-		if (!obj->m_meshRenderer.m_IsEnabled) continue;
+		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
+		if (nullptr == meshRenderer) continue;
+		if (!meshRenderer->IsEnabled()) continue;
 
 		scene.UpdateModel(obj->m_transform.GetWorldMatrix());
-		obj->m_meshRenderer.m_Mesh->Draw();
+		meshRenderer->m_Mesh->Draw();
 	}
 
 	//DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);

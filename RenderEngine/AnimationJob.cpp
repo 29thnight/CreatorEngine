@@ -1,7 +1,8 @@
 #include "AnimationJob.h"
-#include "Scene.h"
+#include "RenderScene.h"
 #include "Skeleton.h"
-#include "ObjectRenderers.h"
+#include "Renderer.h"
+#include "Scene.h"
 
 using namespace DirectX;
 
@@ -24,13 +25,14 @@ int CurrentKeyIndex(std::vector<T> keys, double time)
     return -1;
 }
 
-void AnimationJob::Update(Scene& scene, float deltaTime)
+void AnimationJob::Update(RenderScene& scene, float deltaTime)
 {
-    for (auto sceneObj : scene.m_SceneObjects)
-    {
-        if (nullptr == sceneObj->m_animator || !sceneObj->m_animator->m_IsEnabled) continue;
 
-        Animator* animator = sceneObj->m_animator;
+    for (auto& sceneObj : scene.GetScene()->m_SceneObjects)
+    {
+		Animator* animator = sceneObj->GetComponent<Animator>();
+        if (nullptr == animator || !animator->IsEnabled()) continue;
+
         Skeleton* skeleton = animator->m_Skeleton;
         Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
 

@@ -1,12 +1,12 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Core.Minimal.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include "Model.h"
 #include "Scene.h"
 #include "Skeleton.h"
 #include "SkeletonLoader.h"
-#include "ObjectRenderers.h"
+#include "Renderer.h"
 
 class ModelLoader
 {

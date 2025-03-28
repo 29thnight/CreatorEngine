@@ -13,7 +13,7 @@ public:
 	WireFramePass();
 	~WireFramePass();
 	// IRenderPass을(를) 통해 상속됨
-	void Execute(Scene& scene, Camera& camera) override;
+	void Execute(RenderScene& scene, Camera& camera) override;
 
 private:
 	CameraBuffer m_CameraBuffer;

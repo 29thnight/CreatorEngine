@@ -46,11 +46,11 @@ void AssetSystem::LoadShaders()
 	}
 	catch (const file::filesystem_error& e)
 	{
-		Log::Warning("Could not load shaders" + std::string(e.what()));
+		Debug->LogWarning("Could not load shaders" + std::string(e.what()));
 	}
 	catch (const std::exception& e)
 	{
-		Log::Warning("Error" + std::string(e.what()));
+		Debug->LogWarning("Error" + std::string(e.what()));
 	}
 }
 

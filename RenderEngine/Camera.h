@@ -1,6 +1,6 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "DeviceResources.h"
+#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/DeviceResources.h"
 #include "Texture.h"
 
 struct ApplyRenderPipelinePass

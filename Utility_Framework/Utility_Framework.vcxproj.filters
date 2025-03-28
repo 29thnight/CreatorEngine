@@ -73,9 +73,6 @@
     <Filter Include="ImGuiLogger">
       <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Logger\NewLogger">
-      <UniqueIdentifier>{e6a02140-6a0b-462d-93c7-29d122b93236}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -147,18 +144,6 @@
     <ClInclude Include="IObject.h">
       <Filter>Interface</Filter>
     </ClInclude>
-    <ClInclude Include="sqlite_modern_cpp.h">
-      <Filter>Core.Logger</Filter>
-    </ClInclude>
-    <ClInclude Include="Logger.h">
-      <Filter>Core.Logger</Filter>
-    </ClInclude>
-    <ClInclude Include="LogIOWriter.h">
-      <Filter>Core.Logger</Filter>
-    </ClInclude>
-    <ClInclude Include="LogMessage.h">
-      <Filter>Core.Logger</Filter>
-    </ClInclude>
     <ClInclude Include="CSVLoader.h">
       <Filter>CSVLoader</Filter>
     </ClInclude>
@@ -180,17 +165,23 @@
     <ClInclude Include="Core.Runtime.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="LogEntry.h">
-      <Filter>Core.Logger\NewLogger</Filter>
+    <ClInclude Include="Reflection.h">
+      <Filter>Utility</Filter>
     </ClInclude>
-    <ClInclude Include="RingBuffer.h">
-      <Filter>Core.Logger\NewLogger</Filter>
+    <ClInclude Include="HashingString.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="LogEntry.h">
+      <Filter>Core.Logger</Filter>
     </ClInclude>
     <ClInclude Include="LogSink.h">
-      <Filter>Core.Logger\NewLogger</Filter>
+      <Filter>Core.Logger</Filter>
     </ClInclude>
     <ClInclude Include="LogSystem.h">
-      <Filter>Core.Logger\NewLogger</Filter>
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
+    <ClInclude Include="RingBuffer.h">
+      <Filter>Core.Logger</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -205,15 +196,6 @@
     </ClCompile>
     <ClCompile Include="HLSLCompiler.cpp">
       <Filter>DirectX11Common\HLSLCompiler</Filter>
-    </ClCompile>
-    <ClCompile Include="Logger.cpp">
-      <Filter>Core.Logger</Filter>
-    </ClCompile>
-    <ClCompile Include="LogIOWriter.cpp">
-      <Filter>Core.Logger</Filter>
-    </ClCompile>
-    <ClCompile Include="LogMessage.cpp">
-      <Filter>Core.Logger</Filter>
     </ClCompile>
     <ClCompile Include="LogSystem.cpp" />
   </ItemGroup>

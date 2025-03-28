@@ -110,7 +110,7 @@ Model* ModelLoader::LoadModel()
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 			m_model->m_Skeleton = skeleton;
 			Animator* animator = m_model->m_animator;
-			animator->m_IsEnabled = true;
+			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 			m_animator = animator;
 		}
@@ -313,15 +313,15 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	int nextIndex = parentIndex;
 	if (true == isRoot)
 	{
-		auto rootObject = m_scene->CreateSceneObject(m_model->name, nextIndex);
+		auto rootObject = m_scene->CreateGameObject(m_model->name, nextIndex);
 		nextIndex = rootObject->m_index;
 
 		if (m_model->m_hasBones)
 		{
 			Banchmark banch;
-			rootObject->m_animator = new Animator();
-			rootObject->m_animator->m_IsEnabled = true;
-			rootObject->m_animator->m_Skeleton = m_model->m_Skeleton;
+			Animator* animator = rootObject->AddComponent<Animator>();
+			animator->SetEnabled(true);
+			animator->m_Skeleton = m_model->m_Skeleton;
 			std::cout << "GenerateSceneObjectHierarchy new Animator : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
@@ -329,15 +329,16 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		Banchmark banch;
-		std::shared_ptr<SceneObject> object = m_scene->CreateSceneObject(node->m_name, nextIndex);
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[meshId];
-		MeshRenderer& meshRenderer = object->m_meshRenderer;
-		meshRenderer.m_IsEnabled = true;
-		meshRenderer.m_Mesh = mesh;
-		meshRenderer.m_Material = material;
+		MeshRenderer* meshRenderer = object->GetComponent<MeshRenderer>();
+
+		meshRenderer->SetEnabled(true);
+		meshRenderer->m_Mesh = mesh;
+		meshRenderer->m_Material = material;
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 		std::cout << "GenerateSceneObjectHierarchy new SceneObject : " << banch.GetElapsedTime() << std::endl;
@@ -345,7 +346,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<SceneObject> object = m_scene->CreateSceneObject(node->m_name, nextIndex);
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, nextIndex);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}

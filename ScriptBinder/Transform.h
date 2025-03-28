@@ -1,6 +1,7 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Core.Minimal.h"
 
+class RenderScene;
 struct Transform
 {
 public:
@@ -26,7 +27,7 @@ public:
 	Mathf::xVector GetWorldQuaternion() const;
 
 private:
-	friend class Scene;
+	friend class RenderScene;
 	bool32 m_dirty{};
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };

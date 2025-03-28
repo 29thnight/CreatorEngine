@@ -12,16 +12,16 @@ public:
     void Initialize(const std::string_view& fileName, float size = 25.f);
 	void SetRenderTarget(Texture* renderTarget);
 	void SetBackBuffer(ID3D11RenderTargetView* backBuffer);
-    void GenerateCubeMap(Scene& scene);
-    Texture* GenerateEnvironmentMap(Scene& scene);
-    Texture* GeneratePrefilteredMap(Scene& scene);
-    Texture* GenerateBRDFLUT(Scene& scene);
+    void GenerateCubeMap(RenderScene& scene);
+    Texture* GenerateEnvironmentMap(RenderScene& scene);
+    Texture* GeneratePrefilteredMap(RenderScene& scene);
+    Texture* GenerateBRDFLUT(RenderScene& scene);
 
     std::unique_ptr<Texture> m_EnvironmentMap{};
     std::unique_ptr<Texture> m_SpecularMap{};
     std::unique_ptr<Texture> m_BRDFLUT{};
 
-    void Execute(Scene& scene, Camera& camera) override;
+    void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
 private:

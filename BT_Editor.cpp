@@ -1,10 +1,11 @@
 #include "BT_Editor.h"
 #include "InputManager.h"
-#include "Utility_Framework/Logger.h"
 #include "Utility_Framework/PathFinder.h"
 #include <regex>
 #include "Utility_Framework/Banchmark.hpp"
-#include "RenderEngine/widgets.h"
+#include "ImGuiHelper/widgets.h"
+#include "Core.Minimal.h"
+#include <ranges>
 
 int BT_Editor::g_NextId = 1;
 
@@ -100,7 +101,7 @@ void BT_Editor::NodeEditor()
             bool found = false;
 			for (auto& [outPin, inPin] : g_Links)
 			{
-				foreach(inPin, [&](int Ipin)
+				std::ranges::for_each(inPin, [&](int Ipin)
 				{
 					if (Ipin == pin)
 					{
@@ -152,7 +153,7 @@ void BT_Editor::NodeEditor()
     // ¸µÅ© ·»´õ¸µ
     for (auto& [outPin, inPin] : g_Links) 
     {
-        foreach(inPin, [&](int pin) 
+        std::ranges::for_each(inPin, [&](int pin)
         {
 			ed::Link(linkID++, outPin, pin);
         });
@@ -421,11 +422,11 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
     {
         outFile << luaScript.str();
         outFile.close();
-		Log::Info("Behavior Tree successfully built to " + outPath);
+		Debug->Log("Behavior Tree successfully built to " + outPath);
     }
     else
     {
-		Log::Error("Failed to write Lua script to " + outPath);
+		Debug->LogError("Failed to write Lua script to " + outPath);
     }
 }
 
@@ -435,7 +436,7 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
 	std::ifstream inFile(inPath);
 	if (!inFile.is_open())
 	{
-		Log::Error("Failed to open Lua file: " + inPath);
+		Debug->LogError("Failed to open Lua file: " + inPath);
 		_isLoadBt = true;
 		return;
 	}
@@ -556,6 +557,6 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
 
 	inFile.close();
 
-	Log::Info("Behavior tree successfully loaded from Lua file with comments.");
+	Debug->Log("Behavior tree successfully loaded from Lua file with comments.");
 	_isLoadBt = true;
 }

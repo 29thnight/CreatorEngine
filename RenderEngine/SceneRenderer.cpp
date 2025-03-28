@@ -5,6 +5,9 @@
 #include "Scene.h"
 #include "ImGuiRegister.h"
 #include "Banchmark.hpp"
+#include "RenderScene.h"
+#include "../ScriptBinder/Scene.h"
+#include "../ScriptBinder/Renderer.h"
 
 #pragma region ImGuizmo
 #include "ImGuizmo.h"
@@ -22,7 +25,7 @@ float camDistance = 8.f;
 static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
 
 
-void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, SceneObject* obj, Camera* cam)
+void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam)
 {
 	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 	static bool useSnap = false;
@@ -94,7 +97,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		// 기즈모로 변환 후 오브젝트에 적용.
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
 
-		auto parentMat = m_currentScene->GetSceneObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		auto parentMat = m_currentScene->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
@@ -161,7 +164,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
 
     //pass 생성
-    //shadowMapPass 는 Scene의 맴버
+    //shadowMapPass 는 RenderScene의 맴버
     //gBufferPass
     m_pGBufferPass = std::make_unique<GBufferPass>();
 	ID3D11RenderTargetView* views[]{
@@ -220,6 +223,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
+
+	m_renderScene = new RenderScene();
 }
 
 
@@ -246,7 +251,7 @@ void SceneRenderer::InitializeImGui()
 	{
 		if (ImGui::CollapsingHeader("ShadowPass"))
 		{
-			m_currentScene->m_LightController.m_shadowMapPass->ControlPanel();
+			m_renderScene->m_LightController->m_shadowMapPass->ControlPanel();
 		}
 
 		if (ImGui::CollapsingHeader("SSAOPass"))
@@ -304,7 +309,7 @@ void SceneRenderer::InitializeImGui()
             light.m_position = XMFLOAT4(0, 0, 0, 0);
             light.m_lightType = LightType::PointLight;
 
-            m_currentScene->m_LightController.AddLight(light);
+            m_renderScene->m_LightController->AddLight(light);
         }
         if (ImGui::Button("Light index + ")) {
             lightIndex++;
@@ -315,17 +320,17 @@ void SceneRenderer::InitializeImGui()
             if (lightIndex < 0) lightIndex = 0;
         }
         if (ImGui::Button("Light On")) {
-            m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
+			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
         }
         if (ImGui::Button("Light Off")) {
-            m_currentScene->m_LightController.GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
+			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
         }
 
-        ImGui::DragFloat3("Light Pos", &m_currentScene->m_LightController.GetLight(lightIndex).m_position.x, 0.1f, -10, 10);
-        ImGui::DragFloat3("Light Dir", &m_currentScene->m_LightController.GetLight(lightIndex).m_direction.x, 0.1f, -1, 1);
-        ImGui::DragFloat("Light colorX", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorY", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorZ", &m_currentScene->m_LightController.GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
+        ImGui::DragFloat3("Light Pos", &m_renderScene->m_LightController->GetLight(lightIndex).m_position.x, 0.1f, -10, 10);
+        ImGui::DragFloat3("Light Dir", &m_renderScene->m_LightController->GetLight(lightIndex).m_direction.x, 0.1f, -1, 1);
+        ImGui::DragFloat("Light colorX", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
+        ImGui::DragFloat("Light colorY", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
+        ImGui::DragFloat("Light colorZ", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
     });
 
 
@@ -395,7 +400,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 {
 	if (!_pScene)
 	{
-		m_currentScene = new Scene();
+		m_currentScene = Scene::CreateNewScene();
+		m_renderScene->SetScene(m_currentScene);
 
 		auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		
@@ -416,14 +422,14 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		spotLight.m_lightType = LightType::SpotLight;
 		spotLight.m_spotLightAngle = 3.142 / 4.0;
 
-		m_currentScene->m_LightController
-			.AddLight(dirLight)
+		m_renderScene->m_LightController
+			->AddLight(dirLight)
 			.AddLight(pointLight)
 			.AddLight(spotLight)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
 		ShadowMapRenderDesc desc;
-		desc.m_eyePosition = XMLoadFloat4(&(m_currentScene->m_LightController.GetLight(0).m_direction)) * -5.f;
+		desc.m_eyePosition = XMLoadFloat4(&(m_renderScene->m_LightController->GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 16;
 		desc.m_viewHeight = 12;
@@ -432,15 +438,14 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_textureWidth = 1920;
 		desc.m_textureHeight = 1080;
 
-		m_currentScene->m_LightController.Initialize();
-		m_currentScene->m_LightController.SetLightWithShadows(0, desc);
+		m_renderScene->m_LightController->Initialize();
+		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		//testUI.Loadsprite("test2.png");
 		//testUI.SetTexture();
 		//testUI.SetUI({ 200,200 },2);
-
 
 		ImGui::ContextRegister("Test UI", true, [&]()
 		{
@@ -465,24 +470,25 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	else
 	{
 		m_currentScene = _pScene;
+		m_renderScene->SetScene(m_currentScene);
 	}
 
-	m_currentScene->SetBuffers(m_ModelBuffer.Get());
+	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
-	m_pSkyBoxPass->GenerateCubeMap(*m_currentScene);
-	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_currentScene);
-	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_currentScene);
-	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_currentScene);
+	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
+	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
 void SceneRenderer::Update(float deltaTime)
 {
-	m_currentScene->Update(deltaTime);
+	m_renderScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
 	PrepareRender();
 	m_pUIPass->Update(deltaTime);
@@ -496,19 +502,18 @@ void SceneRenderer::Render()
 		//[1] ShadowMapPass
 		{
 			static int count = 0;
-			Banchmark banch;
+			//Banchmark banch;
 			camera->ClearRenderTarget();
-			m_currentScene->ShadowStage(*camera);
+			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-			Debug->Log("ShadowMapPass : " + std::to_string(count++));
 			//std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[2] GBufferPass
 		{
 			//Banchmark banch;
-			m_pGBufferPass->Execute(*m_currentScene, *camera);
+			m_pGBufferPass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -516,7 +521,7 @@ void SceneRenderer::Render()
 		//[3] SSAOPass
 		{
 			//Banchmark banch;
-			m_pSSAOPass->Execute(*m_currentScene, *camera);
+			m_pSSAOPass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -525,7 +530,7 @@ void SceneRenderer::Render()
 		{
 			//Banchmark banch;
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-			m_pDeferredPass->Execute(*m_currentScene, *camera);
+			m_pDeferredPass->Execute(*m_renderScene, *camera);
 
 
 			//std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
@@ -535,7 +540,7 @@ void SceneRenderer::Render()
 		if (useWireFrame)
 		{
 			//Banchmark banch;
-			m_pWireFramePass->Execute(*m_currentScene, *camera);
+			m_pWireFramePass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -543,7 +548,7 @@ void SceneRenderer::Render()
 		//[5] skyBoxPass
 		{
 			//Banchmark banch;
-			m_pSkyBoxPass->Execute(*m_currentScene, *camera);
+			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -551,14 +556,14 @@ void SceneRenderer::Render()
 		//[8] AAPass
 		{
 			//Banchmark banch;
-			m_pAAPass->Execute(*m_currentScene, *camera);
+			m_pAAPass->Execute(*m_renderScene, *camera);
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[6] ToneMapPass
 		{
 			//Banchmark banch;
-			m_pToneMapPass->Execute(*m_currentScene, *camera);
+			m_pToneMapPass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -566,7 +571,7 @@ void SceneRenderer::Render()
 		//[*] GridPass
 		{
 			//Banchmark banch;
-			m_pGridPass->Execute(*m_currentScene, *camera);
+			m_pGridPass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -574,7 +579,7 @@ void SceneRenderer::Render()
 		//[7] SpritePass
 		{
 			//Banchmark banch;
-			m_pSpritePass->Execute(*m_currentScene, *camera);
+			m_pSpritePass->Execute(*m_renderScene, *camera);
 
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
@@ -582,12 +587,12 @@ void SceneRenderer::Render()
 		//[]  UIPass
 		{
 			
-			m_pUIPass->Execute(*m_currentScene, *camera);
+			m_pUIPass->Execute(*m_renderScene, *camera);
 		}
 		//[8] BlitPass
 		{
 			//Banchmark banch;
-			m_pBlitPass->Execute(*m_currentScene, *camera);
+			m_pBlitPass->Execute(*m_renderScene, *camera);
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
@@ -601,9 +606,11 @@ void SceneRenderer::PrepareRender()
 {
 	for (auto& obj : m_currentScene->m_SceneObjects)
 	{
-		if (!obj->m_meshRenderer.m_IsEnabled) continue;
+		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
+		if (nullptr == meshRenderer) continue;
+		if (false == meshRenderer->IsEnabled()) continue;
 
-		Material* mat = obj->m_meshRenderer.m_Material;
+		Material* mat = meshRenderer->m_Material;
 
 		switch (mat->m_renderingMode)
 		{
@@ -724,7 +731,7 @@ void SceneRenderer::EditorView()
 		ShowLogWindow();
 	}
 
-	auto obj = m_currentScene->GetSelectSceneObject();
+	auto obj = m_renderScene->GetSelectSceneObject();
 	if (obj) 
 	{
 		auto mat = obj->m_transform.GetWorldMatrix();
@@ -762,8 +769,9 @@ void SceneRenderer::EditorView()
 
 		float convert = DeviceState::g_aspectRatio;
 		size.x = size.y * convert;
-
-		ImGui::Image((ImTextureID)m_currentScene->m_MainCamera.m_renderTarget->m_pSRV, size);
+		//TODO : 카메라를 컨트롤러에서 찾아서 해당 뷰포트를 보여주도록 변경하고, 
+		// 위에 카메라 컨트롤러에 등록된 카메라 번호를 보이게 해야함.
+		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, size);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();
@@ -775,13 +783,13 @@ void SceneRenderer::ShowLogWindow()
 	bool isClear = Debug->IsClear();
 
 	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
-	ImGui::Combo("Log Level", &levelFilter,
-		"Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
-	ImGui::SameLine();
 	if (ImGui::Button("Clear"))
 	{
 		Debug->Clear();
 	}
+	ImGui::SameLine();
+	ImGui::Combo("Log Filter", &levelFilter,
+		"Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
 
 	float sizeX = ImGui::GetContentRegionAvail().x;
 	float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
@@ -799,6 +807,9 @@ void SceneRenderer::ShowLogWindow()
 		const auto& entry = entries[i];
 		bool is_selected = (i == selected_log_index);
 
+		if (entry.level != spdlog::level::trace && entry.level < levelFilter)
+			continue;
+
 		ImVec4 color;
 		switch (entry.level)
 		{
@@ -813,7 +824,7 @@ void SceneRenderer::ShowLogWindow()
 			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
 
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
-		if (ImGui::Selectable(entry.message.c_str(), is_selected))
+		if (ImGui::Selectable(entry.message.c_str(), is_selected, ImGuiSelectableFlags_None, { sizeX , 50 }))
 			selected_log_index = i;
 		ImGui::PopStyleColor(); // Text color
 

@@ -4,7 +4,7 @@
 #include "RenderEngine/DataSystem.h"
 #include "RenderEngine/SceneRenderer.h"
 #include "RenderEngine/Camera.h"
-#include "RenderEngine/Scene.h"
+#include "ScriptBinder/Scene.h"
 #include "RenderEngine/ImGuiRenderer.h"
 #include "RenderEngine/Model.h"
 #include "BT_Editor.h"

@@ -1,6 +1,6 @@
 #include "SoundManager.h"
 #include "Utility_Framework/PathFinder.h"
-#include "Utility_Framework/Logger.h"
+#include "Utility_Framework/Core.Minimal.h"
 
 bool SoundManager::initialize(int maxChannels)
 {
@@ -57,7 +57,7 @@ bool SoundManager::loadSound(const std::string& name, const std::string& filePat
 {
     if (sounds.find(name) != sounds.end())
     {
-        Log::Error("Sound already loaded: " + name);
+        Debug->LogError("Sound already loaded: " + name);
         return false;
     }
 
@@ -69,7 +69,7 @@ bool SoundManager::loadSound(const std::string& name, const std::string& filePat
     FMOD_RESULT result = system->createSound(filePath.c_str(), mode, nullptr, &sound);
     if (result != FMOD_OK) 
     {
-		Log::Error("Failed to load sound: " + filePath + " - " + FMOD_ErrorString(result));
+		Debug->LogError("Failed to load sound: " + filePath + " - " + FMOD_ErrorString(result));
         return false;
     }
 
@@ -92,7 +92,7 @@ void SoundManager::playSound(const std::string& name, int channel, bool isPaused
     auto it = sounds.find(name);
     if (it == sounds.end()) 
     {
-		Log::Error("Sound not found: " + name);
+		Debug->LogError("Sound not found: " + name);
         return;
     }
 
@@ -100,7 +100,7 @@ void SoundManager::playSound(const std::string& name, int channel, bool isPaused
     FMOD_RESULT result = system->playSound(it->second, _channelGroups[channel], isPaused, &pChannel);
     if (result != FMOD_OK) 
     {
-		Log::Error("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
+		Debug->LogError("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
     }
     else 
     {
@@ -113,7 +113,7 @@ void SoundManager::playSound(const std::string& name, ChannelType channel, bool 
     auto it = sounds.find(name);
     if (it == sounds.end())
     {
-        Log::Error("Sound not found: " + name);
+        Debug->LogError("Sound not found: " + name);
         return;
     }
 
@@ -121,7 +121,7 @@ void SoundManager::playSound(const std::string& name, ChannelType channel, bool 
     FMOD_RESULT result = system->playSound(it->second, _channelGroups[(int)channel], isPaused, &pChannel);
     if (result != FMOD_OK)
     {
-        Log::Error("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
+        Debug->LogError("Failed to play sound: " + name + " - " + FMOD_ErrorString(result));
     }
     else
     {
@@ -277,7 +277,7 @@ void SoundManager::Initialize()
     FMOD_RESULT result = FMOD::System_Create(&system);
     if (result != FMOD_OK)
     {
-		Log::Error("FMOD System creation failed: " + std::string(FMOD_ErrorString(result)));
+		Debug->LogError("FMOD System creation failed: " + std::string(FMOD_ErrorString(result)));
     }
     system->getSoftwareChannels(&numberOfAvailableChannels); // 사용 가능한 채널 수를 가져온다.
 
@@ -289,7 +289,7 @@ void SoundManager::Initialize()
     result = system->init(_inputMaxChannels, FMOD_INIT_NORMAL, nullptr); // FMOD 시스템 초기화
     if (result != FMOD_OK)
     {
-		Log::Error("FMOD System initialization failed: " + std::string(FMOD_ErrorString(result)));
+		Debug->LogError("FMOD System initialization failed: " + std::string(FMOD_ErrorString(result)));
     }
 
     _maxChannels = _inputMaxChannels;
@@ -332,11 +332,11 @@ void SoundManager::SoundLoaderThread()
         }
         catch (const file::filesystem_error& e)
         {
-            Log::Warning("Could not load sounds" + std::string(e.what()));
+            Debug->LogWarning("Could not load sounds" + std::string(e.what()));
         }
         catch (const std::exception& e)
         {
-            Log::Warning("Error" + std::string(e.what()));
+            Debug->LogWarning("Error" + std::string(e.what()));
         }
 
         if (_currSoundCount != soundCount)
@@ -363,7 +363,7 @@ void SoundManager::LoadSounds()
             key = key.substr(0, key.find_last_of('.'));
             bool loop  = (dir.path().parent_path() == PathFinder::Relative("Sounds\\BGM"));
             loadSound(key, dir.path().string(),false, loop);
-			Log::Info("Loaded Sound : " + key);
+			Debug->Log("Loaded Sound : " + key);
         }
     }
 	_isSoundLoaderThreadRunning = false;

@@ -94,7 +94,7 @@ void GridPass::PrepareCameraType(Camera* camera)
 	m_pEditorCamera = camera;
 }
 
-void GridPass::Execute(Scene& scene, Camera& camera)
+void GridPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (camera.m_applyRenderPipelinePass.m_GridPass == false)
 	{

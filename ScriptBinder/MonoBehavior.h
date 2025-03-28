@@ -9,17 +9,17 @@
 #endif
 
 #include "IComponent.h"
+#include "ILifeSycle.h"
 
 struct ICollider;
 // 사용자가 새로운 컴포넌트를 추가할 때 유용한 기능을 받기 위한 컴포넌트
-class MonoBehavior : public IComponent
+class MonoBehavior : public IComponent, public ILifeSycle
 {
 public:
-	// Component을(를) 통해 상속됨
-	virtual void Initialize() {};
-	virtual void FixedUpdate(float fixedTick) {};
-	virtual void Update(float tick) {};
-	virtual void LateUpdate(float tick) {};
+	virtual void Start() override {};
+	virtual void Update(float tick) override {};
+	virtual void FixedUpdate(float fixedTick) override {};
+	virtual void LateUpdate(float tick) override {};
 
 public:
 	// ITriggerNotify을(를) 통해 상속됨
@@ -31,4 +31,11 @@ public:
 	virtual void OnCollisionEnter(ICollider* other) {};
 	virtual void OnCollisionStay(ICollider* other) {};
 	virtual void OnCollisionExit(ICollider* other) {};
+
+public:
+	// IComponent을(를) 통해 상속됨
+	std::string ToString() const override = 0;
+	uint32_t GetTypeID() const override = 0;
+	uint32_t GetInstanceID() const override = 0;
+
 };

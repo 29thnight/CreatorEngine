@@ -27,23 +27,14 @@
     <Filter Include="Asset\Loader">
       <UniqueIdentifier>{108407a5-4069-4f4b-a9ec-e212562003f9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiContext">
-      <UniqueIdentifier>{e2195028-e63b-4bde-aba4-9da379d592c1}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Renderer">
       <UniqueIdentifier>{64405519-d391-4dd8-b09b-35b0cab9a4af}</UniqueIdentifier>
     </Filter>
     <Filter Include="Asset\ManagerSystem">
       <UniqueIdentifier>{8bbf4fbb-c1dd-4b3f-9ee0-a4c84b9e19bb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiContext\NodeEditorHelper">
-      <UniqueIdentifier>{99c991f0-4fbe-4b1a-b488-e7ded18fbe3e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\JobSystem">
       <UniqueIdentifier>{2f3b4f44-0408-444f-87c9-a70e4bea1397}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\ObjectAttachedRenderer">
-      <UniqueIdentifier>{b0eb9b89-0076-4fb6-b36d-fa257cc6405c}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resources\Shader">
       <UniqueIdentifier>{02cd0328-9b26-4fc9-bebf-d0fa68abb92b}</UniqueIdentifier>
@@ -135,6 +126,9 @@
     <Filter Include="Shaders\PipelineShader">
       <UniqueIdentifier>{8e767fa1-c4da-49fb-8661-5c3ac7f2f281}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Objects\NewFilter1">
+      <UniqueIdentifier>{0e6f9420-256b-4362-b304-9203a64a1eb2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -158,12 +152,6 @@
     <ClCompile Include="UI_DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="drawing.cpp">
-      <Filter>ImGuiContext\NodeEditorHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="widgets.cpp">
-      <Filter>ImGuiContext\NodeEditorHelper</Filter>
-    </ClCompile>
     <ClCompile Include="AssetSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -179,10 +167,7 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Objects</Filter>
     </ClCompile>
-    <ClCompile Include="SceneObject.cpp">
-      <Filter>Objects</Filter>
-    </ClCompile>
-    <ClCompile Include="Scene.cpp">
+    <ClCompile Include="RenderScene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
     <ClCompile Include="Material.cpp">
@@ -265,7 +250,7 @@
     <ClInclude Include="SceneRenderer.h">
       <Filter>Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="Scene.h">
+    <ClInclude Include="RenderScene.h">
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
@@ -283,15 +268,6 @@
     <ClInclude Include="ImGuiRenderer.h">
       <Filter>Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="ImGUiRegisterClass.h">
-      <Filter>ImGuiContext</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiRegister.h">
-      <Filter>ImGuiContext</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiContext.h">
-      <Filter>ImGuiContext</Filter>
-    </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
@@ -301,28 +277,16 @@
     <ClInclude Include="UI_DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="drawing.h">
-      <Filter>ImGuiContext\NodeEditorHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="widgets.h">
-      <Filter>ImGuiContext\NodeEditorHelper</Filter>
-    </ClInclude>
     <ClInclude Include="AssetSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
     <ClInclude Include="AnimationJob.h">
       <Filter>Asset\JobSystem</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectRenderers.h">
-      <Filter>Renderer\ObjectAttachedRenderer</Filter>
-    </ClInclude>
     <ClInclude Include="Light.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="RenderType.h">
-      <Filter>Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneObject.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
@@ -393,6 +357,9 @@
     </ClInclude>
     <ClInclude Include="PostProcessingPass.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="LightProperty.h">
+      <Filter>Objects\NewFilter1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

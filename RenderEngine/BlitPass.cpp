@@ -55,7 +55,7 @@ void BlitPass::Initialize(ID3D11RenderTargetView* backBufferRTV)
 	m_backBufferRTV = backBufferRTV;
 }
 
-void BlitPass::Execute(Scene& scene, Camera& camera)
+void BlitPass::Execute(RenderScene& scene, Camera& camera)
 {
     if(false == camera.m_applyRenderPipelinePass.m_BlitPass)
 	{

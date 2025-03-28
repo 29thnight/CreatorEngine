@@ -19,7 +19,7 @@ public:
 	~SSAOPass();
 
 	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal);
-	void Execute(Scene& scene, Camera& camera) override;
+	void Execute(RenderScene& scene, Camera& camera) override;
 
 private:
 	std::unique_ptr<Texture> m_NoiseTexture;

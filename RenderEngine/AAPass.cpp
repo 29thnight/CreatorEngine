@@ -39,7 +39,7 @@ AAPass::~AAPass()
 {
 }
 
-void AAPass::Execute(Scene& scene, Camera& camera)
+void AAPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!m_isApply) return;
 

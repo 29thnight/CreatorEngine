@@ -15,14 +15,8 @@
     <Filter Include="Dx11Main">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Component">
-      <UniqueIdentifier>{fc2dbd22-3b0c-4c7e-8568-e2191847c1bd}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Object">
       <UniqueIdentifier>{6b46322a-7d3c-441d-80c0-3c052cf0b9fa}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Component\PhysicsComponent">
-      <UniqueIdentifier>{ea0716e9-c58b-409f-aba5-b75e23b9f114}</UniqueIdentifier>
     </Filter>
     <Filter Include="Utill">
       <UniqueIdentifier>{bd2f311f-ba6c-4f45-a21a-ac8cec09e5b2}</UniqueIdentifier>
@@ -39,26 +33,8 @@
     <Filter Include="Manager\InputManager">
       <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Component\BTComponent">
-      <UniqueIdentifier>{516dcc2c-8146-4689-9c11-f64684768236}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Component\ActionComponent">
-      <UniqueIdentifier>{92c6d2ec-5bcf-494d-8160-a2f65f316d33}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Event">
-      <UniqueIdentifier>{43573d9f-1cf5-4d87-b278-0f135a468ba4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Factory">
-      <UniqueIdentifier>{66773a7c-4614-474b-81f0-83cfb2001f3a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Manager\SoundManager">
       <UniqueIdentifier>{21879e33-f24e-493c-a98a-6d47f4562738}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Component\Interact">
-      <UniqueIdentifier>{b5c7a05e-49c9-4a74-ac3c-250ef1bcb371}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Component\Interact\Test">
-      <UniqueIdentifier>{35ba2124-0562-4724-9270-8f9965b614b9}</UniqueIdentifier>
     </Filter>
     <Filter Include="Utill\MeshEditor">
       <UniqueIdentifier>{8f159f87-7be6-4ff8-a6ec-29e5c00c47ee}</UniqueIdentifier>
@@ -86,15 +62,6 @@
     <ClInclude Include="Dx11Main.h">
       <Filter>Dx11Main</Filter>
     </ClInclude>
-    <ClInclude Include="InputManager2.h">
-      <Filter>Manager\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="Component.h">
-      <Filter>Component</Filter>
-    </ClInclude>
-    <ClInclude Include="Object.h">
-      <Filter>Object</Filter>
-    </ClInclude>
     <ClInclude Include="BehaviorTree.h">
       <Filter>Utill\BT</Filter>
     </ClInclude>
@@ -119,18 +86,6 @@
     <ClInclude Include="RigidbodyComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="BehaviorTreeComponent.h">
-      <Filter>Component\BTComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="ActionComponent.h">
-      <Filter>Component\ActionComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="EventSystem.h">
-      <Filter>Event</Filter>
-    </ClInclude>
-    <ClInclude Include="ComponentFactory.h">
-      <Filter>Factory</Filter>
-    </ClInclude>
     <ClInclude Include="SoundManager.h">
       <Filter>Manager\SoundManager</Filter>
     </ClInclude>
@@ -140,29 +95,8 @@
     <ClInclude Include="BT_Editor.h">
       <Filter>Utill\BT</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectFactory.h">
-      <Filter>Factory</Filter>
-    </ClInclude>
-    <ClInclude Include="TestComponent.h">
-      <Filter>Component\Interact\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="TestInteractableComponent.h">
-      <Filter>Component\Interact\Test</Filter>
-    </ClInclude>
-    <ClInclude Include="InteractableComponent.h">
-      <Filter>Component\Interact</Filter>
-    </ClInclude>
-    <ClInclude Include="SphereColliderComponent.h">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="MeshEditor.h">
       <Filter>Utill\MeshEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="CharacterController.h">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="StairColliderComponent.h">
-      <Filter>Component\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="ProjectSetting.h">
       <Filter>Window</Filter>
@@ -211,29 +145,11 @@
     <ClCompile Include="Dx11Main.cpp">
       <Filter>Dx11Main</Filter>
     </ClCompile>
-    <ClCompile Include="InputManager2.cpp">
-      <Filter>Manager\InputManager</Filter>
-    </ClCompile>
-    <ClCompile Include="Object.cpp">
-      <Filter>Object</Filter>
-    </ClCompile>
     <ClCompile Include="BehaviorTree.cpp">
       <Filter>Utill\BT</Filter>
     </ClCompile>
     <ClCompile Include="PathFinding.cpp">
       <Filter>Utill\PathFinding</Filter>
-    </ClCompile>
-    <ClCompile Include="BehaviorTreeComponent.cpp">
-      <Filter>Component\BTComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="ActionComponent.cpp">
-      <Filter>Component\ActionComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="EventSystem.cpp">
-      <Filter>Event</Filter>
-    </ClCompile>
-    <ClCompile Include="ComponentFactory.cpp">
-      <Filter>Factory</Filter>
     </ClCompile>
     <ClCompile Include="SoundManager.cpp">
       <Filter>Manager\SoundManager</Filter>
@@ -241,36 +157,8 @@
     <ClCompile Include="BT_Editor.cpp">
       <Filter>Utill\BT</Filter>
     </ClCompile>
-    <ClCompile Include="ObjectFactory.cpp">
-      <Filter>Factory</Filter>
-    </ClCompile>
-    <ClCompile Include="TestComponent.cpp">
-      <Filter>Component\Interact\Test</Filter>
-    </ClCompile>
-    <ClCompile Include="TestInteractableComponent.cpp">
-      <Filter>Component\Interact\Test</Filter>
-    </ClCompile>
-    <ClCompile Include="SphereColliderComponent.cpp">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="CharacterController.cpp">
-      <Filter>Utill</Filter>
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClCompile>
     <ClCompile Include="MeshEditor.cpp">
       <Filter>Utill\MeshEditor</Filter>
-    </ClCompile>
-    <ClCompile Include="StairColliderComponent.cpp">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="ColliderComponent.cpp">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="RigidbodyComponent.cpp">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="BoxColliderComponent.cpp">
-      <Filter>Component\PhysicsComponent</Filter>
     </ClCompile>
     <ClCompile Include="KeyState.cpp">
       <Filter>Manager\InputManager</Filter>
@@ -278,10 +166,5 @@
     <ClCompile Include="InputManager.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="ObjectLIst.txt">
-      <Filter>Object</Filter>
-    </Text>
   </ItemGroup>
 </Project>

@@ -2,5 +2,17 @@
 
 std::string GameObject::ToString() const
 {
-    return std::string();
+    return m_name.ToString();
+}
+
+void GameObject::ShowBoneHierarchy(Bone* bone)
+{
+}
+
+void GameObject::RenderBoneEditor()
+{
+}
+
+void GameObject::EditorMeshRenderer()
+{
 }

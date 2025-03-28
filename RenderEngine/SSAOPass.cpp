@@ -103,7 +103,7 @@ void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth
     m_NoiseTexture = std::unique_ptr<Texture>(tex);
 }
 
-void SSAOPass::Execute(Scene& scene, Camera& camera)
+void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
 
