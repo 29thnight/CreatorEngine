@@ -402,6 +402,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	{
 		m_currentScene = Scene::CreateNewScene();
 		m_renderScene->SetScene(m_currentScene);
+		m_renderScene->Initialize();
 
 		auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		

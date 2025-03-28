@@ -21,6 +21,7 @@ public:
 	GameObject& operator=(GameObject&) = delete;
 
 	std::string ToString() const override;
+	unsigned int GetInstanceID() const override { return m_instanceID; }
 
 	void ShowBoneHierarchy(Bone* bone);
 	void RenderBoneEditor();

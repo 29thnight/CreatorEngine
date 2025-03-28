@@ -7,6 +7,6 @@
 
 interface IObject
 {
-	virtual unsigned int GetInstanceID() const {};
+	virtual unsigned int GetInstanceID() const = 0;
 	virtual std::string ToString() const = 0;
 };
