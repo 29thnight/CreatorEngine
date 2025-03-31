@@ -703,6 +703,12 @@ void SceneRenderer::EditorView()
 			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 255, 255));
 			ImVec2 pos = ImGui::GetCursorScreenPos();
 			ImVec2 size = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str());
+
+			if (0 == size.x)
+			{
+				size.x = 5.f;
+			}
+
 			if (ImGui::InvisibleButton("##last_log_btn", size)) {
 				m_bShowLogWindow = true;
 			}

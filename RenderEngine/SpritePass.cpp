@@ -103,7 +103,7 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 		std::back_inserter(sprites),
 		[](const std::shared_ptr<GameObject>& object)
 		{
-			return object->GetComponent<SpriteRenderer>()->IsEnabled();
+			return nullptr != object->GetComponent<SpriteRenderer>() && object->GetComponent<SpriteRenderer>()->IsEnabled();
 		}
 	);
 

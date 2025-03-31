@@ -50,14 +50,13 @@ private:
 	Model* LoadModel();
 	void GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex);
 
-	std::shared_ptr<Assimp::Importer> m_importer;
+	std::shared_ptr<Assimp::Importer> m_importer{};
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory;
 
-	Model* m_model;
-	Material* m_material;
-	Animator* m_animator;
+	Model* m_model{};
+	Material* m_material{};
 
 	Scene* m_scene;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };

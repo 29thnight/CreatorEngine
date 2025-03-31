@@ -112,7 +112,6 @@ Model* ModelLoader::LoadModel()
 			Animator* animator = m_model->m_animator;
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
-			m_animator = animator;
 		}
 		ParseModel();
 	}
@@ -334,7 +333,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[meshId];
-		MeshRenderer* meshRenderer = object->GetComponent<MeshRenderer>();
+		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
 		meshRenderer->SetEnabled(true);
 		meshRenderer->m_Mesh = mesh;

@@ -19,7 +19,10 @@ public:
 	Animator* m_Animator = nullptr;
 
 public:
-	std::string ToString() const override;
+	std::string ToString() const override
+	{
+		return std::string("MeshRenderer");
+	}
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
@@ -31,8 +34,6 @@ public:
 
 private:
 	bool m_IsEnabled = false;
-
-
 };
 
 class SpriteRenderer : public Component, public IRenderable
