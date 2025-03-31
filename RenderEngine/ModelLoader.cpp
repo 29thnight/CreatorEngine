@@ -49,6 +49,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 
 void ModelLoader::ProcessNodes()
 {
+	m_model->m_numTotalMeshes = m_AIScene->mNumMeshes;
 	ProcessNode(m_AIScene->mRootNode, 0);
 }
 
@@ -312,15 +313,16 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	int nextIndex = parentIndex;
 	if (true == isRoot)
 	{
-		auto rootObject = m_scene->CreateGameObject(m_model->name, nextIndex);
+		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObject::Type::Mesh, nextIndex);
 		nextIndex = rootObject->m_index;
+		m_modelRootIndex = rootObject->m_index;
 
 		if (m_model->m_hasBones)
 		{
 			Banchmark banch;
-			Animator* animator = rootObject->AddComponent<Animator>();
-			animator->SetEnabled(true);
-			animator->m_Skeleton = m_model->m_Skeleton;
+			m_animator = rootObject->AddComponent<Animator>();
+			m_animator->SetEnabled(true);
+			m_animator->m_Skeleton = m_model->m_Skeleton;
 			std::cout << "GenerateSceneObjectHierarchy new Animator : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
@@ -328,7 +330,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		Banchmark banch;
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, nextIndex);
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
@@ -345,7 +347,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
-		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, nextIndex);
+		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -353,5 +355,35 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	for (uint32 i = 0; i < node->m_numChildren; ++i)
 	{
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
+	}
+}
+
+void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(Node* node, Bone* bone, bool isRoot, int parentIndex)
+{
+	int nextIndex = parentIndex;
+	if (true == isRoot)
+	{
+		auto rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		nextIndex = rootObject->m_index;
+	}
+	else
+	{
+		std::shared_ptr<GameObject> boneObject{};
+		boneObject = m_scene->GetGameObject(bone->m_name);
+		if (nullptr == boneObject)
+		{
+			boneObject = m_scene->CreateGameObject(bone->m_name, GameObject::Type::Bone, nextIndex);
+		}
+		else
+		{
+			boneObject->m_gameObjectType = GameObject::Type::Bone;
+		}
+		nextIndex = boneObject->m_index;
+		boneObject->m_rootIndex = m_modelRootIndex;
+	}
+
+	for (uint32 i = 0; i < bone->m_children.size(); ++i)
+	{
+		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
 	}
 }

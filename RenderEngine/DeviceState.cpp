@@ -13,3 +13,4 @@ ID3D11ShaderResourceView* DeviceState::g_depthStancilSRV = nullptr;
 ID3D11ShaderResourceView* DeviceState::g_editorDepthStancilSRV = nullptr;
 DirectX11::Sizef DeviceState::g_ClientRect = {};
 float DeviceState::g_aspectRatio = 0.f;
+std::atomic<int> DeviceState::g_renderCallCount = 0;

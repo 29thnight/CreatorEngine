@@ -90,6 +90,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         float3 numerator = NDF * G * F;
         float denominator = 4.0 * saturate(surf.NdotV) * NdotL;
         float3 specular = numerator / max(denominator, 0.001);
+        
+        light.color.rgb *= light.intencity;
 
         Lo += (kD * albedo / PI + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);
 

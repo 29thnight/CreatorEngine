@@ -13,6 +13,18 @@ cbuffer UseTonemap : register(b0)
     float filmShoulder;
     float filmBlackClip;
     float filmWhiteClip;
+    float toneMapExposure;
+}
+
+float3 ACESFilmicToneMapping(float3 color)
+{
+    color *= 0.6f;
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0f, 1.0f);
 }
 
 float3 FilmToneMap(float3 LinearColor)
@@ -96,16 +108,6 @@ float3 FilmToneMap(float3 LinearColor)
     return max(0, ToneColor);
 }
 
-float3 AcesToneMap_UE4(float3 LinearColor)
-{
-    const float3x3 sRGB_2_AP0 = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, sRGB_2_XYZ_MAT));
-
-    float3 aces = mul(sRGB_2_AP0, LinearColor * 1.5);
-    float3 oces = RRT(aces);
-    return ODT(oces);
-}
-
-
 struct PixelShaderInput // see Fullscreen.vs.hlsl
 {
     float4 position : SV_POSITION;
@@ -125,7 +127,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         }
         else
         {
-            toneMapped = AcesToneMap_UE4(colour);
+            toneMapped = ACESFilmicToneMapping(colour);
         }
     }
     else
@@ -133,5 +135,5 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         toneMapped = colour;
     }
     
-    return float4(toneMapped, 1);
+    return float4(toneMapped * toneMapExposure, 1);
 }

@@ -14,6 +14,8 @@ public:
 	Mathf::xMatrix m_globalInverseTransform;
 	~Skeleton();
 	static constexpr uint32 MAX_BONES{ 512 };
+
+	Bone* FindBone(const std::string_view& _name);
 };
 
 class Bone

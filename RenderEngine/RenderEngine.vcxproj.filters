@@ -361,26 +361,11 @@
     <ClInclude Include="LightProperty.h">
       <Filter>Objects\NewFilter1</Filter>
     </ClInclude>
+    <ClInclude Include="cbuffers.h">
+      <Filter>RenderPass\PostProcessingPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\x64\Assets\Shaders\BlockFilterDownsample.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur6x6_AxisX.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur6x6_AxisY.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur11x11_AxisX.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur11x11_AxisY.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\UpsampleAccumulate.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\SSAO.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
@@ -446,6 +431,18 @@
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\VertexShader.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BloomComposite.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BloomUpsample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

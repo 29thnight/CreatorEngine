@@ -122,7 +122,7 @@ LightingInfo EvalLightingInfo(SurfaceInfo surf, Light light)
         default:
             break;
     }
-    //light.color = light.color * 5.f; // color.w is intensity
+
     return li;
 }
 

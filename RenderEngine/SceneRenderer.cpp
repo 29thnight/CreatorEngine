@@ -224,6 +224,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
 
+	m_pPostProcessingPass = std::make_unique<PostProcessingPass>();
+
 	m_renderScene = new RenderScene();
 }
 
@@ -297,6 +299,12 @@ void SceneRenderer::InitializeImGui()
 		if (ImGui::CollapsingHeader("GridPass"))
 		{
 			m_pGridPass->ControlPanel();
+		}
+
+		ImGui::Spacing();
+		if (ImGui::CollapsingHeader("PostProcessPass"))
+		{
+			m_pPostProcessingPass->ControlPanel();
 		}
 	});
 
@@ -442,6 +450,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
+		model = Model::LoadModel("plane.fbx");
+		Model::LoadModelToScene(model, *m_currentScene);
 		model = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("Link_SwordAnimation.fbx");
 		//testUI.Loadsprite("test2.png");
@@ -497,6 +507,7 @@ void SceneRenderer::Update(float deltaTime)
 
 void SceneRenderer::Render()
 {
+	DirectX11::ResetCallCount();
 	for(auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
@@ -523,7 +534,6 @@ void SceneRenderer::Render()
 		{
 			//Banchmark banch;
 			m_pSSAOPass->Execute(*m_renderScene, *camera);
-
 			//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
@@ -532,8 +542,6 @@ void SceneRenderer::Render()
 			//Banchmark banch;
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->Execute(*m_renderScene, *camera);
-
-
 			//std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
@@ -559,6 +567,11 @@ void SceneRenderer::Render()
 			//Banchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
+		}
+
+		//[*] PostProcessPass
+		{
+			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
 		}
 
 		//[6] ToneMapPass
@@ -587,19 +600,18 @@ void SceneRenderer::Render()
 
 		//[]  UIPass
 		{
-			
 			m_pUIPass->Execute(*m_renderScene, *camera);
 		}
+
 		//[8] BlitPass
 		{
 			//Banchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
-
-		
 	}
 
+	Debug->Log("Draw Call Count : " + std::to_string(DirectX11::GetDrawCallCount()));
 	m_pGBufferPass->ClearDeferredQueue();
 }
 

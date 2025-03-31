@@ -13,175 +13,217 @@ PostProcessingPass::PostProcessingPass()
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
+	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
-	m_pBloomDownSampledCS = &AssetsSystems->ComputeShaders["BloomDownSampled"];
-	m_pGaussianBlur6x6_AxisX_CS = &AssetsSystems->ComputeShaders["GaussianBlur6x6_AxisX"];
-	m_pGaussianBlur6x6_AxisY_CS = &AssetsSystems->ComputeShaders["GaussianBlur6x6_AxisY"];
-	m_pGaussianBlur11x11_AxisX_CS = &AssetsSystems->ComputeShaders["GaussianBlur11x11_AxisX"];
-	m_pGaussianBlur11x11_AxisY_CS = &AssetsSystems->ComputeShaders["GaussianBlur11x11_AxisY"];
-	
-	m_BloomBuffer = DirectX11::CreateBuffer(sizeof(BloomBuffer), D3D11_BIND_CONSTANT_BUFFER, &m_BloomConstant);
-	m_DownSampledBuffer = DirectX11::CreateBuffer(sizeof(DownSampledBuffer), D3D11_BIND_CONSTANT_BUFFER, &m_DownSampledConstant);
-	m_BlurBuffer = DirectX11::CreateBuffer(sizeof(BlurBuffer), D3D11_BIND_CONSTANT_BUFFER, &m_BlurConstant);
-	m_UpsampleBuffer = DirectX11::CreateBuffer(sizeof(UpsampleBuffer), D3D11_BIND_CONSTANT_BUFFER, &m_UpsampleConstant);
+	m_pFullScreenVS = &AssetsSystems->VertexShaders["Fullscreen"];
+	m_pBloomDownSampledCS = &AssetsSystems->ComputeShaders["BloomThresholdDownsample"];
+	m_pGaussianBlurCS = &AssetsSystems->ComputeShaders["GaussianBlur"];
+	m_pBloomCompositePS = &AssetsSystems->PixelShaders["BloomComposite"];
+
+	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateInputLayout(
+			vertexLayoutDesc,
+			_countof(vertexLayoutDesc),
+			m_pFullScreenVS->GetBufferPointer(),
+			m_pFullScreenVS->GetBufferSize(),
+			&m_pso->m_inputLayout
+		)
+	);
+
+	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&m_pso->m_rasterizerState
+		)
+	);
+
 
 	TextureInitialization();
+	GaussianBlurComputeKernel();
+
+	m_bloomThresholdBuffer = DirectX11::CreateBuffer(sizeof(ThresholdParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomThreshold);
+	m_bloomBlurBuffer = DirectX11::CreateBuffer(sizeof(BlurParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomBlur);
+	m_bloomCompositeBuffer = DirectX11::CreateBuffer(sizeof(CompositeParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomComposite);
 
 }
 
 PostProcessingPass::~PostProcessingPass()
 {
-	Memory::SafeDelete(m_BloomDownSampledTexture1_StepX);
-	Memory::SafeDelete(m_BloomDownSampledTexture1_StepY);
-	Memory::SafeDelete(m_BloomDownSampledTexture2_StepX);
-	Memory::SafeDelete(m_BloomDownSampledTexture2_StepY);
-	Memory::SafeDelete(m_BloomDownSampledTextureFinal_StepX);
-	Memory::SafeDelete(m_BloomDownSampledTextureFinal_StepY);
 	Memory::SafeDelete(m_CopiedTexture);
 }
 
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 {
+	// Copy the back buffer to a texture
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+
 	if (m_PostProcessingApply.m_Bloom)
 	{
 		BloomPass(scene, camera);
 	}
+
+	DirectX11::CopyResource(camera.m_renderTarget->m_pTexture, m_CopiedTexture->m_pTexture);
 }
 
 void PostProcessingPass::ControlPanel()
 {
+	ImGui::Checkbox("ApplyBloom", &m_PostProcessingApply.m_Bloom);
+	ImGui::DragFloat("Threshold", &m_bloomThreshold.threshold);
+	ImGui::DragFloat("Knee", &m_bloomThreshold.knee);
+	ImGui::DragFloat("Coeddicient", &m_bloomComposite.coeddicient);
+
 }
 
 void PostProcessingPass::TextureInitialization()
 {
+	//Bloom Pass
+	BloomBufferWidth = DeviceState::g_ClientRect.width / 2;
+	BloomBufferHeight = DeviceState::g_ClientRect.height / 2;
+
 	m_CopiedTexture = Texture::Create(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
 	);
+	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	//Bloom Pass
-	m_ApplyBloomCurveTexture = Texture::Create(
+	m_BloomFilterSRV1 = Texture::Create(
 		BloomBufferWidth,
 		BloomBufferHeight,
-		"BloomCurveTexture",
+		"BloomFilterSRV1",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
 	);
+	m_BloomFilterSRV1->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomFilterSRV1->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_BloomDownSampledTexture1_StepX = Texture::Create(
+	m_BloomFilterSRV2 = Texture::Create(
 		BloomBufferWidth,
 		BloomBufferHeight,
-		"BloomDownSampledTexture1",
+		"BloomFilterSRV2",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
 	);
+	m_BloomFilterSRV2->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomFilterSRV2->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_BloomDownSampledTexture1_StepY = Texture::Create(
-		BloomBufferWidth,
-		BloomBufferHeight,
-		"BloomDownSampledTexture2",
+	m_BloomResult = Texture::Create(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"CopiedTexture",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
 	);
+	m_BloomResult->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomResult->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_BloomDownSampledTexture2_StepX = Texture::Create(
-		BloomBufferWidth / 2,
-		BloomBufferHeight / 2,
-		"BloomDownSampledTexture3",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
-	);
-
-	m_BloomDownSampledTexture2_StepY = Texture::Create(
-		BloomBufferWidth / 2,
-		BloomBufferHeight / 2,
-		"BloomDownSampledTexture4",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
-	);
-
-	m_BloomDownSampledTextureFinal_StepX = Texture::Create(
-		BloomBufferWidth / 4,
-		BloomBufferHeight / 4,
-		"BloomDownSampledTextureFinal",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
-	);
-
-	m_BloomDownSampledTextureFinal_StepY = Texture::Create(
-		BloomBufferWidth / 4,
-		BloomBufferHeight / 4,
-		"BloomDownSampledTextureFinal",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
-	);
 }
 
 void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 {
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	m_pso->m_vertexShader = m_pFullScreenVS;
+	m_pso->m_pixelShader = m_pBloomCompositePS;
 
-	DirectX11::CSSetShader(m_pBloomDownSampledCS->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(0, 1, &m_CopiedTexture->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_ApplyBloomCurveTexture->m_pUAV, nullptr);
+	m_pso->Apply();
 
-	m_DownSampledConstant.inputSize = { (int)DeviceState::g_ClientRect.width, (int)DeviceState::g_ClientRect.height };
-	m_DownSampledConstant.outputSize = { (int)BloomBufferWidth, (int)BloomBufferHeight };
+	// Downsample the copied texture
+	const UINT offsets[]{ 0 };
+	constexpr ID3D11RenderTargetView* nullRTV = nullptr;
+	constexpr ID3D11ShaderResourceView* nullSRV = nullptr;
+	constexpr ID3D11UnorderedAccessView* nullUAV = nullptr;
+	{
+		DirectX11::UpdateBuffer(m_bloomThresholdBuffer.Get(), &m_bloomThreshold);
 
-	DirectX11::UpdateBuffer(m_DownSampledBuffer.Get(), &m_DownSampledConstant);
+		DirectX11::CSSetShader(m_pBloomDownSampledCS->GetShader(), 0, 0);
+		DirectX11::CSSetShaderResources(0, 1, &m_CopiedTexture->m_pSRV);
+		DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomFilterSRV1->m_pUAV, offsets);
+		DirectX11::CSSetConstantBuffer(0, 1, m_bloomThresholdBuffer.GetAddressOf());
 
-	uint32 threadGroupCountX = (uint32)ceilf(BloomBufferHeight + 7 / 8.0f);
-	uint32 threadGroupCountY = (uint32)ceilf(BloomBufferWidth + 7 / 8.0f);
+		DirectX11::Dispatch(DeviceState::g_ClientRect.width / 16, DeviceState::g_ClientRect.height / 16, 1);
 
-	DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
+		DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+		DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+	}
 
-	DirectX11::CSSetUnorderedAccessViews(0, 1, nullptr, nullptr);
-	DirectX11::CSSetShaderResources(0, 1, nullptr);
+	// Blur the downsampled texture
+	{
+		DirectX11::CSSetShader(m_pGaussianBlurCS->GetShader(), 0, 0);
 
-	DirectX11::CopyResource(m_BloomDownSampledTexture1_StepX->m_pTexture, m_ApplyBloomCurveTexture->m_pTexture);
-	//Step 1 ----------------------------------------------
+		ID3D11ShaderResourceView* csSRVs[]{ m_BloomFilterSRV1->m_pSRV, m_BloomFilterSRV2->m_pSRV };
+		ID3D11UnorderedAccessView* csUAVs[]{ m_BloomFilterSRV2->m_pUAV, m_BloomFilterSRV1->m_pUAV };
 
-	DirectX11::CSSetShader(m_pGaussianBlur6x6_AxisX_CS->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(0, 1, &m_BloomDownSampledTexture1_StepX->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomDownSampledTexture1_StepY->m_pUAV, nullptr);
+		for (uint32 direction = 0; direction < 2; ++direction)
+		{
+			m_bloomBlur.direction = direction;
+			DirectX11::UpdateBuffer(m_bloomBlurBuffer.Get(), &m_bloomBlur);
 
-	m_BlurConstant.texSize = { int(BloomBufferWidth / 2), int(BloomBufferHeight / 2) };
+			DirectX11::CSSetShaderResources(0, 1, &csSRVs[direction]);
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &csUAVs[direction], offsets);
 
-	DirectX11::UpdateBuffer(m_BlurBuffer.Get(), &m_BlurConstant);
+			DirectX11::CSSetConstantBuffer(0, 1, m_bloomBlurBuffer.GetAddressOf());
 
-	threadGroupCountX = (uint32)ceilf((BloomBufferHeight / 2.f) + 7 / 8.0f);
-	threadGroupCountY = (uint32)ceilf((BloomBufferWidth / 2.f) + 7 / 8.0f);
+			DirectX11::Dispatch(DeviceState::g_ClientRect.width / 16, DeviceState::g_ClientRect.height / 16, 1);
 
-	DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
+			DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+		}
+	}
 
-	DirectX11::CSSetUnorderedAccessViews(0, 1, nullptr, nullptr);
-	DirectX11::CSSetShaderResources(0, 1, nullptr);
+	// Composite the blurred texture with the original texture
+	{
+		ID3D11RenderTargetView* rtv = m_BloomResult->GetRTV();
+		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-	DirectX11::CSSetShader(m_pGaussianBlur6x6_AxisY_CS->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(0, 1, &m_BloomDownSampledTexture1_StepY->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomDownSampledTexture1_StepX->m_pUAV, nullptr);
-	
-	m_BlurConstant.texSize = { int(BloomBufferWidth / 2), int(BloomBufferHeight / 2) };
+		DirectX11::VSSetShader(m_pFullScreenVS->GetShader(), 0, 0);
+		DirectX11::PSSetShader(m_pBloomCompositePS->GetShader(), 0, 0);
 
-	DirectX11::UpdateBuffer(m_BlurBuffer.Get(), &m_BlurConstant);
+		ID3D11ShaderResourceView* pSRVs[]{ m_CopiedTexture->m_pSRV, m_BloomFilterSRV1->m_pSRV };
+		DirectX11::PSSetShaderResources(0, 2, pSRVs);
 
-	threadGroupCountX = (uint32)ceilf((BloomBufferHeight / 2.f) + 7 / 8.0f);
-	threadGroupCountY = (uint32)ceilf((BloomBufferWidth / 2.f) + 7 / 8.0f);
+		DirectX11::UpdateBuffer(m_bloomCompositeBuffer.Get(), &m_bloomComposite);
+		DirectX11::PSSetConstantBuffer(0, 1, m_bloomCompositeBuffer.GetAddressOf());
 
-	DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
+		DirectX11::Draw(4, 0);
 
-	DirectX11::CSSetUnorderedAccessViews(0, 1, nullptr, nullptr);
-	DirectX11::CSSetShaderResources(0, 1, nullptr);
+		DirectX11::PSSetShaderResources(0, 1, &nullSRV);
+		DirectX11::UnbindRenderTargets();
 
-	//Step 2 ----------------------------------------------
+		DirectX11::CopyResource(m_CopiedTexture->m_pTexture, m_BloomResult->m_pTexture);
+	}
+}
 
-	DirectX11::CSSetShader(m_pGaussianBlur6x6_AxisX_CS->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(0, 1, &m_BloomDownSampledTexture1_StepX->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomDownSampledTexture2_StepY->m_pUAV, nullptr);
+void PostProcessingPass::GaussianBlurComputeKernel()
+{
+	float sigma = 10.f;
+	float sigmaRcp = 1.f / sigma;
+	float twoSigmaSq = 2 * sigma * sigma;
 
-
-
+	float sum = 0.f;
+	for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	{
+		m_bloomBlur.coefficients[i] = (1.f / sigma) * std::expf(-static_cast<float>(i * i) / twoSigmaSq);
+		sum += 2 * m_bloomBlur.coefficients[i];
+	}
+	sum -= m_bloomBlur.coefficients[0];
+	float normalizationFactor = 1.f / sum;
+	for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	{
+		m_bloomBlur.coefficients[i] *= normalizationFactor;
+	}
 }

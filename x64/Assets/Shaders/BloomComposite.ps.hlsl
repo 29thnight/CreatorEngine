@@ -15,8 +15,8 @@ struct FullscreenVsOutput
 };
 
 // pixel shader
-float4 PSMain(FullscreenVsOutput p) : SV_TARGET
+float4 main(FullscreenVsOutput p) : SV_TARGET
 {
     // output: tex0 + coefficient * tex1
-    return mad(coefficient, tex1.Sample(LinearSampler, p.texCoord), tex0.Sample(LinearSampler, p.texCoord));
+    return mad(coefficient, tex1.Sample(PointSampler, p.texCoord), tex0.Sample(PointSampler, p.texCoord));
 }

@@ -17,10 +17,21 @@ namespace DeviceState
 	extern ID3D11ShaderResourceView* g_editorDepthStancilSRV;
 	extern DirectX11::Sizef g_ClientRect;
 	extern float g_aspectRatio;
+	extern std::atomic<int> g_renderCallCount;
 }
 
 namespace DirectX11
 {
+	inline void ResetCallCount()
+	{
+		DeviceState::g_renderCallCount = 0;
+	}
+
+	inline int GetDrawCallCount()
+	{
+		return DeviceState::g_renderCallCount.load();
+	}
+
 	inline ID3D11Buffer* CreateBuffer(uint32 size, D3D11_BIND_FLAG bindFlag, const void* data = nullptr)
 	{
 		if (!DeviceState::g_pDevice)
@@ -144,6 +155,7 @@ namespace DirectX11
 			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
 			return;
 		}
+		DeviceState::g_renderCallCount++;
 		DeviceState::g_pDeviceContext->DrawIndexed(indexCount, startIndexLocation, baseVertexLocation);
 	}
 
@@ -265,6 +277,7 @@ namespace DirectX11
            Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
             return;
         }
+		DeviceState::g_renderCallCount++;
         DeviceState::g_pDeviceContext->Draw(vertexCount, startVertexLocation);
     }
 

@@ -2,6 +2,8 @@
 #include "ImGuiRegister.h"
 #include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
+#include "../ScriptBinder/Renderer.h"
+#include "Skeleton.h"
 #include "Light.h"
 
 RenderScene::RenderScene()
@@ -17,44 +19,10 @@ RenderScene::~RenderScene()
 
 	Memory::SafeDelete(m_LightController);
 }
-//
-//std::shared_ptr<SceneObject> Scene::AddSceneObject(const std::shared_ptr<SceneObject>& sceneObject)
-//{
-//	m_SceneObjects.push_back(sceneObject);
-//
-//    const_cast<SceneObject::Index&>(sceneObject->m_index) = m_SceneObjects.size() - 1;
-//
-//	m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
-//
-//	return sceneObject;
-//}
-//
-//std::shared_ptr<SceneObject> Scene::CreateSceneObject(const std::string_view& name, SceneObject::Index parentIndex)
-//{
-//    SceneObject::Index index = m_SceneObjects.size();
-//
-//	m_SceneObjects.push_back(std::make_shared<SceneObject>(name, index, parentIndex));
-//	auto parentObj = GetSceneObject(parentIndex);
-//	if(parentObj->m_index != index)
-//	{
-//		parentObj->m_childrenIndices.push_back(index);
-//	}
-//	return m_SceneObjects[index];
-//}
-//
-//std::shared_ptr<SceneObject> Scene::GetSceneObject(SceneObject::Index index)
-//{
-//	if (index < m_SceneObjects.size())
-//	{
-//		return m_SceneObjects[index];
-//	}
-//	return m_SceneObjects[0];
-//}
 
 void RenderScene::Initialize()
 {
-
-	m_currentScene->CreateGameObject("Root", 0);
+	m_currentScene->CreateGameObject("Root");
 	m_MainCamera.RegisterContainer();
 	m_LightController = new LightController();
 	EditorSceneObjectHierarchy();
@@ -163,8 +131,21 @@ void RenderScene::EditorSceneObjectInspector()
 void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
 	auto obj = m_currentScene->GetGameObject(objIndex);
-	model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-	obj->m_transform.SetAndDecomposeMatrix(model);
+
+	if(GameObject::Type::Bone == obj->GetType())
+	{
+		auto animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		auto bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		if (bone)
+		{
+			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+		}
+	}
+	else
+	{
+		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
+		obj->m_transform.SetAndDecomposeMatrix(model);
+	}
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
 		UpdateModelRecursive(childIndex, model);
@@ -181,6 +162,37 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 	if (ImGui::IsItemClicked())
 		m_selectedSceneObject = obj.get();
+
+	if (ImGui::BeginDragDropSource())
+	{
+		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(GameObject::Index));
+		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
+		ImGui::EndDragDropSource();
+	}
+
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
+
+			// 부모 변경 로직
+			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
+			{
+				auto draggedObj = m_currentScene->GetGameObject(draggedIndex);
+				auto oldParent = m_currentScene->GetGameObject(draggedObj->m_parentIndex);
+
+				// 1. 기존 부모에서 제거
+				auto& siblings = oldParent->m_childrenIndices;
+				std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
+
+				// 2. 새로운 부모에 추가
+				draggedObj->m_parentIndex = obj->m_index;
+				obj->m_childrenIndices.push_back(draggedIndex);
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
 
 	if (opened)
 	{

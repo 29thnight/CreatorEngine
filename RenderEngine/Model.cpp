@@ -75,6 +75,10 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 
 	Banchmark banch;
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
+	if (model->m_hasBones)
+	{
+		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+	}
 	std::cout << "LoadModelToScene : " << banch.GetElapsedTime() << std::endl;
 
 	return model;

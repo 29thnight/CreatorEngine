@@ -30,6 +30,7 @@ struct alignas(16) Light
 
 	int m_lightType{};
 	int m_lightStatus{};
+	float m_intencity{ 5.f };
 };
 
 struct alignas(16) LightProperties

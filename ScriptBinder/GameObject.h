@@ -15,16 +15,26 @@ class GameObject : public IObject
 {
 public:
 	using Index = int;
-	GameObject(const std::string_view& name, GameObject::Index index, GameObject::Index parentIndex);
+
+	enum class Type
+	{
+		Empty,
+		Camera,
+		Light,
+		Mesh,
+		Bone,
+		TypeMax
+	};
+
+	GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
 
 	std::string ToString() const override;
+	HashingString GetHashedName() const { return m_name; }
 	unsigned int GetInstanceID() const override { return m_instanceID; }
 
-	void ShowBoneHierarchy(Bone* bone);
-	void RenderBoneEditor();
 	void EditorMeshRenderer();
 
 	template<typename T>
@@ -105,23 +115,31 @@ public:
 		component->SetDestroyMark();
 	}
 
+	GameObject::Type GetType() const { return m_gameObjectType; }
+
+	void SetScene(Scene* pScene) { m_pScene = pScene; }
+
 	Transform m_transform{};
-	const Index m_index;
-	const Index m_parentIndex;
+	Index m_index;
+	Index m_parentIndex;
+	//for bone update
+	Index m_rootIndex{ 0 };
 	std::vector<GameObject::Index> m_childrenIndices;
 
 private:
 	friend class RenderScene;
 	friend class ModelLoader;
+	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
+	
 	const size_t m_typeID{ GENERATE_CLASS_GUID };
 	const size_t m_instanceID{ GENERATE_GUID };
+	
 	HashingString m_name{};
 	HashingString m_tag{};
-	Scene* m_pScene{};
+	static Scene* m_pScene;
+	
 	std::unordered_map<uint32_t, size_t> m_componentIds{};
 	std::vector<Component*> m_components{};
-
-
 
 	//debug layer
 	Bone* selectedBone{ nullptr };

@@ -27,6 +27,7 @@ struct Light
 
     int lightType;
     int status;
+    float intencity;
 };
 
 cbuffer LightProperties : register(b1)
@@ -70,6 +71,7 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
             shadow += (closestDepth < currentDepth - epsilon);
         }
     }
+
     shadow /= 9;
     return shadow;
 }

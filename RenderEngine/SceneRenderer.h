@@ -12,6 +12,7 @@
 #include "WireFramePass.h"
 #include "GridPass.h"
 #include "AAPass.h"
+#include "PostProcessingPass.h"
 
 #include "Model.h"
 #include "Light.h"
@@ -60,6 +61,7 @@ private:
 	std::unique_ptr<WireFramePass> m_pWireFramePass{};
     std::unique_ptr<GridPass> m_pGridPass{};
 	std::unique_ptr<AAPass> m_pAAPass{};
+	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
 
 	std::unique_ptr<UIPass> m_pUIPass{};
 	//buffers

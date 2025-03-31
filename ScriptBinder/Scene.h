@@ -13,8 +13,9 @@ public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObject::Index parentIndex = 0);
+	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
+	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 
 	void Start();
 	void Update(float deltaSecond);

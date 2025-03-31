@@ -49,6 +49,7 @@ private:
 
 	Model* LoadModel();
 	void GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex);
+	void GenerateSkeletonToSceneObjectHierarchy(Node* node, Bone* bone, bool isRoot, int parentIndex);
 
 	std::shared_ptr<Assimp::Importer> m_importer{};
 	const aiScene* m_AIScene;
@@ -57,7 +58,7 @@ private:
 
 	Model* m_model{};
 	Material* m_material{};
-
+	Animator* m_animator{};
 	Scene* m_scene;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
@@ -67,4 +68,5 @@ private:
 
 	bool m_hasBones{ false };
 	bool m_isInitialized{ false };
+	int m_modelRootIndex{ 0 };
 };
