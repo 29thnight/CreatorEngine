@@ -28,5 +28,5 @@ private:
 	Texture* m_AntiAliasingTexture;
 	FXAAParametersBuffer m_FXAAParameters;
 	ComPtr<ID3D11Buffer> m_FXAAParametersBuffer;
-	bool m_isApply{ false };
+	bool m_isApply{ true };
 };

@@ -10,6 +10,8 @@ ToneMapPass::ToneMapPass()
 
     m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
     m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
+	m_pAutoExposureHistogramCS = &AssetsSystems->ComputeShaders["AutoExposureHistogram"];
+    m_pAutoExposureEvalCS = &AssetsSystems->ComputeShaders["AutoExposureEval"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -64,10 +66,75 @@ ToneMapPass::ToneMapPass()
 
 	DirectX::SetName(m_pReinhardConstantBuffer, "ToneMapReinhardConstantBuffer");
 
+    auto& device = DeviceState::g_pDevice;
+
+    D3D11_BUFFER_DESC cbDesc0 = {};
+    cbDesc0.ByteWidth = sizeof(LuminanceHistogramData);
+    cbDesc0.Usage = D3D11_USAGE_DYNAMIC;
+    cbDesc0.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    cbDesc0.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    device->CreateBuffer(&cbDesc0, nullptr, &m_pAutoExposureConstantBuffer);
+
+    D3D11_BUFFER_DESC bufDesc = {};
+    bufDesc.ByteWidth = sizeof(UINT) * NUM_BINS;
+    bufDesc.Usage = D3D11_USAGE_DEFAULT;
+    bufDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    bufDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bufDesc.StructureByteStride = sizeof(UINT);
+
+    device->CreateBuffer(&bufDesc, nullptr, &m_pHistogramBuffer);
+
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc0 = {};
+    uavDesc0.Format = DXGI_FORMAT_UNKNOWN;
+    uavDesc0.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    uavDesc0.Buffer.NumElements = 256;
+
+    device->CreateUnorderedAccessView(m_pHistogramBuffer, &uavDesc0, &m_exposureUAV);
+
+    D3D11_BUFFER_DESC cbDesc1 = {};
+    cbDesc1.ByteWidth = sizeof(LuminanceAverageData);
+    cbDesc1.Usage = D3D11_USAGE_DYNAMIC;
+    cbDesc1.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    cbDesc1.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    device->CreateBuffer(&cbDesc1, nullptr, &m_pLuminanceAverageBuffer);
+
+    D3D11_TEXTURE2D_DESC texDesc = {};
+    texDesc.Width = 1;
+    texDesc.Height = 1;
+    texDesc.MipLevels = 1;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+
+    device->CreateTexture2D(&texDesc, nullptr, &luminanceTexture);
+
+    // UAV 积己
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc1 = {};
+    uavDesc1.Format = texDesc.Format;
+    uavDesc1.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+
+    device->CreateUnorderedAccessView(luminanceTexture.Get(), &uavDesc1, &luminanceUAV);
+
+    D3D11_TEXTURE2D_DESC readbackDesc = texDesc;
+    readbackDesc.Usage = D3D11_USAGE_STAGING;
+    readbackDesc.BindFlags = 0;
+    readbackDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+    device->CreateTexture2D(&readbackDesc, nullptr, &readbackTexture);
 }
 
 ToneMapPass::~ToneMapPass()
 {
+	Memory::SafeDelete(m_pACESConstantBuffer);
+    Memory::SafeDelete(m_pReinhardConstantBuffer);
+
+	Memory::SafeDelete(m_pHistogramBuffer);
+	Memory::SafeDelete(m_pAutoExposureConstantBuffer);
+	//Memory::SafeDelete(m_pAutoExposureReadBuffer);
 }
 
 void ToneMapPass::Initialize(Texture* dest)
@@ -83,6 +150,62 @@ void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
 
 void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 {
+	auto& context = DeviceState::g_pDeviceContext;
+    ID3D11ShaderResourceView* nullSRVs[1] = { nullptr };
+    ID3D11UnorderedAccessView* nullUAVs[1] = { nullptr };
+
+    {
+        D3D11_MAPPED_SUBRESOURCE mappedResource{};
+        context->Map(m_pAutoExposureConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        memcpy(mappedResource.pData, &m_luminanceHistogramConstant, sizeof(m_luminanceHistogramConstant));
+        context->Unmap(m_pAutoExposureConstantBuffer, 0);
+
+        context->CSSetShader(m_pAutoExposureHistogramCS->GetShader(), nullptr, 0);
+
+        ID3D11ShaderResourceView* srvs[] = { camera.m_renderTarget->m_pSRV };
+        context->CSSetShaderResources(0, 1, srvs);
+
+        ID3D11UnorderedAccessView* uavs[] = { m_exposureUAV.Get() };
+        context->CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+
+        ID3D11Buffer* cbuffers[] = { m_pAutoExposureConstantBuffer };
+        context->CSSetConstantBuffers(0, 1, cbuffers);
+
+        context->Dispatch((1920 + 15) / 16, (1080 + 15) / 16, 1);
+    }
+
+    {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        context->Map(m_pLuminanceAverageBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        memcpy(mapped.pData, &m_luminanceAverageConstant, sizeof(m_luminanceAverageConstant));
+        context->Unmap(m_pLuminanceAverageBuffer, 0);
+
+        context->CSSetShader(m_pAutoExposureEvalCS->GetShader(), nullptr, 0);
+
+        ID3D11UnorderedAccessView* uavs[] = {
+            m_exposureUAV.Get(),  // u0: RWStructuredBuffer<uint>
+            luminanceUAV.Get()   // u1: RWTexture2D<float>
+        };
+        context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
+
+        ID3D11Buffer* cbuffers[] = { m_pLuminanceAverageBuffer };
+        context->CSSetConstantBuffers(0, 1, cbuffers);
+
+        context->Dispatch(1, 1, 1);
+    }
+
+    context->CopyResource(readbackTexture.Get(), luminanceTexture.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mappedRead;
+    context->Map(readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedRead);
+    float* result = reinterpret_cast<float*>(mappedRead.pData);
+
+    printf("Adapted Luminance: %f\n", *result);
+
+    context->Unmap(readbackTexture.Get(), 0);
+
+    context->CSSetShaderResources(0, 1, nullSRVs); // Compute Shader SRV 秦力
+    context->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr); // UAV 秦力
 
 	if (m_toneMapType == ToneMapType::Reinhard)
 	{
@@ -108,7 +231,6 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
 
-	auto context = DeviceState::g_pDeviceContext;
 	context->CopyResource(camera.m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
 
     ID3D11ShaderResourceView* nullSRV = nullptr;

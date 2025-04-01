@@ -215,6 +215,18 @@ void Camera::UpdateBuffer()
 	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
+void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext)
+{
+	Mathf::xMatrix view = CalculateView();
+	Mathf::xMatrix proj = CalculateProjection();
+
+	deferredContext->UpdateSubresource(m_ViewBuffer.Get(), 0, nullptr, &view, 0, 0);
+	deferredContext->UpdateSubresource(m_ProjBuffer.Get(), 0, nullptr, &proj, 0, 0);
+
+	deferredContext->VSSetConstantBuffers(1, 1, m_ViewBuffer.GetAddressOf());
+	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
+}
+
 void Camera::ClearRenderTarget()
 {
 	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);

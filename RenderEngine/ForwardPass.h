@@ -1,7 +1,7 @@
 #pragma once
 #include "IRenderPass.h"
 #include "Texture.h"
-#include "SceneObject.h"
+#include "../ScriptBinder/GameObject.h"
 
 class ForwardPass final : public IRenderPass
 {
@@ -18,5 +18,5 @@ private:
 	ComPtr<ID3D11Buffer> m_boneBuffer;
 
 	//forward render queue
-	std::vector<SceneObject*> m_forwardQueue;
+	std::vector<GameObject*> m_forwardQueue;
 };

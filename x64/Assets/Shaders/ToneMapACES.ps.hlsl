@@ -116,24 +116,28 @@ struct PixelShaderInput // see Fullscreen.vs.hlsl
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    float3 colour = Colour.Sample(PointSampler, IN.texCoord).rgb;
+    float4 colour = Colour.Sample(PointSampler, IN.texCoord);
     float3 toneMapped = 0;
+    
     [branch]
     if (useTonemap)
     {
+        [branch]
         if (useFilmic)
         {
-            toneMapped = FilmToneMap(colour);
+            toneMapped = FilmToneMap(colour.rgb);
         }
         else
         {
-            toneMapped = ACESFilmicToneMapping(colour);
+            toneMapped = ACESFilmicToneMapping(colour.rgb);
         }
     }
     else
     {
-        toneMapped = colour;
+        toneMapped = colour.rgb;
     }
     
-    return float4(toneMapped * toneMapExposure, 1);
+    float Exposure = useTonemap ? toneMapExposure : 1.0f;
+        
+    return float4(toneMapped, 1.f);
 }

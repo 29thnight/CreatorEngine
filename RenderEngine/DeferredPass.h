@@ -9,7 +9,6 @@ public:
     DeferredPass();
     ~DeferredPass();
     void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
-	//void EditorInitialize(Texture* renderTarget, Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
     void UseAmbientOcclusion(Texture* aoMap);
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
@@ -17,7 +16,6 @@ public:
 	void ControlPanel() override;
 
 private:
-    Texture* m_RenderTarget{};
     Texture* m_DiffuseTexture{};
     Texture* m_MetalRoughTexture{};
     Texture* m_NormalTexture{};
@@ -26,12 +24,6 @@ private:
     Texture* m_EnvironmentMap{};
     Texture* m_PreFilter{};
     Texture* m_BrdfLut{};
-
-	Texture* m_EditorRenderTarget{};
-	Texture* m_EditorDiffuseTexture{};
-	Texture* m_EditorMetalRoughTexture{};
-	Texture* m_EditorNormalTexture{};
-	Texture* m_EditorEmissiveTexture{};
 
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };

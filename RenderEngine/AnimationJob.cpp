@@ -3,6 +3,7 @@
 #include "Skeleton.h"
 #include "Renderer.h"
 #include "Scene.h"
+#include "Banchmark.hpp"
 
 using namespace DirectX;
 
@@ -12,7 +13,7 @@ inline float lerp(float a, float b, float f)
 }
 
 template <typename T>
-int CurrentKeyIndex(std::vector<T> keys, double time)
+int CurrentKeyIndex(std::vector<T>& keys, double time)
 {
     float duration = time;
     for (UINT i = 0; i < keys.size() - 1; ++i)
@@ -25,24 +26,58 @@ int CurrentKeyIndex(std::vector<T> keys, double time)
     return -1;
 }
 
+AnimationJob::AnimationJob() :
+    m_UpdateThreadPool(8)
+{
+}
+
+AnimationJob::~AnimationJob()
+{
+}
+
 void AnimationJob::Update(RenderScene& scene, float deltaTime)
 {
-
-    for (auto& sceneObj : scene.GetScene()->m_SceneObjects)
+    uint32 currSize = scene.GetScene()->m_SceneObjects.size();
+    if(m_objectSize != currSize)
     {
-		Animator* animator = sceneObj->GetComponent<Animator>();
-        if (nullptr == animator || !animator->IsEnabled()) continue;
+        if(0 == m_objectSize)
+        {
+            for (auto& sceneObj : scene.GetScene()->m_SceneObjects)
+            {
+                Animator* animator = sceneObj->GetComponent<Animator>();
+                if (nullptr == animator || !animator->IsEnabled()) continue;
 
-        Skeleton* skeleton = animator->m_Skeleton;
-        Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
+                m_currAnimator.push_back(animator);
+            }
+        }
+        else
+        {
+            for (uint32 i = m_objectSize - 1; i < currSize; ++i)
+            {
+                Animator* animator = scene.GetScene()->m_SceneObjects[i]->GetComponent<Animator>();
+                if (nullptr == animator || !animator->IsEnabled()) continue;
 
-        animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
-        animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-		//XMMATRIX sceneObjMatrix = sceneObj->m_transform.GetWorldMatrix();
-		XMMATRIX rootTransform = /*sceneObjMatrix **/ skeleton->m_rootTransform;
-
-        UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
+                m_currAnimator.push_back(animator);
+            }
+        }
+        m_objectSize = currSize;
     }
+
+    for(auto& animator : m_currAnimator)
+    {
+        m_UpdateThreadPool.Enqueue([&]
+        {
+            Skeleton* skeleton = animator->m_Skeleton;
+            Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
+
+            animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+            animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+            XMMATRIX rootTransform = skeleton->m_rootTransform;
+            UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
+        });
+    }
+
+    m_UpdateThreadPool.NotifyAllAndWait();
 }
 
 void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)

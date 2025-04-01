@@ -126,9 +126,6 @@
     <Filter Include="Shaders\PipelineShader">
       <UniqueIdentifier>{8e767fa1-c4da-49fb-8661-5c3ac7f2f281}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Objects\NewFilter1">
-      <UniqueIdentifier>{0e6f9420-256b-4362-b304-9203a64a1eb2}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -358,11 +355,11 @@
     <ClInclude Include="PostProcessingPass.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClInclude>
-    <ClInclude Include="LightProperty.h">
-      <Filter>Objects\NewFilter1</Filter>
-    </ClInclude>
     <ClInclude Include="cbuffers.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="LightProperty.h">
+      <Filter>Objects</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -444,6 +441,12 @@
     <FxCompile Include="..\x64\Assets\Shaders\BloomUpsample.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\AutoExposureHistogram.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\AutoExposureEval.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\x64\Assets\Shaders\Lighting.hlsli">
@@ -476,5 +479,8 @@
     <ClInclude Include="UIsprite.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>
+    <None Include="..\x64\Assets\Shaders\AutoExposureShared.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
   </ItemGroup>
 </Project>

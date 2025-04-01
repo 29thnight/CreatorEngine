@@ -7,6 +7,18 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "LightProperty.h"
+#include "Banchmark.hpp"
+
+constexpr uint32 ThreadNumber = 16;
+
+enum class JobBufferType
+{
+	Model,
+	View,
+	Projection,
+	Bone,
+	Material
+};
 
 GBufferPass::GBufferPass()
 {
@@ -55,7 +67,6 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
-
 }
 
 GBufferPass::~GBufferPass()
@@ -84,6 +95,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	m_pso->Apply();
 
 	auto& deviceContext = DeviceState::g_pDeviceContext;
+
 	for (auto& RTV : m_renderTargetViews)
 	{
 		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
@@ -99,9 +111,10 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
+	int index = 0;
 
 	for (auto& sceneObject : m_deferredQueue)
-	{
+	{		
 		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
@@ -140,11 +153,9 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		{
 			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
 		}
-
+		//36 skinedMesh Draw -> FrameDrop : 형편없구만
 		meshRenderer->m_Mesh->Draw();
 	}
-
-	//m_deferredQueue.clear();
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	for (uint32 i = 0; i < 5; i++)

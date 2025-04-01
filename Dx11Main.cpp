@@ -9,6 +9,8 @@
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
+#include "Utility_Framework/TimeSystem.h"
+
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
 	m_deviceResources->RegisterDeviceNotify(this);
@@ -25,7 +27,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	EventInitialize();
 	SceneInitialize();
-
 }
 
 DirectX11::Dx11Main::~Dx11Main()

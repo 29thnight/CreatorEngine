@@ -9,11 +9,7 @@ private:
 	using _timePoint = std::chrono::high_resolution_clock::time_point;
 public:
 	Banchmark() : _start(_clock::now()) {}
-	~Banchmark()
-	{
-		//_duration elapsed = _clock::now() - _start;
-		//printf("Banchmark Elapsed time: %f ms\n", elapsed.count());
-	}
+	~Banchmark() = default;
 
 	double GetElapsedTime()
 	{

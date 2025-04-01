@@ -19,5 +19,4 @@ public:
 	Camera m_shadowCamera{};
 	std::unique_ptr<Texture> m_shadowMapTexture{};
 	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
-
 };

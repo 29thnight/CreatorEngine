@@ -72,3 +72,17 @@ void Mesh::Draw()
 	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
 
 }
+
+ID3D11CommandList* Mesh::Draw(ID3D11DeviceContext* _defferedContext)
+{
+	UINT offset = 0;
+	_defferedContext->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	_defferedContext->IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	_defferedContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	_defferedContext->DrawIndexed(m_indices.size(), 0, 0);
+
+	ID3D11CommandList* commandList;
+	_defferedContext->FinishCommandList(false, &commandList);
+
+	return commandList;
+}

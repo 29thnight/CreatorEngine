@@ -21,6 +21,7 @@ namespace Mathf
     using Matrix = SimpleMath::Matrix;
     using Quaternion = SimpleMath::Quaternion;
 
+	static xMatrix xMatrixIdentity = XMMatrixIdentity();
 	static xVector xVectorZero = XMVectorZero();
 	static xVector xVectorOne = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
 	static xVector xVectorUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);

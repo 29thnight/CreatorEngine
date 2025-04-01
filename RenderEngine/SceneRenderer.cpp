@@ -156,7 +156,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//Buffer 생성
 	XMMATRIX identity = XMMatrixIdentity();
 
-	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &Mathf::xMatrixIdentity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
 
 	m_pEditorCamera = std::make_unique<Camera>();
@@ -514,12 +514,12 @@ void SceneRenderer::Render()
 		//[1] ShadowMapPass
 		{
 			static int count = 0;
-			//Banchmark banch;
+			Banchmark banch;
 			camera->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-			//std::cout << "ShadowMapPass : " << banch.GetElapsedTime() << std::endl;
+			Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
 		}
 
 		//[2] GBufferPass
@@ -539,10 +539,10 @@ void SceneRenderer::Render()
 
 		//[4] DeferredPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->Execute(*m_renderScene, *camera);
-			//std::cout << "DeferredPass : " << banch.GetElapsedTime() << std::endl;
+			Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
 		}
 
 		//[*] WireFramePass

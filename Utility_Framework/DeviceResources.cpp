@@ -131,7 +131,6 @@ void DirectX11::DeviceResources::HandleDeviceLost()
     }
 
     CreateDeviceResources();
-    m_d2dContext->SetDpi(m_dpi, m_dpi);
     CreateWindowSizeDependentResources();
 
     if (m_deviceNotify != nullptr)
@@ -159,7 +158,7 @@ void DirectX11::DeviceResources::Present()
     // 다음 VSync까지 대기하도록 합니다. 이를 통해 화면에 표시되지 않는 프레임을
     // 렌더링하는 주기를 낭비하지 않을 수 있습니다.
     DXGI_PRESENT_PARAMETERS parameters = { 0 };
-    HRESULT hr = m_swapChain->Present1(1, 0, &parameters);
+    HRESULT hr = m_swapChain->Present1(0, 0, &parameters);
 
     // 렌더링 대상의 콘텐츠를 삭제합니다.
     // 이 작업은 기존 콘텐츠를 완전히 덮어쓸 경우에만
@@ -211,43 +210,6 @@ void DirectX11::DeviceResources::ResizeResources()
 
 void DirectX11::DeviceResources::CreateDeviceIndependentResources()
 {
-    // Direct2D 리소스를 초기화합니다.
-    D2D1_FACTORY_OPTIONS options;
-    ZeroMemory(&options, sizeof(D2D1_FACTORY_OPTIONS));
-
-#if defined(_DEBUG)
-    // 프로젝트가 디버그 빌드 중인 경우 SDK 레이어를 통해 Direct2D 디버깅을 사용합니다.
-   options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
-#endif
-
-    // Direct2D 팩터리를 초기화합니다.
-    //DirectX11::ThrowIfFailed(
-    //   D2D1CreateFactory(
-    //       D2D1_FACTORY_TYPE_SINGLE_THREADED,
-    //       __uuidof(ID2D1Factory3),
-    //       &options,
-    //       &m_d2dFactory
-    //   )
-    //;
-    //
-    /// DirectWrite 팩터리를 초기화합니다.
-    //irectX11::ThrowIfFailed(
-    //   DWriteCreateFactory(
-    //       DWRITE_FACTORY_TYPE_SHARED,
-    //       __uuidof(IDWriteFactory3),
-    //       &m_dwriteFactory
-    //   )
-    //;
-    //
-    /// WIC(Windows Imaging Component) 팩터리를 초기화합니다. //이거 왜 터지냐? ㅋㅋㅋ
-    //irectX11::ThrowIfFailed(
-    //	CoCreateInstance(
-    //		CLSID_WICImagingFactory2,
-    //		nullptr,
-    //		CLSCTX_INPROC_SERVER,
-    //		IID_PPV_ARGS(&m_wicFactory)
-    //	)
-    //;
 }
 
 void DirectX11::DeviceResources::CreateDeviceResources()
@@ -325,23 +287,6 @@ void DirectX11::DeviceResources::CreateDeviceResources()
     DirectX11::ThrowIfFailed(
         context.As(&m_d3dContext)
     );
-
-    // Direct2D 디바이스 개체 및 해당 컨텍스트를 만듭니다.
-    ComPtr<IDXGIDevice3> dxgiDevice;
-    DirectX11::ThrowIfFailed(
-        m_d3dDevice.As(&dxgiDevice)
-    );
-
-   //DirectX11::ThrowIfFailed(
-   //     m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice)
-   // );
-   //
-   // DirectX11::ThrowIfFailed(
-   //     m_d2dDevice->CreateDeviceContext(
-   //         D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-   //         &m_d2dContext
-   //     )
-   // );
 }
 
 void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
@@ -549,36 +494,9 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         m_d3dContext->RSSetViewports(1, &m_screenViewport);
 
-        // 스왑 체인 백 버퍼에 연결된 Direct2D 대상
-        // 비트맵을 만들고 이를 현재 대상으로 설정합니다.
-       /* D2D1_BITMAP_PROPERTIES1 bitmapProperties =
-            D2D1::BitmapProperties1(
-                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
-                m_dpi,
-                m_dpi
-            );*/
-
         DirectX11::ThrowIfFailed(
             m_swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer))
         );
-
-		/*D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
-			D2D1_RENDER_TARGET_TYPE_DEFAULT,
-			D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-			0,
-			0,
-			D2D1_RENDER_TARGET_USAGE_NONE,
-			D2D1_FEATURE_LEVEL_DEFAULT
-		);*/
-
-	/*	m_d2dFactory->CreateDxgiSurfaceRenderTarget(
-			dxgiBackBuffer.Get(),
-            &props,
-			&m_d2dTarget
-		);
-        m_d2dContext->SetDpi(m_effectiveDpi, m_effectiveDpi);
-        m_d2dContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);*/
     }
 }
 

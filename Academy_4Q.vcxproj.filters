@@ -69,15 +69,6 @@
       <Filter>Utill\PathFinding</Filter>
     </ClInclude>
     <ClInclude Include="BoxColliderComponent.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ColliderComponent.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="RigidbodyComponent.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="BoxColliderComponent.h">
       <Filter>Component\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="ColliderComponent.h">

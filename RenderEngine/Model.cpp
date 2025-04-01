@@ -10,17 +10,17 @@ Model::Model()
 
 Model::~Model()
 {
-	for (auto mesh : m_Meshes)
+	for (auto& mesh : m_Meshes)
 	{
 		delete mesh;
 	}
 
-	for (auto material : m_Materials)
+	for (auto& material : m_Materials)
 	{
 		delete material;
 	}
 
-	for (auto texture : m_Textures)
+	for (auto& texture : m_Textures)
 	{
 		delete texture;
 	}

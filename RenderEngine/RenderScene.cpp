@@ -5,10 +5,11 @@
 #include "../ScriptBinder/Renderer.h"
 #include "Skeleton.h"
 #include "Light.h"
+#include "Banchmark.hpp"
+#include "TimeSystem.h"
 
 RenderScene::RenderScene()
 {
-
 }
 
 RenderScene::~RenderScene()
@@ -27,6 +28,35 @@ void RenderScene::Initialize()
 	m_LightController = new LightController();
 	EditorSceneObjectHierarchy();
 	EditorSceneObjectInspector();
+
+	animationJobThread = std::thread([&]
+	{
+		using namespace std::chrono;
+
+		auto prev = high_resolution_clock::now();
+
+		while (true)
+		{
+			auto now = high_resolution_clock::now();
+			duration<float> elapsed = now - prev;
+
+			// 16.6ms ~ 60fps 에 맞춰 제한
+			if (elapsed.count() >= (1.0f / 60.0f))
+			{
+				prev = now;
+				float delta = elapsed.count();
+				Banchmark p1;
+				m_animationJob.Update(*this, delta);
+				std::cout << "p1 : " << p1.GetElapsedTime() << std::endl;
+			}
+			else
+			{
+				std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
+			}
+		}
+	});
+
+	animationJobThread.detach();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -36,8 +66,6 @@ void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
 
 void RenderScene::Update(float deltaSecond)
 {
-	m_animationJob.Update(*this, deltaSecond);
-
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
@@ -56,9 +84,19 @@ void RenderScene::UseModel()
 	DirectX11::VSSetConstantBuffer(0, 1, &m_ModelBuffer);
 }
 
+void RenderScene::UseModel(ID3D11DeviceContext* deferredContext)
+{
+	deferredContext->VSSetConstantBuffers(0, 1, &m_ModelBuffer);
+}
+
 void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 {
 	DirectX11::UpdateBuffer(m_ModelBuffer, &model);
+}
+
+void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
+{
+	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
 }
 
 void RenderScene::EditorSceneObjectHierarchy()
@@ -130,12 +168,12 @@ void RenderScene::EditorSceneObjectInspector()
 
 void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
-	auto obj = m_currentScene->GetGameObject(objIndex);
+	const auto& obj = m_currentScene->GetGameObject(objIndex);
 
 	if(GameObject::Type::Bone == obj->GetType())
 	{
-		auto animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		auto bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
 		if (bone)
 		{
 			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
@@ -179,8 +217,8 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 			// 부모 변경 로직
 			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
 			{
-				auto draggedObj = m_currentScene->GetGameObject(draggedIndex);
-				auto oldParent = m_currentScene->GetGameObject(draggedObj->m_parentIndex);
+				const auto& draggedObj = m_currentScene->GetGameObject(draggedIndex);
+				const auto& oldParent = m_currentScene->GetGameObject(draggedObj->m_parentIndex);
 
 				// 1. 기존 부모에서 제거
 				auto& siblings = oldParent->m_childrenIndices;

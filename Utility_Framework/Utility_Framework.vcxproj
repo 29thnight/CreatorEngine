@@ -29,7 +29,7 @@
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
-    <ClInclude Include="Core.Thread.h" />
+    <ClInclude Include="Core.Thread.hpp" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CSVLoader.h" />
     <ClInclude Include="Delegate.h" />
@@ -57,11 +57,11 @@
     <ClInclude Include="TypeDefinition.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Core.Thread.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
     <ClCompile Include="LogSystem.cpp" />
+    <ClCompile Include="TimeSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="MemoryPool.inl" />
