@@ -62,6 +62,7 @@ public:
 	void Draw();
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
+	const std::string& GetName() { return m_name; }
 private:
 	friend class ModelLoader;
 	std::string m_name;

@@ -3,6 +3,13 @@
 #include "Component.h"
 #include "IRenderable.h"
 
+struct LightMapping {
+	int lightmapIndex{ -1 };
+	int ligthmapResolution{ 0 };
+	Mathf::Vector2 lightmapOffset{ 0,0 };
+	Mathf::Vector2 lightmapTiling{ 0,0 };
+};
+
 constexpr uint32 MAX_BONES{ 512 };
 
 class Mesh;
@@ -17,6 +24,8 @@ public:
 	Material* m_Material;
 	Mesh* m_Mesh;
 	Animator* m_Animator = nullptr;
+	
+	LightMapping m_LightMapping;
 
 public:
 	std::string ToString() const override

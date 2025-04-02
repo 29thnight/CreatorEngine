@@ -49,18 +49,18 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     step_line = saturate(step_line); // clamp(0.0,1.0)와 동일
     
     // 체커보드 패턴 계산
-    float chec = checker(posWorld.xz, unitSize);
+    //float chec = checker(posWorld.xz, unitSize);
     
     // 거리 페이드 계산
     float fadeFactor = 1.0 - saturate((distPlanar - fadeStart) / (fadeEnd - fadeStart));
     
     // 최종 알파값 (각각의 패턴에 따른 알파 합산 후 페이드 적용)
     float alphaGrid = step_line * gridColor.a;
-    float alphaChec = chec * checkerColor.a;
-    float alpha = saturate(alphaGrid + alphaChec) * fadeFactor;
+    //float alphaChec = chec * checkerColor.a;
+    float alpha = saturate(alphaGrid /*+ alphaChec*/) * fadeFactor;
     
     // 최종 색상 (프리멀티플라이드 알파 블렌딩)
-    float3 color = (checkerColor.rgb * alphaChec) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);
+    float3 color = (checkerColor.rgb /** alphaChec*/) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);
     if (alpha < 0.5)
         discard;
     return float4(color, alpha);

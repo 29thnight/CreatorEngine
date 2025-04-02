@@ -97,7 +97,7 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
 
 	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
-
+	
 	auto desc = scene.m_LightController->m_shadowMapRenderDesc;
 
 	m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController->GetLight(0).m_direction)) * -5.f;
