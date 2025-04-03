@@ -21,13 +21,15 @@ class Animator;
 class MeshRenderer : public Component, public IRenderable
 {
 public:
-	Material* m_Material;
-	Mesh* m_Mesh;
-	Animator* m_Animator = nullptr;
-	
-	LightMapping m_LightMapping;
+	Material* m_Material{ nullptr };
+	Mesh* m_Mesh{ nullptr };
+	Animator* m_Animator{ nullptr };
 
+	LightMapping m_LightMapping;
 public:
+	MeshRenderer() meta_default(MeshRenderer)
+	~MeshRenderer() = default;
+
 	std::string ToString() const override
 	{
 		return std::string("MeshRenderer");
@@ -41,8 +43,24 @@ public:
 		m_IsEnabled = able;
 	}
 
+	static const Meta::Type& Reflect()
+	{
+		static const Meta::MetaProperties<1> properties
+		{
+			Meta::MakeProperty("m_Material", &MeshRenderer::m_Material)
+		};
+
+		static const Meta::Type type
+		{
+			"MeshRenderer",
+			properties
+		};
+
+		return type;
+	}
+
 private:
-	bool m_IsEnabled = false;
+	bool m_IsEnabled{ false };
 };
 
 class SpriteRenderer : public Component, public IRenderable

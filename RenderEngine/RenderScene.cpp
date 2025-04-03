@@ -8,6 +8,20 @@
 #include "Banchmark.hpp"
 #include "TimeSystem.h"
 
+// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
+int InputTextCallback(ImGuiInputTextCallbackData* data)
+{
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+	{
+		// UserData에 저장된 std::string 포인터를 가져옴
+		std::string* str = static_cast<std::string*>(data->UserData);
+		// 새로운 길이에 맞춰 std::string의 크기 재조정
+		str->resize(data->BufTextLen);
+		data->Buf = const_cast<char*>(str->c_str());
+	}
+	return 0;
+}
+
 RenderScene::RenderScene()
 {
 }
@@ -15,15 +29,14 @@ RenderScene::RenderScene()
 RenderScene::~RenderScene()
 {
 	//TODO : ComPtr이라 자동 해제 -> default로 변경할 것
-    ImGui::ContextUnregister("SceneObject Hierarchy");
-    ImGui::ContextUnregister("SceneObject Inspector");
+    ImGui::ContextUnregister("GameObject Hierarchy");
+    ImGui::ContextUnregister("GameObject Inspector");
 
 	Memory::SafeDelete(m_LightController);
 }
 
 void RenderScene::Initialize()
 {
-	m_currentScene->CreateGameObject("Root");
 	m_MainCamera.RegisterContainer();
 	m_LightController = new LightController();
 	EditorSceneObjectHierarchy();
@@ -45,9 +58,7 @@ void RenderScene::Initialize()
 			{
 				prev = now;
 				float delta = elapsed.count();
-				Banchmark p1;
 				m_animationJob.Update(*this, delta);
-				std::cout << "p1 : " << p1.GetElapsedTime() << std::endl;
 			}
 			else
 			{
@@ -101,29 +112,44 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 
 void RenderScene::EditorSceneObjectHierarchy()
 {
-	ImGui::ContextRegister("SceneObject Hierarchy", [&]()
+	ImGui::ContextRegister("GameObject Hierarchy", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
-		for (auto& obj : m_currentScene->m_SceneObjects)
+		if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (obj->m_index == 0 || obj->m_parentIndex > 0) continue;
+			for (auto& obj : m_currentScene->m_SceneObjects)
+			{
+				if (0 == obj->m_index || obj->m_parentIndex > 0) continue;
 
-			ImGui::PushID((int)&obj);
-			DrawSceneObject(obj);
-			ImGui::PopID();
+				ImGui::PushID((int)&obj);
+				DrawSceneObject(obj);
+				ImGui::PopID();
+			}
+			ImGui::TreePop();
 		}
 	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 
 void RenderScene::EditorSceneObjectInspector()
 {
-	ImGui::ContextRegister("SceneObject Inspector", [&]()
+	ImGui::ContextRegister("GameObject Inspector", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
 		if (m_selectedSceneObject)
 		{
+			// 객체의 이름을 std::string으로 가져옴 (매 프레임마다 갱신되면 안되면 static이 아니어야 함)
+			std::string name = m_selectedSceneObject->m_name.ToString();
+			if (ImGui::InputText("name",
+				&name[0],
+				name.capacity() + 1,
+				ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
+				InputTextCallback,
+				static_cast<void*>(&name)))
+			{
+				m_selectedSceneObject->m_name.SetString(name);
+			}
 			Mathf::Vector4 position = m_selectedSceneObject->m_transform.position;
 			Mathf::Vector4 rotation = m_selectedSceneObject->m_transform.rotation;
 			Mathf::Vector4 scale = m_selectedSceneObject->m_transform.scale;
@@ -136,32 +162,45 @@ void RenderScene::EditorSceneObjectInspector()
 				pyr[i] = XMConvertToDegrees(pyr[i]);
 			}
 
-			ImGui::Text(m_selectedSceneObject->m_name.ToString().c_str());
-			ImGui::Separator();
-			ImGui::Text("Position");	
-			ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000);
-			ImGui::Text("Rotation");
-			ImGui::DragFloat3("##Rotation", &pyr[0], 0.1f);
-			ImGui::Text("Scale");
-			ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
-			ImGui::Text("Index");
-			ImGui::InputInt("##Index", const_cast<int*>(&m_selectedSceneObject->m_index), 0, 0, ImGuiInputTextFlags_ReadOnly);
-			ImGui::Text("Parent Index");
-			ImGui::InputInt("##ParentIndex", const_cast<int*>(&m_selectedSceneObject->m_parentIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
+			if(ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::Text("Position ");
+				ImGui::SameLine();
+				ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000);
+				ImGui::Text("Rotation");
+				ImGui::SameLine();
+				ImGui::DragFloat3("##Rotation", &pyr[0], 0.1f);
+				ImGui::Text("Scale     ");
+				ImGui::SameLine();
+				ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
 
-			for (int i = 0; i < 3; i++)
-            {
-				pyr[i] = XMConvertToRadians(pyr[i]);
+				{
+					for (int i = 0; i < 3; i++)
+					{
+						pyr[i] = XMConvertToRadians(pyr[i]);
+					}
+
+					rotation = XMQuaternionRotationRollPitchYaw(pyr[0], pyr[1], pyr[2]);
+
+					m_selectedSceneObject->m_transform.position = position;
+					m_selectedSceneObject->m_transform.rotation = rotation;
+					m_selectedSceneObject->m_transform.scale = scale;
+					m_selectedSceneObject->m_transform.m_dirty = true;
+
+					m_selectedSceneObject->m_transform.GetLocalMatrix();
+				}
 			}
 
-			rotation = XMQuaternionRotationRollPitchYaw(pyr[0], pyr[1], pyr[2]);
+			for (auto& component : m_selectedSceneObject->m_components)
+			{
+				const auto& type = Meta::Find(component->ToString());
+				if (!type) continue;
 
-			m_selectedSceneObject->m_transform.position = position;
-			m_selectedSceneObject->m_transform.rotation = rotation;
-			m_selectedSceneObject->m_transform.scale = scale;
-			m_selectedSceneObject->m_transform.m_dirty = true;
-
-			m_selectedSceneObject->m_transform.GetLocalMatrix();
+				if(ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
+				{
+					Meta::DrawObject(component, *type);
+				}
+			}
 		}
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
@@ -192,9 +231,20 @@ void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatri
 
 void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnDoubleClick;
 	if (obj.get() == m_selectedSceneObject)
+	{
 		flags |= ImGuiTreeNodeFlags_Selected;
+	}
+	else if (0 == obj->m_parentIndex)
+	{
+		flags |= ImGuiTreeNodeFlags_DefaultOpen;
+	}
+
+	if (0 == obj->m_childrenIndices.size())
+	{
+		flags |= ImGuiTreeNodeFlags_Leaf;
+	}
 
 	bool opened = ImGui::TreeNodeEx(obj->m_name.ToString().c_str(), flags);
 

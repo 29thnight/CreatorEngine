@@ -165,7 +165,7 @@
     <ClInclude Include="Core.Runtime.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="Reflection.h">
+    <ClInclude Include="Reflection.hpp">
       <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="HashingString.h">

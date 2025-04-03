@@ -1,7 +1,5 @@
-// HistogramAutoExposure_Build.hlsl
 #define Epsilon 0.0001
 #define NUM_HISTOGRAM_BINS 256
-#define HISTOGRAM_THREADS_PER_DIMENSION 16
 
 cbuffer LuminanceHistogramData : register(b0)
 {
@@ -28,7 +26,7 @@ uint HDRToHistogramBin(float3 hdrColor)
     return (uint) (logLuminance * 254.0f + 1.0f); // bin 1~255 사용, 0은 거의 0에 가까운 값
 }
 
-[numthreads(HISTOGRAM_THREADS_PER_DIMENSION, HISTOGRAM_THREADS_PER_DIMENSION, 1)]
+[numthreads(16, 16, 1)]
 void main(uint groupIndex : SV_GroupIndex, uint3 groupId : SV_GroupID, uint3 threadId : SV_DispatchThreadID)
 {
     // 그룹 내 공유 히스토그램 초기화
