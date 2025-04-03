@@ -1,55 +1,404 @@
 #include "LightMap.h"
+#include "AssetSystem.h"
+#include "Scene.h"
+#include "Mesh.h"
+#include "Light.h"
+#include "Renderer.h"
+#include "RenderScene.h"
+#include "Material.h"
+#include "Core.Random.h"
+#include "LightmapShadowPass.h"
+#include "PositionMapPass.h"
+#include "NormalMapPass.h"
+//#include "Light.h"
+namespace lm {
+	struct CBData {
+		DirectX::XMINT2 Offset;
+		DirectX::XMINT2 Size;
+	};
 
-namespace LightMap {
-    LightMap::Rect* LightMap::LightMap::FindBestFit(std::vector<Rect>& freeSpaces, int width, int height)
-    {
-		Rect* bestFit = nullptr;
-		int bestArea = INT_MAX;
+	struct CBTransform {
+		Mathf::Matrix worldMat;
+	};
 
-		for (auto& space : freeSpaces)
+	struct alignas(16) CBLight {
+		Mathf::Matrix view;
+		Mathf::Matrix proj;
+
+		Mathf::Vector4 position;
+		Mathf::Vector4 direction;
+		Mathf::Color4  color;
+
+		float constantAtt;
+		float linearAtt;
+		float quadAtt;
+		float spotAngle;
+
+		int lightType;
+		int status;
+	};
+
+	struct CBSetting {
+		float bias;
+		int lightsize;
+		int pad[2];
+	};
+
+	LightMap::LightMap()
+	{
+	}
+	LightMap::~LightMap()
+	{
+		delete sample;
+	}
+
+	void LightMap::Prepare()
+	{
+		m_computeShader = &AssetsSystems->ComputeShaders["Lightmap"];
+
+		m_Buffer = DirectX11::CreateBuffer(sizeof(CBData), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+		m_transformBuf = DirectX11::CreateBuffer(sizeof(CBTransform), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+		//m_lightBuf = DirectX11::CreateBuffer(sizeof(CBLight), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+		m_settingBuf = DirectX11::CreateBuffer(sizeof(CBSetting), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
+		sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+
+		float size = 80.f;
+
+		rects.clear();
+
+		for (auto& obj : m_renderscene->GetScene()->m_SceneObjects) {
+			auto* renderer = obj->GetComponent<MeshRenderer>();
+			if (renderer == nullptr) continue;
+			if (!renderer->IsEnabled()) continue;
+			if (renderer->m_Mesh == nullptr)continue;
+
+			// 해상도 push.
+			Rect r;
+			r.w = size;
+			r.h = size;
+
+			r.data = renderer;
+			r.worldMat = obj->m_transform.GetWorldMatrix();
+			renderer->m_LightMapping.ligthmapResolution = size;
+			renderer->m_LightMapping.lightmapTiling.x = size / canvasSize;
+			renderer->m_LightMapping.lightmapTiling.y = size / canvasSize;
+			rects.push_back(r);
+		}
+	}
+	void LightMap::TestPrepare()
+	{
+		for (int i = 0; i < 50; i++) {
+
+			Rect r;
+			r.w = Random<float>(160, 240).Generate();
+			r.h = r.w;//Random<float>(160, 240).Generate();
+			rects.push_back(r);
+		}
+		//testMeshTextures = m_scene->GetSceneObject(1)->m_meshRenderer.m_Material->m_pBaseColor;
+
+		CreateLightMap();
+	}
+	void LightMap::PrepareRectangles()
+	{
+		// rects에 각 메쉬의 해상도를 넣어줌
+
+
+		// 정렬 (높이 오름차순)
+		std::sort(rects.begin(), rects.end(), [](const Rect& a, const Rect& b) {
+			return a.h < b.h;
+			});
+
+		CreateLightMap();
+	}
+
+	void LightMap::CalculateRectangles()
+	{
+		int useSpace = 0;
+		Rect nextPoint = { 0, 0, 0, 0 };
+		int maxHeight = 0;
+		int i = rects.size();
+		int j = 0;
+		int lightmapIndex = 0;
+
+		while (i > 0) {
+			if (rects[j].w + padding <= canvasSize - nextPoint.w) {
+				rects[j].x = nextPoint.w;   // 현재 x 위치
+				rects[j].y = nextPoint.h;  // 현재 y 위치
+
+				nextPoint.w += rects[j].w + padding;
+				maxHeight = std::max(maxHeight, rects[j].h);
+				useSpace += rects[j].w * rects[j].h;
+				rects[j].x = nextPoint.w - rects[j].w;
+				rects[j].y = nextPoint.h + padding;
+
+				MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[j].data);
+				renderer->m_LightMapping.lightmapIndex = lightmapIndex;
+				renderer->m_LightMapping.lightmapOffset.x = rects[j].x;
+				renderer->m_LightMapping.lightmapOffset.y = rects[j].y;
+
+				j++;
+				i--;
+			}
+			else {
+				nextPoint.w = 0;
+				nextPoint.h += maxHeight + padding;
+				maxHeight = 0;
+			}
+
+			// 추가할 rect가 size를 초과하면 새로운 lightmap을 만들고 다시 배치.
+			if (nextPoint.h + maxHeight + padding > canvasSize) {
+				lightmapIndex++;
+				j--;
+				i++;
+				useSpace = 0;
+				nextPoint = { 0, 0, 0, 0 };
+				maxHeight = 0;
+				CreateLightMap();
+			}
+		}
+
+		float efficiency = ((float)useSpace / (canvasSize * canvasSize)) * 100.0f;
+		std::cout << "Efficiency: " << efficiency << "%\n";
+	}
+
+	void LightMap::DrawRectangles(
+		const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+		const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
+	)
+	{
+		int lightmapIndex = 0;
+
+		DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+		DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
+
+		DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
+
+		CBSetting cbset = {};
+		cbset.lightsize = MAX_LIGHTS;
+		cbset.bias = 0.2f;
+		DirectX11::UpdateBuffer(m_settingBuf.Get(), &cbset);
+		DirectX11::CSSetConstantBuffer(0, 1, m_settingBuf.GetAddressOf());	// setting 0
+
 		{
-			if (space.width >= width && space.height >= height)
-			{
-				int area = space.width * space.height;
-				if (area < bestArea)
-				{
-					bestFit = &space;
-					bestArea = area;
-				}
-			}
+			// texture Array 생성
+			std::vector<ID3D11ShaderResourceView*> SRVs;
+			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
+			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[1]->m_pSRV);
+			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[2]->m_pSRV);
+			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[3]->m_pSRV);
+			ID3D11Texture2D* textureArray = nullptr;
+			ID3D11ShaderResourceView* textureArraySRV = nullptr;
+
+			
+
+			D3D11_TEXTURE2D_DESC textureDesc = {};
+			SRVs[0]->GetResource(reinterpret_cast<ID3D11Resource**>(&textureArray));  // 첫 번째 텍스처 정보 가져오기
+			D3D11_TEXTURE2D_DESC firstTextureDesc;
+			textureArray->GetDesc(&firstTextureDesc);
+
+			textureDesc.Width = firstTextureDesc.Width;
+			textureDesc.Height = firstTextureDesc.Height;
+			textureDesc.MipLevels = firstTextureDesc.MipLevels;
+			textureDesc.ArraySize = static_cast<UINT>(SRVs.size()); // 개별 텍스처 개수
+			textureDesc.Format = firstTextureDesc.Format;
+			textureDesc.SampleDesc = firstTextureDesc.SampleDesc;
+			textureDesc.Usage = D3D11_USAGE_DEFAULT;
+			textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			textureDesc.CPUAccessFlags = 0;
+			textureDesc.MiscFlags = 0;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = textureDesc.Format;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+			srvDesc.Texture2DArray.MostDetailedMip = 0;
+			srvDesc.Texture2DArray.MipLevels = textureDesc.MipLevels;
+			srvDesc.Texture2DArray.FirstArraySlice = 0;
+			srvDesc.Texture2DArray.ArraySize = static_cast<UINT>(SRVs.size());
+
+			DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
+
+			DirectX11::CSSetShaderResources(0, 1, &textureArraySRV); // shadowmap texture array 0
 		}
-		return bestFit;
-    }
 
-	void LightMap::SplitSpace(std::vector<Rect>& freeSpaces, Rect used, int width, int height)
-	{
-		freeSpaces.erase(std::remove_if(freeSpaces.begin(), freeSpaces.end(),
-			[&](Rect& r) { return r.x == used.x && r.y == used.y; }), freeSpaces.end());
+		{
+			// light matrix
+			std::vector<CBLight> lightMats;
+			for (int i = 0; i < MAX_LIGHTS; i++) {
+				// CB light
+				CBLight cblit = {};
+				auto& light = m_renderscene->m_LightController->GetLight(i);
+				cblit.view = light.GetViewMatrix();
+				cblit.proj = light.GetProjectionMatrix(0.1f, 200.f);
+				cblit.position = light.m_position;
+				cblit.direction = light.m_direction;
+				cblit.color = light.m_color;
+				cblit.constantAtt = light.m_constantAttenuation;
+				cblit.linearAtt = light.m_linearAttenuation;
+				cblit.quadAtt = light.m_quadraticAttenuation;
+				cblit.spotAngle = light.m_spotLightAngle;
+				cblit.lightType = light.m_lightType;
+				cblit.status = light.m_lightStatus;
 
-		// 새로운 남은 공간 추가 (수직 분할 + 수평 분할)
-		freeSpaces.emplace_back(used.x + width, used.y, used.width - width, used.height);  // 오른쪽 공간
-		freeSpaces.emplace_back(used.x, used.y + height, used.width, used.height - height); // 아래쪽 공간
+				lightMats.emplace_back(cblit);
+			}
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.ByteWidth = sizeof(CBLight) * (UINT)lightMats.size();
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.StructureByteStride = sizeof(CBLight);
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			// 초기 데이터 설정
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = lightMats.data();
+
+			// 버퍼 생성
+			ID3D11Buffer* structuredBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &structuredBuffer);
+
+			// (3) Shader Resource View 생성
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.ElementWidth = sizeof(CBLight);
+			srvDesc.Buffer.NumElements = (UINT)lightMats.size();
+
+			ID3D11ShaderResourceView* structuredBufferSRV = nullptr;
+			DeviceState::g_pDevice->CreateShaderResourceView(structuredBuffer, &srvDesc, &structuredBufferSRV);
+
+			// (4) Compute Shader에 바인딩
+			DirectX11::CSSetShaderResources(2, 1, &structuredBufferSRV);
+		}
+
+		//DirectX11::CSSetShaderResources(0, 1, &m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
+
+		for (int i = 0; i < rects.size(); i++)
+		{
+			MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[i].data);
+			if (lightmapIndex != renderer->m_LightMapping.lightmapIndex) {
+				lightmapIndex = renderer->m_LightMapping.lightmapIndex;
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
+			}
+
+			// CB 업데이트
+			CBData cbData = {};
+			int cSize = canvasSize;
+			cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
+			cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
+			DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
+			DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
+
+			// CB Transform
+			CBTransform cbtr = {};
+			cbtr.worldMat = rects[i].worldMat;
+			DirectX11::UpdateBuffer(m_transformBuf.Get(), &cbtr);
+			DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
+
+			if (renderer->m_Mesh == nullptr) continue;
+			auto meshName = renderer->m_Mesh->GetName();
+			DirectX11::CSSetShaderResources(1, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
+			DirectX11::CSSetShaderResources(3, 1, &m_pNormalMapPass->m_normalMapTextures[meshName]->m_pSRV);
+
+			// 컴퓨트 셰이더 실행
+			UINT numGroupsX = (UINT)ceil(canvasSize / 32.0f);
+			UINT numGroupsY = (UINT)ceil(canvasSize / 32.0f);
+			DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
+		}
+
+
+
+
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = canvasSize;
+		desc.Height = canvasSize;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DYNAMIC;  // CPU에서 업데이트 가능
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &imgTexture);
+
+		// Shader Resource View (SRV) 생성 (ImGui에서 사용하기 위해 필요)
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = desc.Format;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+
+		DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
+
+
+
+		//// 스테이징
+		//D3D11_BUFFER_DESC stagingDesc = {};
+		//stagingDesc.Usage = D3D11_USAGE_STAGING;
+		//stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		//stagingDesc.BindFlags = 0;
+		//stagingDesc.MiscFlags = 0;
+		//stagingDesc.ByteWidth = sizeof(CBData);
+		//stagingDesc.StructureByteStride = sizeof(float);
+
+		//ID3D11Buffer* stagingBuffer;
+		//DeviceState::g_pDevice->CreateBuffer(&stagingDesc, nullptr, &stagingBuffer);
+
+		DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[0]->m_pTexture);
+
+
+
+		// 텍스쳐 저장
+		DirectX::ScratchImage image;
+		HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+
+		DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
+			GUID_ContainerFormatPng, L"Lightmap.png");
 	}
 
-	void LightMap::GuillotinePacking(int containerSize, std::vector<Rect>& rects)
+	void LightMap::CreateLightMap()
 	{
-		std::vector<Rect> freeSpaces = { Rect(0, 0, containerSize, containerSize) }; // 초기 공간
+		Texture* tex = Texture::Create(
+			canvasSize,
+			canvasSize,
+			"Lightmap",
+			DXGI_FORMAT_R32G32B32A32_FLOAT,
+			D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+		);
+		tex->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
-		for (auto& rect : rects) {
-			Rect* bestFit = FindBestFit(freeSpaces, rect.width, rect.height);
-			if (!bestFit) {
-				std::cout << "Failed to place rectangle (" << rect.width << ", " << rect.height << ")\n";
-				continue;
-			}
-
-			// 배치 성공 → 새로운 좌표 설정
-			rect.x = bestFit->x;
-			rect.y = bestFit->y;
-
-			// 공간 분할 수행
-			SplitSpace(freeSpaces, *bestFit, rect.width, rect.height);
-		}
+		lightmaps.push_back(tex);
 	}
 
+	void LightMap::ClearLightMaps()
+	{
+		for (auto& lightmap : lightmaps)
+		{
+			delete lightmap;
+		}
+		lightmaps.clear();
+	}
 
+	void LightMap::GenerateLightMap(
+		RenderScene* scene,
+		const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+		const std::unique_ptr<NormalMapPass>& m_pNormalMapPass)
+	{
+		SetScene(scene);
+
+		Prepare();
+		//TestPrepare();
+		PrepareRectangles();
+		CalculateRectangles();
+		DrawRectangles(m_pLightmapShadowPass, m_pPositionMapPass, m_pNormalMapPass);
+	}
 }
+
+/*
+ - 권용우
+
+ 추가 개선 가능 여부
+ 1. 해당 알고리즘으로 shadow Atlas를 생성 가능할듯.
+*/

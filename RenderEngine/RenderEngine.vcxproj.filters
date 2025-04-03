@@ -239,6 +239,15 @@
     <ClCompile Include="PostProcessingPass.cpp">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClCompile>
+    <ClCompile Include="PositionMapPass.cpp">
+      <Filter>LightMap</Filter>
+    </ClCompile>
+    <ClCompile Include="LightmapShadowPass.cpp">
+      <Filter>LightMap</Filter>
+    </ClCompile>
+    <ClCompile Include="NormalMapPass.cpp">
+      <Filter>LightMap</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -361,6 +370,15 @@
     <ClInclude Include="LightProperty.h">
       <Filter>Objects</Filter>
     </ClInclude>
+    <ClInclude Include="PositionMapPass.h">
+      <Filter>LightMap</Filter>
+    </ClInclude>
+    <ClInclude Include="LightmapShadowPass.h">
+      <Filter>LightMap</Filter>
+    </ClInclude>
+    <ClInclude Include="NormalMapPass.h">
+      <Filter>LightMap</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\x64\Assets\Shaders\SSAO.ps.hlsl">
@@ -446,6 +464,18 @@
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\AutoExposureEval.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Lightmap.cs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\PositionMap.ps.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\PositionMap.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="NormalMap.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

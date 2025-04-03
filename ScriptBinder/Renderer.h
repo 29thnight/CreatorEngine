@@ -3,6 +3,13 @@
 #include "Component.h"
 #include "IRenderable.h"
 
+struct LightMapping {
+	int lightmapIndex{ -1 };
+	int ligthmapResolution{ 0 };
+	Mathf::Vector2 lightmapOffset{ 0,0 };
+	Mathf::Vector2 lightmapTiling{ 0,0 };
+};
+
 constexpr uint32 MAX_BONES{ 512 };
 
 class Mesh;
@@ -18,6 +25,7 @@ public:
 	Mesh* m_Mesh{ nullptr };
 	Animator* m_Animator{ nullptr };
 
+	LightMapping m_LightMapping;
 public:
 	MeshRenderer() meta_default(MeshRenderer)
 	~MeshRenderer() = default;

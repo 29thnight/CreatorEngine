@@ -20,17 +20,32 @@ enum LightStatus
 struct alignas(16) Light
 {
 	Mathf::Vector4 m_position{};
-	Mathf::Vector4 m_direction{};
+	Mathf::Vector4 m_direction{ 0,0,1,0 };
 	Mathf::Color4  m_color{};
 
 	float m_constantAttenuation{ 1.f };
 	float m_linearAttenuation{ 0.09f };
 	float m_quadraticAttenuation{ 0.032f };
-	float m_spotLightAngle{};
+	float m_spotLightAngle{60.f};
 
 	int m_lightType{};
 	int m_lightStatus{};
 	float m_intencity{ 5.f };
+
+	Mathf::Matrix GetViewMatrix() {
+		return XMMatrixLookAtLH(m_position, m_direction, { 0, 1, 0, 0 });
+	}
+
+	Mathf::Matrix GetProjectionMatrix(float _near, float _far) {
+		if (m_lightType == LightType::DirectionalLight)
+			return XMMatrixOrthographicLH(10.0f, 10.0f, _near, _far);
+		else if (m_lightType == LightType::PointLight)
+			return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+		else if (m_lightType == LightType::SpotLight)
+			return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+		else
+			return XMMatrixIdentity();
+	}
 };
 
 struct alignas(16) LightProperties
