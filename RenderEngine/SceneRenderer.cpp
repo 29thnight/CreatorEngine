@@ -56,7 +56,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 	if (useWindow)
 	{
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 0.f));
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 1.f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
@@ -453,10 +453,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		model = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
 		model = Model::LoadModel("bangbooExport.fbx");
-		//model = Model::LoadModel("Link_SwordAnimation.fbx");
-		//testUI.Loadsprite("test2.png");
-		//testUI.SetTexture();
-		//testUI.SetUI({ 200,200 },2);
 
 		ImGui::ContextRegister("Test UI", true, [&]()
 		{
@@ -469,7 +465,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		});
 
-	
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))

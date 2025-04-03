@@ -1,5 +1,4 @@
 #define NUM_HISTOGRAM_BINS 256
-#define HISTOGRAM_AVERAGE_THREADS_PER_DIMENSION 16
 
 cbuffer LuminanceAverageData : register(b0)
 {
@@ -15,7 +14,7 @@ RWTexture2D<float> LuminanceOutput : register(u1); // 출력 루미넌스 텍스처
 
 groupshared float HistogramShared[NUM_HISTOGRAM_BINS];
 
-[numthreads(HISTOGRAM_AVERAGE_THREADS_PER_DIMENSION, HISTOGRAM_AVERAGE_THREADS_PER_DIMENSION, 1)]
+[numthreads(16, 16, 1)]
 void main(uint groupIndex : SV_GroupIndex)
 {
     float countForThisBin = (float) LuminanceHistogram[groupIndex];
@@ -30,6 +29,9 @@ void main(uint groupIndex : SV_GroupIndex)
         if (groupIndex < histogramSampleIndex)
         {
             HistogramShared[groupIndex] += HistogramShared[groupIndex + histogramSampleIndex];
+            
+            if (!isfinite(HistogramShared[groupIndex]))
+                HistogramShared[groupIndex] = 0.0f;
         }
         GroupMemoryBarrierWithGroupSync();
     }
@@ -37,15 +39,32 @@ void main(uint groupIndex : SV_GroupIndex)
     // 최종 평균 밝기 계산
     if (groupIndex == 0)
     {
-        // 밝기 평균: weighted log 평균 → log scale → linear scale
-        float weightedLogAverage = (HistogramShared[0] / max((float) pixelCount - countForThisBin, 1.0)) - 1.0;
+        float totalWeight = HistogramShared[0];
 
+        // pixelCount - countForThisBin == 0 이면 division by zero 방지
+        float denom = max((float) pixelCount - countForThisBin, 1.0f);
+
+        // 로그 평균 계산 (안전하게)
+        float weightedLogAverage = (totalWeight / denom) - 1.0f;
+
+        // 로그 평균이 NaN이면 기본값 사용
+        if (!isfinite(weightedLogAverage))
+            weightedLogAverage = 0.0f;
+
+        // log → linear 변환
         float weightedAverageLuminance = exp2(((weightedLogAverage / 254.0f) * logLuminanceRange) + minLogLuminance);
 
-        // 시간 적응 (노출 변화 완화)
+        // 이전 프레임의 값
         float luminanceLastFrame = LuminanceOutput[uint2(0, 0)];
+
+        // 적응 계산 (지수 감쇠)
         float adaptedLuminance = luminanceLastFrame + (weightedAverageLuminance - luminanceLastFrame) * (1.0f - exp(-timeDelta * tau));
 
+        // 결과가 유한하지 않으면 기본값 사용
+        if (!isfinite(adaptedLuminance))
+            adaptedLuminance = 1.0f;
+
+        // 저장
         LuminanceOutput[uint2(0, 0)] = adaptedLuminance;
     }
 }

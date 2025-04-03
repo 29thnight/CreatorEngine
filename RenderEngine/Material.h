@@ -5,7 +5,7 @@
 constexpr bool32 USE_NORMAL_MAP = 1;
 constexpr bool32 USE_BUMP_MAP = 2;
 
-struct alignas(16) MaterialInfomation
+cbuffer MaterialInfomation
 {
 	Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
 	float		  m_metallic{ 0.0f };
@@ -28,8 +28,8 @@ public:
 	};
 
 public:
-	Material() = default;
-	Material(const Material& material) = delete;
+	Material() meta_default(Material)
+	Material(const Material& material) = default;
 	Material(Material&& material) noexcept;
 
 //initialize material chainable functions
@@ -38,6 +38,10 @@ public:
 	Material& SetBaseColor(float r, float g, float b);
 	Material& SetMetallic(float metallic);
 	Material& SetRoughness(float roughness);
+
+	Material& UpdateBaseColor();
+	Material& UpdateMetallic();
+	Material& UpdateRoughness();
 
 public:
 	Material& UseBaseColorMap(Texture* texture);
@@ -55,6 +59,36 @@ public:
 	Texture* m_AOMap{ nullptr };
 	Texture* m_pEmissive{ nullptr };
 
+	Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+	float		  m_metallic{ 0.0f };
+	float		  m_roughness{ 1.0f };
+
 	MaterialInfomation m_materialInfo;
 	RenderingMode m_renderingMode{ RenderingMode::Opaque };
+
+	static const Meta::Type& Reflect()
+	{
+		static const Meta::MetaProperties<3> properties
+		{
+			Meta::MakeProperty("BaseColor", &Material::m_baseColor),
+			Meta::MakeProperty("Metallic", &Material::m_metallic),
+			Meta::MakeProperty("Roughness", &Material::m_roughness)
+		};
+
+		static const Meta::MetaMethods<3> methods
+		{
+			Meta::MakeMethod("UpdateBaseColor", &Material::UpdateBaseColor),
+			Meta::MakeMethod("UpdateMetallic", &Material::UpdateMetallic),
+			Meta::MakeMethod("UpdateRoughness", &Material::UpdateRoughness)
+		};
+
+		static const Meta::Type type
+		{
+			"Material",
+			properties,
+			methods
+		};
+
+		return type;
+	};
 };

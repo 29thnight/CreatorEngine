@@ -65,6 +65,11 @@ public:
 	{
 		return m_string;
 	}
+	void SetString(const std::string_view& str)
+	{
+		m_string = str;
+		m_hash = std::hash<std::string_view>{}(str);
+	}
 
 private:
 	size_t m_hash{};

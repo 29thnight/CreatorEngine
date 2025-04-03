@@ -14,7 +14,7 @@ public:
 	~RenderScene();
 
 	Camera m_MainCamera;
-	LightController* m_LightController;
+	LightController* m_LightController{};
 
 	void Initialize();
 	void SetScene(Scene* scene) { m_currentScene = scene; }

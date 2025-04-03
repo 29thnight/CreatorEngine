@@ -3,6 +3,7 @@
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
 #include "Camera.h"
+#include "TimeSystem.h"
 
 ToneMapPass::ToneMapPass()
 {
@@ -150,62 +151,64 @@ void ToneMapPass::ToneMapSetting(bool isAbleToneMap, ToneMapType type)
 
 void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 {
+ //   m_luminanceAverageConstant.timeDelta = Time->GetElapsedSeconds();
+
 	auto& context = DeviceState::g_pDeviceContext;
-    ID3D11ShaderResourceView* nullSRVs[1] = { nullptr };
-    ID3D11UnorderedAccessView* nullUAVs[1] = { nullptr };
+ //   ID3D11ShaderResourceView* nullSRVs[1] = { nullptr };
+ //   ID3D11UnorderedAccessView* nullUAVs[1] = { nullptr };
 
-    {
-        D3D11_MAPPED_SUBRESOURCE mappedResource{};
-        context->Map(m_pAutoExposureConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        memcpy(mappedResource.pData, &m_luminanceHistogramConstant, sizeof(m_luminanceHistogramConstant));
-        context->Unmap(m_pAutoExposureConstantBuffer, 0);
+ //   {
+ //       D3D11_MAPPED_SUBRESOURCE mappedResource{};
+ //       context->Map(m_pAutoExposureConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+ //       memcpy(mappedResource.pData, &m_luminanceHistogramConstant, sizeof(LuminanceHistogramData));
+ //       context->Unmap(m_pAutoExposureConstantBuffer, 0);
 
-        context->CSSetShader(m_pAutoExposureHistogramCS->GetShader(), nullptr, 0);
+ //       context->CSSetShader(m_pAutoExposureHistogramCS->GetShader(), nullptr, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { camera.m_renderTarget->m_pSRV };
-        context->CSSetShaderResources(0, 1, srvs);
+ //       ID3D11ShaderResourceView* srvs[] = { camera.m_renderTarget->m_pSRV };
+ //       context->CSSetShaderResources(0, 1, srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { m_exposureUAV.Get() };
-        context->CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+ //       ID3D11UnorderedAccessView* uavs[] = { m_exposureUAV.Get() };
+ //       context->CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
 
-        ID3D11Buffer* cbuffers[] = { m_pAutoExposureConstantBuffer };
-        context->CSSetConstantBuffers(0, 1, cbuffers);
+ //       ID3D11Buffer* cbuffers[] = { m_pAutoExposureConstantBuffer };
+ //       context->CSSetConstantBuffers(0, 1, cbuffers);
 
-        context->Dispatch((1920 + 15) / 16, (1080 + 15) / 16, 1);
-    }
+ //       context->Dispatch((1920 + 15) / 16, (1080 + 15) / 16, 1);
+ //   }
 
-    {
-        D3D11_MAPPED_SUBRESOURCE mapped;
-        context->Map(m_pLuminanceAverageBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-        memcpy(mapped.pData, &m_luminanceAverageConstant, sizeof(m_luminanceAverageConstant));
-        context->Unmap(m_pLuminanceAverageBuffer, 0);
+ //   {
+ //       D3D11_MAPPED_SUBRESOURCE mapped;
+ //       context->Map(m_pLuminanceAverageBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+ //       memcpy(mapped.pData, &m_luminanceAverageConstant, sizeof(LuminanceAverageData));
+ //       context->Unmap(m_pLuminanceAverageBuffer, 0);
 
-        context->CSSetShader(m_pAutoExposureEvalCS->GetShader(), nullptr, 0);
+ //       context->CSSetShader(m_pAutoExposureEvalCS->GetShader(), nullptr, 0);
 
-        ID3D11UnorderedAccessView* uavs[] = {
-            m_exposureUAV.Get(),  // u0: RWStructuredBuffer<uint>
-            luminanceUAV.Get()   // u1: RWTexture2D<float>
-        };
-        context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
+ //       ID3D11UnorderedAccessView* uavs[] = {
+ //           m_exposureUAV.Get(),  // u0: RWStructuredBuffer<uint>
+ //           luminanceUAV.Get()   // u1: RWTexture2D<float>
+ //       };
+ //       context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
 
-        ID3D11Buffer* cbuffers[] = { m_pLuminanceAverageBuffer };
-        context->CSSetConstantBuffers(0, 1, cbuffers);
+ //       ID3D11Buffer* cbuffers[] = { m_pLuminanceAverageBuffer };
+ //       context->CSSetConstantBuffers(0, 1, cbuffers);
 
-        context->Dispatch(1, 1, 1);
-    }
+ //       context->Dispatch(1, 1, 1);
+ //   }
 
-    context->CopyResource(readbackTexture.Get(), luminanceTexture.Get());
+ //   context->CopyResource(readbackTexture.Get(), luminanceTexture.Get());
 
-    D3D11_MAPPED_SUBRESOURCE mappedRead;
-    context->Map(readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedRead);
-    float* result = reinterpret_cast<float*>(mappedRead.pData);
+ //   D3D11_MAPPED_SUBRESOURCE mappedRead;
+ //   context->Map(readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedRead);
+ //   float* result = reinterpret_cast<float*>(mappedRead.pData);
 
-    printf("Adapted Luminance: %f\n", *result);
+ //   //printf("Adapted Luminance: %f\n", *result);
 
-    context->Unmap(readbackTexture.Get(), 0);
+ //   context->Unmap(readbackTexture.Get(), 0);
 
-    context->CSSetShaderResources(0, 1, nullSRVs); // Compute Shader SRV 秦力
-    context->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr); // UAV 秦力
+ //   context->CSSetShaderResources(0, 1, nullSRVs); // Compute Shader SRV 秦力
+ //   context->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr); // UAV 秦力
 
 	if (m_toneMapType == ToneMapType::Reinhard)
 	{

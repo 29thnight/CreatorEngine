@@ -20,14 +20,15 @@ public:
 	void Start();
 	void Update(float deltaSecond);
 
-	static Scene* CreateNewScene()
+	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{
 		//TODO : Scene Pooling
 		Scene* allocScene = new Scene();
-
+		allocScene->CreateGameObject("SampleScene");
 		return allocScene;
 	}
 
 private:
+	HashingString m_sceneName;
 	bool m_isPlaying = false;
 };
