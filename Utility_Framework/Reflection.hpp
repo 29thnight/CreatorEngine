@@ -91,33 +91,8 @@ namespace Meta
         const std::type_info& typeInfo;
         std::function<std::any(void* instance)> getter;
         std::function<void(void* instance, std::any value)> setter;
+        bool isPointer{ false };
     };
-
-    template<typename ClassT, typename T>
-    Property MakeProperty(const char* name, T ClassT::* member)
-    {
-        std::string typeStr = ToString<T>();
-
-        if constexpr(std::is_pointer_v<T>)
-        {
-            TypeCast->Register<T>();
-        }
-
-        return
-        {
-            name,
-            typeStr.c_str(),
-            typeid(T),
-            [member](void* instance) -> std::any
-            {
-                return static_cast<ClassT*>(instance)->*member;
-            },
-            [member](void* instance, std::any value)
-            {
-                static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
-            }
-        };
-    }
 
     struct MethodParameter {
         const char* name;
@@ -132,53 +107,6 @@ namespace Meta
         std::function<std::any(void* instance, const std::vector<std::any>& args)> invoker;
         std::vector<MethodParameter> parameters;
     };
-
-    template<typename ClassT, typename Ret, typename... Args, std::size_t... Is>
-    Method MakeMethodImpl(const char* name, Ret(ClassT::* method)(Args...), std::index_sequence<Is...>) 
-    {
-        std::vector<MethodParameter> params = {
-            MethodParameter{
-                ("arg" + std::to_string(Is)).c_str(),
-                ToString<Args>().data(),
-                typeid(Args)
-            }...
-        };
-
-        return {
-            name,
-            [method](void* instance, const std::vector<std::any>& args) -> std::any 
-            {
-                if (args.size() != sizeof...(Args))
-                    throw std::runtime_error("Argument count mismatch");
-
-                auto call = [=]<std::size_t... I>(std::index_sequence<I...>) -> std::any 
-                {
-                    if constexpr (std::is_void_v<Ret>) 
-                    {
-                        (static_cast<ClassT*>(instance)->*method)(
-                            std::any_cast<std::remove_reference_t<Args>>(args[I])...
-                        );
-                        return {};
-                    }
-                    else 
-                    {
-                        return (static_cast<ClassT*>(instance)->*method)(
-                              std::any_cast<std::remove_reference_t<Args>>(args[I])...
-                        );
-                    }
-                };
-
-                return call(std::index_sequence_for<Args...>{});
-            },
-            std::move(params)
-        };
-    }
-
-    template<typename ClassT, typename Ret, typename... Args>
-    Method MakeMethod(const char* name, Ret(ClassT::* method)(Args...))
-    {
-        return MakeMethodImpl(name, method, std::index_sequence_for<Args...>{});
-    }
 
     // --- Type: 하나의 타입 메타데이터 ---
     struct Type
@@ -236,6 +164,87 @@ namespace Meta
 	{
 		return MetaDataRegistry->Find(name.data());
 	}
+
+    template<typename ClassT, typename T>
+    Property MakeProperty(const char* name, T ClassT::* member)
+    {
+        std::string typeStr = ToString<T>();
+		bool isPointer = false;
+
+        if constexpr (std::is_pointer_v<T>)
+        {
+            TypeCast->Register<T>();
+			isPointer = true;
+        }
+
+        if constexpr (Meta::HasReflect<std::remove_cvref_t<T>>)
+        {
+            Meta::Register<std::remove_cvref_t<T>>();
+        }
+
+        return
+        {
+            name,
+            typeStr.c_str(),
+            typeid(T),
+            [member](void* instance) -> std::any
+            {
+                return static_cast<ClassT*>(instance)->*member;
+            },
+            [member](void* instance, std::any value)
+            {
+                static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+            },
+			isPointer
+        };
+    }
+
+    template<typename ClassT, typename Ret, typename... Args, std::size_t... Is>
+    Method MakeMethodImpl(const char* name, Ret(ClassT::* method)(Args...), std::index_sequence<Is...>)
+    {
+        std::vector<MethodParameter> params = {
+            MethodParameter{
+                ("arg" + std::to_string(Is)).c_str(),
+                ToString<Args>().data(),
+                typeid(Args)
+            }...
+        };
+
+        return {
+            name,
+            [method](void* instance, const std::vector<std::any>& args) -> std::any
+            {
+                if (args.size() != sizeof...(Args))
+                    throw std::runtime_error("Argument count mismatch");
+
+                auto call = [=]<std::size_t... I>(std::index_sequence<I...>) -> std::any
+                {
+                    if constexpr (std::is_void_v<Ret>)
+                    {
+                        (static_cast<ClassT*>(instance)->*method)(
+                            std::any_cast<std::remove_reference_t<Args>>(args[I])...
+                        );
+                        return {};
+                    }
+                    else
+                    {
+                        return (static_cast<ClassT*>(instance)->*method)(
+                              std::any_cast<std::remove_reference_t<Args>>(args[I])...
+                        );
+                    }
+                };
+
+                return call(std::index_sequence_for<Args...>{});
+            },
+            std::move(params)
+        };
+    }
+
+    template<typename ClassT, typename Ret, typename... Args>
+    Method MakeMethod(const char* name, Ret(ClassT::* method)(Args...))
+    {
+        return MakeMethodImpl(name, method, std::index_sequence_for<Args...>{});
+    }
 
     // --- Invoke 메서드 by 이름 ---
     inline bool InvokeMethodByMetaName(void* instance, const Type& type, const std::string& methodName, const std::vector<std::any>& args, std::any* outResult = nullptr)
@@ -364,7 +373,7 @@ namespace Meta
 					prop.setter(instance, value);
 				}
 			} // 다른 타입 추가 가능
-            else 
+			else if (prop.isPointer)
             {
                 void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, prop.getter(instance));
                 if (ptr) 
@@ -389,6 +398,18 @@ namespace Meta
                 {
                     ImGui::Text("%s: nullptr", prop.name);
                 }
+            }
+            else if (nullptr != MetaDataRegistry->Find(prop.typeName))
+            {
+				ImGui::PushID(prop.name);
+				ImGui::Text("%s:", prop.name);
+                auto temp = prop.getter(instance);
+                void* subInstance = &temp;  // 값 타입의 주소
+                if (const Meta::Type* subType = MetaDataRegistry->Find(prop.typeName)) 
+                {
+                    DrawObject(subInstance, *subType);
+                }
+				ImGui::PopID();
             }
         }
     }
