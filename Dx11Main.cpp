@@ -5,11 +5,11 @@
 #include "RenderEngine/UI_DataSystem.h"
 #include "Physics/Common.h"
 #include "SoundManager.h"
-#include "MeshEditor.h"
 #include "RenderEngine/FontManager.h"
 #include "Utility_Framework/Banchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
 #include "Utility_Framework/TimeSystem.h"
+#include "ScriptBinder/HotLoadSystem.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -18,14 +18,11 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 
-	UISystem->Initialize(m_deviceResources);
 	Sound->initialize((int)ChannelType::MaxChannel);
-	FontSystem->Initialize();
-
+	ScriptManager->Initialize();
 	m_sceneRenderer->Initialize();
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
-	EventInitialize();
 	SceneInitialize();
 }
 
@@ -47,20 +44,9 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 
 void DirectX11::Dx11Main::Update()
 {
+	// EditorUpdate
 	if (m_isLoading || m_isChangeScene)
 	{
-		m_timeSystem.Tick([&]
-		{
-			Sound->update();
-		});
-
-		return;
-	}
-
-	//렌더러의 업데이트 코드를 여기에 추가합니다.
-	m_timeSystem.Tick([&]
-	{
-		//렌더러의 업데이트 코드를 여기에 추가합니다.
 		std::wostringstream woss;
 		woss.precision(6);
 		woss << L"Creator Editor - "
@@ -74,8 +60,18 @@ void DirectX11::Dx11Main::Update()
 			<< m_timeSystem.GetFrameCount();
 
 		SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
-		//렌더러의 업데이트 코드를 여기에 추가합니다.
-	
+
+		m_timeSystem.Tick([&]
+		{
+			Sound->update();
+		});
+
+		return;
+	}
+
+	//GameUpdate
+	m_timeSystem.Tick([&]
+	{
 		Sound->update();
 		InputManagement->Update(m_timeSystem.GetElapsedSeconds());
 		//InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
@@ -88,21 +84,15 @@ void DirectX11::Dx11Main::Update()
 #ifdef EDITOR
 	if (InputManagement->IsKeyReleased(VK_F6))
 	{
-		loadlevel = 0;
+		//loadlevel = 0;
 	}
-	if (InputManagement->IsKeyDown(VK_F11)) {
+	if (InputManagement->IsKeyDown(VK_F11)) 
+	{
 		m_sceneRenderer->SetWireFrame();
 	}
 #endif // !EDITOR
-	if (InputManagement->IsKeyReleased(VK_F8))
+	if (InputManagement->IsKeyReleased(VK_F9)) 
 	{
-		loadlevel++;
-		if (loadlevel > 2)
-		{
-			loadlevel = 0;
-		}
-	}
-	if (InputManagement->IsKeyReleased(VK_F9)) {
 		Physics->ConnectPVD();
 	}
 
@@ -114,14 +104,10 @@ void DirectX11::Dx11Main::Update()
 bool DirectX11::Dx11Main::Render()
 {
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (m_timeSystem.GetFrameCount() == 0)
+	if (m_timeSystem.GetFrameCount() == 0) return false;
 	{
-		return false;
-	}
-
-	{
-		m_sceneRenderer->Update(m_timeSystem.GetElapsedSeconds());
-		m_sceneRenderer->Render();
+		m_sceneRenderer->OnWillRenderObject(m_timeSystem.GetElapsedSeconds());
+		m_sceneRenderer->SceneRendering();
 	}
 
 #if defined(EDITOR)
@@ -150,18 +136,5 @@ void DirectX11::Dx11Main::OnDeviceRestored()
 {
 	CreateWindowSizeDependentResources();
 }
-
-void DirectX11::Dx11Main::EventInitialize()
-{
-}
-
-void DirectX11::Dx11Main::LoadScene()
-{
-	while(true)
-	{
-	}
-}
-
-
 
 

@@ -28,6 +28,9 @@
     <Filter Include="Managers">
       <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\HotLoadSystem">
+      <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Transform.cpp">
@@ -39,9 +42,12 @@
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
+    <ClCompile Include="HotLoadSystem.cpp">
+      <Filter>Classes\HotLoadSystem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MonoBehavior.h">
+    <ClInclude Include="ModuleBehavior.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="IComponent.h">
@@ -79,6 +85,9 @@
     </ClInclude>
     <ClInclude Include="ILifeSycle.h">
       <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="HotLoadSystem.h">
+      <Filter>Classes\HotLoadSystem</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -25,6 +25,7 @@ namespace Core
 		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;

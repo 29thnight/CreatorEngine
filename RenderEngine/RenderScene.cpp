@@ -116,17 +116,20 @@ void RenderScene::EditorSceneObjectHierarchy()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
-		if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		if (m_currentScene)
 		{
-			for (auto& obj : m_currentScene->m_SceneObjects)
+			if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (0 == obj->m_index || obj->m_parentIndex > 0) continue;
+				for (auto& obj : m_currentScene->m_SceneObjects)
+				{
+					if (0 == obj->m_index || obj->m_parentIndex > 0) continue;
 
-				ImGui::PushID((int)&obj);
-				DrawSceneObject(obj);
-				ImGui::PopID();
+					ImGui::PushID((int)&obj);
+					DrawSceneObject(obj);
+					ImGui::PopID();
+				}
+				ImGui::TreePop();
 			}
-			ImGui::TreePop();
 		}
 	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
@@ -137,7 +140,7 @@ void RenderScene::EditorSceneObjectInspector()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
-		if (m_selectedSceneObject)
+		if (m_currentScene && m_selectedSceneObject)
 		{
 			// 객체의 이름을 std::string으로 가져옴 (매 프레임마다 갱신되면 안되면 static이 아니어야 함)
 			std::string name = m_selectedSceneObject->m_name.ToString();
@@ -207,6 +210,8 @@ void RenderScene::EditorSceneObjectInspector()
 
 void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
+	if(!m_currentScene) return;
+
 	const auto& obj = m_currentScene->GetGameObject(objIndex);
 
 	if(GameObject::Type::Bone == obj->GetType())
@@ -231,6 +236,8 @@ void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatri
 
 void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
+	if (!m_currentScene) return;
+
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnDoubleClick;
 	if (obj.get() == m_selectedSceneObject)
 	{

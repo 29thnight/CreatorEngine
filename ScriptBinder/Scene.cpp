@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include "HotLoadSystem.h"
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
@@ -51,8 +52,62 @@ std::shared_ptr<GameObject> Scene::GetGameObject(const std::string_view& name)
 
 void Scene::Start()
 {
+	for (auto& obj : m_SceneObjects)
+	{
+		if (obj->GetType() == GameObject::Type::Empty)
+		{
+			continue;
+		}
+	}
+	m_isPlaying = true;
+}
+
+void Scene::FixedUpdate(float deltaSecond)
+{
+}
+
+void Scene::OnTriggerEnter(ICollider* other)
+{
+}
+
+void Scene::OnTriggerStay(ICollider* other)
+{
+}
+
+void Scene::OnTriggerExit(ICollider* other)
+{
+}
+
+void Scene::OnCollisionEnter(ICollider* other)
+{
+}
+
+void Scene::OnCollisionStay(ICollider* other)
+{
+}
+
+void Scene::OnCollisionExit(ICollider* other)
+{
 }
 
 void Scene::Update(float deltaSecond)
 {
 }
+
+void Scene::YieldNull()
+{
+	ScriptManager->ReplaceScriptComponent();
+}
+
+void Scene::LateUpdate(float deltaSecond)
+{
+}
+
+void Scene::OnDisable()
+{
+}
+
+void Scene::OnDestroy()
+{
+}
+

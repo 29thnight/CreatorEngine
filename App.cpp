@@ -7,6 +7,7 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
+
 #ifdef UNICODE
 #pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console")
 #else
@@ -17,22 +18,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	PathFinder::Initialize();
 	Log::Initialize();
-	Concurrency::SchedulerPolicy policy
-	{
-		3,
-		Concurrency::MinConcurrency,
-		6,
-		Concurrency::MaxConcurrency,
-		8,
-		Concurrency::ContextPriority,
-		THREAD_PRIORITY_HIGHEST
-	};
-	Concurrency::Scheduler::SetDefaultSchedulerPolicy(policy);
-	Concurrency::task init = concurrency::create_task([]()
-	{
-		return std::string("SUCCESS");
-	});
-	std::string initResult = init.get();
 
 	//시작
 	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
@@ -65,7 +50,7 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 	coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
 	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
-	//coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
+	coreWindow.RegisterHandler(WM_DROPFILES, this, &App::HandleDropFileEvent);
 }
 
 void Core::App::Load()
@@ -152,6 +137,25 @@ LRESULT Core::App::HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lPa
 {
 	WNDCLASS wcSetting = { sizeof(WNDCLASS) };
 	wcSetting.lpfnWndProc = CoreWindow::WndProc;
+
+	return 0;
+}
+
+LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
+{
+	// 드래그 앤 드롭 이벤트 처리
+	HDROP hDrop = (HDROP)wParam;
+	UINT nFiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+	if (nFiles > 0)
+	{
+		std::vector<wchar_t> fileName(MAX_PATH);
+		for (UINT i = 0; i < nFiles; ++i)
+		{
+			DragQueryFile(hDrop, i, fileName.data(), MAX_PATH);
+			file::path filePath(fileName.data());
+			// 파일 경로 처리
+		}
+	}
 
 	return 0;
 }

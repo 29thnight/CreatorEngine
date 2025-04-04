@@ -518,6 +518,9 @@
     <ProjectReference Include="..\ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\ScriptBinder\ScriptBinder.vcxproj">
+      <Project>{4d36af4e-3aa3-4fb5-b462-f66ae13ef959}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>

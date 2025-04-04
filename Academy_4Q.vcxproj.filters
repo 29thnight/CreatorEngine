@@ -15,14 +15,8 @@
     <Filter Include="Dx11Main">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Object">
-      <UniqueIdentifier>{6b46322a-7d3c-441d-80c0-3c052cf0b9fa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Utill">
       <UniqueIdentifier>{bd2f311f-ba6c-4f45-a21a-ac8cec09e5b2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Utill\PathFinding">
-      <UniqueIdentifier>{143b7f16-18a2-42f5-9b31-421f24f57cce}</UniqueIdentifier>
     </Filter>
     <Filter Include="Utill\BT">
       <UniqueIdentifier>{c114c291-5ed0-48e5-8886-2d770a7c424e}</UniqueIdentifier>
@@ -36,14 +30,14 @@
     <Filter Include="Manager\SoundManager">
       <UniqueIdentifier>{21879e33-f24e-493c-a98a-6d47f4562738}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utill\MeshEditor">
-      <UniqueIdentifier>{8f159f87-7be6-4ff8-a6ec-29e5c00c47ee}</UniqueIdentifier>
-    </Filter>
     <Filter Include="MD">
       <UniqueIdentifier>{c2a723ce-99f1-49c0-82bf-f2f7a9dafbb8}</UniqueIdentifier>
     </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager\SceneManager">
+      <UniqueIdentifier>{71d7d567-fc27-47eb-b586-4b5b6515eb60}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -65,29 +59,11 @@
     <ClInclude Include="BehaviorTree.h">
       <Filter>Utill\BT</Filter>
     </ClInclude>
-    <ClInclude Include="PathFinding.h">
-      <Filter>Utill\PathFinding</Filter>
-    </ClInclude>
-    <ClInclude Include="BoxColliderComponent.h">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="ColliderComponent.h">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="RigidbodyComponent.h">
-      <Filter>Component\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="SoundManager.h">
       <Filter>Manager\SoundManager</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectTypeMeta.h">
-      <Filter>Object</Filter>
-    </ClInclude>
     <ClInclude Include="BT_Editor.h">
       <Filter>Utill\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="MeshEditor.h">
-      <Filter>Utill\MeshEditor</Filter>
     </ClInclude>
     <ClInclude Include="ProjectSetting.h">
       <Filter>Window</Filter>
@@ -98,14 +74,11 @@
     <ClInclude Include="KeyState.h">
       <Filter>Manager\InputManager</Filter>
     </ClInclude>
-    <ClInclude Include="GameManager.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="GridEditor.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="InputManager.h">
       <Filter>Manager\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneManager.h">
+      <Filter>Manager\SceneManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -139,17 +112,11 @@
     <ClCompile Include="BehaviorTree.cpp">
       <Filter>Utill\BT</Filter>
     </ClCompile>
-    <ClCompile Include="PathFinding.cpp">
-      <Filter>Utill\PathFinding</Filter>
-    </ClCompile>
     <ClCompile Include="SoundManager.cpp">
       <Filter>Manager\SoundManager</Filter>
     </ClCompile>
     <ClCompile Include="BT_Editor.cpp">
       <Filter>Utill\BT</Filter>
-    </ClCompile>
-    <ClCompile Include="MeshEditor.cpp">
-      <Filter>Utill\MeshEditor</Filter>
     </ClCompile>
     <ClCompile Include="KeyState.cpp">
       <Filter>Manager\InputManager</Filter>

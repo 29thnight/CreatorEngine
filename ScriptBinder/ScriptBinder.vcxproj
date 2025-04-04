@@ -146,12 +146,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Component.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="IComponent.h" />
     <ClInclude Include="ILifeSycle.h" />
     <ClInclude Include="IObject.h" />
@@ -159,7 +161,7 @@
     <ClInclude Include="JobManager.h" />
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="Renderer.h" />
-    <ClInclude Include="MonoBehavior.h" />
+    <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />

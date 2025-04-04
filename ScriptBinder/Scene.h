@@ -1,10 +1,8 @@
 #pragma once
-//#include "Camera.h"
-//#include "Light.h"
 #include "GameObject.h"
-//#include "AnimationJob.h"
 
 class RenderScene;
+struct ICollider;
 class Scene
 {
 public:
@@ -17,12 +15,33 @@ public:
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 
+public:
 	void Start();
+
+public:
+	void FixedUpdate(float deltaSecond);
+
+public:
+	void OnTriggerEnter(ICollider* other);
+	void OnTriggerStay(ICollider* other);
+	void OnTriggerExit(ICollider* other);
+
+public:
+	void OnCollisionEnter(ICollider* other);
+	void OnCollisionStay(ICollider* other);
+	void OnCollisionExit(ICollider* other);
+
+public:
 	void Update(float deltaSecond);
+	void YieldNull();
+	void LateUpdate(float deltaSecond);
+
+public:
+	void OnDisable();
+	void OnDestroy();
 
 	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{
-		//TODO : Scene Pooling
 		Scene* allocScene = new Scene();
 		allocScene->CreateGameObject("SampleScene");
 		return allocScene;

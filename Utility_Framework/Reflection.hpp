@@ -119,51 +119,73 @@ namespace Meta
         };
     }
 
+    struct MethodParameter {
+        const char* name;
+        const char* typeName;
+        const std::type_info& typeInfo;
+    };
+
     // --- Method: 멤버 함수 정보 ---
     struct Method
     {
         const char* name;
         std::function<std::any(void* instance, const std::vector<std::any>& args)> invoker;
+        std::vector<MethodParameter> parameters;
     };
 
-    template<typename ClassT, typename Ret, typename... Args>
-    Method MakeMethod(const char* name, Ret(ClassT::* method)(Args...))
+    template<typename ClassT, typename Ret, typename... Args, std::size_t... Is>
+    Method MakeMethodImpl(const char* name, Ret(ClassT::* method)(Args...), std::index_sequence<Is...>) 
     {
-        return
-        {
+        std::vector<MethodParameter> params = {
+            MethodParameter{
+                ("arg" + std::to_string(Is)).c_str(),
+                ToString<Args>().data(),
+                typeid(Args)
+            }...
+        };
+
+        return {
             name,
-            [method](void* instance, const std::vector<std::any>& args) -> std::any
+            [method](void* instance, const std::vector<std::any>& args) -> std::any 
             {
                 if (args.size() != sizeof...(Args))
                     throw std::runtime_error("Argument count mismatch");
 
-                auto call = [=]<std::size_t... Is>(std::index_sequence<Is...>) -> std::any
+                auto call = [=]<std::size_t... I>(std::index_sequence<I...>) -> std::any 
                 {
-                    if constexpr (std::is_void_v<Ret>) {
-                        (static_cast<ClassT*>(instance)->*method)(
-                            std::any_cast<std::remove_reference_t<Args>>(args[Is])...
-                        );
-                        return std::any{};
-                    }
-                    else
+                    if constexpr (std::is_void_v<Ret>) 
                     {
-                      return (static_cast<ClassT*>(instance)->*method)(
-                          std::any_cast<std::remove_reference_t<Args>>(args[Is])...
-                      );
+                        (static_cast<ClassT*>(instance)->*method)(
+                            std::any_cast<std::remove_reference_t<Args>>(args[I])...
+                        );
+                        return {};
+                    }
+                    else 
+                    {
+                        return (static_cast<ClassT*>(instance)->*method)(
+                              std::any_cast<std::remove_reference_t<Args>>(args[I])...
+                        );
                     }
                 };
 
                 return call(std::index_sequence_for<Args...>{});
-            }
+            },
+            std::move(params)
         };
+    }
+
+    template<typename ClassT, typename Ret, typename... Args>
+    Method MakeMethod(const char* name, Ret(ClassT::* method)(Args...))
+    {
+        return MakeMethodImpl(name, method, std::index_sequence_for<Args...>{});
     }
 
     // --- Type: 하나의 타입 메타데이터 ---
     struct Type
     {
-        const char* name;
-        std::span<const Property> properties;
-        std::span<const Method> methods;
+        const char* name{};
+        std::span<const Property> properties{};
+        std::span<const Method> methods{};
     };
 
     template<typename T, std::size_t N> using MetaContainer = std::array<T, N>;

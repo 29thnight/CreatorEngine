@@ -15,7 +15,3 @@ std::string GameObject::ToString() const
 {
     return m_name.ToString();
 }
-
-void GameObject::EditorMeshRenderer()
-{
-}

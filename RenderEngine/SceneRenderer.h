@@ -35,8 +35,8 @@ public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 
 	void Initialize(Scene* _pScene = nullptr);
-	void Update(float deltaTime);
-	void Render();
+	void OnWillRenderObject(float deltaTime);
+	void SceneRendering();
 
 private:
 	void InitializeDeviceState();

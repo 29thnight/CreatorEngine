@@ -262,10 +262,10 @@ SoundManager::SoundManager()
 
 SoundManager::~SoundManager()
 {
-    while (_isSoundLoaderThreadRunning)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    };
+    //while (_isSoundLoaderThreadRunning)
+    //{
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    //};
 
 	shutdown();
 }

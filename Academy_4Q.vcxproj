@@ -116,9 +116,9 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <Profile>true</Profile>
+      <Profile>false</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -139,9 +139,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <Profile>true</Profile>
+      <Profile>false</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -151,15 +151,11 @@
     <ClInclude Include="CustomWindowDefine.h" />
     <ClInclude Include="Dx11Main.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="GameManager.h" />
-    <ClInclude Include="GridEditor.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="KeyState.h" />
-    <ClInclude Include="MeshEditor.h" />
-    <ClInclude Include="ObjectTypeMeta.h" />
-    <ClInclude Include="PathFinding.h" />
     <ClInclude Include="ProjectSetting.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -170,8 +166,6 @@
     <ClCompile Include="Dx11Main.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
-    <ClCompile Include="MeshEditor.cpp" />
-    <ClCompile Include="PathFinding.cpp" />
     <ClCompile Include="SoundManager.cpp" />
   </ItemGroup>
   <ItemGroup>

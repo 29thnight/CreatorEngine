@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <directxtk/Keyboard.h>
 #include <imgui_internal.h>
+#include <shellapi.h> // Ãß°¡
 #include "DumpHandler.h"
 
 #include "imgui.h"
@@ -159,6 +160,7 @@ private:
 
         if (m_hWnd)
         {
+            DragAcceptFiles(m_hWnd, TRUE);
             ShowWindow(m_hWnd, SW_SHOWNORMAL);
             UpdateWindow(m_hWnd);
         }

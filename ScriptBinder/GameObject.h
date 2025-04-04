@@ -5,12 +5,14 @@
 #include "Component.h"
 #include "Transform.h"
 #include "../Utility_Framework/HashingString.h"
+#include "HotLoadSystem.h"
 #include <ranges>
 
 class Scene;
 class Bone;
 class RenderScene;
 class ModelLoader;
+class ModuleBehavior;
 class GameObject : public IObject
 {
 public:
@@ -35,25 +37,42 @@ public:
 	HashingString GetHashedName() const { return m_name; }
 	unsigned int GetInstanceID() const override { return m_instanceID; }
 
-	void EditorMeshRenderer();
-
 	template<typename T>
 	T* AddComponent()
 	{
+		if (std::ranges::find_if(m_components, [&](Component* component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
+		{
+			return nullptr;
+		}
+
 		T* component = new T();
 		m_components.push_back(component);
 		component->SetOwner(this);
 		m_componentIds[component->GetTypeID()] = m_components.size();
 
-		std::ranges::sort(m_components, [&](Component* a, Component* b)
-		{
-			return a->GetOrderID() < b->GetOrderID();
-		});
+		ComponentsSort();
 
-		std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
+		return component;
+	}
+
+	template<typename T>
+	T* AddScriptComponent(const std::string_view& scriptName)
+	{
+		if (std::ranges::find_if(m_components, [&](Component* component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
 		{
-			m_componentIds[m_components[i]->GetTypeID()] = i;
-		});
+			return nullptr;
+		}
+
+		T* component = ScriptManager->CreateMonoBehavior(scriptName.data());
+		m_components.push_back(component);
+		component->SetOwner(this);
+		m_componentIds[component->GetTypeID()] = m_components.size();
+
+		ComponentsSort();
+
+		size_t index = m_componentIds[component->GetTypeID()];
+
+		ScriptManager->CollectScriptComponent(this, index, scriptName.data());
 
 		return component;
 	}
@@ -61,19 +80,17 @@ public:
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args)
 	{
+		if (std::ranges::find_if(m_components, [&](Component* component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
+		{
+			return nullptr;
+		}
+
 		T* component = new T(std::forward<Args>(args)...);
 		m_components.push_back(component);
 		component->SetOwner(this);
 		m_componentIds[component->GetTypeID()] = m_components.size();
-		std::ranges::sort(m_components, [&](Component* a, Component* b)
-		{
-			return a->GetOrderID() < b->GetOrderID();
-		});
 
-		std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
-		{
-			m_componentIds[m_components[i]->GetTypeID()] = i;
-		});
+		ComponentsSort();
 
 		return component;
 	}
@@ -116,23 +133,38 @@ public:
 	}
 
 	GameObject::Type GetType() const { return m_gameObjectType; }
-
 	void SetScene(Scene* pScene) { m_pScene = pScene; }
 
 	Transform m_transform{};
-	Index m_index;
-	Index m_parentIndex;
+	GameObject::Index m_index;
+	GameObject::Index m_parentIndex;
 	//for bone update
-	Index m_rootIndex{ 0 };
+	GameObject::Index m_rootIndex{ 0 };
 	std::vector<GameObject::Index> m_childrenIndices;
 
 private:
 	friend class RenderScene;
 	friend class ModelLoader;
+	friend class HotLoadSystem;
+
+	void ComponentsSort()
+	{
+		std::ranges::sort(m_components, [&](Component* a, Component* b)
+		{
+			return a->GetOrderID() < b->GetOrderID();
+		});
+
+		std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
+		{
+			m_componentIds[m_components[i]->GetTypeID()] = i;
+		});
+	}
+
+private:
 	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
 	
-	const size_t m_typeID{ GENERATE_CLASS_GUID };
-	const size_t m_instanceID{ GENERATE_GUID };
+	const size_t m_typeID{ TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	const size_t m_instanceID{ TypeTrait::GUIDCreator::GetGUID() };
 	
 	HashingString m_name{};
 	HashingString m_tag{};

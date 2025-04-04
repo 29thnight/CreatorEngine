@@ -506,7 +506,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
-void SceneRenderer::Update(float deltaTime)
+void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	m_renderScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
@@ -514,7 +514,7 @@ void SceneRenderer::Update(float deltaTime)
 	m_pUIPass->Update(deltaTime);
 }
 
-void SceneRenderer::Render()
+void SceneRenderer::SceneRendering()
 {
 	DirectX11::ResetCallCount();
 	for(auto& camera : CameraManagement->m_cameras)
@@ -528,7 +528,7 @@ void SceneRenderer::Render()
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-			Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
+			//Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
 		}
 
 		//[2] GBufferPass
@@ -551,7 +551,7 @@ void SceneRenderer::Render()
 			Banchmark banch;
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->Execute(*m_renderScene, *camera);
-			Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
+			//Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
 		}
 
 		//[*] WireFramePass
@@ -620,7 +620,7 @@ void SceneRenderer::Render()
 		}
 	}
 
-	Debug->Log("Draw Call Count : " + std::to_string(DirectX11::GetDrawCallCount()));
+	//Debug->Log("Draw Call Count : " + std::to_string(DirectX11::GetDrawCallCount()));
 	m_pGBufferPass->ClearDeferredQueue();
 }
 
@@ -739,7 +739,6 @@ void SceneRenderer::EditorView()
 				}
 				ImGui::EndMenu();
 			}
-
             ImGui::EndMainMenuBar();
         }
         ImGui::End();
@@ -747,6 +746,9 @@ void SceneRenderer::EditorView()
 
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height, window_flags)) {
         if (ImGui::BeginMenuBar()) {
+
+			ImGui::Button("Test");
+
             ImGui::Text("Log :");
 
 			ImGui::SameLine();
@@ -823,13 +825,28 @@ void SceneRenderer::EditorView()
 	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
-		ImVec2 size = ImGui::GetContentRegionAvail();
+		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
-		float convert = DeviceState::g_aspectRatio;
-		size.x = size.y * convert;
+		// 이미지의 높이를 영역의 높이로 설정하고, 가로는 aspect ratio를 반영하여 계산
+		float imageHeight = availRegion.y;
+		float imageWidth = imageHeight * DeviceState::g_aspectRatio;
+
+		if (imageWidth > availRegion.x) {
+			imageWidth = availRegion.x;
+			imageHeight = imageWidth / DeviceState::g_aspectRatio;
+		}
+
+		ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
+
+		// 이미지가 중앙에 위치하도록 오프셋 계산 (가로, 세로 모두 중앙 정렬)
+		ImVec2 offset = ImVec2((availRegion.x - imageSize.x) * 0.5f, (availRegion.y - imageSize.y) * 0.5f);
+
+		ImVec2 currentPos = ImGui::GetCursorPos();
+		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
+
 		//TODO : 카메라를 컨트롤러에서 찾아서 해당 뷰포트를 보여주도록 변경하고, 
 		// 위에 카메라 컨트롤러에 등록된 카메라 번호를 보이게 해야함.
-		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, size);
+		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, imageSize);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

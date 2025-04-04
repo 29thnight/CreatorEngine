@@ -55,9 +55,6 @@
     <Filter Include="DirectX11Common\HLSLCompiler">
       <UniqueIdentifier>{39dfc371-3946-477a-9148-ec3212f87486}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Interface">
-      <UniqueIdentifier>{c673a744-35c9-4d79-88f8-78a26f4c00b8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Logger">
       <UniqueIdentifier>{680961e0-282d-49b5-b66c-942eed35b315}</UniqueIdentifier>
     </Filter>
@@ -137,12 +134,6 @@
     </ClInclude>
     <ClInclude Include="PathFinder.h">
       <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="IWorld.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
-    <ClInclude Include="IObject.h">
-      <Filter>Interface</Filter>
     </ClInclude>
     <ClInclude Include="CSVLoader.h">
       <Filter>CSVLoader</Filter>

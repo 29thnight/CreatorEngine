@@ -40,8 +40,6 @@
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
     <ClInclude Include="ImGuiLogger.h" />
-    <ClInclude Include="IObject.h" />
-    <ClInclude Include="IWorld.h" />
     <ClInclude Include="LinkedListLib.hpp" />
     <ClInclude Include="LogEntry.h" />
     <ClInclude Include="LogSink.h" />
