@@ -57,7 +57,7 @@ namespace lm {
 		std::vector<Rect> rects;
 		int canvasSize = 4096;
 		int padding = 4;
-		float bias = 0.02f;
+		float bias = 0.001f;
 
 		ComPtr<ID3D11Buffer> m_Buffer{};
 		ComPtr<ID3D11Buffer> m_transformBuf{};

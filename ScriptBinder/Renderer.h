@@ -3,11 +3,32 @@
 #include "Component.h"
 #include "IRenderable.h"
 
-struct LightMapping {
+struct LightMapping 
+{
+	LightMapping() meta_default(LightMapping)
 	int lightmapIndex{ -1 };
 	int ligthmapResolution{ 0 };
 	Mathf::Vector2 lightmapOffset{ 0,0 };
 	Mathf::Vector2 lightmapTiling{ 0,0 };
+
+	static const Meta::Type& Reflect()
+	{
+		static const Meta::MetaProperties<4> properties
+		{
+			Meta::MakeProperty("lightmapIndex", &LightMapping::lightmapIndex),
+			Meta::MakeProperty("ligthmapResolution", &LightMapping::ligthmapResolution),
+			Meta::MakeProperty("lightmapOffset", &LightMapping::lightmapOffset),
+			Meta::MakeProperty("lightmapTiling", &LightMapping::lightmapTiling)
+		};
+
+		static const Meta::Type type
+		{
+			"LightMapping",
+			properties
+		};
+
+		return type;
+	}
 };
 
 constexpr uint32 MAX_BONES{ 512 };
@@ -45,9 +66,10 @@ public:
 
 	static const Meta::Type& Reflect()
 	{
-		static const Meta::MetaProperties<1> properties
+		static const Meta::MetaProperties<2> properties
 		{
-			Meta::MakeProperty("m_Material", &MeshRenderer::m_Material)
+			Meta::MakeProperty("m_Material", &MeshRenderer::m_Material),
+			Meta::MakeProperty("m_LightMapping", &MeshRenderer::m_LightMapping)
 		};
 
 		static const Meta::Type type

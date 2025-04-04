@@ -166,7 +166,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
 
     // 타겟 텍스처에 기록
-    TargetTexture[DTid.xy] += color;
+    TargetTexture[DTid.xy] = color;
     TargetTexture[DTid.xy + float2(0, 1500)] = worldNormal;
     //TargetTexture[DTid.xy + float2(0, 2600)] = worldCoord;
     
