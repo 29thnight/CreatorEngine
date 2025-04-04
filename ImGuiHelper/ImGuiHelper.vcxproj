@@ -20,6 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="drawing.h" />
+    <ClInclude Include="fa.h" />
+    <ClInclude Include="IconsFontAwesome6.h" />
     <ClInclude Include="ImGuiContext.h" />
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />

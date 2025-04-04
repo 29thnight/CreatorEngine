@@ -141,6 +141,12 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 
 void GridPass::ControlPanel()
 {
+    ImGui::DragFloat("Fade Start", &m_gridUniform.fadeStart, 0.f, 1.f);
+    ImGui::DragFloat("Fade End", &m_gridUniform.fadeEnd, 0.f, 1000.f);
+}
+
+void GridPass::GridSetting()
+{
     ImGui::ColorEdit4("Grid Color", &m_gridUniform.gridColor.x);
     ImGui::ColorEdit4("Checker Color", &m_gridUniform.checkerColor.x);
     ImGui::DragFloat("Unit Size", &m_gridUniform.unitSize, 1.f, 100.f);
@@ -149,6 +155,4 @@ void GridPass::ControlPanel()
     ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
     ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
     ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
-    ImGui::DragFloat("Fade Start", &m_gridUniform.fadeStart, 0.f, 1.f);
-    ImGui::DragFloat("Fade End", &m_gridUniform.fadeEnd, 0.f, 1000.f);
 }

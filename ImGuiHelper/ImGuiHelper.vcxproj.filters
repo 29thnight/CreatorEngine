@@ -16,6 +16,9 @@
     <Filter Include="소스 파일\NodeEditorHelper">
       <UniqueIdentifier>{84f04fb2-3e1c-4a97-921e-dcea9ca6cd35}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\fonts">
+      <UniqueIdentifier>{771775e3-a902-490d-9f1f-f108f8f79c8b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGuiContext.h">
@@ -32,6 +35,12 @@
     </ClInclude>
     <ClInclude Include="widgets.h">
       <Filter>소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="fa.h">
+      <Filter>소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="IconsFontAwesome6.h">
+      <Filter>소스 파일\fonts</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

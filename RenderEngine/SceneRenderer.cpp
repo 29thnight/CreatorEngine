@@ -9,6 +9,9 @@
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
 
+#include "IconsFontAwesome6.h"
+#include "fa.h"
+
 using namespace lm;
 #pragma region ImGuizmo
 #include "ImGuizmo.h"
@@ -36,7 +39,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	static bool boundSizing = false;
 	static bool boundSizingSnap = false;
 
-	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::SetOrthographic(m_pEditorCamera->m_isOrthographic);
 	ImGuizmo::BeginFrame();
 
 	if (editTransformDecomposition)
@@ -60,7 +63,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 1.f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::Begin("Gizmo", 0, gizmoWindowFlags);
+		ImGui::Begin(ICON_FA_USERS_VIEWFINDER "  Scene      ", 0, gizmoWindowFlags);
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 		ImGuizmo::SetDrawlist();
 
@@ -75,16 +78,34 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
 
-        ImGui::Button("Test");
+
 		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
 
         ImVec2 imagePos = ImGui::GetItemRectMin();
-        ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 50, imagePos.y + 50));
+        ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
 
-        // 인비저블 버튼을 생성하여 이미지 위에 겹쳐 놓습니다.
-        if (ImGui::Button("overlay", ImVec2(50, 30))) {
-            // 버튼 클릭 시 처리할 내용을 여기에 작성합니다.
-        }
+		if (ImGui::Button(ICON_FA_BARS " Grid"))
+		{
+			m_bShowGridSettings = true;
+		}
+
+		ImGui::SameLine();
+
+		ImVec2 currentPos = ImGui::GetCursorScreenPos();
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
+
+		if (ImGui::Button(m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE " Orthographic" : ICON_FA_EYE " Perspective"))
+		{
+			m_pEditorCamera->m_isOrthographic = !m_pEditorCamera->m_isOrthographic;
+		}
+
+		currentPos = ImGui::GetCursorScreenPos();
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
+
+		if (ImGui::Button(ICON_FA_CAMERA " Camera"))
+		{
+			m_pEditorCamera->m_isOrthographic = !m_pEditorCamera->m_isOrthographic;
+		}
 
 		ImGui::PopStyleVar(2);
 	}
@@ -321,6 +342,8 @@ void SceneRenderer::InitializeImGui()
 		}
 	});
 
+	ImGui::GetContext("RenderPass").Close();
+
     ImGui::ContextRegister("Light", true, [&]()
     {
         ImGui::Text("Light Index : %d", lightIndex);
@@ -353,23 +376,6 @@ void SceneRenderer::InitializeImGui()
         ImGui::DragFloat("Light colorY", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
         ImGui::DragFloat("Light colorZ", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
     });
-
-
-    ImGui::ContextRegister("EditCamera", true, [&]()
-    {
-        ImGui::Checkbox("Camera Type", &m_pEditorCamera->m_isOrthographic);
-        ImGui::DragFloat("Camera Speed", &m_pEditorCamera->m_speed, 0.1f, 0.1f, 100.0f);
-        ImGui::DragFloat("Camera FOV", &m_pEditorCamera->m_fov, 0.1f, 0.1f, 100.0f);
-        ImGui::DragFloat("Camera Near", &m_pEditorCamera->m_nearPlane, 0.1f, 0.1f, 100.0f);
-        ImGui::DragFloat("Camera Far", &m_pEditorCamera->m_farPlane, 0.1f, 0.1f, 10000.0f);
-
-        if (m_pEditorCamera->m_isOrthographic)
-        {
-            ImGui::DragFloat("Orthographic Width", &m_pEditorCamera->m_viewWidth, 0.1f, 0.1f, 1000.0f);
-            ImGui::DragFloat("Orthographic Height", &m_pEditorCamera->m_viewHeight, 0.1f, 0.1f, 1000.0f);
-        }
-    });
-
 }
 
 void SceneRenderer::InitializeTextures()
@@ -747,22 +753,26 @@ void SceneRenderer::EditorView()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height, window_flags)) {
         if (ImGui::BeginMenuBar()) {
 
-			ImGui::Button("Test");
-
-            ImGui::Text("Log :");
+			ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer");
 
 			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_CODE " Output Log :"))
+			{
+				m_bShowLogWindow = true;
+			}
 
+			ImGui::SameLine();
 			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 255, 255));
 			ImVec2 pos = ImGui::GetCursorScreenPos();
 			ImVec2 size = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str());
 
 			if (0 == size.x)
 			{
-				size.x = 5.f;
+				size.x = 10.f;
 			}
 
-			if (ImGui::InvisibleButton("##last_log_btn", size)) {
+			if (ImGui::InvisibleButton("##last_log_btn", size)) 
+			{
 				m_bShowLogWindow = true;
 			}
 			bool hovered = ImGui::IsItemHovered();
@@ -789,6 +799,11 @@ void SceneRenderer::EditorView()
 	if (m_bShowLogWindow)
 	{
 		ShowLogWindow();
+	}
+
+	if (m_bShowGridSettings)
+	{
+		ShowGridSettings();
 	}
 
 	auto obj = m_renderScene->GetSelectSceneObject();
@@ -822,7 +837,7 @@ void SceneRenderer::EditorView()
 	}
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("GameView", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	ImGui::Begin(ICON_FA_GAMEPAD "  Game        ", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
@@ -899,8 +914,11 @@ void SceneRenderer::ShowLogWindow()
 			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
 
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
-		if (ImGui::Selectable(entry.message.c_str(), is_selected, ImGuiSelectableFlags_None, { sizeX , 50 }))
+
+		if (ImGui::Selectable(std::string(ICON_FA_INFO + entry.message).c_str(), is_selected, ImGuiSelectableFlags_None, { sizeX , 50 }))
+		{
 			selected_log_index = i;
+		}
 		ImGui::PopStyleColor(); // Text color
 
 		if (is_selected)
@@ -910,4 +928,11 @@ void SceneRenderer::ShowLogWindow()
 	ImGui::End();
 
 
+}
+
+void SceneRenderer::ShowGridSettings()
+{
+	ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
+	m_pGridPass->GridSetting();
+	ImGui::End();
 }

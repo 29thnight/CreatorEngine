@@ -39,6 +39,7 @@ public:
 	void PrepareCameraType(Camera* camera);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+    void GridSetting();
 
     ID3D11ShaderResourceView* GetGridSRV() const { return m_gridTexture->m_pSRV; }
 

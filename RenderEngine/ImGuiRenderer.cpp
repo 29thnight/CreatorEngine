@@ -2,6 +2,8 @@
 #include "CoreWindow.h"
 #include "DeviceState.h"
 #include "imgui_internal.h"
+#include "IconsFontAwesome6.h"
+#include "fa.h"
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -10,8 +12,23 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 15.0f, nullptr, io.Fonts->GetGlyphRangesKorean());
+    //io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 15.0f, nullptr, io.Fonts->GetGlyphRangesKorean());
+	
+	static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+	ImFontConfig icons_config;
+	ImFontConfig font_config;
+	icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
+	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
+	io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
 
+	//If you want change between icons size you will need to create a new font
+	//io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 12.0f, &icons_config, icons_ranges);
+	//io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 20.0f, &icons_config, icons_ranges);
+
+	//To use brands icons you need do the same steps but using the brands header
+	//If a quotation mark is displayed instead of the icon, probably the Icon header and Font Awesome version are not the same
+
+	io.Fonts->Build();
     // Setup Dear ImGui style
     //ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
@@ -119,8 +136,8 @@ void ImGuiRenderer::BeginRender()
         ImGuiID dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.5f, nullptr, &id);
         ImGuiID dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
 
-        ImGui::DockBuilderDockWindow("Gizmo", dock1);
-        ImGui::DockBuilderDockWindow("GameView", dock_gameView);
+        ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
+        ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
         ImGui::DockBuilderDockWindow("GameObject Hierarchy", dock2);
         ImGui::DockBuilderDockWindow("GameObject Inspector", dock3);
         ImGui::DockBuilderFinish(id);

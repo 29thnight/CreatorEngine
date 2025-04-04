@@ -77,6 +77,11 @@ public:
 		m_opened = true;
 	}
 
+	void Close()
+	{
+		m_opened = false;
+	}
+
 	bool IsOpened() const
 	{
 		return m_opened;

@@ -138,6 +138,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     }
     
     float Exposure = useTonemap ? toneMapExposure : 1.0f;
+    
+    toneMapped = LINEARtoSRGB(toneMapped * Exposure);
         
     return float4(toneMapped, 1.f);
 }
