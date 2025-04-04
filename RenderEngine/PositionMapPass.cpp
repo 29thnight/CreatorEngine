@@ -61,12 +61,13 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 
 	ClearTextures();
 	m_pso->Apply();
+	int size = 2048;
 
 	auto pre = CD3D11_VIEWPORT(
 		0.0f,
 		0.0f,
-		1024,
-		1024
+		size,
+		size
 	);
 
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
@@ -80,7 +81,7 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		auto meshName = renderer->m_Mesh->GetName();
 		if (m_positionMapTextures.find(meshName) == m_positionMapTextures.end()) {
 			// ¸ðµ¨ÀÇ positionMap »ý¼º
-			m_positionMapTextures[meshName] = Texture::Create(1024, 1024, "Position Map",
+			m_positionMapTextures[meshName] = Texture::Create(size, size, "Position Map",
 				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
 			m_positionMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 			m_positionMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);

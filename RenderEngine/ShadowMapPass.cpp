@@ -95,6 +95,7 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 	m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
+	DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);
 
 	DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 	

@@ -41,7 +41,7 @@ namespace lm {
 	struct CBSetting {
 		float bias;
 		int lightsize;
-		int pad[2];
+		DirectX::XMUINT2 shadowmapSize;
 	};
 
 	LightMap::LightMap()
@@ -63,7 +63,7 @@ namespace lm {
 
 		sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 
-		float size = 80.f;
+		float size = 480.f;
 
 		rects.clear();
 
@@ -134,8 +134,8 @@ namespace lm {
 
 				MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[j].data);
 				renderer->m_LightMapping.lightmapIndex = lightmapIndex;
-				renderer->m_LightMapping.lightmapOffset.x = rects[j].x;
-				renderer->m_LightMapping.lightmapOffset.y = rects[j].y;
+				renderer->m_LightMapping.lightmapOffset.x = rects[j].x / (float)canvasSize;
+				renderer->m_LightMapping.lightmapOffset.y = rects[j].y / (float)canvasSize;
 
 				j++;
 				i--;
@@ -170,6 +170,9 @@ namespace lm {
 	{
 		int lightmapIndex = 0;
 
+		for (auto& lightmap : lightmaps)
+			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(lightmap->m_pUAV, Colors::Transparent);
+
 		DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 		DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
 
@@ -177,47 +180,43 @@ namespace lm {
 
 		CBSetting cbset = {};
 		cbset.lightsize = MAX_LIGHTS;
-		cbset.bias = 0.2f;
+		cbset.bias = bias;
+		cbset.shadowmapSize = { m_pLightmapShadowPass->shadowmapSize, m_pLightmapShadowPass->shadowmapSize };
 		DirectX11::UpdateBuffer(m_settingBuf.Get(), &cbset);
 		DirectX11::CSSetConstantBuffer(0, 1, m_settingBuf.GetAddressOf());	// setting 0
 
 		{
-			// texture Array 생성
-			std::vector<ID3D11ShaderResourceView*> SRVs;
-			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
-			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[1]->m_pSRV);
-			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[2]->m_pSRV);
-			SRVs.push_back(m_pLightmapShadowPass->m_shadowmapTextures[3]->m_pSRV);
+			D3D11_TEXTURE2D_DESC texArrayDesc = {};
+			texArrayDesc.Width = m_pLightmapShadowPass->shadowmapSize;
+			texArrayDesc.Height = m_pLightmapShadowPass->shadowmapSize;
+			texArrayDesc.MipLevels = 1;
+			texArrayDesc.ArraySize = MAX_LIGHTS; // N개의 텍스처
+			texArrayDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+			texArrayDesc.SampleDesc.Count = 1;
+			texArrayDesc.Usage = D3D11_USAGE_DEFAULT;
+			texArrayDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			texArrayDesc.CPUAccessFlags = 0;
+
 			ID3D11Texture2D* textureArray = nullptr;
-			ID3D11ShaderResourceView* textureArraySRV = nullptr;
+			auto hr = DeviceState::g_pDevice->CreateTexture2D(&texArrayDesc, nullptr, &textureArray);
 
-			
-
-			D3D11_TEXTURE2D_DESC textureDesc = {};
-			SRVs[0]->GetResource(reinterpret_cast<ID3D11Resource**>(&textureArray));  // 첫 번째 텍스처 정보 가져오기
-			D3D11_TEXTURE2D_DESC firstTextureDesc;
-			textureArray->GetDesc(&firstTextureDesc);
-
-			textureDesc.Width = firstTextureDesc.Width;
-			textureDesc.Height = firstTextureDesc.Height;
-			textureDesc.MipLevels = firstTextureDesc.MipLevels;
-			textureDesc.ArraySize = static_cast<UINT>(SRVs.size()); // 개별 텍스처 개수
-			textureDesc.Format = firstTextureDesc.Format;
-			textureDesc.SampleDesc = firstTextureDesc.SampleDesc;
-			textureDesc.Usage = D3D11_USAGE_DEFAULT;
-			textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			textureDesc.CPUAccessFlags = 0;
-			textureDesc.MiscFlags = 0;
+			for (UINT i = 0; i < MAX_LIGHTS; i++) {
+				DeviceState::g_pDeviceContext->CopySubresourceRegion(
+					textureArray, D3D11CalcSubresource(0, i, 1), 0, 0, 0, // Dest
+					m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pTexture, 0, nullptr // Source
+				);
+			}
 
 			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = textureDesc.Format;
+			srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
 			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
 			srvDesc.Texture2DArray.MostDetailedMip = 0;
-			srvDesc.Texture2DArray.MipLevels = textureDesc.MipLevels;
+			srvDesc.Texture2DArray.MipLevels = 1;
 			srvDesc.Texture2DArray.FirstArraySlice = 0;
-			srvDesc.Texture2DArray.ArraySize = static_cast<UINT>(SRVs.size());
+			srvDesc.Texture2DArray.ArraySize = MAX_LIGHTS;
 
-			DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
+			
+			hr = DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
 
 			DirectX11::CSSetShaderResources(0, 1, &textureArraySRV); // shadowmap texture array 0
 		}
@@ -230,7 +229,7 @@ namespace lm {
 				CBLight cblit = {};
 				auto& light = m_renderscene->m_LightController->GetLight(i);
 				cblit.view = light.GetViewMatrix();
-				cblit.proj = light.GetProjectionMatrix(0.1f, 200.f);
+				cblit.proj = light.GetProjectionMatrix(0.1f, 100.f);
 				cblit.position = light.m_position;
 				cblit.direction = light.m_direction;
 				cblit.color = light.m_color;
@@ -265,7 +264,6 @@ namespace lm {
 			srvDesc.Buffer.ElementWidth = sizeof(CBLight);
 			srvDesc.Buffer.NumElements = (UINT)lightMats.size();
 
-			ID3D11ShaderResourceView* structuredBufferSRV = nullptr;
 			DeviceState::g_pDevice->CreateShaderResourceView(structuredBuffer, &srvDesc, &structuredBufferSRV);
 
 			// (4) Compute Shader에 바인딩

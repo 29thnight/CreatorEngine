@@ -126,6 +126,12 @@
     <Filter Include="Shaders\PipelineShader">
       <UniqueIdentifier>{8e767fa1-c4da-49fb-8661-5c3ac7f2f281}</UniqueIdentifier>
     </Filter>
+    <Filter Include="LightMap\Calculate">
+      <UniqueIdentifier>{98f16e55-f2ec-4a1f-8b5f-4683cf1aea1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LightMap\Result">
+      <UniqueIdentifier>{76b9fbf7-7a07-447f-ba7e-c2fe118fd105}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -224,9 +230,6 @@
     <ClCompile Include="GridPass.cpp">
       <Filter>RenderPass\GridPass</Filter>
     </ClCompile>
-    <ClCompile Include="LightMap.cpp">
-      <Filter>LightMap</Filter>
-    </ClCompile>
     <ClCompile Include="UIPass.cpp">
       <Filter>RenderPass\UIPass</Filter>
     </ClCompile>
@@ -239,14 +242,20 @@
     <ClCompile Include="PostProcessingPass.cpp">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClCompile>
-    <ClCompile Include="PositionMapPass.cpp">
-      <Filter>LightMap</Filter>
+    <ClCompile Include="LightMap.cpp">
+      <Filter>LightMap\Calculate</Filter>
     </ClCompile>
     <ClCompile Include="LightmapShadowPass.cpp">
-      <Filter>LightMap</Filter>
+      <Filter>LightMap\Calculate</Filter>
     </ClCompile>
     <ClCompile Include="NormalMapPass.cpp">
-      <Filter>LightMap</Filter>
+      <Filter>LightMap\Calculate</Filter>
+    </ClCompile>
+    <ClCompile Include="PositionMapPass.cpp">
+      <Filter>LightMap\Calculate</Filter>
+    </ClCompile>
+    <ClCompile Include="LightMapPass.cpp">
+      <Filter>LightMap\Result</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -358,9 +367,6 @@
     <ClInclude Include="GridPass.h">
       <Filter>RenderPass\GridPass</Filter>
     </ClInclude>
-    <ClInclude Include="LightMap.h">
-      <Filter>LightMap</Filter>
-    </ClInclude>
     <ClInclude Include="PostProcessingPass.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClInclude>
@@ -370,14 +376,20 @@
     <ClInclude Include="LightProperty.h">
       <Filter>Objects</Filter>
     </ClInclude>
-    <ClInclude Include="PositionMapPass.h">
-      <Filter>LightMap</Filter>
+    <ClInclude Include="LightMap.h">
+      <Filter>LightMap\Calculate</Filter>
     </ClInclude>
     <ClInclude Include="LightmapShadowPass.h">
-      <Filter>LightMap</Filter>
+      <Filter>LightMap\Calculate</Filter>
     </ClInclude>
     <ClInclude Include="NormalMapPass.h">
-      <Filter>LightMap</Filter>
+      <Filter>LightMap\Calculate</Filter>
+    </ClInclude>
+    <ClInclude Include="PositionMapPass.h">
+      <Filter>LightMap\Calculate</Filter>
+    </ClInclude>
+    <ClInclude Include="LightMapPass.h">
+      <Filter>LightMap\Result</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -475,6 +487,12 @@
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
     <FxCompile Include="NormalMap.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Lightmap.ps.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\NeighborSampling.cs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
   </ItemGroup>

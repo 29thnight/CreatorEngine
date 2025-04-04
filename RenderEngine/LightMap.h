@@ -51,10 +51,13 @@ namespace lm {
 
 		ID3D11Texture2D* imgTexture = nullptr;
 		ID3D11ShaderResourceView* imgSRV = nullptr;
+		ID3D11ShaderResourceView* textureArraySRV = nullptr;
+		ID3D11ShaderResourceView* structuredBufferSRV = nullptr;
 	private:
 		std::vector<Rect> rects;
-		int canvasSize = 1024;
-		int padding = 2;
+		int canvasSize = 4096;
+		int padding = 4;
+		float bias = 0.02f;
 
 		ComPtr<ID3D11Buffer> m_Buffer{};
 		ComPtr<ID3D11Buffer> m_transformBuf{};

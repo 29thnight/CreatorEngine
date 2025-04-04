@@ -68,6 +68,15 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
+	auto pre = CD3D11_VIEWPORT(
+		0.0f,
+		0.0f,
+		shadowmapSize,
+		shadowmapSize
+	);
+
+	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
+
 	auto buffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	scene.UseModel();
 	for (int i = 0; i < MAX_LIGHTS; i++) {
@@ -78,6 +87,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 		// 비활성화된 라이트는 굽지 않음.
 		if (light.m_lightStatus == LightStatus::Disabled || light.m_lightType != LightType::DirectionalLight)
 			continue;
+		DirectX11::ClearRenderTargetView(m_shadowmapTextures[i]->GetRTV(), Colors::Transparent);
 
 		ID3D11RenderTargetView* rtv = m_shadowmapTextures[i]->GetRTV();
 
@@ -85,12 +95,12 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 
 		// shadowMap 정의
 		ShadowMapRenderDesc desc;
-		desc.m_eyePosition = XMLoadFloat4(&(light.m_direction)) * -10.f;
+		desc.m_eyePosition = XMLoadFloat4(&(light.m_direction)) * -50.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
 		desc.m_viewWidth = 32;
 		desc.m_viewHeight = 32;
 		desc.m_nearPlane = 0.1f;
-		desc.m_farPlane = 200.f;
+		desc.m_farPlane = 100.f;
 		desc.m_textureWidth = shadowmapSize;
 		desc.m_textureHeight = shadowmapSize;
 
@@ -126,6 +136,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 		DirectX11::ClearDepthStencilView(m_shadowMapDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
 	DirectX11::UnbindRenderTargets();
+	DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
 	//ClearShadowMap();
 }
 
