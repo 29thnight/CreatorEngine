@@ -90,6 +90,9 @@ void DirectX11::Dx11Main::Update()
 	{
 		m_sceneRenderer->SetWireFrame();
 	}
+	if (InputManagement->IsKeyDown(VK_F10)) {
+		m_sceneRenderer->SetLightmapPass();
+	}
 #endif // !EDITOR
 	if (InputManagement->IsKeyReleased(VK_F9)) 
 	{

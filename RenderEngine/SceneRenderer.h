@@ -24,6 +24,7 @@
 #include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
 #include "NormalMapPass.h"
+#include "LightMapPass.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -71,6 +72,7 @@ private:
 	std::unique_ptr<LightmapShadowPass> m_pLightmapShadowPass{};
 	std::unique_ptr<PositionMapPass> m_pPositionMapPass{};
 	std::unique_ptr<NormalMapPass> m_pNormalMapPass{};
+	std::unique_ptr<LightMapPass> m_pLightMapPass{};
 
 	std::unique_ptr<UIPass> m_pUIPass{};
 	//buffers
@@ -104,11 +106,13 @@ private:
 //Debug
 public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }
+	void SetLightmapPass() { useTestLightmap = !useTestLightmap; }
 private:
 	int selected_log_index{};
 	bool useWireFrame = false;
 	bool m_bIsClicked{ false };
 	bool m_bShowLogWindow{ false };
+	bool useTestLightmap{ false };
 	bool m_bShowGridSettings{ false };
 
 public:
