@@ -36,15 +36,13 @@ void DataSystem::RenderForEditer()
 {
 	//static std::string selectedModel{};
 
-	//ImGui::ContextRegister("Contents Browser", [&]()
-	//{
-	//	ImGuiID dockspace_id = ImGui::GetID("Contents Browser Space");
+	ImGui::ContextRegister("Contents Browser", [&]()
+	{
+		ImGuiID dockspace_id = ImGui::GetID("Contents Browser Space");
 
-	//	filter.Draw("Search", 180.0f);
-	//	// DockSpace 영역 생성 (0.0f, 0.0f는 현재 창의 가용 영역 전체 사용)
-	//	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f));
+		filter.Draw("Search", 180.0f);
 
-	//}, ImGuiWindowFlags_None);
+	}, ImGuiWindowFlags_None);
 
 	//ImGui::ContextRegister("3D Models", [&]()
 	//{
@@ -203,6 +201,11 @@ void DataSystem::MonitorFiles()
 void DataSystem::LoadModels()
 {
 	file::path shaderpath = PathFinder::Relative("Models\\");
+}
+
+void DataSystem::LoadModel(const std::string_view& filePath)
+{
+	Model* model = Model::LoadModel(filePath);
 }
 
 void DataSystem::LoadTextures()

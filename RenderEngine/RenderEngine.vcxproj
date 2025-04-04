@@ -162,7 +162,6 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
     <ClCompile Include="DeviceState.cpp" />
-    <ClCompile Include="FontManager.cpp" />
     <ClCompile Include="GBufferPass.cpp" />
     <ClCompile Include="GridPass.cpp" />
     <ClCompile Include="ImGuiRenderer.cpp" />
@@ -186,7 +185,6 @@
     <ClCompile Include="AAPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
-    <ClCompile Include="UI_DataSystem.cpp" />
     <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -207,7 +205,6 @@
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />
     <ClInclude Include="DeviceState.h" />
-    <ClInclude Include="FontManager.h" />
     <ClInclude Include="ForwardPass.h" />
     <ClInclude Include="GBufferPass.h" />
     <ClInclude Include="ImGuiRenderer.h" />
@@ -234,7 +231,6 @@
     <ClInclude Include="AAPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
-    <ClInclude Include="UI_DataSystem.h" />
     <ClInclude Include="WireFramePass.h" />
     <ClInclude Include="GridPass.h" />
   </ItemGroup>

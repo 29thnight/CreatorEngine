@@ -49,7 +49,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 
 		const aiScene* assimpScene = importer.ReadFile(filePath.data(),
 			aiProcess_LimitBoneWeights |
-			aiProcessPreset_TargetRealtime_Fast |
+			aiProcessPreset_TargetRealtime_Quality |
 			aiProcess_ConvertToLeftHanded
 		);
 

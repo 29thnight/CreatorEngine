@@ -1,6 +1,9 @@
 #include "ModelLoader.h"
 #include "Banchmark.hpp"
 #include "PathFinder.h"
+#include "DataSystem.h"
+#include "assimp/material.h"
+#include "assimp/pbrmaterial.h"
 
 ModelLoader::ModelLoader()
 {
@@ -106,6 +109,7 @@ Model* ModelLoader::LoadModel()
 	{
 		ProcessNodes();
 		ProcessFlatMeshes();
+		ProcessMaterials();
 		if (m_model->m_hasBones)
 		{
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
@@ -153,9 +157,89 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	ProcessBones(mesh, vertices);
 	Mesh* meshObj = new Mesh(mesh->mName.C_Str(), vertices, indices);
 	m_model->m_Meshes.push_back(meshObj);
-	m_model->m_Materials.push_back(new Material());
+	//m_model->m_Materials.push_back(new Material());
 
 	return meshObj;
+}
+
+void ModelLoader::ProcessMaterials()
+{
+	for (UINT i = 0; i < m_AIScene->mNumMeshes; i++)
+	{
+		aiMesh* mesh = m_AIScene->mMeshes[i];
+		m_model->m_Materials.push_back(GenerateMaterial(mesh));
+	}
+}
+
+Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
+{
+	Material* material = new Material();
+	material->m_name = mesh->mName.C_Str();
+	if (mesh->mMaterialIndex >= 0)
+	{
+		aiMaterial* mat = m_AIScene->mMaterials[mesh->mMaterialIndex];
+
+		Texture* normal = GenerateTexture(mat, aiTextureType_NORMALS);
+		Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
+		if (normal) material->UseNormalMap(normal);
+		else if (bump) material->UseBumpMap(bump);
+
+		Texture* ao = GenerateTexture(mat, aiTextureType_LIGHTMAP);
+		if (ao) material->UseAOMap(ao);
+
+		Texture* emissive = GenerateTexture(mat, aiTextureType_EMISSIVE);
+		if (emissive) material->UseEmissiveMap(emissive);
+
+		if (m_loadType == LoadType::GLTF)
+		{
+			material->ConvertToLinearSpace(true);
+			Texture* albedo = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_TEXTURE);
+			if (albedo) material->UseBaseColorMap(albedo);
+
+			Texture* occlusionMetalRough = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE);
+			if (occlusionMetalRough) material->UseOccRoughMetalMap(occlusionMetalRough);
+
+			float metallic;
+			if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR, metallic) == AI_SUCCESS)
+			{
+				material->SetMetallic(metallic);
+			}
+			float roughness;
+			if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS)
+			{
+				material->SetRoughness(roughness);
+			}
+		}
+		else
+		{
+			Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
+			if (albedo) material->UseBaseColorMap(albedo);
+
+			aiColor3D colour;
+			aiReturn res = mat->Get(AI_MATKEY_COLOR_DIFFUSE, colour);
+			if (res == aiReturn_SUCCESS)
+				material->SetBaseColor(colour[0], colour[1], colour[2]);
+
+			material->SetRoughness(0.9f);
+			material->SetMetallic(0.0f);
+
+			float shininess;
+			res = mat->Get(AI_MATKEY_SHININESS, shininess);
+			if (res == aiReturn_SUCCESS)
+			{
+				// convert shininess to roughness
+				float roughness = sqrt(2.0f / (shininess + 2.0f));
+				material->SetRoughness(roughness);
+			}
+		}
+	}
+	else
+	{
+		material->SetBaseColor(1, 0, 1);
+	}
+
+	m_model->m_Materials.push_back(material);
+	return material;
 }
 
 void ModelLoader::ParseModel()
@@ -386,4 +470,31 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(Node* node, Bone* bone,
 	{
 		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
 	}
+}
+
+Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index)
+{
+	bool hasTex = material->GetTextureCount(type) > 0;
+	Texture* texture = nullptr;
+	if (hasTex)
+	{
+		aiString str;
+		material->GetTexture(type, index, &str);
+		std::string textureName = str.C_Str();
+		textureName = m_directory + textureName;
+		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
+		LPCWSTR path = stemp.c_str();
+		auto it = DataSystems->Textures.find(textureName);
+		if (it != DataSystems->Textures.end())
+		{
+			texture = it->second.get();
+		}
+		else
+		{
+			texture = Texture::LoadFormPath(path);
+			DataSystems->Textures.emplace(textureName, texture);
+			m_model->m_Textures.push_back(texture);
+		}
+	}
+	return texture;
 }

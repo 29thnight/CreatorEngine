@@ -484,7 +484,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		model = Model::LoadModel("bangbooExport.fbx");
+		model = Model::LoadModel("Model/FlightHelmet.gltf");
 
 		ImGui::ContextRegister("Test UI", true, [&]()
 		{

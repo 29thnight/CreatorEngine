@@ -53,6 +53,7 @@ public:
 	Material& ConvertToLinearSpace(bool32 convert);
 
 public:
+	std::string m_name{};
 	Texture* m_pBaseColor{ nullptr };
 	Texture* m_pNormal{ nullptr };
 	Texture* m_pOccRoughMetal{ nullptr };

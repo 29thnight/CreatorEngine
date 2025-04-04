@@ -33,6 +33,8 @@ private:
 	void ProcessFlatMeshes();
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
 	Mesh* GenerateMesh(aiMesh* mesh);
+	void ProcessMaterials();
+	Material* GenerateMaterial(aiMesh* mesh);
 
 	//Save To InHouse Format
 	void ParseModel();
@@ -50,6 +52,7 @@ private:
 	Model* LoadModel();
 	void GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex);
 	void GenerateSkeletonToSceneObjectHierarchy(Node* node, Bone* bone, bool isRoot, int parentIndex);
+	Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
 
 	std::shared_ptr<Assimp::Importer> m_importer{};
 	const aiScene* m_AIScene;
@@ -59,7 +62,7 @@ private:
 	Model* m_model{};
 	Material* m_material{};
 	Animator* m_animator{};
-	Scene* m_scene;
+	Scene* m_scene{};
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
 
