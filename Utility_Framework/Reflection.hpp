@@ -17,35 +17,6 @@ namespace Meta
 {
     using Hash = uint32_t;
 
-    template<std::size_t N>
-    struct MetaString {
-        std::array<char, N> data;
-
-        // 문자열 리터럴을 받아서 배열에 복사합니다.
-        constexpr MetaString(const char(&str)[N]) 
-        {
-            for (std::size_t i = 0; i < N; ++i)
-                data[i] = str[i];
-        }
-
-        // C 스타일 문자열로 반환
-        constexpr const char* c_str() const 
-        {
-            return data.data();
-        }
-    };
-
-    // FixedString을 non-type 템플릿 매개변수로 받는 템플릿 클래스
-    template <MetaString str>
-    struct CompileTimeString 
-    {
-        // 컴파일 타임에 저장된 문자열을 반환
-        static constexpr const char* value() 
-        {
-            return str.c_str();
-        }
-    };
-
     // --- 컴파일 타임 타입 이름 추출 ---
     template<typename T>
     std::string ToString()
@@ -114,15 +85,6 @@ namespace Meta
 
     static inline auto& TypeCast = TypeCaster::GetInstance();
 
-    struct PropertyInfo {
-        const char* name;
-        const char* typeName;
-        const std::type_info& typeInfo;
-        bool isPointer;
-        bool isReference;
-        bool isReflectable;
-    };
-
     struct Property
     {
         const char* name;
@@ -146,23 +108,6 @@ namespace Meta
         std::function<std::any(void* instance, const std::vector<std::any>& args)> invoker;
         std::vector<MethodParameter> parameters;
     };
-
-    struct MethodInfo 
-    {
-        const char* name;
-        std::span<const char*> parameterTypes;
-        const char* returnType;
-    };
-
-    template<typename Ret, typename... Args>
-    constexpr MethodInfo MakeMethodInfo(const char* name) 
-    {
-        return {
-            name,
-            std::to_array<const char*>({ ToString<Args>().data()... }),
-            ToString<Ret>().data()
-        };
-    }
 
     // --- Type: 하나의 타입 메타데이터 ---
     struct Type
@@ -220,19 +165,6 @@ namespace Meta
 	{
 		return MetaDataRegistry->Find(name.data());
 	}
-
-    template<typename ClassT, typename T>
-    constexpr PropertyInfo MakePropertyInfo(const char* name, T ClassT::* member) {
-        using RawT = std::remove_reference_t<std::remove_pointer_t<T>>;
-        return {
-            name,
-            ToString<T>().data(),
-            typeid(T),
-            std::is_pointer_v<T>,
-            std::is_reference_v<T>,
-            HasReflect<RawT>
-        };
-    }
 
     template<typename ClassT, typename T>
     Property MakeProperty(const char* name, T ClassT::* member)
@@ -511,4 +443,34 @@ namespace Meta
 
 } // namespace Meta
 
+constexpr uint32_t PropertyAndMethod = 0;
+constexpr uint32_t PropertyOnly = 1;
+constexpr uint32_t MethodOnly = 2;
+
 #define meta_default(T) { Meta::Register<T>(); }
+
+#define ReflectionField(T, num) using __Ty = T; \s
+ static constexpr uint32_t ret_option = num; \
+ static const Meta::Type& Reflect()
+#define PropertyField static const auto properties = std::to_array
+#define MethodField static const auto methods = std::to_array
+
+#define meta_property(member) Meta::MakeProperty(#member, &__Ty::member),
+#define meta_method(method) Meta::MakeMethod(#method, &__Ty::method),
+
+#define ReturnReflection(T) \
+    if constexpr (ret_option == PropertyAndMethod) \
+    { \
+        static const Meta::Type type{ #T, properties, methods }; \
+        return type; \
+    } \
+    else if constexpr (ret_option == PropertyOnly) \
+    { \
+        static const Meta::Type type{ #T, properties }; \
+        return type; \
+    } \
+    else if constexpr (ret_option == MethodOnly) \
+    { \
+        static const Meta::Type type{ #T, {}, methods }; \
+        return type; \
+    }

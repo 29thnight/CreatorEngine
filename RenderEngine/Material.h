@@ -67,29 +67,22 @@ public:
 	MaterialInfomation m_materialInfo;
 	RenderingMode m_renderingMode{ RenderingMode::Opaque };
 
-	static const Meta::Type& Reflect()
+	ReflectionField(Material, PropertyAndMethod)
 	{
-		static const Meta::MetaProperties<3> properties
-		{
-			Meta::MakeProperty("BaseColor", &Material::m_baseColor),
-			Meta::MakeProperty("Metallic", &Material::m_metallic),
-			Meta::MakeProperty("Roughness", &Material::m_roughness)
-		};
+		PropertyField
+		({
+			meta_property(m_baseColor)
+			meta_property(m_metallic)
+			meta_property(m_roughness)
+		});
 
-		static const Meta::MetaMethods<3> methods
-		{
-			Meta::MakeMethod("UpdateBaseColor", &Material::UpdateBaseColor),
-			Meta::MakeMethod("UpdateMetallic", &Material::UpdateMetallic),
-			Meta::MakeMethod("UpdateRoughness", &Material::UpdateRoughness)
-		};
+		MethodField
+		({
+			meta_method(UpdateBaseColor)
+			meta_method(UpdateMetallic)
+			meta_method(UpdateRoughness)
+		});
 
-		static const Meta::Type type
-		{
-			"Material",
-			properties,
-			methods
-		};
-
-		return type;
+		ReturnReflection(Material)
 	};
 };
