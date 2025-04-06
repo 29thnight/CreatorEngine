@@ -449,9 +449,10 @@ constexpr uint32_t MethodOnly = 2;
 
 #define meta_default(T) { Meta::Register<T>(); }
 
-#define ReflectionField(T, num) using __Ty = T; \s
+#define ReflectionField(T, num) using __Ty = T; \
  static constexpr uint32_t ret_option = num; \
  static const Meta::Type& Reflect()
+
 #define PropertyField static const auto properties = std::to_array
 #define MethodField static const auto methods = std::to_array
 
