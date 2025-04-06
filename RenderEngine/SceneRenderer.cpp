@@ -16,6 +16,14 @@ using namespace lm;
 #pragma region ImGuizmo
 #include "ImGuizmo.h"
 
+enum class SelectGuizmoMode
+{
+    Select,
+    Translate,
+    Rotate,
+    Scale
+};
+
 static const float identityMatrix[16] = { 
 	1.f, 0.f, 0.f, 0.f,
 	0.f, 1.f, 0.f, 0.f,
@@ -38,21 +46,29 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	static float boundsSnap[] = { 0.1f, 0.1f, 0.1f };
 	static bool boundSizing = false;
 	static bool boundSizingSnap = false;
+    static bool selectMode = false;
+    static enum class SelectGuizmoMode selectGizmoMode = SelectGuizmoMode::Translate;
+    static const char* buttons[] = {
+        ICON_FA_EYE,
+        ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
+        ICON_FA_ARROWS_ROTATE,
+        ICON_FA_GROUP_ARROWS_ROTATE
+    };
+    static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
 
 	ImGuizmo::SetOrthographic(m_pEditorCamera->m_isOrthographic);
 	ImGuizmo::BeginFrame();
 
-	if (editTransformDecomposition)
-	{
-		if (ImGui::IsKeyPressed(ImGuiKey_T))
-			mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_R))
-			mCurrentGizmoOperation = ImGuizmo::ROTATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
-			mCurrentGizmoOperation = ImGuizmo::SCALE;
-		if (ImGui::IsKeyPressed(ImGuiKey_F))
-			useSnap = !useSnap;
-	}
+    if (ImGui::IsKeyPressed(ImGuiKey_T))
+        selectGizmoMode = SelectGuizmoMode::Translate;
+    if (ImGui::IsKeyPressed(ImGuiKey_R))
+        selectGizmoMode = SelectGuizmoMode::Rotate;
+    if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
+        selectGizmoMode = SelectGuizmoMode::Scale;
+    if (ImGui::IsKeyPressed(ImGuiKey_F))
+        useSnap = !useSnap;
+    if (ImGui::IsKeyPressed(ImGuiKey_V))
+        selectGizmoMode = SelectGuizmoMode::Select;
 
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
@@ -63,6 +79,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 1.f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
 		ImGui::Begin(ICON_FA_USERS_VIEWFINDER "  Scene      ", 0, gizmoWindowFlags);
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 		ImGuizmo::SetDrawlist();
@@ -77,7 +94,6 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
-
 
 		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
 
@@ -94,27 +110,96 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 		ImVec2 currentPos = ImGui::GetCursorScreenPos();
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 
-		if (ImGui::Button(m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE " Orthographic" : ICON_FA_EYE " Perspective"))
+		if (ImGui::Button(m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
 		{
 			m_pEditorCamera->m_isOrthographic = !m_pEditorCamera->m_isOrthographic;
 		}
 
+        ImGui::SameLine();
 		currentPos = ImGui::GetCursorScreenPos();
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 
 		if (ImGui::Button(ICON_FA_CAMERA " Camera"))
 		{
-			m_pEditorCamera->m_isOrthographic = !m_pEditorCamera->m_isOrthographic;
+            ImGui::OpenPopup("CameraSettings");
 		}
 
+        ImGui::SameLine();
+        currentPos = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(ImVec2(windowWidth - 250.f, currentPos.y));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+        for (int i = 0; i < buttonCount; i++)
+        {
+            // 선택된 버튼은 활성화 색상, 나머지는 비활성화 색상으로 설정합니다.
+            if (i == (int)selectGizmoMode)
+            {
+                // 활성화된 버튼 색상 (예: 녹색 계열)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
+            }
+            else
+            {
+                // 비활성화된 버튼 색상 (예: 회색 계열)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+            }
+
+            // 버튼 렌더링: 버튼을 클릭하면 선택된 인덱스를 업데이트합니다.
+            if (ImGui::Button(buttons[i]))
+            {
+                selectGizmoMode = (SelectGuizmoMode)i;
+            }
+
+            ImGui::SameLine();
+            currentPos = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
+
+            // PushStyleColor 호출마다 PopStyleColor를 호출해 원래 상태로 복원합니다.
+            ImGui::PopStyleColor();
+        }
+        ImGui::PopStyleVar(1);
+
+
+        if (editTransformDecomposition)
+        {
+            switch (selectGizmoMode)
+            {
+            case SelectGuizmoMode::Select:
+                selectMode = true;
+                break;
+            case SelectGuizmoMode::Translate:
+                mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+                selectMode = false;
+                break;
+            case SelectGuizmoMode::Rotate:
+                mCurrentGizmoOperation = ImGuizmo::ROTATE;
+                selectMode = false;
+                break;
+            case SelectGuizmoMode::Scale:
+                mCurrentGizmoOperation = ImGuizmo::SCALE;
+                selectMode = false;
+                break;
+            default:
+                break;
+            }
+        }
+
 		ImGui::PopStyleVar(2);
+
+        if (ImGui::BeginPopup("CameraSettings"))
+        {
+            ImGui::Text("Camera Settings");
+            ImGui::Separator();
+            ImGui::InputFloat("FOV  ", &cam->m_fov);
+            ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
+            ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
+            ImGui::EndPopup();
+        }
 	}
 	else
 	{
 		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 	}
 
-	if (obj)
+	if (obj && !selectMode)
 	{
 		// 기즈모로 변환 후 오브젝트에 적용.
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
@@ -145,7 +230,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 	if (useWindow)
 	{
 		ImGui::End();
-		ImGui::PopStyleColor(1);
+		ImGui::PopStyleColor(2);
 	}
 }
 #pragma endregion
@@ -286,17 +371,6 @@ void SceneRenderer::InitializeImGui()
 		if (ImGui::CollapsingHeader("ShadowPass"))
 		{
 			m_renderScene->m_LightController->m_shadowMapPass->ControlPanel();
-
-			ImGui::Image(
-				(ImTextureID)m_renderScene->m_LightController->m_shadowMapPass->m_shadowMapTexture->m_pSRV,
-				ImVec2(512, 512));
-			ImGui::Image(
-				(ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV,
-				ImVec2(512, 512));
-			ImGui::Image(
-				(ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[1]->m_pSRV,
-				ImVec2(512, 512));
-			//ImGui::EndTabItem();
 		}
 
 		if (ImGui::CollapsingHeader("SSAOPass"))
@@ -535,8 +609,6 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 void SceneRenderer::SceneRendering()
 {
 	DirectX11::ResetCallCount();
-
-
 	//Camera c{};
 	//// 메쉬별로 positionMap 생성
 	//m_pPositionMapPass->Execute(*m_renderScene, c);
@@ -545,8 +617,6 @@ void SceneRenderer::SceneRendering()
 	//m_pLightmapShadowPass->Execute(*m_renderScene, c);
 	//// lightMap 생성
 	//lightMap.GenerateLightMap(m_renderScene, m_pLightmapShadowPass, m_pPositionMapPass, m_pNormalMapPass);
-
-
 
 	for(auto& camera : CameraManagement->m_cameras)
 	{
@@ -562,7 +632,8 @@ void SceneRenderer::SceneRendering()
 			//Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
 		}
 
-		if(!useTestLightmap){
+		if(!useTestLightmap)
+        {
 			//[2] GBufferPass
 			{
 				//Banchmark banch;
@@ -580,13 +651,14 @@ void SceneRenderer::SceneRendering()
 
 			//[4] DeferredPass
 			{
-				Banchmark banch;
+				//Banchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
-				Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
+				//Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
 			}
 		}
-		else {
+		else
+        {
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
 		}
 
@@ -607,19 +679,19 @@ void SceneRenderer::SceneRendering()
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
-		//[8] AAPass
+		//[*] PostProcessPass
+		{
+			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
+		}
+
+		//[6] AAPass
 		{
 			//Banchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
-		//[*] PostProcessPass
-		{
-			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
-		}
-
-		//[6] ToneMapPass
+		//[7] ToneMapPass
 		{
 			//Banchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
@@ -761,11 +833,12 @@ void SceneRenderer::EditorView()
 
 					m_pLightMapPass->Initialize(lightMap.lightmaps);
 
-
-					if (lightMap.imgSRV) {
+					if (lightMap.imgSRV)
+                    {
 						ImGui::ContextUnregister("Baked LightMap");
 
-						ImGui::ContextRegister("Baked LightMap", true, [&]() {
+						ImGui::ContextRegister("Baked LightMap", true, [&]()
+                        {
 							ImGui::Image((ImTextureID)lightMap.imgSRV, ImVec2(512, 512));
 							//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
 							for(int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
@@ -776,7 +849,7 @@ void SceneRenderer::EditorView()
 							{
 								ImGui::Image((ImTextureID)tex->m_pSRV, ImVec2(512, 512));
 							}*/
-							});
+						});
 					}
 				}
 				ImGui::EndMenu();
@@ -786,46 +859,16 @@ void SceneRenderer::EditorView()
         ImGui::End();
     }
 
-    if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height, window_flags)) {
-        if (ImGui::BeginMenuBar()) {
-
+    if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
+        if (ImGui::BeginMenuBar())
+        {
 			ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer");
 
 			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_CODE " Output Log :"))
+			if (ImGui::Button(ICON_FA_CODE " Output Log "))
 			{
 				m_bShowLogWindow = true;
 			}
-
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 255, 255));
-			ImVec2 pos = ImGui::GetCursorScreenPos();
-			ImVec2 size = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str());
-
-			if (0 == size.x)
-			{
-				size.x = 10.f;
-			}
-
-			if (ImGui::InvisibleButton("##last_log_btn", size)) 
-			{
-				m_bShowLogWindow = true;
-			}
-			bool hovered = ImGui::IsItemHovered();
-			bool clicked = ImGui::IsItemClicked();
-
-			if (hovered) 
-			{
-				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-			}
-
-			// 텍스트를 그리기
-			ImDrawList* drawList = ImGui::GetWindowDrawList();
-			pos.y += 5;
-			drawList->AddText(pos, IM_COL32(255, 255, 255, 255), Debug->GetBackLogMessage().c_str());
-
-			//ImGui::Text();
-			ImGui::PopStyleColor();
 
             ImGui::EndMenuBar();
         }
@@ -951,7 +994,8 @@ void SceneRenderer::ShowLogWindow()
 
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
 
-		if (ImGui::Selectable(std::string(ICON_FA_INFO + entry.message).c_str(), is_selected, ImGuiSelectableFlags_None, { sizeX , 50 }))
+		if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
+            is_selected, ImGuiSelectableFlags_None, {sizeX , 50}))
 		{
 			selected_log_index = i;
 		}

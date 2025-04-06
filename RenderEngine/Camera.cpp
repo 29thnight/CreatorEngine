@@ -58,16 +58,16 @@ Mathf::xMatrix Camera::CalculateProjection()
 
 Mathf::Vector4 Camera::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth)
 {
-	// 1. ½ºÅ©¸° ÁÂÇ¥¸¦ NDC ÁÂÇ¥·Î º¯È¯
+	// 1. ìŠ¤í¬ë¦° ì¢Œí‘œë¥¼ NDC ì¢Œí‘œë¡œ ë³€í™˜
 	float x_ndc = (2.0f * screenPosition.x / GetScreenSize().width) - 1.0f;
 	float y_ndc = 1.0f - (2.0f * screenPosition.y / GetScreenSize().height);
 	Mathf::Vector4 screenPositionNDC = { x_ndc, y_ndc, depth, 1.0f };
 
-	// 2. ¿ªÇà·Ä Åõ¿µ º¯È¯ (Projection^-1)
+	// 2. ì—­í–‰ë ¬ íˆ¬ì˜ ë³€í™˜ (Projection^-1)
 	Mathf::xMatrix invProj = CalculateInverseProjection();
 	Mathf::Vector4 viewPosition = XMVector3TransformCoord(screenPositionNDC, invProj);
 
-	// 3. ºä ¿ªÇà·Ä º¯È¯ (View^-1)
+	// 3. ë·° ì—­í–‰ë ¬ ë³€í™˜ (View^-1)
 	Mathf::xMatrix invView = CalculateInverseView();
 	Mathf::Vector4 worldPosition = XMVector3TransformCoord(viewPosition, invView);
 
@@ -152,33 +152,31 @@ void Camera::HandleMovement(float deltaTime)
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
-
-
-		// ¸¶¿ì½º ÀÌµ¿·® °¡Á®¿À±â
+		// ë§ˆìš°ìŠ¤ ì´ë™ëŸ‰ ê°€ì ¸ì˜¤ê¸°
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
 		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
 
-		// Pitch Á¦ÇÑ Àû¿ë
+		// Pitch ì œí•œ ì ìš©
 		//m_pitch += deltaPitch;
 		
-		// ÇöÀç È¸Àü ±âÁØ ÃàÀ» ¾òÀ½
+		// í˜„ì¬ íšŒì „ ê¸°ì¤€ ì¶•ì„ ì–»ìŒ
 		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
 
-		// ÇÁ·¹ÀÓ´ç º¯È­·®¸¸ Àû¿ë
+		// í”„ë ˆì„ë‹¹ ë³€í™”ëŸ‰ë§Œ ì ìš©
 		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
 		XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
 
-		// Yaw¸¦ ¸ÕÀú Àû¿ë -> Pitch¸¦ Àû¿ë
+		// Yawë¥¼ ë¨¼ì € ì ìš© -> Pitchë¥¼ ì ìš©
 		XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
 		m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
 		m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
 		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
 
 
-		// »õ·Î¿î ¹æÇâ º¤ÅÍ °è»ê
+		// ìƒˆë¡œìš´ ë°©í–¥ ë²¡í„° ê³„ì‚°
 		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
 
-		// Right º¤ÅÍ ¾÷µ¥ÀÌÆ® (UPÀ» ±âÁØÀ¸·Î ´Ù½Ã °è»ê)
+		// Right ë²¡í„° ì—…ë°ì´íŠ¸ (UPì„ ê¸°ì¤€ìœ¼ë¡œ ë‹¤ì‹œ ê³„ì‚°)
 		m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
 
 		m_up = XMVector3Cross(m_forward, m_right);

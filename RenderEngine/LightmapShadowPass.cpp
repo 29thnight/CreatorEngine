@@ -84,7 +84,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 		auto& light = scene.m_LightController->GetLight(i);
 
 
-		// ºñÈ°¼ºÈ­µÈ ¶óÀÌÆ®´Â ±ÁÁö ¾ÊÀ½.
+		// ë¹„í™œì„±í™”ëœ ë¼ì´íŠ¸ëŠ” êµ½ì§€ ì•ŠìŒ.
 		if (light.m_lightStatus == LightStatus::Disabled || light.m_lightType != LightType::DirectionalLight)
 			continue;
 		DirectX11::ClearRenderTargetView(m_shadowmapTextures[i]->GetRTV(), Colors::Transparent);
@@ -93,7 +93,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 
 		DirectX11::OMSetRenderTargets(1, &rtv, m_shadowMapDSV);
 
-		// shadowMap Á¤ÀÇ
+		// shadowMap ì •ì˜
 		ShadowMapRenderDesc desc;
 		desc.m_eyePosition = XMLoadFloat4(&(light.m_direction)) * -50.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -122,7 +122,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 
 		m_shadowCamera.UpdateBuffer();
 
-		// shadowMap¿¡ Draw
+		// shadowMapì— Draw
 		for (auto& obj : scene.GetScene()->m_SceneObjects)
 		{
 			auto* renderer = obj->GetComponent<MeshRenderer>();
@@ -176,8 +176,6 @@ void LightmapShadowPass::CreateShadowMap(uint32 width, uint32 height)
 		)
 	);
 
-
-
 	m_shadowmapTextures.push_back(m_shadowMapTexture);
 }
 
@@ -189,12 +187,29 @@ void LightmapShadowPass::ClearShadowMap()
 	}
 }
 
+void LightmapShadowPass::ControlPanel()
+{
+    ImGui::Text("Lightmap Shadow Pass");
+    ImGui::SliderInt("ShadowMap Size", (int*)&shadowmapSize, 512, 8192);
+    ImGui::Text("ShadowMap Count : %d", m_shadowmapTextures.size());
+    ImGui::Text("ShadowMap DSV : %d", m_shadowMapDSV);
+    ImGui::Text("ShadowMap RTV : %d", m_shadowmapTextures[0]->GetRTV());
+
+
+    ImGui::Image(
+        (ImTextureID)m_shadowmapTextures[0]->m_pSRV,
+        ImVec2(512, 512));
+    ImGui::Image(
+        (ImTextureID)m_shadowmapTextures[1]->m_pSRV,
+        ImVec2(512, 512));
+}
+
 /*
- - ±Ç¿ë¿ì
-¶óÀÌÆ®¸Ê¿¡ »ç¿ëÇÒ shadowMap.
+ - ê¶Œìš©ìš°
+ë¼ì´íŠ¸ë§µì— ì‚¬ìš©í•  shadowMap.
 
-enableµÈ directional light¸¸ º£ÀÌÅ·.
+enableëœ directional lightë§Œ ë² ì´í‚¹.
 
-Ãß°¡ °³¼± °¡´É ¿©ºÎ
+ì¶”ê°€ ê°œì„  ê°€ëŠ¥ ì—¬ë¶€
 
 */

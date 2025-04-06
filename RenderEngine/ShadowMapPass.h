@@ -15,6 +15,7 @@ public:
 
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;
+    void ControlPanel() override;
 
 	Camera m_shadowCamera{};
 	std::unique_ptr<Texture> m_shadowMapTexture{};

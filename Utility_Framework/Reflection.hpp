@@ -17,7 +17,7 @@ namespace Meta
 {
     using Hash = uint32_t;
 
-    // --- ÄÄÆÄÀÏ Å¸ÀÓ Å¸ÀÔ ÀÌ¸§ ÃßÃâ ---
+    // --- ì»´íŒŒì¼ íƒ€ì„ íƒ€ì… ì´ë¦„ ì¶”ì¶œ ---
     template<typename T>
     std::string ToString()
     {
@@ -42,7 +42,7 @@ namespace Meta
         return name;
     }
 
-    // --- ¹®ÀÚ¿­ ÇØ½Ã °è»ê (FNV-1a) ---
+    // --- ë¬¸ìì—´ í•´ì‹œ ê³„ì‚° (FNV-1a) ---
     inline constexpr Hash StringToHash(const char* str)
     {
         Hash hash_value = 2166136261u;
@@ -55,7 +55,7 @@ namespace Meta
         return hash_value;
     }
 
-    // --- TypeCaster: ·±Å¸ÀÓ Å¸ÀÔ -> void* º¯È¯ ---
+    // --- TypeCaster: ëŸ°íƒ€ì„ íƒ€ì… -> void* ë³€í™˜ ---
     using AnyCaster = std::function<void* (const std::any&)>;
 
     class TypeCaster : public Singleton<TypeCaster>
@@ -101,7 +101,7 @@ namespace Meta
         const std::type_info& typeInfo;
     };
 
-    // --- Method: ¸â¹ö ÇÔ¼ö Á¤º¸ ---
+    // --- Method: ë©¤ë²„ í•¨ìˆ˜ ì •ë³´ ---
     struct Method
     {
         const char* name;
@@ -109,7 +109,7 @@ namespace Meta
         std::vector<MethodParameter> parameters;
     };
 
-    // --- Type: ÇÏ³ªÀÇ Å¸ÀÔ ¸ŞÅ¸µ¥ÀÌÅÍ ---
+    // --- Type: í•˜ë‚˜ì˜ íƒ€ì… ë©”íƒ€ë°ì´í„° ---
     struct Type
     {
         const char* name{};
@@ -121,14 +121,14 @@ namespace Meta
     template<std::size_t N> using MetaProperties = MetaContainer<Meta::Property, N>;
 	template<std::size_t N> using MetaMethods = MetaContainer<Meta::Method, N>;
 
-    // --- Reflect() Á¸Àç ¿©ºÎ concept ---
+    // --- Reflect() ì¡´ì¬ ì—¬ë¶€ concept ---
     template<typename T>
     concept HasReflect = requires
     {
         { T::Reflect() } -> std::same_as<const Type&>;
     };
 
-    // --- Registry: Àü¿ª Å¸ÀÔ µî·Ï¼Ò ---
+    // --- Registry: ì „ì—­ íƒ€ì… ë“±ë¡ì†Œ ---
     class Registry : public Singleton<Registry>
     {
     public:
@@ -247,7 +247,7 @@ namespace Meta
         return MakeMethodImpl(name, method, std::index_sequence_for<Args...>{});
     }
 
-    // --- Invoke ¸Ş¼­µå by ÀÌ¸§ ---
+    // --- Invoke ë©”ì„œë“œ by ì´ë¦„ ---
     inline bool InvokeMethodByMetaName(void* instance, const Type& type, const std::string& methodName, const std::vector<std::any>& args, std::any* outResult = nullptr)
     {
         for (const auto& method : type.methods)
@@ -264,7 +264,7 @@ namespace Meta
 
     inline void DrawObject(void* instance, const Type& type);
 
-    // --- ImGui ·»´õ¸µ ---
+    // --- ImGui ë Œë”ë§ ---
     inline void DrawProperties(void* instance, const Type& type) 
     {
         for (const auto& prop : type.properties) 
@@ -373,7 +373,7 @@ namespace Meta
 				{
 					prop.setter(instance, value);
 				}
-			} // ´Ù¸¥ Å¸ÀÔ Ãß°¡ °¡´É
+			} // ë‹¤ë¥¸ íƒ€ì… ì¶”ê°€ ê°€ëŠ¥
 			else if (prop.isPointer)
             {
                 void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, prop.getter(instance));
@@ -405,7 +405,7 @@ namespace Meta
 				ImGui::PushID(prop.name);
 				ImGui::Text("%s:", prop.name);
                 auto temp = prop.getter(instance);
-                void* subInstance = &temp;  // °ª Å¸ÀÔÀÇ ÁÖ¼Ò
+                void* subInstance = &temp;  // ê°’ íƒ€ì…ì˜ ì£¼ì†Œ
                 if (const Meta::Type* subType = MetaDataRegistry->Find(prop.typeName)) 
                 {
                     DrawObject(subInstance, *subType);
@@ -419,15 +419,17 @@ namespace Meta
     {
         for (const auto& method : type.methods) 
         {
+            ImGui::Text("Function: ");
+            ImGui::SameLine();
             if (ImGui::Button(method.name)) 
             {
                 try 
                 {
-                    method.invoker(instance, {}); // ÀÎÀÚ ¾ø´Â ÇÔ¼ö¸¸ Áö¿ø
+                    method.invoker(instance, {}); // ì¸ì ì—†ëŠ” í•¨ìˆ˜ë§Œ ì§€ì›
                 }
                 catch (const std::exception& e) 
                 {
-                    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Error: %s", e.what());
+                    Debug->LogError(e.what());
                 }
             }
         }

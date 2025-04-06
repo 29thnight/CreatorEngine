@@ -306,7 +306,7 @@ void ModelLoader::LoadModelFromAsset()
 	file.open(filepath, std::ios::in | std::ios::binary);
 	if (file.is_open())
 	{
-		uint32 size;
+        uint32 size{};
 		file.read(reinterpret_cast<char*>(&size), sizeof(uint32));
 		m_model->m_nodes.resize(size);
 		LoadNodes(file, size);

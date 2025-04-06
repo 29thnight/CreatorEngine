@@ -133,3 +133,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::ClearDepthStencilView(m_shadowMapDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	DirectX11::UnbindRenderTargets();
 }
+
+void ShadowMapPass::ControlPanel()
+{
+    ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(512, 512));
+}
