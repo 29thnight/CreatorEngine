@@ -7,6 +7,7 @@
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
 #include "DataSystem.h"
+#include "RenderState.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -628,31 +629,33 @@ void SceneRenderer::SceneRendering()
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-			//Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
+			RenderStatistics->UpdateRenderState("ShadowMapPass", banch.GetElapsedTime());
 		}
 
 		if(!useTestLightmap)
         {
 			//[2] GBufferPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pGBufferPass->Execute(*m_renderScene, *camera);
-
+				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 			}
 
 			//[3] SSAOPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pSSAOPass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 			}
 
 			//[4] DeferredPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				//Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
 			}
 		}
@@ -664,70 +667,75 @@ void SceneRenderer::SceneRendering()
 		//[*] WireFramePass
 		if (useWireFrame)
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
 			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[5] skyBoxPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] PostProcessPass
 		{
+			Banchmark banch;
 			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
 		}
 
 		//[6] AAPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[7] ToneMapPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
 			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] GridPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pGridPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
 			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[7] SpritePass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pSpritePass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[]  UIPass
 		{
+			Banchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
 		}
 
 		//[8] BlitPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 
-	//Debug->Log("Draw Call Count : " + std::to_string(DirectX11::GetDrawCallCount()));
 	m_pGBufferPass->ClearDeferredQueue();
 }
 
