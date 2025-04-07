@@ -16,12 +16,11 @@ jobs:
       - name: Update version file
         run: echo "${{ github.sha }}" > version.txt
 
-      - name: Commit and push changes
-        env:
-          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Repository secrets에 저장한 PAT 이름입니다.
-        run: |
-          git config user.name "29thnight"
-          git config user.email "ideneb@naver.com"
-          git add version.txt
-          git commit -m "Update version file [skip ci]" || echo "No changes to commit"
-          git push https://29thnight:${PAT}@github.com/29thnight/LastProject.git HEAD:master
+    - name: Update version file
+      run: |
+        echo "v1.0.1" > version.txt
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add version.txt
+        git commit -m "Update version file [skip ci]"
+        git push
