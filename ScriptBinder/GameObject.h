@@ -13,6 +13,7 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
+class LightComponent;
 class GameObject : public IObject
 {
 public:
@@ -46,6 +47,12 @@ public:
 		}
 
 		T* component = new T();
+        if(typeid(T) == typeid(LightComponent) && m_pScene)
+        {
+            LightComponent* lightComponent = static_cast<LightComponent*>(component);
+            lightComponent->m_lightIndex = m_pScene->AddLightCount();
+        }
+
 		m_components.push_back(component);
 		component->SetOwner(this);
 		m_componentIds[component->GetTypeID()] = m_components.size();
@@ -146,6 +153,7 @@ private:
 	friend class RenderScene;
 	friend class ModelLoader;
 	friend class HotLoadSystem;
+    friend class LightComponent;
 
 	void ComponentsSort()
 	{

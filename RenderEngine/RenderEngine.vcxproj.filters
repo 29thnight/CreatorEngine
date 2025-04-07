@@ -149,12 +149,6 @@
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="FontManager.cpp">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="UI_DataSystem.cpp">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
     <ClCompile Include="AssetSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -286,12 +280,6 @@
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="FontManager.h">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="UI_DataSystem.h">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
     <ClInclude Include="AssetSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
@@ -372,9 +360,6 @@
     </ClInclude>
     <ClInclude Include="cbuffers.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
-    </ClInclude>
-    <ClInclude Include="LightProperty.h">
-      <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="LightMap.h">
       <Filter>LightMap\Calculate</Filter>

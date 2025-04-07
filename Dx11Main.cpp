@@ -43,37 +43,35 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-	if (m_isLoading || m_isChangeScene)
-	{
-		std::wostringstream woss;
-		woss.precision(6);
-		woss << L"Creator Editor - "
-			<< L"Width: "
-			<< m_deviceResources->GetOutputSize().width
-			<< L" Height: "
-			<< m_deviceResources->GetOutputSize().height
-			<< L" FPS: "
-			<< m_timeSystem.GetFramesPerSecond()
-			<< L" FrameCount: "
-			<< m_timeSystem.GetFrameCount();
+    m_timeSystem.Tick([&]
+    {
+        std::wostringstream woss;
+        woss.precision(6);
+        woss << L"Creator Editor - "
+            << L"Width: "
+            << m_deviceResources->GetOutputSize().width
+            << L" Height: "
+            << m_deviceResources->GetOutputSize().height
+            << L" FPS: "
+            << m_timeSystem.GetFramesPerSecond()
+            << L" FrameCount: "
+            << m_timeSystem.GetFrameCount();
 
-		SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
+        SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
+        InputManagement->Update(m_timeSystem.GetElapsedSeconds());
+        Sound->update();
+    });
 
-		m_timeSystem.Tick([&]
-		{
-			Sound->update();
-		});
+    if(m_isGameStart)
+    {
+        //GameUpdate
+        m_timeSystem.Tick([&]
+        {
+                //Sound->update();
 
-		return;
-	}
-
-	//GameUpdate
-	m_timeSystem.Tick([&]
-	{
-		Sound->update();
-		InputManagement->Update(m_timeSystem.GetElapsedSeconds());
-		//InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
-	});
+                //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
+        });
+    }
 
 	if (InputManagement->IsKeyReleased(VK_F5))
 	{
@@ -112,18 +110,23 @@ bool DirectX11::Dx11Main::Render()
 	}
 
 #if defined(EDITOR)
-	if(!m_isGameView)
-	{
-		m_imguiRenderer->BeginRender();
-		m_sceneRenderer->EditorView();
-		m_imguiRenderer->Render();
-		m_imguiRenderer->EndRender();
-	}
+    OnGui();
 #endif // !EDITOR
 
 	Debug->Flush();
 
 	return true;
+}
+
+void DirectX11::Dx11Main::OnGui()
+{
+    if (!m_isGameView)
+    {
+        m_imguiRenderer->BeginRender();
+        m_sceneRenderer->EditorView();
+        m_imguiRenderer->Render();
+        m_imguiRenderer->EndRender();
+    }
 }
 
 // 릴리스가 필요한 디바이스 리소스를 렌더러에 알립니다.

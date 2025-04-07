@@ -158,8 +158,10 @@
     <ClInclude Include="ILifeSycle.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IRenderable.h" />
+    <ClInclude Include="IUpdatable.h" />
     <ClInclude Include="JobManager.h" />
     <ClInclude Include="LightComponent.h" />
+    <ClInclude Include="LightProperty.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />

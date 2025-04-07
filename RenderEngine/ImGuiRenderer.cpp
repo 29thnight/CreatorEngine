@@ -138,8 +138,8 @@ void ImGuiRenderer::BeginRender()
 
         ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
         ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
-        ImGui::DockBuilderDockWindow("GameObject Hierarchy", dock2);
-        ImGui::DockBuilderDockWindow("GameObject Inspector", dock3);
+        ImGui::DockBuilderDockWindow("Hierarchy", dock2);
+        ImGui::DockBuilderDockWindow("Inspector", dock3);
         ImGui::DockBuilderFinish(id);
     }
 

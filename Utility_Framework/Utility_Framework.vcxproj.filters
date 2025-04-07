@@ -174,6 +174,15 @@
     <ClInclude Include="RingBuffer.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>
+    <ClInclude Include="..\framework.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Resource.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="..\targetver.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -196,5 +205,18 @@
     <None Include="MemoryPool.inl">
       <Filter>Core.Memory\MemoryPool</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\Academy_4Q.rc">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\Academy_4Q.ico">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </Image>
+    <Image Include="..\small.ico">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -430,7 +430,8 @@ void SceneRenderer::InitializeImGui()
     ImGui::ContextRegister("Light", true, [&]()
     {
         ImGui::Text("Light Index : %d", lightIndex);
-        if (ImGui::Button("Add Light")) {
+        if (ImGui::Button("Add Light"))
+        {
             Light light;
             light.m_color = XMFLOAT4(1, 1, 1, 1);
             light.m_position = XMFLOAT4(0, 0, 0, 0);
@@ -438,21 +439,26 @@ void SceneRenderer::InitializeImGui()
 
             m_renderScene->m_LightController->AddLight(light);
         }
-        if (ImGui::Button("Light index + ")) {
+        if (ImGui::Button("Light index + "))
+        {
             lightIndex++;
             if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
         }
-        if (ImGui::Button("Light index - ")) {
+        if (ImGui::Button("Light index - "))
+        {
             lightIndex--;
             if (lightIndex < 0) lightIndex = 0;
         }
-        if (ImGui::Button("Light On")) {
+        if (ImGui::Button("Light On"))
+        {
 			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
         }
-        if (ImGui::Button("StaticShadow On")) {
+        if (ImGui::Button("StaticShadow On"))
+        {
 			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::StaticShadows;
         }
-        if (ImGui::Button("Light Off")) {
+        if (ImGui::Button("Light Off"))
+        {
 			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
         }
 
@@ -746,7 +752,6 @@ void SceneRenderer::PrepareRender()
 		{
 		case Material::RenderingMode::Opaque:
 			m_pGBufferPass->PushDeferredQueue(obj.get());
-
 			break;
 		case Material::RenderingMode::Transparent:
 			break;
@@ -844,11 +849,6 @@ void SceneRenderer::EditorView()
 							for(int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
 								ImGui::Image((ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pSRV,
 									ImVec2(512, 512));
-
-							/*for (auto& [name, tex] : m_pPositionMapPass->m_positionMapTextures)
-							{
-								ImGui::Image((ImTextureID)tex->m_pSRV, ImVec2(512, 512));
-							}*/
 						});
 					}
 				}

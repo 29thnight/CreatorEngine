@@ -1,5 +1,6 @@
 #pragma once
 #include "GameObject.h"
+#include "LightProperty.h"
 
 class RenderScene;
 struct ICollider;
@@ -47,7 +48,35 @@ public:
 		return allocScene;
 	}
 
+public:
+    void UpdateLight(LightProperties& lightProperties) const
+    {
+        lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
+        lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
+        for (int i = 0; i < MAX_LIGHTS; ++i)
+        {
+            lightProperties.m_lights[i] = m_lightProperties.m_lights[i];
+        }
+    }
+
+    int AddLightCount()
+    {
+        if (m_lightCount >= MAX_LIGHTS)
+        {
+            m_lightCount = MAX_LIGHTS;
+        }
+
+        return m_lightCount++;
+    }
+
+    LightProperties& GetLightProperties()
+    {
+        return m_lightProperties;
+    }
+
 private:
+    LightProperties m_lightProperties;
 	HashingString m_sceneName;
+    int m_lightCount = 0;
 	bool m_isPlaying = false;
 };

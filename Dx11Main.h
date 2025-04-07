@@ -20,6 +20,7 @@ namespace DirectX11
 		void CreateWindowSizeDependentResources();
 		void Update();
 		bool Render();
+        void OnGui();
 		void SceneFinalize();
 
 		// IDeviceNotify
@@ -36,6 +37,7 @@ namespace DirectX11
 
 		//std::unique_ptr<Scene> m_scene;
 		//BT_Editor m_btEditor;
+        bool m_isGameStart = false;
 		bool m_isGameView = false;
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;

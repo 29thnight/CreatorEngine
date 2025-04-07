@@ -154,6 +154,41 @@ namespace Meta
 
     static inline auto& MetaDataRegistry = Registry::GetInstance();
 
+    struct EnumValue {
+        const char* name;
+        int value;
+    };
+
+    struct EnumType {
+        const char* name;
+        std::span<const EnumValue> values;
+    };
+
+    class EnumRegistry : public Singleton<EnumRegistry>
+    {
+    public:
+        friend Singleton;
+
+        void Register(const std::string& name, const EnumType& enumType)
+        {
+            if (enumMap.find(name) == enumMap.end())
+            {
+                enumMap[name] = enumType;
+            }
+        }
+
+        const EnumType* Find(const std::string& name)
+        {
+            auto it = enumMap.find(name);
+            return it != enumMap.end() ? &it->second : nullptr;
+        }
+
+    private:
+        std::unordered_map<std::string, EnumType> enumMap;
+    };
+
+    static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
+
     template<typename T> requires HasReflect<T>
     static inline void Register()
     {
@@ -374,6 +409,26 @@ namespace Meta
 					prop.setter(instance, value);
 				}
 			} // 다른 타입 추가 가능
+            else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
+            {
+                // 현재 enum 값을 정수로 얻어옵니다.
+                int value = std::any_cast<int>(prop.getter(instance));
+                // enum의 모든 이름을 배열에 저장합니다.
+                std::vector<const char*> items;
+                int current_index = 0;
+                for (size_t i = 0; i < enumType->values.size(); i++)
+                {
+                    items.push_back(enumType->values[i].name);
+                    if (enumType->values[i].value == value)
+                        current_index = static_cast<int>(i);
+                }
+                // 콤보 박스로 enum 값을 선택할 수 있도록 합니다.
+                if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
+                {
+                    // 선택된 인덱스에 해당하는 enum 값으로 업데이트합니다.
+                    prop.setter(instance, enumType->values[current_index].value);
+                }
+            }
 			else if (prop.isPointer)
             {
                 void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, prop.getter(instance));
@@ -475,5 +530,17 @@ constexpr uint32_t MethodOnly = 2;
     else if constexpr (ret_option == MethodOnly) \
     { \
         static const Meta::Type type{ #T, {}, methods }; \
+        return type; \
+    }
+
+#define meta_enum(EnumTypeName, ...) \
+    static Meta::EnumType CreateEnumType_##EnumTypeName() { \
+        static constexpr Meta::EnumValue values[] = { __VA_ARGS__ }; \
+        static const Meta::EnumType enumType{ #EnumTypeName, std::span(values) }; \
+        return enumType; \
+    } \
+    static inline const Meta::EnumType& ReflectEnum_##EnumTypeName() { \
+        static const Meta::EnumType type = CreateEnumType_##EnumTypeName(); \
+        Meta::MetaEnumRegistry->Register(#EnumTypeName, type); \
         return type; \
     }

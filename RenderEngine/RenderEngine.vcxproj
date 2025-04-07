@@ -196,7 +196,6 @@
     <ClInclude Include="cbuffers.h" />
     <ClInclude Include="LightMapPass.h" />
     <ClInclude Include="LightmapShadowPass.h" />
-    <ClInclude Include="LightProperty.h" />
     <ClInclude Include="NormalMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="Text.h" />

@@ -4,8 +4,9 @@
 #include <unordered_map>
 #include <directxtk/Keyboard.h>
 #include <imgui_internal.h>
-#include <shellapi.h> // Ãß°¡
+#include <shellapi.h> // ì¶”ê°€
 #include "DumpHandler.h"
+#include "../Resource.h"
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -125,6 +126,7 @@ private:
         wc.lpfnWndProc = CoreWindow::WndProc;
         wc.hInstance = m_hInstance;
         wc.lpszClassName = L"CoreWindowApp";
+        wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));      // í° ì•„ì´ì½˜
 
         RegisterClass(&wc);
     }
@@ -136,12 +138,12 @@ private:
         int x = (rect.right - rect.left - m_width) / 2;
         int y = (rect.bottom - rect.top - m_height) / 2;
 
-        // Á¦¸ñ Ç¥½ÃÁÙ ³ôÀÌ °¡Á®¿À±â
-        int titleBarHeight = GetSystemMetrics(SM_CYCAPTION); // Á¦¸ñ Ç¥½ÃÁÙ ³ôÀÌ
-        int borderHeight = GetSystemMetrics(SM_CYFRAME);     // »ó´Ü ÇÁ·¹ÀÓ ³ôÀÌ
-        int borderWidth = GetSystemMetrics(SM_CXFRAME);      // ÁÂ¿ì ÇÁ·¹ÀÓ ³Êºñ
+        // ì œëª© í‘œì‹œì¤„ ë†’ì´ ê°€ì ¸ì˜¤ê¸°
+        int titleBarHeight = GetSystemMetrics(SM_CYCAPTION); // ì œëª© í‘œì‹œì¤„ ë†’ì´
+        int borderHeight = GetSystemMetrics(SM_CYFRAME);     // ìƒë‹¨ í”„ë ˆì„ ë†’ì´
+        int borderWidth = GetSystemMetrics(SM_CXFRAME);      // ì¢Œìš° í”„ë ˆì„ ë„ˆë¹„
 
-        // Å¬¶óÀÌ¾ğÆ® ¿µ¿ª Á¶Á¤
+        // í´ë¼ì´ì–¸íŠ¸ ì˜ì—­ ì¡°ì •
         rect = { 0, 0, m_width, m_height };
         AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 

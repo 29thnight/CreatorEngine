@@ -19,9 +19,6 @@
     <Filter Include="Classes\Resources">
       <UniqueIdentifier>{f51a4962-46e7-4e5a-ab83-bc10bfdfed21}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Resources\Manager">
-      <UniqueIdentifier>{2fb102d8-0475-490d-82b5-9e988cd0f76f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Scene">
       <UniqueIdentifier>{54eeda4d-ca2e-4bcc-86f3-7f8d04db689f}</UniqueIdentifier>
     </Filter>
@@ -30,6 +27,12 @@
     </Filter>
     <Filter Include="Classes\HotLoadSystem">
       <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Camera">
+      <UniqueIdentifier>{570dd58d-4c44-448c-a051-1a1a5689f7c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Light">
+      <UniqueIdentifier>{044c4c77-9762-42ae-9e91-6e8e20d089b0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -88,6 +91,12 @@
     </ClInclude>
     <ClInclude Include="HotLoadSystem.h">
       <Filter>Classes\HotLoadSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="LightProperty.h">
+      <Filter>Classes\Resources\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="IUpdatable.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

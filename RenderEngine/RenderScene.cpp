@@ -112,7 +112,7 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 
 void RenderScene::EditorSceneObjectHierarchy()
 {
-	ImGui::ContextRegister("GameObject Hierarchy", [&]()
+	ImGui::ContextRegister("Hierarchy", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
@@ -136,7 +136,7 @@ void RenderScene::EditorSceneObjectHierarchy()
 
 void RenderScene::EditorSceneObjectInspector()
 {
-	ImGui::ContextRegister("GameObject Inspector", [&]()
+	ImGui::ContextRegister("Inspector", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
