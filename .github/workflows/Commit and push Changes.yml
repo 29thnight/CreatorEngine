@@ -1,0 +1,27 @@
+name: Update version file
+
+on:
+  push:
+    branches:
+      - master  # 기본 브랜치가 master가 아니라면 해당 브랜치명으로 변경하세요.
+
+jobs:
+  update_version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Update version file
+        run: echo "${{ github.sha }}" > version.txt
+
+      - name: Commit and push changes
+        env:
+          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Repository secrets에 저장한 PAT 이름입니다.
+        run: |
+          git config user.name "29thnight"
+          git config user.email "ideneb@naver.com"
+          git add version.txt
+          git commit -m "Update version file [skip ci]" || echo "No changes to commit"
+          git push https://29thnight:${PAT}@github.com/29thnight/LastProject.git HEAD:master
