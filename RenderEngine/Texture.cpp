@@ -52,6 +52,31 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name
 	return new Texture(texture, name);
 }
 
+
+Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_view& name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 arrsize, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		width,
+		height,
+		1,
+		1,
+		bindFlags,
+		D3D11_USAGE_DEFAULT
+	};
+	textureDesc.ArraySize = arrsize;
+
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+
+	return new Texture(texture, name);
+}
+
 Texture* Texture::LoadFormPath(_In_ const file::path& path)
 {
 	if (!file::exists(path))
