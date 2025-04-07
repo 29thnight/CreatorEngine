@@ -5,7 +5,24 @@
 
 class Texture;
 class Scene;
-class RenderScene;
+class LightController;
+
+constexpr int cascadeCount = 3;
+
+struct ShadowInfo
+{
+	Mathf::xVector m_eyePosition{};
+	Mathf::xVector m_lookAt{};
+	float m_nearPlane{};
+	float m_farPlane{};
+	float m_viewWidth{};
+	float m_viewHeight{};
+	Mathf::xMatrix m_lightViewProjection{};
+};
+
+//cascade마다 값 나눠주기
+std::vector<float>      devideCascadeEnd(Camera& camera, std::vector<float> ratios);
+std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir);
 
 class ShadowMapPass final : public IRenderPass
 {
@@ -15,9 +32,22 @@ public:
 
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;
-    void ControlPanel() override;
-
+	void ControlPanel() override;
 	Camera m_shadowCamera{};
+
 	std::unique_ptr<Texture> m_shadowMapTexture{};
 	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
+	std::unique_ptr<Texture> m_shadowMapTexture2{};
+
+
+	ComPtr<ID3D11Buffer> m_shadowBuffer;
+	D3D11_VIEWPORT shadowViewport;
+	ID3D11Texture2D* shadowMapArray = nullptr; //나중에 지우기
+	ID3D11ShaderResourceView* shadowMapSRV = nullptr;
+
+	//메인 라이트 3, 
+	ID3D11DepthStencilView* m_shadowMapDSVarr[cascadeCount]{};
+
+
 };
+

@@ -22,7 +22,7 @@ class Camera
 public:
 	Camera();
 	~Camera();
-	Mathf::xMatrix CalculateProjection();
+	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
 	Mathf::Vector4 RayCast(Mathf::Vector2 screenPosition);
 	Mathf::xMatrix CalculateView() const;
@@ -33,7 +33,7 @@ public:
 
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
-	void UpdateBuffer();
+	void UpdateBuffer(bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
 	void ClearRenderTarget();
 
@@ -52,7 +52,7 @@ public:
 	float m_yaw{ 0.f };
 	float m_roll{ 0.f };
 	float m_nearPlane{ 0.1f };
-	float m_farPlane{ 10000.f };
+	float m_farPlane{ 500.f };
 	float m_speed{ 10.f };
 
 	float m_aspectRatio{};

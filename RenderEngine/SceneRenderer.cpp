@@ -543,14 +543,14 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
 		ShadowMapRenderDesc desc;
-		desc.m_eyePosition = XMLoadFloat4(&(m_renderScene->m_LightController->GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-		desc.m_viewWidth = 16;
-		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 1.f;
-		desc.m_farPlane = 20.f;
-		desc.m_textureWidth = 1920;
-		desc.m_textureHeight = 1080;
+		desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
+		desc.m_viewWidth = 100;
+		desc.m_viewHeight = 100;
+		desc.m_nearPlane = 0.1f;
+		desc.m_farPlane = 1000.0f;
+		desc.m_textureWidth = 1024;
+		desc.m_textureHeight = 1024;
 
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
