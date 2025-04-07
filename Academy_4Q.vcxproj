@@ -150,6 +150,7 @@
     <ClInclude Include="BT_Editor.h" />
     <ClInclude Include="CustomWindowDefine.h" />
     <ClInclude Include="Dx11Main.h" />
+    <ClInclude Include="EngineSetting.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="KeyState.h" />

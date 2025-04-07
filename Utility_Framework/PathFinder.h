@@ -8,6 +8,7 @@ namespace InternalPath
 {
     inline file::path ExecuteablePath{};
     inline file::path DataPath{};
+	inline file::path IconPath{};
     inline file::path ShaderSourcePath{};
 	inline std::string VS2022Path{ "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\"" };
     inline file::path DynamicSolutionDir{};
@@ -26,6 +27,7 @@ namespace InternalPath
         DataPath = file::path(base).append("..\\Assets\\").lexically_normal();
         ShaderSourcePath = file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
 		DynamicSolutionDir = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+		IconPath = file::path(base).append("..\\Icons\\").lexically_normal();
     }
 };
 
@@ -36,6 +38,11 @@ public:
     {
         InternalPath::Initialize();
     }
+
+	static inline file::path Relative()
+	{
+		return InternalPath::DataPath;
+	}
 
     static inline file::path Relative(const std::string_view& path)
     {
@@ -51,6 +58,11 @@ public:
     {
         return InternalPath::ShaderSourcePath;
     }
+
+	static inline file::path IconPath()
+	{
+		return InternalPath::IconPath;
+	}
 
 	static inline std::string VS2022Path()
 	{

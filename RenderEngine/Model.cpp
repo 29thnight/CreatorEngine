@@ -61,8 +61,6 @@ Model* Model::LoadModel(const std::string_view& filePath)
 		ModelLoader loader = ModelLoader(assimpScene, path_.string());
 		model = loader.LoadModel();
 		model->path = path_;
-
-		std::cout << "LoadModel : " << banch.GetElapsedTime() << std::endl;
 	}
 
 	return model;
@@ -79,7 +77,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	{
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
-	std::cout << "LoadModelToScene : " << banch.GetElapsedTime() << std::endl;
 
 	return model;
 }

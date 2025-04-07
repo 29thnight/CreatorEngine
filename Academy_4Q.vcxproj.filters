@@ -80,6 +80,9 @@
     <ClInclude Include="SceneManager.h">
       <Filter>Manager\SceneManager</Filter>
     </ClInclude>
+    <ClInclude Include="EngineSetting.h">
+      <Filter>Window</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">

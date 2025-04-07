@@ -191,12 +191,12 @@ void Camera::HandleMovement(float deltaTime)
 		rotate = m_rotationQuat;
 	}
 
-	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-	{
-		m_rayDirection = RayCast(InputManagement->GetMousePos());
-		//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
-		//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
-	}
+	//if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
+	//{
+	//	m_rayDirection = RayCast(InputManagement->GetMousePos());
+	//	//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
+	//	//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
+	//}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
 	m_lookAt = m_eyePosition + m_forward;

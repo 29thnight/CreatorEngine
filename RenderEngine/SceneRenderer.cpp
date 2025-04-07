@@ -1,13 +1,12 @@
 #include "SceneRenderer.h"
-#include "SceneRenderer.h"
 #include "DeviceState.h"
 #include "AssetSystem.h"
-#include "Scene.h"
 #include "ImGuiRegister.h"
 #include "Banchmark.hpp"
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
+#include "DataSystem.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -558,7 +557,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		model = Model::LoadModel("bangbooExport.fbx");
+		model = Model::LoadModel("DamagedHelmet.gltf");
 
 		ImGui::ContextRegister("Test UI", true, [&]()
 		{
@@ -858,11 +857,23 @@ void SceneRenderer::EditorView()
         }
         ImGui::End();
     }
-
+	static bool m_bShowContentsBrowser = false;
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-			ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer");
+			if (ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer"))
+			{
+				m_bShowContentsBrowser = !m_bShowContentsBrowser;
+			}
+
+			if (m_bShowContentsBrowser)
+			{
+				DataSystems->OpenContentsBrowser();
+			}
+			else
+			{
+				DataSystems->CloseContentsBrowser();
+			}
 
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_CODE " Output Log "))

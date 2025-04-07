@@ -8,6 +8,7 @@
 #include "Utility_Framework/ImGuiLogger.h"
 #include "Utility_Framework/TimeSystem.h"
 #include "ScriptBinder/HotLoadSystem.h"
+#include "RenderEngine/DataSystem.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -15,11 +16,13 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
+	m_sceneRenderer->Initialize();
 
 	Sound->initialize((int)ChannelType::MaxChannel);
-	ScriptManager->Initialize();
-	m_sceneRenderer->Initialize();
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+
+	ScriptManager->Initialize();
+	DataSystems->Initialize();
 
 	SceneInitialize();
 }

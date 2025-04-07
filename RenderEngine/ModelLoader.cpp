@@ -481,7 +481,7 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 		aiString str;
 		material->GetTexture(type, index, &str);
 		std::string textureName = str.C_Str();
-		textureName = m_directory + textureName;
+		//textureName = textureName;
 		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
 		LPCWSTR path = stemp.c_str();
 		auto it = DataSystems->Textures.find(textureName);

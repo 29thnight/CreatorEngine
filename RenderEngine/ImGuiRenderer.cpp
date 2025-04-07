@@ -34,7 +34,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     //ImGui::StyleColorsLight();
 	ImGuiStyle* style = &ImGui::GetStyle();
 
-	style->WindowPadding = ImVec2(15, 15);
+	style->WindowPadding = ImVec2(5, 5);
 	style->WindowRounding = 5.0f;
 	style->WindowBorderSize = 0.01f;
 	style->FramePadding = ImVec2(5, 5);
