@@ -44,8 +44,14 @@ Camera::~Camera()
 	}
 }
 
-Mathf::xMatrix Camera::CalculateProjection()
+Mathf::xMatrix Camera::CalculateProjection(bool shadow)
 {
+
+	if (shadow)
+	{
+		return XMMatrixOrthographicOffCenterLH(-m_viewWidth, m_viewWidth, -m_viewHeight, m_viewHeight, m_nearPlane, m_farPlane);
+	}
+
 	if (m_isOrthographic)
 	{
 		return XMMatrixOrthographicLH(m_viewWidth, m_viewHeight, m_nearPlane, m_farPlane);
@@ -191,21 +197,21 @@ void Camera::HandleMovement(float deltaTime)
 		rotate = m_rotationQuat;
 	}
 
-	if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-	{
-		m_rayDirection = RayCast(InputManagement->GetMousePos());
-		//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
-		//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
-	}
+	//if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
+	//{
+	//	m_rayDirection = RayCast(InputManagement->GetMousePos());
+	//	//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
+	//	//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
+	//}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
 	m_lookAt = m_eyePosition + m_forward;
 }
 
-void Camera::UpdateBuffer()
+void Camera::UpdateBuffer(bool shadow)
 {
 	Mathf::xMatrix view = CalculateView();
-	Mathf::xMatrix proj = CalculateProjection();
+	Mathf::xMatrix proj = CalculateProjection(shadow);
 	DirectX11::UpdateBuffer(m_ViewBuffer.Get(), &view);
 	DirectX11::UpdateBuffer(m_ProjBuffer.Get(), &proj);
 

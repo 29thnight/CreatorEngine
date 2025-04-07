@@ -39,6 +39,9 @@
     <Filter Include="Manager\SceneManager">
       <UniqueIdentifier>{71d7d567-fc27-47eb-b586-4b5b6515eb60}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Settings">
+      <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -65,9 +68,6 @@
     <ClInclude Include="BT_Editor.h">
       <Filter>Utill\BT</Filter>
     </ClInclude>
-    <ClInclude Include="ProjectSetting.h">
-      <Filter>Window</Filter>
-    </ClInclude>
     <ClInclude Include="CustomWindowDefine.h">
       <Filter>Window</Filter>
     </ClInclude>
@@ -79,6 +79,15 @@
     </ClInclude>
     <ClInclude Include="SceneManager.h">
       <Filter>Manager\SceneManager</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectSetting.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineSetting.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineVersion.h">
+      <Filter>Settings</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

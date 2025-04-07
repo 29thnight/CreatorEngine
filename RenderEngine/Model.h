@@ -20,9 +20,12 @@ public:
     static Model* LoadModelToScene(Model* model, Scene& Scene);
     static Model* LoadModel(const std::string_view& filePath);
 
+    void GenerateFileID();
+
 public:
     std::string	name{};
     file::path	path{};
+    HashingString m_fileID{};
 
 	Animator*   m_animator{};
     Skeleton*   m_Skeleton{};

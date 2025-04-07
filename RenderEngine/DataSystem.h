@@ -9,6 +9,35 @@
 // Main system for storing runtime data
 class DataSystem : public Singleton<DataSystem>
 {
+public:
+	enum class FileType
+	{
+		Unknown,
+		Model,
+		Texture,
+		Shader,
+		CppScript,
+		CSharpScript,
+		Sound,
+	};
+	//일단 이대로 진행
+	enum class AssetType
+	{
+		Model,
+		Material,
+		Skeleton,
+	};
+
+	std::unordered_map<FileType, std::string> FileTypeString =
+	{
+		{ FileType::Model, "Model" },
+		{ FileType::Texture, "Texture" },
+		{ FileType::Shader, "Shader" },
+		{ FileType::CppScript, "CppScript" },
+		{ FileType::CSharpScript, "CSharpScript" },
+		{ FileType::Sound, "Sound" }
+	};
+
 private:
     friend class Singleton;
 
@@ -20,8 +49,15 @@ public:
 	void MonitorFiles();
 	void LoadModels();
 	void LoadModel(const std::string_view& filePath);
+	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
 	void LoadMaterials();
+
+	void OpenContentsBrowser();
+	void CloseContentsBrowser();
+	void ShowDirectoryTree(const file::path& directory);
+	void ShowCurrentDirectoryFiles();
+	void DrawFileTile(ImTextureID iconTexture, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
 
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
@@ -33,7 +69,15 @@ private:
 
 private:
 	//--------- Icon for ImGui
-	Texture* icon{};
+	Texture* TextureIcon{};
+	Texture* ModelIcon{};
+	Texture* AssetsIcon{};
+	Texture* FolderIcon{};
+	Texture* UnknownIcon{};
+	Texture* ShaderIcon{};
+	Texture* CodeIcon{};
+	ImFont* smallFont{};
+	ImFont* extraSmallFont{};
 	//--------- current file count
 	uint32 currModelFileCount = 0;
 	uint32 currShaderFileCount = 0;
@@ -42,6 +86,8 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
+
+	file::path currentDirectory{};
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();

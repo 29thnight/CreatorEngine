@@ -4,6 +4,7 @@
 #include "Utility_Framework/DumpHandler.h"
 #include "Utility_Framework/CoreWindow.h"
 #include "CustomWindowDefine.h"
+#include "RenderEngine/DataSystem.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -154,6 +155,10 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			DragQueryFile(hDrop, i, fileName.data(), MAX_PATH);
 			file::path filePath(fileName.data());
 			// 파일 경로 처리
+			if(".fbx" == filePath.extension() || ".gltf" == filePath.extension() ||	".obj" == filePath.extension())
+			{
+				DataSystems->LoadModel(filePath.string());
+			}
 		}
 	}
 

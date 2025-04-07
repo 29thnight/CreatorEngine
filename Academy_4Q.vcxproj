@@ -120,6 +120,10 @@
       <AdditionalLibraryDirectories>$(SolutionDir)Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #pragma once &gt; EngineVersion.h
+for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineVersion.h</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -143,6 +147,10 @@
       <AdditionalLibraryDirectories>$(SolutionDir)Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
     </Link>
+    <PreBuildEvent>
+      <Command>echo #pragma once &gt; EngineVersion.h
+for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&gt; EngineVersion.h</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
@@ -150,6 +158,8 @@
     <ClInclude Include="BT_Editor.h" />
     <ClInclude Include="CustomWindowDefine.h" />
     <ClInclude Include="Dx11Main.h" />
+    <ClInclude Include="EngineSetting.h" />
+    <ClInclude Include="EngineVersion.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="KeyState.h" />

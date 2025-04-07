@@ -198,6 +198,7 @@
     <ClInclude Include="LightmapShadowPass.h" />
     <ClInclude Include="NormalMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
+    <ClInclude Include="RenderState.h" />
     <ClInclude Include="Text.h" />
     <ClInclude Include="UIsprite.h" />
     <ClInclude Include="UIPass.h" />

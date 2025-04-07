@@ -1,13 +1,13 @@
 #include "SceneRenderer.h"
-#include "SceneRenderer.h"
 #include "DeviceState.h"
 #include "AssetSystem.h"
-#include "Scene.h"
 #include "ImGuiRegister.h"
 #include "Banchmark.hpp"
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
+#include "DataSystem.h"
+#include "RenderState.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -550,21 +550,21 @@ void SceneRenderer::Initialize(Scene* _pScene)
 			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
 		ShadowMapRenderDesc desc;
-		desc.m_eyePosition = XMLoadFloat4(&(m_renderScene->m_LightController->GetLight(0).m_direction)) * -5.f;
 		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-		desc.m_viewWidth = 16;
-		desc.m_viewHeight = 12;
-		desc.m_nearPlane = 1.f;
-		desc.m_farPlane = 20.f;
-		desc.m_textureWidth = 1920;
-		desc.m_textureHeight = 1080;
+		desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
+		desc.m_viewWidth = 100;
+		desc.m_viewHeight = 100;
+		desc.m_nearPlane = 0.1f;
+		desc.m_farPlane = 1000.0f;
+		desc.m_textureWidth = 1024;
+		desc.m_textureHeight = 1024;
 
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
 		model = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		model = Model::LoadModel("bangbooExport.fbx");
+		model = Model::LoadModel("DamagedHelmet.gltf");
 
 		ImGui::ContextRegister("Test UI", true, [&]()
 		{
@@ -635,31 +635,33 @@ void SceneRenderer::SceneRendering()
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
-			//Debug->Log("ShadowMapPass : " + std::to_string(banch.GetElapsedTime()));
+			RenderStatistics->UpdateRenderState("ShadowMapPass", banch.GetElapsedTime());
 		}
 
 		if(!useTestLightmap)
         {
 			//[2] GBufferPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pGBufferPass->Execute(*m_renderScene, *camera);
-
+				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 			}
 
 			//[3] SSAOPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pSSAOPass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
 			}
 
 			//[4] DeferredPass
 			{
-				//Banchmark banch;
+				Banchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				//Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
 			}
 		}
@@ -671,70 +673,75 @@ void SceneRenderer::SceneRendering()
 		//[*] WireFramePass
 		if (useWireFrame)
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
 			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[5] skyBoxPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] PostProcessPass
 		{
+			Banchmark banch;
 			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
 		}
 
 		//[6] AAPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[7] ToneMapPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
 			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[*] GridPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pGridPass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
 			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[7] SpritePass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pSpritePass->Execute(*m_renderScene, *camera);
-
+			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
 		}
 
 		//[]  UIPass
 		{
+			Banchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
 		}
 
 		//[8] BlitPass
 		{
-			//Banchmark banch;
+			Banchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 
-	//Debug->Log("Draw Call Count : " + std::to_string(DirectX11::GetDrawCallCount()));
 	m_pGBufferPass->ClearDeferredQueue();
 }
 
@@ -858,11 +865,23 @@ void SceneRenderer::EditorView()
         }
         ImGui::End();
     }
-
+	static bool m_bShowContentsBrowser = false;
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-			ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer");
+			if (ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer"))
+			{
+				m_bShowContentsBrowser = !m_bShowContentsBrowser;
+			}
+
+			if (m_bShowContentsBrowser)
+			{
+				DataSystems->OpenContentsBrowser();
+			}
+			else
+			{
+				DataSystems->CloseContentsBrowser();
+			}
 
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_CODE " Output Log "))
@@ -950,7 +969,6 @@ void SceneRenderer::ShowLogWindow()
 {
 	static int levelFilter = spdlog::level::trace;
 	bool isClear = Debug->IsClear();
-
 	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
 	if (ImGui::Button("Clear"))
 	{
