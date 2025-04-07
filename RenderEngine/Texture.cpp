@@ -79,21 +79,31 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_vie
 
 Texture* Texture::LoadFormPath(_In_ const file::path& path)
 {
-	if (!file::exists(path))
+	file::path matPath = PathFinder::RelativeToMaterial(path.string());
+	if (!file::exists(path) && !file::exists(matPath))
 	{
 		return nullptr;
+	}
+
+	file::path preparePath{};
+	if (file::exists(matPath))
+	{
+		preparePath = matPath;
+	}
+	else
+	{
+		preparePath = path;
 	}
 
 	ScratchImage image{};
 	TexMetadata metadata{};
 
-	
 	if (path.extension() == ".dds")
 	{
 		//load dds
 		DirectX11::ThrowIfFailed(
 			LoadFromDDSFile(
-				path.c_str(),
+				preparePath.c_str(),
 				DDS_FLAGS_FORCE_RGB,
 				&metadata,
 				image
@@ -105,7 +115,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 		//load tga
 		DirectX11::ThrowIfFailed(
 			LoadFromTGAFile(
-				path.c_str(),
+				preparePath.c_str(),
 				&metadata,
 				image
 			)
@@ -116,7 +126,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 		//load hdr
 		DirectX11::ThrowIfFailed(
 			LoadFromHDRFile(
-				path.c_str(),
+				preparePath.c_str(),
 				&metadata,
 				image
 			)
@@ -127,7 +137,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 		//load wic
 		DirectX11::ThrowIfFailed(
 			LoadFromWICFile(
-				path.c_str(),
+				preparePath.c_str(),
 				WIC_FLAGS_NONE,
 				&metadata,
 				image

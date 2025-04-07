@@ -61,9 +61,15 @@ Model* Model::LoadModel(const std::string_view& filePath)
 		ModelLoader loader = ModelLoader(assimpScene, path_.string());
 		model = loader.LoadModel();
 		model->path = path_;
+		model->GenerateFileID();
 	}
 
 	return model;
+}
+
+void Model::GenerateFileID()
+{
+	m_fileID = path.string();
 }
 
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)

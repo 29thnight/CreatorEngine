@@ -961,7 +961,6 @@ void SceneRenderer::ShowLogWindow()
 {
 	static int levelFilter = spdlog::level::trace;
 	bool isClear = Debug->IsClear();
-
 	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
 	if (ImGui::Button("Clear"))
 	{

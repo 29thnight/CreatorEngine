@@ -156,6 +156,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 	ProcessBones(mesh, vertices);
 	Mesh* meshObj = new Mesh(mesh->mName.C_Str(), vertices, indices);
+	meshObj->m_materialIndex = mesh->mMaterialIndex;
 	m_model->m_Meshes.push_back(meshObj);
 	//m_model->m_Materials.push_back(new Material());
 
@@ -418,7 +419,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[meshId];
+		Material* material = m_model->m_Materials[mesh->m_materialIndex];
 		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
 		meshRenderer->SetEnabled(true);
@@ -481,7 +482,6 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 		aiString str;
 		material->GetTexture(type, index, &str);
 		std::string textureName = str.C_Str();
-		//textureName = textureName;
 		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
 		LPCWSTR path = stemp.c_str();
 		auto it = DataSystems->Textures.find(textureName);

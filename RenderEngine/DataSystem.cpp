@@ -93,13 +93,17 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
-	file::copy_file(source, destination, file::copy_options::update_existing);
+	if(source != destination && file::exists(source) && file::exists(destination))
+	{
+		file::copy_file(source, destination, file::copy_options::update_existing);
+	}
 	std::string name = file::path(filePath).stem().string();
 	if (Models.find(name) != Models.end())
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
 		return;
 	}
+
 	Model* model = Model::LoadModel(destination.string());
 	if (model)
 	{
@@ -108,6 +112,34 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 	else
 	{
 		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
+}
+
+Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
+{
+	file::path source = filePath;
+	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
+	if (source != destination && file::exists(source) && file::exists(destination))
+	{
+		file::copy_file(source, destination, file::copy_options::update_existing);
+	}
+	std::string name = file::path(filePath).stem().string();
+	if (Models.find(name) != Models.end())
+	{
+		Debug->Log("ModelLoader::LoadModel : Model already loaded");
+		return Models[name].get();
+	}
+
+	Model* model = Model::LoadModel(destination.string());
+	if (model)
+	{
+		Models[name] = std::shared_ptr<Model>(model);
+		return model;
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+		return nullptr;
 	}
 }
 
@@ -265,6 +297,16 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileNa
 	ImGui::PopFont();
 
 	ImGui::EndGroup();
+
+	// 드래그 드랍 소스 설정
+	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+	{
+		// 파일 경로를 payload로 설정 ("MODEL_RESOURCE" 라는 타입을 지정)
+		ImGui::SetDragDropPayload("MODEL_RESOURCE", fileName.c_str(), fileName.size() + 1);
+		ImGui::Text("Dragging %s", fileName.c_str());
+		ImGui::EndDragDropSource();
+	}
+
 	ImGui::PopID();
 }
 

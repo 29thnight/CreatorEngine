@@ -7,6 +7,7 @@
 #include "Light.h"
 #include "Banchmark.hpp"
 #include "TimeSystem.h"
+#include "DataSystem.h"
 
 // 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
 int InputTextCallback(ImGuiInputTextCallbackData* data)
@@ -116,6 +117,23 @@ void RenderScene::EditorSceneObjectHierarchy()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
+		ImVec2 availSize = ImGui::GetContentRegionAvail();
+		ImVec2 windowPos = ImGui::GetCursorScreenPos();
+		ImRect dropRect(windowPos, ImVec2(windowPos.x + availSize.x, windowPos.y + availSize.y));
+
+		if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("MODEL_RESOURCE"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Models\\") / filename.filename();
+				
+				Model::LoadModelToScene(DataSystems->LoadCashedModel(filepath.string().c_str()), *m_currentScene);
+			}
+			ImGui::EndDragDropTarget();
+		}
+
 		if (m_currentScene)
 		{
 			if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
@@ -131,7 +149,10 @@ void RenderScene::EditorSceneObjectHierarchy()
 				ImGui::TreePop();
 			}
 		}
-	},ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
+
+		
+
+	}/*,ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing*/);
 }
 
 void RenderScene::EditorSceneObjectInspector()

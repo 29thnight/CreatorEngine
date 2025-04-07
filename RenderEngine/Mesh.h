@@ -68,6 +68,7 @@ private:
 	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
+	uint32 m_materialIndex{};
 	//Mathf::Matrix m_transform{ XMMatrixIdentity() };
 
 	std::string m_nodeName;

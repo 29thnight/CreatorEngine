@@ -49,6 +49,7 @@ public:
 	void MonitorFiles();
 	void LoadModels();
 	void LoadModel(const std::string_view& filePath);
+	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
 	void LoadMaterials();
 
