@@ -1,0 +1,26 @@
+name: Update version file
+
+on:
+  push:
+    branches:
+      - master  # 기본 브랜치가 master가 아니라면 해당 브랜치명으로 변경하세요.
+
+jobs:
+  update_version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Update version file
+        run: echo "${{ github.sha }}" > version.txt
+
+    - name: Update version file
+      run: |
+        echo "v1.0.1" > version.txt
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add version.txt
+        git commit -m "Update version file [skip ci]"
+        git push
