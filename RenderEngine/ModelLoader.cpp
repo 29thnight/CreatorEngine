@@ -140,7 +140,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		if (hasTexCoords)
 		{
 			vertex.uv = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
-		}
+		} 
 
 		vertices.push_back(vertex);
 	}
