@@ -376,6 +376,9 @@
     <ClInclude Include="LightMapPass.h">
       <Filter>LightMap\Result</Filter>
     </ClInclude>
+    <ClInclude Include="RenderState.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\x64\Assets\Shaders\SSAO.ps.hlsl">
