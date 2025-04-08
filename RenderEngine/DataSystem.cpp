@@ -93,7 +93,7 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
-	if(source != destination && file::exists(source) && file::exists(destination))
+	if(source != destination && file::exists(source) && !file::exists(destination))
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);
 	}
