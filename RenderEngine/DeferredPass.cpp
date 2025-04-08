@@ -46,6 +46,7 @@ DeferredPass::DeferredPass()
     m_pso->m_samplers.push_back(pointSampler);
 
     m_Buffer = DirectX11::CreateBuffer(sizeof(DeferredBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+    m_shadowcamBuffer = DirectX11::CreateBuffer(sizeof(cameraView), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 DeferredPass::~DeferredPass()
@@ -104,6 +105,10 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
+
+    cameraView cameraview{};
+    cameraview.cameraView = camera.CalculateView();
+    DirectX11::PSSetConstantBuffer(10, 1, m_shadowcamBuffer.GetAddressOf());
 
     ID3D11ShaderResourceView* srvs[10] = {
         camera.m_depthStencil->m_pSRV,
