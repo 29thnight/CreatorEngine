@@ -56,9 +56,6 @@ public:
 
     static const Meta::Type& Reflect()
     {
-        ReflectEnum_LightType();
-        ReflectEnum_LightStatus();
-
         static const Meta::MetaProperties<10> properties
         {
             Meta::MakeProperty("m_position", &LightComponent::m_position),

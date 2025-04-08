@@ -8,6 +8,7 @@
 #include "../ScriptBinder/Renderer.h"
 #include "DataSystem.h"
 #include "RenderState.h"
+#include "TimeSystem.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -100,6 +101,16 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
         ImVec2 imagePos = ImGui::GetItemRectMin();
         ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
 
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+		if(ImGui::Button(ICON_FA_CHART_BAR))
+		{
+			ImGui::OpenPopup("RenderStatistics");
+		}
+		ImGui::PopStyleVar();
+
+		ImGui::SameLine();
+		ImVec2 currentPos = ImGui::GetCursorScreenPos();
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 		if (ImGui::Button(ICON_FA_BARS " Grid"))
 		{
 			m_bShowGridSettings = true;
@@ -107,7 +118,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 		ImGui::SameLine();
 
-		ImVec2 currentPos = ImGui::GetCursorScreenPos();
+		currentPos = ImGui::GetCursorScreenPos();
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 
 		if (ImGui::Button(m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
@@ -184,6 +195,9 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 
 		ImGui::PopStyleVar(2);
 
+		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.f);
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.1f, 0.1f, 0.1f, 0.8f));
+		ImGui::PushFont(DataSystems->GetSmallFont());
         if (ImGui::BeginPopup("CameraSettings"))
         {
             ImGui::Text("Camera Settings");
@@ -193,6 +207,35 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
             ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
             ImGui::EndPopup();
         }
+
+		if (ImGui::BeginPopup("RenderStatistics"))
+		{
+			ImGui::Text("Render Statistics");
+			ImGui::Separator();
+			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
+			ImGui::Text("Screen Size: %d x %d", (int)DeviceState::g_ClientRect.width, (int)DeviceState::g_ClientRect.height);
+			//Draw Call Count
+			ImGui::Text("Draw Call Count: %d", DirectX11::GetDrawCallCount());
+			ImGui::Separator();
+			ImGui::Text("ShadowMapPass: %.5f ms", RenderStatistics->GetRenderState("ShadowMapPass"));
+			ImGui::Text("GBufferPass: %.5f ms", RenderStatistics->GetRenderState("GBufferPass"));
+			ImGui::Text("SSAOPass: %.5f ms", RenderStatistics->GetRenderState("SSAOPass"));
+			ImGui::Text("DeferredPass: %.5f ms", RenderStatistics->GetRenderState("DeferredPass"));
+			ImGui::Text("LightMapPass: %.5f ms", RenderStatistics->GetRenderState("LightMapPass"));
+			ImGui::Text("WireFramePass: %.5f ms", RenderStatistics->GetRenderState("WireFramePass"));
+			ImGui::Text("SkyBoxPass: %.5f ms", RenderStatistics->GetRenderState("SkyBoxPass"));
+			ImGui::Text("PostProcessPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
+			ImGui::Text("AAPass: %.5f ms", RenderStatistics->GetRenderState("AAPass"));
+			ImGui::Text("ToneMapPass: %.5f ms", RenderStatistics->GetRenderState("ToneMapPass"));
+			ImGui::Text("GridPass: %.5f ms", RenderStatistics->GetRenderState("GridPass"));
+			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
+			ImGui::Text("UIPass: %.5f ms", RenderStatistics->GetRenderState("UIPass"));
+			ImGui::Text("BlitPass: %.5f ms", RenderStatistics->GetRenderState("BlitPass"));
+			ImGui::EndPopup();
+		}
+		ImGui::PopFont();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 	}
 	else
 	{
@@ -667,7 +710,9 @@ void SceneRenderer::SceneRendering()
 		}
 		else
         {
+			Banchmark banch;
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 		}
 
 		//[*] WireFramePass

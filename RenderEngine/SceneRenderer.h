@@ -112,6 +112,7 @@ private:
 	bool useWireFrame = false;
 	bool m_bIsClicked{ false };
 	bool m_bShowLogWindow{ false };
+	bool m_bShowRenderState{ false };
 	bool useTestLightmap{ false };
 	bool m_bShowGridSettings{ false };
 

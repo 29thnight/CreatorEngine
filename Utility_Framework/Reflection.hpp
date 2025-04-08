@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <stdexcept>
 #include <imgui.h>
+#include <magic_enum/magic_enum.hpp>
 
 namespace Meta
 {
@@ -164,23 +165,21 @@ namespace Meta
         std::span<const EnumValue> values;
     };
 
-    class EnumRegistry : public Singleton<EnumRegistry>
+    class EnumRegistry : public Singleton<EnumRegistry> 
     {
     public:
-        friend Singleton;
-
-        void Register(const std::string& name, const EnumType& enumType)
+        void Register(const std::string& name, const EnumType& enumType) 
         {
-            if (enumMap.find(name) == enumMap.end())
+            if (enumMap.find(name) == enumMap.end()) 
             {
                 enumMap[name] = enumType;
             }
         }
 
-        const EnumType* Find(const std::string& name)
+        const EnumType* Find(const std::string& name) 
         {
             auto it = enumMap.find(name);
-            return it != enumMap.end() ? &it->second : nullptr;
+            return (it != enumMap.end()) ? &it->second : nullptr;
         }
 
     private:
@@ -200,6 +199,39 @@ namespace Meta
 	{
 		return MetaDataRegistry->Find(name.data());
 	}
+
+
+    template <typename Enum, std::size_t... Is>
+    auto create_enum_values(std::index_sequence<Is...>) 
+    {
+        return std::array<EnumValue, magic_enum::enum_count<Enum>()>
+        {
+            EnumValue{ magic_enum::enum_names<Enum>()[Is].data(), static_cast<int>(magic_enum::enum_values<Enum>()[Is]) }...
+        };
+    }
+
+    template <typename Enum>
+    const EnumType& create_enum_type() 
+    {
+        static const auto values = create_enum_values<Enum>(std::make_index_sequence<magic_enum::enum_count<Enum>()>{});
+        static const EnumType enumType
+        {
+            magic_enum::enum_type_name<Enum>().data(),
+            std::span<const EnumValue>(values.data(), values.size())
+        };
+        return enumType;
+    }
+
+    // 자동 등록용 템플릿 구조체
+    template <typename Enum>
+    struct EnumAutoRegistrar 
+    {
+        EnumAutoRegistrar() 
+        {
+            auto enumType = create_enum_type<Enum>();
+            MetaEnumRegistry->Register(enumType.name, enumType);
+        }
+    };
 
     template<typename ClassT, typename T>
     Property MakeProperty(const char* name, T ClassT::* member)
@@ -533,14 +565,5 @@ constexpr uint32_t MethodOnly = 2;
         return type; \
     }
 
-#define meta_enum(EnumTypeName, ...) \
-    static Meta::EnumType CreateEnumType_##EnumTypeName() { \
-        static constexpr Meta::EnumValue values[] = { __VA_ARGS__ }; \
-        static const Meta::EnumType enumType{ #EnumTypeName, std::span(values) }; \
-        return enumType; \
-    } \
-    static inline const Meta::EnumType& ReflectEnum_##EnumTypeName() { \
-        static const Meta::EnumType type = CreateEnumType_##EnumTypeName(); \
-        Meta::MetaEnumRegistry->Register(#EnumTypeName, type); \
-        return type; \
-    }
+#define AUTO_REGISTER_ENUM(EnumTypeName) \
+    static const Meta::EnumAutoRegistrar<EnumTypeName> autoRegistrar_##EnumTypeName;

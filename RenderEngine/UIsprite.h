@@ -29,13 +29,9 @@ public:
 	void SetTexture(size_t _index = 0);
 	float2 GetSize();
 
-
-
-
 	std::vector<std::shared_ptr<Texture>> textures;
 	Texture* m_curtexture{};
 
-	
 	//숫자가 클수록 젤위에보임
 	int _layerorder;
 	UiInfo uiinfo;

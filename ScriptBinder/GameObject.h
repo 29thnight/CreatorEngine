@@ -47,11 +47,11 @@ public:
 		}
 
 		T* component = new T();
-        if(typeid(T) == typeid(LightComponent) && m_pScene)
-        {
-            LightComponent* lightComponent = static_cast<LightComponent*>(component);
-            lightComponent->m_lightIndex = m_pScene->AddLightCount();
-        }
+  //      if(typeid(T) == typeid(LightComponent) && m_pScene)
+  //      {
+  //          LightComponent* lightComponent = static_cast<LightComponent*>(component);
+  //          lightComponent->m_lightIndex = m_pScene->AddLightCount();
+  //      }
 
 		m_components.push_back(component);
 		component->SetOwner(this);

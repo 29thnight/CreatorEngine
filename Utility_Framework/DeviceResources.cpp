@@ -343,6 +343,14 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.Scaling = scaling;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 
+		DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
+
+		swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+		swapChainFullscreenDesc.RefreshRate.Denominator = 1;
+		swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+		swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+		swapChainFullscreenDesc.Windowed = TRUE;
+
         ComPtr<IDXGIDevice3> dxgiDevice;
         DirectX11::ThrowIfFailed(
             m_d3dDevice.As(&dxgiDevice)
@@ -364,7 +372,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
                 m_d3dDevice.Get(),
                 m_window->GetHandle(),
                 &swapChainDesc,
-                nullptr,
+                &swapChainFullscreenDesc,
                 nullptr,
                 &swapChain
             )

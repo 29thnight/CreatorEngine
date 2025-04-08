@@ -59,6 +59,9 @@ public:
 	void ShowCurrentDirectoryFiles();
 	void DrawFileTile(ImTextureID iconTexture, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
 
+	ImFont* GetSmallFont() const { return smallFont; }
+	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
+
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;

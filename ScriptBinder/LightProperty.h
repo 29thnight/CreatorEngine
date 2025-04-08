@@ -12,11 +12,7 @@ enum LightType
     LightsTypeMax
 };
 
-meta_enum(LightType,
-    Meta::EnumValue{ "DirectionalLight", static_cast<int>(LightType::DirectionalLight) },
-    Meta::EnumValue{ "PointLight", static_cast<int>(LightType::PointLight) },
-    Meta::EnumValue{ "SpotLight", static_cast<int>(LightType::SpotLight) }
-);
+AUTO_REGISTER_ENUM(LightType)
 
 enum LightStatus
 {
@@ -26,11 +22,7 @@ enum LightStatus
     LightsStatusMax
 };
 
-meta_enum(LightStatus,
-    Meta::EnumValue{ "Disabled", static_cast<int>(LightStatus::Disabled) },
-    Meta::EnumValue{ "Enabled", static_cast<int>(LightStatus::Enabled) },
-    Meta::EnumValue{ "StaticShadows", static_cast<int>(LightStatus::StaticShadows) }
-);
+AUTO_REGISTER_ENUM(LightStatus)
 
 cbuffer Light
 {
@@ -79,7 +71,10 @@ cbuffer ShadowMapConstant
 {
     float m_shadowMapWidth{};
     float m_shadowMapHeight{};
-    Mathf::xMatrix m_lightViewProjection{};
+    Mathf::xMatrix m_lightViewProjection[3]{};
+    float m_casCadeEnd1{};
+    float m_casCadeEnd2{};
+    float m_casCadeEnd3{};
 };
 
 struct ShadowMapRenderDesc
