@@ -35,12 +35,12 @@ ShadowMapPass::ShadowMapPass()
 	);
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-
-	//rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-	//rasterizerDesc.CullMode = D3D11_CULL_BACK;
-	//rasterizerDesc.DepthBias = 1500;              
-	//rasterizerDesc.SlopeScaledDepthBias = 2.0f;   
-	//rasterizerDesc.DepthBiasClamp = 0.0f;         
+	/*
+		rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+		rasterizerDesc.CullMode = D3D11_CULL_BACK;
+		rasterizerDesc.DepthBias = 1500;
+		rasterizerDesc.SlopeScaledDepthBias = 1.0f;
+		rasterizerDesc.DepthBiasClamp = 0.0f;    */
 
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateRasterizerState(
@@ -57,26 +57,23 @@ ShadowMapPass::ShadowMapPass()
 
 	shadowViewport.TopLeftX = 0;
 	shadowViewport.TopLeftY = 0;
-	shadowViewport.Width = 1024;
-	shadowViewport.Height = 1024;
+	shadowViewport.Width = 2048;
+	shadowViewport.Height = 2048;
 	shadowViewport.MinDepth = 0.0f;
 	shadowViewport.MaxDepth = 1.0f;
 
-	m_shadowBuffer = DirectX11::CreateBuffer(sizeof(ShadowInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
 {
 	Texture* shadowMapTexture = Texture::CreateArray(width, height, "Shadow Map",
 		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, 3);
-	//shadowMapTexture->CreateRTV(DXGI_FORMAT_R32_FLOAT);
 
 
 	for (int i = 0; i < cascadeCount; i++)
 	{
 		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
 		depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		//depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
 		depthStencilViewDesc.Texture2DArray.ArraySize = 1;
 		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
@@ -92,29 +89,6 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 	//안에서 배열은 3으로 고정중 필요하면 수정
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
 	m_shadowMapTexture = std::unique_ptr<Texture>(shadowMapTexture);
-
-
-	//m_shadowMapDSV = m_shadowMapTexture->m_pDSV;
-	//Texture* shadowMapTexture2 = Texture::Create(width, height, "Shadow Map2",
-	//	DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE);
-	////shadowMapTexture->CreateRTV(DXGI_FORMAT_R32_FLOAT);
-	//CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc2{};
-	//depthStencilViewDesc2.Format = DXGI_FORMAT_D32_FLOAT;
-	//depthStencilViewDesc2.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	//DirectX11::ThrowIfFailed(
-	//	DeviceState::g_pDevice->CreateDepthStencilView(
-	//		shadowMapTexture2->m_pTexture,
-	//		&depthStencilViewDesc2,
-	//		&shadowMapTexture2->m_pDSV
-	//	)
-	//);
-	//shadowMapTexture2->CreateSRV(DXGI_FORMAT_R32_FLOAT);
-	//m_shadowMapTexture2 = std::unique_ptr<Texture>(shadowMapTexture2);
-	//m_shadowMapDSV = m_shadowMapTexture->m_pDSV;
-
-
-
-
 	m_shadowCamera.m_isOrthographic = true;
 }
 
@@ -123,8 +97,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 
 	m_pso->Apply();
-
-	//ID3D11RenderTargetView* rtv = m_shadowMapTexture->GetRTV();
 	if (!m_abled)
 	{
 		for (int i = 0; i < cascadeCount; i++)
@@ -134,13 +106,14 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.1,0.5 });
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	camera.CalculateProjection();
-	ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
+	scene.m_LightController->m_shadowMapConstant.devideShadow = shadowMapConstant2.devideShadow;
+	scene.m_LightController->m_shadowMapConstant._epsilon = shadowMapConstant2._epsilon;
 
-	//ShadowMapConstant shadowMapConstant;
+	ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
 	auto projMatrix = camera.CalculateProjection();
 	Mathf::Vector4 transformedCascade;
 
@@ -155,8 +128,10 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		DirectX11::OMSetRenderTargets(0, nullptr, m_shadowMapDSVarr[i]);
 		auto desc = scene.m_LightController->m_shadowMapRenderDesc;
-		m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController->GetLight(0).m_direction)) * -50;
-		m_shadowCamera.m_lookAt = desc.m_lookAt;
+		//m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController->GetLight(0).m_direction)) * -50;
+		//m_shadowCamera.m_lookAt = desc.m_lookAt;
+		m_shadowCamera.m_eyePosition = cascadeinfo[i].m_eyePosition;
+		m_shadowCamera.m_lookAt = cascadeinfo[i].m_lookAt;
 		m_shadowCamera.m_viewHeight = cascadeinfo[i].m_viewHeight;
 		m_shadowCamera.m_viewWidth = cascadeinfo[i].m_viewWidth;
 		m_shadowCamera.m_nearPlane = cascadeinfo[i].m_nearPlane;
@@ -166,9 +141,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 		shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
 		shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
-		shadowMapConstant.m_lightViewProjection[i] = m_shadowCamera.CalculateView() * m_shadowCamera.CalculateProjection(true);
-		//shadowMapConstant.m_casCadeEnd[i] = Mathf::Vector4::Transform({0, 0, cascadeEnd[i+1], 1.f}, camera.CalculateProjection()).z;
-
+		//shadowMapConstant.m_lightViewProjection[i] = m_shadowCamera.CalculateView() * m_shadowCamera.CalculateProjection(true);
+		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
 		for (auto& obj : scene.GetScene()->m_SceneObjects)
@@ -185,7 +159,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			meshRenderer->m_Mesh->Draw();
 		}
 		DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
-		//DirectX11::ClearRenderTargetView(rtv, Colors::Transparent);
 		DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
 		DirectX11::UnbindRenderTargets();
 	}
@@ -197,6 +170,8 @@ void ShadowMapPass::ControlPanel()
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
 	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(512, 512));
+	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
+	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
 
 
@@ -224,39 +199,42 @@ std::vector<float> devideCascadeEnd(Camera& camera, std::vector<float> ratios)
 std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir)
 {
 	auto Fullfrustum = camera.GetFrustum();
+
 	XMFLOAT3 FullfrustumCorners[8];
 	Fullfrustum.GetCorners(FullfrustumCorners);
 	float nearZ = camera.m_nearPlane;
 	float farZ = camera.m_farPlane;
-	std::vector<ShadowInfo> shadowinfo;
-	shadowinfo.resize(cascadeCount);
-	std::array<std::array<Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
-	for (int i = 0; i < cascadeCount; i++)
+
+
+	DirectX::BoundingFrustum frustum(camera.CalculateProjection());
+	float frustumDistnace = (frustum.Far - frustum.Near);
+
+	Mathf::Matrix cameraview = camera.CalculateView();
+	Mathf::Matrix viewInverse = camera.CalculateInverseView();
+	Mathf::Vector3 forwardVec;
+	cameraview.Forward(forwardVec);
+	Mathf::Vector3 adjustTranslate = forwardVec * frustumDistnace;
+
+	std::array<std::array<	Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
+
+	for (size_t i = 0; i < sliceFrustums.size(); ++i)
 	{
+		std::array<	Mathf::Vector3, 8>& sliceFrustum = sliceFrustums[i];
 		float curEnd = cascadeEnd[i];
 		float nextEnd = cascadeEnd[i + 1];
-		float cascadeNear = nearZ + curEnd;
-		float cascadeFar = nearZ + nextEnd;
 
-		// 보간해서 새로운 8개 꼭짓점 만들기
-		std::array<Mathf::Vector3, 8>& sliceFrustum = sliceFrustums[i];
+		sliceFrustum[0] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.TopSlope * curEnd, curEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[1] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.BottomSlope * curEnd, curEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[2] = Mathf::Vector3::Transform({ frustum.LeftSlope * curEnd, frustum.TopSlope * curEnd, curEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[3] = Mathf::Vector3::Transform({ frustum.LeftSlope * curEnd, frustum.BottomSlope * curEnd, curEnd }, viewInverse) + adjustTranslate;
 
-		for (int cornerIdx = 0; cornerIdx < 4; ++cornerIdx)
-		{
-			XMVECTOR nearCorner = XMLoadFloat3(&FullfrustumCorners[cornerIdx]);
-			XMVECTOR farCorner = XMLoadFloat3(&FullfrustumCorners[cornerIdx + 4]);
-
-			float range = farZ - nearZ;
-			float t0 = (cascadeNear - nearZ) / range;
-			float t1 = (cascadeFar - nearZ) / range;
-
-			// 보간된 8점 저장
-			sliceFrustum[cornerIdx] = XMVectorLerp(nearCorner, farCorner, t0);
-			sliceFrustum[cornerIdx + 4] = XMVectorLerp(nearCorner, farCorner, t1);
-		}
-
+		sliceFrustum[4] = Mathf::Vector3::Transform({ frustum.RightSlope * nextEnd, frustum.TopSlope * nextEnd, nextEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[5] = Mathf::Vector3::Transform({ frustum.RightSlope * nextEnd, frustum.BottomSlope * nextEnd, nextEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[6] = Mathf::Vector3::Transform({ frustum.LeftSlope * nextEnd, frustum.TopSlope * nextEnd, nextEnd }, viewInverse) + adjustTranslate;
+		sliceFrustum[7] = Mathf::Vector3::Transform({ frustum.LeftSlope * nextEnd, frustum.BottomSlope * nextEnd, nextEnd }, viewInverse) + adjustTranslate;
 	}
-
+	std::vector<ShadowInfo> shadowinfo;
+	shadowinfo.resize(cascadeCount);
 	for (size_t i = 0; i < cascadeCount; ++i)
 	{
 		const std::array<Mathf::Vector3, 8>& sliceFrustum = sliceFrustums[i];
@@ -277,13 +255,12 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		radius = std::ceil(radius * 16.f) / 16.f;
 
-		DirectX::SimpleMath::Vector3 maxExtents = { radius, radius, radius };
-		DirectX::SimpleMath::Vector3 minExtents = -maxExtents;
+		Mathf::Vector3 maxExtents = { radius, radius, radius };
+		Mathf::Vector3 minExtents = -maxExtents;
 		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * minExtents.z;
-
-		DirectX::SimpleMath::Vector3 cascadeExtents = maxExtents - minExtents;
-		DirectX::SimpleMath::Matrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
-		DirectX::SimpleMath::Matrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.f, cascadeExtents.z);
+		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
+		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
+		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.f, cascadeExtents.z);
 
 
 		shadowinfo[i].m_eyePosition = shadowPos;
@@ -292,11 +269,8 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 		shadowinfo[i].m_farPlane = cascadeExtents.z;
 		shadowinfo[i].m_viewWidth = maxExtents.x;
 		shadowinfo[i].m_viewHeight = maxExtents.y;
-		shadowinfo[i].m_lightViewProjection = lightView * lightProj;
+		shadowinfo[i].m_lightViewProjection = (lightView * lightProj);
 	}
-
-
-
 
 	return shadowinfo;
 }

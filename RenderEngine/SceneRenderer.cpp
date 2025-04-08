@@ -599,8 +599,8 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		desc.m_viewHeight = 100;
 		desc.m_nearPlane = 0.1f;
 		desc.m_farPlane = 1000.0f;
-		desc.m_textureWidth = 1024;
-		desc.m_textureHeight = 1024;
+		desc.m_textureWidth = 2048;
+		desc.m_textureHeight = 2048;
 
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
@@ -609,17 +609,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		Model::LoadModelToScene(model, *m_currentScene);
 		model = Model::LoadModel("DamagedHelmet.gltf");
 
-		ImGui::ContextRegister("Test UI", true, [&]()
-		{
-			if (ImGui::Button("Add UI"))
-			{
-				m_pUIPass->pushUI(&testUI);
-			}
-			ImGui::SliderFloat3("pos", &testUI.trans.x, -1, 1);
-			ImGui::SliderFloat3("scale", &testUI.scale.x, -1, 1);
-
-		});
-
+	
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))
@@ -650,7 +640,13 @@ void SceneRenderer::Initialize(Scene* _pScene)
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	m_renderScene->Update(deltaTime);
-	m_pEditorCamera->HandleMovement(deltaTime);
+	//m_pEditorCamera->HandleMovement(deltaTime);
+	for (auto& camera : CameraManagement->m_cameras)
+	{
+		if (nullptr == camera) continue;
+		camera->HandleMovement(deltaTime);
+	}
+
 	PrepareRender();
 	m_pUIPass->Update(deltaTime);
 }

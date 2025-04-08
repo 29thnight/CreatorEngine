@@ -69,14 +69,19 @@ cbuffer LightProperties
 
 cbuffer ShadowMapConstant
 {
-    float m_shadowMapWidth{};
+   float m_shadowMapWidth{};
     float m_shadowMapHeight{};
     Mathf::xMatrix m_lightViewProjection[3]{};
     float m_casCadeEnd1{};
     float m_casCadeEnd2{};
     float m_casCadeEnd3{};
+    float _epsilon = 0.01;
+    int devideShadow = 9; //max = 9 
 };
-
+struct cameraView
+{
+    Mathf::xMatrix cameraView;
+};
 struct ShadowMapRenderDesc
 {
     Mathf::xVector m_eyePosition{};

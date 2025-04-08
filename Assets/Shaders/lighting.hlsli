@@ -41,70 +41,111 @@ cbuffer ShadowMapConstants : register(b2) // supports one
     float mapWidth;
     float mapHeight;
    
-    float4x4 lightViewProjection[3];
+    float4x4 lightViewProjection[3];\
+
     float m_casCadeEnd1;
     float m_casCadeEnd2;
     float m_casCadeEnd3;
-   // float m_casCadeEnd[3];
+    float _epsilon;
+    int devideShadow; //max = 9
+    
 }
+
+cbuffer CameraView : register(b10)
+{
+    matrix cameraview;
+}
+
+
+
+
+
 
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
 {
     
     int shadowIndex = 0;
     
-    
-    //for (int i = 0; i < 3; i++)
-    //{
-    //    if (worldPosition.z <= m_casCadeEnd[i])
-    //    {
-    //        shadowIndex = i;
-    //        break;
-    //    }
-        
-    //}
-    shadowIndex = (worldPosition.z <= m_casCadeEnd1) ? 0 :
-              (worldPosition.z <= m_casCadeEnd2) ? 1 :
-              (worldPosition.z <= m_casCadeEnd3) ? 2 : 0;
   
-       
-   // shadowIndex = 2;
+    float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
+    float m_casCadeEnd[3] = { m_casCadeEnd1, m_casCadeEnd2, m_casCadeEnd3 };
+    shadowIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :
+              (viewPos.z <= m_casCadeEnd2) ? 1 :
+              (viewPos.z <= m_casCadeEnd3) ? 2 : 0;
+  
+    int nextShadowIndex = min(shadowIndex + 1, 2);
+    
+    float2 texelSize = float2(1, 1) / float2(mapWidth, mapHeight);
+    float epsilon = _epsilon;
+    //그림자 경게선 퍼센트 
+    float cascadeEdge = 0.1f;
+    float startZ = m_casCadeEnd[shadowIndex];
+    float endZ = m_casCadeEnd[nextShadowIndex];
+    
+   
     
     float4 lightSpacePosition = mul(lightViewProjection[shadowIndex], worldPosition);
-
     float3 projCoords = lightSpacePosition.xyz / lightSpacePosition.w;
     float currentDepth = projCoords.z;
 
     if (currentDepth > 1)
         return 0;
+    
 
-    //projCoords = projCoords.xy * 0.5 + 0.5;
-    //projCoords = (projCoords + 1) / 2.0; // change to [0 - 1]
-    projCoords.y = -projCoords.y; // bottom right corner is (1, -1) in NDC so we have to flip it
+    projCoords.y = -projCoords.y;
     projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
-    float2 texelSize = float2(1, 1) / float2(mapWidth, mapHeight);
-
     float shadow = 0;
-    float epsilon = 0.0025f;
     //[unroll]
     if (projCoords.x >= 0.0 && projCoords.x <= 1.0 && projCoords.y >= 0.0 && projCoords.y <= 1.0)
     {
-    
         for (int x = -1; x < 2; ++x)
         {
         //[unroll]
             for (int y = -1; y < 2; ++y)
             {
-          
-                //float closestDepth = ShadowMap.Sample(PointSampler, projCoords.xy + float2(x, y) * texelSize).r;
-                //float closestDepth = ShadowMap2.Sample(PointSampler, projCoords.xy + float2(x, y) * texelSize).r;
-                float closestDepth = ShadowMapArr.Sample(PointSampler, float3(projCoords.xy + float2(x, y) * texelSize, shadowIndex)).r;
+                float2 uv = float2(projCoords.xy + float2(x, y) * texelSize);
+                float closestDepth = ShadowMapArr.Sample(PointSampler, float3(uv, shadowIndex)).r;
                 shadow += (closestDepth < currentDepth - epsilon);
             }
         }
     }
-    shadow /= 9;
+    shadow /= devideShadow;
+    float finalShadow = shadow;
     
-    return shadow;
+    if (viewPos.z > endZ - cascadeEdge && shadowIndex < 2)
+    {
+        
+        float4 nextlightSpacePosition = mul(lightViewProjection[nextShadowIndex], worldPosition);
+        float3 nextprojCoords = nextlightSpacePosition.xyz / nextlightSpacePosition.w;
+        float nextcurrentDepth = nextprojCoords.z;
+
+        if (nextcurrentDepth > 1)
+            return 0;
+    
+
+        nextprojCoords.y = -nextprojCoords.y;
+        nextprojCoords.xy = (nextprojCoords.xy * 0.5) + 0.5f;
+        float nextshadow = 0;
+        float blendFactor = saturate((viewPos.z - (endZ - cascadeEdge)) / cascadeEdge);
+        if (nextprojCoords.x >= 0.0 && nextprojCoords.x <= 1.0 && nextprojCoords.y >= 0.0 && nextprojCoords.y <= 1.0)
+        {
+            for (int x = -1; x < 2; ++x)
+            {
+        //[unroll]
+                for (int y = -1; y < 2; ++y)
+                {
+                    float2 uv = float2(nextprojCoords.xy + float2(x, y) * texelSize);
+                    float closestDepth = ShadowMapArr.Sample(PointSampler, float3(uv, nextShadowIndex)).r;
+                    nextshadow += (closestDepth < nextcurrentDepth - epsilon);
+                }
+            }
+        }
+        nextshadow /= devideShadow;
+        finalShadow = lerp(shadow, nextshadow, blendFactor);
+        
+    }
+    
+ 
+    return finalShadow;
 }
 #endif
