@@ -128,8 +128,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		DirectX11::OMSetRenderTargets(0, nullptr, m_shadowMapDSVarr[i]);
 		auto desc = scene.m_LightController->m_shadowMapRenderDesc;
-		//m_shadowCamera.m_eyePosition = XMLoadFloat4(&(scene.m_LightController->GetLight(0).m_direction)) * -50;
-		//m_shadowCamera.m_lookAt = desc.m_lookAt;
 		m_shadowCamera.m_eyePosition = cascadeinfo[i].m_eyePosition;
 		m_shadowCamera.m_lookAt = cascadeinfo[i].m_lookAt;
 		m_shadowCamera.m_viewHeight = cascadeinfo[i].m_viewHeight;
@@ -141,7 +139,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 		shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
 		shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
-		//shadowMapConstant.m_lightViewProjection[i] = m_shadowCamera.CalculateView() * m_shadowCamera.CalculateProjection(true);
 		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();

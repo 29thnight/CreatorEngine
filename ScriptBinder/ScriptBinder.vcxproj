@@ -148,6 +148,7 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SpriteComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -165,6 +166,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="SpriteComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />
   </ItemGroup>
