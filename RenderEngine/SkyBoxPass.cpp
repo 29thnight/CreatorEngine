@@ -1,5 +1,5 @@
 #include "SkyBoxPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Camera.h"
 #include "ImGuiRegister.h"
@@ -32,15 +32,15 @@ struct alignas(16) PrefilterCBuffer
 SkyBoxPass::SkyBoxPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Skybox"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Skybox"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Skybox"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Skybox"];
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-	m_fullscreenVS = &AssetsSystems->VertexShaders["Fullscreen"];
-	m_irradiancePS = &AssetsSystems->PixelShaders["IrradianceMap"];
-	m_prefilterPS = &AssetsSystems->PixelShaders["SpecularPreFilter"];
-	m_brdfPS = &AssetsSystems->PixelShaders["IntegrateBRDF"];
-	m_rectToCubeMapPS = &AssetsSystems->PixelShaders["RectToCubeMap"];
+	m_fullscreenVS = &ShaderSystem->VertexShaders["Fullscreen"];
+	m_irradiancePS = &ShaderSystem->PixelShaders["IrradianceMap"];
+	m_prefilterPS = &ShaderSystem->PixelShaders["SpecularPreFilter"];
+	m_brdfPS = &ShaderSystem->PixelShaders["IntegrateBRDF"];
+	m_rectToCubeMapPS = &ShaderSystem->PixelShaders["RectToCubeMap"];
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
     {

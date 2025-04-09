@@ -1,5 +1,5 @@
 #include "PostProcessingPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -10,25 +10,25 @@ PostProcessingPass::PostProcessingPass()
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
-	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto pointSampler  = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
-	m_pFullScreenVS = &AssetsSystems->VertexShaders["Fullscreen"];
-	m_pBloomDownSampledCS = &AssetsSystems->ComputeShaders["BloomThresholdDownsample"];
-	m_pGaussianBlurCS = &AssetsSystems->ComputeShaders["GaussianBlur"];
-	m_pBloomCompositePS = &AssetsSystems->PixelShaders["BloomComposite"];
+	m_pFullScreenVS = &ShaderSystem->VertexShaders["Fullscreen"];
+	m_pBloomDownSampledCS = &ShaderSystem->ComputeShaders["BloomThresholdDownsample"];
+	m_pGaussianBlurCS = &ShaderSystem->ComputeShaders["GaussianBlur"];
+	m_pBloomCompositePS = &ShaderSystem->PixelShaders["BloomComposite"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "POSITION",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",			0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",		0, DXGI_FORMAT_R32G32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 
 	DirectX11::ThrowIfFailed(
@@ -54,9 +54,9 @@ PostProcessingPass::PostProcessingPass()
 	TextureInitialization();
 	GaussianBlurComputeKernel();
 
-	m_bloomThresholdBuffer = DirectX11::CreateBuffer(sizeof(ThresholdParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomThreshold);
-	m_bloomBlurBuffer = DirectX11::CreateBuffer(sizeof(BlurParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomBlur);
-	m_bloomCompositeBuffer = DirectX11::CreateBuffer(sizeof(CompositeParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomComposite);
+	m_bloomThresholdBuffer	= DirectX11::CreateBuffer(sizeof(ThresholdParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomThreshold);
+	m_bloomBlurBuffer		= DirectX11::CreateBuffer(sizeof(BlurParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomBlur);
+	m_bloomCompositeBuffer	= DirectX11::CreateBuffer(sizeof(CompositeParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomComposite);
 
 }
 
@@ -80,9 +80,9 @@ void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 
 void PostProcessingPass::ControlPanel()
 {
-	ImGui::Checkbox("ApplyBloom", &m_PostProcessingApply.m_Bloom);
-	ImGui::DragFloat("Threshold", &m_bloomThreshold.threshold);
-	ImGui::DragFloat("Knee", &m_bloomThreshold.knee);
+	ImGui::Checkbox("ApplyBloom",	&m_PostProcessingApply.m_Bloom);
+	ImGui::DragFloat("Threshold",	&m_bloomThreshold.threshold);
+	ImGui::DragFloat("Knee",		&m_bloomThreshold.knee);
 	ImGui::DragFloat("Coeddicient", &m_bloomComposite.coeddicient);
 
 }

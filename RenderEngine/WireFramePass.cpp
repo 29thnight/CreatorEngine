@@ -3,14 +3,14 @@
 #include "Camera.h"
 #include "Mesh.h"
 #include "Skeleton.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Renderer.h"
 
 WireFramePass::WireFramePass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["WireFrame"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["WireFrame"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["WireFrame"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["WireFrame"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     m_Buffer = DirectX11::CreateBuffer(sizeof(CameraBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);

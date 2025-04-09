@@ -1,6 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 #include "Banchmark.hpp"
 #include "RenderScene.h"
@@ -288,7 +288,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
-	AssetsSystems->LoadShaders();
+	ShaderSystem->LoadShaders();
 
 	InitializeTextures();
 

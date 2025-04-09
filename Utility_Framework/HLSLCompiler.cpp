@@ -71,7 +71,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 		if (SUCCEEDED(hResult))
 		{
 			m_shaderCache[filePath.string()] = shaderBlob;
-            std::string csoPath = PathFinder::Relative("Shaders\\").string() + filePath.stem().string() + ".cso";
+            std::string csoPath = PathFinder::RelativeToPrecompiledShader().string() + filePath.stem().string() + ".cso";
 			FileWriter writer{ csoPath };
 			writer.write(static_cast<char*>(shaderBlob->GetBufferPointer()), shaderBlob->GetBufferSize());
 			writer.flush();

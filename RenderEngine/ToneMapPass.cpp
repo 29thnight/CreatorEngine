@@ -1,5 +1,5 @@
 #include "ToneMapPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
 #include "Camera.h"
@@ -9,10 +9,10 @@ ToneMapPass::ToneMapPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
 
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
-	m_pAutoExposureHistogramCS = &AssetsSystems->ComputeShaders["AutoExposureHistogram"];
-    m_pAutoExposureEvalCS = &AssetsSystems->ComputeShaders["AutoExposureEval"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapACES"];
+	m_pAutoExposureHistogramCS = &ShaderSystem->ComputeShaders["AutoExposureHistogram"];
+    m_pAutoExposureEvalCS = &ShaderSystem->ComputeShaders["AutoExposureEval"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -212,14 +212,14 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
 	if (m_toneMapType == ToneMapType::Reinhard)
 	{
-        m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapReinhard"];
+        m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapReinhard"];
 		m_toneMapReinhardConstant.m_bUseToneMap = m_isAbleToneMap;
 		DirectX11::UpdateBuffer(m_pReinhardConstantBuffer, &m_toneMapReinhardConstant);
 		DirectX11::PSSetConstantBuffer(0, 1, &m_pReinhardConstantBuffer);
 	}
 	else if (m_toneMapType == ToneMapType::ACES)
 	{
-        m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ToneMapACES"];
+        m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapACES"];
 		m_toneMapACESConstant.m_bUseToneMap = m_isAbleToneMap;
 		m_toneMapACESConstant.m_bUseFilmic = m_isAbleFilmic;
 		DirectX11::UpdateBuffer(m_pACESConstantBuffer, &m_toneMapACESConstant);

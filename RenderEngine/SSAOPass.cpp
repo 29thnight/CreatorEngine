@@ -1,13 +1,13 @@
 #include "SSAOPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include <random>
 
 SSAOPass::SSAOPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["SSAO"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["SSAO"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     m_Buffer = DirectX11::CreateBuffer(sizeof(SSAOBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);

@@ -1,5 +1,5 @@
 #include "UIPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 #include "Mesh.h"
 #include "Scene.h"
@@ -8,10 +8,10 @@ UIPass::UIPass()
 {
 
 	m_pso = std::make_unique<PipelineStateObject>();
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["UI"];
-	//m_pso->m_geometryShader = &AssetsSystems->GeometryShaders["BillBoard"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["UI"];
-	//m_pso->m_computeShader = &AssetsSystems->ComputeShaders["FireCompute"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["UI"];
+	//m_pso->m_geometryShader = &ShaderSystem->GeometryShaders["BillBoard"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["UI"];
+	//m_pso->m_computeShader = &ShaderSystem->ComputeShaders["FireCompute"];
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{

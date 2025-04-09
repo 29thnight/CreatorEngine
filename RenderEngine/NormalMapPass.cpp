@@ -1,5 +1,5 @@
 #include "NormalMapPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -9,8 +9,8 @@ NormalMapPass::NormalMapPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
 
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["NormalMap"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["PositionMap"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["NormalMap"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["PositionMap"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{

@@ -1,5 +1,5 @@
 #include "AAPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
@@ -9,7 +9,7 @@
 AAPass::AAPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
-	m_pso->m_computeShader = &AssetsSystems->ComputeShaders["FXAA"];
+	m_pso->m_computeShader = &ShaderSystem->ComputeShaders["FXAA"];
 
 	m_FXAAParameters.TextureSize.x = (int)DeviceState::g_ClientRect.width;
 	m_FXAAParameters.TextureSize.y = (int)DeviceState::g_ClientRect.height;

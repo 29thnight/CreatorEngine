@@ -1,7 +1,7 @@
 #include "DeferredPass.h"
 #include "Scene.h"
 #include "Light.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 
 struct alignas(16) DeferredBuffer
@@ -15,8 +15,8 @@ struct alignas(16) DeferredBuffer
 DeferredPass::DeferredPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Deferred"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Deferred"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =

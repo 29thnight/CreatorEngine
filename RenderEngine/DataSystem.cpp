@@ -93,7 +93,7 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
-	if(source != destination && file::exists(source) && file::exists(destination))
+	if(source != destination && file::exists(source) && !file::exists(destination))
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);
 	}
@@ -282,7 +282,31 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileNa
 	ImVec2 lineStart = ImVec2(pos.x, pos.y + 2);
 	ImVec2 lineEnd = ImVec2(pos.x + lineWidth, pos.y + 2);
 	// 예시: 주황색 라인, 두께 2.0f
-	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 165, 0, 255), 2.0f);
+
+	switch (fileType)
+	{
+	case FileType::Model:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 165, 0, 255), 2.0f);
+		break;
+	case FileType::Texture:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(0, 255, 0, 255), 2.0f);
+		break;
+	case FileType::Shader:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(0, 0, 255, 255), 2.0f);
+		break;
+	case FileType::CppScript:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 0, 0, 255), 2.0f);
+		break;
+	case FileType::CSharpScript:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 0, 255, 255), 2.0f);
+		break;
+	case FileType::Sound:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 255, 0, 255), 2.0f);
+		break;
+	case FileType::Unknown:
+		ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(128, 128, 128, 255), 2.0f);
+		break;
+	}
 
 	// 라인을 그린 후 일정 공간 확보 (라인 영역만큼 Dummy 호출)
 	ImGui::Dummy(ImVec2(0, 8));

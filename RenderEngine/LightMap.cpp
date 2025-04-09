@@ -1,5 +1,5 @@
 #include "LightMap.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Light.h"
@@ -54,7 +54,7 @@ namespace lm {
 
 	void LightMap::Prepare()
 	{
-		m_computeShader = &AssetsSystems->ComputeShaders["Lightmap"];
+		m_computeShader = &ShaderSystem->ComputeShaders["Lightmap"];
 
 		m_Buffer = DirectX11::CreateBuffer(sizeof(CBData), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 		m_transformBuf = DirectX11::CreateBuffer(sizeof(CBTransform), D3D11_BIND_CONSTANT_BUFFER, nullptr);

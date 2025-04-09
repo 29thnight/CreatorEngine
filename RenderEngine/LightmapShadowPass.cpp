@@ -1,5 +1,5 @@
 #include "LightmapShadowPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Light.h"
@@ -9,8 +9,8 @@
 LightmapShadowPass::LightmapShadowPass() {
 	m_pso = std::make_unique<PipelineStateObject>();
 
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ShadowMap"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ShadowMap"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{

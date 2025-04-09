@@ -1,5 +1,5 @@
 #include "GridPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "DeviceState.h"
 #include "Scene.h"
 #include "ImGuiRegister.h"
@@ -22,8 +22,8 @@ GridPass::GridPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
 
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Grid"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Grid"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Grid"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Grid"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =

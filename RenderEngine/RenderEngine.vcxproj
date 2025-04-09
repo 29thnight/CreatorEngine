@@ -149,7 +149,7 @@
   <ItemGroup>
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
-    <ClCompile Include="AssetSystem.cpp" />
+    <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
@@ -190,7 +190,7 @@
   <ItemGroup>
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
-    <ClInclude Include="AssetSystem.h" />
+    <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="BlitPass.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="cbuffers.h" />

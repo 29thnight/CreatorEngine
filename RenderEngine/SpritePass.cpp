@@ -1,5 +1,5 @@
 #include "SpritePass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "RenderScene.h"
 #include "Renderer.h"
 #include "Scene.h"
@@ -8,8 +8,8 @@ SpritePass::SpritePass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
 
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Sprite"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Sprite"];
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
     {
