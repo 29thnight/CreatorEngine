@@ -3,7 +3,7 @@
 #include "Model.h"	
 #include <ppltasks.h>
 #include <ppl.h>
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include <future>
 
 #include "IconsFontAwesome6.h"

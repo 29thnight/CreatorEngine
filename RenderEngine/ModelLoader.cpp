@@ -1,5 +1,5 @@
 #include "ModelLoader.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
 #include "assimp/material.h"
@@ -404,7 +404,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 		if (m_model->m_hasBones)
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
 			m_animator->m_Skeleton = m_model->m_Skeleton;
@@ -414,7 +414,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		Banchmark banch;
+		Benchmark banch;
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];

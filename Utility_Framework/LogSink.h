@@ -1,7 +1,7 @@
 #pragma once
 #include "LogEntry.h"
 #include "RingBuffer.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include <iostream>
 #include <spdlog/sinks/base_sink.h>
 #include <mutex>

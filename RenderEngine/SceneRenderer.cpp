@@ -2,7 +2,7 @@
 #include "DeviceState.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
@@ -669,7 +669,7 @@ void SceneRenderer::SceneRendering()
 		//[1] ShadowMapPass
 		{
 			static int count = 0;
-			Banchmark banch;
+			Benchmark banch;
 			camera->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
@@ -681,7 +681,7 @@ void SceneRenderer::SceneRendering()
         {
 			//[2] GBufferPass
 			{
-				Banchmark banch;
+				Benchmark banch;
 				m_pGBufferPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
@@ -689,7 +689,7 @@ void SceneRenderer::SceneRendering()
 
 			//[3] SSAOPass
 			{
-				Banchmark banch;
+				Benchmark banch;
 				m_pSSAOPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
 				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
@@ -697,7 +697,7 @@ void SceneRenderer::SceneRendering()
 
 			//[4] DeferredPass
 			{
-				Banchmark banch;
+				Benchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
@@ -706,7 +706,7 @@ void SceneRenderer::SceneRendering()
 		}
 		else
         {
-			Banchmark banch;
+			Benchmark banch;
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 		}
@@ -714,7 +714,7 @@ void SceneRenderer::SceneRendering()
 		//[*] WireFramePass
 		if (useWireFrame)
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
 			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
@@ -722,7 +722,7 @@ void SceneRenderer::SceneRendering()
 
 		//[5] skyBoxPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
 			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
@@ -730,14 +730,14 @@ void SceneRenderer::SceneRendering()
 
 		//[*] PostProcessPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
 		}
 
 		//[6] AAPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
 			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
@@ -745,7 +745,7 @@ void SceneRenderer::SceneRendering()
 
 		//[7] ToneMapPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
 			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
@@ -753,7 +753,7 @@ void SceneRenderer::SceneRendering()
 
 		//[*] GridPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pGridPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
 			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
@@ -761,7 +761,7 @@ void SceneRenderer::SceneRendering()
 
 		//[7] SpritePass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pSpritePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
 			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
@@ -769,14 +769,14 @@ void SceneRenderer::SceneRendering()
 
 		//[]  UIPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
 		}
 
 		//[8] BlitPass
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;

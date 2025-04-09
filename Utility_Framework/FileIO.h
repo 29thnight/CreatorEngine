@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <cstdio>
 
-// FileReader Å¬·¡½º´Â IReader ÀÎÅÍÆäÀÌ½º¸¦ ±¸ÇöÇÏ¿© ÆÄÀÏ ÀĞ±â ±â´ÉÀ» Á¦°ø
+// FileReader í´ë˜ìŠ¤ëŠ” IReader ì¸í„°í˜ì´ìŠ¤ë¥¼ êµ¬í˜„í•˜ì—¬ íŒŒì¼ ì½ê¸° ê¸°ëŠ¥ì„ ì œê³µ
 class FileReader 
 {
 public:
@@ -14,7 +14,7 @@ public:
 			throw std::runtime_error(throwMessage);
 		}
 
-		errno_t err = fopen_s(&file, filePath.string().c_str(), "wb");
+		errno_t err = fopen_s(&file, filePath.string().c_str(), "rb");
 		if (err != 0)
 		{
 			std::string throwMessage = "Failed to open file for writing: " + filePath.string();

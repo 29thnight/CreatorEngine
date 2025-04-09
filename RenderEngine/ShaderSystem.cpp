@@ -1,6 +1,6 @@
 #include "ShaderSystem.h"
 #include "HLSLCompiler.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -14,7 +14,7 @@ void ShaderResourceSystem::LoadShaders()
 {
 	try
 	{
-		Banchmark banch;
+		Benchmark banch;
 		file::path shaderpath = PathFinder::RelativeToShader();
 		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))

@@ -1,12 +1,12 @@
 #include "HLSLCompiler.h"
 #include "FileIO.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
 
 ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 {
-	Banchmark banch;
+	Benchmark banch;
     file::path filePath{ filepath };
 	std::string fileExtension = filePath.extension().string();
 
@@ -80,7 +80,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     }
 	else if (fileExtension == ".cso")
     {
-		Banchmark banch;
+		Benchmark banch;
 		HRESULT hResult = S_OK;
 		hResult = D3DReadFileToBlob(filePath.c_str(), shaderBlob.ReleaseAndGetAddressOf());
 		if (FAILED(hResult))

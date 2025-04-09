@@ -19,7 +19,7 @@ public:
 	{
 		if (str.empty()) 
 		{
-			assert(!str.empty() && "Empty string provided to HashingString constructor.");
+            CORE_ASSERT_MSG(!str.empty(), "Empty string provided to HashingString constructor.");
 		}
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(str);
@@ -40,7 +40,7 @@ public:
 	{
 		if (str.empty()) 
 		{
-			assert(!str.empty() && "Empty string provided in assignment operator for std::string.");
+            CORE_ASSERT_MSG(!str.empty(), "Empty string provided in assignment operator for std::string.");
 		}
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(m_string);
