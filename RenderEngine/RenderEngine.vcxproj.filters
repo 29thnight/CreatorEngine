@@ -248,11 +248,11 @@
     <ClCompile Include="LightMapPass.cpp">
       <Filter>LightMap\Result</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderSystem.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="ForwardPass.cpp">
       <Filter>RenderPass\ForwardPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderSystem.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -380,7 +380,7 @@
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="ShaderSystem.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
