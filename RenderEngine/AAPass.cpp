@@ -84,3 +84,12 @@ void AAPass::ControlPanel()
 		ImGui::SliderFloat("SpanMax", &m_FXAAParameters.SpanMax, 0.0f, 100.0f);
 	}
 }
+
+void AAPass::ReloadShaders()
+{
+	m_pso->m_computeShader = &ShaderSystem->ComputeShaders["FXAA"];
+}
+
+void AAPass::Resize()
+{
+}

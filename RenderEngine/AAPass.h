@@ -22,6 +22,8 @@ public:
 	void SetAntiAliasingTexture(Texture* texture) { m_AntiAliasingTexture = texture; }
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+	virtual void ReloadShaders() override;
+	virtual void Resize() override;
 
 private:
 	Texture* m_CopiedTexture;

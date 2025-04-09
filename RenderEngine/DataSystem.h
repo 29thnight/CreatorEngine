@@ -57,7 +57,7 @@ public:
 	void CloseContentsBrowser();
 	void ShowDirectoryTree(const file::path& directory);
 	void ShowCurrentDirectoryFiles();
-	void DrawFileTile(ImTextureID iconTexture, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
+	void DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
 
 	ImFont* GetSmallFont() const { return smallFont; }
 	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
@@ -68,6 +68,7 @@ public:
 	static ImGuiTextFilter filter;
 
 private:
+	void OpenFile(const file::path& filepath);
 	void AddModel(const file::path& filepath, const file::path& dir);
 
 private:

@@ -67,6 +67,11 @@ class HLSLCompiler
 public:
     static ComPtr<ID3DBlob> LoadFormFile(const std::string_view& filepath);
 
+	static inline void CleanUpCache()
+	{
+		m_shaderCache.clear();
+	}
+
 private:
     static bool CheckResult(HRESULT hResult, ID3DBlob* shader, ID3DBlob* errorBlob);
     static bool CheckExtension(const std::string_view& shaderExtension);

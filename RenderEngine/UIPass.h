@@ -20,6 +20,10 @@ public:
 
 	static bool compareLayer(UIsprite* a, UIsprite* b);
 
+	void ControlPanel() override;
+	void ReloadShaders() override;
+	void Resize() override;
+
 
 	
 private:

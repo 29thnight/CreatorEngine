@@ -39,8 +39,8 @@ namespace InternalPath
 		TextureSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Textures\\").lexically_normal();
 		MaterialSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Materials\\").lexically_normal();
 		UISourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\UI\\").lexically_normal();
+        ShaderSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
 
-        ShaderSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Shaders\\").lexically_normal();
 		DynamicSolutionDir		= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
 		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();

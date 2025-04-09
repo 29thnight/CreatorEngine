@@ -15,6 +15,7 @@ namespace DeviceState
 	extern ID3D11RenderTargetView* g_backBufferRTV;
 	extern ID3D11ShaderResourceView* g_depthStancilSRV;
 	extern ID3D11ShaderResourceView* g_editorDepthStancilSRV;
+	extern ID3DUserDefinedAnnotation* g_annotation;
 	extern DirectX11::Sizef g_ClientRect;
 	extern float g_aspectRatio;
 	extern std::atomic<int> g_renderCallCount;
@@ -44,6 +45,7 @@ namespace DirectX11
 			size,
 			(uint32)bindFlag
 		};
+
 		ID3D11Buffer* buffer{};
 		if (data)
 		{
@@ -98,6 +100,28 @@ namespace DirectX11
 	inline float GetHeight()
 	{
 		return DeviceState::g_ClientRect.height;
+	}
+
+	//[unsafe]
+	inline void BeginEvent(const std::wstring_view& name)
+	{
+		if (!DeviceState::g_annotation)
+		{
+			Debug->LogError("[RenderEngine] -> Annotation is not initialized");
+			return;
+		}
+		DeviceState::g_annotation->BeginEvent(name.data());
+	}
+
+	//[unsafe]
+	inline void EndEvent()
+	{
+		if (!DeviceState::g_annotation)
+		{
+			Debug->LogError("[RenderEngine] -> Annotation is not initialized");
+			return;
+		}
+		DeviceState::g_annotation->EndEvent();
 	}
 
 	//[unsafe]

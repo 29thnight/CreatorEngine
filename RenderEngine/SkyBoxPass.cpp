@@ -396,3 +396,40 @@ void SkyBoxPass::ControlPanel()
 	ImGui::Checkbox("Enable", &m_abled);
 	ImGui::SliderFloat("scale", &m_scale, 1.f, 1000.f);
 }
+
+void SkyBoxPass::ReloadShaders()
+{
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Skybox"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Skybox"];
+	m_fullscreenVS = &ShaderSystem->VertexShaders["Fullscreen"];
+	m_irradiancePS = &ShaderSystem->PixelShaders["IrradianceMap"];
+	m_prefilterPS = &ShaderSystem->PixelShaders["SpecularPreFilter"];
+	m_brdfPS = &ShaderSystem->PixelShaders["IntegrateBRDF"];
+	m_rectToCubeMapPS = &ShaderSystem->PixelShaders["RectToCubeMap"];
+	m_pso->m_inputLayout->Release();
+
+	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateInputLayout(
+			vertexLayoutDesc,
+			_countof(vertexLayoutDesc),
+			m_pso->m_vertexShader->GetBufferPointer(),
+			m_pso->m_vertexShader->GetBufferSize(),
+			&m_pso->m_inputLayout
+		)
+	);
+}
+
+void SkyBoxPass::Resize()
+{
+}

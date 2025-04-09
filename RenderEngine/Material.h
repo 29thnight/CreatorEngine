@@ -18,15 +18,16 @@ cbuffer MaterialInfomation
 	bool32		  m_convertToLinearSpace{};
 };
 
+enum class MaterialRenderingMode
+{
+	Opaque,
+	Transparent,
+};
+
+AUTO_REGISTER_ENUM(MaterialRenderingMode);
+
 class Material
 {
-public:
-	enum class RenderingMode
-	{
-		Opaque,
-		Transparent,
-	};
-
 public:
 	Material() meta_default(Material)
 	Material(const Material& material) = default;
@@ -65,7 +66,7 @@ public:
 	float		  m_roughness{ 1.0f };
 
 	MaterialInfomation m_materialInfo;
-	RenderingMode m_renderingMode{ RenderingMode::Opaque };
+	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 
 	ReflectionField(Material, PropertyAndMethod)
 	{
@@ -74,6 +75,7 @@ public:
 			meta_property(m_baseColor)
 			meta_property(m_metallic)
 			meta_property(m_roughness)
+			meta_enum_property(m_renderingMode)
 		});
 
 		MethodField
@@ -86,3 +88,4 @@ public:
 		ReturnReflection(Material)
 	};
 };
+

@@ -53,6 +53,9 @@ public:
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+	void ReloadShaders() override;
+	void Resize() override;
+
 
 private:
     Texture* m_DestTexture{};

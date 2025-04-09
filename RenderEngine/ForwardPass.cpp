@@ -1,4 +1,4 @@
-#include "GBufferPass.h"
+#include "ForwardPass.h"
 #include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
@@ -9,12 +9,11 @@
 #include "LightProperty.h"
 #include "Banchmark.hpp"
 
-GBufferPass::GBufferPass()
+ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
-
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["GBuffer"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Forward"];
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -38,20 +37,8 @@ GBufferPass::GBufferPass()
 		)
 	);
 
-	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateRasterizerState(
-			&rasterizerDesc,
-			&m_pso->m_rasterizerState
-		)
-	);
-
-	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
-
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
-
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
@@ -59,51 +46,29 @@ GBufferPass::GBufferPass()
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
-GBufferPass::~GBufferPass()
+ForwardPass::~ForwardPass()
 {
-	//TODO: default 로 변경할 것
 }
 
-void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
-{
-	for (uint32 i = 0; i < size; i++)
-	{
-		m_renderTargetViews[i] = renderTargetViews[i];
-	}
-}
-
-void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
-{
-	for (uint32 i = 0; i < size; i++)
-	{
-		m_editorRTV[i] = renderTargetViews[i];
-	}
-}
-
-void GBufferPass::Execute(RenderScene& scene, Camera& camera)
+void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
 
-	auto& deviceContext = DeviceState::g_pDeviceContext;
-
-	for (auto& RTV : m_renderTargetViews)
-	{
-		deviceContext->ClearRenderTargetView(RTV, Colors::Transparent);
-	}
-
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
+	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &view, camera.m_depthStencil->m_pDSV);
+	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
+	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
 	camera.UpdateBuffer();
 	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController->m_pLightBuffer);
 	scene.UseModel();
-
-	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
 
-	for (auto& sceneObject : m_deferredQueue)
-	{		
+	for (auto& sceneObject : m_forwardQueue)
+	{
 		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
@@ -140,38 +105,31 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		}
 		if (mat->m_pEmissive)
 		{
-			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
-		//36 skinedMesh Draw -> FrameDrop : 형편없구만
+
 		meshRenderer->m_Mesh->Draw();
 	}
 
+	ID3D11DepthStencilState* nullDepthStencilState = nullptr;
+	ID3D11BlendState* nullBlendState = nullptr;
+
+	DirectX11::OMSetDepthStencilState(nullDepthStencilState, 1);
+	DirectX11::OMSetBlendState(nullBlendState, nullptr, 0xFFFFFFFF);
+
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	for (uint32 i = 0; i < 5; i++)
-	{
-		DirectX11::PSSetShaderResources(i, 1, &nullSRV);
-	}
-
-	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
-	ZeroMemory(nullRTV, sizeof(nullRTV));
-	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
+	DirectX11::UnbindRenderTargets();
 }
 
-void GBufferPass::PushDeferredQueue(GameObject* sceneObject)
+void ForwardPass::ControlPanel()
 {
-	if (nullptr == sceneObject) return;
-	m_deferredQueue.push_back(sceneObject);
 }
 
-void GBufferPass::ClearDeferredQueue()
-{
-	m_deferredQueue.clear();
-}
-
-void GBufferPass::ReloadShaders()
+void ForwardPass::ReloadShaders()
 {
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["GBuffer"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Forward"];
 	m_pso->m_inputLayout->Release();
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -196,6 +154,17 @@ void GBufferPass::ReloadShaders()
 	);
 }
 
-void GBufferPass::Resize()
+void ForwardPass::Resize()
 {
+}
+
+void ForwardPass::PushForwardQueue(GameObject* sceneObject)
+{
+	if (nullptr == sceneObject) return;
+	m_forwardQueue.push_back(sceneObject);
+}
+
+void ForwardPass::ClearForwardQueue()
+{
+	m_forwardQueue.clear();
 }

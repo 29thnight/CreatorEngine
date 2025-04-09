@@ -158,6 +158,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 	);
 
 	texture->size = { float(metadata.width),float(metadata.height) };
+	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
 
 	return texture;
 }

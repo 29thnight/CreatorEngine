@@ -9,7 +9,7 @@ Texture2D Albedo : register(t0);
 Texture2D NormalMap : register(t1);
 Texture2D OcclusionRoughnessMetal : register(t2);
 Texture2D AoMap : register(t3);
-Texture2D Emissive : register(t4);
+Texture2D Emissive : register(t5);
 
 cbuffer PBRMaterial : register(b0)
 {
@@ -53,8 +53,6 @@ GBufferOutput main(PixelShaderInput IN)
     surf.N = normalize(IN.normal);
     surf.T = normalize(IN.tangent);
     surf.B = normalize(IN.binormal);
-    surf.V = normalize(eyePosition.xyz - surf.posW.xyz);
-    surf.NdotV = dot(surf.N, surf.V);
 
     if (gNormalState == NORMAL_MAP)
     {
@@ -64,6 +62,8 @@ GBufferOutput main(PixelShaderInput IN)
     {
         surf.N = CalcNormalFromBumpMap(NormalMap, IN.texCoord, surf);
     }
+    surf.V = normalize(eyePosition.xyz - surf.posW.xyz);
+    surf.NdotV = dot(surf.N, surf.V);
 
     // PACK GBUFFER
     float4 albedo = gAlbedo;

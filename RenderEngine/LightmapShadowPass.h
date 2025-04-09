@@ -17,7 +17,9 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateShadowMap(uint32 width, uint32 height);
 	void ClearShadowMap();
-    void ControlPanel() override;
+	void ControlPanel() override;
+	void ReloadShaders() override;
+	void Resize() override;
 
 	uint32 shadowmapSize = 4096;
 

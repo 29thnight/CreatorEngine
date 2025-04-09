@@ -114,7 +114,8 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 	scene.UseModel();
 
 	Animator* currentAnimator = nullptr;
-	for (auto& obj : scene.GetScene()->m_SceneObjects) {
+	for (auto& obj : scene.GetScene()->m_SceneObjects) 
+	{
 		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;

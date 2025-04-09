@@ -52,6 +52,7 @@ namespace DirectX11
 		ID3D11DepthStencilState* GetDepthStencilState() const { return m_depthStencilState.Get(); }
 		ID3D11BlendState* GetBlendState() const { return m_blendState.Get(); }
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
+		ID3DUserDefinedAnnotation* GetAnnotation() const { return m_annotation.Get(); }
 
 		ID2D1Factory3* GetD2DFactory() const { return m_d2dFactory.Get(); }
 		ID2D1Device2* GetD2DDevice() const { return m_d2dDevice.Get(); }

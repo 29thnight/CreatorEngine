@@ -8,13 +8,16 @@ ShaderResourceSystem::~ShaderResourceSystem()
 
 void ShaderResourceSystem::Initialize()
 {
+	HLSLIncludeReloadShaders();
+	CSOCleanup();
+	LoadShaders();
+	m_isReloading = false;
 }
 
 void ShaderResourceSystem::LoadShaders()
 {
 	try
 	{
-		Banchmark banch;
 		file::path shaderpath = PathFinder::RelativeToShader();
 		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))
@@ -43,7 +46,6 @@ void ShaderResourceSystem::LoadShaders()
 				AddShaderFromPath(dir.path());
 			}
 		}
-		std::cout << "Shaders loaded in " << banch.GetElapsedTime() << "ms" << std::endl;
 	}
 	catch (const file::filesystem_error& e)
 	{
@@ -52,6 +54,78 @@ void ShaderResourceSystem::LoadShaders()
 	catch (const std::exception& e)
 	{
 		Debug->LogWarning("Error" + std::string(e.what()));
+	}
+}
+
+void ShaderResourceSystem::ReloadShaders()
+{
+	RemoveShaders();
+	HLSLCompiler::CleanUpCache();
+	HLSLIncludeReloadShaders();
+	CSOCleanup();
+	LoadShaders();
+	m_isReloading = false;
+}
+
+void ShaderResourceSystem::HLSLIncludeReloadShaders()
+{
+	file::path shaderpath = PathFinder::RelativeToShader();
+	file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+	//find max last_write_time -> if hlsliTime > csoTime
+	//CSOCleanup();
+	for (auto& dir : file::recursive_directory_iterator(shaderpath))
+	{
+		if (dir.is_directory() || dir.path().extension() != ".hlsli")
+			continue;
+		file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+		if (file::exists(cso))
+		{
+			auto hlsliTime = file::last_write_time(dir.path());
+			auto csoTime = file::last_write_time(cso);
+			if (hlsliTime > csoTime)
+			{
+				CSOAllCleanup();
+				break;
+			}
+		}
+	}
+}
+
+void ShaderResourceSystem::CSOCleanup()
+{
+	file::path shaderpath = PathFinder::RelativeToShader();
+	file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+	for (auto& dir : file::recursive_directory_iterator(shaderpath))
+	{
+		if (dir.is_directory() || dir.path().extension() != ".hlsl")
+			continue;
+		file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+		if (file::exists(cso))
+		{
+			auto hlslTime = file::last_write_time(dir.path());
+			auto csoTime = file::last_write_time(cso);
+
+			if (hlslTime > csoTime)
+			{
+				file::remove(cso);
+			}
+		}
+	}
+}
+
+void ShaderResourceSystem::CSOAllCleanup()
+{
+	file::path shaderpath = PathFinder::RelativeToShader();
+	file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+	for (auto& dir : file::recursive_directory_iterator(shaderpath))
+	{
+		if (dir.is_directory() || dir.path().extension() != ".hlsl")
+			continue;
+		file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+		if (file::exists(cso))
+		{
+			file::remove(cso);
+		}
 	}
 }
 

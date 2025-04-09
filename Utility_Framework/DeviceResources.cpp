@@ -287,6 +287,10 @@ void DirectX11::DeviceResources::CreateDeviceResources()
     DirectX11::ThrowIfFailed(
         context.As(&m_d3dContext)
     );
+    // 디버그용 이벤트 추가용 m_annotation 객체 생성
+    DirectX11::ThrowIfFailed(
+		m_d3dContext->QueryInterface(IID_PPV_ARGS(&m_annotation))
+    );
 }
 
 void DirectX11::DeviceResources::CreateWindowSizeDependentResources()

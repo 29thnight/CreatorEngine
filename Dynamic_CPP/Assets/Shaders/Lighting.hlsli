@@ -13,7 +13,7 @@
 #define LIGHT_ENABLED_W_SHADOWMAP 2
 
 //Texture2D ShadowMap : register(t4); // support 1 for now, future use array
-Texture2DArray ShadowMapArr : register(t4);
+Texture2DArray ShadowMapArr : register(t4); //< -- t4 
 struct Light
 {
     float4 position;
