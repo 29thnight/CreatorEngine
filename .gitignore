@@ -457,3 +457,7 @@ FodyWeavers.xsd
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,visualstudio,c++
 /imgui.ini
+/Dynamic_CPP/Assets/Materials/textures
+/Dynamic_CPP/Assets/Materials
+/Dynamic_CPP/Assets/Models
+/Dynamic_CPP/Assets/Models/FlightHelmet.asset
