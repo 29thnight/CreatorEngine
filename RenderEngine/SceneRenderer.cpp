@@ -2,7 +2,7 @@
 #include "DeviceState.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
@@ -688,7 +688,7 @@ void SceneRenderer::SceneRendering()
 		{
 			DirectX11::BeginEvent(L"ShadowMapPass");
 			static int count = 0;
-			Banchmark banch;
+			Benchmark banch;
 			camera->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
@@ -702,7 +702,7 @@ void SceneRenderer::SceneRendering()
 			//[2] GBufferPass
 			{
 				DirectX11::BeginEvent(L"GBufferPass");
-				Banchmark banch;
+				Benchmark banch;
 				m_pGBufferPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
@@ -711,7 +711,7 @@ void SceneRenderer::SceneRendering()
 			//[3] SSAOPass
 			{
 				DirectX11::BeginEvent(L"SSAOPass");
-				Banchmark banch;
+				Benchmark banch;
 				m_pSSAOPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
@@ -720,7 +720,7 @@ void SceneRenderer::SceneRendering()
 			//[4] DeferredPass
 			{
 				DirectX11::BeginEvent(L"DeferredPass");
-				Banchmark banch;
+				Benchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
@@ -730,7 +730,7 @@ void SceneRenderer::SceneRendering()
 		else
         {
 			DirectX11::BeginEvent(L"LightMapPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -738,7 +738,7 @@ void SceneRenderer::SceneRendering()
 
 		{
 			DirectX11::BeginEvent(L"ForwardPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pForwardPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ForwardPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -748,7 +748,7 @@ void SceneRenderer::SceneRendering()
 		if (useWireFrame)
 		{
 			DirectX11::BeginEvent(L"WireFramePass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -757,7 +757,7 @@ void SceneRenderer::SceneRendering()
 		//[5] skyBoxPass
 		{
 			DirectX11::BeginEvent(L"SkyBoxPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -766,7 +766,7 @@ void SceneRenderer::SceneRendering()
 		//[*] PostProcessPass
 		{
 			DirectX11::BeginEvent(L"PostProcessPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -775,7 +775,7 @@ void SceneRenderer::SceneRendering()
 		//[6] AAPass
 		{
 			DirectX11::BeginEvent(L"AAPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -784,7 +784,7 @@ void SceneRenderer::SceneRendering()
 		//[7] ToneMapPass
 		{
 			DirectX11::BeginEvent(L"ToneMapPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -793,7 +793,7 @@ void SceneRenderer::SceneRendering()
 		//[*] GridPass
 		{
 			DirectX11::BeginEvent(L"GridPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pGridPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -802,7 +802,7 @@ void SceneRenderer::SceneRendering()
 		//[7] SpritePass
 		{
 			DirectX11::BeginEvent(L"SpritePass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pSpritePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -811,7 +811,7 @@ void SceneRenderer::SceneRendering()
 		//[]  UIPass
 		{
 			DirectX11::BeginEvent(L"UIPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();

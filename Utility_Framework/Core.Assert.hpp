@@ -41,11 +41,18 @@ namespace Core
 #ifndef CORE_ASSERT
 #ifdef NDEBUG
 #define CORE_ASSERT(expression) ((void)0)
+#define CORE_ASSERT_MSG(expression, message) ((void)0)
 #else
 #define CORE_ASSERT(expression) \
     if (!(expression))           \
     {                            \
         Core::AssertionFailure(#expression); \
+    }
+
+#define CORE_ASSERT_MSG(expression, message) \
+    if (!(expression))                       \
+    {                                        \
+        Core::AssertionFailure(message);     \
     }
 #endif
 #endif // !CORE_ASSERT

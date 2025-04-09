@@ -1,6 +1,6 @@
 #include "ShaderSystem.h"
 #include "HLSLCompiler.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {

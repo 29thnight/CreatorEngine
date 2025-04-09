@@ -19,9 +19,6 @@
     <Filter Include="Core.Assert">
       <UniqueIdentifier>{db8ea0c4-5a20-4af8-861d-271ee6c424fb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Console">
-      <UniqueIdentifier>{cd58958c-be03-425c-ba98-25fff4128742}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Mathf">
       <UniqueIdentifier>{77365139-821f-44e0-b873-c56013b686fa}</UniqueIdentifier>
     </Filter>
@@ -84,14 +81,11 @@
     <ClInclude Include="CoreWindow.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>
-    <ClInclude Include="Banchmark.hpp">
+    <ClInclude Include="Benchmark.hpp">
       <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="Core.Assert.hpp">
       <Filter>Core.Assert</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.Console.hpp">
-      <Filter>Core.Console</Filter>
     </ClInclude>
     <ClInclude Include="Core.Mathf.h">
       <Filter>Core.Mathf</Filter>

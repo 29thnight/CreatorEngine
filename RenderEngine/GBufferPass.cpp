@@ -7,7 +7,7 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "LightProperty.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 GBufferPass::GBufferPass()
 {
@@ -61,7 +61,7 @@ GBufferPass::GBufferPass()
 
 GBufferPass::~GBufferPass()
 {
-	//TODO: default ·Î º¯°æÇÒ °Í
+	//TODO: default ë¡œ ë³€ê²½í•  ê²ƒ
 }
 
 void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
@@ -142,7 +142,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		{
 			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
 		}
-		//36 skinedMesh Draw -> FrameDrop : ÇüÆí¾ø±¸¸¸
+		//36 skinedMesh Draw -> FrameDrop : í˜•íŽ¸ì—†êµ¬ë§Œ
 		meshRenderer->m_Mesh->Draw();
 	}
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Definition.h"
+#include "Core.Assert.hpp"
 #include <nlohmann/json.hpp>
 
 #include <assimp/Importer.hpp>
@@ -103,7 +104,6 @@ namespace Mathf
         case 3:
             return vec.w;
         }
-        assert(0);
         return 0.0;
     };
 

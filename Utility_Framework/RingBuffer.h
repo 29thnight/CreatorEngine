@@ -1,7 +1,7 @@
 // RingBuffer.h
 #pragma once
 #include <vector>
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include <iostream>
 #include <ranges>
 #include <algorithm>
@@ -26,7 +26,7 @@ public:
 
     std::vector<T> get_all()
     {
-		Banchmark banch;
+		Benchmark banch;
         size_t size = buffer_.size();
 		std::vector<T> result(size);
 

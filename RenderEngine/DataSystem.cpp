@@ -5,8 +5,8 @@
 #include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
-#include "Banchmark.hpp"
-#include "ShaderSystem.h"
+#include "Benchmark.hpp"
+#include <future>
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -336,14 +336,14 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
-	// ShellExecute ÇÔ¼ö È£Ãâ
+	// ShellExecute ?¨ìˆ˜ ?¸ì¶œ
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
-	// ¹İÈ¯°ªÀÌ 32 ÀÌÇÏÀÎ °æ¿ì´Â ¿À·ù¸¦ ³ªÅ¸³À´Ï´Ù.
+	// ë°˜í™˜ê°’ì´ 32 ?´í•˜??ê²½ìš°???¤ë¥˜ë¥??˜í??…ë‹ˆ??
 	if ((int)result <= 32)
 	{
-		// ¿À·ù Ã³¸®: ¿¹¸¦ µé¾î, ¿¡·¯ ¸Ş½ÃÁö Ãâ·Â µîÀÇ Ã³¸® ·ÎÁ÷ ±¸Çö °¡´É
-		MessageBox(NULL, L"ÆÄÀÏ ½ÇÇà¿¡ ½ÇÆĞÇß½À´Ï´Ù.", L"Error", MB_OK | MB_ICONERROR);
+		// ?¤ë¥˜ ì²˜ë¦¬: ?ˆë? ?¤ì–´, ?ëŸ¬ ë©”ì‹œì§€ ì¶œë ¥ ?±ì˜ ì²˜ë¦¬ ë¡œì§ êµ¬í˜„ ê°€??
+		MessageBox(NULL, L"?Œì¼ ?¤í–‰???¤íŒ¨?ˆìŠµ?ˆë‹¤.", L"Error", MB_OK | MB_ICONERROR);
 	}
 }
 

@@ -3,7 +3,7 @@
 #include "Skeleton.h"
 #include "Renderer.h"
 #include "Scene.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 using namespace DirectX;
 
