@@ -2,7 +2,7 @@
 #include "InputManager.h"
 #include "Utility_Framework/PathFinder.h"
 #include <regex>
-#include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/Benchmark.hpp"
 #include "ImGuiHelper/widgets.h"
 #include "Core.Minimal.h"
 #include <ranges>

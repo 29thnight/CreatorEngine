@@ -7,7 +7,7 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "LightProperty.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 
 ForwardPass::ForwardPass()
 {

@@ -820,7 +820,7 @@ void SceneRenderer::SceneRendering()
 		//[8] BlitPass
 		{
 			DirectX11::BeginEvent(L"BlitPass");
-			Banchmark banch;
+			Benchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();

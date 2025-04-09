@@ -1,5 +1,6 @@
 #include "DataSystem.h"
 //#include "MaterialLoader.h"
+#include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>
 #include <shellapi.h>
@@ -336,13 +337,10 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
-	// ShellExecute ?¨ìˆ˜ ?¸ì¶œ
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
-	// ë°˜í™˜ê°’ì´ 32 ?´í•˜??ê²½ìš°???¤ë¥˜ë¥??˜í??…ë‹ˆ??
 	if ((int)result <= 32)
 	{
-		// ?¤ë¥˜ ì²˜ë¦¬: ?ˆë? ?¤ì–´, ?ëŸ¬ ë©”ì‹œì§€ ì¶œë ¥ ?±ì˜ ì²˜ë¦¬ ë¡œì§ êµ¬í˜„ ê°€??
 		MessageBox(NULL, L"?Œì¼ ?¤í–‰???¤íŒ¨?ˆìŠµ?ˆë‹¤.", L"Error", MB_OK | MB_ICONERROR);
 	}
 }

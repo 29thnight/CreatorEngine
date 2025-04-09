@@ -4,7 +4,7 @@
 #include "ImGuiHelper/ImGuiRegister.h"
 #include "Physics/Common.h"
 #include "SoundManager.h"
-#include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/Benchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
 #include "Utility_Framework/TimeSystem.h"
 #include "ScriptBinder/HotLoadSystem.h"
