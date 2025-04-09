@@ -15,16 +15,16 @@ bool HasImageFile(const file::path& directory)
 {
 	for (const auto& entry : file::directory_iterator(directory))
 	{
-		if (entry.is_regular_file()) // ÆÄÀÏÀÎÁö È®ÀÎ
+		if (entry.is_regular_file()) // íŒŒì¼ì¸ì§€ í™•ì¸
 		{
 			std::string ext = entry.path().extension().string();
 			if (ext == ".png" || ext == ".jpg")
 			{
-				return true; // ÇÏ³ª¶óµµ ÀÖÀ¸¸é ¹Ù·Î true ¹İÈ¯
+				return true; // í•˜ë‚˜ë¼ë„ ìˆìœ¼ë©´ ë°”ë¡œ true ë°˜í™˜
 			}
 		}
 	}
-	return false; // ÀÌ¹ÌÁö ÆÄÀÏ ¾øÀ½
+	return false; // ì´ë¯¸ì§€ íŒŒì¼ ì—†ìŒ
 }
 
 DataSystem::~DataSystem()
@@ -34,13 +34,13 @@ DataSystem::~DataSystem()
 void DataSystem::Initialize()
 {
 	file::path iconpath = PathFinder::IconPath();
-	UnknownIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	TextureIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	UnknownIcon = Texture::LoadFormPath(iconpath.string() + "Unknown.png");
+	TextureIcon = Texture::LoadFormPath(iconpath.string() + "Texture.png");
 	ModelIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	AssetsIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	FolderIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	AssetsIcon = Texture::LoadFormPath(iconpath.string() + "Assets.png");
+	FolderIcon = Texture::LoadFormPath(iconpath.string() + "Folder.png");
 	ShaderIcon = Texture::LoadFormPath(iconpath.string() + "Shader.png");
-	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Code.png");
 
 	smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
@@ -173,15 +173,15 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 				nodeFlags |= ImGuiTreeNodeFlags_Selected;
 
 			std::string iconName = ICON_FA_FOLDER + std::string(" ") + dirName;
-			// Æ®¸® ³ëµå »ı¼º: ´İÈù »óÅÂÀÌ¸é ÀÚ½Ä ³ëµåµéÀº ·»´õ¸µµÇÁö ¾ÊÀ½.
+			// íŠ¸ë¦¬ ë…¸ë“œ ìƒì„±: ë‹«íŒ ìƒíƒœì´ë©´ ìì‹ ë…¸ë“œë“¤ì€ ë Œë”ë§ë˜ì§€ ì•ŠìŒ.
 			bool nodeOpen = ImGui::TreeNodeEx(iconName.c_str(), nodeFlags);
 			if (ImGui::IsItemClicked())
 			{
-				currentDirectory = entry.path(); // ¼±ÅÃµÈ µğ·ºÅä¸® °»½Å
+				currentDirectory = entry.path(); // ì„ íƒëœ ë””ë ‰í† ë¦¬ ê°±ì‹ 
 			}
 			if (nodeOpen)
 			{
-				// ÇÏÀ§ µğ·ºÅä¸® Ãâ·Â (Àç±Í È£Ãâ)
+				// í•˜ìœ„ ë””ë ‰í† ë¦¬ ì¶œë ¥ (ì¬ê·€ í˜¸ì¶œ)
 				ShowDirectoryTree(entry.path());
 				ImGui::TreePop();
 			}
@@ -191,17 +191,17 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
-	// ÇÑ Çà¿¡ Ç¥½ÃÇÒ Å¸ÀÏ ¼ö (¿¹: 4°³)
+	// í•œ í–‰ì— í‘œì‹œí•  íƒ€ì¼ ìˆ˜ (ì˜ˆ: 4ê°œ)
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
-	// Å¸ÀÏÀÇ °íÁ¤ ³Êºñ (¿©±â¼­´Â ¿¹½Ã·Î 100px)
+	// íƒ€ì¼ì˜ ê³ ì • ë„ˆë¹„ (ì—¬ê¸°ì„œëŠ” ì˜ˆì‹œë¡œ 100px)
 	const float tileWidth = 200.0f;
 
-	// ÇÑ Çà¿¡ µé¾î°¥ Å¸ÀÏ °³¼ö¸¦ °è»ê (ÃÖ¼Ò 1°³ ÀÌ»ó)
+	// í•œ í–‰ì— ë“¤ì–´ê°ˆ íƒ€ì¼ ê°œìˆ˜ë¥¼ ê³„ì‚° (ìµœì†Œ 1ê°œ ì´ìƒ)
 	int tileColumns = (int)(availableWidth / tileWidth);
 	tileColumns = (tileColumns > 0) ? tileColumns : 1;
 
-	// °è»êÇÑ ¿­ °³¼ö·Î Columns »ı¼º
+	// ê³„ì‚°í•œ ì—´ ê°œìˆ˜ë¡œ Columns ìƒì„±
 	ImGui::Columns(tileColumns, nullptr, false);
 
 	//const int tileColumns = 4;
@@ -222,8 +222,8 @@ void DataSystem::ShowCurrentDirectoryFiles()
 				extension == ".hlsl" || extension == ".cpp" || extension == ".h" || 
 				extension == ".cs")
 			{
-				// ÆÄÀÏ¿¡ ¸Â´Â ¾ÆÀÌÄÜ ÅØ½ºÃ³¸¦ °áÁ¤ÇÏ´Â ·ÎÁ÷ (¿¹½Ã·Î nullptr »ç¿ë)
-				ImTextureID iconTexture{};/* ÆÄÀÏ Á¾·ù¿¡ µû¸¥ ÅØ½ºÃ³ ·Îµå */;
+				// íŒŒì¼ì— ë§ëŠ” ì•„ì´ì½˜ í…ìŠ¤ì²˜ë¥¼ ê²°ì •í•˜ëŠ” ë¡œì§ (ì˜ˆì‹œë¡œ nullptr ì‚¬ìš©)
+				ImTextureID iconTexture{};/* íŒŒì¼ ì¢…ë¥˜ì— ë”°ë¥¸ í…ìŠ¤ì²˜ ë¡œë“œ */;
 				FileType fileType = FileType::Unknown;
 				if (extension == ".fbx" || extension == ".gltf" || extension == ".obj")
 				{
@@ -251,7 +251,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 					iconTexture = (ImTextureID)CodeIcon->m_pSRV;
 				}
 
-				// ÆÄÀÏ ÀÌ¸§, È®ÀåÀÚ µîÀ» Àü´Ş
+				// íŒŒì¼ ì´ë¦„, í™•ì¥ì ë“±ì„ ì „ë‹¬
 				DrawFileTile(iconTexture, entry.path().filename().string(), fileType);
 
 				ImGui::NextColumn();
@@ -263,25 +263,25 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
 {
-	// °¢ Å¸ÀÏ¸¶´Ù °íÀ¯ ID¸¦ ºÎ¿©ÇÏ¿© DrawList È£Ãâ °£¼· ¹æÁö
+	// ê° íƒ€ì¼ë§ˆë‹¤ ê³ ìœ  IDë¥¼ ë¶€ì—¬í•˜ì—¬ DrawList í˜¸ì¶œ ê°„ì„­ ë°©ì§€
 	ImGui::PushID(fileName.c_str());
 	ImGui::BeginGroup();
 
-	// ÀÌ¹ÌÁö ¾ÆÀÌÄÜ Ãâ·Â (Å¬¸¯ ÀÌº¥Æ®°¡ ÇÊ¿äÇÑ °æ¿ì ImageButton »ç¿ë)
+	// ì´ë¯¸ì§€ ì•„ì´ì½˜ ì¶œë ¥ (í´ë¦­ ì´ë²¤íŠ¸ê°€ í•„ìš”í•œ ê²½ìš° ImageButton ì‚¬ìš©)
 	if (ImGui::ImageButton(fileName.c_str(), iconTexture, tileSize))
 	{
-		// Å¬¸¯ ½Ã Ã³¸®ÇÒ ³»¿ë
+		// í´ë¦­ ì‹œ ì²˜ë¦¬í•  ë‚´ìš©
 	}
 
 
-	// ¾ÆÀÌÄÜ ¹Ù·Î ¾Æ·¡¿¡ »ç¿ëÀÚ Á¤ÀÇ »ö»óÀÇ ¶óÀÎÀ» ±×¸®±â À§ÇØ ÇöÀç ½ºÅ©¸° ÁÂÇ¥¸¦ °¡Á®¿È
+	// ì•„ì´ì½˜ ë°”ë¡œ ì•„ë˜ì— ì‚¬ìš©ì ì •ì˜ ìƒ‰ìƒì˜ ë¼ì¸ì„ ê·¸ë¦¬ê¸° ìœ„í•´ í˜„ì¬ ìŠ¤í¬ë¦° ì¢Œí‘œë¥¼ ê°€ì ¸ì˜´
 	ImVec2 pos = ImGui::GetCursorScreenPos();
-	// ¶óÀÎ ±æÀÌ¸¦ Å¸ÀÏ ³Êºñ¿Í µ¿ÀÏÇÏ°Ô ¼³Á¤ (ÇÊ¿ä½Ã tileSize.x »ç¿ë)
+	// ë¼ì¸ ê¸¸ì´ë¥¼ íƒ€ì¼ ë„ˆë¹„ì™€ ë™ì¼í•˜ê²Œ ì„¤ì • (í•„ìš”ì‹œ tileSize.x ì‚¬ìš©)
 	float lineWidth = tileSize.x + 10;
-	// ¶óÀÎ ½ÃÀÛ À§Ä¡¿Í ³¡ À§Ä¡ °è»ê (Á¶Á¤ °¡´ÉÇÑ y ¿ÀÇÁ¼Â)
+	// ë¼ì¸ ì‹œì‘ ìœ„ì¹˜ì™€ ë ìœ„ì¹˜ ê³„ì‚° (ì¡°ì • ê°€ëŠ¥í•œ y ì˜¤í”„ì…‹)
 	ImVec2 lineStart = ImVec2(pos.x, pos.y + 2);
 	ImVec2 lineEnd = ImVec2(pos.x + lineWidth, pos.y + 2);
-	// ¿¹½Ã: ÁÖÈ²»ö ¶óÀÎ, µÎ²² 2.0f
+	// ì˜ˆì‹œ: ì£¼í™©ìƒ‰ ë¼ì¸, ë‘ê»˜ 2.0f
 
 	switch (fileType)
 	{
@@ -308,10 +308,10 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileNa
 		break;
 	}
 
-	// ¶óÀÎÀ» ±×¸° ÈÄ ÀÏÁ¤ °ø°£ È®º¸ (¶óÀÎ ¿µ¿ª¸¸Å­ Dummy È£Ãâ)
+	// ë¼ì¸ì„ ê·¸ë¦° í›„ ì¼ì • ê³µê°„ í™•ë³´ (ë¼ì¸ ì˜ì—­ë§Œí¼ Dummy í˜¸ì¶œ)
 	ImGui::Dummy(ImVec2(0, 8));
 
-	// ÆÄÀÏ ÀÌ¸§°ú ÆÄÀÏ Á¾·ù ÅØ½ºÆ® Ãâ·Â (¿øÇÏ´Â ½ºÅ¸ÀÏ Àû¿ë °¡´É)
+	// íŒŒì¼ ì´ë¦„ê³¼ íŒŒì¼ ì¢…ë¥˜ í…ìŠ¤íŠ¸ ì¶œë ¥ (ì›í•˜ëŠ” ìŠ¤íƒ€ì¼ ì ìš© ê°€ëŠ¥)
 	ImGui::PushFont(smallFont);
 	ImGui::TextWrapped("%s", fileName.c_str());
 	ImGui::PopFont();
@@ -322,10 +322,10 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileNa
 
 	ImGui::EndGroup();
 
-	// µå·¡±× µå¶ø ¼Ò½º ¼³Á¤
+	// ë“œë˜ê·¸ ë“œë ì†ŒìŠ¤ ì„¤ì •
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
-		// ÆÄÀÏ °æ·Î¸¦ payload·Î ¼³Á¤ ("MODEL_RESOURCE" ¶ó´Â Å¸ÀÔÀ» ÁöÁ¤)
+		// íŒŒì¼ ê²½ë¡œë¥¼ payloadë¡œ ì„¤ì • ("MODEL_RESOURCE" ë¼ëŠ” íƒ€ì…ì„ ì§€ì •)
 		ImGui::SetDragDropPayload("MODEL_RESOURCE", fileName.c_str(), fileName.size() + 1);
 		ImGui::Text("Dragging %s", fileName.c_str());
 		ImGui::EndDragDropSource();
