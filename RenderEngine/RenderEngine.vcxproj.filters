@@ -248,11 +248,11 @@
     <ClCompile Include="LightMapPass.cpp">
       <Filter>LightMap\Result</Filter>
     </ClCompile>
-    <ClCompile Include="ForwardPass.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="ShaderSystem.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ForwardPass.cpp">
+      <Filter>RenderPass\ForwardPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
