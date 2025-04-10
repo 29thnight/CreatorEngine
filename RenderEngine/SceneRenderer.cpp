@@ -1,8 +1,8 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
@@ -203,6 +203,10 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
             ImGui::Text("Camera Settings");
             ImGui::Separator();
             ImGui::InputFloat("FOV  ", &cam->m_fov);
+			if (0 == cam->m_fov)
+			{
+				cam->m_fov = 1.f;
+			}
             ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
             ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
             ImGui::EndPopup();
@@ -221,6 +225,7 @@ void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, fl
 			ImGui::Text("GBufferPass: %.5f ms", RenderStatistics->GetRenderState("GBufferPass"));
 			ImGui::Text("SSAOPass: %.5f ms", RenderStatistics->GetRenderState("SSAOPass"));
 			ImGui::Text("DeferredPass: %.5f ms", RenderStatistics->GetRenderState("DeferredPass"));
+			ImGui::Text("ForwardPass: %.5f ms", RenderStatistics->GetRenderState("ForwardPass"));
 			ImGui::Text("LightMapPass: %.5f ms", RenderStatistics->GetRenderState("LightMapPass"));
 			ImGui::Text("WireFramePass: %.5f ms", RenderStatistics->GetRenderState("WireFramePass"));
 			ImGui::Text("SkyBoxPass: %.5f ms", RenderStatistics->GetRenderState("SkyBoxPass"));
@@ -288,9 +293,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
-	AssetsSystems->LoadShaders();
-
 	InitializeTextures();
+
+	ShaderSystem->Initialize();
 
 	Texture* ao = Texture::Create(
 		DeviceState::g_ClientRect.width,
@@ -342,6 +347,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
         m_emissiveTexture.get()
     );
 
+	//forwardPass
+	m_pForwardPass = std::make_unique<ForwardPass>();
+
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
 	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
@@ -387,6 +395,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pLightMapPass = std::make_unique<LightMapPass>();
 
 	m_renderScene = new RenderScene();
+
 }
 
 
@@ -403,6 +412,7 @@ void SceneRenderer::InitializeDeviceState()
     DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
     DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
     DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
+	DeviceState::g_annotation = m_deviceResources->GetAnnotation();
 }
 
 void SceneRenderer::InitializeImGui()
@@ -639,13 +649,19 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	m_renderScene->Update(deltaTime);
-	//m_pEditorCamera->HandleMovement(deltaTime);
-	for (auto& camera : CameraManagement->m_cameras)
+	if(ShaderSystem->IsReloading())
 	{
-		if (nullptr == camera) continue;
-		camera->HandleMovement(deltaTime);
+		ReloadShaders();
 	}
+
+	m_renderScene->Update(deltaTime);
+	m_pEditorCamera->HandleMovement(deltaTime);
+	// 디버그용으로 임시로 같이 움직이도록 조정
+	//for (auto& camera : CameraManagement->m_cameras)
+	//{
+	//	if (nullptr == camera) continue;
+	//	camera->HandleMovement(deltaTime);
+	//}
 
 	PrepareRender();
 	m_pUIPass->Update(deltaTime);
@@ -666,124 +682,154 @@ void SceneRenderer::SceneRendering()
 	for(auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
+		std::wstring name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
+		DirectX11::BeginEvent(name.c_str());
 		//[1] ShadowMapPass
 		{
+			DirectX11::BeginEvent(L"ShadowMapPass");
 			static int count = 0;
-			Banchmark banch;
+			Benchmark banch;
 			camera->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
 			RenderStatistics->UpdateRenderState("ShadowMapPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		if(!useTestLightmap)
         {
 			//[2] GBufferPass
 			{
-				Banchmark banch;
+				DirectX11::BeginEvent(L"GBufferPass");
+				Benchmark banch;
 				m_pGBufferPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
-				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+				DirectX11::EndEvent();
 			}
 
 			//[3] SSAOPass
 			{
-				Banchmark banch;
+				DirectX11::BeginEvent(L"SSAOPass");
+				Benchmark banch;
 				m_pSSAOPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
-				//std::cout << "GBufferPass : " << banch.GetElapsedTime() << std::endl;
+				DirectX11::EndEvent();
 			}
 
 			//[4] DeferredPass
 			{
-				Banchmark banch;
+				DirectX11::BeginEvent(L"DeferredPass");
+				Benchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
-				//Debug->Log("DeferredPass : " + std::to_string(banch.GetElapsedTime()));
+				DirectX11::EndEvent();
 			}
 		}
 		else
         {
-			Banchmark banch;
+			DirectX11::BeginEvent(L"LightMapPass");
+			Benchmark banch;
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
+		{
+			DirectX11::BeginEvent(L"ForwardPass");
+			Benchmark banch;
+			m_pForwardPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("ForwardPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[*] WireFramePass
 		if (useWireFrame)
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"WireFramePass");
+			Benchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
-			//std::cout << "WireFramePass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[5] skyBoxPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"SkyBoxPass");
+			Benchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
-			//std::cout << "SkyBoxPass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[*] PostProcessPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"PostProcessPass");
+			Benchmark banch;
 			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[6] AAPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"AAPass");
+			Benchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
-			//std::cout << "AAPass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[7] ToneMapPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"ToneMapPass");
+			Benchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
-			//std::cout << "ToneMapPass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[*] GridPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"GridPass");
+			Benchmark banch;
 			m_pGridPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
-			//std::cout << "GridPass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[7] SpritePass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"SpritePass");
+			Benchmark banch;
 			m_pSpritePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
-			//std::cout << "SpritePass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
 
 		//[]  UIPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"UIPass");
+			Benchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[8] BlitPass
 		{
-			Banchmark banch;
+			DirectX11::BeginEvent(L"BlitPass");
+			Benchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
-			//std::cout << "BlitPass : " << banch.GetElapsedTime() << std::endl;
+			DirectX11::EndEvent();
 		}
+		DirectX11::EndEvent();
 	}
 
 	m_pGBufferPass->ClearDeferredQueue();
+	m_pForwardPass->ClearForwardQueue();
 }
 
 void SceneRenderer::PrepareRender()
@@ -798,10 +844,11 @@ void SceneRenderer::PrepareRender()
 
 		switch (mat->m_renderingMode)
 		{
-		case Material::RenderingMode::Opaque:
+		case MaterialRenderingMode::Opaque:
 			m_pGBufferPass->PushDeferredQueue(obj.get());
 			break;
-		case Material::RenderingMode::Transparent:
+		case MaterialRenderingMode::Transparent:
+			m_pForwardPass->PushForwardQueue(obj.get());
 			break;
 		}
 	}
@@ -835,6 +882,27 @@ void SceneRenderer::UnbindRenderTargets()
 	ID3D11RenderTargetView* nullRTV = nullptr;
 	ID3D11DepthStencilView* nullDSV = nullptr;
 	DirectX11::OMSetRenderTargets(1, &nullRTV, nullDSV);
+}
+
+void SceneRenderer::ReloadShaders()
+{
+	ShaderSystem->ReloadShaders();
+	m_renderScene->m_LightController->m_shadowMapPass->ReloadShaders();
+	m_pDeferredPass->ReloadShaders();
+	m_pGBufferPass->ReloadShaders();
+	m_pSSAOPass->ReloadShaders();
+	m_pAAPass->ReloadShaders();
+	m_pSkyBoxPass->ReloadShaders();
+	m_pToneMapPass->ReloadShaders();
+	m_pWireFramePass->ReloadShaders();
+	m_pGridPass->ReloadShaders();
+	m_pSpritePass->ReloadShaders();
+	m_pBlitPass->ReloadShaders();
+	m_pPostProcessingPass->ReloadShaders();
+	m_pLightMapPass->ReloadShaders();
+	m_pUIPass->ReloadShaders();
+	m_pLightmapShadowPass->ReloadShaders();
+	m_pForwardPass->ReloadShaders();
 }
 
 void SceneRenderer::EditorView()

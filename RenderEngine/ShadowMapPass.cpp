@@ -1,5 +1,5 @@
 #include "ShadowMapPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -10,8 +10,8 @@ ShadowMapPass::ShadowMapPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
 
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["ShadowMap"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ShadowMap"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
@@ -94,8 +94,6 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 
 void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 {
-
-
 	m_pso->Apply();
 	if (!m_abled)
 	{
@@ -171,7 +169,38 @@ void ShadowMapPass::ControlPanel()
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
 
+void ShadowMapPass::ReloadShaders()
+{
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ShadowMap"];
+	m_pso->m_inputLayout->Release();
 
+	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateInputLayout(
+			vertexLayoutDesc,
+			_countof(vertexLayoutDesc),
+			m_pso->m_vertexShader->GetBufferPointer(),
+			m_pso->m_vertexShader->GetBufferSize(),
+			&m_pso->m_inputLayout
+		)
+	);
+}
+
+void ShadowMapPass::Resize()
+{
+
+}
 
 std::vector<float> devideCascadeEnd(Camera& camera, std::vector<float> ratios)
 {

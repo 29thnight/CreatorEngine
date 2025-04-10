@@ -1,5 +1,5 @@
 #include "GBufferPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
@@ -7,25 +7,15 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "LightProperty.h"
-#include "Banchmark.hpp"
-
-constexpr uint32 ThreadNumber = 16;
-
-enum class JobBufferType
-{
-	Model,
-	View,
-	Projection,
-	Bone,
-	Material
-};
+#include "Benchmark.hpp"
 
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
 
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["GBuffer"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["GBuffer"];
+	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
@@ -71,7 +61,7 @@ GBufferPass::GBufferPass()
 
 GBufferPass::~GBufferPass()
 {
-	//TODO: default ·Î º¯°æÇÒ °Í
+	//TODO: default ë¡œ ë³€ê²½í•  ê²ƒ
 }
 
 void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
@@ -111,7 +101,6 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
-	int index = 0;
 
 	for (auto& sceneObject : m_deferredQueue)
 	{		
@@ -153,7 +142,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		{
 			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
 		}
-		//36 skinedMesh Draw -> FrameDrop : ÇüÆí¾ø±¸¸¸
+		//36 skinedMesh Draw -> FrameDrop : í˜•íŽ¸ì—†êµ¬ë§Œ
 		meshRenderer->m_Mesh->Draw();
 	}
 
@@ -170,10 +159,43 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 void GBufferPass::PushDeferredQueue(GameObject* sceneObject)
 {
+	if (nullptr == sceneObject) return;
 	m_deferredQueue.push_back(sceneObject);
 }
 
 void GBufferPass::ClearDeferredQueue()
 {
 	m_deferredQueue.clear();
+}
+
+void GBufferPass::ReloadShaders()
+{
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["GBuffer"];
+	m_pso->m_inputLayout->Release();
+
+	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateInputLayout(
+			vertexLayoutDesc,
+			_countof(vertexLayoutDesc),
+			m_pso->m_vertexShader->GetBufferPointer(),
+			m_pso->m_vertexShader->GetBufferSize(),
+			&m_pso->m_inputLayout
+		)
+	);
+}
+
+void GBufferPass::Resize()
+{
 }

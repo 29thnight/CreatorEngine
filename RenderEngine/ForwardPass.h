@@ -9,8 +9,13 @@ public:
 	ForwardPass();
 	~ForwardPass();
 
-	void Initialize(ID3D11RenderTargetView* renderTarget);
-	void Execute(Scene& scene) override;
+	void Execute(RenderScene& scene, Camera& camera);
+	void ControlPanel() override;
+	void ReloadShaders() override;
+	void Resize() override;
+
+	void PushForwardQueue(GameObject* sceneObject);
+	void ClearForwardQueue();
 
 private:
 	ID3D11RenderTargetView* m_RenderTarget{};

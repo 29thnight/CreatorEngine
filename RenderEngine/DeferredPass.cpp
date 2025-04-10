@@ -1,7 +1,7 @@
 #include "DeferredPass.h"
 #include "Scene.h"
 #include "Light.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 
 struct alignas(16) DeferredBuffer
@@ -10,13 +10,14 @@ struct alignas(16) DeferredBuffer
     Mathf::xMatrix m_InverseView;
     bool32 m_useAmbientOcclusion{};
     bool32 m_useEnvironmentMap{};
+	float m_envMapIntensity{ 1.f };
 };
 
 DeferredPass::DeferredPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
-    m_pso->m_vertexShader = &AssetsSystems->VertexShaders["Fullscreen"];
-    m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Deferred"];
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Deferred"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
@@ -102,6 +103,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     buffer.m_InverseView = XMMatrixInverse(nullptr, camera.CalculateView());
     buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
     buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
+	buffer.m_envMapIntensity = m_envMapIntensity;
 
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
@@ -149,4 +151,38 @@ void DeferredPass::ControlPanel()
 	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
+	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+}
+
+void DeferredPass::ReloadShaders()
+{
+    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Deferred"];
+
+    m_pso->m_inputLayout->Release();
+
+    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    };
+
+    DirectX11::ThrowIfFailed(
+        DeviceState::g_pDevice->CreateInputLayout(
+            vertexLayoutDesc,
+            _countof(vertexLayoutDesc),
+            m_pso->m_vertexShader->GetBufferPointer(),
+            m_pso->m_vertexShader->GetBufferSize(),
+            &m_pso->m_inputLayout
+        )
+    );
+}
+
+void DeferredPass::Resize()
+{
 }

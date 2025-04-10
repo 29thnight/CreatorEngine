@@ -26,11 +26,14 @@ namespace Meta
 
         const std::string struct_prefix = "struct ";
         const std::string class_prefix = "class ";
+		const std::string enum_prefix = "enum ";
 
         if (name.find(struct_prefix) == 0)
             name = name.substr(struct_prefix.size());
         else if (name.find(class_prefix) == 0)
             name = name.substr(class_prefix.size());
+		else if (name.find(enum_prefix) == 0)
+			name = name.substr(enum_prefix.size());
 
         uint32_t pointerPos{};
 
@@ -264,6 +267,29 @@ namespace Meta
                 static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
             },
 			isPointer
+        };
+    }
+
+    template<typename ClassT, typename EnumT>
+    std::enable_if_t<std::is_enum_v<EnumT>, Property>
+    MakeEnumProperty(const char* name, EnumT ClassT::* member)
+    {
+        return Property{
+            name,
+            ToString<EnumT>(), // enum 타입의 이름을 얻음.
+            typeid(EnumT),
+            // getter: enum 값을 underlying int로 변환하여 반환
+            [member](void* instance) -> std::any {
+                EnumT value = static_cast<ClassT*>(instance)->*member;
+                using Underlying = std::underlying_type_t<EnumT>;
+                return static_cast<int>(static_cast<Underlying>(value));
+            },
+            // setter: 전달받은 int를 다시 enum 타입으로 변환하여 저장
+            [member](void* instance, std::any anyValue) {
+                int intValue = std::any_cast<int>(anyValue);
+                static_cast<ClassT*>(instance)->*member = static_cast<EnumT>(intValue);
+            },
+            false // 이 경우 포인터 여부는 false로 둡니다.
         };
     }
 
@@ -546,6 +572,7 @@ constexpr uint32_t MethodOnly = 2;
 #define MethodField static const auto methods = std::to_array
 
 #define meta_property(member) Meta::MakeProperty(#member, &__Ty::member),
+#define meta_enum_property(member) Meta::MakeEnumProperty(#member, &__Ty::member),
 #define meta_method(method) Meta::MakeMethod(#method, &__Ty::method),
 
 #define ReturnReflection(T) \

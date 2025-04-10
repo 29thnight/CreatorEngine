@@ -22,10 +22,9 @@
     <ClInclude Include="..\framework.h" />
     <ClInclude Include="..\Resource.h" />
     <ClInclude Include="..\targetver.h" />
-    <ClInclude Include="Banchmark.hpp" />
+    <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
-    <ClInclude Include="Core.Console.hpp" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />

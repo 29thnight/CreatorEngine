@@ -1,6 +1,8 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "../Utility_Framework/DeviceResources.h"
+#include "../Utility_Framework/Delegate.h"
+#include "ForwardPass.h"
 #include "ShadowMapPass.h"
 #include "GBufferPass.h"
 #include "SSAOPass.h"
@@ -47,6 +49,7 @@ private:
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
 	void UnbindRenderTargets();
+	void ReloadShaders();
 
 	Scene* m_currentScene{};
 	RenderScene* m_renderScene{};
@@ -60,6 +63,7 @@ private:
 	std::unique_ptr<GBufferPass> m_pGBufferPass{};
 	std::unique_ptr<SSAOPass> m_pSSAOPass{};
 	std::unique_ptr<DeferredPass> m_pDeferredPass{};
+	std::unique_ptr<ForwardPass> m_pForwardPass{};
 	std::unique_ptr<SkyBoxPass> m_pSkyBoxPass{};
 	std::unique_ptr<ToneMapPass> m_pToneMapPass{};
 	std::unique_ptr<SpritePass> m_pSpritePass{};
@@ -94,9 +98,6 @@ private:
 	//Editor Camera
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
-	//render queue
-	std::queue<GameObject*> m_forwardQueue;
-
 	Model* model{};
 	Model* testModel{};
 	UIsprite testUI{};
@@ -107,6 +108,7 @@ private:
 public:
 	void SetWireFrame() { useWireFrame = !useWireFrame; }
 	void SetLightmapPass() { useTestLightmap = !useTestLightmap; }
+
 private:
 	int selected_log_index{};
 	bool useWireFrame = false;

@@ -14,6 +14,8 @@ public:
     void DisableAmbientOcclusion();
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+    virtual void ReloadShaders() override;
+    virtual void Resize() override;
 
 private:
     Texture* m_DiffuseTexture{};
@@ -28,6 +30,7 @@ private:
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };
 	bool m_UseLightWithShadows{ true };
+	float m_envMapIntensity{ 1.f };
 
     ComPtr<ID3D11Buffer> m_Buffer{};
     ComPtr<ID3D11Buffer> m_shadowcamBuffer{};

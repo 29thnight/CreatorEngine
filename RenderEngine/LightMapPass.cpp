@@ -1,5 +1,5 @@
 #include "LightMapPass.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
@@ -17,8 +17,8 @@ struct alignas(16) CB {
 LightMapPass::LightMapPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
-	m_pso->m_vertexShader = &AssetsSystems->VertexShaders["VertexShader"];
-	m_pso->m_pixelShader = &AssetsSystems->PixelShaders["Lightmap"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Lightmap"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
@@ -114,7 +114,8 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 	scene.UseModel();
 
 	Animator* currentAnimator = nullptr;
-	for (auto& obj : scene.GetScene()->m_SceneObjects) {
+	for (auto& obj : scene.GetScene()->m_SceneObjects) 
+	{
 		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;

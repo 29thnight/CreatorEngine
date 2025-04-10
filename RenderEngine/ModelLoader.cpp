@@ -1,9 +1,9 @@
 #include "ModelLoader.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
 #include "assimp/material.h"
-#include "assimp/pbrmaterial.h"
+#include "assimp/Gltfmaterial.h"
 
 ModelLoader::ModelLoader()
 {
@@ -62,7 +62,7 @@ Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
-	nodeObj->m_transform = DirectX::SimpleMath::Matrix(node->mTransformation[0]).Transpose();
+	nodeObj->m_transform = XMMatrixTranspose(XMMATRIX(&node->mTransformation.a1));
 	nodeObj->m_numChildren = node->mNumChildren;
 
 	m_model->m_nodes.push_back(nodeObj);
@@ -150,7 +150,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		aiFace face = mesh->mFaces[i];
 		for (uint32 j = 0; j < face.mNumIndices; j++)
 		{
-			indices.push_back(face.mIndices[j]);
+			indices.push_back((uint32)face.mIndices[j]);
 		}
 	}
 
@@ -194,19 +194,19 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 		if (m_loadType == LoadType::GLTF)
 		{
 			material->ConvertToLinearSpace(true);
-			Texture* albedo = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_TEXTURE);
+			Texture* albedo = GenerateTexture(mat, AI_MATKEY_BASE_COLOR_TEXTURE);
 			if (albedo) material->UseBaseColorMap(albedo);
 
 			Texture* occlusionMetalRough = GenerateTexture(mat, AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLICROUGHNESS_TEXTURE);
 			if (occlusionMetalRough) material->UseOccRoughMetalMap(occlusionMetalRough);
 
 			float metallic;
-			if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR, metallic) == AI_SUCCESS)
+			if (mat->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS)
 			{
 				material->SetMetallic(metallic);
 			}
 			float roughness;
-			if (mat->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS)
+			if (mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS)
 			{
 				material->SetRoughness(roughness);
 			}
@@ -214,7 +214,14 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 		else
 		{
 			Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
-			if (albedo) material->UseBaseColorMap(albedo);
+			if (albedo)
+			{
+				 material->UseBaseColorMap(albedo);
+				 if (albedo->IsTextureAlpha())
+				 {
+					 material->m_renderingMode = MaterialRenderingMode::Transparent;
+				 }
+			}
 
 			aiColor3D colour;
 			aiReturn res = mat->Get(AI_MATKEY_COLOR_DIFFUSE, colour);
@@ -239,7 +246,6 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 		material->SetBaseColor(1, 0, 1);
 	}
 
-	m_model->m_Materials.push_back(material);
 	return material;
 }
 
@@ -404,7 +410,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 		if (m_model->m_hasBones)
 		{
-			Banchmark banch;
+			Benchmark banch;
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
 			m_animator->m_Skeleton = m_model->m_Skeleton;
@@ -414,12 +420,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		Banchmark banch;
+		Benchmark banch;
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[mesh->m_materialIndex];
+		Material* material = m_model->m_Materials[meshId];
 		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
 		meshRenderer->SetEnabled(true);
@@ -492,8 +498,12 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 		else
 		{
 			texture = Texture::LoadFormPath(path);
-			DataSystems->Textures.emplace(textureName, texture);
-			m_model->m_Textures.push_back(texture);
+			if(nullptr != texture)
+			{
+				texture->m_name = textureName;
+				DataSystems->Textures.emplace(textureName, texture);
+				m_model->m_Textures.push_back(texture);
+			}
 		}
 	}
 	return texture;

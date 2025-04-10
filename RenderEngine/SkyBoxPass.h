@@ -23,6 +23,8 @@ public:
 
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+	void ReloadShaders() override;
+	void Resize() override;
 
 private:
     //skybox 쉐이더는 해당 pass의 기본 pso에 고정시키기

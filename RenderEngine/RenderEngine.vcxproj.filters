@@ -149,9 +149,6 @@
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="AssetSystem.cpp">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem</Filter>
     </ClCompile>
@@ -251,6 +248,12 @@
     <ClCompile Include="LightMapPass.cpp">
       <Filter>LightMap\Result</Filter>
     </ClCompile>
+    <ClCompile Include="ForwardPass.cpp">
+      <Filter>RenderPass\ForwardPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderSystem.cpp">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -278,9 +281,6 @@
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="DataSystem.h">
-      <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="AssetSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
     <ClInclude Include="AnimationJob.h">
@@ -376,133 +376,127 @@
     <ClInclude Include="LightMapPass.h">
       <Filter>LightMap\Result</Filter>
     </ClInclude>
+    <ClInclude Include="RenderState.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderSystem.h">
+      <Filter>Asset\ManagerSystem</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\x64\Assets\Shaders\SSAO.ps.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\FXAA.cs.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureHistogram.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\ToneMapACES.ps.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\ToneMapReinhard.ps.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Grid.ps.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomUpsample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\FXAA.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GaussianBlur.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSAO.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ToneMapACES.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ToneMapReinhard.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Blit.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Deferred.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Forward.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Fullscreen.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IntegrateBRDF.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IrradianceMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NeighborSampling.cs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NormalMap.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PixelShader.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\RectToCubeMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ShadowMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Skybox.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Skybox.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpecularPreFilter.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Sprite.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\UI.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\UI.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\VertexShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.ps.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Grid.vs.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.ps.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\WireFrame.ps.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\WireFrame.vs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Blit.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Deferred.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Forward.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Fullscreen.vs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GBuffer.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\IntegrateBRDF.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\IrradianceMap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\RectToCubeMap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\ShadowMap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Skybox.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Skybox.vs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\SpecularPreFilter.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sprite.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\VertexShader.vs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\GaussianBlur.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BloomComposite.ps.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BloomUpsample.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\AutoExposureHistogram.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\AutoExposureEval.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Lightmap.cs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\PositionMap.ps.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\PositionMap.vs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="NormalMap.vs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Lightmap.ps.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\NeighborSampling.cs.hlsl">
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\x64\Assets\Shaders\Lighting.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\Material.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\Phong.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\Sampler.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\Shading.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\BRDF.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\x64\Assets\Shaders\ACES.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
     </ClInclude>
@@ -512,7 +506,30 @@
     <ClInclude Include="UIsprite.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>
-    <None Include="..\x64\Assets\Shaders\AutoExposureShared.hlsli">
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\ACES.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureShared.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\BRDF.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Lighting.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Material.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Phong.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Sampler.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Dynamic_CPP\Assets\Shaders\Shading.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>

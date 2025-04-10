@@ -5,7 +5,7 @@
 #include "../ScriptBinder/Renderer.h"
 #include "Skeleton.h"
 #include "Light.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 

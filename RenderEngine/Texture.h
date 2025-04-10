@@ -68,9 +68,20 @@ public:
 
 	float2 GetImageSize() const;
 
+	bool IsTextureAlpha() const
+	{
+		return m_isTextureAlpha;
+	}
+
+	void SetTextureAlpha(bool isAlpha)
+	{
+		m_isTextureAlpha = isAlpha;
+	}
+
 private:
 	float2 size{};
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
+	bool m_isTextureAlpha{ false };
 };
 
 namespace TextureHelper

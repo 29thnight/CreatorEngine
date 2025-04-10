@@ -2,7 +2,7 @@
 #include "InputManager.h"
 #include "Utility_Framework/PathFinder.h"
 #include <regex>
-#include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/Benchmark.hpp"
 #include "ImGuiHelper/widgets.h"
 #include "Core.Minimal.h"
 #include <ranges>
@@ -45,7 +45,7 @@ void DrawPinIcon(const NodeType& pin, bool connected, int alpha)
     ax::Widgets::Icon(ImVec2(static_cast<float>(m_PinIconSize), static_cast<float>(m_PinIconSize)), iconType, connected, color, ImColor(32, 32, 32, alpha));
 };
 
-// Helper: ³ëµå Å¸ÀÔÀ» ¹®ÀÚ¿­·Î º¯È¯
+// Helper: ë…¸ë“œ íƒ€ì…ì„ ë¬¸ìì—´ë¡œ ë³€í™˜
 std::string NodeTypeToString(NodeType type)
 {
     switch (type)
@@ -65,7 +65,7 @@ void BT_Editor::AddNode(NodeType type, const std::string& name)
     int nodeId = g_NextId++;
     NodeData node = { nodeId, type, name, {}, {} };
 
-    // ÇÉ Ãß°¡
+    // í•€ ì¶”ê°€
     if (type == NodeType::Action) 
     {
         node.inputPins.push_back(g_NextId++);
@@ -88,13 +88,13 @@ void BT_Editor::NodeEditor()
     ed::SetCurrentEditor(_context);
     ed::Begin("BehaviorTreeEditor");
 
-    // ³ëµå ·»´õ¸µ
+    // ë…¸ë“œ ë Œë”ë§
     for (auto& [id, node] : g_Nodes) 
     {
         ed::BeginNode(node.id);
         ImGui::Text("%s", node.name.c_str());
 
-        // ÀÔ·Â ÇÉ
+        // ì…ë ¥ í•€
         for (auto& pin : node.inputPins) 
         {
             ed::BeginPin(pin, ed::PinKind::Input);
@@ -117,7 +117,7 @@ void BT_Editor::NodeEditor()
                 {
                     if (g_SelectedOutputPin != -1)
                     {
-                        g_SelectedInputPin = pin; // ¿¬°áÇÒ ÀÔ·Â ÇÉ ¼±ÅÃ
+                        g_SelectedInputPin = pin; // ì—°ê²°í•  ì…ë ¥ í•€ ì„ íƒ
                         HandlePinConnection();
                     }
                 }
@@ -127,7 +127,7 @@ void BT_Editor::NodeEditor()
             ImGui::Text("In");
         }
 
-        // Ãâ·Â ÇÉ
+        // ì¶œë ¥ í•€
         for (auto& pin : node.outputPins) 
         {
             ImGui::Text("Out");
@@ -135,12 +135,12 @@ void BT_Editor::NodeEditor()
             ed::BeginPin(pin, ed::PinKind::Output);
 			bool hasLink = g_Links.find(pin) != g_Links.end();
             DrawPinIcon(node.type, hasLink, 255);
-            // ÇÉ Å¬¸¯ °¨Áö
+            // í•€ í´ë¦­ ê°ì§€
             if (ImGui::IsItemHovered())
             {
                 if (InputManagement->IsMouseButtonPressed(MouseKey::LEFT))
                 {
-                    g_SelectedOutputPin = pin; // ¿¬°áÇÒ Ãâ·Â ÇÉ ¼±ÅÃ
+                    g_SelectedOutputPin = pin; // ì—°ê²°í•  ì¶œë ¥ í•€ ì„ íƒ
                 }
             }
             ed::EndPin();
@@ -150,7 +150,7 @@ void BT_Editor::NodeEditor()
     }
 
     int linkID = 0;
-    // ¸µÅ© ·»´õ¸µ
+    // ë§í¬ ë Œë”ë§
     for (auto& [outPin, inPin] : g_Links) 
     {
         std::ranges::for_each(inPin, [&](int pin)
@@ -214,9 +214,9 @@ void BT_Editor::HandlePinConnection()
 {
     if (g_SelectedOutputPin != -1 && g_SelectedInputPin != -1) 
     {
-        // ¸µÅ©¸¦ »ı¼º
+        // ë§í¬ë¥¼ ìƒì„±
         g_Links[g_SelectedOutputPin].push_back(g_SelectedInputPin);
-        // ¿¬°áµÈ »óÅÂ ÃÊ±âÈ­
+        // ì—°ê²°ëœ ìƒíƒœ ì´ˆê¸°í™”
         g_SelectedOutputPin = -1;
         g_SelectedInputPin = -1;
     }
@@ -229,7 +229,7 @@ void BT_Editor::ShowAddNodePopup()
 
     if (ImGui::BeginPopup("Add Node")) 
     {
-        // ³ëµå Å¸ÀÔ ¼±ÅÃ (µå·Ó´Ù¿î)
+        // ë…¸ë“œ íƒ€ì… ì„ íƒ (ë“œë¡­ë‹¤ìš´)
         const char* nodeTypeNames[] = { "RootNode", "Condition", "Action", "Selector", "Sequence", "Parallel" };
         const int nodeTypeCount = sizeof(nodeTypeNames) / sizeof(nodeTypeNames[0]);
         const char* currentNodeTypeName = nodeTypeNames[static_cast<int>(selectedNodeType)];
@@ -247,7 +247,7 @@ void BT_Editor::ShowAddNodePopup()
             ImGui::EndCombo();
         }
 
-        // ³ëµå Ãß°¡ ¹öÆ°
+        // ë…¸ë“œ ì¶”ê°€ ë²„íŠ¼
         if (ImGui::Button("Add Node")) 
         {
             AddNode(selectedNodeType, currentNodeTypeName);
@@ -309,7 +309,7 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
     std::ostringstream luaScript;
     luaScript << "-- Auto-generated Lua script for Behavior Tree\n\n";
 
-    // Lua ÇÔ¼ö ¼±¾ğºÎ »ı¼º
+    // Lua í•¨ìˆ˜ ì„ ì–¸ë¶€ ìƒì„±
     luaScript << "-- Define Conditions and Actions\n";
     for (const auto& [id, node] : g_Nodes)
     {
@@ -329,7 +329,7 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
         }
     }
 
-    // Æ®¸® ³ëµå Lua ÇÔ¼ö »ı¼º
+    // íŠ¸ë¦¬ ë…¸ë“œ Lua í•¨ìˆ˜ ìƒì„±
     std::unordered_map<int, std::string> nodeFunctions;
     for (const auto& [id, node] : g_Nodes)
     {
@@ -366,7 +366,7 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
         nodeFunctions[id] = nodeFunc;
     }
 
-    // ÀÚ½Ä ¿¬°á Á¤º¸ »ı¼º
+    // ìì‹ ì—°ê²° ì •ë³´ ìƒì„±
     luaScript << "-- Define children connections\n";
     for (const auto& [id, node] : g_Nodes)
     {
@@ -401,7 +401,7 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
         luaScript << "}\n\n";
     }
 
-    // ·çÆ® ³ëµå ½ÇÇà ÇÔ¼ö »ı¼º
+    // ë£¨íŠ¸ ë…¸ë“œ ì‹¤í–‰ í•¨ìˆ˜ ìƒì„±
     luaScript << "-- Entry point for Behavior Tree\n";
     luaScript << "function RunBehaviorTree(tick)\n";
 
@@ -416,7 +416,7 @@ void BT_Editor::BuildTreeToLua(const std::string& outPath)
 
     luaScript << "end\n";
 
-    // Lua ½ºÅ©¸³Æ®¸¦ ÆÄÀÏ·Î ÀúÀå
+    // Lua ìŠ¤í¬ë¦½íŠ¸ë¥¼ íŒŒì¼ë¡œ ì €ì¥
     std::ofstream outFile(outPath);
     if (outFile.is_open())
     {
@@ -455,7 +455,7 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
     auto end = input.cend();
 
     {
-	Banchmark banchmark;
+	Benchmark banchmark;
         while (std::regex_search(begin, end, match, nodeFuncRegex))
         {
             std::string nodeTypeStr = match[1].str();
@@ -490,7 +490,7 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
 	auto childrenBegin = input.cbegin();
 	auto childrenEnd = input.cend();
     {
-    Banchmark banchmark; //Á¹¶ó ´À·Á 3000ms
+    Benchmark banchmark; //ì¡¸ë¼ ëŠë ¤ 3000ms
         while (std::regex_search(childrenBegin, childrenEnd, match, childrenRegex))
         {
             int parentId = std::stoi(match[1].str());
@@ -516,7 +516,7 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
             childrenBegin++;
         }
     }
-    Banchmark banchmark;
+    Benchmark banchmark;
     int inputPin{};
 	g_Nodes.clear();
 
@@ -528,7 +528,7 @@ void BT_Editor::LoadTreeFromLua(const std::string& inPath)
         g_NextId++;
 		node.type = nodeTypes[id];
 		node.name = name;
-        // ÇÉ Ãß°¡
+        // í•€ ì¶”ê°€
         if (node.type == NodeType::Action)
         {
             node.inputPins.push_back(g_NextId++);

@@ -20,6 +20,8 @@ public:
 	//virtual std::string ToString() abstract;
 	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
 	virtual void ControlPanel() {};
+	virtual void ReloadShaders() {};
+	virtual void Resize() {};
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };

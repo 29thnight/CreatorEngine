@@ -4,17 +4,17 @@
 #include "ImGuiHelper/ImGuiRegister.h"
 #include "Physics/Common.h"
 #include "SoundManager.h"
-#include "Utility_Framework/Banchmark.hpp"
+#include "Utility_Framework/Benchmark.hpp"
 #include "Utility_Framework/ImGuiLogger.h"
 #include "Utility_Framework/TimeSystem.h"
 #include "ScriptBinder/HotLoadSystem.h"
 #include "RenderEngine/DataSystem.h"
+#include "RenderEngine/ShaderSystem.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
 	m_deviceResources->RegisterDeviceNotify(this);
 
-	//아래 렌더러	초기화 코드를 여기에 추가합니다.
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_sceneRenderer->Initialize();
 

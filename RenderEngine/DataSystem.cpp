@@ -1,9 +1,12 @@
 #include "DataSystem.h"
 //#include "MaterialLoader.h"
+#include "ShaderSystem.h"
 #include "Model.h"	
+#include <future>
+#include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include <future>
 
 #include "IconsFontAwesome6.h"
@@ -15,16 +18,16 @@ bool HasImageFile(const file::path& directory)
 {
 	for (const auto& entry : file::directory_iterator(directory))
 	{
-		if (entry.is_regular_file()) // 파일인지 확인
+		if (entry.is_regular_file())
 		{
 			std::string ext = entry.path().extension().string();
 			if (ext == ".png" || ext == ".jpg")
 			{
-				return true; // 하나라도 있으면 바로 true 반환
+				return true;
 			}
 		}
 	}
-	return false; // 이미지 파일 없음
+	return false;
 }
 
 DataSystem::~DataSystem()
@@ -34,13 +37,13 @@ DataSystem::~DataSystem()
 void DataSystem::Initialize()
 {
 	file::path iconpath = PathFinder::IconPath();
-	UnknownIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	TextureIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	UnknownIcon = Texture::LoadFormPath(iconpath.string() + "Unknown.png");
+	TextureIcon = Texture::LoadFormPath(iconpath.string() + "Texture.png");
 	ModelIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	AssetsIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	FolderIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	AssetsIcon = Texture::LoadFormPath(iconpath.string() + "Assets.png");
+	FolderIcon = Texture::LoadFormPath(iconpath.string() + "Folder.png");
 	ShaderIcon = Texture::LoadFormPath(iconpath.string() + "Shader.png");
-	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
+	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Code.png");
 
 	smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
@@ -53,6 +56,11 @@ void DataSystem::RenderForEditer()
 	ImGui::ContextRegister(ICON_FA_FOLDER_OPEN " Content Browser", true, [&]()
 	{
 		static file::path DataDirectory = PathFinder::Relative();
+		if (ImGui::Button(ICON_FA_ARROWS_ROTATE " Reload", ImVec2(0, 0)))
+		{
+			ShaderSystem->SetReloading(true);
+		}
+
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), true);
 		ImGuiTreeNodeFlags rootFlags = 
@@ -77,6 +85,7 @@ void DataSystem::RenderForEditer()
 		ShowCurrentDirectoryFiles();
 		ImGui::PopStyleColor();
 		ImGui::EndChild();
+
 	}, ImGuiWindowFlags_None);
 }
 
@@ -173,15 +182,13 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 				nodeFlags |= ImGuiTreeNodeFlags_Selected;
 
 			std::string iconName = ICON_FA_FOLDER + std::string(" ") + dirName;
-			// 트리 노드 생성: 닫힌 상태이면 자식 노드들은 렌더링되지 않음.
 			bool nodeOpen = ImGui::TreeNodeEx(iconName.c_str(), nodeFlags);
 			if (ImGui::IsItemClicked())
 			{
-				currentDirectory = entry.path(); // 선택된 디렉토리 갱신
+				currentDirectory = entry.path();
 			}
 			if (nodeOpen)
 			{
-				// 하위 디렉토리 출력 (재귀 호출)
 				ShowDirectoryTree(entry.path());
 				ImGui::TreePop();
 			}
@@ -191,21 +198,16 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
-	// 한 행에 표시할 타일 수 (예: 4개)
+
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
-	// 타일의 고정 너비 (여기서는 예시로 100px)
 	const float tileWidth = 200.0f;
 
-	// 한 행에 들어갈 타일 개수를 계산 (최소 1개 이상)
 	int tileColumns = (int)(availableWidth / tileWidth);
 	tileColumns = (tileColumns > 0) ? tileColumns : 1;
 
-	// 계산한 열 개수로 Columns 생성
 	ImGui::Columns(tileColumns, nullptr, false);
 
-	//const int tileColumns = 4;
-	//ImGui::Columns(tileColumns, nullptr, false);
 	if (currentDirectory.empty())
 	{
 		currentDirectory = PathFinder::Relative();
@@ -220,10 +222,9 @@ void DataSystem::ShowCurrentDirectoryFiles()
 			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
 				extension == ".png" || extension == ".dds" || extension == ".hdr" ||
 				extension == ".hlsl" || extension == ".cpp" || extension == ".h" || 
-				extension == ".cs")
+				extension == ".cs" || extension == ".wav" || extension == ".mp3")
 			{
-				// 파일에 맞는 아이콘 텍스처를 결정하는 로직 (예시로 nullptr 사용)
-				ImTextureID iconTexture{};/* 파일 종류에 따른 텍스처 로드 */;
+				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
 				if (extension == ".fbx" || extension == ".gltf" || extension == ".obj")
 				{
@@ -250,9 +251,13 @@ void DataSystem::ShowCurrentDirectoryFiles()
 					fileType = FileType::CSharpScript;
 					iconTexture = (ImTextureID)CodeIcon->m_pSRV;
 				}
+				else if (extension == ".wav" || extension == ".mp3")
+				{
+					fileType = FileType::Sound;
+					iconTexture = (ImTextureID)UnknownIcon->m_pSRV;
+				}
 
-				// 파일 이름, 확장자 등을 전달
-				DrawFileTile(iconTexture, entry.path().filename().string(), fileType);
+				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
 
 				ImGui::NextColumn();
 			}
@@ -261,33 +266,55 @@ void DataSystem::ShowCurrentDirectoryFiles()
 	ImGui::Columns(1);
 }
 
-void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
+void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
 {
-	// 각 타일마다 고유 ID를 부여하여 DrawList 호출 간섭 방지
 	ImGui::PushID(fileName.c_str());
 	ImGui::BeginGroup();
-
-	// 이미지 아이콘 출력 (클릭 이벤트가 필요한 경우 ImageButton 사용)
+	ImU32 color{};
 	if (ImGui::ImageButton(fileName.c_str(), iconTexture, tileSize))
 	{
-		// 클릭 시 처리할 내용
+
 	}
 
+	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+	{
+		OpenFile(directory);
+	}
 
-	// 아이콘 바로 아래에 사용자 정의 색상의 라인을 그리기 위해 현재 스크린 좌표를 가져옴
 	ImVec2 pos = ImGui::GetCursorScreenPos();
-	// 라인 길이를 타일 너비와 동일하게 설정 (필요시 tileSize.x 사용)
 	float lineWidth = tileSize.x + 10;
-	// 라인 시작 위치와 끝 위치 계산 (조정 가능한 y 오프셋)
 	ImVec2 lineStart = ImVec2(pos.x, pos.y + 2);
 	ImVec2 lineEnd = ImVec2(pos.x + lineWidth, pos.y + 2);
-	// 예시: 주황색 라인, 두께 2.0f
-	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32(255, 165, 0, 255), 2.0f);
 
-	// 라인을 그린 후 일정 공간 확보 (라인 영역만큼 Dummy 호출)
+	switch (fileType)
+	{
+	case FileType::Model:
+		color = IM_COL32(255, 165, 0, 255);
+		break;
+	case FileType::Texture:
+		color = IM_COL32(0, 255, 0, 255);
+		break;
+	case FileType::Shader:
+		color = IM_COL32(0, 0, 255, 255);
+		break;
+	case FileType::CppScript:
+		color = IM_COL32(255, 0, 0, 255);
+		break;
+	case FileType::CSharpScript:
+		color = IM_COL32(255, 0, 255, 255);
+		break;
+	case FileType::Sound:
+		color = IM_COL32(255, 255, 0, 255);
+		break;
+	case FileType::Unknown:
+		color = IM_COL32(128, 128, 128, 255);
+		break;
+	}
+
+	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, color, 2.0f);
+
 	ImGui::Dummy(ImVec2(0, 8));
 
-	// 파일 이름과 파일 종류 텍스트 출력 (원하는 스타일 적용 가능)
 	ImGui::PushFont(smallFont);
 	ImGui::TextWrapped("%s", fileName.c_str());
 	ImGui::PopFont();
@@ -298,16 +325,24 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const std::string& fileNa
 
 	ImGui::EndGroup();
 
-	// 드래그 드랍 소스 설정
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
-		// 파일 경로를 payload로 설정 ("MODEL_RESOURCE" 라는 타입을 지정)
 		ImGui::SetDragDropPayload("MODEL_RESOURCE", fileName.c_str(), fileName.size() + 1);
 		ImGui::Text("Dragging %s", fileName.c_str());
 		ImGui::EndDragDropSource();
 	}
 
 	ImGui::PopID();
+}
+
+void DataSystem::OpenFile(const file::path& filepath)
+{
+	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+
+	if ((int)result <= 32)
+	{
+		MessageBox(NULL, L"?뚯씪 ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎.", L"Error", MB_OK | MB_ICONERROR);
+	}
 }
 
 void DataSystem::AddModel(const file::path& filepath, const file::path& dir)

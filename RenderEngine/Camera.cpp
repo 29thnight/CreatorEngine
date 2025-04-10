@@ -27,8 +27,8 @@ Camera::Camera()
 
 	XMMATRIX identity = XMMatrixIdentity();
 
-	std::string viewBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ViewBuffer";
-	std::string projBufferName = "Camera_" + std::to_string(m_cameraIndex) + "_ProjBuffer";
+	std::string viewBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ViewBuffer";
+	std::string projBufferName = "Camera(" + std::to_string(m_cameraIndex) + ")ProjBuffer";
 
 	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
@@ -83,9 +83,7 @@ Mathf::Vector4 Camera::ConvertScreenToWorld(Mathf::Vector2 screenPosition, float
 Mathf::Vector4 Camera::RayCast(Mathf::Vector2 screenPosition)
 {
 	Mathf::Vector4 _near = ConvertScreenToWorld(screenPosition, 0.f);
-	std::cout << "Near" << _near.x << _near.y << _near.z << _near.w << std::endl;
 	Mathf::Vector4 _far = ConvertScreenToWorld(screenPosition, 1.f);
-	std::cout << "Far" << _far.x << _far.y << _far.z << _far.w << std::endl;
 	Mathf::Vector4 direction = _far - _near;
 	direction = XMVector3Normalize(direction);
 	return direction;

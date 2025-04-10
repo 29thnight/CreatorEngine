@@ -1,7 +1,7 @@
 #include "Model.h"
-#include "AssetSystem.h"
+#include "ShaderSystem.h"
 #include "ModelLoader.h"
-#include "Banchmark.hpp"
+#include "Benchmark.hpp"
 #include "PathFinder.h"
 
 Model::Model()
@@ -42,7 +42,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	}
 	else
 	{
-		Banchmark banch;
+		Benchmark banch;
 		Assimp::Importer importer;
 		importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 		importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
@@ -77,7 +77,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
 
-	Banchmark banch;
+	Benchmark banch;
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{
