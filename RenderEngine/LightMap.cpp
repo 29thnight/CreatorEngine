@@ -96,12 +96,12 @@ namespace lm {
 
 			// ÇØ»óµµ push.
 			Rect r;
-			r.w = rectSize;
-			r.h = rectSize;
+			float size = rectSize * renderer->m_LightMapping.lightmapScale;
+			r.w = size;
+			r.h = size;
 
 			r.data = renderer;
 			r.worldMat = obj->m_transform.GetWorldMatrix();
-			float size = rectSize * renderer->m_LightMapping.lightmapScale;
 			renderer->m_LightMapping.ligthmapResolution = size;
 			renderer->m_LightMapping.lightmapTiling.x = size / canvasSize;
 			renderer->m_LightMapping.lightmapTiling.y = size / canvasSize;

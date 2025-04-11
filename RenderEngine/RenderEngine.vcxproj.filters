@@ -132,8 +132,8 @@
     <Filter Include="LightMap\Result">
       <UniqueIdentifier>{76b9fbf7-7a07-447f-ba7e-c2fe118fd105}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\CommonCompute">
-      <UniqueIdentifier>{047ea2b8-ab27-4fbc-a074-81ca85211213}</UniqueIdentifier>
+    <Filter Include="Shaders\LightMap">
+      <UniqueIdentifier>{c9f09488-f6e4-4b2e-8dca-b0a57d59bd4f}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\EffectPass">
       <UniqueIdentifier>{740ca344-887d-4335-98e7-00b5831f77b5}</UniqueIdentifier>
@@ -465,25 +465,7 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IrradianceMap.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NeighborSampling.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NormalMap.vs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PixelShader.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\RectToCubeMap.ps.hlsl">
@@ -525,14 +507,29 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IndirectLightMap.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IndirectLightMap.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.ps.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LightmapEdgeCover.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NeighborSampling.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.ps.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.vs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
       <Filter>Shaders\Effect</Filter>

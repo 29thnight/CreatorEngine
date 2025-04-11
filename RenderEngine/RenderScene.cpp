@@ -86,7 +86,7 @@ void RenderScene::Update(float deltaSecond)
 
 void RenderScene::ShadowStage(Camera& camera)
 {
-	m_LightController->SetEyePosition(m_MainCamera.m_eyePosition);
+	m_LightController->SetEyePosition(camera.m_eyePosition);
 	m_LightController->Update();
 	m_LightController->RenderAnyShadowMap(*this, camera);
 }

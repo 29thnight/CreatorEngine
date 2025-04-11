@@ -1,5 +1,6 @@
 #include "Sampler.hlsli"
 #include "BRDF.hlsli"
+#include "Shading.hlsli"
 
 struct PixelShaderInput
 {
