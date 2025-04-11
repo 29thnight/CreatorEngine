@@ -59,7 +59,6 @@ public:
 		PropertyField
 		({
 			meta_property(m_IsEnabled)
-			meta_property(rotat)
 			meta_property(_layerorder)
 			meta_property(curindex)
 			});

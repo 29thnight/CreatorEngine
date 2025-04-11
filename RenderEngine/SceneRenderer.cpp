@@ -697,6 +697,21 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		//model = Model::LoadModel("sphere.fbx");
 
 
+		std::shared_ptr<GameObject> test2 = m_currentScene->CreateGameObject("TestObj");
+		test2->AddComponent<SpriteComponent>()->Load("test.jpg");
+		test2->GetComponent<SpriteComponent>()->Load("UI2.png");
+		test2->GetComponent<SpriteComponent>()->Load("UI2.png");
+		test2->GetComponent<SpriteComponent>()->SetTexture(0);
+		test2->m_transform.SetPosition({ 960, 540, 0 });
+
+
+		std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj2");
+		test3->AddComponent<SpriteComponent>()->Load("test.jpg");
+		test3->GetComponent<SpriteComponent>()->Load("UI2.png");
+		test3->GetComponent<SpriteComponent>()->SetTexture(0);
+		auto rot = Mathf::Quaternion::CreateFromAxisAngle(Mathf::Vector3::UnitZ, XMConvertToRadians(90));
+		test3->m_transform.SetRotation(rot);
+		test3->m_transform.SetPosition({ 960, 540, 0 });
 
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{

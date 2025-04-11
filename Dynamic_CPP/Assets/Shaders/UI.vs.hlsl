@@ -32,8 +32,8 @@ struct UIVSoutput
 UIVSoutput main(UIdata IN)
 {
     UIVSoutput OUT;
-
-    float4 worldPos = mul(float4(IN.position, 1.0f), model);
+    //float4 worldPos = mul(float4(IN.position, 0.0f, 1.0f), model);
+   float4 worldPos = mul(float4(IN.position, 1.0f), model);
     OUT.position = worldPos;
     OUT.texCoord = IN.texCoord;
 

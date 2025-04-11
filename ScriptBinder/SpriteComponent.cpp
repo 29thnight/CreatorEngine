@@ -39,14 +39,18 @@ void SpriteComponent::Update(float tick)
 	pos = m_pOwner->m_transform.position;
 
 	uiinfo.screenSize = { DirectX11::GetWidth(), DirectX11::GetHeight() };
-	float ndcX = (pos.x / uiinfo.screenSize.x) * 2.0f - 1.0f;
+	float aspectRatio = uiinfo.screenSize.x / uiinfo.screenSize.y;
+
+	float ndcX = ((pos.x / uiinfo.screenSize.x) * 2.0f - 1.0f);
 	float ndcY = 1.0f - (pos.y / uiinfo.screenSize.y) * 2.0f;
 	Mathf::Vector3 ndcpos = { ndcX,ndcY, 0.f };
 
+	float aspect = uiinfo.screenSize.y / uiinfo.screenSize.x;
 	float scaleX = (uiinfo.size.x / uiinfo.screenSize.x) * 2.0f;
 	float scaleY = (uiinfo.size.y / uiinfo.screenSize.y) * 2.0f;
-	scale = { scaleX, scaleY, 1 };
+	scale = { scaleX, scaleY , 1 };
 	Mathf::Vector3 parentscale = m_pOwner->m_transform.scale;
+
 	scale *= parentscale;
 
 
@@ -67,12 +71,14 @@ void SpriteComponent::Update(float tick)
 		yaw = atan2f(-rotMatrix.r[1].m128_f32[0], rotMatrix.r[0].m128_f32[0]); // -m12, m11
 		roll = 0.0f;
 	}
-	
+	Mathf::Matrix aspectScaleMatrix = Mathf::Matrix::CreateScale({ 1.0f, aspectRatio, 1.0f });
 	rotat.z = roll;
-	Mathf::Matrix scaleM = Mathf::Matrix::CreateScale(scale);
-	Mathf::Matrix rotM = Mathf::Matrix::CreateRotationZ(rotat.z);
-	Mathf::Matrix tranM = Mathf::Matrix::CreateTranslation(ndcpos);
-	uiinfo.world = DirectX::XMMatrixTranspose(scaleM * rotM * tranM);
+	Mathf::Matrix world = Mathf::Matrix::CreateScale(scale)
+	*Mathf::Matrix::CreateFromYawPitchRoll(0,0,rotat.z)
+	*Mathf::Matrix::CreateTranslation(ndcpos)
+		* aspectScaleMatrix;
+	uiinfo.world = DirectX::XMMatrixTranspose(world);
+	
 	
 }
 

@@ -63,6 +63,10 @@ namespace Mathf
         return Vector3::Lerp(a, b, t);
     }
 
+    inline Vector2 Lerp(const Vector2& a, const Vector2& b, float t) noexcept
+    {
+        return Vector2::Lerp(a, b, t);
+    }
     inline Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t) noexcept
     {
         return Quaternion::Slerp(a, b, t);
