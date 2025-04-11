@@ -20,7 +20,7 @@ public:
 	void ControlPanel() override;
 	void Resize() override;
 
-	uint32 shadowmapSize = 4096;
+	int shadowmapSize = 4096;
 
 	Camera m_shadowCamera{};
 	//Texture* m_shadowMapTexture{};

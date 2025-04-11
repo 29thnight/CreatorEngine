@@ -76,6 +76,7 @@ void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 	for (auto& sceneObject : scene.GetScene()->m_SceneObjects)
 	{
 		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
+		if (meshRenderer == nullptr) continue;
 		if (!meshRenderer->IsEnabled()) continue;
 
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
@@ -96,9 +97,13 @@ void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 
 void WireFramePass::ControlPanel()
 {
+}
+
+void WireFramePass::ReloadShaders()
+{
     m_pso->m_vertexShader = &ShaderSystem->VertexShaders["WireFrame"];
     m_pso->m_pixelShader = &ShaderSystem->PixelShaders["WireFrame"];
-	m_pso->m_inputLayout->Release();
+    m_pso->m_inputLayout->Release();
 
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
     {

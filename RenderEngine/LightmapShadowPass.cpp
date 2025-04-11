@@ -75,6 +75,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 		shadowmapSize
 	);
 
+	ClearShadowMap();
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
 
 	auto buffer = DirectX11::CreateBuffer(sizeof(ShadowMapConstant), D3D11_BIND_CONSTANT_BUFFER, nullptr);
@@ -137,7 +138,6 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 	}
 	DirectX11::UnbindRenderTargets();
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
-	//ClearShadowMap();
 }
 
 void LightmapShadowPass::CreateShadowMap(uint32 width, uint32 height)

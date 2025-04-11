@@ -369,7 +369,8 @@ void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 	scene.UseModel();
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
-	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
+	//auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
+	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
 
 	scene.UpdateModel(modelMatrix);
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);

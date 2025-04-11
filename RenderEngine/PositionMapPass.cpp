@@ -4,6 +4,11 @@
 #include "Mesh.h"
 #include "Sampler.h"
 #include "Renderer.h"
+struct alignas(16) PositionMapBuffer
+{
+	int positionMapWidth;
+	int positionMapheight;
+};
 
 PositionMapPass::PositionMapPass()
 {
@@ -36,6 +41,8 @@ PositionMapPass::PositionMapPass()
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
 	rasterizerDesc.CullMode = D3D11_CULL_NONE;
+	rasterizerDesc.AntialiasedLineEnable = true;
+	//rasterizerDesc.MultisampleEnable = true;
 
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateRasterizerState(
@@ -50,6 +57,7 @@ PositionMapPass::PositionMapPass()
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
+	m_Buffer = DirectX11::CreateBuffer(sizeof(PositionMapBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 void PositionMapPass::Initialize(uint32 width, uint32 height)
@@ -59,15 +67,18 @@ void PositionMapPass::Initialize(uint32 width, uint32 height)
 void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 
-	ClearTextures();
+	//ClearTextures();
 	m_pso->Apply();
-	int size = 2048;
+
+	PositionMapBuffer posBuf = { posNormMapSize, posNormMapSize };
+	DirectX11::UpdateBuffer(m_Buffer.Get(), &posBuf);
+	DirectX11::VSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 
 	auto pre = CD3D11_VIEWPORT(
 		0.0f,
 		0.0f,
-		size,
-		size
+		posNormMapSize,
+		posNormMapSize
 	);
 
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
@@ -80,14 +91,23 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		if (!renderer->IsEnabled()) continue;
 		auto meshName = renderer->m_Mesh->GetName();
 		if (m_positionMapTextures.find(meshName) == m_positionMapTextures.end()) {
+			if (m_positionMapTextures[meshName] != nullptr) continue;
 			// ¸ðµ¨ÀÇ positionMap »ý¼º
-			m_positionMapTextures[meshName] = Texture::Create(size, size, "Position Map",
+			m_positionMapTextures[meshName] = Texture::Create(posNormMapSize, posNormMapSize, "Position Map",
 				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
 			m_positionMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 			m_positionMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
-			auto* rtv = m_positionMapTextures[meshName]->GetRTV();
-			DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, nullptr);
+			m_normalMapTextures[meshName] = Texture::Create(posNormMapSize, posNormMapSize, "Normal Map",
+				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+			m_normalMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+			m_normalMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+			ID3D11RenderTargetView* rtv[2] = {
+				m_positionMapTextures[meshName]->GetRTV(),
+				m_normalMapTextures[meshName]->GetRTV()
+			};
+			DeviceState::g_pDeviceContext->OMSetRenderTargets(2, rtv, nullptr);
 
 			renderer->m_Mesh->Draw();
 
@@ -99,8 +119,8 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
 			//	GUID_ContainerFormatPng, a.c_str());
 
-			ID3D11RenderTargetView* nullRTV = nullptr;
-			DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
+			ID3D11RenderTargetView* nullRTV[2] = { nullptr, nullptr };
+			DeviceState::g_pDeviceContext->OMSetRenderTargets(2, nullRTV, nullptr);
 		}
 	}
 
@@ -115,6 +135,11 @@ void PositionMapPass::ClearTextures()
 		delete texture.second;
 	}
 	m_positionMapTextures.clear();
+	for (auto& texture : m_normalMapTextures)
+	{
+		delete texture.second;
+	}
+	m_normalMapTextures.clear();
 }
 
 void PositionMapPass::ControlPanel()

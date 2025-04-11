@@ -7,6 +7,7 @@ struct LightMapping
 {
 	int lightmapIndex{ -1 };
 	int ligthmapResolution{ 0 };
+	float lightmapScale{ 1.f };
 	Mathf::Vector2 lightmapOffset{ 0,0 };
 	Mathf::Vector2 lightmapTiling{ 0,0 };
 
@@ -19,6 +20,7 @@ struct LightMapping
 		({
 			meta_property(lightmapIndex)
 			meta_property(ligthmapResolution)
+			Meta::MakeProperty("lightmapScale", &LightMapping::lightmapScale),
 			meta_property(lightmapOffset)
 			meta_property(lightmapTiling)
 		});

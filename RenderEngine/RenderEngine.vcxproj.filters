@@ -132,6 +132,9 @@
     <Filter Include="LightMap\Result">
       <UniqueIdentifier>{76b9fbf7-7a07-447f-ba7e-c2fe118fd105}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\CommonCompute">
+      <UniqueIdentifier>{047ea2b8-ab27-4fbc-a074-81ca85211213}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -237,9 +240,6 @@
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
     <ClCompile Include="LightmapShadowPass.cpp">
-      <Filter>LightMap\Calculate</Filter>
-    </ClCompile>
-    <ClCompile Include="NormalMapPass.cpp">
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
     <ClCompile Include="PositionMapPass.cpp">
@@ -367,9 +367,6 @@
     <ClInclude Include="LightmapShadowPass.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
-    <ClInclude Include="NormalMapPass.h">
-      <Filter>LightMap\Calculate</Filter>
-    </ClInclude>
     <ClInclude Include="PositionMapPass.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
@@ -494,6 +491,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IndirectLightMap.cs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LightmapEdgeCover.cs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
