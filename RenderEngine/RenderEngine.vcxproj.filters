@@ -135,6 +135,12 @@
     <Filter Include="Shaders\CommonCompute">
       <UniqueIdentifier>{047ea2b8-ab27-4fbc-a074-81ca85211213}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\EffectPass">
+      <UniqueIdentifier>{740ca344-887d-4335-98e7-00b5831f77b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Effect">
+      <UniqueIdentifier>{42155f28-f404-4149-8689-61a9f1ecafec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -253,6 +259,18 @@
     </ClCompile>
     <ClCompile Include="ShaderSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectManager.cpp">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectModules.cpp">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClCompile>
+    <ClCompile Include="SparkleEffect.cpp">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderModules.cpp">
+      <Filter>RenderPass\EffectPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -382,6 +400,18 @@
     <ClInclude Include="UIsprite.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>
+    <ClInclude Include="EffectManager.h">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectModules.h">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SparkleEffect.h">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderModules.h">
+      <Filter>RenderPass\EffectPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
@@ -503,6 +533,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LightmapEdgeCover.cs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
