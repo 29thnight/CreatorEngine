@@ -7,3 +7,4 @@
 #include "LogSystem.h"
 #include "CSVLoader.h"
 #include "Reflection.hpp"
+#include "Delegate.h"

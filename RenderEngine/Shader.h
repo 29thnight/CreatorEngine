@@ -9,6 +9,7 @@ public:
 	virtual ~IShader() = default;
 
 	virtual void Compile() = 0;
+	virtual void Reset() = 0;
 	std::string m_name;
 
 	inline void* GetBufferPointer()
@@ -21,9 +22,69 @@ public:
 		return m_blob->GetBufferSize();
 	}
 
+	void SwapAndReCompile(const ComPtr<ID3DBlob>& blob)
+	{
+		if (m_isCompiled)
+		{
+			Reset();
+			m_blob.Reset();
+			m_isCompiled = false;
+		}
+		m_blob = blob;
+		Compile();
+	}
+
 protected:
 	bool m_isCompiled{ false };
 	ComPtr<ID3DBlob> m_blob;
+};
+
+template<typename T>
+concept ShaderType = std::derived_from<T, IShader>;
+
+template<ShaderType T>
+class ShaderPtr
+{
+public:
+	T* operator->()
+	{
+		return m_shader;
+	}
+
+	T& operator*()
+	{
+		return *m_shader;
+	}
+
+	operator T* ()
+	{
+		return m_shader;
+	}
+
+	bool operator==(std::nullptr_t)
+	{
+		return m_shader == nullptr;
+	}
+
+	ShaderPtr() = default;
+	ShaderPtr(T* shader) : m_shader(shader), m_shader_identifier(m_shader->m_name) 
+	{
+		if ("null" == m_shader->m_name)
+		{
+			throw std::runtime_error("Shader name is null");
+		}
+	};
+	~ShaderPtr() = default;
+	ShaderPtr& operator=(T* shader)
+	{
+		m_shader = shader;
+		m_shader_identifier = shader->m_name;
+		
+		return *this;
+	}
+
+	std::string m_shader_identifier{};
+	T* m_shader{ nullptr };
 };
 
 class VertexShader final : public IShader
@@ -51,7 +112,7 @@ public:
 		return m_vertexShader.Get();
 	}
 
-	void Reset()
+	void Reset() override
 	{
 		m_vertexShader.Reset();
 	}
@@ -82,10 +143,11 @@ public:
 	{
 		return m_pixelShader.Get();
 	}
-	void Reset()
+	void Reset() override
 	{
 		m_pixelShader.Reset();
 	}
+
 private:
 	ComPtr<ID3D11PixelShader> m_pixelShader;
 };
@@ -112,7 +174,7 @@ public:
 	{
 		return m_computeShader.Get();
 	}
-	void Reset()
+	void Reset() override
 	{
 		m_computeShader.Reset();
 	}
@@ -142,7 +204,7 @@ public:
 	{
 		return m_geometryShader.Get();
 	}
-	void Reset()
+	void Reset() override
 	{
 		m_geometryShader.Reset();
 	}
@@ -172,7 +234,7 @@ public:
 	{
 		return m_hullShader.Get();
 	}
-	void Reset()
+	void Reset() override
 	{
 		m_hullShader.Reset();
 	}
@@ -202,7 +264,7 @@ public:
 	{
 		return m_domainShader.Get();
 	}
-	void Reset()
+	void Reset() override
 	{
 		m_domainShader.Reset();
 	}

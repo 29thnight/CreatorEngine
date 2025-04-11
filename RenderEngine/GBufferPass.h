@@ -15,7 +15,6 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void PushDeferredQueue(GameObject* sceneObject);
 	void ClearDeferredQueue();
-	virtual void ReloadShaders() override;
 	virtual void Resize() override;
 
 private:

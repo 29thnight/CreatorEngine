@@ -7,7 +7,6 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "Benchmark.hpp"
-#include <future>
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -32,6 +31,13 @@ bool HasImageFile(const file::path& directory)
 
 DataSystem::~DataSystem()
 {
+	Memory::SafeDelete(UnknownIcon);
+	Memory::SafeDelete(TextureIcon);
+	Memory::SafeDelete(ModelIcon);
+	Memory::SafeDelete(AssetsIcon);
+	Memory::SafeDelete(FolderIcon);
+	Memory::SafeDelete(ShaderIcon);
+	Memory::SafeDelete(CodeIcon);
 }
 
 void DataSystem::Initialize()
@@ -282,6 +288,7 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	}
 
 	ImVec2 pos = ImGui::GetCursorScreenPos();
+	std::string typeID{};
 	float lineWidth = tileSize.x + 10;
 	ImVec2 lineStart = ImVec2(pos.x, pos.y + 2);
 	ImVec2 lineEnd = ImVec2(pos.x + lineWidth, pos.y + 2);
@@ -327,7 +334,7 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
-		ImGui::SetDragDropPayload("MODEL_RESOURCE", fileName.c_str(), fileName.size() + 1);
+		ImGui::SetDragDropPayload(FileTypeString[fileType].c_str(), fileName.c_str(), fileName.size() + 1);
 		ImGui::Text("Dragging %s", fileName.c_str());
 		ImGui::EndDragDropSource();
 	}
@@ -341,7 +348,7 @@ void DataSystem::OpenFile(const file::path& filepath)
 
 	if ((int)result <= 32)
 	{
-		MessageBox(NULL, L"?Œì¼ ?¤í–‰???¤íŒ¨?ˆìŠµ?ˆë‹¤.", L"Error", MB_OK | MB_ICONERROR);
+		MessageBox(NULL, L"Failed Open File", L"Error", MB_OK | MB_ICONERROR);
 	}
 }
 

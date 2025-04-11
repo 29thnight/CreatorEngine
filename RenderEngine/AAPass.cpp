@@ -85,11 +85,6 @@ void AAPass::ControlPanel()
 	}
 }
 
-void AAPass::ReloadShaders()
-{
-	m_pso->m_computeShader = &ShaderSystem->ComputeShaders["FXAA"];
-}
-
 void AAPass::Resize()
 {
 }

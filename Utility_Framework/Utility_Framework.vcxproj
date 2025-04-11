@@ -47,8 +47,13 @@
     <ClInclude Include="LogSink.h" />
     <ClInclude Include="LogSystem.h" />
     <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="MetaUtility.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
+    <ClInclude Include="ReflectionFunction.h" />
+    <ClInclude Include="ReflectionMecro.h" />
+    <ClInclude Include="ReflectionRegister.h" />
+    <ClInclude Include="ReflectionType.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
@@ -64,6 +69,7 @@
     <ClCompile Include="TimeSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Delegate.inl" />
     <None Include="MemoryPool.inl" />
   </ItemGroup>
   <ItemGroup>

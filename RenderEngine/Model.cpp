@@ -14,16 +14,16 @@ Model::~Model()
 	{
 		delete mesh;
 	}
+	//원본은 ResourceManager에서 관리 됨.
+	//for (auto& material : m_Materials)
+	//{
+	//	delete material;
+	//}
 
-	for (auto& material : m_Materials)
-	{
-		delete material;
-	}
-
-	for (auto& texture : m_Textures)
-	{
-		delete texture;
-	}
+	//for (auto& texture : m_Textures)
+	//{
+	//	delete texture;
+	//}
 
 	if (m_Skeleton)
 	{

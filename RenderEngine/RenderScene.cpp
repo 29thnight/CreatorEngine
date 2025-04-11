@@ -123,7 +123,7 @@ void RenderScene::EditorSceneObjectHierarchy()
 
 		if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("MODEL_RESOURCE"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 			{
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
@@ -150,9 +150,7 @@ void RenderScene::EditorSceneObjectHierarchy()
 			}
 		}
 
-		
-
-	}/*,ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing*/);
+	}, ImGuiWindowFlags_NoMove);
 }
 
 void RenderScene::EditorSceneObjectInspector()

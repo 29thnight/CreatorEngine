@@ -26,20 +26,11 @@ GridPass::GridPass()
     m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Grid"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+    InputLayOutContainer vertexLayoutDesc =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
     };
-
-    DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateInputLayout(
-            vertexLayoutDesc,
-            _countof(vertexLayoutDesc),
-            m_pso->m_vertexShader->GetBufferPointer(),
-            m_pso->m_vertexShader->GetBufferSize(),
-            &m_pso->m_inputLayout
-        )
-    );
+    m_pso->CreateInputLayout(std::move(vertexLayoutDesc));
 
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
@@ -155,28 +146,6 @@ void GridPass::GridSetting()
     ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
     ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
     ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
-}
-
-void GridPass::ReloadShaders()
-{
-    m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Grid"];
-    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Grid"];
-    m_pso->m_inputLayout->Release();
-
-    D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-    {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-
-    DirectX11::ThrowIfFailed(
-        DeviceState::g_pDevice->CreateInputLayout(
-            vertexLayoutDesc,
-            _countof(vertexLayoutDesc),
-            m_pso->m_vertexShader->GetBufferPointer(),
-            m_pso->m_vertexShader->GetBufferSize(),
-            &m_pso->m_inputLayout
-        )
-    );
 }
 
 void GridPass::Resize()

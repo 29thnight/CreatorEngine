@@ -15,31 +15,21 @@ PostProcessingPass::PostProcessingPass()
 	m_pso->m_samplers.push_back(pointSampler);
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
-	m_pFullScreenVS = &ShaderSystem->VertexShaders["Fullscreen"];
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
 	m_pBloomDownSampledCS = &ShaderSystem->ComputeShaders["BloomThresholdDownsample"];
 	m_pGaussianBlurCS = &ShaderSystem->ComputeShaders["GaussianBlur"];
 	m_pBloomCompositePS = &ShaderSystem->PixelShaders["BloomComposite"];
 
-	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-	{
-		{ "POSITION",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",			0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",		0, DXGI_FORMAT_R32G32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TANGENT",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDINDICES",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDWEIGHT",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	InputLayOutContainer vertexLayoutDesc = {
+		{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
-
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateInputLayout(
-			vertexLayoutDesc,
-			_countof(vertexLayoutDesc),
-			m_pFullScreenVS->GetBufferPointer(),
-			m_pFullScreenVS->GetBufferSize(),
-			&m_pso->m_inputLayout
-		)
-	);
+	m_pso->CreateInputLayout(std::move(vertexLayoutDesc));
 
 	CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
 
@@ -49,7 +39,6 @@ PostProcessingPass::PostProcessingPass()
 			&m_pso->m_rasterizerState
 		)
 	);
-
 
 	TextureInitialization();
 	GaussianBlurComputeKernel();
@@ -68,6 +57,7 @@ PostProcessingPass::~PostProcessingPass()
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 {
 	// Copy the back buffer to a texture
+	PrepaerShaderState();
 	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
 
 	if (m_PostProcessingApply.m_Bloom)
@@ -85,6 +75,13 @@ void PostProcessingPass::ControlPanel()
 	ImGui::DragFloat("Knee",		&m_bloomThreshold.knee);
 	ImGui::DragFloat("Coeddicient", &m_bloomComposite.coeddicient);
 
+}
+
+void PostProcessingPass::PrepaerShaderState()
+{
+	m_pBloomDownSampledCS = &ShaderSystem->ComputeShaders["BloomThresholdDownsample"];
+	m_pGaussianBlurCS = &ShaderSystem->ComputeShaders["GaussianBlur"];
+	m_pBloomCompositePS = &ShaderSystem->PixelShaders["BloomComposite"];
 }
 
 void PostProcessingPass::TextureInitialization()
@@ -137,7 +134,7 @@ void PostProcessingPass::TextureInitialization()
 
 void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 {
-	m_pso->m_vertexShader = m_pFullScreenVS;
+	//m_pso->m_vertexShader = m_pFullScreenVS;
 	m_pso->m_pixelShader = m_pBloomCompositePS;
 
 	m_pso->Apply();
@@ -190,7 +187,7 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 		ID3D11RenderTargetView* rtv = m_BloomResult->GetRTV();
 		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-		DirectX11::VSSetShader(m_pFullScreenVS->GetShader(), 0, 0);
+		//DirectX11::VSSetShader(m_pFullScreenVS->GetShader(), 0, 0);
 		DirectX11::PSSetShader(m_pBloomCompositePS->GetShader(), 0, 0);
 
 		ID3D11ShaderResourceView* pSRVs[]{ m_CopiedTexture->m_pSRV, m_BloomFilterSRV1->m_pSRV };
@@ -226,36 +223,6 @@ void PostProcessingPass::GaussianBlurComputeKernel()
 	{
 		m_bloomBlur.coefficients[i] *= normalizationFactor;
 	}
-}
-
-void PostProcessingPass::ReloadShaders()
-{
-	m_pFullScreenVS = &ShaderSystem->VertexShaders["Fullscreen"];
-	m_pBloomDownSampledCS = &ShaderSystem->ComputeShaders["BloomThresholdDownsample"];
-	m_pGaussianBlurCS = &ShaderSystem->ComputeShaders["GaussianBlur"];
-	m_pBloomCompositePS = &ShaderSystem->PixelShaders["BloomComposite"];
-	m_pso->m_inputLayout->Release();
-
-	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-	{
-		{ "POSITION",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",			0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",		0, DXGI_FORMAT_R32G32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TANGENT",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDINDICES",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BLENDWEIGHT",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	};
-
-	DirectX11::ThrowIfFailed(
-		DeviceState::g_pDevice->CreateInputLayout(
-			vertexLayoutDesc,
-			_countof(vertexLayoutDesc),
-			m_pFullScreenVS->GetBufferPointer(),
-			m_pFullScreenVS->GetBufferSize(),
-			&m_pso->m_inputLayout
-		)
-	);
 }
 
 void PostProcessingPass::Resize()

@@ -208,6 +208,16 @@ void DirectX11::DeviceResources::ResizeResources()
 	CreateWindowSizeDependentResources();
 }
 
+void DirectX11::DeviceResources::ReportLiveDeviceObjects()
+{
+#if defined(_DEBUG)
+	if (m_debugDevice != nullptr)
+	{
+		m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+	}
+#endif
+}
+
 void DirectX11::DeviceResources::CreateDeviceIndependentResources()
 {
 }
@@ -257,6 +267,10 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         &m_d3dFeatureLevel,		// 만들어진 디바이스의 기능 수준을 반환합니다.
         &context				// 디바이스 직접 컨텍스트를 반환합니다.
     );
+
+	// 디버그 레이어를 사용하여 디바이스를 만들면 디버그 레이어에 대한 포인터를 가져옵니다.
+    DirectX11::ThrowIfFailed(device->QueryInterface(IID_PPV_ARGS(&m_debugDevice)));
+
 
     if (FAILED(hr))
     {

@@ -15,10 +15,10 @@ public:
 
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 private:
+	void PrepaerShaderState();
 	void TextureInitialization();
 	void BloomPass(RenderScene& scene, Camera& camera);
 	void GaussianBlurComputeKernel();

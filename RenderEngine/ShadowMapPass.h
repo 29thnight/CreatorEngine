@@ -35,7 +35,6 @@ public:
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	virtual void ReloadShaders() override;
 	virtual void Resize() override;
 
 	Camera m_shadowCamera{};

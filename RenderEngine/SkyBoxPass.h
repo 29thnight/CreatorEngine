@@ -23,7 +23,6 @@ public:
 
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 private:

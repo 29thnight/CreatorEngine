@@ -59,11 +59,53 @@ void ShaderResourceSystem::LoadShaders()
 
 void ShaderResourceSystem::ReloadShaders()
 {
-	RemoveShaders();
+	//RemoveShaders();
 	HLSLCompiler::CleanUpCache();
 	HLSLIncludeReloadShaders();
 	CSOCleanup();
-	LoadShaders();
+
+	try
+	{
+		file::path shaderpath = PathFinder::RelativeToShader();
+		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+		for (auto& dir : file::recursive_directory_iterator(shaderpath))
+		{
+			if (dir.is_directory() || dir.path().extension() != ".hlsl")
+				continue;
+
+			file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+
+			if (file::exists(cso))
+			{
+				auto hlslTime = file::last_write_time(dir.path());
+				auto csoTime = file::last_write_time(cso);
+
+				if (hlslTime > csoTime)
+				{
+					ReloadShaderFromPath(dir.path());
+				}
+				else
+				{
+					ReloadShaderFromPath(cso);
+				}
+			}
+			else
+			{
+				ReloadShaderFromPath(dir.path());
+			}
+		}
+	}
+	catch (const file::filesystem_error& e)
+	{
+		Debug->LogWarning("Could not load shaders" + std::string(e.what()));
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogWarning("Error" + std::string(e.what()));
+	}
+
+	m_shaderReloadedDelegate.Broadcast();
+
 	m_isReloading = false;
 }
 
@@ -140,6 +182,17 @@ void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)
 	AddShader(filename.string(), ext, blob);
 }
 
+void ShaderResourceSystem::ReloadShaderFromPath(const file::path& filepath)
+{
+	ComPtr<ID3DBlob> blob = HLSLCompiler::LoadFormFile(filepath.string());
+	file::path filename = filepath.filename();
+	std::string ext = filename.replace_extension().extension().string();
+	filename.replace_extension();
+	ext.erase(0, 1);
+
+	ReloadShader(filename.string(), ext, blob);
+}
+
 void ShaderResourceSystem::AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob)
 {
 	if (ext == "vs")
@@ -177,6 +230,44 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 		ComputeShader cs = ComputeShader(name, blob);
 		cs.Compile();
 		ComputeShaders[name] = cs;
+	}
+	else
+	{
+		throw std::runtime_error("Unknown shader type");
+	}
+}
+
+void ShaderResourceSystem::ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob)
+{
+	if (ext == "vs")
+	{
+		VertexShader& vs = VertexShaders[name];
+		vs.SwapAndReCompile(blob);
+	}
+	else if (ext == "hs")
+	{
+		HullShader& hs = HullShaders[name];
+		hs.SwapAndReCompile(blob);
+	}
+	else if (ext == "ds")
+	{
+		DomainShader& ds = DomainShaders[name];
+		ds.SwapAndReCompile(blob);
+	}
+	else if (ext == "gs")
+	{
+		GeometryShader& gs = GeometryShaders[name];
+		gs.SwapAndReCompile(blob);
+	}
+	else if (ext == "ps")
+	{
+		PixelShader& ps = PixelShaders[name];
+		ps.SwapAndReCompile(blob);
+	}
+	else if (ext == "cs")
+	{
+		ComputeShader& cs = ComputeShaders[name];
+		cs.SwapAndReCompile(blob);
 	}
 	else
 	{

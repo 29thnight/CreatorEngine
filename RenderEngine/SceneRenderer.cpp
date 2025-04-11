@@ -352,9 +352,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
+	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string());
 	
-
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
 	m_pToneMapPass->Initialize(
@@ -615,18 +614,18 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("plane.fbx");
-		Model::LoadModelToScene(model, *m_currentScene);
-		model = Model::LoadModel("DamagedHelmet.gltf");
+		//model = Model::LoadModel("plane.fbx");
+		//Model::LoadModelToScene(model, *m_currentScene);
+		//model = Model::LoadModel("DamagedHelmet.gltf");
 
 	
-		ImGui::ContextRegister("Test Add Model", true, [&]()
-		{
-			if (ImGui::Button("Add Model"))
-			{
-				Model::LoadModelToScene(model, *m_currentScene);
-			}
-		});
+		//ImGui::ContextRegister("Test Add Model", true, [&]()
+		//{
+		//	if (ImGui::Button("Add Model"))
+		//	{
+		//		Model::LoadModelToScene(model, *m_currentScene);
+		//	}
+		//});
 	}
 	else
 	{
@@ -887,22 +886,6 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::ReloadShaders()
 {
 	ShaderSystem->ReloadShaders();
-	m_renderScene->m_LightController->m_shadowMapPass->ReloadShaders();
-	m_pDeferredPass->ReloadShaders();
-	m_pGBufferPass->ReloadShaders();
-	m_pSSAOPass->ReloadShaders();
-	m_pAAPass->ReloadShaders();
-	m_pSkyBoxPass->ReloadShaders();
-	m_pToneMapPass->ReloadShaders();
-	m_pWireFramePass->ReloadShaders();
-	m_pGridPass->ReloadShaders();
-	m_pSpritePass->ReloadShaders();
-	m_pBlitPass->ReloadShaders();
-	m_pPostProcessingPass->ReloadShaders();
-	m_pLightMapPass->ReloadShaders();
-	m_pUIPass->ReloadShaders();
-	m_pLightmapShadowPass->ReloadShaders();
-	m_pForwardPass->ReloadShaders();
 }
 
 void SceneRenderer::EditorView()

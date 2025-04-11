@@ -16,6 +16,21 @@ cbuffer MaterialInfomation
 	bool32		  m_useEmissive{};
 	bool32		  m_useNormalMap{};
 	bool32		  m_convertToLinearSpace{};
+
+	MaterialInfomation() meta_default(MaterialInfomation);
+	~MaterialInfomation() = default;
+
+	ReflectionField(MaterialInfomation, PropertyOnly)
+	{
+		PropertyField
+		({
+			meta_property(m_baseColor)
+			meta_property(m_metallic)
+			meta_property(m_roughness)
+		});
+
+		ReturnReflectionPropertyOnly(MaterialInfomation)
+	};
 };
 
 enum class MaterialRenderingMode
@@ -40,10 +55,6 @@ public:
 	Material& SetMetallic(float metallic);
 	Material& SetRoughness(float roughness);
 
-	Material& UpdateBaseColor();
-	Material& UpdateMetallic();
-	Material& UpdateRoughness();
-
 public:
 	Material& UseBaseColorMap(Texture* texture);
 	Material& UseNormalMap(Texture* texture);
@@ -61,31 +72,18 @@ public:
 	Texture* m_AOMap{ nullptr };
 	Texture* m_pEmissive{ nullptr };
 
-	Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-	float		  m_metallic{ 0.0f };
-	float		  m_roughness{ 1.0f };
-
 	MaterialInfomation m_materialInfo;
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 
-	ReflectionField(Material, PropertyAndMethod)
+	ReflectionField(Material, PropertyOnly)
 	{
 		PropertyField
 		({
-			meta_property(m_baseColor)
-			meta_property(m_metallic)
-			meta_property(m_roughness)
+			meta_property(m_materialInfo)
 			meta_enum_property(m_renderingMode)
 		});
 
-		MethodField
-		({
-			meta_method(UpdateBaseColor)
-			meta_method(UpdateMetallic)
-			meta_method(UpdateRoughness)
-		});
-
-		ReturnReflection(Material)
+		ReturnReflectionPropertyOnly(Material)
 	};
 };
 

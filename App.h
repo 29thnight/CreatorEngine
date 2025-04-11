@@ -15,6 +15,7 @@ namespace Core
 		App() = default;
 		~App() = default;
 		void Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height);
+		void Finalize();
 		void SetWindow(CoreWindow& coreWindow);
 		void Load();
 		void Run();
