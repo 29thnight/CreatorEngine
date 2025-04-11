@@ -60,7 +60,6 @@ namespace lm {
 		// IRenderPass을(를) 통해 상속됨
 		void Initialize();
 		void Execute(RenderScene& scene, Camera& camera) override;
-		virtual void ReloadShaders() override;
 		virtual void Resize() override;
 
 	public:

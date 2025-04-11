@@ -447,13 +447,6 @@ namespace lm {
 	{
 	}
 
-	void LightMap::ReloadShaders()
-	{
-		m_computeShader = &ShaderSystem->ComputeShaders["Lightmap"];
-		m_edgeComputeShader = &ShaderSystem->ComputeShaders["NeighborSampling"];
-		m_edgeCoverComputeShader = &ShaderSystem->ComputeShaders["LightmapEdgeCover"];
-		m_MSAAcomputeShader = &ShaderSystem->ComputeShaders["MSAA"];
-	}
 
 	void LightMap::Resize()
 	{

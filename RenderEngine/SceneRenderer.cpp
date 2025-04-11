@@ -684,14 +684,6 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		m_renderScene->m_LightController->Initialize();
 		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-		model = Model::LoadModel("plane.fbx");
-		Model::LoadModelToScene(model, *m_currentScene);
-
-		/*std::shared_ptr<GameObject> test2 = m_currentScene->CreateGameObject("TestObj");
-		test2->AddComponent<SpriteComponent>()->Load("test.jpg");
-		test2->GetComponent<SpriteComponent>()->Load("test2.png");
-		test2->GetComponent<SpriteComponent>()->SetTexture(0);
-		test2->m_transform.SetPosition({ 960, 540, 0 });
 
 		model[0] = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model[0], *m_currentScene);
@@ -701,11 +693,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		model[4] = Model::LoadModel("bangbooExport.fbx");
 		//model = Model::LoadModel("sphere.fbx");
 
-		std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj2");
-		test3->AddComponent<SpriteComponent>()->Load("test.jpg");
-		test3->GetComponent<SpriteComponent>()->Load("test2.png");
-		test3->GetComponent<SpriteComponent>()->SetTexture(0);
-		test3->m_transform.SetPosition({ 560, 540, 0 });*/
+
 
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{

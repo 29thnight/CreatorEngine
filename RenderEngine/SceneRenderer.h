@@ -97,8 +97,6 @@ private:
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
 	Model* model[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-	UIsprite testUI{};
-	UIsprite testUI2{};
 
 	lm::LightMap lightMap;
 //Debug
