@@ -41,7 +41,7 @@ struct PixelShaderInput
     float2 texCoord : TEXCOORD0;
 };
 
-float4 main(PixelShaderInput IN) : SV_TARGET
+float4 VSmain(PixelShaderInput IN) : SV_TARGET
 {
     SurfaceInfo surf;
     surf.posW = IN.wPosition;

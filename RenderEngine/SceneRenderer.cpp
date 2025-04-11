@@ -17,10 +17,34 @@
 
 #include <iostream>
 #include <string>
+#include <regex>
 
 using namespace lm;
 #pragma region ImGuizmo
 #include "ImGuizmo.h"
+
+// Trim from the start (left)
+std::string ltrim(const std::string& s) {
+	std::string result = s;
+	result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char ch) {
+		return !std::isspace(ch);
+		}));
+	return result;
+}
+
+// Trim from the end (right)
+std::string rtrim(const std::string& s) {
+	std::string result = s;
+	result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char ch) {
+		return !std::isspace(ch);
+		}).base(), result.end());
+	return result;
+}
+
+// Trim from both ends
+std::string trim(const std::string& s) {
+	return ltrim(rtrim(s));
+}
 
 enum class SelectGuizmoMode
 {
@@ -1171,10 +1195,26 @@ void SceneRenderer::ShowLogWindow()
 
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
 
+		int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
+
+
 		if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
-            is_selected, ImGuiSelectableFlags_None, {sizeX , 50}))
+			is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
 		{
 			selected_log_index = i;
+			std::regex pattern(R"(([A-Za-z]:\\.*))");
+			std::istringstream iss(entry.message);
+			std::string line;
+
+			while (std::getline(iss, line)) 
+			{
+				std::smatch match;
+				if (std::regex_search(line, match, pattern)) 
+				{
+					std::string fileDirectory = match[1].str();
+					DataSystems->OpenFile(fileDirectory);
+				}
+			}
 		}
 		ImGui::PopStyleColor(); // Text color
 

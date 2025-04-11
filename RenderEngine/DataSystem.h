@@ -54,6 +54,7 @@ public:
 	void LoadMaterials();
 	Texture* LoadTexture(const std::string_view& filePath);
 
+	void OpenFile(const file::path& filepath);
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
@@ -70,7 +71,6 @@ public:
 	static ImGuiTextFilter filter;
 
 private:
-	void OpenFile(const file::path& filepath);
 	void AddModel(const file::path& filepath, const file::path& dir);
 
 private:

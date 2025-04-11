@@ -24,6 +24,7 @@ public:
 
 	void SwapAndReCompile(const ComPtr<ID3DBlob>& blob)
 	{
+
 		if (m_isCompiled)
 		{
 			Reset();
