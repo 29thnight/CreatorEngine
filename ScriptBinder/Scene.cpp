@@ -1,6 +1,6 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
-
+#include "IlifeSycle.h"
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
 	m_SceneObjects.push_back(sceneObject);
@@ -92,6 +92,11 @@ void Scene::OnCollisionExit(ICollider* other)
 
 void Scene::Update(float deltaSecond)
 {
+	for (auto& obj : m_SceneObjects)
+	{
+		obj->Update(deltaSecond);
+	}
+
 }
 
 void Scene::YieldNull()

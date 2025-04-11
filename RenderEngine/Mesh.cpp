@@ -86,3 +86,29 @@ ID3D11CommandList* Mesh::Draw(ID3D11DeviceContext* _defferedContext)
 
 	return commandList;
 }
+
+
+UIMesh::UIMesh()
+	
+{
+	m_vertices = UIQuad;
+	m_indices = UIIndices;
+	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(UIvertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
+	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
+	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
+	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
+}
+
+UIMesh::~UIMesh()
+{
+
+}
+
+void UIMesh::Draw()
+{
+	UINT offset = 0;
+	DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
+}

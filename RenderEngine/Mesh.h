@@ -151,3 +151,49 @@ public:
 		return std::vector<uint32>{ 0, 2, 1, 0, 3, 2 };
 	}
 };
+
+struct UIvertex
+{
+	DirectX::XMFLOAT3 position;
+	DirectX::XMFLOAT2 texCoord;
+};
+
+
+
+class UIMesh
+{
+public:
+	UIMesh();
+	~UIMesh();
+
+	void Draw();
+	//ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
+
+	const std::string& GetName() { return m_name; }
+private:
+	friend class ModelLoader;
+	std::string m_name;
+	std::vector<UIvertex> m_vertices;
+	std::vector<uint32> m_indices;
+	uint32 m_materialIndex{};
+
+	std::string m_nodeName;
+
+	DirectX::BoundingBox m_boundingBox;
+	DirectX::BoundingSphere m_boundingSphere;
+
+	ComPtr<ID3D11Buffer> m_vertexBuffer{};
+	ComPtr<ID3D11Buffer> m_indexBuffer{};
+	static constexpr uint32 m_stride = sizeof(UIvertex);
+
+
+	std::vector<UIvertex> UIQuad
+	{
+		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } },  // 좌상단
+		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // 우상단
+		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // 우하단
+		{ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} },    // 좌하단
+
+	};
+	std::vector<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };
+};

@@ -6,12 +6,17 @@
 #include "RenderScene.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
+#include "../ScriptBinder/SpriteComponent.h"
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "TimeSystem.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+
+
+#include <iostream>
+#include <string>
 
 using namespace lm;
 #pragma region ImGuizmo
@@ -617,9 +622,20 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		model = Model::LoadModel("plane.fbx");
 		Model::LoadModelToScene(model, *m_currentScene);
-		model = Model::LoadModel("DamagedHelmet.gltf");
 
-	
+		/*std::shared_ptr<GameObject> test2 = m_currentScene->CreateGameObject("TestObj");
+		test2->AddComponent<SpriteComponent>()->Load("test.jpg");
+		test2->GetComponent<SpriteComponent>()->Load("test2.png");
+		test2->GetComponent<SpriteComponent>()->SetTexture(0);
+		test2->m_transform.SetPosition({ 960, 540, 0 });
+
+
+		std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj2");
+		test3->AddComponent<SpriteComponent>()->Load("test.jpg");
+		test3->GetComponent<SpriteComponent>()->Load("test2.png");
+		test3->GetComponent<SpriteComponent>()->SetTexture(0);
+		test3->m_transform.SetPosition({ 560, 540, 0 });*/
+
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
 			if (ImGui::Button("Add Model"))
@@ -627,6 +643,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 				Model::LoadModelToScene(model, *m_currentScene);
 			}
 		});
+		m_renderScene->SetScene(m_currentScene);
 	}
 	else
 	{
@@ -653,7 +670,8 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	{
 		ReloadShaders();
 	}
-
+	//컴포넌트업데이트 확인용 추가
+	m_currentScene->Update(deltaTime);
 	m_renderScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
 	// 디버그용으로 임시로 같이 움직이도록 조정
@@ -664,7 +682,6 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	//}
 
 	PrepareRender();
-	m_pUIPass->Update(deltaTime);
 }
 
 void SceneRenderer::SceneRendering()

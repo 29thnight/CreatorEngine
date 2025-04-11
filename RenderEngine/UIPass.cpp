@@ -3,7 +3,8 @@
 #include "ImGuiRegister.h"
 #include "Mesh.h"
 #include "Scene.h"
-
+#include "../ScriptBinder/GameObject.h"
+#include "../ScriptBinder/SpriteComponent.h"
 UIPass::UIPass()
 {
 
@@ -63,18 +64,6 @@ void UIPass::Initialize(Texture* renderTargetView)
 	m_renderTarget = renderTargetView;
 }
 
-void UIPass::pushUI(UIsprite* UI)
-{
-	_testUI.push_back(UI);
-}
-
-void UIPass::Update(float delta)
-{
-	for (auto& Uiobject : _testUI)
-	{
-		Uiobject->Update();
-	}
-}
 
 void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
@@ -91,12 +80,22 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
 
 	
-	std::sort(_testUI.begin(), _testUI.end(), compareLayer);
-	for (auto& Uiobject : _testUI)
+	for (auto& Obj : scene.GetScene()->m_SceneObjects)
+	{
+		auto a = scene.GetScene();
+		SpriteComponent* ui = Obj->GetComponent<SpriteComponent>();
+		if (ui == nullptr) continue;
+		if (false == ui->IsEnabled()) continue;
+		_2DObjects.push_back(ui);
+
+	}
+
+	std::sort(_2DObjects.begin(), _2DObjects.end(), compareLayer);
+	for (auto& Uiobject : _2DObjects)
 	{
 		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
 		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
-		Uiobject->Draw();
+		Uiobject->m_UIMesh->Draw();
 	}
 
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
@@ -105,10 +104,10 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
-
+	_2DObjects.clear();
 }
 
-bool UIPass::compareLayer(UIsprite* a, UIsprite* b)
+bool UIPass::compareLayer(SpriteComponent* a, SpriteComponent* b)
 {
 	return a->_layerorder < b->_layerorder;
 }
@@ -145,7 +144,3 @@ void UIPass::Resize()
 {
 }
 
-void UIPass::DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
-{
-
-}

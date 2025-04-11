@@ -100,8 +100,8 @@ private:
 
 	Model* model{};
 	Model* testModel{};
-	UIsprite testUI{};
-	UIsprite testUI2{};
+	//UIsprite testUI{};
+	//UIsprite testUI2{};
 
 	lm::LightMap lightMap;
 //Debug

@@ -52,6 +52,8 @@ public:
 	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
 	void LoadMaterials();
+	Texture* LoadTexture(const std::string_view& filePath);
+
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();

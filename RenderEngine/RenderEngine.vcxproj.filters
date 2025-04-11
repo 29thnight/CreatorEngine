@@ -382,6 +382,9 @@
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
+    <ClInclude Include="UIsprite.h">
+      <Filter>Resources\UI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
@@ -501,9 +504,6 @@
       <Filter>RenderPass\UIPass</Filter>
     </ClInclude>
     <ClInclude Include="Text.h">
-      <Filter>Resources\UI</Filter>
-    </ClInclude>
-    <ClInclude Include="UIsprite.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>

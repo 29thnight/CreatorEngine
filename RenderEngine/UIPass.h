@@ -1,7 +1,7 @@
 #pragma once
 #include "IRenderPass.h"
 #include "UIsprite.h"
-
+#include "../ScriptBinder/SpriteComponent.h"
 class GameObject;
 class Camera;
 class UIPass : public IRenderPass
@@ -12,13 +12,10 @@ public:
 
 	void Initialize(Texture* renderTargetView);
 
-	void pushUI(UIsprite* UI);
-	void Update(float delta);
 
-	void DrawCanvas(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
-	virtual void Execute(RenderScene& scene,Camera& camera);
+	virtual void Execute(RenderScene& scene,Camera& camera) override;
 
-	static bool compareLayer(UIsprite* a, UIsprite* b);
+	static bool compareLayer(SpriteComponent* a, SpriteComponent* b);
 
 	void ControlPanel() override;
 	void ReloadShaders() override;
@@ -32,9 +29,8 @@ private:
 
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
-	std::vector<GameObject*> _2DObjects;
-	//테스트용
-	std::vector<UIsprite*> _testUI;
 	
+	std::vector<SpriteComponent*> _2DObjects;
+
 };
 

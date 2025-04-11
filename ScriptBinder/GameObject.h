@@ -7,6 +7,7 @@
 #include "../Utility_Framework/HashingString.h"
 #include "HotLoadSystem.h"
 #include <ranges>
+#include "ILifeSycle.h"
 
 class Scene;
 class Bone;
@@ -14,7 +15,7 @@ class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
 class LightComponent;
-class GameObject : public IObject
+class GameObject : public IObject, public ILifeSycle
 {
 public:
 	using Index = int;
@@ -139,6 +140,11 @@ public:
 		component->SetDestroyMark();
 	}
 
+
+	virtual void Start() override;
+	virtual void Update(float tick) override;
+	virtual void FixedUpdate(float fixedTick) override;
+	virtual void LateUpdate(float tick) override;
 	GameObject::Type GetType() const { return m_gameObjectType; }
 	void SetScene(Scene* pScene) { m_pScene = pScene; }
 

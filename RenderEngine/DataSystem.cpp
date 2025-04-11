@@ -160,6 +160,64 @@ void DataSystem::LoadMaterials()
 {
 }
 
+Texture* DataSystem::LoadTexture(const std::string_view& filePath)
+{
+	file::path source = filePath;
+	file::path destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
+	if (source != destination && file::exists(source) && !file::exists(destination))
+	{
+		file::copy_file(source, destination, file::copy_options::update_existing);
+	}
+	std::string name = file::path(filePath).stem().string();
+	if (Textures.find(name) != Textures.end())
+	{
+		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+		return nullptr;
+	}
+
+	Texture* texture = Texture::LoadFormPath(destination.string());
+	if (texture)
+	{
+		Textures[name] = std::shared_ptr<Texture>(texture);
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
+	file::path _filepath = PathFinder::Relative("UI\\").string() + filePath.data();
+	std::shared_ptr<Texture> newTexture = std::shared_ptr<Texture>(Texture::LoadFormPath(_filepath));
+
+	
+	
+	//textures.push_back(newTexture);
+	//Textures[name] = newTexture;
+	
+
+
+	//if (source != destination && file::exists(source) && !file::exists(destination))
+	//{
+	//	file::copy_file(source, destination, file::copy_options::update_existing);
+	//}
+	//std::string name = file::path(filePath).stem().string();
+	//if (Models.find(name) != Models.end())
+	//{
+	//	Debug->Log("ModelLoader::LoadModel : Model already loaded");
+	//	return;
+	//}
+
+	//Model* model = Model::LoadModel(destination.string());
+	//if (model)
+	//{
+	//	Models[name] = std::shared_ptr<Model>(model);
+	//}
+	//else
+	//{
+	//	Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	//}
+	return nullptr;
+}
+
+
 void DataSystem::OpenContentsBrowser()
 {
 	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Open();
