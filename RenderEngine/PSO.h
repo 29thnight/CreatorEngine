@@ -3,15 +3,17 @@
 #include "Shader.h"
 #include "Sampler.h"
 
+using InputLayOutContainer = std::vector<D3D11_INPUT_ELEMENT_DESC>;
+
 class PipelineStateObject
 {
 public:
-	VertexShader*	m_vertexShader;
-	PixelShader*	m_pixelShader;
-	GeometryShader* m_geometryShader;
-	HullShader*		m_hullShader;
-	DomainShader*   m_domainShader;
-	ComputeShader*	m_computeShader;
+	ShaderPtr<VertexShader>		m_vertexShader;
+	ShaderPtr<PixelShader>		m_pixelShader;
+	ShaderPtr<GeometryShader>	m_geometryShader;
+	ShaderPtr<HullShader>		m_hullShader;
+	ShaderPtr<DomainShader>		m_domainShader;
+	ShaderPtr<ComputeShader>	m_computeShader;
 
 	ID3D11InputLayout*		 m_inputLayout{ nullptr };
 	ID3D11RasterizerState*	 m_rasterizerState{ nullptr };
@@ -22,8 +24,16 @@ public:
 
 	std::vector<std::shared_ptr<Sampler>> m_samplers;
 
+	Core::DelegateHandle m_shaderReloadEventHandle;
+	InputLayOutContainer m_inputLayoutDescContainer;
 public:
+	PipelineStateObject();
+	~PipelineStateObject();
+
 	void Apply();
+	void CreateInputLayout();
+	void CreateInputLayout(InputLayOutContainer&& vertexLayoutDesc);
+	void ReloadShaders();
     void Reset();
 };
 

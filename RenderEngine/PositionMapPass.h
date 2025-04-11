@@ -13,9 +13,12 @@ public:
 	void ClearTextures();
 
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 	std::unordered_map<std::string, Texture*> m_positionMapTextures;
+	std::unordered_map<std::string, Texture*> m_normalMapTextures;
+	ComPtr<ID3D11Buffer> m_Buffer{};
+public:
+	int posNormMapSize = 2048;
 };
 

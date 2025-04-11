@@ -42,24 +42,6 @@ Material& Material::SetRoughness(float roughness)
 	return *this;
 }
 
-Material& Material::UpdateBaseColor()
-{
-	m_materialInfo.m_baseColor = m_baseColor;
-	return *this;
-}
-
-Material& Material::UpdateMetallic()
-{
-	m_materialInfo.m_metallic = m_metallic;
-	return *this;
-}
-
-Material& Material::UpdateRoughness()
-{
-	m_materialInfo.m_roughness = m_roughness;
-	return *this;
-}
-
 Material& Material::UseBaseColorMap(Texture* texture)
 {
 	m_pBaseColor = texture;

@@ -11,7 +11,6 @@ public:
 
 	void Execute(RenderScene& scene, Camera& camera);
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 	void PushForwardQueue(GameObject* sceneObject);

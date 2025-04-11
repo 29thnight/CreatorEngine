@@ -26,7 +26,6 @@ public:
 
     std::vector<T> get_all()
     {
-		Benchmark banch;
         size_t size = buffer_.size();
 		std::vector<T> result(size);
 
@@ -36,7 +35,6 @@ public:
             result[i] = buffer_[idx];
         }
 
-		std::cout << "RingBuffer : " << banch.GetElapsedTime() << "\n";
         return result;
     }
 

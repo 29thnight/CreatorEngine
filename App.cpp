@@ -28,6 +28,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 	Core::App app;
 	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
+	app.Finalize();
 
 	Log::Finalize();
 
@@ -43,6 +44,11 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	InputManagement->Initialize(coreWindow.GetHandle());
 	Load();
 	Run();
+}
+
+void Core::App::Finalize()
+{
+	m_deviceResources->ReportLiveDeviceObjects();
 }
 
 void Core::App::SetWindow(CoreWindow& coreWindow)

@@ -25,7 +25,6 @@
 #include "LightMap.h"
 #include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
-#include "NormalMapPass.h"
 #include "LightMapPass.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
@@ -75,7 +74,6 @@ private:
 
 	std::unique_ptr<LightmapShadowPass> m_pLightmapShadowPass{};
 	std::unique_ptr<PositionMapPass> m_pPositionMapPass{};
-	std::unique_ptr<NormalMapPass> m_pNormalMapPass{};
 	std::unique_ptr<LightMapPass> m_pLightMapPass{};
 
 	std::unique_ptr<UIPass> m_pUIPass{};
@@ -98,10 +96,9 @@ private:
 	//Editor Camera
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
-	Model* model{};
-	Model* testModel{};
-	//UIsprite testUI{};
-	//UIsprite testUI2{};
+	Model* model[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+	UIsprite testUI{};
+	UIsprite testUI2{};
 
 	lm::LightMap lightMap;
 //Debug

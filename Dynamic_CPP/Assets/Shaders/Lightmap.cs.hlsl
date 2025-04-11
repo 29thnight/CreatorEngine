@@ -1,3 +1,4 @@
+#include "Sampler.hlsli"
 #define MAX_LIGHTS 4
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
@@ -7,7 +8,13 @@
 #define LIGHT_ENABLED 1
 #define LIGHT_ENABLED_W_SHADOWMAP 2
 
-//#define Test true
+struct SurfaceInfo
+{
+    float4 posW;
+    float3 N;
+    float3 T;
+    float3 B;
+};
 
 struct Light
 {
@@ -40,27 +47,35 @@ struct Vertex
 };
 
 // s, u, t, b
-SamplerState litSample : register(s0);
+//SamplerState litSample : register(s0);
 RWTexture2D<float4> TargetTexture : register(u0); // 타겟 텍스처 (UAV)
 
 Texture2DArray<float> shadowMapTextures : register(t0); // 소스 텍스처 (SRV)
 Texture2D<float4> positionMapTexture : register(t1); // 소스 텍스처 (SRV)
 StructuredBuffer<Light> g_Lights : register(t2);
-Texture2D<float4> normalMapTexture : register(t3); // 소스 텍스처 (SRV)
-//StructuredBuffer<LightViewProj> g_LightViewProj : register(t3);
-//StructuredBuffer<Vertex> g_InputVertices : register(t4);
+Texture2D<float4> normalMapTexture : register(t3); // 노멀맵까지 적용된 텍스쳐로 받기.
+
+TextureCube EnvMap : register(t4);
+Texture2D AoMap : register(t5);
+
 
 cbuffer lightMapSetting : register(b0)
 {
     float bias;
     int lightSize;
     int2 shadowmapSize;
+    
+    float4 globalAmbient;
+    
+    int useEnvMap;
+
 }
 
 cbuffer CB : register(b1)
 {
     int2 Offset; // 타겟 텍스처에서 그릴 위치
     int2 Size; // 복사할 영역 크기
+    int useAO;
 };
 
 cbuffer transform : register(b2)
@@ -68,19 +83,26 @@ cbuffer transform : register(b2)
     matrix worldMat;
 };
 
-//struct VertexShaderOutput
-//{
-//    float4 position : SV_POSITION;
-//    float4 pos : POSITION0;
-//    float4 wPosition : POSITION1;
-//    float3 normal : NORMAL;
-//    float3 tangent : TANGENT;
-//    float3 binormal : BINORMAL;
-//    float2 texCoord : TEXCOORD0;
-//};
-
-//StructuredBuffer<AppData> g_InputVertices : register(t0);
-//RWStructuredBuffer<AppData> g_OutputVertices : register(u1);
+float4 Sampling(Texture2D tex, SamplerState state, float2 uv, float2 textureSize)
+{
+    float2 texel = float2(1, 1) / textureSize;
+    float4 color = { 0, 0, 0, 1 };
+    
+    for (int x = -2; x < 3; ++x)
+    {
+        //[unroll]
+        for (int y = -2; y < 3; ++y)
+        {
+            color += tex.SampleLevel(state, uv + (float2(x, y) * texel), 0);
+        }
+    }
+    color /= 25.0;
+    return color;
+}
+float3 LinearToGamma(float3 color)
+{
+    return pow(color, 1.0 / 2.2);
+}
 
 [numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -93,20 +115,28 @@ void main(uint3 DTid : SV_DispatchThreadID)
         targetPos.y < Offset.y || targetPos.y > (Offset.y + Size.y))
         return;
 
-    // 타겟 텍스처 좌표를 0~1로 정규화
+    // 타겟 텍스처 좌표를 0~1로 정규화 // targetpos 0~lightmapSize, offset
     float2 localUV = (targetPos - Offset) / Size;
 
     // UV 좌표를 소스 텍스처 범위에 매핑
     //float2 sourceUV = localUV;
     //float2 sourceUV = UVOffset + (localUV * UVSize);
-
-
     
     
-    float4 localCoord = positionMapTexture.SampleLevel(litSample, localUV, 0);
-    float4 localNormal = normalMapTexture.SampleLevel(litSample, localUV, 0);
     
-    float4 worldCoord = mul(worldMat, localCoord);
+    float4 localpos = Sampling(positionMapTexture, LinearSampler, localUV, float2(2048, 2048));
+    float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
+    
+    
+    
+    //float4 localpos = positionMapTexture.SampleLevel(LinearSampler, localUV, 0);
+    //float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
+    
+    
+    
+    
+    
+    float4 worldpos = mul(worldMat, localpos);
     float4 worldNormal = mul(worldMat, localNormal);
     
     float4 color = float4(0, 0, 0, 1); // 초기화
@@ -120,7 +150,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (light.status == LIGHT_DISABLED || light.lightType != DIRECTIONAL_LIGHT)
             continue;
         
-        float4 lightSpaceView = mul(light.litView, worldCoord);
+        float4 lightSpaceView = mul(light.litView, worldpos);
         float4 lightSpaceProj = mul(light.litProj, lightSpaceView);    
 
         //float2 shadowUV = (lightSpaceProj.xy / lightSpaceProj.w) * 0.5 + 0.5;
@@ -141,17 +171,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
         //float epsilon = 0.01f;
         //[unroll]
-        for (int x = -1; x < 2; ++x)
+        for (int x = -4; x < 5; ++x)
         {
         //[unroll]
-            for (int y = -1; y < 2; ++y)
+            for (int y = -4; y < 5; ++y)
             {
-                float closestDepth = shadowMapTextures.SampleLevel(litSample, float3(projCoords.xy + (float2(x, y) * shadowMaptexelSize), i), 0.0).r;
+                float closestDepth = shadowMapTextures.SampleLevel(LinearSampler, float3(projCoords.xy + (float2(x, y) * shadowMaptexelSize), i), 0.0).r;
                 shadow += (closestDepth < currentDepth - bias);
             }
         }
 
-        shadow /= 9;
+        shadow /= 81; // float으로 나누면 sphere의 그림자에 계단현상. 하지만 float으로 해야 부드러운 셰도우 샘플링 가능
         
         // 라이트의 영향을 계산 (Directional Light)
         float3 lightDir = normalize(light.direction.xyz);
@@ -160,94 +190,41 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 라이트 색상과 강도 적용
         float3 lightContribution = light.color.rgb * NdotL * (1 - shadow); //(inShadow ? 0.0 : 1.0);
         color.rgb += lightContribution;
-        
-        
-        //color.rgb = float3(currentDepth, shadowDepth, shadow);
     }
-
-    // 타겟 텍스처에 기록
-    TargetTexture[DTid.xy] = color;
-    TargetTexture[DTid.xy + float2(0, 1500)] = worldNormal;
-    //TargetTexture[DTid.xy + float2(0, 2600)] = worldCoord;
     
-    //// 라이트맵 계산
-    //float4 color = float4(0, 0, 0, 1); // 초기화
-
-    //for (int i = 0; i < g_InputVertices.length; ++i)
-    //{
-    //    AppData vertex = g_InputVertices[i];
-
-    //    // 월드 좌표에서 라이트 뷰-프로젝션 좌표로 변환
-    //    float4 worldPos = float4(vertex.position, 1.0);
-    //    float4 lightSpacePos = mul(lightViewProj, worldPos);
-
-    //    // 섀도우맵에서 깊이 값 샘플링
-    //    float shadowDepth = ShadowMap.Sample(Sampler0, lightSpacePos.xy / lightSpacePos.w).r;
-
-    //    // 그림자 여부 결정
-    //    bool inShadow = (shadowDepth < lightSpacePos.z / lightSpacePos.w);
-
-    //    // 라이트의 영향을 계산
-    //    float3 lightDir = normalize(lightPosition.xyz - vertex.position);
-    //    float NdotL = max(dot(vertex.normal, lightDir), 0.0);
-
-    //    // 라이트 색상과 강도 적용
-    //    float3 lightContribution = lightColor.rgb * lightIntensity * NdotL * (inShadow ? 0.0 : 1.0);
-    //    color.rgb += lightContribution;
-    //}
-
-    //// 타겟 텍스처에 기록
-    //TargetTexture[DTid.xy] = color;
+    SurfaceInfo surf;
+    surf.posW = worldpos;
+    surf.N = worldNormal.rgb;
+    float4 ambient = globalAmbient;
+    if (useEnvMap)
+    {
+        float3 irradiance = EnvMap.SampleLevel(LinearSampler, surf.N, 0.0).rgb;
+        float3 diffuse = irradiance;
+        ambient.rgb = diffuse;
+    }
+    float ao = useAO ? AoMap.SampleLevel(PointSampler, localUV.xy, 0.0).r : 1.0;
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    //// 라이트맵 계산
-    //float4 color = float4(0, 0, 0, 1); // 초기화
-
-    //for (int i = 0; i < lightSize; ++i)
-    //{
-    //    Light light = g_Lights[i];
-
-    //    // 라이트의 영향을 계산
-    //    float3 lightDir = normalize(light.position.xyz - g_InputVertices[DTid.x].position);
-    //    float NdotL = max(dot(g_InputVertices[DTid.x].normal, lightDir), 0.0);
-
-    //    // 라이트 색상과 강도 적용
-    //    color.rgb += light.color.rgb * NdotL;
-    //}
-
-    //// 타겟 텍스처에 기록
-    //TargetTexture[DTid.xy] = color;
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    // 소스 텍스처 샘플링
-    //float4 color = float4(temp, 1); //SourceTexture.SampleLevel(Sampler0, sourceUV, 0);
+    ambient *= ao;// * occlusion;
     
     // 타겟 텍스처에 기록
-    //TargetTexture[DTid.xy] = temp;//color;
+    
+    //for (int x = -1; x < 2; ++x)
+    //{
+    //    for (int y = -1; y < 2; ++y)
+    //    {
+    //        if (TargetTexture[DTid.xy + float2(x, y)].a < 0.01)
+    //        {
+    //            TargetTexture[DTid.xy + float2(x, y)] = color;
+    //        }
+    //    }
+    //}
+    
+    float4 finalColor = color + ambient;
+    //finalColor.rgb = LinearToGamma(finalColor.rgb);
+    TargetTexture[DTid.xy] = finalColor;
+    
+    //TargetTexture[DTid.xy + float2(0, 1300)] = worldNormal;
+    //TargetTexture[DTid.xy + float2(0, 2600)] = worldpos;
 }
 
 /*

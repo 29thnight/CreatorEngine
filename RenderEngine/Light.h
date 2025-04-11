@@ -9,6 +9,7 @@ class ForwardPass;
 class GBufferPass;
 class SceneRenderer;
 class RenderScene;
+//class lm::LightMap;
 class LightController
 {
 public:
@@ -26,6 +27,8 @@ public:
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
 	void RenderAnyShadowMap(RenderScene& scene, Camera& camera);
 
+	const LightProperties& GetProperties() { return m_lightProperties; }
+
 	Texture* GetShadowMapTexture();
 
 	uint32 m_lightCount{ 0 };
@@ -36,6 +39,7 @@ private:
 	friend class GBufferPass;
 	friend class ShadowMapPass;
 	friend class SceneRenderer;
+	//friend class lm::LightMap;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
 	ShadowMapRenderDesc m_shadowMapRenderDesc;

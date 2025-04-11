@@ -28,10 +28,14 @@ public:
 	std::unordered_map<std::string, PixelShader>	PixelShaders;
 	std::unordered_map<std::string, ComputeShader>	ComputeShaders;
 
+	Core::Delegate<void> m_shaderReloadedDelegate;
+
 private:
 	// Shader loading
 	void AddShaderFromPath(const file::path& filepath);
+	void ReloadShaderFromPath(const file::path& filepath);
 	void AddShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
+	void ReloadShader(const std::string& name, const std::string& ext, const ComPtr<ID3DBlob>& blob);
 	void RemoveShaders();
 
 	bool m_isReloading = false;

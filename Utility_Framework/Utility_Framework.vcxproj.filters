@@ -67,6 +67,12 @@
     <Filter Include="ImGuiLogger">
       <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Delegate">
+      <UniqueIdentifier>{a1b99cd2-1945-4fa3-8a84-dc3ff277e569}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Reflection">
+      <UniqueIdentifier>{fabc6f1b-1af9-4234-b2d3-22470fb2531a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -141,17 +147,11 @@
     <ClInclude Include="ImGuiLogger.h">
       <Filter>ImGuiLogger</Filter>
     </ClInclude>
-    <ClInclude Include="Delegate.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
     <ClInclude Include="FileIO.h">
       <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="Core.Runtime.h">
       <Filter>Core.definition</Filter>
-    </ClInclude>
-    <ClInclude Include="Reflection.hpp">
-      <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="HashingString.h">
       <Filter>Utility</Filter>
@@ -177,6 +177,27 @@
     <ClInclude Include="..\targetver.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>
+    <ClInclude Include="Delegate.h">
+      <Filter>Core.Delegate</Filter>
+    </ClInclude>
+    <ClInclude Include="Reflection.hpp">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionFunction.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="MetaUtility.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionRegister.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionType.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionMecro.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -198,6 +219,9 @@
   <ItemGroup>
     <None Include="MemoryPool.inl">
       <Filter>Core.Memory\MemoryPool</Filter>
+    </None>
+    <None Include="Delegate.inl">
+      <Filter>Core.Delegate</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

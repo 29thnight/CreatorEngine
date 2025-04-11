@@ -35,6 +35,7 @@ VertexShaderOutput main(AppData IN)
     VertexShaderOutput OUT;
     matrix mvp = mul(mul(projection, view), model);
     OUT.position = mul(mvp, float4(IN.position, 1.0f));
+    OUT.position.z = OUT.position.w * 0.99999;
     OUT.texCoord = IN.position;
     return OUT;
 }

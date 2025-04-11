@@ -57,6 +57,7 @@ LightMapPass::LightMapPass()
 
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
+	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_cbuffer = DirectX11::CreateBuffer(sizeof(CB), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
@@ -138,6 +139,61 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 			}
 		}
 
+		Material* mat = meshRenderer->m_Material;
+		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
+
+		if (mat->m_pBaseColor)
+		{
+			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
+		}
+		if (mat->m_pNormal)
+		{
+			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
+		}
+		if (mat->m_pOccRoughMetal)
+		{
+			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+		}
+		if (mat->m_AOMap)
+		{
+			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
+		}
+		if (mat->m_pEmissive)
+		{
+			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+		}
+
 		meshRenderer->m_Mesh->Draw();
 	}
+}
+
+void LightMapPass::ReloadShaders()
+{
+	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["VertexShader"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Lightmap"];
+
+	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateInputLayout(
+			vertexLayoutDesc,
+			_countof(vertexLayoutDesc),
+			m_pso->m_vertexShader->GetBufferPointer(),
+			m_pso->m_vertexShader->GetBufferSize(),
+			&m_pso->m_inputLayout
+		)
+	);
+}
+
+void LightMapPass::Resize()
+{
 }

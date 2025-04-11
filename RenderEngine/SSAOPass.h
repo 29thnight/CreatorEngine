@@ -21,7 +21,6 @@ public:
 	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 private:

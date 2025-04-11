@@ -1,12 +1,10 @@
 #include "HLSLCompiler.h"
 #include "FileIO.h"
-#include "Benchmark.hpp"
 
 std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
 
 ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 {
-	Benchmark banch;
     file::path filePath{ filepath };
 	std::string fileExtension = filePath.extension().string();
 
@@ -19,8 +17,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     ComPtr<ID3DBlob> errorBlob;
 
     flag compileFlag{};
-
-	std::cout << "Find Cache shader: " << filePath.string() << std::endl;
 
 #if defined(_DEBUG)
     compileFlag |= D3DCOMPILE_DEBUG;
@@ -80,7 +76,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     }
 	else if (fileExtension == ".cso")
     {
-		Benchmark banch;
 		HRESULT hResult = S_OK;
 		hResult = D3DReadFileToBlob(filePath.c_str(), shaderBlob.ReleaseAndGetAddressOf());
 		if (FAILED(hResult))
@@ -90,7 +85,6 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 
 		m_shaderCache[filePath.string()] = shaderBlob;
 
-		std::cout << "Read cso in " << banch.GetElapsedTime() << "ms" << std::endl;
     }
 
     return shaderBlob;

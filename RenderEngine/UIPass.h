@@ -18,7 +18,6 @@ public:
 	static bool compareLayer(SpriteComponent* a, SpriteComponent* b);
 
 	void ControlPanel() override;
-	void ReloadShaders() override;
 	void Resize() override;
 
 

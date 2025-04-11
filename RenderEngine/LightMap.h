@@ -1,4 +1,5 @@
 #pragma once
+#include "IRenderPass.h"
 #include "DeviceResources.h"
 #include "Texture.h"
 #include "Sampler.h"
@@ -17,7 +18,7 @@ namespace lm {
 		Mathf::Matrix worldMat;
 	};
 
-	class LightMap
+	class LightMap final : public IRenderPass
 	{
 	public:
 		LightMap();
@@ -26,8 +27,8 @@ namespace lm {
 		void GenerateLightMap(
 			RenderScene* scene,
 			const std::unique_ptr<LightmapShadowPass>& lightmapShadowPass,
-			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
-			const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
+			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
+			//const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
 		);
 	private:
 		void TestPrepare();
@@ -38,8 +39,8 @@ namespace lm {
 		void CalculateRectangles();
 		void DrawRectangles(
 			const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
-			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
-			const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
+			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
+			//const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
 		);
 
 	private:
@@ -50,22 +51,38 @@ namespace lm {
 		std::vector<Texture*> lightmaps;
 
 		ID3D11Texture2D* imgTexture = nullptr;
+		Texture* edgeTexture = nullptr;
+		Texture* envMap = nullptr;
 		ID3D11ShaderResourceView* imgSRV = nullptr;
 		ID3D11ShaderResourceView* textureArraySRV = nullptr;
 		ID3D11ShaderResourceView* structuredBufferSRV = nullptr;
-	private:
-		std::vector<Rect> rects;
+
+		// IRenderPass을(를) 통해 상속됨
+		void Initialize();
+		void Execute(RenderScene& scene, Camera& camera) override;
+		virtual void ReloadShaders() override;
+		virtual void Resize() override;
+
+	public:
 		int canvasSize = 4096;
 		int padding = 4;
-		float bias = 0.001f;
+		float bias = 0.0057f;
+		int rectSize = 40;
+	private:
+		std::vector<Rect> rects;
 
 		ComPtr<ID3D11Buffer> m_Buffer{};
 		ComPtr<ID3D11Buffer> m_transformBuf{};
 		ComPtr<ID3D11Buffer> m_lightBuf{};
 		ComPtr<ID3D11Buffer> m_settingBuf{};
 		ComputeShader* m_computeShader{};
+		ComputeShader* m_edgeComputeShader{};
+		ComputeShader* m_edgeCoverComputeShader{};
+
+		ComputeShader* m_MSAAcomputeShader{};
 
 		RenderScene* m_renderscene = nullptr;
 		Sampler* sample = nullptr;
+		Sampler* pointSample = nullptr;
 	};
 }

@@ -61,9 +61,7 @@ namespace DirectX11
 		IDWriteFactory3* GetDWriteFactory() const { return m_dwriteFactory.Get(); }
 		IWICImagingFactory2* GetWicImagingFactory() const { return m_wicFactory; }
 
-        void BeginEvent(const std::wstring_view& name);
-        void EndEvent();
-        void SetMarker(const std::wstring_view& name);
+		void ReportLiveDeviceObjects();
 
 		CoreWindow* GetWindow() const { return m_window; }
 
@@ -78,6 +76,7 @@ namespace DirectX11
 		ComPtr<ID3D11DeviceContext3> m_d3dContext;
 		ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3DUserDefinedAnnotation> m_annotation;
+		ComPtr<ID3D11Debug> m_debugDevice;
 
 		ComPtr<ID3D11RenderTargetView1> m_d3dRenderTargetView;
 		ComPtr<ID3D11Texture2D1> m_backBuffer;

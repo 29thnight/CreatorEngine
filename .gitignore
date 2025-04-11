@@ -461,3 +461,4 @@ FodyWeavers.xsd
 /Dynamic_CPP/Assets/Materials
 /Dynamic_CPP/Assets/Models
 /Dynamic_CPP/Assets/Models/FlightHelmet.asset
+EngineVersion.h

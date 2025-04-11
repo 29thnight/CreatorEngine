@@ -2,6 +2,7 @@
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
+#include "LightProperty.h"
 #include "Light.h"
 #include "Renderer.h"
 #include "RenderScene.h"
@@ -9,12 +10,11 @@
 #include "Core.Random.h"
 #include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
-#include "NormalMapPass.h"
-//#include "Light.h"
 namespace lm {
-	struct CBData {
-		DirectX::XMINT2 Offset;
-		DirectX::XMINT2 Size;
+	struct alignas(16) CBData {
+		int2 Offset;
+		int2 Size;
+		bool32 useAo;
 	};
 
 	struct CBTransform {
@@ -38,10 +38,12 @@ namespace lm {
 		int status;
 	};
 
-	struct CBSetting {
+	struct alignas(16) CBSetting {
 		float bias;
 		int lightsize;
-		DirectX::XMUINT2 shadowmapSize;
+		int2 shadowmapSize;
+		DirectX::XMFLOAT4 globalAmbient;
+		bool32 useEnvMap;
 	};
 
 	LightMap::LightMap()
@@ -52,9 +54,12 @@ namespace lm {
 		delete sample;
 	}
 
-	void LightMap::Prepare()
+	void LightMap::Initialize()
 	{
 		m_computeShader = &ShaderSystem->ComputeShaders["Lightmap"];
+		m_edgeComputeShader = &ShaderSystem->ComputeShaders["NeighborSampling"];
+		m_edgeCoverComputeShader = &ShaderSystem->ComputeShaders["LightmapEdgeCover"];
+		m_MSAAcomputeShader = &ShaderSystem->ComputeShaders["MSAA"];
 
 		m_Buffer = DirectX11::CreateBuffer(sizeof(CBData), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 		m_transformBuf = DirectX11::CreateBuffer(sizeof(CBTransform), D3D11_BIND_CONSTANT_BUFFER, nullptr);
@@ -62,8 +67,24 @@ namespace lm {
 		m_settingBuf = DirectX11::CreateBuffer(sizeof(CBSetting), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 		sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+		pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
-		float size = 480.f;
+
+	}
+
+	void LightMap::Prepare()
+	{
+		ClearLightMaps();
+
+		edgeTexture = Texture::Create(
+			canvasSize,
+			canvasSize,
+			"Lightmap",
+			DXGI_FORMAT_R32G32B32A32_FLOAT,
+			D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+		);
+		edgeTexture->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+		edgeTexture->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
 		rects.clear();
 
@@ -75,11 +96,12 @@ namespace lm {
 
 			// 해상도 push.
 			Rect r;
-			r.w = size;
-			r.h = size;
+			r.w = rectSize;
+			r.h = rectSize;
 
 			r.data = renderer;
 			r.worldMat = obj->m_transform.GetWorldMatrix();
+			float size = rectSize * renderer->m_LightMapping.lightmapScale;
 			renderer->m_LightMapping.ligthmapResolution = size;
 			renderer->m_LightMapping.lightmapTiling.x = size / canvasSize;
 			renderer->m_LightMapping.lightmapTiling.y = size / canvasSize;
@@ -164,8 +186,8 @@ namespace lm {
 
 	void LightMap::DrawRectangles(
 		const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
-		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
-		const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
+		//const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
 	)
 	{
 		int lightmapIndex = 0;
@@ -175,6 +197,7 @@ namespace lm {
 
 		DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 		DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
+		DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 0
 
 		DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
 
@@ -182,6 +205,9 @@ namespace lm {
 		cbset.lightsize = MAX_LIGHTS;
 		cbset.bias = bias;
 		cbset.shadowmapSize = { m_pLightmapShadowPass->shadowmapSize, m_pLightmapShadowPass->shadowmapSize };
+		cbset.globalAmbient = m_renderscene->m_LightController->GetProperties().m_globalAmbient;
+		cbset.useEnvMap = true;
+		//cbset.useAo = true;
 		DirectX11::UpdateBuffer(m_settingBuf.Get(), &cbset);
 		DirectX11::CSSetConstantBuffer(0, 1, m_settingBuf.GetAddressOf());	// setting 0
 
@@ -270,6 +296,7 @@ namespace lm {
 			DirectX11::CSSetShaderResources(2, 1, &structuredBufferSRV);
 		}
 
+		DirectX11::CSSetShaderResources(4, 1, &envMap->m_pSRV);
 		//DirectX11::CSSetShaderResources(0, 1, &m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
 
 		for (int i = 0; i < rects.size(); i++)
@@ -285,6 +312,7 @@ namespace lm {
 			int cSize = canvasSize;
 			cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
 			cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
+			cbData.useAo = renderer->m_Material->m_AOMap != nullptr;
 			DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 			DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
 
@@ -297,7 +325,9 @@ namespace lm {
 			if (renderer->m_Mesh == nullptr) continue;
 			auto meshName = renderer->m_Mesh->GetName();
 			DirectX11::CSSetShaderResources(1, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
-			DirectX11::CSSetShaderResources(3, 1, &m_pNormalMapPass->m_normalMapTextures[meshName]->m_pSRV);
+			DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
+			if(renderer->m_Material->m_AOMap)
+				DirectX11::CSSetShaderResources(5, 1, &renderer->m_Material->m_AOMap->m_pSRV);
 
 			// 컴퓨트 셰이더 실행
 			UINT numGroupsX = (UINT)ceil(canvasSize / 32.0f);
@@ -306,8 +336,51 @@ namespace lm {
 		}
 
 
+		//for (auto& lightmap : lightmaps) {
+		//	// 엣지 설정.
+		//	DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
+		//	DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(edgeTexture->m_pUAV, Colors::Transparent);
+		//	DirectX11::CSSetUnorderedAccessViews(0, 1, &edgeTexture->m_pUAV, nullptr); // 외각선 텍스처
+		//	DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+		//	DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+
+		//	// 엣지로 덮어쓰기.
+		//	DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+		//	DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+		//	DirectX11::CSSetShaderResources(0, 1, &edgeTexture->m_pSRV); // 외각선 텍스처
+		//	DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+
+		//	// 엣지 설정.
+		//	DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
+		//	DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(edgeTexture->m_pUAV, Colors::Transparent);
+		//	DirectX11::CSSetUnorderedAccessViews(0, 1, &edgeTexture->m_pUAV, nullptr); // 외각선 텍스처
+		//	DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+		//	DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+
+		//	// 엣지로 덮어쓰기.
+		//	DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+		//	DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+		//	DirectX11::CSSetShaderResources(0, 1, &edgeTexture->m_pSRV); // 외각선 텍스처
+		//	DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+		//}
+
+		for (auto& lightmap : lightmaps) {
+			// msaa
+			DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
+			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(edgeTexture->m_pUAV, Colors::Transparent);
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &edgeTexture->m_pUAV, nullptr); // 외각선 텍스처
+			DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+			DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+			// msaa 덮어쓰기.
+			DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+			DirectX11::CSSetShaderResources(0, 1, &edgeTexture->m_pSRV); // 외각선 텍스처
+			DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+		}
 
 
+
+		// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.Width = canvasSize;
 		desc.Height = canvasSize;
@@ -329,30 +402,18 @@ namespace lm {
 
 		DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
 
+		for (int i = 0; i < lightmaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[i]->m_pTexture);
 
-
-		//// 스테이징
-		//D3D11_BUFFER_DESC stagingDesc = {};
-		//stagingDesc.Usage = D3D11_USAGE_STAGING;
-		//stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-		//stagingDesc.BindFlags = 0;
-		//stagingDesc.MiscFlags = 0;
-		//stagingDesc.ByteWidth = sizeof(CBData);
-		//stagingDesc.StructureByteStride = sizeof(float);
-
-		//ID3D11Buffer* stagingBuffer;
-		//DeviceState::g_pDevice->CreateBuffer(&stagingDesc, nullptr, &stagingBuffer);
-
-		DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[0]->m_pTexture);
-
-
-
-		// 텍스쳐 저장
-		DirectX::ScratchImage image;
-		HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-
-		DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
-			GUID_ContainerFormatPng, L"Lightmap.png");
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Lightmap" + std::to_wstring(i) + L".png";
+			DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
+				GUID_ContainerFormatPng, filename.data());
+		}
+		imgTexture->Release();
+		imgTexture = nullptr;
 	}
 
 	void LightMap::CreateLightMap()
@@ -365,6 +426,7 @@ namespace lm {
 			D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
 		);
 		tex->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+		tex->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
 		lightmaps.push_back(tex);
 	}
@@ -376,13 +438,33 @@ namespace lm {
 			delete lightmap;
 		}
 		lightmaps.clear();
+		delete edgeTexture;
+		edgeTexture = nullptr;
+	}
+
+
+	void LightMap::Execute(RenderScene& scene, Camera& camera)
+	{
+	}
+
+	void LightMap::ReloadShaders()
+	{
+		m_computeShader = &ShaderSystem->ComputeShaders["Lightmap"];
+		m_edgeComputeShader = &ShaderSystem->ComputeShaders["NeighborSampling"];
+		m_edgeCoverComputeShader = &ShaderSystem->ComputeShaders["LightmapEdgeCover"];
+		m_MSAAcomputeShader = &ShaderSystem->ComputeShaders["MSAA"];
+	}
+
+	void LightMap::Resize()
+	{
 	}
 
 	void LightMap::GenerateLightMap(
 		RenderScene* scene,
 		const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
-		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
-		const std::unique_ptr<NormalMapPass>& m_pNormalMapPass)
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
+		//const std::unique_ptr<NormalMapPass>& m_pNormalMapPass
+	)
 	{
 		SetScene(scene);
 
@@ -390,7 +472,7 @@ namespace lm {
 		//TestPrepare();
 		PrepareRectangles();
 		CalculateRectangles();
-		DrawRectangles(m_pLightmapShadowPass, m_pPositionMapPass, m_pNormalMapPass);
+		DrawRectangles(m_pLightmapShadowPass, m_pPositionMapPass);
 	}
 }
 

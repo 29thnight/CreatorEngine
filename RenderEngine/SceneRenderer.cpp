@@ -357,9 +357,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR/rosendal_park_sunset_puresky_4k.hdr").string());
+	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string());
 	
-
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
 	m_pToneMapPass->Initialize(
@@ -382,11 +381,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//LightmapShadowPass
 	m_pLightmapShadowPass = std::make_unique<LightmapShadowPass>();
-	//m_pLightmapShadowPass->Initialize(8192, 8192);
 
 	//PositionMapPass
 	m_pPositionMapPass = std::make_unique<PositionMapPass>();
-	m_pNormalMapPass = std::make_unique<NormalMapPass>();
+
+	//LightMap
+	lightMap.Initialize();
 
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
@@ -526,6 +526,70 @@ void SceneRenderer::InitializeImGui()
         ImGui::DragFloat("Light colorY", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
         ImGui::DragFloat("Light colorZ", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
     });
+
+	ImGui::ContextRegister("LightMap", true, [&]() {
+		static bool useSetting = false;
+		static bool useBakedMaps = false;
+		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
+		ImGui::Text("LightMap");
+		if (ImGui::CollapsingHeader("Settings")) {
+			if (ImGui::IsItemToggledOpen()) {
+				useSetting = !useSetting;
+			}
+		}
+		if (ImGui::CollapsingHeader("Baked Maps")) {
+			if (ImGui::IsItemToggledOpen()) {
+				useBakedMaps = !useBakedMaps;
+			}
+		}
+
+		if (useSetting) {
+			ImGui::Text("Position and NormalMap Settings");
+			ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
+			if (ImGui::Button("Clear position normal maps")) {
+				m_pPositionMapPass->ClearTextures();
+			}
+			ImGui::Text("LightMap Shadow Settings");
+			ImGui::DragInt("ShadowMap Size", &m_pLightmapShadowPass->shadowmapSize, 128, 512, 8192);
+
+			ImGui::Text("LightMap Bake Settings");
+			ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
+			ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
+			ImGui::DragInt("Padding", &lightMap.padding);
+			ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
+		}
+
+		if (ImGui::Button("Generate LightMap"))
+		{
+			Camera c{};
+			// 메쉬별로 positionMap 생성
+			m_pPositionMapPass->Execute(*m_renderScene, c);
+			// lightMap에 사용할 shadowMap 생성
+			m_pLightmapShadowPass->Execute(*m_renderScene, c);
+			// lightMap 생성
+			lightMap.GenerateLightMap(m_renderScene, m_pLightmapShadowPass, m_pPositionMapPass);
+
+			m_pLightMapPass->Initialize(lightMap.lightmaps);
+		}
+
+		if (useBakedMaps) {
+			if (lightMap.imgSRV)
+			{
+				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
+					ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+				}
+				ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
+				//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
+				for (int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
+					ImGui::Image((ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pSRV,
+						ImVec2(512, 512));
+			}
+			else {
+				ImGui::Text("No LightMap");
+			}
+		}
+		ImGui::EndChild();
+	});
 }
 
 void SceneRenderer::InitializeTextures()
@@ -629,6 +693,13 @@ void SceneRenderer::Initialize(Scene* _pScene)
 		test2->GetComponent<SpriteComponent>()->SetTexture(0);
 		test2->m_transform.SetPosition({ 960, 540, 0 });
 
+		model[0] = Model::LoadModel("plane.fbx");
+		Model::LoadModelToScene(model[0], *m_currentScene);
+		model[1] = Model::LoadModel("damit.glb");
+		model[2] = Model::LoadModel("sphere.fbx");
+		model[3] = Model::LoadModel("SkinningTest.fbx");
+		model[4] = Model::LoadModel("bangbooExport.fbx");
+		//model = Model::LoadModel("sphere.fbx");
 
 		std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj2");
 		test3->AddComponent<SpriteComponent>()->Load("test.jpg");
@@ -638,9 +709,18 @@ void SceneRenderer::Initialize(Scene* _pScene)
 
 		ImGui::ContextRegister("Test Add Model", true, [&]()
 		{
-			if (ImGui::Button("Add Model"))
-			{
-				Model::LoadModelToScene(model, *m_currentScene);
+			static int num = 0;
+			std::string modelname = "Add : " + model[num]->name;
+			if (ImGui::Button(modelname.c_str())) {
+				Model::LoadModelToScene(model[num], *m_currentScene);
+			}
+			if (ImGui::Button("+")) {
+				num++;
+				if (num > 4) { num = 4; }
+			}
+			if (ImGui::Button("-")) {
+				num--;
+				if (num < 0) { num = 0; }
 			}
 		});
 		m_renderScene->SetScene(m_currentScene);
@@ -662,6 +742,7 @@ void SceneRenderer::Initialize(Scene* _pScene)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+	lightMap.envMap = envMap;
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -904,22 +985,6 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::ReloadShaders()
 {
 	ShaderSystem->ReloadShaders();
-	m_renderScene->m_LightController->m_shadowMapPass->ReloadShaders();
-	m_pDeferredPass->ReloadShaders();
-	m_pGBufferPass->ReloadShaders();
-	m_pSSAOPass->ReloadShaders();
-	m_pAAPass->ReloadShaders();
-	m_pSkyBoxPass->ReloadShaders();
-	m_pToneMapPass->ReloadShaders();
-	m_pWireFramePass->ReloadShaders();
-	m_pGridPass->ReloadShaders();
-	m_pSpritePass->ReloadShaders();
-	m_pBlitPass->ReloadShaders();
-	m_pPostProcessingPass->ReloadShaders();
-	m_pLightMapPass->ReloadShaders();
-	m_pUIPass->ReloadShaders();
-	m_pLightmapShadowPass->ReloadShaders();
-	m_pForwardPass->ReloadShaders();
 }
 
 void SceneRenderer::EditorView()
@@ -958,31 +1023,11 @@ void SceneRenderer::EditorView()
 
 			if (ImGui::BeginMenu("Bake Lightmap"))
 			{
-				if (ImGui::MenuItem("Bake"))
+				if (ImGui::MenuItem("LightMap Window"))
 				{
-					Camera c{};
-					// 메쉬별로 positionMap 생성
-					m_pPositionMapPass->Execute(*m_renderScene, c);
-					m_pNormalMapPass->Execute(*m_renderScene, c);
-					// lightMap에 사용할 shadowMap 생성
-					m_pLightmapShadowPass->Execute(*m_renderScene, c);
-					// lightMap 생성
-					lightMap.GenerateLightMap(m_renderScene, m_pLightmapShadowPass, m_pPositionMapPass, m_pNormalMapPass);
-
-					m_pLightMapPass->Initialize(lightMap.lightmaps);
-
-					if (lightMap.imgSRV)
-                    {
-						ImGui::ContextUnregister("Baked LightMap");
-
-						ImGui::ContextRegister("Baked LightMap", true, [&]()
-                        {
-							ImGui::Image((ImTextureID)lightMap.imgSRV, ImVec2(512, 512));
-							//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
-							for(int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
-								ImGui::Image((ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pSRV,
-									ImVec2(512, 512));
-						});
+					if (!ImGui::GetContext("LightMap").IsOpened())
+					{
+						ImGui::GetContext("LightMap").Open();
 					}
 				}
 				ImGui::EndMenu();
