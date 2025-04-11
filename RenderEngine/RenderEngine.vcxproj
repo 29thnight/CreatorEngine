@@ -149,13 +149,17 @@
   <ItemGroup>
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
+    <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="EffectModules.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
+    <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
     <ClCompile Include="LightmapShadowPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />
+    <ClCompile Include="SparkleEffect.cpp" />
     <ClCompile Include="Text.cpp" />
     <ClCompile Include="UIsprite.cpp" />
     <ClCompile Include="UIPass.cpp" />
@@ -190,6 +194,9 @@
   <ItemGroup>
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
+    <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="EffectModules.h" />
+    <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="BlitPass.h" />
     <ClInclude Include="Camera.h" />
@@ -198,6 +205,7 @@
     <ClInclude Include="LightmapShadowPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
+    <ClInclude Include="SparkleEffect.h" />
     <ClInclude Include="Text.h" />
     <ClInclude Include="UIsprite.h" />
     <ClInclude Include="UIPass.h" />
@@ -438,6 +446,15 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

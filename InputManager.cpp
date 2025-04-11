@@ -12,7 +12,7 @@ bool InputManager::Initialize(HWND _hwnd)
     else
     {
         hwnd = _hwnd;
-        std::cout << "게임인풋 초기화 성공" << std::endl;
+        std::cout << "GameInput System Initialize succeed" << std::endl;
         return true;
     }
 

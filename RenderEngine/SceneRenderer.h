@@ -26,6 +26,7 @@
 #include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
+#include "EffectManager.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -71,6 +72,7 @@ private:
     std::unique_ptr<GridPass> m_pGridPass{};
 	std::unique_ptr<AAPass> m_pAAPass{};
 	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
+	std::unique_ptr<EffectManager> m_pEffectPass{};
 
 	std::unique_ptr<LightmapShadowPass> m_pLightmapShadowPass{};
 	std::unique_ptr<PositionMapPass> m_pPositionMapPass{};
