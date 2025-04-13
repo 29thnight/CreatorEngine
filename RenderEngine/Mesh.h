@@ -13,6 +13,7 @@ struct Node
 	uint32 m_numMeshes{};
 	std::vector<uint32> m_meshes;
 
+    Node() = default;
 	Node(const std::string_view& name) : m_name(name) {}
 };
 
@@ -189,10 +190,10 @@ private:
 
 	std::vector<UIvertex> UIQuad
 	{
-		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } },  // ÁÂ»ó´Ü
-		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // ¿ì»ó´Ü
-		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // ¿ìÇÏ´Ü
-		{ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} },    // ÁÂÇÏ´Ü
+		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } },  // ì¢Œìƒë‹¨
+		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // ìš°ìƒë‹¨
+		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // ìš°í•˜ë‹¨
+		{ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} },    // ì¢Œí•˜ë‹¨
 
 	};
 	std::vector<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };

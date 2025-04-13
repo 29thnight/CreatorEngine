@@ -34,14 +34,23 @@
     <Filter Include="Classes\Resources\Light">
       <UniqueIdentifier>{044c4c77-9762-42ae-9e91-6e8e20d089b0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\ComponentBase">
+      <UniqueIdentifier>{f6d05690-7090-4db2-97cc-812958f1bceb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\SceneManager">
+      <UniqueIdentifier>{bdd71775-7937-4339-95ed-838af4423abe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\RegistrableSceneEvents">
+      <UniqueIdentifier>{61bc41e4-b61a-4efc-a54c-7f321c88b8e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Object">
+      <UniqueIdentifier>{d4616844-2a43-4840-ad71-b715341b47bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject">
+      <UniqueIdentifier>{f146b3e7-4103-48ad-a96c-6c2bcf57155d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Transform.cpp">
-      <Filter>Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="GameObject.cpp">
-      <Filter>Classes</Filter>
-    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
@@ -50,6 +59,18 @@
     </ClCompile>
     <ClCompile Include="SpriteComponent.cpp">
       <Filter>Classes\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneManager.cpp">
+      <Filter>Managers\SceneManager</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>Classes\GameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Classes\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Object.cpp">
+      <Filter>Classes\Object</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -62,17 +83,8 @@
     <ClInclude Include="IObject.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="GameObject.h">
-      <Filter>Classes</Filter>
-    </ClInclude>
     <ClInclude Include="TypeTrait.h">
       <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform.h">
-      <Filter>Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="Component.h">
-      <Filter>Classes\Components</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>Classes\Components</Filter>
@@ -98,11 +110,40 @@
     <ClInclude Include="LightProperty.h">
       <Filter>Classes\Resources\Light</Filter>
     </ClInclude>
-    <ClInclude Include="IUpdatable.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="SpriteComponent.h">
       <Filter>Classes\Components</Filter>
     </ClInclude>
+    <ClInclude Include="GameObjectPool.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraComponent.h">
+      <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Component.h">
+      <Filter>Classes\Components\ComponentBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneManager.h">
+      <Filter>Managers\SceneManager</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObject.h">
+      <Filter>Classes\GameObject</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.h">
+      <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Object.h">
+      <Filter>Classes\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="IUpdatable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="IFixedUpdatable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="GameObejct.inl">
+      <Filter>Classes\GameObject</Filter>
+    </None>
   </ItemGroup>
 </Project>

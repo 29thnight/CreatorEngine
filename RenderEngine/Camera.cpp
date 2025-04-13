@@ -12,18 +12,21 @@ Camera::Camera()
 
 	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
 
-	m_renderTarget = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		cameraRTVName,
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
+    auto renderTexture = TextureHelper::CreateRenderTexture(  
+       DeviceState::g_ClientRect.width,  
+       DeviceState::g_ClientRect.height,  
+       cameraRTVName,  
+       DXGI_FORMAT_R16G16B16A16_FLOAT  
+    );  
+    m_renderTarget.swap(renderTexture);
 
-	m_depthStencil = TextureHelper::CreateDepthTexture(
+
+	auto depthStencil = TextureHelper::CreateDepthTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"Camera_" + std::to_string(m_cameraIndex) + "_DSV"
 	);
+    m_depthStencil.swap(depthStencil);
 
 	XMMATRIX identity = XMMatrixIdentity();
 

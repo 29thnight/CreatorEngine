@@ -4,10 +4,10 @@
 #include "../RenderEngine/mesh.h"
 #include "GameObject.h"
 #include "transform.h"
+
 SpriteComponent::SpriteComponent()
 {
 	
-		meta_default(SpriteComponent);
 		m_orderID = Component::Order2Uint(ComponentOrder::MeshRenderer);
 		m_typeID = TypeTrait::GUIDCreator::GetTypeID<SpriteComponent>();
 		m_UIMesh = new UIMesh();
@@ -26,12 +26,6 @@ void SpriteComponent::SetTexture(int index)
 	curindex = index;
 	m_curtexture = textures[curindex].get();
 	uiinfo.size = textures[curindex]->GetImageSize();
-}
-
-
-void SpriteComponent::Start()
-{
-	
 }
 
 void SpriteComponent::Update(float tick)
@@ -53,7 +47,7 @@ void SpriteComponent::Update(float tick)
 	auto quat = m_pOwner->m_transform.rotation;
 	DirectX::XMMATRIX rotMatrix = DirectX::XMMatrixRotationQuaternion(quat);
 
-	// 2. ø¿¿œ∑Ø ∞¢ √ﬂ√‚
+	// 2. Ïò§ÏùºÎü¨ Í∞Å Ï∂îÏ∂ú
 	float pitch, yaw, roll;
 	pitch = asinf(-rotMatrix.r[2].m128_f32[1]); // -m31
 
@@ -74,14 +68,6 @@ void SpriteComponent::Update(float tick)
 	Mathf::Matrix tranM = Mathf::Matrix::CreateTranslation(ndcpos);
 	uiinfo.world = DirectX::XMMatrixTranspose(scaleM * rotM * tranM);
 	
-}
-
-void SpriteComponent::FixedUpdate(float fixedTick)
-{
-}
-
-void SpriteComponent::LateUpdate(float tick)
-{
 }
 
 void SpriteComponent::UpdateTexture()

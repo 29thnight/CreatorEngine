@@ -13,11 +13,12 @@ class AnimationJob
 public:
     AnimationJob();
     ~AnimationJob();
-    void Update(RenderScene& scene, float deltaTime);
+    void Update(float deltaTime);
 private:
     void UpdateBones(Animator& animator);
     void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& transform, float time);
 
+    Core::DelegateHandle m_AnimationUpdateHandle;
     ThreadPool m_UpdateThreadPool;
     std::vector<Animator*> m_currAnimator;
     uint32 m_objectSize{};

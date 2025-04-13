@@ -4,6 +4,7 @@
 #include "ImGuiRegister.h"
 #include "Benchmark.hpp"
 #include "RenderScene.h"
+#include "../ScriptBinder/SceneManager.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
 #include "../ScriptBinder/SpriteComponent.h"
@@ -335,7 +336,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
 	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
-	m_ambientOcclusionTexture = std::unique_ptr<Texture>(std::move(ao));
+	m_ambientOcclusionTexture = MakeUniqueTexturePtr(ao);
 
 	//Buffer 생성
 	XMMATRIX identity = XMMatrixIdentity();
@@ -427,6 +428,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
+
+    m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 
 }
 
@@ -617,134 +620,130 @@ void SceneRenderer::InitializeImGui()
 		}
 		ImGui::EndChild();
 	});
+
+    //model[0] = Model::LoadModel("plane.fbx");
+    //Model::LoadModelToScene(model[0], *m_currentScene);
+    //model[1] = Model::LoadModel("damit.glb");
+    //model[2] = Model::LoadModel("sphere.fbx");
+    //model[3] = Model::LoadModel("SkinningTest.fbx");
+    //model[4] = Model::LoadModel("bangbooExport.fbx");
+    //model = Model::LoadModel("sphere.fbx");
+    
+    //ImGui::ContextRegister("Test Add Model", true, [&]()
+    //{
+    //	static int num = 0;
+    //	std::string modelname = "Add : " + model[num]->name;
+    //	if (ImGui::Button(modelname.c_str())) {
+    //		Model::LoadModelToScene(model[num], *m_currentScene);
+    //	}
+    //	if (ImGui::Button("+")) {
+    //		num++;
+    //		if (num > 4) { num = 4; }
+    //	}
+    //	if (ImGui::Button("-")) {
+    //		num--;
+    //		if (num < 0) { num = 0; }
+    //	}
+    //});
 }
 
 void SceneRenderer::InitializeTextures()
 {
-	m_diffuseTexture = TextureHelper::CreateRenderTexture(
+	auto diffuseTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"DiffuseRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_diffuseTexture.swap(diffuseTexture);
 
-	m_metalRoughTexture = TextureHelper::CreateRenderTexture(
+	auto metalRoughTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"MetalRoughRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_metalRoughTexture.swap(metalRoughTexture);
 
-	m_normalTexture = TextureHelper::CreateRenderTexture(
+	auto normalTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"NormalRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_normalTexture.swap(normalTexture);
 
-	m_emissiveTexture = TextureHelper::CreateRenderTexture(
+	auto emissiveTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"EmissiveRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_emissiveTexture.swap(emissiveTexture);
 
-	m_toneMappedColourTexture = TextureHelper::CreateRenderTexture(
+	auto toneMappedColourTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"ToneMappedColourRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_toneMappedColourTexture.swap(toneMappedColourTexture);
 
-	m_gridTexture = TextureHelper::CreateRenderTexture(
+	auto gridTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"GridRTV",
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
+    m_gridTexture.swap(gridTexture);
 }
 
-void SceneRenderer::Initialize(Scene* _pScene)
+void SceneRenderer::NewCreateSceneInitialize()
 {
-	if (!_pScene)
-	{
-		m_currentScene = Scene::CreateNewScene();
-		m_renderScene->SetScene(m_currentScene);
-		m_renderScene->Initialize();
+	m_currentScene = SceneManagers->GetActiveScene();
+	m_renderScene->SetScene(m_currentScene);
+	m_renderScene->Initialize();
 
-		auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		
-		Light pointLight;
-		pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
-		pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
-		pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
-		pointLight.m_lightType = LightType::DirectionalLight;
+	Light pointLight;
+	pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
+	pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
+	pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
+	pointLight.m_lightType = LightType::DirectionalLight;
 
-		Light dirLight;
-		dirLight.m_color = lightColour;
-		dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
-		dirLight.m_lightType = LightType::DirectionalLight;
+	Light dirLight;
+	dirLight.m_color = lightColour;
+	dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
+	dirLight.m_lightType = LightType::DirectionalLight;
 
-		Light spotLight;
-		spotLight.m_color = XMFLOAT4(Colors::Magenta);
-		spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
-		spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
-		spotLight.m_lightType = LightType::SpotLight;
-		spotLight.m_spotLightAngle = 3.142 / 4.0;
+	Light spotLight;
+	spotLight.m_color = XMFLOAT4(Colors::Magenta);
+	spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
+	spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
+	spotLight.m_lightType = LightType::SpotLight;
+	spotLight.m_spotLightAngle = 3.142 / 4.0;
 
-		m_renderScene->m_LightController
-			->AddLight(dirLight)
-			.AddLight(pointLight)
-			.AddLight(spotLight)
-			.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+	m_renderScene->m_LightController
+		->AddLight(dirLight)
+		.AddLight(pointLight)
+		.AddLight(spotLight)
+		.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
 
-		ShadowMapRenderDesc desc;
-		desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-		desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
-		desc.m_viewWidth = 100;
-		desc.m_viewHeight = 100;
-		desc.m_nearPlane = 0.1f;
-		desc.m_farPlane = 1000.0f;
-		desc.m_textureWidth = 2048;
-		desc.m_textureHeight = 2048;
+	ShadowMapRenderDesc desc;
+	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
+	desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
+	desc.m_viewWidth = 100;
+	desc.m_viewHeight = 100;
+	desc.m_nearPlane = 0.1f;
+	desc.m_farPlane = 1000.0f;
+	desc.m_textureWidth = 2048;
+	desc.m_textureHeight = 2048;
 
-		m_renderScene->m_LightController->Initialize();
-		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
+	m_renderScene->m_LightController->Initialize();
+	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-
-		model[0] = Model::LoadModel("plane.fbx");
-		Model::LoadModelToScene(model[0], *m_currentScene);
-		model[1] = Model::LoadModel("damit.glb");
-		model[2] = Model::LoadModel("sphere.fbx");
-		model[3] = Model::LoadModel("SkinningTest.fbx");
-		model[4] = Model::LoadModel("bangbooExport.fbx");
-		//model = Model::LoadModel("sphere.fbx");
-
-
-
-		ImGui::ContextRegister("Test Add Model", true, [&]()
-		{
-			static int num = 0;
-			std::string modelname = "Add : " + model[num]->name;
-			if (ImGui::Button(modelname.c_str())) {
-				Model::LoadModelToScene(model[num], *m_currentScene);
-			}
-			if (ImGui::Button("+")) {
-				num++;
-				if (num > 4) { num = 4; }
-			}
-			if (ImGui::Button("-")) {
-				num--;
-				if (num < 0) { num = 0; }
-			}
-		});
-		m_renderScene->SetScene(m_currentScene);
-	}
-	else
-	{
-		m_currentScene = _pScene;
-		m_renderScene->SetScene(m_currentScene);
-	}
+	m_renderScene->SetScene(m_currentScene);
 
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 
@@ -767,16 +766,9 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 		ReloadShaders();
 	}
 	//컴포넌트업데이트 확인용 추가
-	m_currentScene->Update(deltaTime);
 	m_renderScene->Update(deltaTime);
-	//m_pEffectPass->UpdateEffects(deltaTime);
+
 	m_pEditorCamera->HandleMovement(deltaTime);
-	// 디버그용으로 임시로 같이 움직이도록 조정
-	//for (auto& camera : CameraManagement->m_cameras)
-	//{
-	//	if (nullptr == camera) continue;
-	//	camera->HandleMovement(deltaTime);
-	//}
 
 	PrepareRender();
 }
@@ -1209,7 +1201,7 @@ void SceneRenderer::ShowLogWindow()
 
 		int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
 
-
+        ImGui::PushID(i);
 		if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
 			is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
 		{
@@ -1232,6 +1224,7 @@ void SceneRenderer::ShowLogWindow()
 
 		if (is_selected)
 			ImGui::PopStyleColor(); // Header color
+        ImGui::PopID();
 	}
 
 	ImGui::End();

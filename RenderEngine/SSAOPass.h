@@ -24,7 +24,7 @@ public:
 	void Resize() override;
 
 private:
-	std::unique_ptr<Texture> m_NoiseTexture;
+    UniqueTexturePtr m_NoiseTexture{ TEXTURE_NULL_INITIALIZER };
 	SSAOBuffer m_SSAOBuffer;
 	ComPtr<ID3D11Buffer> m_Buffer;
 	ID3D11ShaderResourceView* m_DepthSRV;

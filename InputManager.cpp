@@ -1,4 +1,4 @@
-﻿#include "InputManager.h"
+#include "InputManager.h"
 #include <wrl.h>
 
 #pragma comment(lib, "GameInput.lib")
@@ -12,7 +12,7 @@ bool InputManager::Initialize(HWND _hwnd)
     else
     {
         hwnd = _hwnd;
-        std::cout << "GameInput System Initialize succeed" << std::endl;
+        std::cout << "GameInput System NewCreateSceneInitialize succeed" << std::endl;
         return true;
     }
 

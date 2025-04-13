@@ -20,7 +20,7 @@ public:
 		CSharpScript,
 		Sound,
 	};
-	//ÀÏ´Ü ÀÌ´ë·Î ÁøÇà
+	//ì¼ë‹¨ ì´ëŒ€ë¡œ ì§„í–‰
 	enum class AssetType
 	{
 		Model,
@@ -45,6 +45,7 @@ private:
 	~DataSystem();
 public:
 	void Initialize();
+    void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
 	void LoadModels();
@@ -53,6 +54,7 @@ public:
 	void LoadTextures();
 	void LoadMaterials();
 	Texture* LoadTexture(const std::string_view& filePath);
+    Texture* LoadMaterialTexture(const std::string_view& filePath);
 
 	void OpenFile(const file::path& filepath);
 

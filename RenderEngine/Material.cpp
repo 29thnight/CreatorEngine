@@ -1,7 +1,5 @@
 #include "Material.h"
-#include "Material.h"
-#include "Material.h"
-#include "Material.h"
+
 
 Material::Material(Material&& material) noexcept
 {

@@ -22,7 +22,7 @@ struct ShadowInfo
 };
 
 
-//cascade¸¶´Ù °ª ³ª´²ÁÖ±â
+//cascadeë§ˆë‹¤ ê°’ ë‚˜ëˆ ì£¼ê¸°
 std::vector<float>      devideCascadeEnd(Camera& camera, std::vector<float> ratios);
 std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir);
 
@@ -39,14 +39,14 @@ public:
 
 	Camera m_shadowCamera{};
 
-	std::unique_ptr<Texture> m_shadowMapTexture{};
+	UniqueTexturePtr m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
 	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
 
 
 	D3D11_VIEWPORT shadowViewport;
 	ID3D11ShaderResourceView* shadowMapSRV = nullptr;
 
-	//±×¸²ÀÚ Àû¿ëÇÒ ºû¸¶´Ù 3°³ ÇöÀç´Â ºû 1°³¿¡¸¸ Àû¿ë°¡´É
+	//ê·¸ë¦¼ì ì ìš©í•  ë¹›ë§ˆë‹¤ 3ê°œ í˜„ì¬ëŠ” ë¹› 1ê°œì—ë§Œ ì ìš©ê°€ëŠ¥
 	ID3D11DepthStencilView* m_shadowMapDSVarr[cascadeCount]{};
 
 	ShadowMapConstant shadowMapConstant2;

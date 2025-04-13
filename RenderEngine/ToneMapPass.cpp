@@ -103,7 +103,7 @@ ToneMapPass::ToneMapPass()
 
     device->CreateTexture2D(&texDesc, nullptr, &luminanceTexture);
 
-    // UAV 积己
+    // UAV 靸濎劚
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc1 = {};
     uavDesc1.Format = texDesc.Format;
     uavDesc1.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
@@ -197,8 +197,8 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
  //   context->Unmap(readbackTexture.Get(), 0);
 
- //   context->CSSetShaderResources(0, 1, nullSRVs); // Compute Shader SRV 秦力
- //   context->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr); // UAV 秦力
+ //   context->CSSetShaderResources(0, 1, nullSRVs); // Compute Shader SRV 頃挫牅
+ //   context->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr); // UAV 頃挫牅
 
 	if (m_toneMapType == ToneMapType::Reinhard)
 	{
@@ -240,15 +240,11 @@ void ToneMapPass::ControlPanel()
 	if (m_toneMapType == ToneMapType::ACES)
 	{
 		ImGui::Checkbox("Use Filmic", &m_isAbleFilmic);
+        ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
 	}
     if (m_toneMapType == ToneMapType::ACES && m_toneMapACESConstant.m_bUseFilmic)
     {
-        ImGui::DragFloat("Film Slope", &m_toneMapACESConstant.filmSlope, 0.01f, 0.0f, 1.0f);
-        ImGui::DragFloat("Film Toe", &m_toneMapACESConstant.filmToe, 0.01f, 0.0f, 1.0f);
-        ImGui::DragFloat("Film Shoulder", &m_toneMapACESConstant.filmShoulder, 0.01f, 0.0f, 1.0f);
-        ImGui::DragFloat("Film Black Clip", &m_toneMapACESConstant.filmBlackClip, 0.01f, 0.0f, 1.0f);
-        ImGui::DragFloat("Film White Clip", &m_toneMapACESConstant.filmWhiteClip, 0.01f, 0.0f, 1.0f);
-		ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 1.0f);
+		//ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
     }
 }
 

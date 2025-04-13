@@ -43,6 +43,7 @@ namespace file = std::filesystem;
 #include <utility>
 #include <vector>
 #include <cstdint>
+#include <ranges>
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"

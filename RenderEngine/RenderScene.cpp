@@ -43,32 +43,32 @@ void RenderScene::Initialize()
 	EditorSceneObjectHierarchy();
 	EditorSceneObjectInspector();
 
-	animationJobThread = std::thread([&]
-	{
-		using namespace std::chrono;
+	//animationJobThread = std::thread([&]
+	//{
+	//	using namespace std::chrono;
 
-		auto prev = high_resolution_clock::now();
+	//	auto prev = high_resolution_clock::now();
 
-		while (true)
-		{
-			auto now = high_resolution_clock::now();
-			duration<float> elapsed = now - prev;
+	//	while (true)
+	//	{
+	//		auto now = high_resolution_clock::now();
+	//		duration<float> elapsed = now - prev;
 
-			// 16.6ms ~ 60fps 에 맞춰 제한
-			if (elapsed.count() >= (1.0f / 60.0f))
-			{
-				prev = now;
-				float delta = elapsed.count();
-				m_animationJob.Update(*this, delta);
-			}
-			else
-			{
-				std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
-			}
-		}
-	});
+	//		// 16.6ms ~ 60fps 에 맞춰 제한
+	//		if (elapsed.count() >= (1.0f / 60.0f))
+	//		{
+	//			prev = now;
+	//			float delta = elapsed.count();
+	//			m_animationJob.Update(delta);
+	//		}
+	//		else
+	//		{
+	//			std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
+	//		}
+	//	}
+	//});
 
-	animationJobThread.detach();
+	//animationJobThread.detach();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)

@@ -10,9 +10,10 @@
 
 #include "Component.h"
 #include "ILifeSycle.h"
+#include "Scene.h"
 
 struct ICollider;
-// »ç¿ëÀÚ°¡ »õ·Î¿î ÄÄÆ÷³ÍÆ®¸¦ Ãß°¡ÇÒ ¶§ À¯¿ëÇÑ ±â´ÉÀ» ¹Ş±â À§ÇÑ ÄÄÆ÷³ÍÆ®
+// ì‚¬ìš©ìê°€ ìƒˆë¡œìš´ ì»´í¬ë„ŒíŠ¸ë¥¼ ì¶”ê°€í•  ë•Œ ìœ ìš©í•œ ê¸°ëŠ¥ì„ ë°›ê¸° ìœ„í•œ ì»´í¬ë„ŒíŠ¸
 class ModuleBehavior : public Component, public ILifeSycle
 {
 public:
@@ -38,6 +39,6 @@ public:
 	virtual void LateUpdate(float tick) override {};
 
 public:
-	// IComponentÀ»(¸¦) ÅëÇØ »ó¼ÓµÊ
+	// IComponentì„(ë¥¼) í†µí•´ ìƒì†ë¨
 	std::string ToString() const override = 0;
 };

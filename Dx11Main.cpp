@@ -10,13 +10,17 @@
 #include "ScriptBinder/HotLoadSystem.h"
 #include "RenderEngine/DataSystem.h"
 #include "RenderEngine/ShaderSystem.h"
+#include "SceneManager.h"
+#include "EngineSetting.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
 	m_deviceResources->RegisterDeviceNotify(this);
 
+
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
-	m_sceneRenderer->Initialize();
+    SceneManagers->CreateScene();
+	//m_sceneRenderer->NewCreateSceneInitialize();
 
 	Sound->initialize((int)ChannelType::MaxChannel);
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
@@ -24,12 +28,29 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	ScriptManager->Initialize();
 	DataSystems->Initialize();
 
-	SceneInitialize();
+    m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
+    {
+        InputManagement->Update(deltaSecond);
+        Sound->update();
+    });
+
+    m_SceneRenderingEventHandle = SceneManagers->SceneRenderingEvent.AddLambda([&](float deltaSecond)
+    {
+        m_sceneRenderer->OnWillRenderObject(deltaSecond);
+        m_sceneRenderer->SceneRendering();
+    });
+
+    m_GUIRenderingEventHandle = SceneManagers->GUIRenderingEvent.AddLambda([&]()
+    {
+        OnGui();
+    });
+
 }
 
 DirectX11::Dx11Main::~Dx11Main()
 {
 	m_deviceResources->RegisterDeviceNotify(nullptr);
+    SceneManagers->Deccommissioning();
 }
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
@@ -48,21 +69,8 @@ void DirectX11::Dx11Main::Update()
 	// EditorUpdate
     m_timeSystem.Tick([&]
     {
-        std::wostringstream woss;
-        woss.precision(6);
-        woss << L"Creator Editor - "
-            << L"Width: "
-            << m_deviceResources->GetOutputSize().width
-            << L" Height: "
-            << m_deviceResources->GetOutputSize().height
-            << L" FPS: "
-            << m_timeSystem.GetFramesPerSecond()
-            << L" FrameCount: "
-            << m_timeSystem.GetFrameCount();
-
-        SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
-        InputManagement->Update(m_timeSystem.GetElapsedSeconds());
-        Sound->update();
+        InfoWindow();
+        SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
     });
 
     if(m_isGameStart)
@@ -70,37 +78,37 @@ void DirectX11::Dx11Main::Update()
         //GameUpdate
         m_timeSystem.Tick([&]
         {
-                //Sound->update();
-
-                //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
+            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
+            //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
         });
     }
 
+#ifdef EDITOR
 	if (InputManagement->IsKeyReleased(VK_F5))
 	{
-		m_isGameView = !m_isGameView;
+        EngineSettingInstance->ToggleGameView();
 	}
-#ifdef EDITOR
+
 	if (InputManagement->IsKeyReleased(VK_F6))
 	{
 		//loadlevel = 0;
 	}
+
 	if (InputManagement->IsKeyDown(VK_F11)) 
 	{
 		m_sceneRenderer->SetWireFrame();
 	}
-	if (InputManagement->IsKeyDown(VK_F10)) {
+
+	if (InputManagement->IsKeyDown(VK_F10))
+    {
 		m_sceneRenderer->SetLightmapPass();
 	}
-#endif // !EDITOR
+ 
 	if (InputManagement->IsKeyReleased(VK_F9)) 
 	{
 		Physics->ConnectPVD();
 	}
-
-#if defined(EDITOR)
-#endif // !Editor
-
+#endif // !EDITOR
 }
 
 bool DirectX11::Dx11Main::Render()
@@ -108,17 +116,31 @@ bool DirectX11::Dx11Main::Render()
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
 	if (m_timeSystem.GetFrameCount() == 0) return false;
 	{
-		m_sceneRenderer->OnWillRenderObject(m_timeSystem.GetElapsedSeconds());
-		m_sceneRenderer->SceneRendering();
+        SceneManagers->SceneRendering(m_timeSystem.GetElapsedSeconds());
 	}
 
 #if defined(EDITOR)
-    OnGui();
+    SceneManagers->GUIRendering();
 #endif // !EDITOR
 
-	Debug->Flush();
-
 	return true;
+}
+
+void DirectX11::Dx11Main::InfoWindow()
+{
+    std::wostringstream woss;
+    woss.precision(6);
+    woss << L"Creator Editor - "
+        << L"Width: "
+        << m_deviceResources->GetOutputSize().width
+        << L" Height: "
+        << m_deviceResources->GetOutputSize().height
+        << L" FPS: "
+        << m_timeSystem.GetFramesPerSecond()
+        << L" FrameCount: "
+        << m_timeSystem.GetFrameCount();
+
+    SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 }
 
 void DirectX11::Dx11Main::OnGui()

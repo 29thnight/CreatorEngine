@@ -44,29 +44,32 @@ std::optional<NodeAnimation> AnimationLoader::LoadNodeAnimation(aiNodeAnim* _pNo
     NodeAnimation nodeAnim;
     nodeAnim.m_name = _pNodeAnim->mNodeName.data;
 
+    nodeAnim.m_positionKeys.reserve(_pNodeAnim->mNumPositionKeys);
     for (uint32 i = 0; i < _pNodeAnim->mNumPositionKeys; ++i)
     {
         aiVectorKey& aiPosKey = _pNodeAnim->mPositionKeys[i];
-        NodeAnimation::PositionKey posKey;
+        NodeAnimation::PositionKey posKey{};
         posKey.m_position = XMVectorSet(aiPosKey.mValue.x, aiPosKey.mValue.y, aiPosKey.mValue.z, 1);
         posKey.m_time = aiPosKey.mTime;
         nodeAnim.m_positionKeys.push_back(posKey);
     }
 
+    nodeAnim.m_rotationKeys.reserve(_pNodeAnim->mNumRotationKeys);
     for (uint32 i = 0; i < _pNodeAnim->mNumRotationKeys; ++i)
     {
         aiQuatKey& aiRotKey = _pNodeAnim->mRotationKeys[i];
-        NodeAnimation::RotationKey rotKey;
+        NodeAnimation::RotationKey rotKey{};
         aiQuaternion& aiQuat = aiRotKey.mValue;
         rotKey.m_rotation = XMVectorSet(aiQuat.x, aiQuat.y, aiQuat.z, aiQuat.w);
         rotKey.m_time = aiRotKey.mTime;
         nodeAnim.m_rotationKeys.push_back(rotKey);
     }
 
+    nodeAnim.m_scaleKeys.reserve(_pNodeAnim->mNumScalingKeys);
     for (uint32 i = 0; i < _pNodeAnim->mNumScalingKeys; ++i)
     {
         aiVectorKey& aiScalKeys = _pNodeAnim->mScalingKeys[i];
-        NodeAnimation::ScaleKey scalKey;
+        NodeAnimation::ScaleKey scalKey{};
         scalKey.m_scale.x = aiScalKeys.mValue.x;
         scalKey.m_scale.y = aiScalKeys.mValue.y;
         scalKey.m_scale.z = aiScalKeys.mValue.z;

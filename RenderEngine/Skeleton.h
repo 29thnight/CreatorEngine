@@ -28,6 +28,7 @@ public:
 	Mathf::xMatrix m_offset;
 	std::vector<Bone*> m_children;
 
+    Bone() = default;
 	Bone(const std::string& _name, int _index, const Mathf::xMatrix& _offset) :
 		m_name(_name),
 		m_index(_index),

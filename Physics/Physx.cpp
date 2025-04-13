@@ -37,7 +37,7 @@ PxFilterFlags CustomFilterShader(
     int group1 = fd1.word0;
 
     if (!collisionMatrix[group0][group1]) {
-        return PxFilterFlag::eSUPPRESS; // √Êµπ π´Ω√
+        return PxFilterFlag::eSUPPRESS; // Ï∂©Îèå Î¨¥Ïãú
     }
 
 
@@ -54,26 +54,26 @@ PxFilterFlags CustomFilterShader(
 
 void PhysicX::Initialize()
 {
-    m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_allocator, m_errorCallback);     // ø°∑Ø √‚∑¬
+    m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_allocator, m_errorCallback);     // ÏóêÎü¨ Ï∂úÎ†•
 
 #if _DEBUG
-    // PVD º≥¡§
+    // PVD ÏÑ§Ï†ï
     pvd = PxCreatePvd(*m_foundation);
     PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
     auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
 #endif
 
-    m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 40.f), recordMemoryAllocations, pvd);  // ø°∑Ø √‚∑¬¿ª ±‚π›¿∏∑Œ ««¡˜Ω∫ ª˝º∫.
+    m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 40.f), recordMemoryAllocations, pvd);  // ÏóêÎü¨ Ï∂úÎ†•ÏùÑ Í∏∞Î∞òÏúºÎ°ú ÌîºÏßÅÏä§ ÏÉùÏÑ±.
 
     m_defaultMaterial = m_physics->createMaterial(1.f, 1.f, 0.f);
 
-    gDispatcher = PxDefaultCpuDispatcherCreate(2);  // ∏ﬁ∏∏Æ«Æ ºˆ.
+    gDispatcher = PxDefaultCpuDispatcherCreate(2);  // Î©îÎ™®Î¶¨ÌíÄ Ïàò.
 
-    // Scene ª˝º∫
+    // Scene ÏÉùÏÑ±
     physx::PxSceneDesc sceneDesc(m_physics->getTolerancesScale());
     sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
 
-    // æ¿ ª˝º∫ Ω√ ¿Ã 2∞°¡ˆ¥¬ ¿÷æÓæﬂ «œ¥¬µÌ. æ¯¿∏∏È Scene¿Ã null∂‰.
+    // Ïî¨ ÏÉùÏÑ± Ïãú Ïù¥ 2Í∞ÄÏßÄÎäî ÏûàÏñ¥Ïïº ÌïòÎäîÎìØ. ÏóÜÏúºÎ©¥ SceneÏù¥ nullÎú∏.
     sceneDesc.cpuDispatcher = gDispatcher;
     //sceneDesc.filterShader = PxDefaultSimulationFilterShader;
     sceneDesc.filterShader = CustomFilterShader;
@@ -86,12 +86,12 @@ void PhysicX::Initialize()
 
     m_controllerManager = PxCreateControllerManager(*m_scene);
 
-    // µπˆ±◊ Ω√∞¢»≠ «√∑°±◊ º≥¡§
-    m_scene->setVisualizationParameter(PxVisualizationParameter::eSCALE, 1.0f); // ¿¸√º Ω∫ƒ…¿œ
-    m_scene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f); // √Êµπ «¸≈¬ Ω√∞¢»≠
-    m_scene->setVisualizationParameter(PxVisualizationParameter::eACTOR_AXES, 1.0f);       // æ◊≈Õ √‡ Ω√∞¢»≠
-    m_scene->setVisualizationParameter(PxVisualizationParameter::eCONTACT_POINT, 1.0f);   // ¡¢√À¡° Ω√∞¢»≠
-    m_scene->setVisualizationParameter(PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0f); // ¡∂¿Œ∆Æ «¡∑π¿” Ω√∞¢»≠
+    // ÎîîÎ≤ÑÍ∑∏ ÏãúÍ∞ÅÌôî ÌîåÎûòÍ∑∏ ÏÑ§Ï†ï
+    m_scene->setVisualizationParameter(PxVisualizationParameter::eSCALE, 1.0f); // Ï†ÑÏ≤¥ Ïä§ÏºÄÏùº
+    m_scene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f); // Ï∂©Îèå ÌòïÌÉú ÏãúÍ∞ÅÌôî
+    m_scene->setVisualizationParameter(PxVisualizationParameter::eACTOR_AXES, 1.0f);       // Ïï°ÌÑ∞ Ï∂ï ÏãúÍ∞ÅÌôî
+    m_scene->setVisualizationParameter(PxVisualizationParameter::eCONTACT_POINT, 1.0f);   // Ï†ëÏ¥âÏ†ê ÏãúÍ∞ÅÌôî
+    m_scene->setVisualizationParameter(PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0f); // Ï°∞Ïù∏Ìä∏ ÌîÑÎ†àÏûÑ ÏãúÍ∞ÅÌôî
 }
 
 void PhysicX::UnInitialize()
@@ -107,7 +107,7 @@ void PhysicX::UnInitialize()
         for (PxI32 i = static_cast<PxI32>(controllerCount) - 1; i >= 0; --i) {
             PxController* controller = m_controllerManager->getController(i);
             if (controller) {
-                controller->release();  // ƒ¡∆Æ∑—∑Ø «ÿ¡¶
+                controller->release();  // Ïª®Ìä∏Î°§Îü¨ Ìï¥Ï†ú
             }
         }
         m_controllerManager->release();
@@ -143,7 +143,7 @@ void PhysicX::UnInitialize()
 void PhysicX::PreUpdate()
 {
 
-    // ∞¥√ºµÈ¿« ∞™¿ª actorø° ¿‘∑¬«œ¥¬ ¥‹∞Ë.
+    // Í∞ùÏ≤¥Îì§Ïùò Í∞íÏùÑ actorÏóê ÏûÖÎ†•ÌïòÎäî Îã®Í≥Ñ.
     PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
     std::vector<PxActor*> actors(curActorCount);
     m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
@@ -156,10 +156,10 @@ void PhysicX::PreUpdate()
 
         if (info->isCharacterController) continue;
 
-        //if (info->changeflag == false) continue;  // ∫Ø∞ÊªÁ«◊¿Ã ¿÷¿ª ∂ß∏∏ ∫Ø∞Ê«œµµ∑œ «œ∞ÌΩÕ¿∫µ•
-        //info->changeflag = false;                 // const¡¢±Ÿ∏ª∞Ì ∏« æ’ «Ï¥ı∏∏ ¿–æÓº≠ «œ∞ÌΩÕ¥Ÿ.
+        //if (info->changeflag == false) continue;  // Î≥ÄÍ≤ΩÏÇ¨Ìï≠Ïù¥ ÏûàÏùÑ ÎïåÎßå Î≥ÄÍ≤ΩÌïòÎèÑÎ°ù ÌïòÍ≥†Ïã∂ÏùÄÎç∞
+        //info->changeflag = false;                 // constÏ†ëÍ∑ºÎßêÍ≥† Îß® Ïïû Ìó§ÎçîÎßå ÏùΩÏñ¥ÏÑú ÌïòÍ≥†Ïã∂Îã§.
 
-        // Ω√πƒ∑π¿Ãº««“ actor æ˜µ•¿Ã∆Æ
+        // ÏãúÎÆ¨Î†àÏù¥ÏÖòÌï† actor ÏóÖÎç∞Ïù¥Ìä∏
         dynamicActor->setMass(info->mass);
         dynamicActor->setLinearDamping(info->drag);
         dynamicActor->setAngularDamping(info->angularDrag);
@@ -167,11 +167,11 @@ void PhysicX::PreUpdate()
         dynamicActor->setActorFlag(PxActorFlag::eDISABLE_GRAVITY, !info->useGravity);
         dynamicActor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, info->isKinematic);
 
-        // ¿ßƒ°, »∏¿¸ æ˜µ•¿Ã∆Æ
+        // ÏúÑÏπò, ÌöåÏ†Ñ ÏóÖÎç∞Ïù¥Ìä∏
         auto [posX, posY, posZ] = rb->GetWorldPosition();
         auto [rotX, rotY, rotZ, rotW] = rb->GetWorldRotation();
 
-        // ¿Ã¿¸ ¿ßƒ°, »∏¿¸ ¿˙¿Â.
+        // Ïù¥Ï†Ñ ÏúÑÏπò, ÌöåÏ†Ñ Ï†ÄÏû•.
         info->prePosition[0] = posX;
         info->prePosition[1] = posY;
         info->prePosition[2] = posZ;
@@ -183,10 +183,10 @@ void PhysicX::PreUpdate()
 
         PxTransform p({ posX, posY, posZ }, { rotX, rotY, rotZ, rotW });
         //if (info->isKinematic)
-        //    dynamicActor->setKinematicTarget(p); // ≈∞≥◊∏ﬁ∆Ω¿œ ∂ß ¿Ãµø√≥∏Æ
+        //    dynamicActor->setKinematicTarget(p); // ÌÇ§ÎÑ§Î©îÌã±Ïùº Îïå Ïù¥ÎèôÏ≤òÎ¶¨
         //else
         if(!info->isCharacterController)
-            dynamicActor->setGlobalPose(p);     // ±‚∫ª ¿Ãµø«— ¡§∫∏ æ˜µ•¿Ã∆Æ.
+            dynamicActor->setGlobalPose(p);     // Í∏∞Î≥∏ Ïù¥ÎèôÌïú Ï†ïÎ≥¥ ÏóÖÎç∞Ïù¥Ìä∏.
     }
 }
 
@@ -194,14 +194,14 @@ void PhysicX::Update(float fixedDeltaTime)
 {
     if (fixedDeltaTime > 0.f) {
         m_scene->simulate(fixedDeltaTime);
-        /////-----------------------∫Æ-------------------------
-        m_scene->fetchResults(true);    //trueΩ√ block«‘. Ω∫∑πµÂ ªÁøÎ«“∞≈∏È falseªÁøÎ.
+        /////-----------------------Î≤Ω-------------------------
+        m_scene->fetchResults(true);    //trueÏãú blockÌï®. Ïä§Î†àÎìú ÏÇ¨Ïö©Ìï†Í±∞Î©¥ falseÏÇ¨Ïö©.
     }
 }
 
 void PhysicX::PostUpdate()
 {
-    // ∞¥√ºµÈ¿« ∞™¿ª actorø°º≠ πﬁæ∆ø¿¥¬ ¥‹∞Ë.
+    // Í∞ùÏ≤¥Îì§Ïùò Í∞íÏùÑ actorÏóêÏÑú Î∞õÏïÑÏò§Îäî Îã®Í≥Ñ.
     PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
     std::vector<PxActor*> actors(curActorCount);
     m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
@@ -211,7 +211,7 @@ void PhysicX::PostUpdate()
         IRigidbody* rb = static_cast<IRigidbody*>(actors[i]->userData);
 
         //if (rb->GetInfo()->isKinematic == true)
-        //    continue; // Kinematic¿∫ π∞∏Æ ∞·∞˙∏¶ π›øµ«œ¡ˆ æ ¿Ω. (trigger¥¬ «œ¥œ±Ó ¿ßø° ¿€º∫)
+        //    continue; // KinematicÏùÄ Î¨ºÎ¶¨ Í≤∞Í≥ºÎ•º Î∞òÏòÅÌïòÏßÄ ÏïäÏùå. (triggerÎäî ÌïòÎãàÍπå ÏúÑÏóê ÏûëÏÑ±)
 
         auto pose = dynamicActor->getGlobalPose();
         auto pos = pose.p;
@@ -224,7 +224,7 @@ void PhysicX::PostUpdate()
 
 void PhysicX::PostUpdate(float interpolated)
 {
-    // ∞¥√ºµÈ¿« ∞™¿ª actorø°º≠ πﬁæ∆ø¿¥¬ ¥‹∞Ë.
+    // Í∞ùÏ≤¥Îì§Ïùò Í∞íÏùÑ actorÏóêÏÑú Î∞õÏïÑÏò§Îäî Îã®Í≥Ñ.
     PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
     std::vector<PxActor*> actors(curActorCount);
     m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
@@ -236,7 +236,7 @@ void PhysicX::PostUpdate(float interpolated)
 
 
        // if (info->isKinematic == true)
-        //    continue; // Kinematic¿∫ π∞∏Æ ∞·∞˙∏¶ π›øµ«œ¡ˆ æ ¿Ω. (trigger¥¬ «œ¥œ±Ó ¿ßø° ¿€º∫)
+        //    continue; // KinematicÏùÄ Î¨ºÎ¶¨ Í≤∞Í≥ºÎ•º Î∞òÏòÅÌïòÏßÄ ÏïäÏùå. (triggerÎäî ÌïòÎãàÍπå ÏúÑÏóê ÏûëÏÑ±)
 
         auto pose = dynamicActor->getGlobalPose();
         auto pos = pose.p;
@@ -271,7 +271,7 @@ void PhysicX::ClearActors()
 
     //m_scene->flushSimulation(true);
 
-    //// controller ¡§∏Æ
+    //// controller Ï†ïÎ¶¨
     //PxU32 numControllers = m_controllerManager->getNbControllers();
     //for (PxU32 i = 0; i < numControllers; ++i) {
     //    PxController* controller = m_controllerManager->getController(i);
@@ -279,7 +279,7 @@ void PhysicX::ClearActors()
     //}
     //m_controllerManager->purgeControllers();
 
-    //// actor ¡§∏Æ
+    //// actor Ï†ïÎ¶¨
     //PxU32 actorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC);
     //std::vector<PxActor*> actors(actorCount);
     //m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC, actors.data(), actorCount);
@@ -288,73 +288,73 @@ void PhysicX::ClearActors()
     //    actor->release();
     //}
 
-    // ¿”¿«∑Œ º“∏Í ª˝º∫«œø© ≈¨∏ÆæÓ «œ¥¬ πÊΩƒ¿Ã¡ˆ∏∏ ø¿∑˘∞° ¿÷¥Ÿ∏È ∫Ø∞Êøπ¡§.
+    // ÏûÑÏùòÎ°ú ÏÜåÎ©∏ ÏÉùÏÑ±ÌïòÏó¨ ÌÅ¥Î¶¨Ïñ¥ ÌïòÎäî Î∞©ÏãùÏù¥ÏßÄÎßå Ïò§Î•òÍ∞Ä ÏûàÎã§Î©¥ Î≥ÄÍ≤ΩÏòàÏ†ï.
     //UnInitialize();
     //if (m_scene) {
-    //    m_scene->fetchResults(true);  // Ω√πƒ∑π¿Ãº« ¡æ∑· ¥Î±‚
+    //    m_scene->fetchResults(true);  // ÏãúÎÆ¨Î†àÏù¥ÏÖò Ï¢ÖÎ£å ÎåÄÍ∏∞
     //}
 
     //for (PxU32 i = 0; i < m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC); i++) {
     //    PxActor* actor;
     //    m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC, &actor, 1, i);
     //    m_scene->removeActor(*actor);
-    //    actor->release(); // æ»¿¸«— ∏±∏Æ¡Ó
+    //    actor->release(); // ÏïàÏ†ÑÌïú Î¶¥Î¶¨Ï¶à
     //}
 
-    //// 2? ∏µÁ ƒ≥∏Ø≈Õ ƒ¡∆Æ∑—∑Ø «ÿ¡¶
+    //// 2? Î™®Îì† Ï∫êÎ¶≠ÌÑ∞ Ïª®Ìä∏Î°§Îü¨ Ìï¥Ï†ú
     //if (m_controllerManager) {
     //    const PxU32 controllerCount = m_controllerManager->getNbControllers();
     //    for (PxI32 i = static_cast<PxI32>(controllerCount) - 1; i >= 0; --i) {
     //        PxController* controller = m_controllerManager->getController(i);
     //        if (controller) {
     //            controller->release();
-    //            controller = nullptr;  // ¥ı∫Ì «ÿ¡¶ πÊ¡ˆ
+    //            controller = nullptr;  // ÎçîÎ∏î Ìï¥Ï†ú Î∞©ÏßÄ
     //        }
     //    }
     //    m_controllerManager->release();
     //    m_controllerManager = nullptr;
     //}
 
-    //// 3? µΩ∫∆–√≥ «ÿ¡¶
+    //// 3? ÎîîÏä§Ìå®Ï≤ò Ìï¥Ï†ú
     //if (gDispatcher) {
     //    gDispatcher->release();
     //    gDispatcher = nullptr;
     //}
 
-    //// 4? π∞∏Æ ¿Á¡˙(Material) «ÿ¡¶
+    //// 4? Î¨ºÎ¶¨ Ïû¨Ïßà(Material) Ìï¥Ï†ú
     //if (m_defaultMaterial) {
     //    m_defaultMaterial->release();
     //    m_defaultMaterial = nullptr;
     //}
 
-    //// 5? Scene «ÿ¡¶
+    //// 5? Scene Ìï¥Ï†ú
     //if (m_scene) {
     //    m_scene->release();
     //    m_scene = nullptr;
     //}
 
-    //// 6? Physics «ÿ¡¶
+    //// 6? Physics Ìï¥Ï†ú
     //if (m_physics) {
     //    m_physics->release();
     //    m_physics = nullptr;
     //}
 
-    //// 7? PVD «ÿ¡¶ (ø¨∞· ¡æ∑· »ƒ «ÿ¡¶)
+    //// 7? PVD Ìï¥Ï†ú (Ïó∞Í≤∞ Ï¢ÖÎ£å ÌõÑ Ìï¥Ï†ú)
     //if (pvd) {
     //    if (pvd->isConnected()) {
-    //        pvd->disconnect();  // PVD ø¨∞· ¡æ∑·
+    //        pvd->disconnect();  // PVD Ïó∞Í≤∞ Ï¢ÖÎ£å
     //    }
     //    pvd->release();
     //    pvd = nullptr;
     //}
 
-    //// 8? Foundation «ÿ¡¶ (∞°¿Â ∏∂¡ˆ∏∑ø° «ÿ¡¶)
+    //// 8? Foundation Ìï¥Ï†ú (Í∞ÄÏû• ÎßàÏßÄÎßâÏóê Ìï¥Ï†ú)
     //if (m_foundation) {
     //    m_foundation->release();
     //    m_foundation = nullptr;
     //}
 
-    //Initialize();
+    //NewCreateSceneInitialize();
 }
 
 void PhysicX::ConnectPVD()

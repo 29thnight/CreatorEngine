@@ -24,7 +24,7 @@ public:
 
 	void CreateScriptFile(const std::string_view& name);
 
-	ModuleBehavior* CreateMonoBehavior(const char* name)
+	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
 		return m_scriptFactoryFunc(name);
 	}

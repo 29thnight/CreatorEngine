@@ -2,6 +2,7 @@
 #include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
+#include "ResourceAllocator.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
 
@@ -45,9 +46,12 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	{
 		m_loadType = LoadType::ASSET;
 	}
-	m_model = new Model();
+	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-	m_model->m_animator = new Animator();
+    if(0 < m_AIScene->mNumAnimations)
+    {
+        m_model->m_animator = new Animator();
+    }
 }
 
 void ModelLoader::ProcessNodes()
@@ -58,7 +62,7 @@ void ModelLoader::ProcessNodes()
 
 Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 {
-	Node* nodeObj = new Node(node->mName.C_Str());
+	Node* nodeObj = AllocateResource<Node>(node->mName.C_Str());
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
@@ -83,6 +87,8 @@ Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 
 void ModelLoader::ProcessFlatMeshes()
 {
+    m_model->m_Meshes.reserve(m_AIScene->mNumMeshes);
+
 	for (uint32 i = 0; i < m_AIScene->mNumMeshes; i++)
 	{
 		aiMesh* aimesh = m_AIScene->mMeshes[i];
@@ -112,11 +118,13 @@ Model* ModelLoader::LoadModel()
 		ProcessMaterials();
 		if (m_model->m_hasBones)
 		{
+            Benchmark banch4;
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 			m_model->m_Skeleton = skeleton;
 			Animator* animator = m_model->m_animator;
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
+            std::cout << "Skeleton :" << banch4.GetElapsedTime() << std::endl;
 		}
 		ParseModel();
 	}
@@ -129,6 +137,8 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	std::vector<Vertex> vertices;
 	std::vector<uint32> indices;
 	bool hasTexCoords = mesh->mTextureCoords[0];
+    vertices.reserve(mesh->mNumVertices);
+    indices.reserve(mesh->mNumFaces * 3); // Assuming each face is a triangle
 
 	for (uint32 i = 0; i < mesh->mNumVertices; i++)
 	{
@@ -155,10 +165,9 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	}
 
 	ProcessBones(mesh, vertices);
-	Mesh* meshObj = new Mesh(mesh->mName.C_Str(), vertices, indices);
+	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
 	m_model->m_Meshes.push_back(meshObj);
-	//m_model->m_Materials.push_back(new Material());
 
 	return meshObj;
 }
@@ -174,7 +183,7 @@ void ModelLoader::ProcessMaterials()
 
 Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 {
-	Material* material = new Material();
+	Material* material = AllocateResource<Material>();
 	material->m_name = mesh->mName.C_Str();
 	if (mesh->mMaterialIndex >= 0)
 	{
@@ -363,7 +372,7 @@ void ModelLoader::LoadMesh(std::fstream& infile)
 			infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
 			infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
 			m_model->m_Meshes.push_back(mesh);
-			m_model->m_Materials.push_back(new Material());
+			//m_model->m_Materials.push_back(new Material());
 		}
 	}
 }
@@ -410,17 +419,14 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 
 		if (m_model->m_hasBones)
 		{
-			Benchmark banch;
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
 			m_animator->m_Skeleton = m_model->m_Skeleton;
-			std::cout << "GenerateSceneObjectHierarchy new Animator : " << banch.GetElapsedTime() << std::endl;
 		}
 	}
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
-		Benchmark banch;
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
 
 		uint32 meshId = node->m_meshes[i];
@@ -433,7 +439,6 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 		meshRenderer->m_Material = material;
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
-		std::cout << "GenerateSceneObjectHierarchy new SceneObject : " << banch.GetElapsedTime() << std::endl;
 	}
 
 	if (false == isRoot && 0 == node->m_numMeshes)
@@ -489,7 +494,7 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 		material->GetTexture(type, index, &str);
 		std::string textureName = str.C_Str();
 		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
-		LPCWSTR path = stemp.c_str();
+		file::path _path = stemp.c_str();
 		auto it = DataSystems->Textures.find(textureName);
 		if (it != DataSystems->Textures.end())
 		{
@@ -497,11 +502,10 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 		}
 		else
 		{
-			texture = Texture::LoadFormPath(path);
+			texture = DataSystems->LoadMaterialTexture(_path.string());
 			if(nullptr != texture)
 			{
 				texture->m_name = textureName;
-				DataSystems->Textures.emplace(textureName, texture);
 				m_model->m_Textures.push_back(texture);
 			}
 		}

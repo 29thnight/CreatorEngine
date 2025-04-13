@@ -7,6 +7,7 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "Benchmark.hpp"
+#include "ResourceAllocator.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -31,13 +32,7 @@ bool HasImageFile(const file::path& directory)
 
 DataSystem::~DataSystem()
 {
-	Memory::SafeDelete(UnknownIcon);
-	Memory::SafeDelete(TextureIcon);
-	Memory::SafeDelete(ModelIcon);
-	Memory::SafeDelete(AssetsIcon);
-	Memory::SafeDelete(FolderIcon);
-	Memory::SafeDelete(ShaderIcon);
-	Memory::SafeDelete(CodeIcon);
+
 }
 
 void DataSystem::Initialize()
@@ -55,6 +50,21 @@ void DataSystem::Initialize()
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
 
 	RenderForEditer();
+}
+
+void DataSystem::Finalize()
+{
+    DeallocateResource(UnknownIcon);
+    DeallocateResource(TextureIcon);
+    DeallocateResource(ModelIcon);
+    DeallocateResource(AssetsIcon);
+    DeallocateResource(FolderIcon);
+    DeallocateResource(ShaderIcon);
+    DeallocateResource(CodeIcon);
+
+    Models.clear();
+    Textures.clear();
+    Materials.clear();
 }
 
 void DataSystem::RenderForEditer()
@@ -122,7 +132,15 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 	Model* model = Model::LoadModel(destination.string());
 	if (model)
 	{
-		Models[name] = std::shared_ptr<Model>(model);
+        auto deleter = [&](Model* model)
+        {
+            if (model)
+            {
+                DeallocateResource<Model>(model);
+            }
+        };
+
+		Models[name] = std::shared_ptr<Model>(model, deleter);
 	}
 	else
 	{
@@ -145,16 +163,29 @@ Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
 		return Models[name].get();
 	}
 
-	Model* model = Model::LoadModel(destination.string());
+    Model* model{};
+    try
+    {
+        model = Model::LoadModel(destination.string());
+    }
+    catch (const std::exception& e)
+    {
+        Debug->LogError(e.what());
+        return nullptr;
+    }
+
 	if (model)
 	{
-		Models[name] = std::shared_ptr<Model>(model);
+        auto deleter = [&](Model* model)
+        {
+            if (model)
+            {
+                DeallocateResource<Model>(model);
+            }
+        };
+
+		Models[name] = std::shared_ptr<Model>(model, deleter);
 		return model;
-	}
-	else
-	{
-		Debug->LogError("ModelLoader::LoadModel : Model file not found");
-		return nullptr;
 	}
 }
 
@@ -178,49 +209,60 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 	if (Textures.find(name) != Textures.end())
 	{
 		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
-		return nullptr;
+        return Textures[name].get();
 	}
 
 	Texture* texture = Texture::LoadFormPath(destination.string());
+
 	if (texture)
 	{
-		Textures[name] = std::shared_ptr<Texture>(texture);
+		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
+        {
+            if (texture)
+            {
+                DeallocateResource<Texture>(texture);
+            }
+        });
+        return texture;
 	}
 	else
 	{
 		Debug->LogError("ModelLoader::LoadModel : Model file not found");
 	}
-	file::path _filepath = PathFinder::Relative("UI\\").string() + filePath.data();
-	std::shared_ptr<Texture> newTexture = std::shared_ptr<Texture>(Texture::LoadFormPath(_filepath));
 
-	
-	
-	//textures.push_back(newTexture);
-	//Textures[name] = newTexture;
-	
-
-
-	//if (source != destination && file::exists(source) && !file::exists(destination))
-	//{
-	//	file::copy_file(source, destination, file::copy_options::update_existing);
-	//}
-	//std::string name = file::path(filePath).stem().string();
-	//if (Models.find(name) != Models.end())
-	//{
-	//	Debug->Log("ModelLoader::LoadModel : Model already loaded");
-	//	return;
-	//}
-
-	//Model* model = Model::LoadModel(destination.string());
-	//if (model)
-	//{
-	//	Models[name] = std::shared_ptr<Model>(model);
-	//}
-	//else
-	//{
-	//	Debug->LogError("ModelLoader::LoadModel : Model file not found");
-	//}
 	return nullptr;
+}
+
+Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
+{
+    file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+
+    std::string name = file::path(filePath).stem().string();
+    if (Textures.find(name) != Textures.end())
+    {
+        Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+        return Textures[name].get();
+    }
+
+    Texture* texture = Texture::LoadFormPath(destination.string());
+
+    if (texture)
+    {
+        Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
+        {
+            if (texture)
+            {
+                DeallocateResource<Texture>(texture);
+            }
+        });
+        return texture;
+    }
+    else
+    {
+        Debug->LogError("ModelLoader::LoadModel : Model file not found");
+    }
+
+    return nullptr;
 }
 
 
@@ -283,14 +325,14 @@ void DataSystem::ShowCurrentDirectoryFiles()
 		{
 			std::string extension = entry.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
+            if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb" ||
 				extension == ".png" || extension == ".dds" || extension == ".hdr" ||
 				extension == ".hlsl" || extension == ".cpp" || extension == ".h" || 
 				extension == ".cs" || extension == ".wav" || extension == ".mp3")
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
-				if (extension == ".fbx" || extension == ".gltf" || extension == ".obj")
+				if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb")
 				{
 					fileType = FileType::Model;
 					iconTexture = (ImTextureID)ModelIcon->m_pSRV;

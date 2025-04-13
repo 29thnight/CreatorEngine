@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "ILifeSycle.h"
 #include "IRenderable.h"
+#include "IUpdatable.h"
 
 class Texture;
 class UIMesh;
@@ -15,8 +16,8 @@ struct alignas(16) UiInfo
  
 };
 
-//¸ğµç 2dÀÌ¹ÌÁö ±âº»?
-class SpriteComponent : public Component, public IRenderable, public ILifeSycle
+//ëª¨ë“  2dì´ë¯¸ì§€ ê¸°ë³¸?
+class SpriteComponent : public Component, public IRenderable, public IUpdatable<SpriteComponent>, public Meta::IReflectable<SpriteComponent>
 {
 public:
 	SpriteComponent();
@@ -33,21 +34,19 @@ public:
 	{
 		return m_IsEnabled;
 	}
+
 	void SetEnabled(bool able) override
 	{
 		m_IsEnabled = able;
 	}
-	
-	virtual void Start() override;
+	//REQ_TEST[ì„¸í™˜] : ì„¸í™˜ì•„ ì´ê±° ë˜ëŠ”ì§€ í™•ì¸ ì¢€ ë¶€íƒí• ê»˜
 	virtual void Update(float tick) override;
-	virtual void FixedUpdate(float fixedTick) override;
-	virtual void LateUpdate(float tick) override;
 
 	void UpdateTexture();
 	void SetTexture(int index);
 	void SetOrder(int index) { _layerorder = index;}
 
-	//	//¼ıÀÚ°¡ Å¬¼ö·Ï Á©À§¿¡º¸ÀÓ
+	//	//ìˆ«ìê°€ í´ìˆ˜ë¡ ì ¤ìœ„ì—ë³´ì„
 	int _layerorder;
 	UiInfo uiinfo;
 	UIMesh* m_UIMesh{ nullptr };
@@ -62,21 +61,21 @@ public:
 			meta_property(rotat)
 			meta_property(_layerorder)
 			meta_property(curindex)
-			});
+		});
 
 		MethodField
 		({
 			meta_method(UpdateTexture)
-			});
+		});
 
 		ReturnReflection(SpriteComponent)
 	};
 private:
 	bool m_IsEnabled =true;
 
-	//È­¸é»ó ÁÂÇ¥ {1920 / 1080}
+	//í™”ë©´ìƒ ì¢Œí‘œ {1920 / 1080}
 	Mathf::Vector3 pos{};
-	//ndcÁÂÇ¥ {-1,1}
+	//ndcì¢Œí‘œ {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };
 	Mathf::Vector3 scale{ 1,1,1 };

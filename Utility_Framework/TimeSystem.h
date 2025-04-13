@@ -61,7 +61,7 @@ namespace DirectX11
 		template<typename TUpdate>
 		void Tick(const TUpdate& update)
 		{
-			// ÇöÀç ½Ã°£À» Äõ¸®ÇÕ´Ï´Ù.
+			// í˜„ìž¬ ì‹œê°„ì„ ì¿¼ë¦¬í•©ë‹ˆë‹¤.
 			LARGE_INTEGER currentTime;
 
 			if (!QueryPerformanceCounter(&currentTime))
@@ -74,20 +74,20 @@ namespace DirectX11
 			m_qpcLastTime = currentTime;
 			m_qpcSecondCounter += timeDelta;
 
-			// ³Ê¹« Å« ½Ã°£ µ¨Å¸¸¦ Á¦ÇÑÇÕ´Ï´Ù(¿¹: µð¹ö°Å¿¡¼­ ÀÏ½Ã ÁßÁöµÈ ÈÄ).
+			// ë„ˆë¬´ í° ì‹œê°„ ë¸íƒ€ë¥¼ ì œí•œí•©ë‹ˆë‹¤(ì˜ˆ: ë””ë²„ê±°ì—ì„œ ì¼ì‹œ ì¤‘ì§€ëœ í›„).
 			if (timeDelta > m_qpcMaxDelta)
 			{
 				timeDelta = m_qpcMaxDelta;
 			}
 
-			// QPC ´ÜÀ§¸¦ Á¤±Ô ´«±Ý Çü½ÄÀ¸·Î º¯È¯ÇÕ´Ï´Ù. ÀÌÀüÀÇ Á¦ÇÑÀ¸·Î ÀÎÇØ ¿À¹öÇÃ·ÎÇÒ ¼ö ¾ø½À´Ï´Ù.
+			// QPC ë‹¨ìœ„ë¥¼ ì •ê·œ ëˆˆê¸ˆ í˜•ì‹ìœ¼ë¡œ ë³€í™˜í•©ë‹ˆë‹¤. ì´ì „ì˜ ì œí•œìœ¼ë¡œ ì¸í•´ ì˜¤ë²„í”Œë¡œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
 			timeDelta *= TicksPerSecond;
 			timeDelta /= m_qpcFrequency.QuadPart;
 
 			uint32 lastFrameCount = m_frameCount;
 
 			{
-				// °¡º¯ timestep ¾÷µ¥ÀÌÆ® ³í¸®ÀÔ´Ï´Ù.
+				// ê°€ë³€ timestep ì—…ë°ì´íŠ¸ ë…¼ë¦¬ìž…ë‹ˆë‹¤.
 				m_elapsedTicks = timeDelta;
 				m_totalTicks += timeDelta;
 				m_leftOverTicks = 0;
@@ -96,7 +96,7 @@ namespace DirectX11
 				update();
 			}
 
-			// ÇöÀç framerate¸¦ ÃßÀûÇÕ´Ï´Ù.
+			// í˜„ìž¬ framerateë¥¼ ì¶”ì í•©ë‹ˆë‹¤.
 			if (m_frameCount != lastFrameCount)
 			{
 				m_framesThisSecond++;
@@ -113,7 +113,7 @@ namespace DirectX11
 		template<typename TUpdate>
 		void FixedTick(const TUpdate& fixedUpdate)
 		{
-			// ÇöÀç ½Ã°£À» Äõ¸®ÇÕ´Ï´Ù.
+			// í˜„ìž¬ ì‹œê°„ì„ ì¿¼ë¦¬í•©ë‹ˆë‹¤.
 			LARGE_INTEGER currentTime;
 
 			if (!QueryPerformanceCounter(&currentTime))
@@ -123,22 +123,22 @@ namespace DirectX11
 
 			uint64 timeDelta = currentTime.QuadPart - m_qpcLastTime.QuadPart;
 
-			// ³Ê¹« Å« ½Ã°£ µ¨Å¸¸¦ Á¦ÇÑÇÕ´Ï´Ù(¿¹: µð¹ö°Å¿¡¼­ ÀÏ½Ã ÁßÁöµÈ ÈÄ).
+			// ë„ˆë¬´ í° ì‹œê°„ ë¸íƒ€ë¥¼ ì œí•œí•©ë‹ˆë‹¤(ì˜ˆ: ë””ë²„ê±°ì—ì„œ ì¼ì‹œ ì¤‘ì§€ëœ í›„).
 			if (timeDelta > m_qpcMaxDelta)
 			{
 				timeDelta = m_qpcMaxDelta;
 			}
 
-			// QPC ´ÜÀ§¸¦ Á¤±Ô ´«±Ý Çü½ÄÀ¸·Î º¯È¯ÇÕ´Ï´Ù. ÀÌÀüÀÇ Á¦ÇÑÀ¸·Î ÀÎÇØ ¿À¹öÇÃ·ÎÇÒ ¼ö ¾ø½À´Ï´Ù.
+			// QPC ë‹¨ìœ„ë¥¼ ì •ê·œ ëˆˆê¸ˆ í˜•ì‹ìœ¼ë¡œ ë³€í™˜í•©ë‹ˆë‹¤. ì´ì „ì˜ ì œí•œìœ¼ë¡œ ì¸í•´ ì˜¤ë²„í”Œë¡œí•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
 			timeDelta *= TicksPerSecond;
 			timeDelta /= m_qpcFrequency.QuadPart;
 
-			// ¾ÛÀÌ ¸ñÇ¥ °æ°ú ½Ã°£(1/4¹Ð¸®ÃÊ ÀÌ³»)¿¡ ±ÙÁ¢ÇÏ°Ô ½ÇÇàÇÏ´Â °æ¿ì
-			// ´ë»ó °ª¿¡ Á¤È®È÷ ÀÏÄ¡ÇÏµµ·Ï Å¬·ÏÀ» Á¦ÇÑÇÕ´Ï´Ù. ÀÌ·¸°Ô ÇÏ¸é »ç¼ÒÇÏ°í ¹«°üÇÑ ¿À·ù°¡ ¹æÁöµË´Ï´Ù.
-			// ¹æÁöÇÒ ¼ö ÀÖ½À´Ï´Ù. ½Ã°£À» Á¦ÇÑÇÏÁö ¾ÊÀ¸¸é 59.94 NTSC µð½ºÇÃ·¹ÀÌ¿¡¼­ »ç¿ëÇÏµµ·Ï ¼³Á¤µÈ
-			// vsync¿Í ÇÔ²² ½ÇÇàµÇ¸ç 60fps °íÁ¤ ¾÷µ¥ÀÌÆ®°¡ ¿ä±¸µÇ´Â °ÔÀÓ¿¡
-			// »ç¼ÒÇÑ ¿À·ù°¡ ´©ÀûµÇ¾î °á±¹ ÇÁ·¹ÀÓÀÌ »èÁ¦µÉ ¼ö ÀÖ½À´Ï´Ù. ¹Ý¿Ã¸²ÇÏ´Â °ÍÀÌ ÁÁ½À´Ï´Ù.
-			// ÀÛÀº ÆíÂ÷¸¦ 0À¸·Î ÁÙ¿© ¿øÈ°ÇÏ°Ô ½ÇÇàµÉ ¼ö ÀÖµµ·Ï ÇÏ¼¼¿ä.
+			// ì•±ì´ ëª©í‘œ ê²½ê³¼ ì‹œê°„(1/4ë°€ë¦¬ì´ˆ ì´ë‚´)ì— ê·¼ì ‘í•˜ê²Œ ì‹¤í–‰í•˜ëŠ” ê²½ìš°
+			// ëŒ€ìƒ ê°’ì— ì •í™•ížˆ ì¼ì¹˜í•˜ë„ë¡ í´ë¡ì„ ì œí•œí•©ë‹ˆë‹¤. ì´ë ‡ê²Œ í•˜ë©´ ì‚¬ì†Œí•˜ê³  ë¬´ê´€í•œ ì˜¤ë¥˜ê°€ ë°©ì§€ë©ë‹ˆë‹¤.
+			// ë°©ì§€í•  ìˆ˜ ìžˆìŠµë‹ˆë‹¤. ì‹œê°„ì„ ì œí•œí•˜ì§€ ì•Šìœ¼ë©´ 59.94 NTSC ë””ìŠ¤í”Œë ˆì´ì—ì„œ ì‚¬ìš©í•˜ë„ë¡ ì„¤ì •ëœ
+			// vsyncì™€ í•¨ê»˜ ì‹¤í–‰ë˜ë©° 60fps ê³ ì • ì—…ë°ì´íŠ¸ê°€ ìš”êµ¬ë˜ëŠ” ê²Œìž„ì—
+			// ì‚¬ì†Œí•œ ì˜¤ë¥˜ê°€ ëˆ„ì ë˜ì–´ ê²°êµ­ í”„ë ˆìž„ì´ ì‚­ì œë  ìˆ˜ ìžˆìŠµë‹ˆë‹¤. ë°˜ì˜¬ë¦¼í•˜ëŠ” ê²ƒì´ ì¢‹ìŠµë‹ˆë‹¤.
+			// ìž‘ì€ íŽ¸ì°¨ë¥¼ 0ìœ¼ë¡œ ì¤„ì—¬ ì›í™œí•˜ê²Œ ì‹¤í–‰ë  ìˆ˜ ìžˆë„ë¡ í•˜ì„¸ìš”.
 
 			if (abs(static_cast<int64>(timeDelta - m_targetElapsedTicks)) < TicksPerSecond / 4000)
 			{
@@ -170,29 +170,28 @@ namespace DirectX11
 		static TimeSystem* TimeSysInstance;
 
 	private:
-		// ¿øº» Å¸ÀÌ¹Ö µ¥ÀÌÅÍ¿¡´Â QPC ´ÜÀ§°¡ »ç¿ëµË´Ï´Ù.
+		// ì›ë³¸ íƒ€ì´ë° ë°ì´í„°ì—ëŠ” QPC ë‹¨ìœ„ê°€ ì‚¬ìš©ë©ë‹ˆë‹¤.
+        LARGE_INTEGER m_qpcFrequency{};
+		LARGE_INTEGER m_qpcLastTime{};
+		uint64 m_qpcMaxDelta{};
 
-		LARGE_INTEGER m_qpcFrequency;
-		LARGE_INTEGER m_qpcLastTime;
-		uint64 m_qpcMaxDelta;
+		// íŒŒìƒëœ íƒ€ì´ë° ë°ì´í„°ì—ëŠ” ì •ì‹ ëˆˆê¸ˆ í˜•ì‹ì´ ì‚¬ìš©ë©ë‹ˆë‹¤.
+		uint64 m_elapsedTicks{};
+		uint64 m_totalTicks{};
+		uint64 m_leftOverTicks{};
+		uint32 m_fixedLeftOverTicks{};
 
-		// ÆÄ»ýµÈ Å¸ÀÌ¹Ö µ¥ÀÌÅÍ¿¡´Â Á¤½Ä ´«±Ý Çü½ÄÀÌ »ç¿ëµË´Ï´Ù.
-		uint64 m_elapsedTicks;
-		uint64 m_totalTicks;
-		uint64 m_leftOverTicks;
-		uint32 m_fixedLeftOverTicks;
+		// framerate ì¶”ì ìš© ë©¤ë²„ìž…ë‹ˆë‹¤.
+		uint32 m_frameCount{};
+		uint32 m_framesPerSecond{};
+		uint32 m_framesThisSecond{};
+		uint64 m_qpcSecondCounter{};
 
-		// framerate ÃßÀû¿ë ¸â¹öÀÔ´Ï´Ù.
-		uint32 m_frameCount;
-		uint32 m_framesPerSecond;
-		uint32 m_framesThisSecond;
-		uint64 m_qpcSecondCounter;
+		// ê³ ì • timestep ëª¨ë“œ êµ¬ì„±ìš© ë©¤ë²„ìž…ë‹ˆë‹¤.
+		bool m_isFixedTimeStep{};
+		uint64 m_targetElapsedTicks{};
 
-		// °íÁ¤ timestep ¸ðµå ±¸¼º¿ë ¸â¹öÀÔ´Ï´Ù.
-		bool m_isFixedTimeStep;
-		uint64 m_targetElapsedTicks;
-
-		float m_fixedInterpolatedLerp;
+		float m_fixedInterpolatedLerp{};
 	};
 }
 
