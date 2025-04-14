@@ -95,6 +95,12 @@ public:
 	bool  curkeyStates[KEYBOARD_COUNT] = {};
 
 	bool curmouseState[mouseCount] = {};
+
+
+	Mathf::Vector2 GameViewpos;
+	Mathf::Vector2 GameViewsize;
+
+
 private:
 
 	//Å°º¸µå

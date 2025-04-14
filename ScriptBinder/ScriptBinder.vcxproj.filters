@@ -57,7 +57,7 @@
     <ClCompile Include="HotLoadSystem.cpp">
       <Filter>Classes\HotLoadSystem</Filter>
     </ClCompile>
-    <ClCompile Include="SpriteComponent.cpp">
+    <ClCompile Include="UIComponent.cpp">
       <Filter>Classes\Components</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
@@ -71,6 +71,15 @@
     </ClCompile>
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="UICollider.cpp">
+      <Filter>Classes\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="UIManager.cpp">
+      <Filter>Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="Canvas.cpp">
+      <Filter>Classes\GameObject</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -110,7 +119,7 @@
     <ClInclude Include="LightProperty.h">
       <Filter>Classes\Resources\Light</Filter>
     </ClInclude>
-    <ClInclude Include="SpriteComponent.h">
+    <ClInclude Include="UIComponent.h">
       <Filter>Classes\Components</Filter>
     </ClInclude>
     <ClInclude Include="GameObjectPool.h">
@@ -139,6 +148,15 @@
     </ClInclude>
     <ClInclude Include="IFixedUpdatable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="UICollider.h">
+      <Filter>Classes\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="UIManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="Canvas.h">
+      <Filter>Classes\GameObject</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

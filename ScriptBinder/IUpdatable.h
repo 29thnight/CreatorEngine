@@ -13,7 +13,7 @@ interface IUpdatable
         {
             return;
         }
-        currentScene->UpdateEvent.AddLambda([this](float deltaSecond)
+        m_updateEventHandle = currentScene->UpdateEvent.AddLambda([this](float deltaSecond)
         {
             Update(deltaSecond);
         });

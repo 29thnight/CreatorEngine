@@ -28,7 +28,6 @@ void InputManager::Update(float deltaTime)
     MouseUpdate();
     GamePadUpdate();
  
-    
 }
 
 

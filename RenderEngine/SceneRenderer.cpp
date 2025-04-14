@@ -7,11 +7,12 @@
 #include "../ScriptBinder/SceneManager.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
-#include "../ScriptBinder/SpriteComponent.h"
+#include "../ScriptBinder/UIComponent.h"
+#include "../ScriptBinder/UICollider.h";
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "TimeSystem.h"
-
+#include "../InputManager.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -740,6 +741,15 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
+
+	std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj3");
+	test3->AddComponent<UIComponent>()->Load(DataSystems->LoadTexture("test.jpg"));
+	test3->GetComponent<UIComponent>()->Load(DataSystems->LoadTexture("test2.png"));
+	test3->GetComponent<UIComponent>()->Load(DataSystems->LoadTexture("UI2.png"));
+	test3->GetComponent<UIComponent>()->SetTexture(0);
+	test3->m_transform.SetPosition({ 960, 540, 0 });
+	test3->AddComponent<UICollider>()->SetCollider();
+
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
@@ -1144,6 +1154,22 @@ void SceneRenderer::EditorView()
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
 
+
+	
+		//std::cout << "GameViewpos : " << GameViewpos.x << ", " << GameViewpos.y << std::endl;
+		ImVec2 windowPos = ImGui::GetWindowPos();
+		ImVec2 imageScreenPos = ImVec2(windowPos.x + currentPos.x + offset.x,
+			windowPos.y + currentPos.y + offset.y);
+
+
+		Mathf::Vector2 GameViewpos;
+		GameViewpos.x = imageScreenPos.x;
+		GameViewpos.y = imageScreenPos.y;
+		Mathf::Vector2 GameViewsize;	
+		GameViewsize.x = imageSize.x;
+		GameViewsize.y = imageSize.y;
+		InputManagement->GameViewpos = GameViewpos;
+		InputManagement->GameViewsize = GameViewsize;
 		//TODO : 카메라를 컨트롤러에서 찾아서 해당 뷰포트를 보여주도록 변경하고, 
 		// 위에 카메라 컨트롤러에 등록된 카메라 번호를 보이게 해야함.
 		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, imageSize);

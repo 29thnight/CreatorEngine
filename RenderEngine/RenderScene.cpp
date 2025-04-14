@@ -8,6 +8,7 @@
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
+#include "UIComponent.h"
 
 // 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
 int InputTextCallback(ImGuiInputTextCallbackData* data)
@@ -131,8 +132,41 @@ void RenderScene::EditorSceneObjectHierarchy()
 				
 				Model::LoadModelToScene(DataSystems->LoadCashedModel(filepath.string().c_str()), *m_currentScene);
 			}
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
+
+				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
+				UIComponent* sprite = nullptr;
+				if (m_selectedSceneObject)
+				{
+					if (UIComponent* hasSprite = m_selectedSceneObject->GetComponent<UIComponent>())
+						sprite = hasSprite;
+					else		
+						sprite = m_selectedSceneObject->AddComponent<UIComponent>();
+					if (sprite)
+					{
+						sprite->Load(texture);
+					}
+				}
+				else
+				{
+					ImGui::Text("No GameObject Selected");
+					auto rootObject = m_currentScene->CreateGameObject(filename.string().c_str(), GameObject::Type::Mesh);
+					sprite = rootObject->AddComponent<UIComponent>();
+					if (sprite)
+					{
+						sprite->Load(texture);
+					}
+				}
+			
+
+			}
 			ImGui::EndDragDropTarget();
 		}
+
 
 		if (m_currentScene)
 		{

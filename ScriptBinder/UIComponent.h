@@ -17,17 +17,17 @@ struct alignas(16) UiInfo
 };
 
 //모든 2d이미지 기본?
-class SpriteComponent : public Component, public IRenderable, public IUpdatable<SpriteComponent>, public Meta::IReflectable<SpriteComponent>
+class UIComponent : public Component, public IRenderable, public IUpdatable<UIComponent>, public Meta::IReflectable<UIComponent>
 {
 public:
-	SpriteComponent();
-	~SpriteComponent() = default;
+	UIComponent();
+	~UIComponent() = default;
 
-	void Load(std::string_view filepath);
+	void Load(Texture* ptr);
 
 	std::string ToString() const override
 	{
-		return std::string("SpriteComponent");
+		return std::string("UIComponent");
 	}
 
 	bool IsEnabled() const override
@@ -46,14 +46,14 @@ public:
 	void SetTexture(int index);
 	void SetOrder(int index) { _layerorder = index;}
 
-	//	//숫자가 클수록 젤위에보임
+	//숫자가 클수록 젤위에보임
 	int _layerorder;
 	UiInfo uiinfo;
 	UIMesh* m_UIMesh{ nullptr };
 	Texture* m_curtexture{};
 	int curindex = 0;
 	
-	ReflectionField(SpriteComponent, PropertyAndMethod)
+	ReflectionField(UIComponent, PropertyAndMethod)
 	{
 		PropertyField
 		({
@@ -67,20 +67,22 @@ public:
 			meta_method(UpdateTexture)
 		});
 
-		ReturnReflection(SpriteComponent)
+		ReturnReflection(UIComponent)
 	};
-private:
-	bool m_IsEnabled =true;
-
 	//화면상 좌표 {1920 / 1080}
 	Mathf::Vector3 pos{};
 	//ndc좌표 {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };
 	Mathf::Vector3 scale{ 1,1,1 };
-	int rotZ;
-	std::vector<std::shared_ptr<Texture>> textures;
+	std::function<void()> ClickFunc;
+private:
+	bool m_IsEnabled =true;
 
+
+	int rotZ;
+	std::vector<Texture*> textures;
+	
 
 };
 

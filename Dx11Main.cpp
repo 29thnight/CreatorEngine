@@ -12,6 +12,8 @@
 #include "RenderEngine/ShaderSystem.h"
 #include "SceneManager.h"
 #include "EngineSetting.h"
+#include "ScriptBinder/UIManager.h"
+
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -31,6 +33,10 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
+        Mathf::Vector2 mousePos = InputManagement->GetMousePos();
+
+        if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
+          UIManagers->m_clickEvent.Broadcast(mousePos);
         Sound->update();
     });
 
@@ -71,6 +77,7 @@ void DirectX11::Dx11Main::Update()
     {
         InfoWindow();
         SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
     });
 
     if(m_isGameStart)
@@ -78,7 +85,6 @@ void DirectX11::Dx11Main::Update()
         //GameUpdate
         m_timeSystem.Tick([&]
         {
-            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
             //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
         });
     }

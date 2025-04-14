@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Scene.h"
 #include "../ScriptBinder/GameObject.h"
-#include "../ScriptBinder/SpriteComponent.h"
+#include "../ScriptBinder/UIComponent.h"
 UIPass::UIPass()
 {
 
@@ -74,7 +74,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	for (auto& Obj : scene.GetScene()->m_SceneObjects)
 	{
 		auto a = scene.GetScene();
-		SpriteComponent* ui = Obj->GetComponent<SpriteComponent>();
+		UIComponent* ui = Obj->GetComponent<UIComponent>();
 		if (ui == nullptr) continue;
 		if (false == ui->IsEnabled()) continue;
 		_2DObjects.push_back(ui);
@@ -98,7 +98,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	_2DObjects.clear();
 }
 
-bool UIPass::compareLayer(SpriteComponent* a, SpriteComponent* b)
+bool UIPass::compareLayer(UIComponent* a, UIComponent* b)
 {
 	return a->_layerorder < b->_layerorder;
 }
