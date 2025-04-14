@@ -32,13 +32,13 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 
     if ("" == shaderExtension)
     {
-        return nullptr;
+		throw std::runtime_error("Shader file has no extension");
     }
 
     shaderExtension.erase(0, 1);
     if (!CheckExtension(shaderExtension))
     {
-        return nullptr;
+		throw std::runtime_error("Shader file has invalid extension");
     }
 
 	if (fileExtension == ".hlsl")
@@ -60,8 +60,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
         );
         if (!CheckResult(hResult, shaderBlob.Get(), errorBlob.Get()))
         {
-            OutputDebugStringA(static_cast<char*>(errorBlob->GetBufferPointer()));
-            return nullptr;
+            throw std::runtime_error(std::string("Shader compilation failed\n") + reinterpret_cast<const char*>(errorBlob->GetBufferPointer()));
         }
 
 		if (SUCCEEDED(hResult))
@@ -80,7 +79,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 		hResult = D3DReadFileToBlob(filePath.c_str(), shaderBlob.ReleaseAndGetAddressOf());
 		if (FAILED(hResult))
 		{
-			return nullptr;
+			throw std::runtime_error("Failed to read compiled shader file");
 		}
 
 		m_shaderCache[filePath.string()] = shaderBlob;

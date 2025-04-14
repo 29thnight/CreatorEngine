@@ -115,6 +115,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -135,6 +136,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -147,28 +149,38 @@
   <ItemGroup>
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
+    <ClCompile Include="Object.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SpriteComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Component.h" />
+    <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="IComponent.h" />
     <ClInclude Include="ILifeSycle.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IRenderable.h" />
-    <ClInclude Include="IUpdatable.h" />
     <ClInclude Include="JobManager.h" />
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightProperty.h" />
+    <ClInclude Include="Object.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SpriteComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />
+    <ClInclude Include="IUpdatable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="GameObejct.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

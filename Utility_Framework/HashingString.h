@@ -80,6 +80,9 @@ public:
 		m_hash = std::hash<std::string_view>{}(str);
 	}
 
+    constexpr char* data() { return m_string.data(); }
+    constexpr size_t size() { return m_string.size(); }
+
 private:
 	size_t m_hash{};
 	std::string m_string{};

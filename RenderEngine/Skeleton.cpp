@@ -1,10 +1,11 @@
 #include "Skeleton.h"
+#include "ResourceAllocator.h"
 
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
 	{
-		delete bone;
+        DeallocateResource(bone);
 	}
 
 	m_bones.clear();

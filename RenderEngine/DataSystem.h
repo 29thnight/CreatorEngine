@@ -20,7 +20,7 @@ public:
 		CSharpScript,
 		Sound,
 	};
-	//¿œ¥‹ ¿Ã¥Î∑Œ ¡¯«‡
+	//ÏùºÎã® Ïù¥ÎåÄÎ°ú ÏßÑÌñâ
 	enum class AssetType
 	{
 		Model,
@@ -45,6 +45,7 @@ private:
 	~DataSystem();
 public:
 	void Initialize();
+    void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
 	void LoadModels();
@@ -53,7 +54,9 @@ public:
 	void LoadTextures();
 	void LoadMaterials();
 	Texture* LoadTexture(const std::string_view& filePath);
+    Texture* LoadMaterialTexture(const std::string_view& filePath);
 
+	void OpenFile(const file::path& filepath);
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
@@ -70,7 +73,6 @@ public:
 	static ImGuiTextFilter filter;
 
 private:
-	void OpenFile(const file::path& filepath);
 	void AddModel(const file::path& filepath, const file::path& dir);
 
 private:

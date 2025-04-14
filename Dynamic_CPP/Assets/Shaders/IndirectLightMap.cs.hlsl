@@ -6,19 +6,36 @@ struct Triangle
     float3 n0, n1, n2;
 };
 
+
 // === 버퍼 ===
-StructuredBuffer<Triangle> g_Triangles : register(t0);
-Texture2D g_PositionMap : register(t1);
-Texture2D g_NormalMap : register(t2);
+StructuredBuffer<Triangle> this_Triangles : register(t0);
+StructuredBuffer<Triangle> other_Triangles : register(t1);
+
+Texture2D this_PositionMap : register(t3);
+Texture2D other_PositionMap : register(t4);
+
+Texture2D this_NormalMap : register(t5);
+Texture2D other_NormalMap : register(t6);
+
+Texture2D this_lightMap : register(t7);
+Texture2D other_lightMap : register(t8);
+
 RWTexture2D<float4> g_IndirectLightMap : register(u0);
 
 // === 상수 버퍼 ===
 cbuffer CB_Lightmap : register(b0)
 {
-    uint g_TriangleCount;
-    uint g_SampleCount;
     uint2 Resolution;
+    uint this_TriangleCount;    // indice
+    uint other_TriangleCount;
+    uint g_SampleCount;         // ray 샘플링 수
 }
+
+cbuffer worldMatrix : register(b1)
+{
+    float4x4 this_WorldMatrix;
+    float4x4 other_WorldMatrix;
+};
 
 // === 유틸리티 ===
 float RadicalInverse_VdC(uint bits)
@@ -85,48 +102,48 @@ bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out float t, ou
 [numthreads(32, 32, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    if (dispatchThreadID.x >= Resolution.x || dispatchThreadID.y >= Resolution.y)
-        return;
+    //if (dispatchThreadID.x >= Resolution.x || dispatchThreadID.y >= Resolution.y)
+    //    return;
 
-    float2 uv = (dispatchThreadID.xy + 0.5) / Resolution;
-    float3 pos = g_PositionMap.SampleLevel(LinearSampler, uv, 0).rgb;
-    float3 normal = normalize(g_NormalMap.SampleLevel(LinearSampler, uv, 0).rgb);
+    //float2 uv = (dispatchThreadID.xy + 0.5) / Resolution;
+    //float3 pos = g_PositionMap.SampleLevel(LinearSampler, uv, 0).rgb;
+    //float3 normal = normalize(g_NormalMap.SampleLevel(LinearSampler, uv, 0).rgb);
 
-    float3x3 TBN = BuildTBN(normal);
-    float3 indirect = float3(0, 0, 0);
+    //float3x3 TBN = BuildTBN(normal);
+    //float3 indirect = float3(0, 0, 0);
 
-    for (uint i = 0; i < g_SampleCount; ++i)
-    {
-        float2 xi = HammersleySample(i, g_SampleCount);
-        float3 localDir = SampleHemisphere(xi);
-        float3 worldDir = mul(localDir, TBN);
+    //for (uint i = 0; i < g_SampleCount; ++i)
+    //{
+    //    float2 xi = HammersleySample(i, g_SampleCount);
+    //    float3 localDir = SampleHemisphere(xi);
+    //    float3 worldDir = mul(localDir, TBN);
 
-        float minT = 1e20;
-        float3 color = float3(0, 0, 0);
+    //    float minT = 1e20;
+    //    float3 color = float3(0, 0, 0);
 
-        for (uint t = 0; t < g_TriangleCount; ++t)
-        {
-            float hitT;
-            float3 bary;
-            if (RayTriangleIntersect(pos, worldDir, g_Triangles[t], hitT, bary))
-            {
-                if (hitT < minT)
-                {
-                    minT = hitT;
-                    float3 n0 = g_Triangles[t].n0;
-                    float3 n1 = g_Triangles[t].n1;
-                    float3 n2 = g_Triangles[t].n2;
-                    float3 interpNormal = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
+    //    for (uint t = 0; t < g_TriangleCount; ++t)
+    //    {
+    //        float hitT;
+    //        float3 bary;
+    //        if (RayTriangleIntersect(pos, worldDir, g_Triangles[t], hitT, bary))
+    //        {
+    //            if (hitT < minT)
+    //            {
+    //                minT = hitT;
+    //                float3 n0 = g_Triangles[t].n0;
+    //                float3 n1 = g_Triangles[t].n1;
+    //                float3 n2 = g_Triangles[t].n2;
+    //                float3 interpNormal = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
 
-                    // 단순 노멀 컬러 (디버그용)
-                    color = interpNormal * 0.5 + 0.5;
-                }
-            }
-        }
+    //                // 단순 노멀 컬러 (디버그용)
+    //                color = interpNormal * 0.5 + 0.5;
+    //            }
+    //        }
+    //    }
 
-        indirect += color;
-    }
+    //    indirect += color;
+    //}
 
-    indirect /= g_SampleCount;
-    g_IndirectLightMap[dispatchThreadID.xy] = float4(indirect, 1);
+    //indirect /= g_SampleCount;
+    //g_IndirectLightMap[dispatchThreadID.xy] = float4(indirect, 1);
 }

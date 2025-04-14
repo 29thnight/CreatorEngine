@@ -12,7 +12,8 @@ constexpr uint32_t MethodOnly = 2;
  static constexpr uint32_t ret_option = num; \
  static const Meta::Type& Reflect()
 
-#define ReflectionFieldInheritance(T, num, Parent) using __Ty = T; using __P_Ty = Parent \
+#define ReflectionFieldInheritance(T, num, Parent) using __Ty = T; \
+ using __P_Ty = Parent; \
  static constexpr uint32_t ret_option = num; \
  static const Meta::Type& Reflect()
 
@@ -55,6 +56,13 @@ constexpr uint32_t MethodOnly = 2;
     if constexpr (ret_option == PropertyOnly) \
     { \
         static const Meta::Type type{ #T, properties, {}, &__P_Ty::Reflect() }; \
+        return type; \
+    } \
+
+#define ReturnReflectionInheritanceMethodOnly(T) \
+    if constexpr (ret_option == MethodOnly) \
+    { \
+        static const Meta::Type type{ #T, {}, methods, &__P_Ty::Reflect() }; \
         return type; \
     } \
 

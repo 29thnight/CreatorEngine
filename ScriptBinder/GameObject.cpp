@@ -1,44 +1,34 @@
 #include "GameObject.h"
 #include "Scene.h"
-Scene* GameObject::m_pScene = nullptr;
+#include "SceneManager.h"
 
 GameObject::GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex) :
-    m_name(name.data()), 
+    Object(name),
     m_gameObjectType(type),
     m_index(index), 
     m_parentIndex(parentIndex)
 {
 }
 
-std::string GameObject::ToString() const
+void GameObject::ComponentsSort()
 {
-    return m_name.ToString();
+    std::ranges::sort(m_components, [&](Component* a, Component* b)
+    {
+        return a->GetOrderID() < b->GetOrderID();
+    });
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
+    {
+        m_componentIds[m_components[i]->GetTypeID()] = i;
+    });
 }
 
-void GameObject::Start()
+GameObject* GameObject::Find(const std::string_view& name)
 {
-
-}
-
-void GameObject::Update(float tick)
-{
-    
-	for (auto& component : m_components)
-	{
-        ILifeSycle* LifeSycle = dynamic_cast<ILifeSycle*>(component);
-		if (LifeSycle)
-		{
-			LifeSycle->Update(tick);
-		}
-	}
-}
-
-void GameObject::FixedUpdate(float fixedTick)
-{
-
-}
-
-void GameObject::LateUpdate(float tick)
-{
-
+    Scene* scene = SceneManagers->GetActiveScene();
+    if (scene)
+    {
+        return scene->GetGameObject(name).get();
+    }
+    return nullptr;
 }

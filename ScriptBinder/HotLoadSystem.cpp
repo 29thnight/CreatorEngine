@@ -232,14 +232,14 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			itemGroups.push_back(itemGroup);
 		}
 
-		// µÎ ¹øÂ° ItemGroup (ÀÎµ¦½º 1)¿¡ Çì´õ ÆÄÀÏ Ãß°¡ (ClInclude)
+		// ë‘ ë²ˆì§¸ ItemGroup (ì¸ë±ìŠ¤ 1)ì— í—¤ë” íŒŒì¼ ì¶”ê°€ (ClInclude)
 		pugi::xml_node headerGroup = itemGroups[1];
 		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
 		newHeader.append_attribute("Include") = "Assets\\Script\\" + scriptHeaderFileName;
 		pugi::xml_node filterNodeHeader = newHeader.append_child("Filter");
 		filterNodeHeader.text().set("Script\\ScriptClass");
 
-		// ¼¼ ¹øÂ° ItemGroup (ÀÎµ¦½º 2)¿¡ ¼Ò½º ÆÄÀÏ Ãß°¡ (ClCompile)
+		// ì„¸ ë²ˆì§¸ ItemGroup (ì¸ë±ìŠ¤ 2)ì— ì†ŒìŠ¤ íŒŒì¼ ì¶”ê°€ (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
 		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;
@@ -266,12 +266,12 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			itemGroups.push_back(itemGroup);
 		}
 
-		// µÎ ¹øÂ° ItemGroup (ÀÎµ¦½º 1)¿¡ Çì´õ ÆÄÀÏ Ãß°¡ (ClInclude)
+		// ë‘ ë²ˆì§¸ ItemGroup (ì¸ë±ìŠ¤ 1)ì— í—¤ë” íŒŒì¼ ì¶”ê°€ (ClInclude)
 		pugi::xml_node headerGroup = itemGroups[1];
 		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
 		newHeader.append_attribute("Include") = "\\Assets\\Script\\" + scriptHeaderFileName;
 
-		// ¼¼ ¹øÂ° ItemGroup (ÀÎµ¦½º 2)¿¡ ¼Ò½º ÆÄÀÏ Ãß°¡ (ClCompile)
+		// ì„¸ ë²ˆì§¸ ItemGroup (ì¸ë±ìŠ¤ 2)ì— ì†ŒìŠ¤ íŒŒì¼ ì¶”ê°€ (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
 		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;

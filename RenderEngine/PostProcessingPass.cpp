@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
+#include "ResourceAllocator.h"
 
 #pragma warning(disable: 2398)
 PostProcessingPass::PostProcessingPass()
@@ -51,7 +52,8 @@ PostProcessingPass::PostProcessingPass()
 
 PostProcessingPass::~PostProcessingPass()
 {
-	Memory::SafeDelete(m_CopiedTexture);
+	//Memory::SafeDelete(m_CopiedTexture);
+    DeallocateResource(m_CopiedTexture);
 }
 
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)

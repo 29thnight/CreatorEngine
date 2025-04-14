@@ -2,13 +2,17 @@
 #include "GameObject.h"
 #include "LightProperty.h"
 
+class GameObject;
 class RenderScene;
+class SceneManager;
 struct ICollider;
 class Scene
 {
-public:
+private:
 	Scene() = default;
 	~Scene() = default;
+
+public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
@@ -16,39 +20,75 @@ public:
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 
-public:
-	void Start();
+private:
+    friend class SceneManager;
+    //for Editor
+    void Reset();
 
 public:
-	void FixedUpdate(float deltaSecond);
+    //Events
+    //Initialization
+    Core::Delegate<void> AwakeEvent{};
+    Core::Delegate<void> OnEnableEvent{};
+    Core::Delegate<void> StartEvent{};
+
+    //Physics
+    Core::Delegate<void, float>      FixedUpdateEvent{};
+    Core::Delegate<void, ICollider*> OnTriggerEnterEvent{};
+    Core::Delegate<void, ICollider*> OnTriggerStayEvent{};
+    Core::Delegate<void, ICollider*> OnTriggerExitEvent{};
+    Core::Delegate<void, ICollider*> OnCollisionEnterEvent{};
+	Core::Delegate<void, ICollider*> OnCollisionStayEvent{};
+	Core::Delegate<void, ICollider*> OnCollisionExitEvent{};
+
+    //Game logic
+    Core::Delegate<void, float> UpdateEvent{};
+    Core::Delegate<void, float> LateUpdateEvent{};
+
+    //Disable or Enable
+    Core::Delegate<void> OnDisableEvent{};
+    Core::Delegate<void> OnDestroyEvent{};
 
 public:
-	void OnTriggerEnter(ICollider* other);
-	void OnTriggerStay(ICollider* other);
-	void OnTriggerExit(ICollider* other);
+    //EventBroadcaster
+    //Initialization
+    void Awake();
+    void OnEnable();
+    void Start();
 
-public:
-	void OnCollisionEnter(ICollider* other);
-	void OnCollisionStay(ICollider* other);
-	void OnCollisionExit(ICollider* other);
+    //Physics
+    void FixedUpdate(float deltaSecond);
+    void OnTriggerEnter(ICollider* collider);
+    void OnTriggerStay(ICollider* collider);
+    void OnTriggerExit(ICollider* collider);
+    void OnCollisionEnter(ICollider* collider);
+    void OnCollisionStay(ICollider* collider);
+    void OnCollisionExit(ICollider* collider);
 
-public:
-	void Update(float deltaSecond);
-	void YieldNull();
-	void LateUpdate(float deltaSecond);
+    //Game logic
+    void Update(float deltaSecond);
+    void YieldNull();
+    void LateUpdate(float deltaSecond);
 
-public:
-	void OnDisable();
+    //Disable or Enable
+    void OnDisable();
 	void OnDestroy();
 
 	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{
 		Scene* allocScene = new Scene();
-		allocScene->CreateGameObject("SampleScene");
+		allocScene->CreateGameObject(sceneName);
 		return allocScene;
 	}
 
+    std::atomic_bool m_isAwake{ false };
+    std::atomic_bool m_isLoaded{ false };
+    std::atomic_bool m_isDirty{ false };
+    std::atomic_bool m_isEnable{ false };
+    std::atomic_size_t m_buildIndex{ 0 };
+
 public:
+    //TODO : 진짜 이렇게 구현할건지 고민 좀 해보자
     void UpdateLight(LightProperties& lightProperties) const
     {
         lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
@@ -75,8 +115,22 @@ public:
     }
 
 private:
+    std::string GenerateUniqueGameObjectName(const std::string_view& name)
+    {
+        std::string uniqueName{ name.data() };
+        std::string baseName{ name.data() };
+        int count = 1;
+        while (m_gameObjectNameSet.find(uniqueName) != m_gameObjectNameSet.end())
+        {
+            uniqueName = baseName + std::string(" (") + std::to_string(count++) + std::string(")");
+        }
+        m_gameObjectNameSet.insert(uniqueName);
+        return uniqueName;
+    }
+
+private:
+    std::unordered_set<std::string> m_gameObjectNameSet{};
     LightProperties m_lightProperties;
 	HashingString m_sceneName;
     int m_lightCount = 0;
-	bool m_isPlaying = false;
 };

@@ -4,6 +4,7 @@
 #include "ReflectionRegister.h"
 #include "Core.Mathf.h"
 #include "LogSystem.h"
+#include "HashingString.h"
 #include <imgui.h>
 #include <magic_enum/magic_enum.hpp>
 
@@ -219,6 +220,14 @@ namespace Meta
                 {
                     prop.setter(instance, value);
                 }
+            }//[OverWatching]
+            else if (hash == StringToHash("HashingString"))
+            {
+                HashingString value = std::any_cast<HashingString>(prop.getter(instance));
+                if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
+                {
+                    prop.setter(instance, value);
+                }
             }
             else if (hash == StringToHash("Mathf::Vector2") || hash == StringToHash("DirectX::SimpleMath::Vector2"))
             {
@@ -300,12 +309,12 @@ namespace Meta
                 {
                     prop.setter(instance, value);
                 }
-            }// ´Ù¸¥ Å¸ÀÔ Ãß°¡ °¡´É
+            }// ë‹¤ë¥¸ íƒ€ì… ì¶”ê°€ ê°€ëŠ¥
             else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
             {
-                // ÇöÀç enum °ªÀ» Á¤¼ö·Î ¾ò¾î¿É´Ï´Ù.
+                // í˜„ì¬ enum ê°’ì„ ì •ìˆ˜ë¡œ ì–»ì–´ì˜µë‹ˆë‹¤.
                 int value = std::any_cast<int>(prop.getter(instance));
-                // enumÀÇ ¸ğµç ÀÌ¸§À» ¹è¿­¿¡ ÀúÀåÇÕ´Ï´Ù.
+                // enumì˜ ëª¨ë“  ì´ë¦„ì„ ë°°ì—´ì— ì €ì¥í•©ë‹ˆë‹¤.
                 std::vector<const char*> items;
                 int current_index = 0;
                 for (size_t i = 0; i < enumType->values.size(); i++)
@@ -314,10 +323,10 @@ namespace Meta
                     if (enumType->values[i].value == value)
                         current_index = static_cast<int>(i);
                 }
-                // ÄŞº¸ ¹Ú½º·Î enum °ªÀ» ¼±ÅÃÇÒ ¼ö ÀÖµµ·Ï ÇÕ´Ï´Ù.
+                // ì½¤ë³´ ë°•ìŠ¤ë¡œ enum ê°’ì„ ì„ íƒí•  ìˆ˜ ìˆë„ë¡ í•©ë‹ˆë‹¤.
                 if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
                 {
-                    // ¼±ÅÃµÈ ÀÎµ¦½º¿¡ ÇØ´çÇÏ´Â enum °ªÀ¸·Î ¾÷µ¥ÀÌÆ®ÇÕ´Ï´Ù.
+                    // ì„ íƒëœ ì¸ë±ìŠ¤ì— í•´ë‹¹í•˜ëŠ” enum ê°’ìœ¼ë¡œ ì—…ë°ì´íŠ¸í•©ë‹ˆë‹¤.
                     prop.setter(instance, enumType->values[current_index].value);
                 }
             }
@@ -333,42 +342,46 @@ namespace Meta
                     if (const Type* subType = MetaDataRegistry->Find(copyname))
                     {
                         ImGui::PushID(prop.name);
-                        ImGui::Text("%s:", prop.name);
-                        DrawObject(ptr, *subType);
+                        if(ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            DrawObject(ptr, *subType);
+                        }
                         ImGui::PopID();
                     }
                     else
                     {
-                        ImGui::Text("%s: [Unregistered Type]", prop.name);
+                        //TODO : í…ŒìŠ¤íŠ¸ í›„ ì œê±°
+                        ImGui::Text("%s: [Unregistered Type For GUI Debug]", prop.name);
                     }
                 }
                 else
                 {
-                    ImGui::Text("%s: nullptr", prop.name);
+                    //TODO : í…ŒìŠ¤íŠ¸ í›„ ì œê±°
+                    ImGui::Text("%s: nullptr [For GUI Debug]", prop.name);
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))
             {
-                ImGui::PushID(prop.name);
-                ImGui::Text("%s:", prop.name);
-
-                // ±âÁ¸ ÀÎ½ºÅÏ½ºÀÇ ÁÖ¼Ò¿¡¼­ ÇØ´ç ¿ÀÇÁ¼ÂÀ» ´õÇÕ´Ï´Ù.
-                void* subInstance = reinterpret_cast<void*>(
-                    reinterpret_cast<char*>(instance) + prop.offset
-                    );
+                // ê¸°ì¡´ ì¸ìŠ¤í„´ìŠ¤ì˜ ì£¼ì†Œì—ì„œ í•´ë‹¹ ì˜¤í”„ì…‹ì„ ë”í•©ë‹ˆë‹¤.
+                void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 
                 if (const Meta::Type* subType = MetaDataRegistry->Find(prop.typeName))
                 {
-                    DrawObject(subInstance, *subType);
+                    ImGui::PushID(prop.name);
+                    if (ImGui::CollapsingHeader(prop.name, ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        DrawObject(subInstance, *subType);
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::PopID();
+
             }
         }
     }
 
     inline void DrawMethods(void* instance, const Type& type)
     {
-        // ÇÏ³ªÀÇ Á¤Àû ÄÁÅ×ÀÌ³Ê·Î ¸ğµç ¸Å°³º¯¼ö¸¦ °ü¸®ÇÕ´Ï´Ù.
+        // í•˜ë‚˜ì˜ ì •ì  ì»¨í…Œì´ë„ˆë¡œ ëª¨ë“  ë§¤ê°œë³€ìˆ˜ë¥¼ ê´€ë¦¬í•©ë‹ˆë‹¤.
         static std::unordered_map<std::string, std::any> paramValues;
 
         for (const auto& method : type.methods)
@@ -393,13 +406,13 @@ namespace Meta
             {
                 if (ImGui::TreeNode(method.name))
                 {
-                    // °¢ ¸Å°³º¯¼ö¿¡ ´ëÇØ °íÀ¯ÇÑ Å° »ı¼º
+                    // ê° ë§¤ê°œë³€ìˆ˜ì— ëŒ€í•´ ê³ ìœ í•œ í‚¤ ìƒì„±
                     for (size_t i = 0; i < method.parameters.size(); i++)
                     {
                         const auto& param = method.parameters[i];
                         std::string key = std::string(method.name) + "_param_" + std::to_string(i);
 
-                        // ÇØ´ç Å°°¡ ÄÁÅ×ÀÌ³Ê¿¡ ¾ø´Ù¸é, ±âº»°ªÀ» ¼³Á¤
+                        // í•´ë‹¹ í‚¤ê°€ ì»¨í…Œì´ë„ˆì— ì—†ë‹¤ë©´, ê¸°ë³¸ê°’ì„ ì„¤ì •
                         if (paramValues.find(key) == paramValues.end())
                         {
                             if (std::string(param.typeName) == "int")
@@ -410,10 +423,10 @@ namespace Meta
                                 paramValues[key] = false;
                             else if (std::string(param.typeName) == "std::string")
                                 paramValues[key] = std::string();
-                            // ¿©±â¼­ ´Ù¸¥ Áö¿ø Å¸ÀÔ¿¡ ´ëÇÑ ±âº»°ªÀ» Ãß°¡ÇÒ ¼ö ÀÖÀ½
+                            // ì—¬ê¸°ì„œ ë‹¤ë¥¸ ì§€ì› íƒ€ì…ì— ëŒ€í•œ ê¸°ë³¸ê°’ì„ ì¶”ê°€í•  ìˆ˜ ìˆìŒ
                         }
 
-                        // °¢ Å¸ÀÔº°·Î UI À§Á¬À» Ãâ·ÂÇÕ´Ï´Ù.
+                        // ê° íƒ€ì…ë³„ë¡œ UI ìœ„ì ¯ì„ ì¶œë ¥í•©ë‹ˆë‹¤.
                         if (std::string(param.typeName) == "int")
                         {
                             int value = std::any_cast<int>(paramValues[key]);
@@ -435,9 +448,9 @@ namespace Meta
                         else if (std::string(param.typeName) == "std::string")
                         {
                             std::string value = std::any_cast<std::string>(paramValues[key]);
-                            // C ½ºÅ¸ÀÏ ¹öÆÛ°¡ ÇÊ¿äÇÏ¹Ç·Î ÀÓ½Ã ¹öÆÛ »ç¿ë
+                            // C ìŠ¤íƒ€ì¼ ë²„í¼ê°€ í•„ìš”í•˜ë¯€ë¡œ ì„ì‹œ ë²„í¼ ì‚¬ìš©
                             char buf[128];
-                            // strncpy_s¸¦ »ç¿ëÇÏ¿© ¾ÈÀüÇÏ°Ô ¹®ÀÚ¿­ º¹»ç (_TRUNCATE: Ãâ·Â ¹öÆÛ Å©±â¸¦ ³Ñ¾î°¡¸é Àß¶ó³¿)
+                            // strncpy_së¥¼ ì‚¬ìš©í•˜ì—¬ ì•ˆì „í•˜ê²Œ ë¬¸ìì—´ ë³µì‚¬ (_TRUNCATE: ì¶œë ¥ ë²„í¼ í¬ê¸°ë¥¼ ë„˜ì–´ê°€ë©´ ì˜ë¼ëƒ„)
                             strncpy_s(buf, sizeof(buf), value.c_str(), _TRUNCATE);
                             buf[sizeof(buf) - 1] = '\0';
                             if (ImGui::InputText(param.name.c_str(), buf, sizeof(buf)))
@@ -476,10 +489,15 @@ namespace Meta
 
     inline void DrawObject(void* instance, const Type& type)
     {
-        ImGui::Indent();
+        if (type.parent)
+        {
+            DrawObject(instance, *type.parent);
+        }
+
+        //ImGui::Indent();
         DrawProperties(instance, type);
         DrawMethods(instance, type);
-        ImGui::Unindent();
+        //ImGui::Unindent();
     }
 
     template<typename Derived>

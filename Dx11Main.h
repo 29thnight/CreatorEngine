@@ -6,6 +6,7 @@
 #include "ScriptBinder/Scene.h"
 #include "RenderEngine/ImGuiRenderer.h"
 #include "RenderEngine/Model.h"
+#include "Delegate.h"
 #include <memory>
 #include <future>
 
@@ -20,6 +21,7 @@ namespace DirectX11
 		void CreateWindowSizeDependentResources();
 		void Update();
 		bool Render();
+        void InfoWindow();
         void OnGui();
 		void SceneFinalize();
 
@@ -32,6 +34,10 @@ namespace DirectX11
 		TimeSystem m_timeSystem;
 		std::shared_ptr<SceneRenderer> m_sceneRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
+
+        Core::DelegateHandle m_InputEvenetHandle;
+        Core::DelegateHandle m_SceneRenderingEventHandle;
+        Core::DelegateHandle m_GUIRenderingEventHandle;
 
 		std::thread m_renderThread;
 

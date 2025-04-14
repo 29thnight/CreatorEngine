@@ -37,7 +37,7 @@ class SceneRenderer
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 
-	void Initialize(Scene* _pScene = nullptr);
+	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
 	void SceneRendering();
 
@@ -51,45 +51,48 @@ private:
 	void UnbindRenderTargets();
 	void ReloadShaders();
 
-	Scene* m_currentScene{};
-	RenderScene* m_renderScene{};
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
 
-	ID3D11DepthStencilView* m_depthStencilView{};
-	ID3D11ShaderResourceView* m_depthStencilSRV{};
+	Scene*       m_currentScene{};
+	RenderScene* m_renderScene{};
+
+	ID3D11DepthStencilView*     m_depthStencilView{};
+	ID3D11ShaderResourceView*   m_depthStencilSRV{};
+
+    Core::DelegateHandle m_newSceneCreatedEventHandle{};
 
 	//pass
-	std::unique_ptr<ShadowMapPass> m_pShadowMapPass{};
-	std::unique_ptr<GBufferPass> m_pGBufferPass{};
-	std::unique_ptr<SSAOPass> m_pSSAOPass{};
-	std::unique_ptr<DeferredPass> m_pDeferredPass{};
-	std::unique_ptr<ForwardPass> m_pForwardPass{};
-	std::unique_ptr<SkyBoxPass> m_pSkyBoxPass{};
-	std::unique_ptr<ToneMapPass> m_pToneMapPass{};
-	std::unique_ptr<SpritePass> m_pSpritePass{};
-	std::unique_ptr<BlitPass> m_pBlitPass{};
-	std::unique_ptr<WireFramePass> m_pWireFramePass{};
-    std::unique_ptr<GridPass> m_pGridPass{};
-	std::unique_ptr<AAPass> m_pAAPass{};
+	std::unique_ptr<ShadowMapPass>      m_pShadowMapPass{};
+	std::unique_ptr<GBufferPass>        m_pGBufferPass{};
+	std::unique_ptr<SSAOPass>           m_pSSAOPass{};
+	std::unique_ptr<DeferredPass>       m_pDeferredPass{};
+	std::unique_ptr<ForwardPass>        m_pForwardPass{};
+	std::unique_ptr<SkyBoxPass>         m_pSkyBoxPass{};
+	std::unique_ptr<ToneMapPass>        m_pToneMapPass{};
+	std::unique_ptr<SpritePass>         m_pSpritePass{};
+	std::unique_ptr<BlitPass>           m_pBlitPass{};
+	std::unique_ptr<WireFramePass>      m_pWireFramePass{};
+    std::unique_ptr<GridPass>           m_pGridPass{};
+	std::unique_ptr<AAPass>             m_pAAPass{};
 	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
-	std::unique_ptr<EffectManager> m_pEffectPass{};
+	std::unique_ptr<EffectManager>      m_pEffectPass{};
 
 	std::unique_ptr<LightmapShadowPass> m_pLightmapShadowPass{};
-	std::unique_ptr<PositionMapPass> m_pPositionMapPass{};
-	std::unique_ptr<LightMapPass> m_pLightMapPass{};
+	std::unique_ptr<PositionMapPass>    m_pPositionMapPass{};
+	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
 
-	std::unique_ptr<UIPass> m_pUIPass{};
+	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers
 	ComPtr<ID3D11Buffer> m_ModelBuffer;
 
 	//Textures
-	std::unique_ptr<Texture> m_diffuseTexture;
-	std::unique_ptr<Texture> m_metalRoughTexture;
-	std::unique_ptr<Texture> m_normalTexture;
-	std::unique_ptr<Texture> m_emissiveTexture;
-	std::unique_ptr<Texture> m_ambientOcclusionTexture;
-	std::unique_ptr<Texture> m_toneMappedColourTexture;
-    std::unique_ptr<Texture> m_gridTexture;
+	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_metalRoughTexture       { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_normalTexture           { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
+    UniqueTexturePtr m_gridTexture             { TEXTURE_NULL_INITIALIZER };
 
 	//sampler
 	Sampler* m_linearSampler{};
@@ -98,21 +101,23 @@ private:
 	//Editor Camera
 	std::unique_ptr<Camera> m_pEditorCamera{};
 
-	Model* model[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	lm::LightMap lightMap;
 //Debug
 public:
-	void SetWireFrame() { useWireFrame = !useWireFrame; }
-	void SetLightmapPass() { useTestLightmap = !useTestLightmap; }
+	void SetWireFrame()     { useWireFrame = !useWireFrame; }
+	void SetLightmapPass()  { useTestLightmap = !useTestLightmap; }
 
 private:
-	int selected_log_index{};
-	bool useWireFrame = false;
-	bool m_bIsClicked{ false };
-	bool m_bShowLogWindow{ false };
-	bool m_bShowRenderState{ false };
-	bool useTestLightmap{ false };
+	int  selected_log_index{};
+
+private:
+    bool useWireFrame       { false };
+	bool m_bIsClicked       { false };
+	bool m_bShowLogWindow   { false };
+	bool m_bShowRenderState { false };
+	bool useTestLightmap    { false };
 	bool m_bShowGridSettings{ false };
 
 public:

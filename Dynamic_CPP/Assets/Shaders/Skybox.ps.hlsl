@@ -1,4 +1,5 @@
 #include "Sampler.hlsli"
+#include "Shading.hlsli"
 
 TextureCube SkyboxTexture : register(t0);
 

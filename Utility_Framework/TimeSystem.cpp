@@ -24,7 +24,7 @@ DirectX11::TimeSystem::TimeSystem() :
 		throw std::exception("Failed_QueryPerformanceCounter");
 	}
 
-	// Initialize max delta to 1/10 of a second.
+	// NewCreateSceneInitialize max delta to 1/10 of a second.
 	m_qpcMaxDelta = m_qpcFrequency.QuadPart / 10;
 
 	TimeSysInstance = this;

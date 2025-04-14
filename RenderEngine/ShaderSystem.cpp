@@ -173,7 +173,16 @@ void ShaderResourceSystem::CSOAllCleanup()
 
 void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)
 {
-	ComPtr<ID3DBlob> blob = HLSLCompiler::LoadFormFile(filepath.string());
+	ComPtr<ID3DBlob> blob{};
+	try
+	{
+		blob = HLSLCompiler::LoadFormFile(filepath.string());
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogError("Failed to load shader: " + filepath.string() + "\n[shader compile logs] : \n" + e.what());
+		return;
+	}
 	file::path filename = filepath.filename();
 	std::string ext = filename.replace_extension().extension().string();
 	filename.replace_extension();
@@ -184,7 +193,16 @@ void ShaderResourceSystem::AddShaderFromPath(const file::path& filepath)
 
 void ShaderResourceSystem::ReloadShaderFromPath(const file::path& filepath)
 {
-	ComPtr<ID3DBlob> blob = HLSLCompiler::LoadFormFile(filepath.string());
+	ComPtr<ID3DBlob> blob{};
+	try
+	{
+		blob = HLSLCompiler::LoadFormFile(filepath.string());
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogError("Failed to load shader: " + filepath.string() + "\n[shader compile logs] : \n" + e.what());
+		return;
+	}
 	file::path filename = filepath.filename();
 	std::string ext = filename.replace_extension().extension().string();
 	filename.replace_extension();
@@ -199,6 +217,7 @@ void ShaderResourceSystem::AddShader(const std::string& name, const std::string&
 	{
 		VertexShader vs = VertexShader(name, blob);
 		vs.Compile();
+
 		VertexShaders[name] = vs;
 	}
 	else if (ext == "hs")

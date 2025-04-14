@@ -36,9 +36,6 @@
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Manager\SceneManager">
-      <UniqueIdentifier>{71d7d567-fc27-47eb-b586-4b5b6515eb60}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Settings">
       <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
     </Filter>
@@ -76,9 +73,6 @@
     </ClInclude>
     <ClInclude Include="InputManager.h">
       <Filter>Manager\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneManager.h">
-      <Filter>Manager\SceneManager</Filter>
     </ClInclude>
     <ClInclude Include="ProjectSetting.h">
       <Filter>Settings</Filter>

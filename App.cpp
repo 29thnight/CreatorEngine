@@ -1,4 +1,4 @@
-﻿#include "App.h"
+#include "App.h"
 #include "InputManager.h"
 #include "Utility_Framework/PathFinder.h"
 #include "Utility_Framework/DumpHandler.h"
@@ -49,6 +49,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 void Core::App::Finalize()
 {
 	m_deviceResources->ReportLiveDeviceObjects();
+    DataSystems->Finalize();
 }
 
 void Core::App::SetWindow(CoreWindow& coreWindow)

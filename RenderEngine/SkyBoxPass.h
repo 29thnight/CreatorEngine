@@ -17,16 +17,16 @@ public:
     Texture* GeneratePrefilteredMap(RenderScene& scene);
     Texture* GenerateBRDFLUT(RenderScene& scene);
 
-    std::unique_ptr<Texture> m_EnvironmentMap{};
-    std::unique_ptr<Texture> m_SpecularMap{};
-    std::unique_ptr<Texture> m_BRDFLUT{};
+    UniqueTexturePtr m_EnvironmentMap { TEXTURE_NULL_INITIALIZER };
+    UniqueTexturePtr m_SpecularMap    { TEXTURE_NULL_INITIALIZER };
+    UniqueTexturePtr m_BRDFLUT        { TEXTURE_NULL_INITIALIZER };
 
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize() override;
 
 private:
-    //skybox Ω¶¿Ã¥ı¥¬ «ÿ¥Á pass¿« ±‚∫ª psoø° ∞Ì¡§Ω√≈∞±‚
+    //skybox ÏâêÏù¥ÎçîÎäî Ìï¥Îãπ passÏùò Í∏∞Î≥∏ psoÏóê Í≥†Ï†ïÏãúÌÇ§Í∏∞
 	VertexShader* m_fullscreenVS{};
 	PixelShader* m_irradiancePS{};
 	PixelShader* m_prefilterPS{};
@@ -38,8 +38,8 @@ private:
 
 	std::unique_ptr<Mesh> m_skyBoxMesh{};
 
-	std::unique_ptr<Texture> m_skyBoxTexture{};
-	std::unique_ptr<Texture> m_skyBoxCubeMap{};
+	UniqueTexturePtr m_skyBoxTexture{ TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_skyBoxCubeMap{ TEXTURE_NULL_INITIALIZER };
 
 	Mathf::xMatrix m_scaleMatrix{};
 	Texture* m_RenderTarget{};
