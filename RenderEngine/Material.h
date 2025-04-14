@@ -20,7 +20,7 @@ cbuffer MaterialInfomation
 	MaterialInfomation() meta_default(MaterialInfomation);
 	~MaterialInfomation() = default;
 
-	ReflectionField(MaterialInfomation, PropertyOnly)
+	ReflectionField(MaterialInfomation)
 	{
 		PropertyField
 		({
@@ -29,7 +29,7 @@ cbuffer MaterialInfomation
 			meta_property(m_roughness)
 		});
 
-		ReturnReflectionPropertyOnly(MaterialInfomation)
+		FieldEnd(MaterialInfomation, PropertyOnly)
 	};
 };
 
@@ -75,7 +75,7 @@ public:
 	MaterialInfomation m_materialInfo;
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 
-	ReflectionField(Material, PropertyOnly)
+	ReflectionField(Material)
 	{
 		PropertyField
 		({
@@ -83,7 +83,7 @@ public:
 			meta_enum_property(m_renderingMode)
 		});
 
-		ReturnReflectionPropertyOnly(Material)
+		FieldEnd(Material, PropertyOnly)
 	};
 };
 

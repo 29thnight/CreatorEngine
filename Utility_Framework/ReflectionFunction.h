@@ -15,6 +15,7 @@ namespace Meta
     {
         const Type& type = T::Reflect();
         MetaDataRegistry->Register(type.name, type);
+        MetaFactoryRegistry->Register<T>();
     }
 
     static inline const Type* Find(const std::string_view& name)
@@ -228,6 +229,12 @@ namespace Meta
                 {
                     prop.setter(instance, value);
                 }
+            }
+            else if (hash == StringToHash("HashedGuid"))
+            {
+				HashedGuid value = std::any_cast<HashedGuid>(prop.getter(instance));
+				std::cout << "HashedGuid : " << value.m_ID_Data << std::endl;
+                ImGui::InputInt(prop.name, (int*)&value.m_ID_Data);
             }
             else if (hash == StringToHash("Mathf::Vector2") || hash == StringToHash("DirectX::SimpleMath::Vector2"))
             {
@@ -507,10 +514,10 @@ namespace Meta
         IReflectable()
         {
             static bool registered = []()
-                {
-                    Meta::Register<Derived>();
-                    return true;
-                }();
+            {
+                Meta::Register<Derived>();
+                return true;
+            }();
             (void)registered;
         }
     };

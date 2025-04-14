@@ -33,6 +33,8 @@ public:
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
 
+	void AddComponent(Meta::Type& type);
+
 	template<typename T>
 	T* AddComponent();
 
@@ -54,6 +56,12 @@ public:
 	template<typename T>
 	void RemoveComponent(T* component);
 
+	void RemoveComponent(uint32 id);
+
+	void RemoveComponent(const std::string_view& scriptName);
+
+	void RemoveComponent(Meta::Type& type);
+
 	GameObject::Type GetType() const { return m_gameObjectType; }
 
     static GameObject* Find(const std::string_view& name);
@@ -65,7 +73,7 @@ public:
 	GameObject::Index m_rootIndex{ 0 };
 	std::vector<GameObject::Index> m_childrenIndices;
 
-    ReflectionFieldInheritance(GameObject, PropertyOnly, Object)
+    ReflectionFieldInheritance(GameObject, Object)
     {
         PropertyField
         ({
@@ -76,25 +84,22 @@ public:
             meta_property(m_childrenIndices)
         });
 
-        ReturnReflectionInheritancePropertyOnly(GameObject)
+        FieldEnd(GameObject, PropertyOnlyInheritance)
     }
 
-private:
 	friend class RenderScene;
 	friend class ModelLoader;
 	friend class HotLoadSystem;
 
-	void ComponentsSort();
-
 private:
 	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
 	
-	const size_t m_typeID{ TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
-	const size_t m_instanceID{ TypeTrait::GUIDCreator::GetGUID() };
+	HashedGuid m_typeID{ TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	
 	HashingString m_tag{};
 	
-	std::unordered_map<uint32_t, size_t> m_componentIds{};
+	std::unordered_map<HashedGuid, size_t> m_componentIds{};
 	std::vector<Component*> m_components{};
 
 	//debug layer

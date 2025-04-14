@@ -163,7 +163,6 @@
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="IComponent.h" />
-    <ClInclude Include="ILifeSycle.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IRenderable.h" />
     <ClInclude Include="JobManager.h" />
@@ -176,7 +175,6 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SpriteComponent.h" />
     <ClInclude Include="Transform.h" />
-    <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="IUpdatable.h" />
   </ItemGroup>
   <ItemGroup>

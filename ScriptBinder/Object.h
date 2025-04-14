@@ -16,7 +16,7 @@ public:
     Object(Object&&) = delete;
 
 public:
-    size_t GetInstanceID() const override final { return m_instanceID; }
+    size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
     std::string ToString() const override final { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
 
@@ -26,7 +26,7 @@ public:
 
     void SetDontDestroyOnLoad(Object* objPtr);
 
-    ReflectionField(Object, PropertyOnly)
+    ReflectionField(Object)
     {
         PropertyField
         ({
@@ -34,11 +34,11 @@ public:
             meta_property(m_instanceID)
         });
 
-        ReturnReflectionPropertyOnly(Object)
+        FieldEnd(Object, PropertyOnly)
     }
 
 protected:
-    size_t            m_instanceID{ TypeTrait::GUIDCreator::GetGUID() };
+    HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
     HashingString     m_name{ "Object" };
     std::atomic<bool> m_destroyMark{ false };
     std::atomic<bool> m_dontDestroyOnLoad{ false };

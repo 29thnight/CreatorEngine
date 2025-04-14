@@ -7,11 +7,8 @@
 
 SpriteComponent::SpriteComponent()
 {
-	
-		m_orderID = Component::Order2Uint(ComponentOrder::MeshRenderer);
-		m_typeID = TypeTrait::GUIDCreator::GetTypeID<SpriteComponent>();
-		m_UIMesh = new UIMesh();
-	
+	m_typeID = TypeTrait::GUIDCreator::GetTypeID<SpriteComponent>();
+	m_UIMesh = new UIMesh();
 }
 
 void SpriteComponent::Load(std::string_view filepath)

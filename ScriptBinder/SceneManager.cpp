@@ -77,12 +77,12 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
     return allocScene;
 }
 
-Scene* SceneManager::LoadScene(const std::string_view& name)
+Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
     return nullptr;
 }
 
-Scene* SceneManager::LoadSceneAsync(const std::string_view& name)
+Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 {
     return nullptr;
 }

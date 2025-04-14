@@ -71,6 +71,10 @@ void DirectX11::Dx11Main::Update()
     {
         InfoWindow();
         SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
+        if(!m_isGameStart)
+        {
+            SceneManagers->GameLogic(0);
+        }
     });
 
     if(m_isGameStart)

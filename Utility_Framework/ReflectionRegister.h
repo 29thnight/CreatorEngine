@@ -65,6 +65,7 @@ namespace Meta
     class EnumRegistry : public Singleton<EnumRegistry>
     {
     public:
+		friend Singleton;
         void Register(const std::string& name, const EnumType& enumType)
         {
             if (enumMap.find(name) == enumMap.end())
@@ -84,6 +85,41 @@ namespace Meta
     };
 
     static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
+
+    using FactoryFunction = std::function<void*()>;
+
+    class FactoryRegistry : public Singleton<FactoryRegistry>
+    {
+    public:
+        friend Singleton;
+
+        template<typename T>
+        void Register()
+        {
+            _factories[ToString<T>()] = []() -> void*
+                {
+                    if constexpr (requires { T::Create(); }) // 커스텀 메모리풀 지원
+                    {
+                        return T::Create();
+                    }
+                    else
+                    {
+                        return new T();
+                    }
+                };
+        }
+
+        void* Create(const std::string& typeName)
+        {
+            auto it = _factories.find(typeName);
+            return (it != _factories.end()) ? it->second() : nullptr;
+        }
+
+    private:
+        std::unordered_map<std::string, FactoryFunction> _factories;
+    };
+
+    static inline auto& MetaFactoryRegistry = FactoryRegistry::GetInstance();
 
     template <typename Enum>
     struct EnumAutoRegistrar

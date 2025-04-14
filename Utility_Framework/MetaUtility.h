@@ -52,4 +52,18 @@ namespace Meta
 
         return hash_value;
     }
+
+    // Helper : vector 타입 여부 검사
+    inline bool IsVectorType(const std::string& typeName)
+    {
+        return typeName.find("std::vector<") != std::string::npos;
+    }
+
+    // Helper : vector 내부 타입 추출
+    inline std::string ExtractVectorElementType(const std::string& typeName)
+    {
+        auto start = typeName.find('<') + 1;
+        auto end = typeName.find('>');
+        return typeName.substr(start, end - start);
+    }
 }

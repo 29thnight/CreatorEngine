@@ -198,6 +198,15 @@
     <ClInclude Include="ReflectionMecro.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="TypeTrait.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="MetaAlias.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionYml.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

@@ -14,18 +14,18 @@ struct LightMapping
 	LightMapping() meta_default(LightMapping)
 	~LightMapping() = default;
 
-	ReflectionField(LightMapping, PropertyOnly)
+	ReflectionField(LightMapping)
 	{
 		PropertyField
 		({
 			meta_property(lightmapIndex)
 			meta_property(ligthmapResolution)
-			Meta::MakeProperty("lightmapScale", &LightMapping::lightmapScale),
+			meta_property(lightmapScale)
 			meta_property(lightmapOffset)
 			meta_property(lightmapTiling)
 		});
 
-		ReturnReflectionPropertyOnly(LightMapping)
+		FieldEnd(LightMapping, PropertyOnly)
 	}
 };
 
@@ -40,39 +40,42 @@ class Animator;
 class MeshRenderer : public Component, public IRenderable, public Meta::IReflectable<MeshRenderer>
 {
 public:
-	Material* m_Material{ nullptr };
-	Mesh* m_Mesh{ nullptr };
-	Animator* m_Animator{ nullptr };
+	GENERATED_BODY(MeshRenderer)
 
-	LightMapping m_LightMapping;
-public:
-	MeshRenderer() = default;
-	~MeshRenderer() = default;
-
-	std::string ToString() const override
+	std::string ToString() const override 
 	{
 		return std::string("MeshRenderer");
 	}
+
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
 	}
+
 	void SetEnabled(bool able) override
 	{
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(MeshRenderer, PropertyOnly)
+	ReflectionField(MeshRenderer)
 	{
 		PropertyField
 		({
+			meta_property(m_typeID)
 			meta_property(m_Material)
 			meta_property(m_Mesh)
 			meta_property(m_Animator)
 			meta_property(m_LightMapping)
 		});
-		ReturnReflectionPropertyOnly(MeshRenderer)
+
+		FieldEnd(MeshRenderer, PropertyOnly)
 	}
+
+public:
+	Material* m_Material{ nullptr };
+	Mesh* m_Mesh{ nullptr };
+	Animator* m_Animator{ nullptr };
+	LightMapping m_LightMapping;
 
 private:
 	bool m_IsEnabled{ false };
@@ -84,36 +87,38 @@ public:
 	Texture* m_Sprite = nullptr;
 
 public:
-	SpriteRenderer() = default;
-	~SpriteRenderer() = default;
+	GENERATED_BODY(SpriteRenderer)
 
 	std::string ToString() const override
 	{
 		return std::string("SpriteRenderer");
 	}
+
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
 	}
+
 	void SetEnabled(bool able) override
 	{
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(SpriteRenderer, PropertyOnly)
+	ReflectionField(SpriteRenderer)
 	{
 		PropertyField
 		({
 			meta_property(m_Sprite)
 		});
-		ReturnReflectionPropertyOnly(SpriteRenderer)
+
+		FieldEnd(SpriteRenderer, PropertyOnly)
 	}
 
 private:
 	bool m_IsEnabled = false;
 };
 
-class Animator : public Component, public IRenderable
+class Animator : public Component, public IRenderable, public Meta::IReflectable<Animator>
 {
 public:
 	Skeleton* m_Skeleton{ nullptr };
@@ -122,24 +127,24 @@ public:
 	DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
 
 public:
-	Animator() meta_default(Animator)
-	~Animator() = default;
+	GENERATED_BODY(Animator)
 
-public:
 	std::string ToString() const override
 	{
 		return std::string("Animator");
 	}
+
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
 	}
+
 	void SetEnabled(bool able) override
 	{
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(Animator, PropertyOnly)
+	ReflectionField(Animator)
 	{
 		PropertyField
 		({
@@ -147,7 +152,8 @@ public:
 			meta_property(m_TimeElapsed)
 			meta_property(m_AnimIndexChosen)
 		});
-		ReturnReflectionPropertyOnly(Animator)
+
+		FieldEnd(Animator, PropertyOnly)
 	}
 
 private:

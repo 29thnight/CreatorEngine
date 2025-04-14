@@ -1,60 +1,63 @@
 #pragma once
-#include <span>
+#include "MetaAlias.h"
 
 namespace Meta
 {
     struct Property
     {
-        const char* name;
-        std::string typeName;
-        const std::type_info& typeInfo;
-        std::function<std::any(void* instance)> getter;
-        std::function<void(void* instance, std::any value)> setter;
-        bool isPointer;
-        std::ptrdiff_t offset;  // 추가: 멤버 오프셋
+        const char*           name;
+        std::string           typeName;
+        const Meta::TypeInfo& typeInfo;
+        Meta::GetterType      getter;
+        Meta::SetterType      setter;
+        bool                  isPointer;
+        Meta::OffsetType      offset;
     };
 
     struct MethodParameter
     {
-        std::string name;
-        std::string typeName;
-        const std::type_info& typeInfo;
+        std::string     name;
+        std::string     typeName;
+        const TypeInfo& typeInfo;
     };
 
-    // --- Method: 멤버 함수 정보 ---
     struct Method
     {
-        const char* name;
-        std::function<std::any(void* instance, const std::vector<std::any>& args)> invoker;
-        std::vector<MethodParameter> parameters;
+        const char*              name;
+        Invoker                  invoker;
+        MethodParameterContainer parameters;
     };
 
-    // --- Type: 하나의 타입 메타데이터 ---
     struct Type
     {
-        const char* name{};
-        std::span<const Property> properties{};
-        std::span<const Method> methods{};
-        const Type* parent = nullptr;  // 부모 타입을 가리키는 포인터 (없으면 nullptr)
+        std::string            name{};
+        View<const Property>   properties{};
+        View<const Method>     methods{};
+        const Type*            parent{ nullptr };
+		HashedGuid             typeID{};
     };
 
     struct EnumValue 
     {
         const char* name;
-        int value;
+        int         value;
     };
 
     struct EnumType 
     {
-        const char* name;
-        std::span<const EnumValue> values;
+        const char*           name;
+        View<const EnumValue> values;
     };
 
-    template<typename T, std::size_t N> using MetaContainer = std::array<T, N>;
-    template<std::size_t N> using MetaProperties = MetaContainer<Meta::Property, N>;
-    template<std::size_t N> using MetaMethods = MetaContainer<Meta::Method, N>;
+    template<typename T, std::size_t N> 
+    using MetaContainer = std::array<T, N>;
 
-    // --- Reflect() 존재 여부 concept ---
+    template<std::size_t N> 
+    using MetaProperties = MetaContainer<Meta::Property, N>;
+
+    template<std::size_t N> 
+    using MetaMethods = MetaContainer<Meta::Method, N>;
+
     template<typename T>
     concept HasReflect = requires
     {

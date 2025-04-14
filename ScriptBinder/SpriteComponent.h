@@ -8,7 +8,7 @@
 class Texture;
 class UIMesh;
 
-struct alignas(16) UiInfo
+cbuffer UiInfo
 {
 	Mathf::xMatrix world;
 	float2 size;
@@ -39,21 +39,20 @@ public:
 	{
 		m_IsEnabled = able;
 	}
-	//REQ_TEST[세환] : 세환아 이거 되는지 확인 좀 부탁할께
+
 	virtual void Update(float tick) override;
 
 	void UpdateTexture();
 	void SetTexture(int index);
 	void SetOrder(int index) { _layerorder = index;}
 
-	//	//숫자가 클수록 젤위에보임
 	int _layerorder;
 	UiInfo uiinfo;
 	UIMesh* m_UIMesh{ nullptr };
 	Texture* m_curtexture{};
 	int curindex = 0;
 	
-	ReflectionField(SpriteComponent, PropertyAndMethod)
+	ReflectionField(SpriteComponent)
 	{
 		PropertyField
 		({
@@ -68,7 +67,7 @@ public:
 			meta_method(UpdateTexture)
 		});
 
-		ReturnReflection(SpriteComponent)
+		FieldEnd(SpriteComponent, PropertyAndMethod)
 	};
 private:
 	bool m_IsEnabled =true;
@@ -81,7 +80,5 @@ private:
 	Mathf::Vector3 scale{ 1,1,1 };
 	int rotZ;
 	std::vector<std::shared_ptr<Texture>> textures;
-
-
 };
 

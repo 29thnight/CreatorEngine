@@ -15,8 +15,6 @@ inline T* GameObject::AddComponent()
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size();
 
-    ComponentsSort();
-
     return component;
 }
 
@@ -32,8 +30,6 @@ inline T* GameObject::AddScriptComponent(const std::string_view& scriptName)
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size();
-
-    ComponentsSort();
 
     size_t index = m_componentIds[component->GetTypeID()];
 
@@ -54,8 +50,6 @@ inline T* GameObject::AddComponent(Args && ...args)
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size();
-
-    ComponentsSort();
 
     return component;
 }

@@ -83,9 +83,6 @@
     <ClInclude Include="IObject.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="TypeTrait.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>Classes\Components</Filter>
     </ClInclude>
@@ -100,9 +97,6 @@
     </ClInclude>
     <ClInclude Include="LightComponent.h">
       <Filter>Classes\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="ILifeSycle.h">
-      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="HotLoadSystem.h">
       <Filter>Classes\HotLoadSystem</Filter>

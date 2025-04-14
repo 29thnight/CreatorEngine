@@ -775,14 +775,6 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 void SceneRenderer::SceneRendering()
 {
 	DirectX11::ResetCallCount();
-	//Camera c{};
-	//// 메쉬별로 positionMap 생성
-	//m_pPositionMapPass->Execute(*m_renderScene, c);
-	//m_pNormalMapPass->Execute(*m_renderScene, c);
-	//// lightMap에 사용할 shadowMap 생성
-	//m_pLightmapShadowPass->Execute(*m_renderScene, c);
-	//// lightMap 생성
-	//lightMap.GenerateLightMap(m_renderScene, m_pLightmapShadowPass, m_pPositionMapPass, m_pNormalMapPass);
 
 	for(auto& camera : CameraManagement->m_cameras)
 	{
@@ -1124,6 +1116,7 @@ void SceneRenderer::EditorView()
 	ImGui::Begin(ICON_FA_GAMEPAD "  Game        ", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
+		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
 		// 이미지의 높이를 영역의 높이로 설정하고, 가로는 aspect ratio를 반영하여 계산
@@ -1139,6 +1132,20 @@ void SceneRenderer::EditorView()
 
 		// 이미지가 중앙에 위치하도록 오프셋 계산 (가로, 세로 모두 중앙 정렬)
 		ImVec2 offset = ImVec2((availRegion.x - imageSize.x) * 0.5f, (availRegion.y - imageSize.y) * 0.5f);
+
+		//static bool LogOnce = false;
+
+		//if(!LogOnce)
+		//{
+		//	Debug->Log("offset Begin : " + std::to_string(windowPos.x + offset.x) + " " + std::to_string(windowPos.y + offset.y));
+
+		//	Debug->Log("offset End : " + std::to_string(windowPos.x + offset.x + imageSize.x) + " " + std::to_string(windowPos.y + offset.y + imageSize.y));
+
+		//	LogOnce = true;
+		//}
+
+		//ImVec2 mousePos = ImGui::GetMousePos();
+		//std::cout << "MousePos : " << mousePos.x << " " << mousePos.y << std::endl;
 
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
