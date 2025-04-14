@@ -10,6 +10,7 @@
 #include "Core.Random.h"
 #include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
+#include "ResourceAllocator.h"
 namespace lm {
 	struct alignas(16) CBData {
 		int2 Offset;
@@ -435,10 +436,10 @@ namespace lm {
 	{
 		for (auto& lightmap : lightmaps)
 		{
-			delete lightmap;
+			DeallocateResource(lightmap);
 		}
 		lightmaps.clear();
-		delete edgeTexture;
+		DeallocateResource(edgeTexture);
 		edgeTexture = nullptr;
 	}
 
