@@ -1,7 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "ILifeSycle.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
 

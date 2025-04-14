@@ -27,7 +27,7 @@ public:
     Scene* GetScene(size_t index) { return m_scenes[index]; }
 
     Scene* CreateScene(const std::string_view& name = "SampleScene");
-	Scene* SaveScene(const std::string_view& name, bool isAsync = false);
+	Scene* SaveScene(const std::string_view& name = "SampleScene", bool isAsync = false);
     Scene* LoadScene(const std::string_view& name, bool isAsync = false);
 
     void AddDontDestroyOnLoad(Object* objPtr);

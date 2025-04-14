@@ -21,27 +21,45 @@ namespace Meta
             std::any value = prop.getter(instance);
 
             // Vector 처리
-            if (IsVectorType(prop.typeName))
-            {
+			if (IsVectorType(prop.typeName))
+			{
+				const std::string elementTypeName = ExtractVectorElementType(prop.typeName);
+				auto value = prop.getter(instance);
+
 				MetaYml::Node arrayNode;
-                const std::string elementTypeName = ExtractVectorElementType(prop.typeName);
 
-                auto vec = std::any_cast<std::vector<void*>*>(value);
+				// shared_ptr<T>
+				if (elementTypeName.find("std::shared_ptr<") != std::string::npos)
+				{
+					const std::string innerTypeName = ExtractVectorElementType(elementTypeName);
+					auto vec = std::any_cast<std::vector<std::shared_ptr<void>>*>(value);
 
-                for (auto& element : *vec)
-                {
-                    if (const Type* subType = MetaDataRegistry->Find(elementTypeName))
-                    {
-                        arrayNode.push_back(Serialize(element, *subType));
-                    }
-                    else
-                    {
-                        arrayNode.push_back(nullptr);
-                    }
-                }
-                node[prop.name] = arrayNode;
-                continue;
-            }
+					for (auto& element : *vec)
+					{
+						if (const Type* subType = MetaDataRegistry->Find(innerTypeName))
+						{
+							arrayNode.push_back(Serialize(element.get(), *subType));
+						}
+						else
+						{
+							arrayNode.push_back(MetaYml::Node());
+						}
+					}
+				}
+				// T*
+				else if (const Type* subType = MetaDataRegistry->Find(elementTypeName))
+				{
+					auto vec = std::any_cast<std::vector<void*>*>(value);
+
+					for (auto& element : *vec)
+					{
+						arrayNode.push_back(Serialize(element, *subType));
+					}
+				}
+
+				node[prop.name] = arrayNode;
+				continue;
+			}
 
             // Pointer 처리
             if (prop.isPointer)
@@ -73,8 +91,31 @@ namespace Meta
                 continue;
             }
 
-            // 기본 타입 처리
-            node[prop.name] = value;
+			if (prop.typeName == "int")
+			{
+				node[prop.name] = std::any_cast<int>(value);
+			}
+			else if (prop.typeName == "float")
+			{
+				node[prop.name] = std::any_cast<float>(value);
+			}
+			else if (prop.typeName == "bool")
+			{
+				node[prop.name] = std::any_cast<bool>(value);
+			}
+			else if (prop.typeName == "std::string")
+			{
+				node[prop.name] = std::any_cast<std::string>(value);
+			}
+			else if (prop.typeName == "HashingString")
+			{
+				node[prop.name] = std::any_cast<HashingString>(value).ToString();
+			}
+			else
+			{
+				// 처리 불가 타입 → null 처리 or 에러로그
+				node[prop.name] = YAML::Node();
+			}
         }
         return node;
     }

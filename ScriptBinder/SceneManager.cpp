@@ -1,6 +1,7 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Object.h"
+#include "FileIO.h"
 
 void SceneManager::Editor()
 {
@@ -79,7 +80,20 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
 
 Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
-    return nullptr;
+	std::ofstream sceneFileOut("TestScene.yml");
+    MetaYml::Node sceneNode{};
+
+    try
+    {
+        sceneNode = Meta::Serialize(m_activeScene);
+    }
+	catch (const std::exception& e)
+	{
+		Debug->LogError(e.what());
+		return nullptr;
+	}
+
+	sceneFileOut << sceneNode;
 }
 
 Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)

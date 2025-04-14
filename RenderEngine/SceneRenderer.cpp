@@ -1006,6 +1006,11 @@ void SceneRenderer::EditorView()
         {
             if (ImGui::BeginMenu("File"))
             {
+				if (ImGui::MenuItem("Save Current Scene"))
+				{
+					//Test
+					SceneManagers->SaveScene();
+				}
                 if (ImGui::MenuItem("Exit"))
                 {
                     // Exit action

@@ -6,13 +6,14 @@ class GameObject;
 class RenderScene;
 class SceneManager;
 struct ICollider;
-class Scene
+class Scene : public Meta::IReflectable<Scene>
 {
 private:
+
+public:
 	Scene() = default;
 	~Scene() = default;
 
-public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
@@ -77,6 +78,7 @@ public:
 	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{
 		Scene* allocScene = new Scene();
+		allocScene->m_sceneName = sceneName.data();
 		allocScene->CreateGameObject(sceneName);
 		return allocScene;
 	}
@@ -112,6 +114,17 @@ public:
     LightProperties& GetLightProperties()
     {
         return m_lightProperties;
+    }
+
+    ReflectionField(Scene)
+    {
+		PropertyField
+		({
+            meta_property(m_SceneObjects)
+			meta_property(m_sceneName)
+		});
+			
+		FieldEnd(Scene, PropertyOnly)
     }
 
 private:

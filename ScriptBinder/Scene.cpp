@@ -1,6 +1,5 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
-#include "IlifeSycle.h"
 #include "GameObjectPool.h"
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
