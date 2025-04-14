@@ -28,6 +28,12 @@
     <Filter Include="Common">
       <UniqueIdentifier>{1cc72946-c63f-40a6-9003-a5d95b767ca0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="PhysicsActor">
+      <UniqueIdentifier>{4e72ddb1-1d48-460a-95ee-1e1534b14ff0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Helper">
+      <UniqueIdentifier>{775e5a04-abc5-4072-8086-1f922a21ee31}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -57,6 +63,24 @@
     <ClInclude Include="Common.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="PhysicsCommon.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="StaticRigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="DynamicRigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsHelper.h">
+      <Filter>Helper</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsDebug.h">
+      <Filter>Helper</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Physics.cpp">
@@ -74,5 +98,23 @@
     <ClCompile Include="Common.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="RigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
+    </ClCompile>
+    <ClCompile Include="StaticRigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
+    </ClCompile>
+    <ClCompile Include="DynamicRigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsHelper.cpp">
+      <Filter>Helper</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsDebug.cpp">
+      <Filter>Helper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="PhysicsFlags.txt" />
   </ItemGroup>
 </Project>
