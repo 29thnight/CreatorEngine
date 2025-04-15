@@ -111,8 +111,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -149,10 +150,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CharacterController.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="ConvexMeshResource.h" />
     <ClInclude Include="DynamicRigidBody.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Func.h" />
+    <ClInclude Include="HeightFieldResource.h" />
     <ClInclude Include="ICollider.h" />
     <ClInclude Include="IRigidbody.h" />
     <ClInclude Include="pch.h" />
@@ -162,12 +166,17 @@
     <ClInclude Include="PhysicsHelper.h" />
     <ClInclude Include="PhysicsInfo.h" />
     <ClInclude Include="Physx.h" />
+    <ClInclude Include="ResourceBase.h" />
     <ClInclude Include="RigidBody.h" />
     <ClInclude Include="StaticRigidBody.h" />
+    <ClInclude Include="TriangleMeshResource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CharacterController.cpp" />
     <ClCompile Include="Common.cpp" />
+    <ClCompile Include="ConvexMeshResource.cpp" />
     <ClCompile Include="DynamicRigidBody.cpp" />
+    <ClCompile Include="HeightFieldResource.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -179,8 +188,10 @@
     <ClCompile Include="PhysicsEventCallback.cpp" />
     <ClCompile Include="PhysicsHelper.cpp" />
     <ClCompile Include="Physx.cpp" />
+    <ClCompile Include="ResourceBase.cpp" />
     <ClCompile Include="RigidBody.cpp" />
     <ClCompile Include="StaticRigidBody.cpp" />
+    <ClCompile Include="TriangleMeshResource.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">

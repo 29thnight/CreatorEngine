@@ -1,7 +1,11 @@
 #include "Physx.h"
+#include "PhysicsHelper.h"
 #include "IRigidbody.h"
 #include "PhysicsInfo.h"
 #include "PhysicsEventCallback.h"
+#include "ConvexMeshResource.h"
+#include "TriangleMeshResource.h"
+#include "HeightFieldResource.h"
 #include <thread>
 #include <atomic>
 #include <condition_variable>
@@ -148,9 +152,6 @@ void PhysicX::ReadPhysicsData()
 	m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
 	auto& writeBuffer = bufferPool.GetWriteBuffer();
 	writeBuffer.resize(curActorCount);
-
-	std::vector<PxActor*> actors(curActorCount);
-	m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
 
 	for (int i = 0; i < curActorCount; i++) {
 		auto dynamicActor = static_cast<PxRigidDynamic*>(actors[i]);
@@ -366,48 +367,152 @@ void PhysicX::CreateStaticBody(const BoxColliderInfo & info, const EColliderType
 
 void PhysicX::CreateStaticBody(const SphereColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material);
+
+	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
+
+	shape->release();
+
+	if (staticBody != nullptr)
+	{
+		staticBody->SetRadius(info.radius);
+	}
 }
 
 void PhysicX::CreateStaticBody(const CapsuleColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material);
+
+	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
+
+	shape->release();
+
+	if (staticBody != nullptr)
+	{
+		staticBody->SetRadius(info.radius);
+		staticBody->SetHalfHeight(info.height);
+	}
 }
 
 void PhysicX::CreateStaticBody(const ConvexMeshColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
+	ConvexMeshResource* convexMesh = new ConvexMeshResource(m_physics, info.vertices, info.vertexSize, info.convexPolygonLimit);
+	physx::PxConvexMesh* pxConvexMesh = convexMesh->GetConvexMesh();
+
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material);
+
+	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
+	shape->release();
 }
 
 void PhysicX::CreateStaticBody(const TriangleMeshColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
-	physx::PxTriangleMesh* mesh;
-	physx::PxDeformableSurface* surface;
+	TriangleMeshResource* triangleMesh = new TriangleMeshResource(m_physics, info.vertices, info.vertexSize, info.indices,info.indexSize);
+	physx::PxTriangleMesh* pxTriangleMesh = triangleMesh->GetTriangleMesh();
+
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material);
+
+	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
+
+	shape->release();	
 }
 
 void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
+	HeightFieldResource* heightField = new HeightFieldResource(m_physics, info.heightMep, info.numCols,info.numRows);
+	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
+
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material);
+
+	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
+	staticBody->SetOffsetRotation(Mathf::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
+	staticBody->SetOffsetTranslation(Mathf::Matrix::CreateTranslation(Mathf::Vector3(info.rowScale * info.numRows * 0.5f, 0.0f, -info.colScale * info.numCols * 0.5f)));
+
+	shape->release();
+
 }
 
 void PhysicX::CreateDynamicBody(const BoxColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxBoxGeometry(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z), *material);
+
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+
+	shape->release();
+
+	if (dynamicBody != nullptr)
+	{
+		dynamicBody->SetExtent(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z);
+	}
 }
 
 void PhysicX::CreateDynamicBody(const SphereColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material);
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+	shape->release();
+	if (dynamicBody != nullptr)
+	{
+		dynamicBody->SetRadius(info.radius);
+	}
 }
 
 void PhysicX::CreateDynamicBody(const CapsuleColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material);
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+	shape->release();
+	if (dynamicBody != nullptr)
+	{
+		dynamicBody->SetRadius(info.radius);
+		dynamicBody->SetHalfHeight(info.height);
+	}
 }
 
 void PhysicX::CreateDynamicBody(const ConvexMeshColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	/*static int number = 0;
+	number++;*/
+
+	ConvexMeshResource* convexMesh = new ConvexMeshResource(m_physics, info.vertices, info.vertexSize, info.convexPolygonLimit);
+	physx::PxConvexMesh* pxConvexMesh = convexMesh->GetConvexMesh();
+
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material);
+
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+	shape->release();
 }
 
 void PhysicX::CreateDynamicBody(const TriangleMeshColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	TriangleMeshResource* triangleMesh = new TriangleMeshResource(m_physics, info.vertices, info.vertexSize, info.indices, info.indexSize);
+	physx::PxTriangleMesh* pxTriangleMesh = triangleMesh->GetTriangleMesh();
+
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material);
+
+	shape->setFlag(physx::PxShapeFlag::eSCENE_QUERY_SHAPE,true);
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+	shape->release();
 }
 
 void PhysicX::CreateDynamicBody(const HeightFieldColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix, bool isKinematic)
 {
+	HeightFieldResource* heightField = new HeightFieldResource(m_physics, info.heightMep, info.numCols, info.numRows);
+	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
+	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material);
+	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, collisionMatrix, isKinematic);
+	shape->release();
 }
 
 StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix)
@@ -431,7 +536,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 
 	//충돌데이터 등록, 리지드 바디 등록
 	m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
-	m_rigidBodyContainer.insert(std::make_pair(colInfo.id, staticBody));
+	m_rigidBodyContainer.insert(std::make_pair(staticBody->GetID(), staticBody));
 
 	m_updateActors.push_back(staticBody);
 
@@ -440,23 +545,259 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 
 DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix, bool isKinematic)
 {
-	return nullptr;
+	//필터데이터
+	physx::PxFilterData filterData;
+	filterData.word0 = colInfo.layerNumber;
+	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	shape->setSimulationFilterData(filterData);
+
+	//collisionData
+	DynamicRigidBody* dynamicBody = new DynamicRigidBody(collideType, colInfo.id, colInfo.layerNumber);
+	CollisionData* collisionData = new CollisionData();
+
+	//다이나믹 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 정보 등록
+	if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData))
+	{
+		Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
+		return nullptr;
+	}
+
+	//충돌데이터 등록, 리지드 바디 등록
+	m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
+	m_rigidBodyContainer.insert(std::make_pair(dynamicBody->GetID(), dynamicBody));
+
+	m_updateActors.push_back(dynamicBody);
+
+	return dynamicBody;
 }
 
-void PhysicX::GetRigidBodyData(unsigned int id, const RigidBodyGetSetData& rigidBodyData)
+bool TransformDifferent(const physx::PxTransform& first, physx::PxTransform& second, float positionTolerance, float rotationTolerance) {
+
+	//compare position
+	if (!(first.p).isFinite() || !(second.p).isFinite() || (first.p - second.p).magnitude() > positionTolerance) {
+		if (!(first.q).isFinite() || !(second.q).isFinite() || (physx::PxAbs(first.q.w - second.q.w) > rotationTolerance) || 
+			(physx::PxAbs(first.q.x - second.q.x)>rotationTolerance)||
+			(physx::PxAbs(first.q.y - second.q.y) > rotationTolerance) || 
+			(physx::PxAbs(first.q.z - second.q.z) > rotationTolerance))
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData)
 {
+	auto body = m_rigidBodyContainer.find(id)->second;
+	
+	//dynamicBody 의 경우
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+	if (dynamicBody)
+	{
+		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
+		Mathf::Matrix dxMatrix;
+		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
+		rigidBodyData.transform = Mathf::Matrix::CreateScale(dynamicBody->GetScale()) * dxMatrix * dynamicBody->GetOffsetTranslation();
+		CopyVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
+		CopyVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
+
+		physx::PxRigidDynamicLockFlags flags = pxBody->getRigidDynamicLockFlags();
+
+		rigidBodyData.isLockLinearX = (flags & physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_X);
+		rigidBodyData.isLockLinearY = (flags & physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y);
+		rigidBodyData.isLockLinearZ = (flags & physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z);
+		rigidBodyData.isLockAngularX = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X);
+		rigidBodyData.isLockAngularY = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y);
+		rigidBodyData.isLockAngularZ = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
+	}
+	//staticBody 의 경우
+	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+	if (staticBody)
+	{
+		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
+		Mathf::Matrix dxMatrix;
+		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
+		rigidBodyData.transform = Mathf::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
+	}
 }
 
 void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData, int* collisionMatrix)
 {
+	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사
+	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
+	{
+		return;
+	}
+
+	auto body = m_rigidBodyContainer.find(id)->second;
+
+	//dynamicBody 의 경우
+	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+	if (dynamicBody)
+	{
+		//받은 데이터로 pxBody의 transform과 속도와 각속도 설정
+		Mathf::Matrix dxMatrix = rigidBodyData.transform;
+		physx::PxTransform pxTransform;
+		physx::PxVec3 pxLinearVelocity;
+		physx::PxVec3 pxAngularVelocity;
+		CopyVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
+		CopyVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
+
+
+		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
+		//운동학 객체가 아닌경우 각	속도 선속도 설정
+		if (!(pxBody->getRigidBodyFlags()&physx::PxRigidBodyFlag::eKINEMATIC))
+		{
+			pxBody->setLinearVelocity(pxLinearVelocity);
+			pxBody->setAngularVelocity(pxAngularVelocity);
+		}
+
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X, rigidBodyData.isLockAngularX);
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y, rigidBodyData.isLockAngularY);
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z, rigidBodyData.isLockAngularZ);
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_X, rigidBodyData.isLockLinearX);
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
+		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
+
+		Mathf::Vector3 position;
+		Mathf::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		Mathf::Quaternion rotation;
+		dxMatrix.Decompose(scale, rotation, position);
+		dxMatrix = Mathf::Matrix::CreateScale(1.0f) * Mathf::Matrix::CreateFromQuaternion(rotation) * Mathf::Matrix::CreateTranslation(position);
+
+		CopyMatrixDxToPx(dxMatrix, pxTransform);
+		pxBody->setGlobalPose(pxTransform);
+		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, collisionMatrix);
+
+		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)
+		{
+			dynamicBody->SetConvertScale(scale, m_physics, collisionMatrix);
+		}
+		else {
+			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
+		}
+	}
+	//staticBody 의 경우
+	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+	if (staticBody)
+	{
+		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
+		Mathf::Matrix dxMatrix = rigidBodyData.transform;
+		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
+		physx::PxTransform pxCurrTransform;
+		
+		Mathf::Vector3 position;
+		Mathf::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		Mathf::Quaternion rotation;
+
+		dxMatrix.Decompose(scale, rotation, position);
+		dxMatrix = Mathf::Matrix::CreateScale(1.0f) * 
+			Mathf::Matrix::CreateFromQuaternion(rotation) * staticBody->GetOffsetRotation().Invert() *
+			Mathf::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
+
+		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
+	}
 }
 
 void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
 {
+	//등록되어 있는지 검사
+	if (m_rigidBodyContainer.find(id)==m_rigidBodyContainer.end())
+	{
+		Debug->LogWarning("RemoveRigidBody id :" + std::to_string(id) + " Remove Failed");
+		return;
+	}
+
+	RigidBody* body = m_rigidBodyContainer[id];
+
+	//삭제할 리지드 바디 등록 (PxActor는 다음 프레임에 삭제)
+	if (body)
+	{
+		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+		if (dynamicBody) {
+			if (dynamicBody->GetRigidDynamic()->getScene() == scene)
+			{
+				removeActorList.push_back(dynamicBody->GetRigidDynamic());
+				m_rigidBodyContainer.erase(id);
+			}
+		}
+		StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+		if (staticBody) {
+			if (staticBody->GetRigidStatic()->getScene() == scene)
+			{
+				removeActorList.push_back(staticBody->GetRigidStatic());
+				m_rigidBodyContainer.erase(id);
+			}
+		}
+	}
+
+	//등록 예정 지점도 확인후 삭제
+	auto bodyIter = m_updateActors.begin();
+	for (bodyIter; bodyIter!= m_updateActors.end(); bodyIter++)
+	{
+		if ((*bodyIter)->GetID()==id)
+		{
+			m_updateActors.erase(bodyIter);
+			break;
+		}
+	}
+	
 }
 
 void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
 {
+	//삭제할 리지드 바디 등록 (물리씬에 등록된 상태면 다음 프레임에 삭제)
+	for (const auto& body : m_rigidBodyContainer) {
+		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body.second);
+		if (dynamicBody) {
+			
+			if (dynamicBody->GetRigidDynamic()->getScene() == scene)
+			{
+				removeActorList.push_back(dynamicBody->GetRigidDynamic());
+				continue;
+			}
+		}
+		StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body.second);
+		if (staticBody) {
+			if (staticBody->GetRigidStatic()->getScene() == scene)
+			{
+				removeActorList.push_back(staticBody->GetRigidStatic());
+				continue;
+			}
+		}
+	}
+	//저장된 리지드 바디 삭제 
+	m_rigidBodyContainer.clear();
+
+	//등록예정인 리지드 바디 삭제
+	for (const auto& body : m_updateActors) {
+		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+		if (dynamicBody) {
+			if (dynamicBody->GetRigidDynamic()->getScene() == scene)
+			{
+				removeActorList.push_back(dynamicBody->GetRigidDynamic());
+				continue;
+			}
+		}
+		StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+		if (staticBody) {
+			if (staticBody->GetRigidStatic()->getScene() == scene)
+			{
+				removeActorList.push_back(staticBody->GetRigidStatic());
+				continue;
+			}
+		}
+	}
+	//등록된 리지드 바디 삭제
+	m_updateActors.clear();
 }
 
 void PhysicX::PostUpdate() {}
@@ -521,8 +862,8 @@ void PhysicX::ClearActors()
 	PxU32 numMeshes = m_physics->getNbConvexMeshes();
 	std::vector<PxConvexMesh*> meshes(numMeshes);
 	m_physics->getConvexMeshes(meshes.data(), numMeshes);
-	void PhysicX::ClearActors()
-		mesh->release();
+	void PhysicX::ClearActors();
+	
 }
 
 //Physics->ShowNotRelease();

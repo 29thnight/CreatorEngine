@@ -174,14 +174,14 @@ struct ConvexMeshColliderInfo
 	Mathf::Vector3* vertices = nullptr;	//모델 버텍스 정보
 	int vertexSize = 0;	//모델 버텍스 사이즈
 	unsigned char convexPolygonLimit = 4; 	//Convex 폴리곤의 최대 갯수 최소 4개 , 최대 256개
-	unsigned int convexMeshHash = 0;	//ConvexMesh 해쉬값
+	//unsigned int convexMeshHash = 0;	//ConvexMesh 해쉬값
 };
 
 //메쉬 정보로 만드는 평면형 콜라이더 정보 //-> physx::PxDeformableSurface 로 대체 할듯 
 struct TriangleMeshColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
-	unsigned int triangleMeshHash = 0;	//TriangleMesh 해쉬값
+	//unsigned int triangleMeshHash = 0;	//TriangleMesh 해쉬값
 	Mathf::Vector3* vertices = nullptr;	//모델 버텍스 정보
 	int vertexSize = 0;	//모델 버텍스 사이즈
 	unsigned int* indices = nullptr;	//모델 인덱스 정보
@@ -192,7 +192,7 @@ struct TriangleMeshColliderInfo
 struct HeightFieldColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
-	unsigned int heightFieldHash = 0;	//HeightField 해쉬값
+	//unsigned int heightFieldHash = 0;	//HeightField 해쉬값
 	int* heightMep = nullptr;	//모델 높이 맵 정보
 	unsigned int numCols = 0;	//높이 맵 가로 겟수
 	unsigned int numRows = 0;	//높이 맵 세로 겟수

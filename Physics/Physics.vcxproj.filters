@@ -34,6 +34,12 @@
     <Filter Include="Helper">
       <UniqueIdentifier>{775e5a04-abc5-4072-8086-1f922a21ee31}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ResourceBase">
+      <UniqueIdentifier>{8141cf32-cbb0-4926-8b82-3465871d37b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Character">
+      <UniqueIdentifier>{16c9c28e-1d20-40ec-95e6-09bb9b963213}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -81,6 +87,21 @@
     <ClInclude Include="PhysicsDebug.h">
       <Filter>Helper</Filter>
     </ClInclude>
+    <ClInclude Include="ResourceBase.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="ConvexMeshResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="HeightFieldResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="TriangleMeshResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterController.h">
+      <Filter>Character</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Physics.cpp">
@@ -112,6 +133,21 @@
     </ClCompile>
     <ClCompile Include="PhysicsDebug.cpp">
       <Filter>Helper</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceBase.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="ConvexMeshResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="HeightFieldResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="TriangleMeshResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterController.cpp">
+      <Filter>Character</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

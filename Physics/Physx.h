@@ -99,7 +99,7 @@ public:
 	DynamicRigidBody* SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix, bool isKinematic);
 
 	//반환
-	void GetRigidBodyData(unsigned int id,const RigidBodyGetSetData& rigidBodyData);
+	void GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData);
 	//수정
 	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData,int* collisionMatrix);
 	//삭제
@@ -190,6 +190,12 @@ private:
 	//collision data 관리용
 	std::unordered_map<unsigned int, CollisionData*> m_collisionDataContainer; //collision data 관리용
 	std::vector<unsigned int>m_removeCollisionIds; //삭제할 collision data id들
+
+	//==================================================================================
+	//character controller 관리용
+	physx::PxControllerManager* m_characterControllerManager;
+	std::unordered_map<unsigned int, CharacterController*> m_characterControllerContainer; //character controller 관리용
+
 
 public:
 	bool recordMemoryAllocations = true; // 디버그용 메모리 할당 추적
