@@ -33,10 +33,10 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
-        Mathf::Vector2 mousePos = InputManagement->GetMousePos();
-
-        if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-          UIManagers->m_clickEvent.Broadcast(mousePos);
+        //Mathf::Vector2 mousePos = InputManagement->GetMousePos();
+        /*if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
+          UIManagers->m_clickEvent.Broadcast(mousePos);*/
+		UIManagers->CheckInput();
         Sound->update();
     });
 

@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "../ScriptBinder/GameObject.h"
 #include "../ScriptBinder/UIComponent.h"
+#include "../ScriptBinder/UIManager.h"
+#include "../ScriptBinder/Canvas.h"
 UIPass::UIPass()
 {
 
@@ -71,17 +73,36 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
 
 	
-	for (auto& Obj : scene.GetScene()->m_SceneObjects)
+	std::vector<Canvas*> canvases;
+	for (auto& Canvas2 : UIManagers->Canvases)
 	{
-		auto a = scene.GetScene();
-		UIComponent* ui = Obj->GetComponent<UIComponent>();
-		if (ui == nullptr) continue;
-		if (false == ui->IsEnabled()) continue;
-		_2DObjects.push_back(ui);
+		canvases.push_back(Canvas2->GetComponent<Canvas>());
+	}
+	std::sort(canvases.begin(), canvases.end(), [](Canvas* a, Canvas* b) {
+		return a->CanvasOrder < b->CanvasOrder;
+		});
 
+
+
+	for (auto& Canvases : UIManagers->Canvases)
+	{
+		Canvas* canvas = Canvases->GetComponent<Canvas>();
+		if (false == canvas->IsEnabled()) continue;
+		for (auto& uiObj : canvas->UIObjs)
+		{
+			UIComponent* ui = uiObj->GetComponent<UIComponent>();
+			if (ui == nullptr) continue;
+			if (false == ui->IsEnabled()) continue;
+			_2DObjects.push_back(ui);
+		}
 	}
 
-	std::sort(_2DObjects.begin(), _2DObjects.end(), compareLayer);
+
+	std::sort(_2DObjects.begin(), _2DObjects.end(), [](UIComponent* a, UIComponent* b) {
+		return a->_layerorder < b->_layerorder;
+		});
+
+
 	for (auto& Uiobject : _2DObjects)
 	{
 		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
@@ -98,9 +119,9 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	_2DObjects.clear();
 }
 
-bool UIPass::compareLayer(UIComponent* a, UIComponent* b)
+bool UIPass::compareLayer(int  a, int  b)
 {
-	return a->_layerorder < b->_layerorder;
+	return a  < b ;
 }
 
 void UIPass::ControlPanel()

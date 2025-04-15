@@ -63,11 +63,14 @@ public:
 
 	ComPtr<IGameInput> gameInput;
 
-	//키보드 마우스
+	//키보드 마우스 ***** Down Pressed hold인거 Down 첫틱도받게 수정필요 이름 통일필요
 public:
 	void KeyBoardUpdate();
+	//누름
 	bool IsKeyDown(unsigned int key) const;
+	// 누르는중
 	bool IsKeyPressed(unsigned int key) const;
+	//뗌
 	bool IsKeyReleased(unsigned int key) const;
 
 	//키 세팅 변경용?
@@ -82,8 +85,11 @@ public:
 	float2 GetMouseDelta() const;
 	bool IsWheelUp();
 	bool IsWheelDown();
+	//누르는중
 	bool IsMouseButtonDown(MouseKey button);
+	//한번누른거
 	bool IsMouseButtonPressed(MouseKey button);
+	//뗌
 	bool IsMouseButtonReleased(MouseKey button);
 	void HideCursor();
 	void ShowCursor();

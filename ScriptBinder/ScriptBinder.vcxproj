@@ -153,6 +153,7 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="UIButton.cpp" />
     <ClCompile Include="UIComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="UICollider.cpp" />
@@ -178,6 +179,7 @@
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="UIButton.h" />
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />

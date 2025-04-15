@@ -11,7 +11,7 @@ enum class UIColliderType
 	Circle,
 	Capsule,
 };
-class UICollider : public Component, public ICollision2D, public IUpdatable<UICollider>
+class UICollider : public Component, public IUpdatable<UICollider>//, public ICollision2D
 {
 public:
 	UICollider();
@@ -23,7 +23,7 @@ public:
 	}
 
 	void SetCollider();
-	void CheckClick(Mathf::Vector2 _mousePos) override;
+	bool CheckClick(Mathf::Vector2 _mousePos);
 
 	void Update(float deltaSecond) override;
 

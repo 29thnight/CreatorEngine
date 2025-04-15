@@ -8,7 +8,9 @@
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
 #include "../ScriptBinder/UIComponent.h"
-#include "../ScriptBinder/UICollider.h";
+#include "../ScriptBinder/UICollider.h"
+#include "../ScriptBinder/UIManager.h"
+#include "../ScriptBinder/UIButton.h"
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "TimeSystem.h"
@@ -741,15 +743,18 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
+	UIManagers->MakeImage("TestImage", DataSystems->LoadTexture("test.jpg"));
+	std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImage2", DataSystems->LoadTexture("test2.png"));
 
-	std::shared_ptr<GameObject> test3 = m_currentScene->CreateGameObject("TestObj3");
-	test3->AddComponent<UIComponent>()->Load(DataSystems->LoadTexture("test.jpg"));
-	test3->GetComponent<UIComponent>()->Load(DataSystems->LoadTexture("test2.png"));
-	test3->GetComponent<UIComponent>()->Load(DataSystems->LoadTexture("UI2.png"));
-	test3->GetComponent<UIComponent>()->SetTexture(0);
-	test3->m_transform.SetPosition({ 960, 540, 0 });
-	test3->AddComponent<UICollider>()->SetCollider();
 
+	auto setcan = UIManagers->MakeCanvas("setting");
+	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("123.png"), []() {std::cout << "soooo angry" << std::endl;} ,{ 1360, 540 }, setcan.get());
+	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;}, { 560,540 }, setcan.get());
+
+	UIManagers->SelectUI = Angryy2.get();
+
+	Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
+	Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 

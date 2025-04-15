@@ -31,6 +31,20 @@ void UIComponent::SetTexture(int index)
 	uiinfo.size = textures[curindex]->GetImageSize();
 }
 
+GameObject* UIComponent::GetNextNavi(Direction dir)
+{
+	if (navigation[dir] == nullptr)
+	{
+		return m_pOwner;
+	}
+	return navigation[dir];
+}
+
+void UIComponent::SetNavi(Direction dir, GameObject* other)
+{
+	navigation[dir] = other;
+}
+
 void UIComponent::Update(float tick)
 {
 	pos = m_pOwner->m_transform.position;

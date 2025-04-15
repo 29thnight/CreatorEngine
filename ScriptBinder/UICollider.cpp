@@ -18,7 +18,7 @@ void UICollider::SetCollider()
 }
 
 //checkcollison
-void UICollider::CheckClick(Mathf::Vector2 _mousePos)
+bool UICollider::CheckClick(Mathf::Vector2 _mousePos)
 {
 	
 
@@ -40,11 +40,14 @@ void UICollider::CheckClick(Mathf::Vector2 _mousePos)
 		localY > minY && localY < maxY)
 	{
 		isClick = true;
+		return true;
 	}
 	else
 	{
 		isClick = false;
 	}
+
+	return false;
 }
 
 
@@ -56,16 +59,6 @@ void UICollider::Update(float deltaSecond)
 	obBox.Extents.x = uiComponent->uiinfo.size.x;
 	obBox.Extents.y = uiComponent->uiinfo.size.y;
 
-
-
-	if (isClick)
-	{
-		std::cout<< ("UICollider Clicked") << std::endl;
-	}
-	else
-	{
-		std::cout << ("UICollider Not Clicked") << std::endl;
-	}
 }
 
 

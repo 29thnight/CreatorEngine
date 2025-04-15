@@ -16,6 +16,14 @@ struct alignas(16) UiInfo
  
 };
 
+enum class Direction
+{ Up, 
+  Down, 
+  Left, 
+  Right 
+};
+
+
 //모든 2d이미지 기본?
 class UIComponent : public Component, public IRenderable, public IUpdatable<UIComponent>, public Meta::IReflectable<UIComponent>
 {
@@ -45,6 +53,14 @@ public:
 	void UpdateTexture();
 	void SetTexture(int index);
 	void SetOrder(int index) { _layerorder = index;}
+	
+	//다음 방향 오브젝트리턴
+	GameObject* GetNextNavi(Direction dir);
+
+	void SetNavi(Direction dir, GameObject* other);
+	//패드용 네비게이션
+	std::unordered_map<Direction, GameObject*> navigation;
+
 
 	//숫자가 클수록 젤위에보임
 	int _layerorder;
@@ -70,7 +86,7 @@ public:
 		ReturnReflection(UIComponent)
 	};
 	//화면상 좌표 {1920 / 1080}
-	Mathf::Vector3 pos{};
+	Mathf::Vector3 pos{960,540,0};
 	//ndc좌표 {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };

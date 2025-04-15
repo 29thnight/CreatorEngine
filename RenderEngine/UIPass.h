@@ -15,7 +15,7 @@ public:
 
 	virtual void Execute(RenderScene& scene,Camera& camera) override;
 
-	static bool compareLayer(UIComponent* a, UIComponent* b);
+	static bool compareLayer(int a, int b);
 
 	void ControlPanel() override;
 	void Resize() override;
