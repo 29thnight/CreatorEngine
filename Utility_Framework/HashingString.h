@@ -61,7 +61,7 @@ public:
 
 	bool operator==(const HashingString& other) const 
 	{
-		return m_hash == other.m_hash && m_string == other.m_string;
+		return m_hash == other.m_hash;
 	}
 
 

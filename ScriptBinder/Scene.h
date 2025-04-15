@@ -87,7 +87,7 @@ public:
     std::atomic_bool m_isLoaded{ false };
     std::atomic_bool m_isDirty{ false };
     std::atomic_bool m_isEnable{ false };
-    std::atomic_size_t m_buildIndex{ 0 };
+    size_t m_buildIndex{ 0 };
 
 public:
     //TODO : 진짜 이렇게 구현할건지 고민 좀 해보자
@@ -120,8 +120,9 @@ public:
     {
 		PropertyField
 		({
-            meta_property(m_SceneObjects)
 			meta_property(m_sceneName)
+			meta_property(m_buildIndex)
+            meta_property(m_SceneObjects)
 		});
 			
 		FieldEnd(Scene, PropertyOnly)

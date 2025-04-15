@@ -220,7 +220,7 @@ void RenderScene::EditorSceneObjectInspector()
 
 				if(ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
 				{
-					Meta::DrawObject(component, *type);
+					Meta::DrawObject(component.get(), *type);
 				}
 			}
 		}

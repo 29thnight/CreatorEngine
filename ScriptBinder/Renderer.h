@@ -2,6 +2,10 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
+#include "../RenderEngine/Mesh.h"
+#include "../RenderEngine/Material.h"
+#include "../RenderEngine/Texture.h"
+#include "../RenderEngine/Skeleton.h"
 
 struct LightMapping 
 {
@@ -31,12 +35,11 @@ struct LightMapping
 
 constexpr uint32 MAX_BONES{ 512 };
 
-class Mesh;
-class Material;
-class Texture;
-class Skeleton;
+//class Mesh;
+//class Material;
+//class Texture;
+//class Skeleton;
 class Animator;
-
 class MeshRenderer : public Component, public IRenderable, public Meta::IReflectable<MeshRenderer>
 {
 public:
@@ -57,18 +60,17 @@ public:
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(MeshRenderer)
+	ReflectionFieldInheritance(MeshRenderer, Component)
 	{
 		PropertyField
 		({
-			meta_property(m_typeID)
 			meta_property(m_Material)
 			meta_property(m_Mesh)
 			meta_property(m_Animator)
 			meta_property(m_LightMapping)
 		});
 
-		FieldEnd(MeshRenderer, PropertyOnly)
+		FieldEnd(MeshRenderer, PropertyOnlyInheritance)
 	}
 
 public:

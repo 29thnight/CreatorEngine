@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <set>
+#include <memory>
 #include "combaseapi.h"
 
 inline GUID GenerateGUID()
@@ -17,6 +18,29 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 {
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
+
+// ±‚∫ª: ∫§≈Õ æ∆¥‘
+template<typename T>
+struct VectorElementType { using Type = void; };
+
+// std::vector<T>
+template<typename T>
+struct VectorElementType<std::vector<T>> { using Type = T; };
+
+template<typename T>
+using VectorElementTypeT = typename VectorElementType<T>::Type;
+
+template<typename T>
+constexpr bool is_shared_ptr_v = false;
+
+template<typename T>
+constexpr bool is_shared_ptr_v<std::shared_ptr<T>> = true;
+
+template<typename T>
+constexpr bool is_vector_v = false;
+
+template<typename T>
+constexpr bool is_vector_v<std::vector<T>> = true;
 
 struct HashedGuid
 {

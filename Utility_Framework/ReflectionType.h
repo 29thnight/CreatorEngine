@@ -1,8 +1,46 @@
 #pragma once
 #include "MetaAlias.h"
+#include <memory>
 
 namespace Meta
 {
+    struct IVectorIterator
+    {
+        virtual bool IsValid() const = 0;
+        virtual void* Get() const = 0;
+        virtual void Next() = 0;
+        virtual ~IVectorIterator() = default;
+    };
+
+    template<typename T>
+    struct VectorIteratorImpl : public IVectorIterator
+    {
+        using Iter = typename std::vector<T>::iterator;
+
+        Iter current;
+        Iter end;
+
+        VectorIteratorImpl(Iter begin, Iter end)
+            : current(begin), end(end)
+        {
+			//CORE_ASSERT_MSG(current != end, "VectorIteratorImpl: Invalid iterator");
+        }
+
+        bool IsValid() const override { return current != end; }
+        void* Get() const override
+        {
+            if constexpr (std::is_pointer_v<T>)
+                return *current;
+            else if constexpr (is_shared_ptr_v<T>)
+                return current->get();
+            else
+                return const_cast<void*>(static_cast<const void*>(&(*current)));
+        }
+        void Next() override { ++current; }
+    };
+
+	using VectorIteratorFunc = std::function<std::unique_ptr<IVectorIterator>(void* instance)>;
+
     struct Property
     {
         const char*           name;
@@ -12,6 +50,14 @@ namespace Meta
         Meta::SetterType      setter;
         bool                  isPointer;
         Meta::OffsetType      offset;
+
+        //TODO: vector 처리 전용 프로퍼티가 따로 있어야함.
+        bool                    isVector = false;
+        const Meta::TypeInfo&   elementTypeInfo;
+        VectorIteratorFunc      createVectorIterator;
+        std::string             elementTypeName;
+		HashedGuid			    elementTypeID;
+		bool                    isElementPointer = false;
     };
 
     struct MethodParameter

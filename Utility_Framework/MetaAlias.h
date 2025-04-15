@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <span>
+#include <any>
 #include "TypeTrait.h"
 
 namespace Meta

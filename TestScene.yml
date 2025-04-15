@@ -1,1 +1,40 @@
-m_sceneName: ""
+m_sceneName: SampleScene
+m_buildIndex: ~
+Scene:
+  m_SceneObjects:
+    - GameObject:
+        m_name: SampleScene
+        m_instanceID: 725849226
+        m_childrenIndices: [1]
+        m_components: ~
+      m_index: 0
+      m_parentIndex: 0
+      m_rootIndex: 0
+    - GameObject:
+        m_name: plane
+        m_instanceID: 4059967748
+        m_childrenIndices: [2]
+        m_components: ~
+      m_index: 1
+      m_parentIndex: 0
+      m_rootIndex: 0
+    - GameObject:
+        m_name: RootNode
+        m_instanceID: 2314072073
+        m_childrenIndices: ~
+        m_components:
+          - MeshRenderer:
+              m_typeID: 659998325
+              m_instanceID: 3207898504
+            m_Material: ~
+            m_Mesh: ~
+            m_Animator: ~
+            m_LightMapping:
+              lightmapIndex: -1
+              ligthmapResolution: 0
+              lightmapScale: 1
+              lightmapOffset: ~
+              lightmapTiling: ~
+      m_index: 2
+      m_parentIndex: 1
+      m_rootIndex: 0

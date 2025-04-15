@@ -71,7 +71,8 @@ void HotLoadSystem::ReplaceScriptComponent()
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
 			auto* newScript = CreateMonoBehavior(name.c_str());
-			gameObject->m_components[index] = newScript;
+			//gameObject->m_components[index] = newScript;
+			gameObject->m_components[index].reset(newScript);
 		}
 		m_isReloading = false;
 	}

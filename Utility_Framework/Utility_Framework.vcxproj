@@ -24,6 +24,7 @@
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="ClassProperty.h" />
+    <ClInclude Include="ComponentHandler.h" />
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Mathf.h" />

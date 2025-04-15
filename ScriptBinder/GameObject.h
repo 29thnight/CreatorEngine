@@ -79,11 +79,11 @@ public:
     {
         PropertyField
         ({
-            meta_property(m_name)
             meta_property(m_index)
             meta_property(m_parentIndex)
             meta_property(m_rootIndex)
             meta_property(m_childrenIndices)
+			meta_property(m_components)
         });
 
         FieldEnd(GameObject, PropertyOnlyInheritance)
@@ -102,7 +102,7 @@ private:
 	HashingString m_tag{};
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
-	std::vector<Component*> m_components{};
+	std::vector<std::shared_ptr<Component>> m_components{};
 
 	//debug layer
 	Bone* selectedBone{ nullptr };

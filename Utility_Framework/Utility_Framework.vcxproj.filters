@@ -207,6 +207,9 @@
     <ClInclude Include="ReflectionYml.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="ComponentHandler.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

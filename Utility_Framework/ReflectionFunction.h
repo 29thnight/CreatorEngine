@@ -1,4 +1,5 @@
 #pragma once
+#include "TypeTrait.h"
 #include "MetaUtility.h"
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
@@ -49,12 +50,37 @@ namespace Meta
     Property MakePropertyImpl(const char* name, T ClassT::* member)
     {
         std::string typeStr = ToString<T>();
-        bool isPointer = false;
+        bool isPointer = std::is_pointer_v<T>;
+		bool isVector = is_vector_v<T>;
+		bool isElementPointer = false;
 
         if constexpr (std::is_pointer_v<T>)
         {
-            TypeCast->Register<T>();
-            isPointer = true;
+            using Pointee = std::remove_pointer_t<T>;
+            TypeCast->Register<Pointee>();
+        }
+        else if constexpr (is_shared_ptr_v<T>)
+        {
+            using Pointee = typename T::element_type;
+            TypeCast->Register<Pointee>();
+        }
+        else if constexpr (requires { typename VectorElementType<T>::Type; })
+        {
+            using ElemType = VectorElementTypeT<T>;
+
+            if constexpr (std::is_pointer_v<ElemType>)
+            {
+                using Pointee = std::remove_pointer_t<ElemType>;
+				isElementPointer = true;
+                TypeCast->Register<Pointee>();
+            }
+            else if constexpr (is_shared_ptr_v<ElemType>)
+            {
+                using Pointee = typename ElemType::element_type;
+				isElementPointer = true;
+                TypeCast->Register<Pointee>();
+				TypeCast->RegisterSharedPtr<Pointee>();
+            }
         }
 
         if constexpr (Meta::HasReflect<std::remove_cvref_t<T>>)
@@ -64,22 +90,125 @@ namespace Meta
 
         std::ptrdiff_t offset = GetMemberOffset(member);
 
-        return
+        if constexpr (is_vector_v<T>)
         {
-            name,
-            typeStr.c_str(),
-            typeid(T),
-            [member](void* instance) -> std::any
+            using ElementType = VectorElementTypeT<T>;
+
+			if constexpr (std::is_pointer_v<ElementType>)
+			{
+				using Pointee = std::remove_pointer_t<ElementType>;
+                return
+                {
+                    name,
+                    typeStr.c_str(),
+                    typeid(T),
+                    [member](void* instance) -> std::any
+                    {
+                        return static_cast<ClassT*>(instance)->*member;
+                    },
+                    [member](void* instance, std::any value)
+                    {
+                        static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+                    },
+                    isPointer,
+                    offset,
+                    isVector,
+                    typeid(ElementType),
+                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
+                    {
+                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
+                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
+                    },
+                    GetVectorElementTypeName<ElementType>(),
+                    TypeTrait::GUIDCreator::GetTypeID<Pointee>(),
+                    isElementPointer,
+                };
+			}
+            else if constexpr (is_shared_ptr_v<ElementType>)
             {
-                return static_cast<ClassT*>(instance)->*member;
-            },
-            [member](void* instance, std::any value)
+                using Pointee = typename ElementType::element_type;
+
+				size_t typeID = TypeTrait::GUIDCreator::GetTypeID<Pointee>();
+
+                return
+                {
+                    name,
+                    typeStr.c_str(),
+                    typeid(T),
+                    [member](void* instance) -> std::any
+                    {
+                        return static_cast<ClassT*>(instance)->*member;
+                    },
+                    [member](void* instance, std::any value)
+                    {
+                        static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+                    },
+                    isPointer,
+                    offset,
+                    isVector,
+                    typeid(ElementType),
+                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
+                    {
+                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
+						std::cout << "vecPtr: " << vecPtr << std::endl;
+                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
+                    },
+                    GetVectorElementTypeName<ElementType>(),
+                    TypeTrait::GUIDCreator::GetTypeID<Pointee>(),
+                    isElementPointer,
+                };
+            }
+            else
             {
-                static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
-            },
-            isPointer,
-            offset
-        };
+                // vector<int>, vector<float>, vector<string> 이런거 처리
+                return
+                {
+                    name,
+                    typeStr.c_str(),
+                    typeid(T),
+                    [member](void* instance) -> std::any
+                    {
+                        return &(static_cast<ClassT*>(instance)->*member);
+                    },
+                    [member](void* instance, std::any value)
+                    {
+                        (static_cast<ClassT*>(instance)->*member) = *std::any_cast<T*>(value);
+                    },
+                    isPointer,
+                    offset,
+                    isVector,
+                    typeid(ElementType),
+                    [member](void* instance) -> std::unique_ptr<IVectorIterator>
+                    {
+                        auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
+                        return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
+                    },
+                    GetVectorElementTypeName<ElementType>(),
+                    isElementPointer
+                };
+            }
+        }
+        else
+        {
+            return
+            {
+                name,
+                typeStr.c_str(),
+                typeid(T),
+                [member](void* instance) -> std::any
+                {
+                    return static_cast<ClassT*>(instance)->*member;
+                },
+                [member](void* instance, std::any value)
+                {
+                    static_cast<ClassT*>(instance)->*member = std::any_cast<T>(value);
+                },
+                isPointer,
+                offset,
+                isVector,
+                typeid(T),
+            };
+        }
     }
 
     template<typename ClassT, typename EnumT>
@@ -100,7 +229,9 @@ namespace Meta
                 static_cast<ClassT*>(instance)->*member = static_cast<EnumT>(intValue);
             },
             false,
-            GetMemberOffset(member)
+            GetMemberOffset(member),
+			false,
+			typeid(EnumT),
         };
     }
 

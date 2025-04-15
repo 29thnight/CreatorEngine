@@ -40,6 +40,22 @@ namespace Meta
         return name;
     }
 
+	inline std::string RemoveObjectPrefix(const std::string& name)
+	{
+		const std::string object_prefix = "class ";
+		const std::string struct_prefix = "struct ";
+		const std::string enum_prefix = "enum ";
+
+		if (name.find(object_prefix) == 0)
+			return name.substr(object_prefix.size());
+		else if (name.find(struct_prefix) == 0)
+			return name.substr(struct_prefix.size());
+		else if (name.find(enum_prefix) == 0)
+			return name.substr(enum_prefix.size());
+
+		return name;
+	}
+
     // --- 문자열 해시 계산 (FNV-1a) ---
     inline constexpr Hash StringToHash(const char* str)
     {
@@ -65,5 +81,11 @@ namespace Meta
         auto start = typeName.find('<') + 1;
         auto end = typeName.find('>');
         return typeName.substr(start, end - start);
+    }
+
+	template<typename T>
+    inline std::string GetVectorElementTypeName()
+    {
+        return RemoveObjectPrefix(ExtractVectorElementType(ToString<T>()));
     }
 }
