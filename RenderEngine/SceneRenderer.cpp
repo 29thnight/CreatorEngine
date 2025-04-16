@@ -8,9 +8,9 @@
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
 #include "../ScriptBinder/UIComponent.h"
-#include "../ScriptBinder/UICollider.h"
 #include "../ScriptBinder/UIManager.h"
 #include "../ScriptBinder/UIButton.h"
+#include "../ScriptBinder/TextComponent.h"
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "TimeSystem.h"
@@ -351,6 +351,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
 
+	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
     //shadowMapPass 는 RenderScene의 맴버
     //gBufferPass
@@ -417,7 +418,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	lightMap.Initialize();
 
 	m_pUIPass = std::make_unique<UIPass>();
-	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
@@ -433,6 +434,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
     m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+
+	
 
 }
 
@@ -745,11 +748,11 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	UIManagers->MakeImage("TestImage", DataSystems->LoadTexture("test.jpg"));
 	std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImage2", DataSystems->LoadTexture("test2.png"));
-
-
+	test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"myfile.spritefont"));
+	//auto text = test->GetComponent<TextComponent>();
 	auto setcan = UIManagers->MakeCanvas("setting");
-	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("123.png"), []() {std::cout << "soooo angry" << std::endl;} ,{ 1360, 540 }, setcan.get());
-	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;}, { 560,540 }, setcan.get());
+	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("123.png"), []() {std::cout << "soooo angry" << std::endl;} , "setting", { 1360, 540 });
+	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;}, "setting",{ 560,540 });
 
 	UIManagers->SelectUI = Angryy2.get();
 

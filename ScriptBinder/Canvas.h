@@ -39,6 +39,7 @@ public:
 		ReturnReflectionPropertyOnly(Canvas)
 	};
 	bool m_IsEnabled = true;
+	int PreCanvasOrder = 0;
 	int CanvasOrder = 0;
 	std::vector<GameObject*> UIObjs;
 

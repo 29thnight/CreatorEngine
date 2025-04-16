@@ -5,7 +5,8 @@
 //#include "Billboards.h"
 #include "Model.h"
 #include "ImGuiRegister.h"
-
+#include <DirectXTK/SpriteFont.h>
+#include <DirectXTK/SpriteBatch.h>
 // Main system for storing runtime data
 class DataSystem : public Singleton<DataSystem>
 {
@@ -55,7 +56,7 @@ public:
 	void LoadMaterials();
 	Texture* LoadTexture(const std::string_view& filePath);
     Texture* LoadMaterialTexture(const std::string_view& filePath);
-
+	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
 
 	void OpenContentsBrowser();
@@ -70,6 +71,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
+	std::unordered_map<std::wstring, SpriteFont*> SFonts;
 	static ImGuiTextFilter filter;
 
 private:

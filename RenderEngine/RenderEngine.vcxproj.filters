@@ -242,9 +242,6 @@
     <ClCompile Include="Text.cpp">
       <Filter>Resources\UI</Filter>
     </ClCompile>
-    <ClCompile Include="UIsprite.cpp">
-      <Filter>Resources\UI</Filter>
-    </ClCompile>
     <ClCompile Include="PostProcessingPass.cpp">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClCompile>
@@ -399,9 +396,6 @@
     </ClInclude>
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="UIsprite.h">
-      <Filter>Resources\UI</Filter>
     </ClInclude>
     <ClInclude Include="EffectManager.h">
       <Filter>RenderPass\EffectPass</Filter>

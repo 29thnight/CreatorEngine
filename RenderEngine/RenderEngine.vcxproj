@@ -161,7 +161,6 @@
     <ClCompile Include="PositionMapPass.cpp" />
     <ClCompile Include="SparkleEffect.cpp" />
     <ClCompile Include="Text.cpp" />
-    <ClCompile Include="UIsprite.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -209,7 +208,6 @@
     <ClInclude Include="RenderState.h" />
     <ClInclude Include="SparkleEffect.h" />
     <ClInclude Include="Text.h" />
-    <ClInclude Include="UIsprite.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />

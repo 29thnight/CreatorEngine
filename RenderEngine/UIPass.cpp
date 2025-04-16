@@ -4,7 +4,6 @@
 #include "Mesh.h"
 #include "Scene.h"
 #include "../ScriptBinder/GameObject.h"
-#include "../ScriptBinder/UIComponent.h"
 #include "../ScriptBinder/UIManager.h"
 #include "../ScriptBinder/Canvas.h"
 UIPass::UIPass()
@@ -52,17 +51,19 @@ UIPass::UIPass()
 	m_UIBuffer = DirectX11::CreateBuffer(sizeof(UiInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
-void UIPass::Initialize(Texture* renderTargetView)
+void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
 {
 	m_renderTarget = renderTargetView;
+	m_spriteBatch = spriteBatch;
 }
 
 
 void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
+
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
-
+	m_spriteBatch->Begin();
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 	
@@ -74,15 +75,13 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 
 	
 	std::vector<Canvas*> canvases;
-	for (auto& Canvas2 : UIManagers->Canvases)
+	/*for (auto& Canvas2 : UIManagers->Canvases)
 	{
 		canvases.push_back(Canvas2->GetComponent<Canvas>());
 	}
 	std::sort(canvases.begin(), canvases.end(), [](Canvas* a, Canvas* b) {
 		return a->CanvasOrder < b->CanvasOrder;
-		});
-
-
+		});*/
 
 	for (auto& Canvases : UIManagers->Canvases)
 	{
@@ -91,23 +90,42 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 		for (auto& uiObj : canvas->UIObjs)
 		{
 			UIComponent* ui = uiObj->GetComponent<UIComponent>();
-			if (ui == nullptr) continue;
-			if (false == ui->IsEnabled()) continue;
-			_2DObjects.push_back(ui);
+			if (ui && ui->IsEnabled())
+			{
+				_2DObjects.push_back(ui);
+			}
+			TextComponent* text = uiObj->GetComponent<TextComponent>();
+			if (text && text->IsEnabled())
+			{
+				_TextObjects.push_back(text);
+			}
 		}
 	}
 
 
 	std::sort(_2DObjects.begin(), _2DObjects.end(), [](UIComponent* a, UIComponent* b) {
-		return a->_layerorder < b->_layerorder;
-		});
+		if (a->_layerorder != b->_layerorder)
+			return a->_layerorder < b->_layerorder;
 
+		// 동일한 layer일 경우, CanvasOrder 기준으로 비교
+		auto aCanvas = a->GetOwnerCanvas(); 
+		auto bCanvas = b->GetOwnerCanvas();
+
+		int aOrder = aCanvas ? aCanvas->CanvasOrder : 0;
+		int bOrder = bCanvas ? bCanvas->CanvasOrder : 0;
+
+		return aOrder < bOrder;
+		});
 
 	for (auto& Uiobject : _2DObjects)
 	{
 		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
 		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
 		Uiobject->m_UIMesh->Draw();
+	}
+	for (auto& Textobject : _TextObjects)
+	{
+		Textobject->Draw(m_spriteBatch);
 	}
 
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
@@ -117,6 +135,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
 	_2DObjects.clear();
+	m_spriteBatch->End();
 }
 
 bool UIPass::compareLayer(int  a, int  b)

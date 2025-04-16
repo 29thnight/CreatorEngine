@@ -66,25 +66,8 @@ void UIComponent::Update(float tick)
 	auto quat = m_pOwner->m_transform.rotation;
 	float pitch, yaw, roll;
 	Mathf::QuaternionToEular(quat, pitch,yaw,roll);
-	//DirectX::XMMATRIX rotMatrix = DirectX::XMMatrixRotationQuaternion(quat);
-
-	//// 2. 오일러 각 추출
-	//
-	//pitch = asinf(-rotMatrix.r[2].m128_f32[1]); // -m31
-
-	//if (cosf(pitch) > 0.0001f)
-	//{
-	//	yaw = atan2f(rotMatrix.r[2].m128_f32[0], rotMatrix.r[2].m128_f32[2]); // m13, m33
-	//	roll = atan2f(rotMatrix.r[0].m128_f32[1], rotMatrix.r[1].m128_f32[1]); // m21, m22
-	//}
-	//else
-	//{
-	//	yaw = atan2f(-rotMatrix.r[1].m128_f32[0], rotMatrix.r[0].m128_f32[0]); // -m12, m11
-	//	roll = 0.0f;
-	//}
-
 	rotat.z = roll;
-	float aspect = uiinfo.screenSize.y / uiinfo.screenSize.x; // 가로보다 세로가 얼마나 긴지
+	float aspect = uiinfo.screenSize.y / uiinfo.screenSize.x; 
 	Mathf::Matrix toSquare = Mathf::Matrix::CreateScale({ 1.0f, aspect, 1.0f });
 	Mathf::Matrix rotMat = Mathf::Matrix::CreateFromYawPitchRoll(0, 0, rotat.z);
 	Mathf::Matrix toOriginal = Mathf::Matrix::CreateScale({ 1.0f, 1.0f / aspect, 1.0f });

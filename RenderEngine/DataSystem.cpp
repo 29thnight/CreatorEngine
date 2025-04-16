@@ -8,7 +8,6 @@
 #include <ppl.h>
 #include "Benchmark.hpp"
 #include "ResourceAllocator.h"
-
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -264,6 +263,31 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
 
     return nullptr;
 }
+
+SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
+{
+	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();
+	std::wstring name = file::path(filePath).stem().wstring();
+
+	if (SFonts.find(name) != SFonts.end())
+	{
+		Debug->Log("Font already loaded");
+		return SFonts[name];
+	}
+
+	SpriteFont* SFont = new DirectX::SpriteFont(
+		DeviceState::g_pDevice,
+		destination.c_str()
+	);
+
+	SFonts[name] = (SFont);
+	return SFont;
+	
+
+
+	return nullptr;
+}
+
 
 
 void DataSystem::OpenContentsBrowser()

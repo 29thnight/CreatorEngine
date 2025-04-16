@@ -14,15 +14,25 @@ public:
 	std::shared_ptr<GameObject> MakeCanvas(const std::string_view& name = "Canvas");
 
 	//오브젝이름 / 파일경로 / 어느캔버스 기본0
-	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture, Mathf::Vector2 Pos = { 960,540 }, GameObject * canvas = nullptr);
-	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 }, GameObject* canvas = nullptr);
+	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
 	void CheckInput();
+
+	GameObject* FindCanvasName(std::string_view name);
+	void Update();
+	
+	void SortCanvas();
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
 	std::vector<GameObject*> Canvases;
+	//이정 캔버스
 	//현재 상호작용할 UI
 	GameObject* CurCanvas = nullptr;
 	GameObject* SelectUI = nullptr;
+
+	bool needSort = false;
 private:
 	
 	

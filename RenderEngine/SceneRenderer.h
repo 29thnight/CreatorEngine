@@ -19,7 +19,6 @@
 #include "Model.h"
 #include "Light.h"
 #include "Camera.h"
-#include "UIsprite.h"
 #include "UIPass.h"
 
 #include "LightMap.h"
@@ -27,7 +26,7 @@
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
 #include "EffectManager.h"
-
+#include <DirectXTK/SpriteBatch.h>
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -104,6 +103,8 @@ private:
 	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	lm::LightMap lightMap;
+
+	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

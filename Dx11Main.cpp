@@ -36,7 +36,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         //Mathf::Vector2 mousePos = InputManagement->GetMousePos();
         /*if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
           UIManagers->m_clickEvent.Broadcast(mousePos);*/
-		UIManagers->CheckInput();
+		UIManagers->Update();
         Sound->update();
     });
 

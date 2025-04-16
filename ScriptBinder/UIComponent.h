@@ -1,13 +1,12 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "ILifeSycle.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
 
 class Texture;
 class UIMesh;
-
+class Canvas;
 struct alignas(16) UiInfo
 {
 	Mathf::xMatrix world;
@@ -47,13 +46,15 @@ public:
 	{
 		m_IsEnabled = able;
 	}
-	//REQ_TEST[세환] : 세환아 이거 되는지 확인 좀 부탁할께
+
 	virtual void Update(float tick) override;
 
+	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
+	Canvas* GetOwnerCanvas() { return ownerCanvas;  }
 	void UpdateTexture();
 	void SetTexture(int index);
 	void SetOrder(int index) { _layerorder = index;}
-	
+
 	//다음 방향 오브젝트리턴
 	GameObject* GetNextNavi(Direction dir);
 
@@ -61,14 +62,15 @@ public:
 	//패드용 네비게이션
 	std::unordered_map<Direction, GameObject*> navigation;
 
-
 	//숫자가 클수록 젤위에보임
 	int _layerorder;
 	UiInfo uiinfo;
 	UIMesh* m_UIMesh{ nullptr };
 	Texture* m_curtexture{};
 	int curindex = 0;
-	
+
+	//text 사용 여부
+	bool hasText = false;
 	ReflectionField(UIComponent, PropertyAndMethod)
 	{
 		PropertyField
@@ -97,6 +99,7 @@ private:
 
 
 	int rotZ;
+	Canvas* ownerCanvas = nullptr;
 	std::vector<Texture*> textures;
 	
 

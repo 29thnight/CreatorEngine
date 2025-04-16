@@ -153,10 +153,10 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="UIButton.cpp" />
     <ClCompile Include="UIComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
-    <ClCompile Include="UICollider.cpp" />
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -179,12 +179,12 @@
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="TextComponent.h" />
     <ClInclude Include="UIButton.h" />
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="IUpdatable.h" />
-    <ClInclude Include="UICollider.h" />
     <ClInclude Include="UIManager.h" />
   </ItemGroup>
   <ItemGroup>

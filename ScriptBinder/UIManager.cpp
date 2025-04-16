@@ -3,7 +3,6 @@
 #include "Scene.h"
 #include "Canvas.h"
 #include "UIComponent.h"	
-#include "UICollider.h"
 #include "UIButton.h"
 #include "../InputManager.h"
 std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
@@ -13,126 +12,184 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
 	newObj->AddComponent<Canvas>();
 	Canvases.push_back(newObj.get());
 
+	needSort = true;
 	return newObj;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Texture* texture,Mathf::Vector2 Pos, GameObject* canvas)
+std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Texture* texture, GameObject* canvas,Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
+		MakeCanvas();
+	if (!canvas)
+		canvas = Canvases[0];
+
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	if(!canvasCom)
 	{
-		MakeCanvas("Main");
+		std::cout << "This Obj Not Canvas" << std::endl;
+		return nullptr;
 	}
-	int canvasIndex =0;
-	if(canvas)
-	{
-		for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-		{
-			if (Canvases[canvasIndex] == canvas)
-				break;
-		}
-	}
-	
-	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, Canvases[canvasIndex]->m_index);
+	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
 	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newImage->AddComponent<UIComponent>()->Load(texture);
-	Canvases[canvasIndex]->GetComponent<Canvas>()->AddUIObject(newImage.get());
+
+	canvasCom->AddUIObject(newImage.get());
+	
 
 	return newImage;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos, GameObject* canvas)
+std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos)
+{
+	if (Canvases.empty())
+		MakeCanvas(canvasname);
+	int canvasIndex = 0;
+
+	
+	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
+	{
+		if (Canvases[canvasIndex]->ToString() == canvasname)
+			break;
+	}
+
+	GameObject* canvas = FindCanvasName(canvasname);
+	if (canvas == nullptr)
+	{
+		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+		return nullptr;
+	}
+	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
+	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newImage->AddComponent<UIComponent>()->Load(texture);
+	canvas->GetComponent<Canvas>()->AddUIObject(newImage.get());
+
+	return newImage;
+}
+
+
+std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, GameObject* canvas, Mathf::Vector2 Pos)
 {
 
 	if (Canvases.empty())
-	{
 		MakeCanvas();
-	}
-	int canvasIndex = 0;
-	if (canvas)
+	if (!canvas)
+		canvas = Canvases[0];
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	if (!canvasCom)
 	{
-		for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
-		{
-			if (Canvases[canvasIndex] == canvas)
-				break;
-		}
+		std::cout << "This Obj Not Canvas" << std::endl;
+		return nullptr;
 	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, Canvases[canvasIndex]->m_index);
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<UIComponent>()->Load(texture);
-	newButton->AddComponent<UICollider>();
-	newButton->GetComponent<UICollider>()->SetCollider();
 	newButton->AddComponent<UIButton>(clickfun);
 
-	Canvases[canvasIndex]->GetComponent<Canvas>()->AddUIObject(newButton.get());
+	canvasCom->AddUIObject(newButton.get());
+
+	return newButton;
+}
+
+
+
+std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+{
+
+	if (Canvases.empty())
+		MakeCanvas(canvasname);
+	int canvasIndex = 0;
+	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
+	{
+		if (Canvases[canvasIndex]->ToString() == canvasname)
+			break;
+	}
+	GameObject* canvas = FindCanvasName(canvasname);
+	if (canvas == nullptr)
+	{
+		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+		return nullptr;
+	}
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
+	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
+	newButton->AddComponent<UIComponent>()->Load(texture);
+	newButton->AddComponent<UIButton>(clickfun);
+
+	canvas->GetComponent<Canvas>()->AddUIObject(newButton.get());
 
 	return newButton;
 }
 
 void UIManager::CheckInput()
 {
-	
+	if (CurCanvas == nullptr) return;
+	Canvas* curCanvas = CurCanvas->GetComponent<Canvas>();
 	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
-		for (auto& Canvases : Canvases)
+		for (auto& uiObj : curCanvas->UIObjs)
 		{
-			Canvas* canvas = Canvases->GetComponent<Canvas>();
-			if (false == canvas->IsEnabled()) continue;
-			for (auto& uiObj : canvas->UIObjs)
-			{
-				UIComponent* UI = uiObj->GetComponent<UIComponent>();
-				if (false == UI->IsEnabled()) continue;
-				UICollider* collider = uiObj->GetComponent<UICollider>();
-				if (collider == nullptr) continue;
-				if (collider->CheckClick(InputManagement->GetMousePos()) == false) continue;
-				UIButton* btn = uiObj->GetComponent<UIButton>();
-				if (btn == nullptr) continue;
-					btn->Click();
-					break;
-			}
+			UIComponent* UI = uiObj->GetComponent<UIComponent>();
+			if (false == UI->IsEnabled()) continue;
+			UIButton* btn = uiObj->GetComponent<UIButton>();
+			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
+			btn->Click();
+			break;
 		}
 	}
 
+	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
 	if (stickL.x > 0.5)
 	{
-		SelectUI = SelectUI->GetComponent<UIComponent>()->GetNextNavi(Direction::Right);
+		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<UIComponent>()->GetNextNavi(Direction::Right);
 	}
 	if (stickL.x < -0.5)
 	{
-		
-		SelectUI = SelectUI->GetComponent<UIComponent>()->GetNextNavi(Direction::Left);
+		curCanvas->SelectUI = curCanvas->SelectUI->GetComponent<UIComponent>()->GetNextNavi(Direction::Left);
 	}
 
 	if (InputManagement->IsControllerButtonReleased(0, ControllerButton::A))
 	{
-		if (SelectUI == nullptr) return;
-		SelectUI->GetComponent<UIButton>()->Click();
-	}
+		if (curCanvas->SelectUI == nullptr) return;
+		curCanvas->SelectUI->GetComponent<UIButton>()->Click();
+	}	
+}
 
-	//테스트용
-	if (InputManagement->IsControllerButtonReleased(0, ControllerButton::START_BUTTON))
+GameObject* UIManager::FindCanvasName(std::string_view name)
+{
+	for (auto& canvasObj : Canvases)
 	{
-		std::cout << "캔버스 켰음" << std::endl;
-		for (auto& Canvases : Canvases)
-		{
-			if (Canvases->ToString() == "setting")
-			{
-				Canvas* canvas = Canvases->GetComponent<Canvas>();
-				canvas->SetEnabled(true);
-			}
-		}
+		if (canvasObj && canvasObj->ToString() == name)
+			return canvasObj;
 	}
+	return nullptr;
+}
 
-	if (InputManagement->IsControllerButtonReleased(0, ControllerButton::BACK_BUTTON))
-	{
-		for (auto& Canvases : Canvases)
-		{
-			if (Canvases->ToString() == "setting")
-			{
-				Canvas* canvas = Canvases->GetComponent<Canvas>();
-				canvas->SetEnabled(false);
-			}
-		}
-	}
+void UIManager::Update()
+{
+	SortCanvas();
 	
+	for (int i = Canvases.size() -1; i >= 0; i--)
+	{
+		if (!Canvases[i]->GetComponent<Canvas>()->IsEnabled()) continue;
+		CurCanvas = Canvases[i];
+		break;
+	}
+	CheckInput();
+}
+
+void UIManager::SortCanvas()
+{
+	if(needSort == false)return;
+	else
+	{
+		std::sort(Canvases.begin(), Canvases.end(), [](GameObject* a, GameObject* b) {
+			auto aCanvas = a->GetComponent<Canvas>();
+			auto bCanvas = b->GetComponent<Canvas>();
+
+			if (aCanvas && bCanvas)
+				return aCanvas->CanvasOrder < bCanvas->CanvasOrder;
+			return false; // 정렬 기준 없음
+			});
+	}
+	needSort = false;
 }
