@@ -1,40 +1,58 @@
 m_sceneName: SampleScene
-m_buildIndex: ~
-Scene:
-  m_SceneObjects:
-    - GameObject:
-        m_name: SampleScene
-        m_instanceID: 725849226
-        m_childrenIndices: [1]
-        m_components: ~
-      m_index: 0
-      m_parentIndex: 0
-      m_rootIndex: 0
-    - GameObject:
-        m_name: plane
-        m_instanceID: 4059967748
-        m_childrenIndices: [2]
-        m_components: ~
-      m_index: 1
-      m_parentIndex: 0
-      m_rootIndex: 0
-    - GameObject:
-        m_name: RootNode
-        m_instanceID: 2314072073
-        m_childrenIndices: ~
-        m_components:
-          - MeshRenderer:
-              m_typeID: 659998325
-              m_instanceID: 3207898504
-            m_Material: ~
-            m_Mesh: ~
-            m_Animator: ~
-            m_LightMapping:
-              lightmapIndex: -1
-              ligthmapResolution: 0
-              lightmapScale: 1
-              lightmapOffset: ~
-              lightmapTiling: ~
-      m_index: 2
-      m_parentIndex: 1
-      m_rootIndex: 0
+m_buildIndex: 0
+m_SceneObjects:
+  - GameObject: 2166264123
+    m_name: SampleScene
+    m_instanceID: 2633640663
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+    m_index: 0
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [1]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: plane
+    m_instanceID: 972127140
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+    m_index: 1
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [2]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: RootNode
+    m_instanceID: 907287977
+    m_transform:
+      position: {x: 5.89591551, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+    m_index: 2
+    m_parentIndex: 1
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 3079321533
+        m_instanceID: 2803455564
+        m_Material:
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.272165537
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: Plane.001
+          m_materialIndex: 0
+          m_nodeName: ""
+        m_Animator: ~
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}

@@ -3,7 +3,7 @@
 Transform& Transform::SetScale(Mathf::Vector3 scale)
 {
 	m_dirty = true;
-	this->scale = scale;
+	this->scale = Mathf::Vector4(scale);
 
 	return *this;
 }
@@ -11,7 +11,7 @@ Transform& Transform::SetScale(Mathf::Vector3 scale)
 Transform& Transform::SetPosition(Mathf::Vector3 pos)
 {
 	m_dirty = true;
-	position = pos;
+	position = Mathf::Vector4(pos);
 
 	return *this;
 }
@@ -65,8 +65,15 @@ Mathf::xMatrix Transform::GetInverseMatrix() const
 
 void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 {
+	Mathf::xVector _scale{}, _rotation{}, _position{};
+
 	m_localMatrix = matrix;
-	DirectX::XMMatrixDecompose(&scale, &rotation, &position, m_localMatrix);
+	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, m_localMatrix);
+
+	XMStoreFloat4(&position, _position);
+	XMStoreFloat4(&scale, _scale);
+	XMStoreFloat4(&rotation, _rotation);
+
 	m_dirty = false;
 }
 
@@ -78,10 +85,6 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 	if (XMVectorGetX(determinant) != 0.0f)
 	{
 		m_inverseMatrix = XMMatrixInverse(&determinant, m_worldMatrix);
-	}
-	else
-	{
-		//throw std::exception("Inverse Matrix does not exist");
 	}
 }
 

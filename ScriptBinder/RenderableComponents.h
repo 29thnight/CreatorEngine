@@ -7,6 +7,8 @@
 #include "../RenderEngine/Texture.h"
 #include "../RenderEngine/Skeleton.h"
 
+constexpr uint32 MAX_BONES{ 512 };
+
 struct LightMapping 
 {
 	int lightmapIndex{ -1 };
@@ -33,22 +35,11 @@ struct LightMapping
 	}
 };
 
-constexpr uint32 MAX_BONES{ 512 };
-
-//class Mesh;
-//class Material;
-//class Texture;
-//class Skeleton;
 class Animator;
-class MeshRenderer : public Component, public IRenderable, public Meta::IReflectable<MeshRenderer>
+class MeshRenderer : public Component, public IRenderable
 {
 public:
 	GENERATED_BODY(MeshRenderer)
-
-	std::string ToString() const override 
-	{
-		return std::string("MeshRenderer");
-	}
 
 	bool IsEnabled() const override
 	{
@@ -83,18 +74,13 @@ private:
 	bool m_IsEnabled{ false };
 };
 
-class SpriteRenderer : public Component, public IRenderable, public Meta::IReflectable<SpriteRenderer>
+class SpriteRenderer : public Component, public IRenderable
 {
 public:
 	Texture* m_Sprite = nullptr;
 
 public:
 	GENERATED_BODY(SpriteRenderer)
-
-	std::string ToString() const override
-	{
-		return std::string("SpriteRenderer");
-	}
 
 	bool IsEnabled() const override
 	{
@@ -106,21 +92,21 @@ public:
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(SpriteRenderer)
+	ReflectionFieldInheritance(SpriteRenderer, Component)
 	{
 		PropertyField
 		({
 			meta_property(m_Sprite)
 		});
 
-		FieldEnd(SpriteRenderer, PropertyOnly)
+		FieldEnd(SpriteRenderer, PropertyOnlyInheritance)
 	}
 
 private:
 	bool m_IsEnabled = false;
 };
 
-class Animator : public Component, public IRenderable, public Meta::IReflectable<Animator>
+class Animator : public Component, public IRenderable
 {
 public:
 	Skeleton* m_Skeleton{ nullptr };
@@ -131,11 +117,6 @@ public:
 public:
 	GENERATED_BODY(Animator)
 
-	std::string ToString() const override
-	{
-		return std::string("Animator");
-	}
-
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
@@ -146,7 +127,7 @@ public:
 		m_IsEnabled = able;
 	}
 
-	ReflectionField(Animator)
+	ReflectionFieldInheritance(Animator, Component)
 	{
 		PropertyField
 		({
@@ -155,7 +136,7 @@ public:
 			meta_property(m_AnimIndexChosen)
 		});
 
-		FieldEnd(Animator, PropertyOnly)
+		FieldEnd(Animator, PropertyOnlyInheritance)
 	}
 
 private:

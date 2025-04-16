@@ -1,7 +1,9 @@
 #pragma once
-#include "ReflectionFunction.h"
+#include "ReflectionYml.h"
+#include "ReflectionImGuiHelper.h"
 
 #pragma region Reflection Macros
+#define EXPAND(x) x
 
 #define meta_default(T) { Meta::Register<T>(); }
 
@@ -18,8 +20,6 @@
 #define meta_property(member) Meta::MakeProperty(#member, &__Ty::member),
 #define meta_enum_property(member) Meta::MakeProperty(#member, &__Ty::member),
 #define meta_method(method, ...) Meta::MakeMethod(#method, &__Ty::method, { __VA_ARGS__ }),
-
-#define EXPAND(x) x
 
 #define PropertyAndMethod \
     static const Meta::Type type{ type_name.c_str(), properties, methods, nullptr, TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
@@ -49,12 +49,18 @@
         std::string type_name = #T;\
         EXPAND(Mecro) \
 
+#define REFLECTION_REGISTER() void RegisterReflect()
+
 #define AUTO_REGISTER_ENUM(EnumTypeName) \
     static const Meta::EnumAutoRegistrar<EnumTypeName> autoRegistrar_##EnumTypeName;
+
+#define AUTO_REGISTER_CLASS(ClassTypeName) \
+    Meta::Register<ClassTypeName>();
 
 #define GENERATED_BODY(T) \
     T() \
     { \
+        m_name = #T; \
         m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
     virtual ~T() = default; \

@@ -3,7 +3,7 @@
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Mesh.h"
 #include "Light.h"
 #include "LightProperty.h"

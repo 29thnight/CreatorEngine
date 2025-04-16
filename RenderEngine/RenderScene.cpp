@@ -2,7 +2,7 @@
 #include "ImGuiRegister.h"
 #include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
-#include "../ScriptBinder/Renderer.h"
+#include "../ScriptBinder/RenderableComponents.h"
 #include "Skeleton.h"
 #include "Light.h"
 #include "Benchmark.hpp"
@@ -136,7 +136,11 @@ void RenderScene::EditorSceneObjectHierarchy()
 
 		if (m_currentScene)
 		{
-			if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			if (0 == m_currentScene->m_SceneObjects.size())
+			{
+				ImGui::Text("No GameObject in Scene");
+			}
+			else if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				for (auto& obj : m_currentScene->m_SceneObjects)
 				{

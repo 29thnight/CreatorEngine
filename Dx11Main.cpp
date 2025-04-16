@@ -45,6 +45,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         OnGui();
     });
 
+    SceneManagers->ManagerInitialize();
 }
 
 DirectX11::Dx11Main::~Dx11Main()

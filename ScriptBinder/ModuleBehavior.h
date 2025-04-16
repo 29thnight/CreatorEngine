@@ -29,8 +29,4 @@ public:
 	virtual void OnCollisionExit(ICollider* other) {};
 	virtual void Update(float tick) {};
 	virtual void LateUpdate(float tick) {};
-
-public:
-	// IComponent을(를) 통해 상속됨
-	std::string ToString() const override = 0;
 };

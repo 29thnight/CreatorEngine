@@ -3,18 +3,15 @@
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
+#include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"
 
 class LightComponent : public Component, public IRenderable
 {
 public:
-    LightComponent() meta_default(LightComponent)
-    ~LightComponent() = default;
-    std::string ToString() const override
-    {
-        return std::string("LightComponent");
-    }
+	GENERATED_BODY(LightComponent)
+
     bool IsEnabled() const override
     {
         return m_IsEnabled;
@@ -26,7 +23,7 @@ public:
 
     void UpdateLight()
     {
-        Light& light = GameObject::m_pScene->GetLightProperties().m_lights[m_lightIndex];
+        Light& light = SceneManagers->GetActiveScene()->GetLightProperties().m_lights[m_lightIndex];
         light.m_position = m_position;
         light.m_direction = m_direction;
         light.m_color = m_color;
@@ -54,30 +51,30 @@ public:
     LightStatus m_lightStatus{ Enabled };
     float m_intencity{ 5.f };
 
-    static const Meta::Type& Reflect()
-    {
-        static const Meta::MetaProperties<10> properties
-        {
-            Meta::MakeProperty("m_position", &LightComponent::m_position),
-            Meta::MakeProperty("m_direction", &LightComponent::m_direction),
-            Meta::MakeProperty("m_color", &LightComponent::m_color),
-            Meta::MakeProperty("m_constantAttenuation", &LightComponent::m_constantAttenuation),
-            Meta::MakeProperty("m_linearAttenuation", &LightComponent::m_linearAttenuation),
-            Meta::MakeProperty("m_quadraticAttenuation", &LightComponent::m_quadraticAttenuation),
-            Meta::MakeProperty("m_spotLightAngle", &LightComponent::m_spotLightAngle),
-            Meta::MakeProperty("m_lightType", &LightComponent::m_lightType),
-            Meta::MakeProperty("m_lightStatus", &LightComponent::m_lightStatus),
-            Meta::MakeProperty("m_intencity", &LightComponent::m_intencity)
-        };
+    ReflectionFieldInheritance(LightComponent, Component)
+	{
+		PropertyField
+		({
+			meta_property(m_lightIndex)
+			meta_property(m_position)
+			meta_property(m_direction)
+			meta_property(m_color)
+			meta_property(m_constantAttenuation)
+			meta_property(m_linearAttenuation)
+			meta_property(m_quadraticAttenuation)
+			meta_property(m_spotLightAngle)
+			meta_property(m_lightType)
+			meta_property(m_lightStatus)
+			meta_property(m_intencity)
+		});
 
-        static const Meta::Type type
-        {
-            "LightComponent",
-            properties
-        };
+		MethodField
+		({
+			meta_method(UpdateLight)
+		});
 
-        return type;
-    }
+		FieldEnd(LightComponent, PropertyAndMethodInheritance)
+	}
 
 private:
     bool m_IsEnabled{ false };

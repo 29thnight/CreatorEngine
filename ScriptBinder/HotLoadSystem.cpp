@@ -95,10 +95,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		scriptFile 
 			<< scriptIncludeString 
 			<< name 
-			<< scriptBodyString 
-			<< scriptToStringFunString 
-			<< name 
-			<< scriptToStringEndString 
+			<< scriptBodyString
 			<< scriptEndString;
 
 		scriptFile.close();

@@ -56,6 +56,45 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	return m_SceneObjects[index];
 }
 
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+{
+    if (name.empty())
+    {
+        return nullptr;
+    }
+
+    if (parentIndex >= m_SceneObjects.size())
+    {
+        parentIndex = 0;
+    }
+
+    std::string uniqueName = GenerateUniqueGameObjectName(name);
+
+    GameObject::Index index = m_SceneObjects.size();
+    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    if (nullptr == ptr)
+    {
+        return nullptr;
+    }
+
+    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
+        {
+            if (obj)
+            {
+                ObjectPool::Deallocate(obj);
+            }
+        });
+
+    m_SceneObjects.push_back(newObj);
+    auto parentObj = GetGameObject(parentIndex);
+    if (parentObj->m_index != index)
+    {
+        parentObj->m_childrenIndices.push_back(index);
+    }
+
+    return m_SceneObjects[index];
+}
+
 std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 {
 	if (index < m_SceneObjects.size())

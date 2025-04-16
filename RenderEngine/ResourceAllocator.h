@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModelLoader.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 
 class ResourceAllocator : public Singleton<ResourceAllocator>
 {

@@ -6,7 +6,7 @@
 #include "RenderScene.h"
 #include "../ScriptBinder/SceneManager.h"
 #include "../ScriptBinder/Scene.h"
-#include "../ScriptBinder/Renderer.h"
+#include "../ScriptBinder/RenderableComponents.h"
 #include "../ScriptBinder/SpriteComponent.h"
 #include "DataSystem.h"
 #include "RenderState.h"
@@ -1010,6 +1010,10 @@ void SceneRenderer::EditorView()
 				{
 					//Test
 					SceneManagers->SaveScene();
+				}
+				if (ImGui::MenuItem("Load Scene"))
+				{
+					SceneManagers->LoadScene();
 				}
                 if (ImGui::MenuItem("Exit"))
                 {

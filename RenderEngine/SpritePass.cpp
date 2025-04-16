@@ -1,7 +1,7 @@
 #include "SpritePass.h"
 #include "ShaderSystem.h"
 #include "RenderScene.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Scene.h"
 
 SpritePass::SpritePass()

@@ -119,7 +119,6 @@ namespace Meta
     };
 
     static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
-
     using FactoryFunction = std::function<void*()>;
 
     class FactoryRegistry : public Singleton<FactoryRegistry>
@@ -130,7 +129,7 @@ namespace Meta
         template<typename T>
         void Register()
         {
-            _factories[ToString<T>()] = []() -> void*
+            _factories[ToString<T>()] = []() -> T*
             {
                 if constexpr (requires { T::Create(); }) // 커스텀 메모리풀 지원
                 {
@@ -149,6 +148,17 @@ namespace Meta
             return (it != _factories.end()) ? it->second() : nullptr;
         }
 
+		template<typename T>
+		T* Create(const std::string& typeName)
+		{
+			auto it = _factories.find(typeName);
+			if (it != _factories.end())
+			{
+				return static_cast<T*>(it->second());
+			}
+			return nullptr;
+		}
+
     private:
         std::unordered_map<std::string, FactoryFunction> _factories;
     };
@@ -164,4 +174,16 @@ namespace Meta
             MetaEnumRegistry->Register(enumType.name, enumType);
         }
     };
+
+	template <typename T>
+	struct ClassAutoRegistrar
+	{
+		ClassAutoRegistrar()
+		{
+			auto type = T::Reflect();
+			MetaDataRegistry->Register(type.name, type);
+			TypeCast->RegisterSharedPtr<T>();
+			TypeCast->Register<T>();
+		}
+	};
 }

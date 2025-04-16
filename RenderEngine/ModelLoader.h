@@ -6,7 +6,7 @@
 #include "Scene.h"
 #include "Skeleton.h"
 #include "SkeletonLoader.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 
 class ModelLoader
 {

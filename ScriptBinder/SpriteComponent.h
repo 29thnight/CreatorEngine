@@ -12,22 +12,16 @@ cbuffer UiInfo
 	Mathf::xMatrix world;
 	float2 size;
 	float2 screenSize;
- 
 };
 
 //모든 2d이미지 기본?
-class SpriteComponent : public Component, public IRenderable, public IUpdatable<SpriteComponent>, public Meta::IReflectable<SpriteComponent>
+class SpriteComponent : public Component, public IRenderable, public IUpdatable, public Meta::IReflectable<SpriteComponent>
 {
 public:
 	SpriteComponent();
 	~SpriteComponent() = default;
 
 	void Load(std::string_view filepath);
-
-	std::string ToString() const override
-	{
-		return std::string("SpriteComponent");
-	}
 
 	bool IsEnabled() const override
 	{
@@ -51,7 +45,7 @@ public:
 	Texture* m_curtexture{};
 	int curindex = 0;
 	
-	ReflectionField(SpriteComponent)
+	ReflectionFieldInheritance(SpriteComponent, Component)
 	{
 		PropertyField
 		({
@@ -66,7 +60,7 @@ public:
 			meta_method(UpdateTexture)
 		});
 
-		FieldEnd(SpriteComponent, PropertyAndMethod)
+		FieldEnd(SpriteComponent, PropertyAndMethodInheritance)
 	};
 private:
 	bool m_IsEnabled =true;

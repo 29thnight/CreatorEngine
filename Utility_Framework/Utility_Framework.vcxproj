@@ -53,6 +53,7 @@
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
+    <ClInclude Include="ReflectionImGuiHelper.h" />
     <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />

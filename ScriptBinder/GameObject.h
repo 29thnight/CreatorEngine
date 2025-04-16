@@ -25,8 +25,9 @@ public:
 		TypeMax
 	};
 
-	GameObject() = default;
+	GameObject();
 	GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
@@ -35,7 +36,7 @@ public:
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
 
-	void AddComponent(Meta::Type& type);
+	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 
 	template<typename T>
 	T* AddComponent();
@@ -79,6 +80,7 @@ public:
     {
         PropertyField
         ({
+			meta_property(m_transform)
             meta_property(m_index)
             meta_property(m_parentIndex)
             meta_property(m_rootIndex)
@@ -89,14 +91,13 @@ public:
         FieldEnd(GameObject, PropertyOnlyInheritance)
     }
 
+	friend class SceneManager;
 	friend class RenderScene;
 	friend class ModelLoader;
 	friend class HotLoadSystem;
 
 private:
 	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
-	
-	HashedGuid m_typeID{ TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	
 	HashingString m_tag{};

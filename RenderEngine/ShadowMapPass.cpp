@@ -3,7 +3,7 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Light.h"
 
 ShadowMapPass::ShadowMapPass()

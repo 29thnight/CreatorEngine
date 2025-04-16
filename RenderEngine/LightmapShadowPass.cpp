@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 
 LightmapShadowPass::LightmapShadowPass() {
 	m_pso = std::make_unique<PipelineStateObject>();

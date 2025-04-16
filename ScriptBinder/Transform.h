@@ -2,12 +2,12 @@
 #include "../Utility_Framework/Core.Minimal.h"
 
 class RenderScene;
-struct Transform
+struct Transform : public Meta::IReflectable<Transform>
 {
 public:
-	Mathf::xVector position{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::xVector rotation{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::xVector scale{ 1.f, 1.f, 1.f, 1.f };
+	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
+	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
+	Mathf::Vector4 scale{ 1.f, 1.f, 1.f, 1.f };
 
 	Transform& SetScale(Mathf::Vector3 scale);
 	Transform& SetPosition(Mathf::Vector3 pos);
@@ -25,6 +25,17 @@ public:
 	Mathf::xVector GetWorldPosition() const;
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
+
+	ReflectionField(Transform)
+	{
+		PropertyField
+		({
+			meta_property(position)
+			meta_property(rotation)
+			meta_property(scale)
+		});
+		FieldEnd(Transform, PropertyOnly)
+	}
 
 private:
 	friend class RenderScene;

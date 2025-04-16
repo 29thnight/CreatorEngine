@@ -80,7 +80,7 @@ public:
 		PropertyField
 		({
 			meta_property(m_materialInfo)
-			meta_enum_property(m_renderingMode)
+			meta_property(m_renderingMode)
 		});
 
 		FieldEnd(Material, PropertyOnly)

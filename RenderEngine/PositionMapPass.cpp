@@ -3,7 +3,8 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
+
 struct alignas(16) PositionMapBuffer
 {
 	int positionMapWidth;

@@ -3,7 +3,7 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Skeleton.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Scene.h"
 #include "GameObject.h"
 #include "Material.h"

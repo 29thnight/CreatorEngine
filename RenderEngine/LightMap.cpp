@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "LightProperty.h"
 #include "Light.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "RenderScene.h"
 #include "Material.h"
 #include "Core.Random.h"

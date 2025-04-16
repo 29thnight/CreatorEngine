@@ -50,8 +50,9 @@ namespace Meta
         Meta::SetterType      setter;
         bool                  isPointer;
         Meta::OffsetType      offset;
+		HashedGuid		      typeID;
 
-        //TODO: vector 처리 전용 프로퍼티가 따로 있어야함.
+        //TODO: vector 처리 전용 프로퍼티가 따로 있어야 할거 같음.
         bool                    isVector = false;
         const Meta::TypeInfo&   elementTypeInfo;
         VectorIteratorFunc      createVectorIterator;

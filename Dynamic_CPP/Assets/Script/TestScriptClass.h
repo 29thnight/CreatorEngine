@@ -15,8 +15,4 @@ public:
 	virtual void OnCollisionExit(ICollider* other) override;
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override;
-	std::string ToString() const override
-	{
-		return "TestScriptClass";
-	}
 };

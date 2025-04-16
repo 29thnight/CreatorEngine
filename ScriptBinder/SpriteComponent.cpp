@@ -7,6 +7,7 @@
 
 SpriteComponent::SpriteComponent()
 {
+	m_name = "SpriteComponent";
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<SpriteComponent>();
 	m_UIMesh = new UIMesh();
 }
@@ -27,7 +28,7 @@ void SpriteComponent::SetTexture(int index)
 
 void SpriteComponent::Update(float tick)
 {
-	pos = m_pOwner->m_transform.position;
+	pos = Mathf::Vector3(m_pOwner->m_transform.position);
 
 	uiinfo.screenSize = { DirectX11::GetWidth(), DirectX11::GetHeight() };
 	float ndcX = (pos.x / uiinfo.screenSize.x) * 2.0f - 1.0f;
@@ -37,7 +38,7 @@ void SpriteComponent::Update(float tick)
 	float scaleX = (uiinfo.size.x / uiinfo.screenSize.x) * 2.0f;
 	float scaleY = (uiinfo.size.y / uiinfo.screenSize.y) * 2.0f;
 	scale = { scaleX, scaleY, 1 };
-	Mathf::Vector3 parentscale = m_pOwner->m_transform.scale;
+	Mathf::Vector3 parentscale = Mathf::Vector3(m_pOwner->m_transform.scale);
 	scale *= parentscale;
 
 

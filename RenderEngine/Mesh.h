@@ -55,7 +55,7 @@ class ModelLoader;
 class Mesh
 {
 public:
-	Mesh() = default;
+	Mesh() meta_default(Mesh)
 	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
@@ -63,16 +63,28 @@ public:
 	void Draw();
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
-	const std::string& GetName() { return m_name; }
+	const std::string& GetName() { return m_name.ToString(); }
+
+	ReflectionField(Mesh)
+	{
+		PropertyField
+		({
+			meta_property(m_name)
+			meta_property(m_materialIndex)
+			meta_property(m_nodeName)
+		});
+		FieldEnd(Mesh, PropertyOnly)
+	}
+
 private:
 	friend class ModelLoader;
-	std::string m_name;
+	friend class Meta::Property;
+	HashingString m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
 	uint32 m_materialIndex{};
-	//Mathf::Matrix m_transform{ XMMatrixIdentity() };
 
-	std::string m_nodeName;
+	HashingString m_nodeName;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
@@ -158,8 +170,6 @@ struct UIvertex
 	DirectX::XMFLOAT3 position;
 	DirectX::XMFLOAT2 texCoord;
 };
-
-
 
 class UIMesh
 {

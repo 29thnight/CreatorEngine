@@ -4,7 +4,8 @@
 #include "TypeTrait.h"
 #include "HashingString.h"
 
-class Object : public IObject, public Meta::IReflectable<Object>
+class SceneManager;
+class Object : public IObject
 {
 public:
     Object() = default;
@@ -12,11 +13,16 @@ public:
 
 public:
     Object(const std::string_view& name) : m_name(name.data()) {}
+	Object(const std::string_view& name, size_t instanceID) : m_name(name.data()), m_instanceID(instanceID) 
+    {
+		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
+    }
     Object(const Object&) = delete;
     Object(Object&&) = delete;
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
+	HashedGuid GetTypeID() const override final { return m_typeID; }
     std::string ToString() const override final { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
 
@@ -38,6 +44,8 @@ public:
     }
 
 protected:
+    friend SceneManager;
+	HashedGuid        m_typeID{ TypeTrait::GUIDCreator::GetTypeID<Object>() };
     HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
     HashingString     m_name{ "Object" };
     std::atomic<bool> m_destroyMark{ false };

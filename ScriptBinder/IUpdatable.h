@@ -3,7 +3,6 @@
 #include "SceneManager.h"
 #include "Scene.h"
 
-template<typename T>
 interface IUpdatable
 {
     IUpdatable()

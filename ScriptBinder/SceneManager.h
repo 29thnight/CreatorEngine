@@ -11,6 +11,7 @@ private:
     ~SceneManager() = default;
 
 public:
+	void ManagerInitialize();
     void Editor();
     void Initialization();
     void Physics(float deltaSecond);
@@ -28,7 +29,7 @@ public:
 
     Scene* CreateScene(const std::string_view& name = "SampleScene");
 	Scene* SaveScene(const std::string_view& name = "SampleScene", bool isAsync = false);
-    Scene* LoadScene(const std::string_view& name, bool isAsync = false);
+    Scene* LoadScene(const std::string_view& name = "SampleScene", bool isAsync = false);
 
     void AddDontDestroyOnLoad(Object* objPtr);
 
