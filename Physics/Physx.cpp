@@ -348,6 +348,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic = false)
 
 	return out;
 }
+//==========================================================================================
+//rigid body
 
 void PhysicX::CreateStaticBody(const BoxColliderInfo & info, const EColliderType & colliderType, int* collisionMatrix)
 {
@@ -798,6 +800,190 @@ void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxAct
 	}
 	//등록된 리지드 바디 삭제
 	m_updateActors.clear();
+}
+
+//==============================================
+//케릭터 컨트롤러
+
+void PhysicX::CreateCCT(const CharacterControllerInfo& controllerInfo, const CharacterMovementInfo& movementInfo)
+{
+	m_waittingCCTList.push_back(std::make_pair(controllerInfo, movementInfo));
+}
+
+void PhysicX::RemoveCCT(const unsigned int& id)
+{
+	auto controllerIter = m_characterControllerContainer.find(id);
+	if (controllerIter!= m_characterControllerContainer.end()) {
+		m_characterControllerContainer.erase(controllerIter);
+	}
+}
+
+void PhysicX::RemoveAllCCT()
+{
+	m_characterControllerContainer.clear();
+	m_updateCCTList.clear();
+	m_waittingCCTList.clear();
+}
+
+void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
+{
+	if (m_characterControllerContainer.find(info.id) == m_characterControllerContainer.end())
+	{
+		return;
+	}
+
+	CharacterController* controller = m_characterControllerContainer[info.id];
+	controller->AddMovementInput(info.input, info.isDynamic);
+}
+
+CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
+{
+	CharacterControllerGetSetData data;
+	if (m_characterControllerContainer.find(id) == m_characterControllerContainer.end())
+	{
+		auto& controller = m_characterControllerContainer[id];
+		physx::PxController* pxController = controller->GetController();
+
+		controller->GetPosition(data.position);
+	}
+	else {
+		for (auto& [controller, movement] : m_updateCCTList) {
+			if (controller.id == id)
+			{
+				data.position = controller.position;
+			}
+		}
+
+		for (auto& [controller, movement]:m_waittingCCTList)
+		{
+			if (controller.id == id)
+			{
+				data.position = controller.position;
+			}
+		}
+
+	}	
+	return data;
+}
+
+CharacterMovementGetSetData PhysicX::GetMovementData(const unsigned int& id)
+{
+	CharacterMovementGetSetData data;
+	if (m_characterControllerContainer.find(id) == m_characterControllerContainer.end())
+	{
+		auto& controller = m_characterControllerContainer[id];
+		CharacterMovement* movement = controller->GetCharacterMovement();
+		
+		data.velocity = movement->GetOutVector();
+		data.isFall = movement->GetIsFall();
+		data.maxSpeed = movement->GetMaxSpeed();
+		
+	}
+
+	return data;
+}
+
+void PhysicX::SetCCTData(const unsigned int& id,const CharacterControllerGetSetData& controllerData)
+{
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
+	{
+		auto& controller = m_characterControllerContainer[id];
+		physx::PxController* pxController = controller->GetController();
+
+		m_characterControllerContainer[id]->ChangeLayerNumber(controllerData.LayerNumber, m_collisionMatrix);
+		controller->SetPosition(controllerData.position);
+	}
+	else {
+		for (auto& [controller, movement] : m_updateCCTList) {
+			if (controller.id == id)
+			{
+				controller.position = controllerData.position;
+			}
+		}
+		for (auto& [controller, movement] : m_waittingCCTList)
+		{
+			if (controller.id == id)
+			{
+				controller.position = controllerData.position;
+			}
+		}
+	}
+
+}
+
+void PhysicX::SetMovementData(const unsigned int& id,const CharacterMovementGetSetData& movementData)
+{
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end()) {
+		auto& controller = m_characterControllerContainer[id];
+		CharacterMovement* movement = controller->GetCharacterMovement();
+
+		controller->SetMoveRestrct(movementData.restrictDirection);
+		movement->SetIsFall(movementData.isFall);
+		movement->SetVelocity(movementData.velocity);
+		movement->SetMaxSpeed(movementData.maxSpeed);
+		movement->SetAcceleration(movementData.acceleration);
+	}
+}
+
+//===================================================
+//케릭터 관절 정보 -> 레그돌
+
+void PhysicX::CreateCharacterInfo(const ArticulationInfo& info)
+{
+	if (m_ragdollContainer.find(info.id) != m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::CreateCharacterInfo() : id is already exist id :" + std::to_string(info.id));
+		return;
+	}
+
+	RagdollPhysics* ragdoll = new RagdollPhysics();
+	CollisionData* collisionData = new CollisionData();
+
+	collisionData->thisId = info.id;
+	collisionData->thisLayerNumber = info.layerNumber;
+
+	m_collisionDataContainer.insert(std::make_pair(info.id, collisionData));
+
+	ragdoll->Initialize(info, m_physics, collisionData);
+
+}
+
+void PhysicX::RemoveCharacterInfo(const unsigned int& id)
+{
+}
+
+void PhysicX::RemoveAllCharacterInfo()
+{
+}
+
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const Mathf::Vector3& extent)
+{
+}
+
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& radius)
+{
+}
+
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& halfHeight, const float& radius)
+{
+}
+
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info)
+{
+}
+
+ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
+{
+	return ArticulationGetData();
+}
+
+void PhysicX::SetArticulationData(const unsigned int& id, const ArticulationSetData& articulationData)
+{
+}
+
+unsigned int PhysicX::GetArticulationCount()
+{
+	return 0;
 }
 
 void PhysicX::PostUpdate() {}

@@ -40,6 +40,9 @@
     <Filter Include="Character">
       <UniqueIdentifier>{16c9c28e-1d20-40ec-95e6-09bb9b963213}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Ragdoll">
+      <UniqueIdentifier>{bd9da527-b3aa-4d7a-b70f-79094c5fe763}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -102,6 +105,18 @@
     <ClInclude Include="CharacterController.h">
       <Filter>Character</Filter>
     </ClInclude>
+    <ClInclude Include="CharacterMovement.h">
+      <Filter>Character</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollPhysics.h">
+      <Filter>Ragdoll</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollJoint.h">
+      <Filter>Ragdoll</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollLink.h">
+      <Filter>Ragdoll</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Physics.cpp">
@@ -148,6 +163,18 @@
     </ClCompile>
     <ClCompile Include="CharacterController.cpp">
       <Filter>Character</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterMovement.cpp">
+      <Filter>Character</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollPhysics.cpp">
+      <Filter>Ragdoll</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollJoint.cpp">
+      <Filter>Ragdoll</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollLink.cpp">
+      <Filter>Ragdoll</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

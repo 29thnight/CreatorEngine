@@ -11,7 +11,8 @@
 #include "PhysicsCommon.h"
 #include "StaticRigidBody.h"
 #include "DynamicRigidBody.h"
-
+#include "CharacterController.h"
+#include "RagdollPhysics.h"
 
 class PhysicsBufferPool {
 public:
@@ -109,36 +110,39 @@ public:
 	//==============================================
 	//케릭터 컨트롤러
 	//생성
-	void CreateCCT();
+	void CreateCCT(const CharacterControllerInfo& controllerInfo,const CharacterMovementInfo& movementInfo);
 	//삭제
-	void RemoveCCT();
+	void RemoveCCT(const unsigned int& id);
 	//전체 삭제
 	void RemoveAllCCT();
 	//입력값 추가
-	void AddInputMove();
+	void AddInputMove(const CharactorControllerInputInfo& info);
 	//getter setter
-	void GetCCTData();
-	void GetMovementData();
-	void SetCCTData();
-	void SetMovementData();
+	CharacterControllerGetSetData GetCCTData(const unsigned int& id);
+	CharacterMovementGetSetData GetMovementData(const unsigned int& id);
+	void SetCCTData(const unsigned int& id ,const CharacterControllerGetSetData& controllerData);
+	void SetMovementData(const unsigned int& id,const CharacterMovementGetSetData& movementData);
 	//===================================================
 	//케릭터 관절 정보 -> 레그돌
 	//추가
-	void CreateCharacterInfo();
+	void CreateCharacterInfo(const ArticulationInfo& info);
 	//삭제
-	void RemoveCharacterInfo();
+	void RemoveCharacterInfo(const unsigned int& id);
 	//모두삭제 
 	void RemoveAllCharacterInfo();
 
 	//관절에 링크 및 조인트 추가
-	void AddArticulationLink();
+	void AddArticulationLink(unsigned int id, LinkInfo& info, const Mathf::Vector3& extent);
+	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& radius);
+	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& halfHeight,const float& radius);
+	void AddArticulationLink(unsigned int id, LinkInfo& info);
 
 	//getter setter
-	void GetArticulationData();
-	void SetArticulationData();
+	ArticulationGetData GetArticulationData(const unsigned int& id);
+	void SetArticulationData(const unsigned int& id, const ArticulationSetData& articulationData);
 
 	//생성된 관절 겟수 반환
-	void GetArticulationCount();
+	unsigned int GetArticulationCount();
 	//==========================================================
 	//use Cuda PxDeformableSurface
 	/*void CreateDeformableSurface();
@@ -180,6 +184,8 @@ private:
 	physx::PxMaterial* m_defaultMaterial = nullptr;
 
 	physx::PxControllerManager* m_controllerManager = nullptr;
+	
+	int m_collisionMatrix[32];
 
 	//==================================================================================
 	//rigid body 관리용
@@ -195,6 +201,15 @@ private:
 	//character controller 관리용
 	physx::PxControllerManager* m_characterControllerManager;
 	std::unordered_map<unsigned int, CharacterController*> m_characterControllerContainer; //character controller 관리용
+
+	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_waittingCCTList; //대기중인 캐릭터 컨트롤러 리스트
+	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_updateCCTList; //업데이트 할 캐릭터 컨트롤러 리스트
+
+	//==================================================================================
+	//Ragdoll 관리용
+	std::unordered_map<unsigned int, RagdollPhysics*> m_ragdollContainer; //ragdoll 관리용
+	std::unordered_map<unsigned int, RagdollPhysics*> m_simulationRagdollContainer; //ragdoll 시뮬레이션 관리용
+
 
 
 public:

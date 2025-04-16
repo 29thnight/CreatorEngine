@@ -151,6 +151,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CharacterController.h" />
+    <ClInclude Include="CharacterMovement.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="ConvexMeshResource.h" />
     <ClInclude Include="DynamicRigidBody.h" />
@@ -166,6 +167,9 @@
     <ClInclude Include="PhysicsHelper.h" />
     <ClInclude Include="PhysicsInfo.h" />
     <ClInclude Include="Physx.h" />
+    <ClInclude Include="RagdollJoint.h" />
+    <ClInclude Include="RagdollLink.h" />
+    <ClInclude Include="RagdollPhysics.h" />
     <ClInclude Include="ResourceBase.h" />
     <ClInclude Include="RigidBody.h" />
     <ClInclude Include="StaticRigidBody.h" />
@@ -173,6 +177,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CharacterController.cpp" />
+    <ClCompile Include="CharacterMovement.cpp" />
     <ClCompile Include="Common.cpp" />
     <ClCompile Include="ConvexMeshResource.cpp" />
     <ClCompile Include="DynamicRigidBody.cpp" />
@@ -188,6 +193,9 @@
     <ClCompile Include="PhysicsEventCallback.cpp" />
     <ClCompile Include="PhysicsHelper.cpp" />
     <ClCompile Include="Physx.cpp" />
+    <ClCompile Include="RagdollJoint.cpp" />
+    <ClCompile Include="RagdollLink.cpp" />
+    <ClCompile Include="RagdollPhysics.cpp" />
     <ClCompile Include="ResourceBase.cpp" />
     <ClCompile Include="RigidBody.cpp" />
     <ClCompile Include="StaticRigidBody.cpp" />
