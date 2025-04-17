@@ -11,11 +11,11 @@ public:
 	bool Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink,physx::PxArticulationReducedCoordinate* pxArtriculation);
 	bool Update();
 
-	physx::PxShape* CreateShape(const LinkInfo& linkInfo, int* collisionMatrix, const float& halfHeight, const float& radius);
-	physx::PxShape* CreateShape(const LinkInfo& linkInfo, int* collisionMatrix, const float& radius);
-	physx::PxShape* CreateShape(const LinkInfo& linkInfo, int* collisionMatrix, const Mathf::Vector3& extent);
+	physx::PxShape* CreateShape(physx::PxMaterial* material, const Mathf::Vector3& extent, CollisionData* collisionData);
+	physx::PxShape* CreateShape(physx::PxMaterial* material, const float& radius, const float& halfHeight, CollisionData* collisionData);
+	physx::PxShape* CreateShape(physx::PxMaterial* material, const float& radius, CollisionData* collisionData);
 
-	bool ChangeLayerNumber(const unsigned int& newLayerNumber, int* collisionMatrix);
+	bool ChangeLayerNumber(const physx::PxFilterData& fillterData, CollisionData* collisionData);
 
 	inline physx::PxArticulationLink* GetPxLink() { return m_pxLink; }
 	inline const std::string& GetName() const { return m_name; }

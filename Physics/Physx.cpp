@@ -17,15 +17,9 @@
 #include "ICollider.h"
 #include <cuda_runtime.h>
 
-static PhysicsEventCallback eventCallback;
+
 
 // block(default), player, enemy, interact
-bool collisionMatrix[4][4] = {
-	{true, true, true, true},
-	{true, true, true, true},
-	{true, true, false, false},
-	{true, true, false, false}
-};
 
 bool intersectionMatrix[3][3] = {
 	{1, 1, 1},
@@ -43,9 +37,9 @@ PxFilterFlags CustomFilterShader(
 	int group0 = fd0.word0;
 	int group1 = fd1.word0;
 
-	if (!collisionMatrix[group0][group1]) {
-		return PxFilterFlag::eSUPPRESS; 
-	}
+	//if (!collisionMatrix[group0][group1]) {
+	//	return PxFilterFlag::eSUPPRESS; 
+	//}
 
 
 	pairFlags = PxPairFlag::eCONTACT_DEFAULT;
@@ -134,151 +128,31 @@ void PhysicX::Initialize()
 
 	m_controllerManager = PxCreateControllerManager(*m_scene);
 }
+//void PhysicX::HasConvexMeshResource(const unsigned int& hash)
+//{
+//	
+//}
+void PhysicX::RemoveActors()
+{
+	for (auto removeActor : m_removeActorList)
+	{
+		m_scene->removeActor(*removeActor);
+	}
+	m_removeActorList.clear();
+}
 void PhysicX::UnInitialize() {
 	if (m_foundation) m_foundation->release();
 }
 
-void PhysicX::PreUpdate() {}
 
 
 
-void PhysicX::ReadPhysicsData()
-{
-	PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
-
-	// 
-	PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
-	std::vector<PxActor*> actors(curActorCount);
-	m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
-	auto& writeBuffer = bufferPool.GetWriteBuffer();
-	writeBuffer.resize(curActorCount);
-
-	for (int i = 0; i < curActorCount; i++) {
-		auto dynamicActor = static_cast<PxRigidDynamic*>(actors[i]);
-		IRigidbody* rb = static_cast<IRigidbody*>(actors[i]->userData);
-
-		RigidbodyInfo* info = rb->GetInfo();
-
-		if (info->isCharacterController) continue;
-
-		//if (info->changeflag == false) continue;  //
-		//info->changeflag = false;                 // 
-
-		// 
-		dynamicActor->setMass(info->mass);
-		dynamicActor->setLinearDamping(info->drag);
-		dynamicActor->setAngularDamping(info->angularDrag);
-		dynamicActor->setCMassLocalPose(PxTransform(info->centerOfMass[0], info->centerOfMass[1], info->centerOfMass[2]));
-		dynamicActor->setActorFlag(PxActorFlag::eDISABLE_GRAVITY, !info->useGravity);
-		dynamicActor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, info->isKinematic);
-
-		// 
-		auto [posX, posY, posZ] = rb->GetWorldPosition();
-		auto [rotX, rotY, rotZ, rotW] = rb->GetWorldRotation();
-
-		// 
-		info->prePosition[0] = posX;
-		info->prePosition[1] = posY;
-		info->prePosition[2] = posZ;
-
-		info->preRotation[0] = rotX;
-		info->preRotation[1] = rotY;
-		info->preRotation[2] = rotZ;
-		info->preRotation[3] = rotW;
-
-		PxTransform p({ posX, posY, posZ }, { rotX, rotY, rotZ, rotW });
-		//if (info->isKinematic)
-		//    dynamicActor->setKinematicTarget(p); // 
-		//else
-		if (!info->isCharacterController)
-			dynamicActor->setGlobalPose(p);     // 
-		if (!rb) continue;
-
-		RigidbodyInfo* info = writeBuffer[i];
-		{
-			//
-			PxTransform transform = dynamicActor->getGlobalPose();
-
-			info->prePosition[0] = info->Position[0];
-			info->prePosition[1] = info->Position[1];
-			info->prePosition[2] = info->Position[2];
-
-			info->preRotation[0] = info->Rotation[0];
-			info->preRotation[1] = info->Rotation[1];
-			info->preRotation[2] = info->Rotation[2];
-			info->preRotation[3] = info->Rotation[3];
-
-			info->Position[0] = transform.p.x;
-			info->Position[1] = transform.p.y;
-			info->Position[2] = transform.p.z;
-
-			info->Rotation[0] = transform.q.x;
-			info->Rotation[1] = transform.q.y;
-			info->Rotation[2] = transform.q.z;
-			info->Rotation[3] = transform.q.w;
-
-			info->linearVelocity[0] = dynamicActor->getLinearVelocity().x;
-			info->linearVelocity[1] = dynamicActor->getLinearVelocity().y;
-			info->linearVelocity[2] = dynamicActor->getLinearVelocity().z;
-
-			info->angularVelocity[0] = dynamicActor->getAngularVelocity().x;
-			info->angularVelocity[1] = dynamicActor->getAngularVelocity().y;
-			info->angularVelocity[2] = dynamicActor->getAngularVelocity().z;
-		}
-
-		// 
-		if (info->useNewPosition) {
-			dynamicActor->setGlobalPose(PxTransform({ info->newPosition[0], info->newPosition[1], info->newPosition[2] }));
-			info->useNewPosition = false;
-		}
-
-		// 
-		if (info->useForce) {
-			dynamicActor->addForce({ info->force[0], info->force[1], info->force[2] });
-			info->useForce = false;
-		}
-
-	}
-
-}
 
 
 
 
 void PhysicX::Update(float fixedDeltaTime)
 {
-
-	//if (fixedDeltaTime > 0.f) {
-	//    m_scene->simulate(fixedDeltaTime);
-	//    /////-----------------------ï¿½ï¿½-------------------------
-	//    m_scene->fetchResults(true);    
-	//    m_scene->fetchResultsParticleSystem();
-	//    //m_scene->fetchResults();
-
-	//    ReadPhysicsData();  //
-	//    bufferPool.SwapBuffers();
-	//}
-	//==========================
-
-	//
-	RemoveActors();
-	//todo: 
-	//deformer surface 
-	//ragdoll
-
-	m_scene->simulate(fixedDeltaTime);
-	m_scene->fetchResults(true);
-
-	//todo: cuda 
-	m_scene->fetchResultsParticleSystem();
-
-	//
-	eventCallback.onSimulationEvent();
-
-	//cuda
-	if (cudaGetLastError() != cudaError::cudaSuccess) {
-		std::cout << "CUDA error: " << cudaGetErrorString(cudaGetLastError()) << std::endl;
-	}
 
 }
 
@@ -310,19 +184,18 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic = false)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
-
-	pxOrgin = { in.origin.x, in.origin.y, in.origin.z };
-	pxDirection = { in.direction.x, in.direction.y, in.direction.z };
+	CopyVectorDxToPx(in.origin, pxOrgin);
+	CopyVectorDxToPx(in.direction, pxDirection);
 
 	// RaycastHit 
 	const physx::PxU32 maxHits = 20;
 	physx::PxRaycastHit hitBuffer[maxHits];
 	physx::PxRaycastBuffer hitBufferStruct(hitBuffer, maxHits);
 
-	//ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	//Ãæµ¹ Äõ¸® Á¤º¸
 	physx::PxQueryFilterData filterData;
 	filterData.data.word0 = in.layerNumber;
-	filterData.data.word1 = collisionMatrix[in.layerNumber][in.layerNumber];
+	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
 
 	if (isStatic)
 	{
@@ -558,7 +431,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	CollisionData* collisionData = new CollisionData();
 
 	//´ÙÀÌ³ª¹Í ¹Ùµð ÃÊ±âÈ­-->rigidbody »ý¼º ¹× shape attach , collider Á¤º¸ µî·Ï, collisionData Á¤º¸ µî·Ï
-	if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData))
+	if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData,isKinematic))
 	{
 		Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
 		return nullptr;
@@ -945,199 +818,168 @@ void PhysicX::CreateCharacterInfo(const ArticulationInfo& info)
 	m_collisionDataContainer.insert(std::make_pair(info.id, collisionData));
 
 	ragdoll->Initialize(info, m_physics, collisionData);
+	m_ragdollContainer.insert(std::make_pair(info.id, ragdoll));
 
 }
 
 void PhysicX::RemoveCharacterInfo(const unsigned int& id)
 {
+	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
+	{
+		Debug->LogWarning("remove ragdoll data fail container have not data id:"+std::to_string(id));
+		return;
+	}
+
+	auto articulationIter = m_ragdollContainer.find(id);
+	auto pxArticulation = articulationIter->second->GetPxArticulation();
+
+	if (articulationIter->second->GetIsRagdoll() == true)
+	{
+		m_scene->removeArticulation(*pxArticulation);
+		if (pxArticulation)
+		{
+			pxArticulation->release();
+			pxArticulation = nullptr;
+		}
+	}
+
+	m_ragdollContainer.erase(articulationIter);
 }
 
 void PhysicX::RemoveAllCharacterInfo()
 {
+	for (auto& [id, ragdoll] : m_ragdollContainer)
+	{
+		auto pxArticulation = ragdoll->GetPxArticulation();
+		if (ragdoll->GetIsRagdoll() == true)
+		{
+			m_scene->removeArticulation(*pxArticulation);
+			if (pxArticulation) {
+				pxArticulation->release();
+				pxArticulation = nullptr;
+			}
+
+			Debug->Log("PhysicX::RemoveAllCharacterInfo() : remove articulation id :" + std::to_string(id));
+		}
+	}
+	m_ragdollContainer.clear();
 }
 
 void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const Mathf::Vector3& extent)
 {
+	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		return;
+	}
+
+	RagdollPhysics* ragdoll = m_ragdollContainer[id];
+	ragdoll->AddArticulationLink(info,m_collisionMatrix, extent);
 }
 
 void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& radius)
 {
+	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		return;
+	}
+	RagdollPhysics* ragdoll = m_ragdollContainer[id];
+	ragdoll->AddArticulationLink(info, m_collisionMatrix, radius);
 }
 
 void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& halfHeight, const float& radius)
 {
+	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		return;
+	}
+	RagdollPhysics* ragdoll = m_ragdollContainer[id];
+	ragdoll->AddArticulationLink(info, m_collisionMatrix, halfHeight, radius);
 }
 
 void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info)
 {
+	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		return;
+	}
+	RagdollPhysics* ragdoll = m_ragdollContainer[id];
+	ragdoll->AddArticulationLink(info, m_collisionMatrix);
 }
 
 ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
 {
-	return ArticulationGetData();
+	ArticulationGetData data;
+	auto articulationIter = m_ragdollContainer.find(id);
+	if (articulationIter == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::GetArticulationData() : id is not exist id :" + std::to_string(id));
+		return data;
+	}
+
+	auto ragdoll = articulationIter->second;
+
+	physx::PxTransform pxTransform = ragdoll->GetPxArticulation()->getRootGlobalPose();
+	Mathf::Matrix dxMatrix;
+	CopyMatrixPxToDx(pxTransform, dxMatrix);
+
+	data.WorldTransform = dxMatrix;
+	data.bIsRagdollSimulation = ragdoll->GetIsRagdoll();
+
+	for (auto& [name, link] : ragdoll->GetLinkContainer()) {
+		ArticulationLinkGetData linkData;
+		linkData.jointLocalTransform = link->GetRagdollJoint()->GetSimulLocalTransform();
+		linkData.name = link->GetName();
+
+		data.linkData.push_back(linkData);
+	}
+
+	return data;
 }
 
 void PhysicX::SetArticulationData(const unsigned int& id, const ArticulationSetData& articulationData)
 {
+	auto articulationIter = m_ragdollContainer.find(id);
+	if (articulationIter == m_ragdollContainer.end())
+	{
+		Debug->LogError("PhysicX::SetArticulationData() : id is not exist id :" + std::to_string(id));
+		return;
+	}
+
+	auto ragdoll = articulationIter->second;
+	
+	ragdoll->ChangeLayerNumber(articulationData.LayerNumber, m_collisionMatrix);
+
+	if (articulationData.bIsRagdollSimulation != ragdoll->GetIsRagdoll()) {
+		ragdoll->SetIsRagdoll(articulationData.bIsRagdollSimulation);
+		ragdoll->SetWorldTransform(articulationData.WorldTransform);
+
+		//·¹±×µ¹ ½Ã¹Ä·¹ÀÌ¼ÇÀ» ÇØ¾ßÇÏ´Â °æ¿ì
+		if (articulationData.bIsRagdollSimulation)
+		{
+			for (const auto& linkData : articulationData.linkData)
+			{
+				ragdoll->SetLinkTransformUpdate(linkData.name, linkData.boneWorldTransform);
+			}
+			auto pxArticulation = ragdoll->GetPxArticulation();
+			bool isCheck = m_scene->addArticulation(*pxArticulation);
+
+			if (isCheck == false)
+			{
+				Debug->LogError("PhysicX::SetArticulationData() : add articulation failed id :" + std::to_string(id));
+			}
+		}
+	}
+
 }
 
 unsigned int PhysicX::GetArticulationCount()
 {
-	return 0;
+	return m_scene->getNbArticulations();
 }
-
-void PhysicX::PostUpdate() {}
-
-
-
-
-
-physx::PxRigidDynamic* PhysicX::CreateDynamicActor(const physx::PxTransform& transform)
-{
-	// ??????? ???? actor???? ?????? ???.
-	PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
-	std::vector<PxActor*> actors(curActorCount);
-	m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
-	return m_physics->createRigidDynamic(transform);
-}
-
-
-physx::PxRigidStatic* PhysicX::CreateStaticActor(const physx::PxTransform & transform)
-{
-	return m_physics->createRigidStatic(transform);
-}
-
-
-// if (info->isKinematic == true)
-	//    continue; /
-physx::PxShape* PhysicX::CreateBoxShape(Mathf::Vector3 size, physx::PxMaterial * material)
-{
-	if (material == nullptr) material = m_defaultMaterial;
-	return m_physics->createShape(PxBoxGeometry(size.x, size.y, size.z), *material);
-}
-
-physx::PxShape* PhysicX::CreateSphereShape(float radius, physx::PxMaterial * material)
-{
-	if (material == nullptr) material = m_defaultMaterial;
-	return m_physics->createShape(PxSphereGeometry(radius), *material);
-}
-
-	
-physx::PxShape* PhysicX::CreateCapsuleShape(float radius, float halfHeight, physx::PxMaterial * material)
-{
-	if (material == nullptr) material = m_defaultMaterial;
-	return m_physics->createShape(PxCapsuleGeometry(radius, halfHeight), *material);
-}
-
-
-
-physx::PxShape* PhysicX::CreatePlaneShape(physx::PxMaterial * material)
-{
-	if (material == nullptr) material = m_defaultMaterial;
-	return m_physics->createShape(PxPlaneGeometry(), *material);
-}
-
-void PhysicX::AddRigidBody()
-{
-}
-
-
-void PhysicX::ClearActors()
-{
-
-	PxU32 numMeshes = m_physics->getNbConvexMeshes();
-	std::vector<PxConvexMesh*> meshes(numMeshes);
-	m_physics->getConvexMeshes(meshes.data(), numMeshes);
-	void PhysicX::ClearActors();
-	
-}
-
-//Physics->ShowNotRelease();
-
-//m_scene->flushSimulation(true);
-
-//// controller 
-//PxU32 numControllers = m_controllerManager->getNbControllers();
-//for (PxU32 i = 0; i < numControllers; ++i) {
-//    PxController* controller = m_controllerManager->getController(i);
-//    controller->release();
-//}
-//m_controllerManager->purgeControllers();
-
-//// actor 
-//PxU32 actorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC);
-//std::vector<PxActor*> actors(actorCount);
-//m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC, actors.data(), actorCount);
-//for (PxActor* actor : actors) {
-//    m_scene->removeActor(*actor);
-//    actor->release();
-//}
-
-// 
-//UnInitialize();
-//if (m_scene) {
-//    m_scene->fetchResults(true);  
-
-//for (PxU32 i = 0; i < m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC); i++) {
-//    PxActor* actor;
-//    m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC | PxActorTypeFlag::eRIGID_STATIC, &actor, 1, i);
-//    m_scene->removeActor(*actor);
-//    actor->release();
-
-////
-//if (m_controllerManager) {
-//    const PxU32 controllerCount = m_controllerManager->getNbControllers();
-//    for (PxI32 i = static_cast<PxI32>(controllerCount) - 1; i >= 0; --i) {
-//        PxController* controller = m_controllerManager->getController(i);
-//        if (controller) {
-//            controller->release();
-//            controller = nullptr;  //
-//        }
-//    }
-//    m_controllerManager->release();
-//    m_controllerManager = nullptr;
-//}
-
-//// 
-//if (gDispatcher) {
-//    gDispatcher->release();
-//    gDispatcher = nullptr;
-//}
-
-//// 4
-//if (m_defaultMaterial) {
-//    m_defaultMaterial->release();
-//    m_defaultMaterial = nullptr;
-//}
-
-//// 
-//if (m_scene) {
-//    m_scene->release();
-//    m_scene = nullptr;
-//}
-
-//// 6? Physics
-//if (m_physics) {
-//    m_physics->release();
-//    m_physics = nullptr;
-//}
-
-//// 
-//if (pvd) {
-//    if (pvd->isConnected()) {
-//        pvd->disconnect();  //
-//    pvd->release();
-//    pvd = nullptr;
-//}
-
-//// 8?
-//if (m_foundation) {
-//    m_foundation->release();
-//    m_foundation = nullptr;
-//}
-
-    //Initialize();
-
 
 void PhysicX::ConnectPVD()
 {
@@ -1167,49 +1009,4 @@ void PhysicX::ShowNotRelease()
    std::cout << m_physics->getNbShapes()<< std::endl;  // 3
    std::cout << m_physics->getNbTetrahedronMeshes()<< std::endl;
    std::cout << m_physics->getNbTriangleMeshes() << std::endl;
-}
-
-void PhysicX::GetShapes(std::vector<BoxShape>& out)
-{
-    PxU32 curActorCount = m_scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
-    std::vector<PxActor*> actors(curActorCount);
-    m_scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, actors.data(), curActorCount);
-
-    for (PxU32 i = 0; i < curActorCount; i++)
-    {
-        PxRigidActor* actor = static_cast<PxRigidActor*>(actors[i]);
-        PxTransform globalPose = actor->getGlobalPose();
-
-        PxU32 shapeCount = actor->getNbShapes();
-        std::vector<PxShape*> shapes(shapeCount);
-        actor->getShapes(shapes.data(), shapeCount);
-
-        for (PxU32 j = 0; j < shapeCount; j++)
-        {
-            PxShape* shape = shapes[j];
-            PxTransform localPose = shape->getLocalPose();
-            PxTransform worldColliderPose = globalPose * localPose;
-
-            PxBoxGeometry box;
-            if (shape->getGeometry().getType() == PxGeometryType::eBOX)
-            {
-                PxGeometryHolder holder(shape->getGeometry());
-                
-                auto extent = holder.box().halfExtents;
-                BoxShape boxshape;
-                boxshape.worldPosition[0] = worldColliderPose.p.x / 10.f;
-                boxshape.worldPosition[1] = worldColliderPose.p.y / 10.f;
-                boxshape.worldPosition[2] = worldColliderPose.p.z / 10.f;
-                boxshape.worldRotation[0] = worldColliderPose.q.x;
-                boxshape.worldRotation[1] = worldColliderPose.q.y;
-                boxshape.worldRotation[2] = worldColliderPose.q.z;
-                boxshape.worldRotation[3] = worldColliderPose.q.w;
-                boxshape.halfSize[0] = extent.x / 10.f;
-                boxshape.halfSize[1] = extent.y / 10.f;
-                boxshape.halfSize[2] = extent.z / 10.f;
-
-                out.push_back(boxshape);
-            }
-        }
-    }
 }

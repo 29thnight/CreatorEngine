@@ -14,23 +14,23 @@
 #include "CharacterController.h"
 #include "RagdollPhysics.h"
 
-class PhysicsBufferPool {
-public:
-	std::vector<RigidbodyInfo*> buffers[2]; //
-	std::atomic<int> activeBuffer{ 0 }; // 
-
-	std::vector<RigidbodyInfo*>& GetWriteBuffer() {
-		return buffers[activeBuffer.load() ^ 1]; // 
-	}
-
-	std::vector<RigidbodyInfo*>& GetReadBuffer() {
-		return buffers[activeBuffer.load()]; // 
-	}
-
-	void SwapBuffers() {
-		activeBuffer.store(activeBuffer.load() ^ 1); // 
-	}
-};
+//class PhysicsBufferPool {
+//public:
+//	std::vector<RigidbodyInfo*> buffers[2]; //
+//	std::atomic<int> activeBuffer{ 0 }; // 
+//
+//	std::vector<RigidbodyInfo*>& GetWriteBuffer() {
+//		return buffers[activeBuffer.load() ^ 1]; // 
+//	}
+//
+//	std::vector<RigidbodyInfo*>& GetReadBuffer() {
+//		return buffers[activeBuffer.load()]; // 
+//	}
+//
+//	void SwapBuffers() {
+//		activeBuffer.store(activeBuffer.load() ^ 1); // 
+//	}
+//};
 
 
 class PhysicX : public Singleton<PhysicX>
@@ -43,20 +43,16 @@ public:
 	//core
 	//물리엔진 세팅
 	void Initialize();
-	void UnInitialize();
+	
 
-	void PreUpdate();
+	
 	//물리엔진 업데이트
 	void Update(float fixedDeltaTime);
-	void PostUpdate();
-	void PostUpdate(float interpolated);
+	
 
-	void AddRigidBody();
-
-	void ClearActors();
 
 	void AddActor(physx::PxActor* actor) { m_scene->addActor(*actor); }
-	void ConnectPVD();
+
 
 	physx::PxPhysics* GetPhysics() { return m_physics; }
 	physx::PxScene* GetPxScene() { return m_scene; }
@@ -160,19 +156,28 @@ public:
 	//todo:
 	//==========================================================
 	//컨벡스 메쉬 여부
-	void HasConvexMeshResource();
+	//void HasConvexMeshResource(const unsigned int& hash);
 	//logger --> 아마 안쓸듯
-	void SetLogger();
+	//void SetLogger();
 	//삭제 예정 엑터 삭제
 	void RemoveActors();
 
 	void UnInitialize(); //물리엔진 종료
 	void ShowNotRelease(); // 해제 되지 않은 객체들 출력
 	void ConnectPVD(); //pvd 다시 연결
+
+	//===========================================================================================
+	//collision data ->  4quest CollisionDataManager 대응
+	void CollisionDataUpdate();
+	CollisionData* FindCollisionData(const unsigned int& id);
+
+
+
 private:
 	physx::PxDefaultAllocator		m_allocator;
 	physx::PxDefaultErrorCallback	m_errorCallback;
 
+	
 	physx::PxPvd* pvd = nullptr;
 	physx::PxFoundation* m_foundation = nullptr;
 	physx::PxPhysics* m_physics = nullptr;
@@ -185,7 +190,12 @@ private:
 
 	physx::PxControllerManager* m_controllerManager = nullptr;
 	
+	//===========================================================================================
+	PhysicsEventCallback* m_eventCallback;
+
 	int m_collisionMatrix[32];
+
+	std::vector<physx::PxActor*> m_removeActorList; //삭제할 액터들
 
 	//==================================================================================
 	//rigid body 관리용

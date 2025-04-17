@@ -82,3 +82,57 @@ void PhysicsEventCallback::onTrigger(PxTriggerPair* pairs, PxU32 count)
 void PhysicsEventCallback::onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count)
 {
 }
+
+void PhysicsEventCallback::StartTrigger()
+{
+	for (auto trigger = m_triggerMap.begin(); trigger != m_triggerMap.end();) {
+		CollisionData* TriggerActorData = Physics->FindCollisionData(trigger->first);
+		if (TriggerActorData == nullptr)
+		{
+			trigger = m_triggerMap.erase(m_triggerMap.find(trigger->first));
+			continue;
+		}
+
+		for (auto otherTrigger = trigger->second.begin(); otherTrigger != trigger->second.end();)
+		{
+			CollisionData* OtherActorData = Physics->FindCollisionData(*otherTrigger);
+			if (OtherActorData == nullptr)
+			{
+				otherTrigger = trigger->second.erase(trigger->second.find(*otherTrigger));
+				continue;
+			}
+
+
+			CollisionData ThisData;
+			CollisionData OtherData;
+
+			ThisData.thisId = TriggerActorData->thisId;
+			ThisData.otherId = OtherActorData->thisId;
+			ThisData.thisLayerNumber = TriggerActorData->thisLayerNumber;
+			ThisData.otherLayerNumber = OtherActorData->thisLayerNumber;
+
+			OtherData.thisId = OtherActorData->thisId;
+			OtherData.otherId = TriggerActorData->thisId;
+			OtherData.thisLayerNumber = OtherActorData->thisLayerNumber;
+			OtherData.otherLayerNumber = TriggerActorData->thisLayerNumber;
+
+			m_callbackFunction(ThisData, ECollisionEventType::ON_OVERLAP);
+			m_callbackFunction(OtherData, ECollisionEventType::ON_OVERLAP);
+
+			++otherTrigger;
+		}
+		++trigger;
+	}
+}
+
+void PhysicsEventCallback::SettingCollisionData()
+{
+}
+
+void PhysicsEventCallback::SettiingTriggerData()
+{
+}
+
+void PhysicsEventCallback::CountTrigger()
+{
+}
