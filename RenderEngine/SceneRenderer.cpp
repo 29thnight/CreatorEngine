@@ -733,29 +733,28 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
-	model[0] = Model::LoadModel("plane.fbx");
-	Model::LoadModelToScene(model[0], *m_currentScene);
-	model[1] = Model::LoadModel("damit.glb");
-	model[2] = Model::LoadModel("sphere.fbx");
-	model[3] = Model::LoadModel("SkinningTest.fbx");
-	model[4] = Model::LoadModel("bangbooExport.fbx");
+	//model[0] = Model::LoadModel(PathFinder::Relative("Models\\plane.fbx").string());
+	//model[1] = Model::LoadModel(PathFinder::Relative("Models\\damit.glb").string());
+	//model[2] = Model::LoadModel(PathFinder::Relative("Models\\sphere.fbx").string());
+	//model[3] = Model::LoadModel(PathFinder::Relative("Models\\SkinningTest.fbx").string());
+	//model[4] = Model::LoadModel(PathFinder::Relative("Models\\bangbooExport.fbx").string());
 
-	ImGui::ContextRegister("Test Add Model", true, [&]()
-	{
-		static int num = 0;
-		std::string modelname = "Add : " + model[num]->name;
-		if (ImGui::Button(modelname.c_str())) {
-			Model::LoadModelToScene(model[num], *m_currentScene);
-		}
-		if (ImGui::Button("+")) {
-			num++;
-			if (num > 4) { num = 4; }
-		}
-		if (ImGui::Button("-")) {
-			num--;
-			if (num < 0) { num = 0; }
-		}
-	});
+	//ImGui::ContextRegister("Test Add Model", true, [&]()
+	//{
+	//	static int num = 0;
+	//	std::string modelname = "Add : " + model[num]->name;
+	//	if (ImGui::Button(modelname.c_str())) {
+	//		Model::LoadModelToScene(model[num], *m_currentScene);
+	//	}
+	//	if (ImGui::Button("+")) {
+	//		num++;
+	//		if (num > 4) { num = 4; }
+	//	}
+	//	if (ImGui::Button("-")) {
+	//		num--;
+	//		if (num < 0) { num = 0; }
+	//	}
+	//});
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -764,9 +763,8 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	{
 		ReloadShaders();
 	}
-	//컴포넌트업데이트 확인용 추가
-	m_renderScene->Update(deltaTime);
 
+	m_renderScene->Update(deltaTime);
 	m_pEditorCamera->HandleMovement(deltaTime);
 
 	PrepareRender();
@@ -1128,7 +1126,6 @@ void SceneRenderer::EditorView()
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
-		// 이미지의 높이를 영역의 높이로 설정하고, 가로는 aspect ratio를 반영하여 계산
 		float imageHeight = availRegion.y;
 		float imageWidth = imageHeight * DeviceState::g_aspectRatio;
 
@@ -1138,29 +1135,10 @@ void SceneRenderer::EditorView()
 		}
 
 		ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
-
-		// 이미지가 중앙에 위치하도록 오프셋 계산 (가로, 세로 모두 중앙 정렬)
 		ImVec2 offset = ImVec2((availRegion.x - imageSize.x) * 0.5f, (availRegion.y - imageSize.y) * 0.5f);
-
-		//static bool LogOnce = false;
-
-		//if(!LogOnce)
-		//{
-		//	Debug->Log("offset Begin : " + std::to_string(windowPos.x + offset.x) + " " + std::to_string(windowPos.y + offset.y));
-
-		//	Debug->Log("offset End : " + std::to_string(windowPos.x + offset.x + imageSize.x) + " " + std::to_string(windowPos.y + offset.y + imageSize.y));
-
-		//	LogOnce = true;
-		//}
-
-		//ImVec2 mousePos = ImGui::GetMousePos();
-		//std::cout << "MousePos : " << mousePos.x << " " << mousePos.y << std::endl;
-
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
 
-		//TODO : 카메라를 컨트롤러에서 찾아서 해당 뷰포트를 보여주도록 변경하고, 
-		// 위에 카메라 컨트롤러에 등록된 카메라 번호를 보이게 해야함.
 		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, imageSize);
 	}
 	ImGui::End();
@@ -1208,7 +1186,6 @@ void SceneRenderer::ShowLogWindow()
 		default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
 		}
 
-		// 선택 시 배경색
 		if (is_selected)
 			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
 
@@ -1235,10 +1212,10 @@ void SceneRenderer::ShowLogWindow()
 				}
 			}
 		}
-		ImGui::PopStyleColor(); // Text color
+		ImGui::PopStyleColor();
 
 		if (is_selected)
-			ImGui::PopStyleColor(); // Header color
+			ImGui::PopStyleColor();
         ImGui::PopID();
 	}
 

@@ -2,11 +2,12 @@
 #include "Scene.h"
 #include "Object.h"
 #include "FileIO.h"
-#include "RegisterReflect.h"
+#include "DataSystem.h"
+#include "RegisterReflect.def"
 
 void SceneManager::ManagerInitialize()
 {
-    RegisterReflect();
+    REFLECTION_REGISTER_EXECUTE()
 }
 
 void SceneManager::Editor()
@@ -109,11 +110,12 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile("TestScene.yml");
         if (m_activeScene)
         {
-			delete m_activeScene;
+			Scene* swapScene = m_activeScene;
+			m_activeScene = nullptr;
+			delete swapScene;
         }
 		m_activeScene = Scene::LoadScene(name);
 
-        //auto& gameObjects = m_activeScene->m_SceneObjects;
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
 			const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -123,35 +125,7 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 				continue;
 			}
 
-            if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
-            {
-				auto obj = m_activeScene->LoadGameObject(
-                    objNode["m_instanceID"].as<size_t>(), 
-                    objNode["m_name"].as<std::string>(), 
-                    GameObject::Type::Empty, 
-                    objNode["m_parentIndex"].as<GameObject::Index>()
-                );
-
-                if(obj)
-                {
-                    Deserialize(obj.get(), objNode);
-                }
-
-                //obj->m_transform.position = Meta::YamlNodeToVector4(objNode["m_transform"]["position"]);
-				//obj->m_transform.rotation = Meta::YamlNodeToVector4(objNode["m_transform"]["rotation"]);
-				//obj->m_transform.scale = Meta::YamlNodeToVector4(objNode["m_transform"]["scale"]);
-				//obj->m_index = objNode["m_index"].as<GameObject::Index>();
-				//obj->m_rootIndex = objNode["m_rootIndex"].as<GameObject::Index>();
-				//obj->m_childrenIndices = objNode["m_childrenIndices"].as<std::vector<GameObject::Index>>();
-				//if (objNode["m_components"])
-				//{
-				//	for (const auto& componentNode : objNode["m_components"])
-				//	{
-				//		const Meta::Type& componentType = *Meta::ExtractTypeFromYAML(componentNode);
-				//		obj->AddComponent(componentType);
-				//	}
-				//}
-            }
+			DesirealizeGameObject(type, objNode);
         }
 
 
@@ -174,5 +148,65 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     if (objPtr)
     {
         m_dontDestroyOnLoadObjects.push_back(objPtr);
+    }
+}
+
+void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+{
+    if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
+    {
+        auto obj = m_activeScene->LoadGameObject(
+            itNode["m_instanceID"].as<size_t>(),
+            itNode["m_name"].as<std::string>(),
+            GameObject::Type::Empty,
+            itNode["m_parentIndex"].as<GameObject::Index>()
+        ).get();
+
+        if (obj)
+        {
+            Deserialize(obj, itNode);
+        }
+
+        if (itNode["m_components"])
+        {
+            for (const auto& componentNode : itNode["m_components"])
+            {
+				DesirealizeComponent(type, obj, componentNode);
+            }
+        }
+    }
+}
+
+void SceneManager::DesirealizeComponent(const Meta::Type* type, GameObject* obj, const MetaYml::detail::iterator_value& itNode)
+{
+    const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
+    if (nullptr == componentType)
+    {
+        return;
+    }
+    
+    auto component = obj->AddComponent((*componentType)).get();
+    if (component)
+    {
+        using namespace TypeTrait;
+        if (componentType->typeID == GUIDCreator::GetTypeID<MeshRenderer>())
+        {
+            auto meshRenderer = static_cast<MeshRenderer*>(component);
+			Model* model = nullptr;
+			if (itNode["m_Material"])
+			{
+				auto materialNode = itNode["m_Material"];
+				FileGuid guid = materialNode["m_fileGuid"].as<std::string>();
+                model = DataSystems->LoadModelGUID(guid);
+			}
+			MetaYml::Node getMeshNode = itNode["m_Mesh"];
+			if (model && getMeshNode)
+            {
+                meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
+                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+            }
+            Deserialize(meshRenderer, itNode);
+            meshRenderer->SetEnabled(true);
+        }
     }
 }

@@ -49,8 +49,11 @@
     <Filter Include="Classes\GameObject">
       <UniqueIdentifier>{f146b3e7-4103-48ad-a96c-6c2bcf57155d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\ReflComponent">
+    <Filter Include="Managers\EngineReflect">
       <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\ComponentFactory">
+      <UniqueIdentifier>{25bd8b3d-610a-4fc6-87f7-0a1e660d89c6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -74,9 +77,6 @@
     </ClCompile>
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="RegisterReflect.cpp">
-      <Filter>Classes\Components\ReflComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -137,8 +137,11 @@
     <ClInclude Include="IFixedUpdatable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
-    <ClInclude Include="RegisterReflect.h">
-      <Filter>Classes\Components\ReflComponent</Filter>
+    <ClInclude Include="RegisterReflect.def">
+      <Filter>Managers\EngineReflect</Filter>
+    </ClInclude>
+    <ClInclude Include="ComponentFactory.h">
+      <Filter>Classes\Components\ComponentFactory</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

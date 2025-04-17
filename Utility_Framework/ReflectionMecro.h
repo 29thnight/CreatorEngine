@@ -7,7 +7,8 @@
 
 #define meta_default(T) { Meta::Register<T>(); }
 
-#define ReflectionField(T) using __Ty = T; \
+#define ReflectionField(T) public: \
+ using __Ty = T; \
  static const Meta::Type& Reflect()
 
 #define ReflectionFieldInheritance(T, Parent) using __Ty = T; \
@@ -50,6 +51,7 @@
         EXPAND(Mecro) \
 
 #define REFLECTION_REGISTER() void RegisterReflect()
+#define REFLECTION_REGISTER_EXECUTE() RegisterReflect();
 
 #define AUTO_REGISTER_ENUM(EnumTypeName) \
     static const Meta::EnumAutoRegistrar<EnumTypeName> autoRegistrar_##EnumTypeName;

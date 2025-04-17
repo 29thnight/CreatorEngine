@@ -122,6 +122,11 @@ namespace Meta
 			vecNode["w"] = quat.w;
 			node[prop.name] = vecNode;
 		}
+		else if (typeID == GUIDCreator::GetTypeID<FileGuid>())
+		{
+			FileGuid fileGuid = std::any_cast<FileGuid>(value);
+			node[prop.name] = fileGuid.ToString();
+		}
 		else
 		{
 			node[prop.name] = "[not suport type]"; // 기타 미지원 타입
@@ -183,7 +188,7 @@ namespace Meta
 			{
 				prop.setter(instance, Mathf::Quaternion(
 						node[prop.name]["x"].as<float>(), 
-						node[prop.name]["y"].as<float>(), 
+						node[prop.name]["y"].as<float>(),
 						node[prop.name]["z"].as<float>(), 
 						node[prop.name]["w"].as<float>()
 					)
@@ -191,7 +196,15 @@ namespace Meta
 			}
 			else if (prop.typeID == GUIDCreator::GetTypeID<std::vector<int>>())
 			{
-				prop.setter(instance, node[prop.name].as<std::vector<int>>());
+				if(!node[prop.name].IsNull())
+				{
+					auto vec = node[prop.name].as<std::vector<int>>();
+					prop.setter(instance, &vec);
+				}
+			}
+			else if (prop.typeID == GUIDCreator::GetTypeID<FileGuid>())
+			{
+				prop.setter(instance, FileGuid(node[prop.name].as<std::string>()));
 			}
 			else
 			{
@@ -212,7 +225,7 @@ namespace Meta
 		else if(type.name == "Component")
 		{
 			const Type& compRealType = *FindTypeByInstance(instance);
-			node[compRealType.name] = type.typeID.m_ID_Data;
+			node[compRealType.name] = compRealType.typeID.m_ID_Data;
 		}
 
 		// 부모 먼저 직렬화
@@ -228,12 +241,7 @@ namespace Meta
 		// 프로퍼티 순회
 		for (const auto& prop : type.properties)
 		{
-			// typeID 필드는 이미 넣었으므로 생략
-			if (std::string(prop.name) == "m_typeID")
-				continue;
-
 			std::any value = prop.getter(instance);
-
 
 			// 벡터 처리
 			if (prop.isVector)
@@ -351,7 +359,7 @@ namespace Meta
 				std::size_t typeID = kv.second.as<std::size_t>();
 
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);
-				if (type && type->typeID.m_ID_Data == typeID)
+				if (type && type->typeID == typeID)
 				{
 					return type;  // 이름도 맞고 ID도 맞으면 확정
 				}
@@ -378,33 +386,6 @@ namespace Meta
 		return nullptr;
 	}
 
-	inline Mathf::Vector4 YamlNodeToVector4(const MetaYml::Node& node)
-	{
-		if (node.IsMap())
-		{
-			return Mathf::Vector4(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
-		}
-		return Mathf::Vector4();
-	}
-
-	inline Mathf::Vector3 YamlNodeToVector3(const MetaYml::Node& node)
-	{
-		if (node.IsMap())
-		{
-			return Mathf::Vector3(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>());
-		}
-		return Mathf::Vector3();
-	}
-
-	inline Mathf::Vector2 YamlNodeToVector2(const MetaYml::Node& node)
-	{
-		if (node.IsMap())
-		{
-			return Mathf::Vector2(node["x"].as<float>(), node["y"].as<float>());
-		}
-		return Mathf::Vector2();
-	}
-
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
 	{
 		// 부모 먼저 역직렬화
@@ -417,6 +398,11 @@ namespace Meta
 		{
 			if (node[prop.name])
 			{
+				if (prop.isPointer)
+				{
+					continue;
+				}
+
 				if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
 				{
 					void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);

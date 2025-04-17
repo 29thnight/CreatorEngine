@@ -78,19 +78,14 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
     }
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
+    {
+        if (obj)
         {
-            if (obj)
-            {
-                ObjectPool::Deallocate(obj);
-            }
-        });
+            ObjectPool::Deallocate(obj);
+        }
+    });
 
     m_SceneObjects.push_back(newObj);
-    auto parentObj = GetGameObject(parentIndex);
-    if (parentObj->m_index != index)
-    {
-        parentObj->m_childrenIndices.push_back(index);
-    }
 
     return m_SceneObjects[index];
 }

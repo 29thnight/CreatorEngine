@@ -47,9 +47,9 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 	}*/
 
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
-	DirectX::SetName(m_vertexBuffer.Get(), m_name.ToString() + "VertexBuffer");
+	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
-	DirectX::SetName(m_indexBuffer.Get(), m_name.ToString() + "IndexBuffer");
+	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
 Mesh::Mesh(Mesh&& _other) noexcept :

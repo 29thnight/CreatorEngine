@@ -1,11 +1,11 @@
 #include "DataSystem.h"
-//#include "MaterialLoader.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
+#include "FileIO.h"
 #include "Benchmark.hpp"
 #include "ResourceAllocator.h"
 
@@ -50,6 +50,12 @@ void DataSystem::Initialize()
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
 
 	RenderForEditer();
+	m_watcher = new efsw::FileWatcher();
+	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
+	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
+	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
+	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
+	m_watcher->watch();
 }
 
 void DataSystem::Finalize()
@@ -65,6 +71,8 @@ void DataSystem::Finalize()
     Models.clear();
     Textures.clear();
     Materials.clear();
+
+	delete m_watcher;
 }
 
 void DataSystem::RenderForEditer()
@@ -112,6 +120,35 @@ void DataSystem::MonitorFiles()
 void DataSystem::LoadModels()
 {
 	file::path shaderpath = PathFinder::Relative("Models\\");
+}
+
+Model* DataSystem::LoadModelGUID(FileGuid guid)
+{
+	file::path modelPath = m_assetMetaRegistry->GetPath(guid);
+	std::string name = modelPath.stem().string();
+	if (Models.find(name) != Models.end())
+	{
+		Debug->Log("ModelLoader::LoadModel : Model already loaded");
+		return Models[name].get();
+	}
+
+	Model* model = Model::LoadModel(modelPath.string());
+	if (model)
+	{
+		auto deleter = [&](Model* model)
+		{
+			if (model)
+			{
+				DeallocateResource<Model>(model);
+			}
+		};
+		Models[name] = std::shared_ptr<Model>(model, deleter);
+		return model;
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
 }
 
 void DataSystem::LoadModel(const std::string_view& filePath)
@@ -304,7 +341,6 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
-
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;

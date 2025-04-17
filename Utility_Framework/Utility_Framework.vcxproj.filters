@@ -207,9 +207,6 @@
     <ClInclude Include="ReflectionYml.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ComponentHandler.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionImGuiHelper.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

@@ -56,19 +56,6 @@ namespace Meta
 		return name;
 	}
 
-    // --- 문자열 해시 계산 (FNV-1a) ---
-    inline constexpr Hash StringToHash(const char* str)
-    {
-        Hash hash_value = 2166136261u;
-        while (*str)
-        {
-            hash_value ^= static_cast<Hash>(*str++);
-            hash_value *= 16777619u;
-        }
-
-        return hash_value;
-    }
-
     // Helper : vector 타입 여부 검사
     inline bool IsVectorType(const std::string& typeName)
     {

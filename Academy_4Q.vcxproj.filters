@@ -83,6 +83,18 @@
     <ClInclude Include="EngineVersion.h">
       <Filter>Settings</Filter>
     </ClInclude>
+    <ClInclude Include="Hierarchy.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneView.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="GameView.h">
+      <Filter>Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Inspector.h">
+      <Filter>Window</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Academy_4Q.rc">

@@ -5,6 +5,7 @@
 //#include "Billboards.h"
 #include "Model.h"
 #include "ImGuiRegister.h"
+#include "AssetMetaWather.h"
 
 // Main system for storing runtime data
 class DataSystem : public Singleton<DataSystem>
@@ -49,6 +50,7 @@ public:
 	void RenderForEditer();
 	void MonitorFiles();
 	void LoadModels();
+	Model* LoadModelGUID(FileGuid guid);
 	void LoadModel(const std::string_view& filePath);
 	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
@@ -70,8 +72,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
-	static ImGuiTextFilter filter;
 
+	static ImGuiTextFilter filter;
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 
@@ -96,6 +98,9 @@ private:
 	file::path m_dragDropPath{};
 
 	file::path currentDirectory{};
+	efsw::FileWatcher* m_watcher{};
+	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
+	std::shared_ptr<AssetMetaWatcher> m_assetMetaWatcher{};
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();

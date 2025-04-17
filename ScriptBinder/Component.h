@@ -20,7 +20,6 @@ public:
 	{
 		PropertyField
 		({
-			meta_property(m_typeID)
 			meta_property(m_instanceID)
 		});
 

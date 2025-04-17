@@ -30,6 +30,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 {
 	file::path filepath(fileName);
 	m_directory = filepath.parent_path().string() + "\\";
+	m_metaDirectory = filepath.string() + ".meta";
 	if (filepath.extension() == ".obj")
 	{
 		m_loadType = LoadType::OBJ;
@@ -60,9 +61,9 @@ void ModelLoader::ProcessNodes()
 	ProcessNode(m_AIScene->mRootNode, 0);
 }
 
-Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
+ModelNode* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 {
-	Node* nodeObj = AllocateResource<Node>(node->mName.C_Str());
+	ModelNode* nodeObj = AllocateResource<ModelNode>(node->mName.C_Str());
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
@@ -78,7 +79,7 @@ Node* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 
 	for (uint32 i = 0; i < node->mNumChildren; i++)
 	{
-		Node* child = ProcessNode(node->mChildren[i], nodeObj->m_index);
+		ModelNode* child = ProcessNode(node->mChildren[i], nodeObj->m_index);
 		nodeObj->m_childrenIndex.push_back(child->m_index);
 	}
 
@@ -118,13 +119,11 @@ Model* ModelLoader::LoadModel()
 		ProcessMaterials();
 		if (m_model->m_hasBones)
 		{
-            Benchmark banch4;
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 			m_model->m_Skeleton = skeleton;
 			Animator* animator = m_model->m_animator;
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
-            std::cout << "Skeleton :" << banch4.GetElapsedTime() << std::endl;
 		}
 		ParseModel();
 	}
@@ -185,6 +184,10 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 {
 	Material* material = AllocateResource<Material>();
 	material->m_name = mesh->mName.C_Str();
+
+	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
+	material->m_fileGuid = modelFileNode["guid"].as<std::string>();
+
 	if (mesh->mMaterialIndex >= 0)
 	{
 		aiMaterial* mat = m_AIScene->mMaterials[mesh->mMaterialIndex];
@@ -278,12 +281,12 @@ void ModelLoader::ParseNodes(std::fstream& outfile)
 {
 	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
 	{
-		Node* node = m_model->m_nodes[i];
+		ModelNode* node = m_model->m_nodes[i];
 		ParseNode(outfile, node);
 	}
 }
 
-void ModelLoader::ParseNode(std::fstream& outfile, Node* node)
+void ModelLoader::ParseNode(std::fstream& outfile, ModelNode* node)
 {
 	size_t strSize = node->m_name.size();
 	outfile.write(reinterpret_cast<char*>(&strSize), sizeof(size_t));
@@ -340,13 +343,13 @@ void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
 	}
 }
 
-void ModelLoader::LoadNode(std::fstream& infile, Node* node)
+void ModelLoader::LoadNode(std::fstream& infile, ModelNode* node)
 {
     size_t size{};
 	std::string name;
 	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
 	infile.read(reinterpret_cast<char*>(name.data()), size);
-	node = new Node(name);
+	node = new ModelNode(name);
 
 	infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
 	infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
@@ -361,7 +364,7 @@ void ModelLoader::LoadMesh(std::fstream& infile)
 {
 	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
 	{
-		Node* node = m_model->m_nodes[i];
+		ModelNode* node = m_model->m_nodes[i];
 		for (uint32 j = 0; j < node->m_numMeshes; j++)
 		{
 			Mesh* mesh = new Mesh();
@@ -408,7 +411,7 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 	}
 }
 
-void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int parentIndex)
+void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
 	if (true == isRoot)
@@ -454,7 +457,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(Node* node, bool isRoot, int pare
 	}
 }
 
-void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(Node* node, Bone* bone, bool isRoot, int parentIndex)
+void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
 	if (true == isRoot)

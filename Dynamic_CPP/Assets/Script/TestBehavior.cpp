@@ -3,6 +3,12 @@
 
 void TestBehavior::Start()
 {
+	// Initialize the behavior
+	// This is where you can set up any initial state or properties for the behavior
+	// For example, you might want to set the position, rotation, or scale of the object
+	// that this behavior is attached to.
+	// You can also use this method to register any event listeners or perform any other
+	// setup tasks that are needed before the behavior starts running.
 }
 
 void TestBehavior::FixedUpdate(float fixedTick)

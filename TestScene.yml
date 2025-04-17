@@ -3,7 +3,7 @@ m_buildIndex: 0
 m_SceneObjects:
   - GameObject: 2166264123
     m_name: SampleScene
-    m_instanceID: 2633640663
+    m_instanceID: 1005393101
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
@@ -14,8 +14,8 @@ m_SceneObjects:
     m_childrenIndices: [1]
     m_components: ~
   - GameObject: 2166264123
-    m_name: plane
-    m_instanceID: 972127140
+    m_name: DamagedHelmet
+    m_instanceID: 2665258946
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
@@ -26,27 +26,29 @@ m_SceneObjects:
     m_childrenIndices: [2]
     m_components: ~
   - GameObject: 2166264123
-    m_name: RootNode
-    m_instanceID: 907287977
+    m_name: node_damagedHelmet_-6514
+    m_instanceID: 1582177489
     m_transform:
-      position: {x: 5.89591551, y: 0, z: 0, w: 1}
-      rotation: {x: 0, y: 0, z: 0, w: 1}
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
     m_index: 2
     m_parentIndex: 1
     m_rootIndex: 0
     m_childrenIndices: ~
     m_components:
-      - MeshRenderer: 3079321533
-        m_instanceID: 2803455564
+      - MeshRenderer: 659998325
+        m_instanceID: 372593566
         m_Material:
+          m_name: mesh_helmet_LP_13930damagedHelmet
+          m_fileGuid: "{7B261F08-83C7-4779-A987-90763B846DA0}"
           m_materialInfo:
-            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
-            m_metallic: 0
-            m_roughness: 0.272165537
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 1
+            m_roughness: 1
           m_renderingMode: 0
         m_Mesh:
-          m_name: Plane.001
+          m_name: mesh_helmet_LP_13930damagedHelmet
           m_materialIndex: 0
           m_nodeName: ""
         m_Animator: ~

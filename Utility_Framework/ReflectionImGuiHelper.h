@@ -9,8 +9,8 @@ namespace Meta
     {
         for (const auto& prop : type.properties)
         {
-            const Hash hash = StringToHash(prop.typeName.c_str());
-            if (hash == StringToHash("int"))
+            const HashedGuid hash = prop.typeID;
+            if (hash == GUIDCreator::GetTypeID<int>())
             {
                 int value = std::any_cast<int>(prop.getter(instance));
                 if (ImGui::InputInt(prop.name, &value))
@@ -18,7 +18,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("unsigned int"))
+            else if (hash == GUIDCreator::GetTypeID<unsigned int>())
             {
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S32, &value))
@@ -26,7 +26,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("long long"))
+            else if (hash == GUIDCreator::GetTypeID<long long>())
             {
                 long long value = std::any_cast<long long>(prop.getter(instance));
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S64, &value))
@@ -34,7 +34,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("float"))
+            else if (hash == GUIDCreator::GetTypeID<float>())
             {
                 float value = std::any_cast<float>(prop.getter(instance));
                 if (ImGui::InputFloat(prop.name, &value))
@@ -42,7 +42,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("bool") || hash == StringToHash("bool32"))
+            else if (hash == GUIDCreator::GetTypeID<bool>()|| prop.typeName == "bool32")
             {
                 bool value = std::any_cast<bool>(prop.getter(instance));
                 if (ImGui::Checkbox(prop.name, &value))
@@ -50,7 +50,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("std::string"))
+            else if (hash == GUIDCreator::GetTypeID<std::string>())
             {
                 std::string value = std::any_cast<std::string>(prop.getter(instance));
                 if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
@@ -58,7 +58,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }//[OverWatching]
-            else if (hash == StringToHash("HashingString"))
+            else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));
                 if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
@@ -66,12 +66,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("HashedGuid"))
-            {
-                HashedGuid value = std::any_cast<HashedGuid>(prop.getter(instance));
-                ImGui::InputInt(prop.name, (int*)&value.m_ID_Data);
-            }
-            else if (hash == StringToHash("Mathf::Vector2") || hash == StringToHash("DirectX::SimpleMath::Vector2"))
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
             {
                 auto value = std::any_cast<Mathf::Vector2>(prop.getter(instance));
                 if (ImGui::DragFloat2(prop.name, &value.x, 0.1f))
@@ -79,7 +74,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("Mathf::Vector3") || hash == StringToHash("DirectX::SimpleMath::Vector3"))
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Vector3>())
             {
                 auto value = std::any_cast<Mathf::Vector3>(prop.getter(instance));
                 if (ImGui::DragFloat3(prop.name, &value.x, 0.1f))
@@ -87,10 +82,8 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("Mathf::Vector4")
-                || hash == StringToHash("DirectX::SimpleMath::Vector4")
-                || hash == StringToHash("DirectX::XMFLOAT4")
-                || hash == StringToHash("DirectX::SimpleMath::Quaternion"))
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>()
+                || hash == GUIDCreator::GetTypeID<Mathf::Quaternion>())
             {
                 auto value = std::any_cast<Mathf::Vector4>(prop.getter(instance));
                 if (ImGui::DragFloat4(prop.name, &value.x, 0.1f))
@@ -98,8 +91,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("Mathf::Color4")
-                || hash == StringToHash("DirectX::SimpleMath::Color"))
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
             {
                 auto value = std::any_cast<Mathf::Color4>(prop.getter(instance));
                 if (ImGui::ColorEdit4(prop.name, &value.x))
@@ -107,8 +99,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("float2")
-                || hash == StringToHash("DirectX::XMFLOAT2"))
+            else if (hash == GUIDCreator::GetTypeID<float2>())
             {
                 auto value = std::any_cast<float2>(prop.getter(instance));
                 if (ImGui::DragFloat2(prop.name, &value.x))
@@ -116,8 +107,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("float3")
-                || hash == StringToHash("DirectX::XMFLOAT3"))
+            else if (hash == GUIDCreator::GetTypeID<float3>())
             {
                 auto value = std::any_cast<float3>(prop.getter(instance));
                 if (ImGui::DragFloat3(prop.name, &value.x))
@@ -125,8 +115,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("float4")
-                || hash == StringToHash("DirectX::XMFLOAT4"))
+            else if (hash == GUIDCreator::GetTypeID<float4>())
             {
                 auto value = std::any_cast<float4>(prop.getter(instance));
                 if (ImGui::DragFloat4(prop.name, &value.x))
@@ -134,8 +123,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("int2")
-                || hash == StringToHash("DirectX::XMINT2"))
+            else if (hash == GUIDCreator::GetTypeID<int2>())
             {
                 auto value = std::any_cast<int2>(prop.getter(instance));
                 if (ImGui::InputInt2(prop.name, &value.x))
@@ -143,8 +131,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
             }
-            else if (hash == StringToHash("int3")
-                || hash == StringToHash("DirectX::XMINT3"))
+            else if (hash == GUIDCreator::GetTypeID<int3>())
             {
                 auto value = std::any_cast<int3>(prop.getter(instance));
                 if (ImGui::InputInt3(prop.name, &value.x))
@@ -263,7 +250,7 @@ namespace Meta
                                 paramValues[key] = 0.0f;
                             else if (std::string(param.typeName) == "bool")
                                 paramValues[key] = false;
-                            else if (std::string(param.typeName) == "std::string")
+                            else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
                                 paramValues[key] = std::string();
                             // 여기서 다른 지원 타입에 대한 기본값을 추가할 수 있음
                         }
@@ -287,7 +274,7 @@ namespace Meta
                             ImGui::Checkbox(param.name.c_str(), &value);
                             paramValues[key] = value;
                         }
-                        else if (std::string(param.typeName) == "std::string")
+                        else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
                         {
                             std::string value = std::any_cast<std::string>(paramValues[key]);
                             // C 스타일 버퍼가 필요하므로 임시 버퍼 사용

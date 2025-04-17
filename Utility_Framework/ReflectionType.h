@@ -66,6 +66,7 @@ namespace Meta
         std::string     name;
         std::string     typeName;
         const TypeInfo& typeInfo;
+        HashedGuid		typeID;
     };
 
     struct Method

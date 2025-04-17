@@ -265,7 +265,8 @@ namespace Meta
             MethodParameter{
                 (Is < paramNames.size() ? paramNames[Is] : ("arg" + std::to_string(Is))),
                 ToString<Args>(),
-                typeid(Args)
+                typeid(Args),
+				TypeTrait::GUIDCreator::GetTypeID<Args>()
             }...
         };
 

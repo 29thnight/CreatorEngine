@@ -147,6 +147,12 @@
     <Filter Include="Renderer\Interfaces">
       <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Interface">
+      <UniqueIdentifier>{db58febd-5884-4fbf-b7a4-fe2fa87f65ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
+      <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -420,6 +426,15 @@
     </ClInclude>
     <ClInclude Include="Interfaces\ISceneRenderer.h">
       <Filter>Renderer\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IFileResource.h">
+      <Filter>Resources\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaWather.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaRegistry.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

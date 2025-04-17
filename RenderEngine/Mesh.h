@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include <assimp/Importer.hpp>
 
-struct Node
+struct ModelNode
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -13,8 +13,8 @@ struct Node
 	uint32 m_numMeshes{};
 	std::vector<uint32> m_meshes;
 
-    Node() = default;
-	Node(const std::string_view& name) : m_name(name) {}
+	ModelNode() = default;
+	ModelNode(const std::string_view& name) : m_name(name) {}
 };
 
 struct Vertex
@@ -55,7 +55,7 @@ class ModelLoader;
 class Mesh
 {
 public:
-	Mesh() meta_default(Mesh)
+	Mesh() = default;
 	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
@@ -63,7 +63,7 @@ public:
 	void Draw();
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
-	const std::string& GetName() { return m_name.ToString(); }
+	std::string GetName() const { return m_name; }
 
 	ReflectionField(Mesh)
 	{
@@ -71,20 +71,17 @@ public:
 		({
 			meta_property(m_name)
 			meta_property(m_materialIndex)
-			meta_property(m_nodeName)
 		});
 		FieldEnd(Mesh, PropertyOnly)
 	}
 
 private:
 	friend class ModelLoader;
-	friend class Meta::Property;
-	HashingString m_name;
+
+	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
 	uint32 m_materialIndex{};
-
-	HashingString m_nodeName;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;

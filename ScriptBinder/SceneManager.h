@@ -47,9 +47,14 @@ public:
     Core::Delegate<void>        newSceneCreatedEvent{};
 
 private:
+    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
+	void DesirealizeComponent(const Meta::Type* type, GameObject* obj, const MetaYml::detail::iterator_value& itNode);
+
+private:
     std::vector<Scene*>         m_scenes{};
     std::vector<Object*>        m_dontDestroyOnLoadObjects{};
     Scene*                      m_activeScene{};
+	std::string                 m_LoadSceneName{};
     std::atomic_size_t          m_activeSceneIndex{};
 };
 

@@ -18,7 +18,7 @@ public:
     }
 
     template<typename... Args>
-    Node* AllocateNode(Args&&... args)
+    ModelNode* AllocateNode(Args&&... args)
     {
         return m_nodePool.allocate_element(std::forward<Args>(args)...);
     }
@@ -57,7 +57,7 @@ public:
         m_modelPool.deallocate_element(model);
     }
 
-    void DeallocateNode(Node* node)
+    void DeallocateNode(ModelNode* node)
     {
         m_nodePool.deallocate_element(node);
     }
@@ -88,7 +88,7 @@ public:
     }
 
 private:
-    MemoryPool<Node, 4096> m_nodePool;
+    MemoryPool<ModelNode, 4096> m_nodePool;
     MemoryPool<Mesh, 4096> m_meshPool;
     MemoryPool<Material, 4096> m_materialPool;
     MemoryPool<Texture, 4096> m_texturePool;
@@ -101,7 +101,7 @@ static inline auto& ResourceMemoryPools = ResourceAllocator::GetInstance();
 
 template<typename T>
 concept ResourceType = std::is_base_of_v<Model, T>
-                    || std::is_base_of_v<Node, T>
+                    || std::is_base_of_v<ModelNode, T>
                     || std::is_base_of_v<Mesh, T>
                     || std::is_base_of_v<Material, T>
                     || std::is_base_of_v<Texture, T>
@@ -115,7 +115,7 @@ static inline T* AllocateResource(Args&&... args)
     {
         return ResourceMemoryPools->AllocateModel(std::forward<Args>(args)...);
     }
-    else if constexpr (std::is_same_v<T, Node>)
+    else if constexpr (std::is_same_v<T, ModelNode>)
     {
         return ResourceMemoryPools->AllocateNode(std::forward<Args>(args)...);
     }
@@ -153,7 +153,7 @@ static inline void DeallocateResource(T* resource)
     {
         ResourceMemoryPools->DeallocateModel(resource);
     }
-    else if constexpr (std::is_same_v<T, Node>)
+    else if constexpr (std::is_same_v<T, ModelNode>)
     {
         ResourceMemoryPools->DeallocateNode(resource);
     }
