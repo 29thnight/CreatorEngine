@@ -267,25 +267,25 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
 SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 {
 	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();
-	std::wstring name = file::path(filePath).stem().wstring();
+	std::string name = file::path(filePath).stem().string();
 
-	if (SFonts.find(name) != SFonts.end())
+	if (!SFonts.empty())
 	{
-		Debug->Log("Font already loaded");
-		return SFonts[name];
+		if (SFonts.find(name) != SFonts.end())
+		{
+			Debug->Log("Font already loaded");
+			return SFonts[name].get();
+		}
 	}
 
-	SpriteFont* SFont = new DirectX::SpriteFont(
-		DeviceState::g_pDevice,
-		destination.c_str()
-	);
 
-	SFonts[name] = (SFont);
-	return SFont;
+
+	SFonts.emplace(name, std::make_shared<SpriteFont>(DeviceState::g_pDevice, destination.c_str()));
+	
 	
 
 
-	return nullptr;
+	return SFonts[name].get();
 }
 
 

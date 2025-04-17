@@ -7,7 +7,7 @@
 #include "../ScriptBinder/SceneManager.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/Renderer.h"
-#include "../ScriptBinder/UIComponent.h"
+#include "../ScriptBinder/ImageComponent.h"
 #include "../ScriptBinder/UIManager.h"
 #include "../ScriptBinder/UIButton.h"
 #include "../ScriptBinder/TextComponent.h"
@@ -746,21 +746,27 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-	UIManagers->MakeImage("TestImage", DataSystems->LoadTexture("test.jpg"));
-	std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImage2", DataSystems->LoadTexture("test2.png"));
-	test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"myfile.spritefont"));
-	//auto text = test->GetComponent<TextComponent>();
+
+	
 	auto setcan = UIManagers->MakeCanvas("setting");
 	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("123.png"), []() {std::cout << "soooo angry" << std::endl;} , "setting", { 1360, 540 });
 	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;}, "setting",{ 560,540 });
 
-	UIManagers->SelectUI = Angryy2.get();
+	//UIManagers->SelectUI = Angryy2.get();
 
-	Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
-	Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
+	//Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
+	//Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
+	std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImagegg2", DataSystems->LoadTexture("test2.png"));
+	test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"DNF2.SFont"));
+	test->GetComponent<TextComponent>()->SetMessage("안녕");
+
+
+	std::shared_ptr<GameObject> text = UIManagers->MakeText("Text", DataSystems->LoadSFont(L"DNF2.SFont"));
+	text->GetComponent<TextComponent>()->SetMessage("그건 불가능함");
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
+	//UIManagers->MakeImage("TestImage", DataSystems->LoadTexture("test.jpg"));
 	m_renderScene->SetScene(m_currentScene);
 
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());

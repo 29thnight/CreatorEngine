@@ -155,8 +155,9 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="UIButton.cpp" />
-    <ClCompile Include="UIComponent.cpp" />
+    <ClCompile Include="ImageComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
+    <ClCompile Include="UIComponent.cpp" />
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -181,10 +182,11 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="UIButton.h" />
-    <ClInclude Include="UIComponent.h" />
+    <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="IUpdatable.h" />
+    <ClInclude Include="UIComponent.h" />
     <ClInclude Include="UIManager.h" />
   </ItemGroup>
   <ItemGroup>

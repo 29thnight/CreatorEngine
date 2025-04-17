@@ -1,6 +1,6 @@
 #pragma once
 #include "IRenderPass.h"
-#include "../ScriptBinder/UIComponent.h"
+#include "../ScriptBinder/ImageComponent.h"
 #include "../ScriptBinder/TextComponent.h"
 #include <DirectXTK/SpriteBatch.h>
 class GameObject;
@@ -30,7 +30,7 @@ private:
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
 	
-	std::vector<UIComponent*> _2DObjects;
+	std::vector<ImageComponent*> _2DObjects;
 	std::vector<TextComponent*> _TextObjects;
 };
 

@@ -2,9 +2,10 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "GameObject.h"
 #include <stop_token>
+#include <DirectXTK/SpriteFont.h>
 class Canvas;
 class Texture;
-//필요한가
+
 class UIManager : public Singleton<UIManager>
 {
 
@@ -18,6 +19,10 @@ public:
 	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeText(const std::string_view& name, SpriteFont* Sfont, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeText(const std::string_view& name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+
+
 
 	void CheckInput();
 

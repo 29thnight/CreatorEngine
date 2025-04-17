@@ -71,7 +71,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
-	std::unordered_map<std::wstring, SpriteFont*> SFonts;
+	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	static ImGuiTextFilter filter;
 
 private:

@@ -37,7 +37,8 @@ UIPass::UIPass()
 
 	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
@@ -63,25 +64,33 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
-	m_spriteBatch->Begin();
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, nullptr);
+	DirectX11::OMSetRenderTargets(1, &view, camera.m_renderTarget->m_pDSV);
+
+	
 	
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 	camera.UpdateBuffer();
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-
+	
 	
 	std::vector<Canvas*> canvases;
-	/*for (auto& Canvas2 : UIManagers->Canvases)
+	for (auto& Canvases : UIManagers->Canvases)
 	{
-		canvases.push_back(Canvas2->GetComponent<Canvas>());
+		Canvas* canvas = Canvases->GetComponent<Canvas>();
+		if (false == canvas->IsEnabled()) continue;
+		for (auto& uiObj : canvas->UIObjs)
+		{
+			ImageComponent* ui = uiObj->GetComponent<ImageComponent>();
+			if (ui && ui->IsEnabled())
+			{
+				_2DObjects.push_back(ui);
+			}
+		
+		}
 	}
-	std::sort(canvases.begin(), canvases.end(), [](Canvas* a, Canvas* b) {
-		return a->CanvasOrder < b->CanvasOrder;
-		});*/
 
 	for (auto& Canvases : UIManagers->Canvases)
 	{
@@ -89,11 +98,6 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 		if (false == canvas->IsEnabled()) continue;
 		for (auto& uiObj : canvas->UIObjs)
 		{
-			UIComponent* ui = uiObj->GetComponent<UIComponent>();
-			if (ui && ui->IsEnabled())
-			{
-				_2DObjects.push_back(ui);
-			}
 			TextComponent* text = uiObj->GetComponent<TextComponent>();
 			if (text && text->IsEnabled())
 			{
@@ -101,9 +105,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 			}
 		}
 	}
-
-
-	std::sort(_2DObjects.begin(), _2DObjects.end(), [](UIComponent* a, UIComponent* b) {
+	std::sort(_2DObjects.begin(), _2DObjects.end(), [](ImageComponent* a, ImageComponent* b) {
 		if (a->_layerorder != b->_layerorder)
 			return a->_layerorder < b->_layerorder;
 
@@ -117,25 +119,39 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 		return aOrder < bOrder;
 		});
 
+
+	
 	for (auto& Uiobject : _2DObjects)
 	{
 		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
 		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
 		Uiobject->m_UIMesh->Draw();
+
 	}
+
+
+
+	auto viewc = camera.CalculateView();
+	camera.m_isOrthographic = true;
+	auto projc = camera.CalculateProjection(true);
+	auto vipro = viewc * projc;
+	camera.m_isOrthographic = false;
+	m_spriteBatch->Begin(DirectX::SpriteSortMode_Deferred, DeviceState::g_pBlendState, nullptr, m_NoWriteDepthStencilState.Get(), nullptr,nullptr, vipro);
+	
 	for (auto& Textobject : _TextObjects)
 	{
 		Textobject->Draw(m_spriteBatch);
 	}
-
+	m_spriteBatch->End();
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
+	_TextObjects.clear();
 	_2DObjects.clear();
-	m_spriteBatch->End();
+	
 }
 
 bool UIPass::compareLayer(int  a, int  b)

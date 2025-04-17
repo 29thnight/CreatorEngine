@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
-
+#include "Canvas.h"
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 
@@ -15,29 +15,32 @@ public:
 	
 	std::string ToString() const override
 	{
-		return std::string("UIComponent");
+		return std::string("TextComponent");
 	}
 
 	bool IsEnabled() const override
 	{
-		return m_IsEnabled;
+		return m_TIsEnabled;
 	}
 
 	void SetEnabled(bool able) override
 	{
-		m_IsEnabled = able;
+		m_TIsEnabled = able;
 	}
 	virtual void Update(float tick) override;
-	void SetMessage(std::wstring_view _message) { message = _message; }
+
+	//한글이 안나올시 sfont 제대로 만들었는지 확인
+	void SetMessage(std::string_view _message) { message = _message.data(); }
 	void LoadFont(SpriteFont* _font) { font = _font; }
 	void Draw(SpriteBatch* Sbatch);
-
-	std::wstring message;
+	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
+	std::string message;
 	ReflectionField(TextComponent, PropertyOnly)
 	{
 		PropertyField
 		({
-			meta_property(m_IsEnabled)
+			meta_property(m_TIsEnabled)
+			meta_property(relpos)
 			meta_property(message)
 			});
 
@@ -48,10 +51,13 @@ public:
 
 private:
 	Mathf::Vector2 pos{ 0,0};
+	Canvas* ownerCanvas = nullptr;
 
-	bool m_IsEnabled = true;
+	//상위ui 위치기준 추가값
+	Mathf::Vector2 relpos{ 0,0 };
+	bool m_TIsEnabled = true;
 	SpriteFont* font = nullptr;
 	DirectX::XMVECTORF32 color = DirectX::Colors::Black;
-	float fontSize;
+	float fontSize =5.f;
 };
 

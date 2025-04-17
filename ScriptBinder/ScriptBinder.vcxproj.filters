@@ -75,7 +75,7 @@
     <ClCompile Include="UIManager.cpp">
       <Filter>Managers</Filter>
     </ClCompile>
-    <ClCompile Include="UIComponent.cpp">
+    <ClCompile Include="ImageComponent.cpp">
       <Filter>Classes\Components\UI</Filter>
     </ClCompile>
     <ClCompile Include="Canvas.cpp">
@@ -85,6 +85,9 @@
       <Filter>Classes\Components\UI</Filter>
     </ClCompile>
     <ClCompile Include="TextComponent.cpp">
+      <Filter>Classes\Components\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UIComponent.cpp">
       <Filter>Classes\Components\UI</Filter>
     </ClCompile>
   </ItemGroup>
@@ -155,7 +158,7 @@
     <ClInclude Include="UIManager.h">
       <Filter>Managers</Filter>
     </ClInclude>
-    <ClInclude Include="UIComponent.h">
+    <ClInclude Include="ImageComponent.h">
       <Filter>Classes\Components\UI</Filter>
     </ClInclude>
     <ClInclude Include="Canvas.h">
@@ -165,6 +168,9 @@
       <Filter>Classes\Components\UI</Filter>
     </ClInclude>
     <ClInclude Include="TextComponent.h">
+      <Filter>Classes\Components\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIComponent.h">
       <Filter>Classes\Components\UI</Filter>
     </ClInclude>
   </ItemGroup>

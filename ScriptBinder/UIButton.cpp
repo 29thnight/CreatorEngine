@@ -1,7 +1,7 @@
 #include "UIButton.h"
 #include "../RenderEngine/DeviceState.h"
 #include "../InputManager.h"
-#include "UIComponent.h"
+#include "ImageComponent.h"
 UIButton::UIButton(std::function<void()> func)
 {
 	m_orderID = Component::Order2Uint(ComponentOrder::BehaviorScript);
@@ -16,10 +16,14 @@ void UIButton::Update(float deltaSecond)
 
 void UIButton::UpdateCollider()
 {
-	UIComponent* uiComponent = GetOwner()->GetComponent<UIComponent>();
-	obBox.Center = uiComponent->pos;
-	obBox.Extents.x = uiComponent->uiinfo.size.x;
-	obBox.Extents.y = uiComponent->uiinfo.size.y;
+	GameObject* owner = GetOwner();
+	owner->m_transform.GetWorldPosition();
+	auto pos = owner->m_transform.GetWorldPosition();
+
+	ImageComponent* Image = GetOwner()->GetComponent<ImageComponent>();
+	obBox.Center = Mathf::Vector3{ pos.m128_f32[0], pos.m128_f32[1],0 };
+	obBox.Extents.x = Image->uiinfo.size.x;
+	obBox.Extents.y = Image->uiinfo.size.y;
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
