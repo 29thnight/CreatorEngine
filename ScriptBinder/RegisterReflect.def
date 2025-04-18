@@ -7,6 +7,8 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "TextComponent.h"
+#include "ImageComponent.h"
+#include "UIComponent.h"
 
 REFLECTION_REGISTER()
 {
@@ -25,4 +27,6 @@ REFLECTION_REGISTER()
 	AUTO_REGISTER_CLASS(Transform);
 	AUTO_REGISTER_CLASS(MaterialInfomation);
 	AUTO_REGISTER_CLASS(TextComponent);
+	AUTO_REGISTER_CLASS(ImageComponent);
+	AUTO_REGISTER_CLASS(UIComponent);
 }

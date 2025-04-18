@@ -2,9 +2,7 @@
 #include "GameObject.h"
 
 float MaxOreder = 100.0f;
-UIComponent::UIComponent()
-{
-}
+
 void UIComponent::SetNavi(Direction dir, GameObject* otherUI)
 {
 	navigation[dir] = otherUI;

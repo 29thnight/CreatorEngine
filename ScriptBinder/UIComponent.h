@@ -25,8 +25,7 @@ enum class Direction
 class UIComponent : public Component, public IRenderable
 {
 public:
-	UIComponent();
-	~UIComponent() = default;
+	GENERATED_BODY(UIComponent)
 
 	bool IsEnabled() const override
 	{
@@ -48,6 +47,18 @@ public:
 	Mathf::Vector3 pos{ 960,540,0 };
 	Mathf::Vector2 scale{ 1,1};
 	UItype type = UItype::None;
+
+	ReflectionField(UIComponent)
+	{
+		PropertyField
+		({
+			meta_property(m_IsEnabled)
+			meta_property(_layerorder)
+		});
+
+		FieldEnd(UIComponent, PropertyOnly)
+	}
+
 protected:
 	bool m_IsEnabled = true;
 private:

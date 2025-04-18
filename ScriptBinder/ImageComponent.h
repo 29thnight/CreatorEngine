@@ -35,12 +35,10 @@ public:
 	ImageInfo uiinfo;
 	Texture* m_curtexture{};
 	int curindex = 0;
-	ReflectionField(ImageComponent)
+	ReflectionFieldInheritance(ImageComponent, UIComponent)
 	{
 		PropertyField
 		({
-			meta_property(m_IsEnabled)
-			meta_property(_layerorder)
 			meta_property(curindex)
 		});
 
@@ -49,7 +47,7 @@ public:
 			meta_method(UpdateTexture)
 		});
 
-		FieldEnd(ImageComponent, PropertyAndMethod)
+		FieldEnd(ImageComponent, PropertyAndMethodInheritance)
 	};
 	//ndc좌표 {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
