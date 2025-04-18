@@ -147,6 +147,9 @@
     <Filter Include="Renderer\Interfaces">
       <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="LightMap\Algorithm">
+      <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -507,9 +510,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IndirectLightMap.cs.hlsl">
       <Filter>Shaders\LightMap</Filter>
     </FxCompile>
@@ -539,6 +539,12 @@
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
       <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AddTextureColor.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

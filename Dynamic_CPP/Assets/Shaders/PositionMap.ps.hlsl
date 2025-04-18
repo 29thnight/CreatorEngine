@@ -18,6 +18,6 @@ Output main(PS_INPUT input) : SV_Target
     
     Output output;
     output.positionMap = float4(input.localPos, 1.0f); // 월드 좌표 저장
-    output.normalMap = float4(input.localNor, 1.0f); // 월드 노멀 저장
+    output.normalMap = float4(input.localNor, 0.0f); // 월드 노멀 저장
     return output;
 }

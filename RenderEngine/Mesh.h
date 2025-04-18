@@ -64,6 +64,8 @@ public:
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
 	const std::string& GetName() { return m_name; }
+	const std::vector<Vertex>& GetVertices() { return m_vertices; }
+	const std::vector<uint32>& GetIndices() { return m_indices; }
 private:
 	friend class ModelLoader;
 	std::string m_name;
