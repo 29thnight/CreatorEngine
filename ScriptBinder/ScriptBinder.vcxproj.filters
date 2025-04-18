@@ -78,6 +78,9 @@
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
     </ClCompile>
+    <ClCompile Include="ComponentFactory.cpp">
+      <Filter>Classes\Components\ComponentFactory</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">

@@ -199,7 +199,6 @@
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectModules.h" />
     <ClInclude Include="Interfaces\ISceneRenderer.h" />
-    <ClInclude Include="IFileResource.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ShaderSystem.h" />

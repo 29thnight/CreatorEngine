@@ -166,6 +166,11 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			{
 				DataSystems->LoadModel(filePath.string());
 			}
+
+			if (".png" == filePath.extension() || ".dds" == filePath.extension() || ".hdr" == filePath.extension())
+			{
+				DataSystems->LoadTexture(filePath.string());
+			}
 		}
 	}
 

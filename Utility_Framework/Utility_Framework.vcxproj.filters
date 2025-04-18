@@ -73,6 +73,9 @@
     <Filter Include="Core.Reflection">
       <UniqueIdentifier>{fabc6f1b-1af9-4234-b2d3-22470fb2531a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Coroutine">
+      <UniqueIdentifier>{762822fa-b780-4fa8-9113-9a9c4d4751ae}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -210,6 +213,12 @@
     <ClInclude Include="ReflectionImGuiHelper.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="Core.Coroutine.h">
+      <Filter>Core.Coroutine</Filter>
+    </ClInclude>
+    <ClInclude Include="CoroutineHelper.h">
+      <Filter>Core.Coroutine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -226,6 +235,9 @@
     </ClCompile>
     <ClCompile Include="LogSystem.cpp">
       <Filter>Core.Logger</Filter>
+    </ClCompile>
+    <ClCompile Include="Core.Coroutine.cpp">
+      <Filter>Core.Coroutine</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -134,6 +134,7 @@ void Scene::Start()
 void Scene::FixedUpdate(float deltaSecond)
 {
     FixedUpdateEvent.Broadcast(deltaSecond);
+	CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
 void Scene::OnTriggerEnter(ICollider* collider)
@@ -173,7 +174,11 @@ void Scene::Update(float deltaSecond)
 
 void Scene::YieldNull()
 {
+	CoroutineManagers->yield_Null();
 	ScriptManager->ReplaceScriptComponent();
+	CoroutineManagers->yield_WaitForSeconds();
+	CoroutineManagers->yield_OtherEvent();
+	CoroutineManagers->yield_StartCoroutine();
 }
 
 void Scene::LateUpdate(float deltaSecond)

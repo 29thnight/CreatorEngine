@@ -10,5 +10,7 @@ private:
 	~ComponentFactory() = default;
 
 public:
-	//void LoadComponent(const MetaYml::iterator_value& itNode, GameObject* obj
+	void LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode);
 };
+
+static auto& ComponentFactorys = ComponentFactory::GetInstance();

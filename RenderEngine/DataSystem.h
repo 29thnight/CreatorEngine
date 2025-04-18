@@ -55,6 +55,7 @@ public:
 	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
 	void LoadMaterials();
+	Texture* LoadTexture(FileGuid guid);
 	Texture* LoadTexture(const std::string_view& filePath);
     Texture* LoadMaterialTexture(const std::string_view& filePath);
 

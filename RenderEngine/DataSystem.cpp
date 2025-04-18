@@ -234,10 +234,37 @@ void DataSystem::LoadMaterials()
 {
 }
 
+Texture* DataSystem::LoadTexture(FileGuid guid)
+{
+	file::path texturePath = m_assetMetaRegistry->GetPath(guid);
+	std::string name = texturePath.stem().string();
+	if (Textures.find(name) != Textures.end())
+	{
+		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+		return Textures[name].get();
+	}
+	Texture* texture = Texture::LoadFormPath(texturePath.string());
+	if (texture)
+	{
+		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
+		{
+			if (texture)
+			{
+				DeallocateResource<Texture>(texture);
+			}
+		});
+		return texture;
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
+}
+
 Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 {
 	file::path source = filePath;
-	file::path destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
+	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
 	if (source != destination && file::exists(source) && !file::exists(destination))
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);

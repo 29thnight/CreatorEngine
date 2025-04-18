@@ -3,6 +3,7 @@
 #include "Object.h"
 #include "FileIO.h"
 #include "DataSystem.h"
+#include "ComponentFactory.h"
 #include "RegisterReflect.def"
 
 void SceneManager::ManagerInitialize()
@@ -52,6 +53,7 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
+	CoroutineManagers->yield_WaitForEndOfFrame();
 }
 
 void SceneManager::Pausing()
@@ -171,42 +173,8 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         {
             for (const auto& componentNode : itNode["m_components"])
             {
-				DesirealizeComponent(type, obj, componentNode);
+                ComponentFactorys->LoadComponent(obj, componentNode);
             }
-        }
-    }
-}
-
-void SceneManager::DesirealizeComponent(const Meta::Type* type, GameObject* obj, const MetaYml::detail::iterator_value& itNode)
-{
-    const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
-    if (nullptr == componentType)
-    {
-        return;
-    }
-    
-    auto component = obj->AddComponent((*componentType)).get();
-    if (component)
-    {
-        using namespace TypeTrait;
-        if (componentType->typeID == GUIDCreator::GetTypeID<MeshRenderer>())
-        {
-            auto meshRenderer = static_cast<MeshRenderer*>(component);
-			Model* model = nullptr;
-			if (itNode["m_Material"])
-			{
-				auto materialNode = itNode["m_Material"];
-				FileGuid guid = materialNode["m_fileGuid"].as<std::string>();
-                model = DataSystems->LoadModelGUID(guid);
-			}
-			MetaYml::Node getMeshNode = itNode["m_Mesh"];
-			if (model && getMeshNode)
-            {
-                meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
-                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
-            }
-            Deserialize(meshRenderer, itNode);
-            meshRenderer->SetEnabled(true);
         }
     }
 }

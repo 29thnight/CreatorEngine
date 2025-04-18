@@ -147,6 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="Object.cpp" />

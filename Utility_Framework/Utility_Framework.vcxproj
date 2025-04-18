@@ -25,6 +25,7 @@
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
+    <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
@@ -33,6 +34,7 @@
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.hpp" />
     <ClInclude Include="CoreWindow.h" />
+    <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
@@ -66,6 +68,7 @@
     <ClInclude Include="TypeTrait.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
