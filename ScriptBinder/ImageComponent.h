@@ -17,8 +17,6 @@ struct alignas(16) ImageInfo
  
 };
 
-
-//모든 2d이미지 기본?
 class ImageComponent : public UIComponent, public IUpdatable, public Meta::IReflectable<ImageComponent>
 {
 public:
@@ -49,11 +47,8 @@ public:
 
 		FieldEnd(ImageComponent, PropertyAndMethodInheritance)
 	};
-	//ndc좌표 {-1,1}
-	Mathf::Vector3 trans{ 0,0,0 };
-	Mathf::Vector3 rotat{ 0,0,0 };
 private:
-	float rotate;
+	float rotate =0;
 	std::vector<Texture*> textures;
 	XMFLOAT2 origin{};
 

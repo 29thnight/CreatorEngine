@@ -8,7 +8,7 @@
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
 
-class TextComponent : public UIComponent, public IUpdatable
+class TextComponent : public UIComponent, public IUpdatable, public Meta::IReflectable<TextComponent>
 {
 public:
 	TextComponent();
@@ -22,16 +22,16 @@ public:
 	void Draw(SpriteBatch* Sbatch);
 	std::string message;
 
-	ReflectionField(TextComponent)
+	ReflectionFieldInheritance(TextComponent, UIComponent)
 	{
 		PropertyField
 		({
 			meta_property(_isTable)
 			meta_property(relpos)
-			meta_property(_layerorder)
+			meta_property(message)
 		});
 
-		FieldEnd(TextComponent, PropertyOnly)
+		FieldEnd(TextComponent, PropertyOnlyInheritance)
 	};
 
 
