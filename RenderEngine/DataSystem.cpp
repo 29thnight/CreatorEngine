@@ -1,11 +1,11 @@
 #include "DataSystem.h"
-//#include "MaterialLoader.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
 #include <ppl.h>
+#include "FileIO.h"
 #include "Benchmark.hpp"
 #include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
@@ -49,6 +49,12 @@ void DataSystem::Initialize()
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
 
 	RenderForEditer();
+	m_watcher = new efsw::FileWatcher();
+	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
+	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
+	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
+	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
+	m_watcher->watch();
 }
 
 void DataSystem::Finalize()
@@ -64,6 +70,8 @@ void DataSystem::Finalize()
     Models.clear();
     Textures.clear();
     Materials.clear();
+
+	delete m_watcher;
 }
 
 void DataSystem::RenderForEditer()
@@ -111,6 +119,35 @@ void DataSystem::MonitorFiles()
 void DataSystem::LoadModels()
 {
 	file::path shaderpath = PathFinder::Relative("Models\\");
+}
+
+Model* DataSystem::LoadModelGUID(FileGuid guid)
+{
+	file::path modelPath = m_assetMetaRegistry->GetPath(guid);
+	std::string name = modelPath.stem().string();
+	if (Models.find(name) != Models.end())
+	{
+		Debug->Log("ModelLoader::LoadModel : Model already loaded");
+		return Models[name].get();
+	}
+
+	Model* model = Model::LoadModel(modelPath.string());
+	if (model)
+	{
+		auto deleter = [&](Model* model)
+		{
+			if (model)
+			{
+				DeallocateResource<Model>(model);
+			}
+		};
+		Models[name] = std::shared_ptr<Model>(model, deleter);
+		return model;
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
 }
 
 void DataSystem::LoadModel(const std::string_view& filePath)
@@ -196,10 +233,37 @@ void DataSystem::LoadMaterials()
 {
 }
 
+Texture* DataSystem::LoadTexture(FileGuid guid)
+{
+	file::path texturePath = m_assetMetaRegistry->GetPath(guid);
+	std::string name = texturePath.stem().string();
+	if (Textures.find(name) != Textures.end())
+	{
+		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
+		return Textures[name].get();
+	}
+	Texture* texture = Texture::LoadFormPath(texturePath.string());
+	if (texture)
+	{
+		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
+		{
+			if (texture)
+			{
+				DeallocateResource<Texture>(texture);
+			}
+		});
+		return texture;
+	}
+	else
+	{
+		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+	}
+}
+
 Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 {
 	file::path source = filePath;
-	file::path destination = PathFinder::Relative("UI\\") / file::path(filePath).filename();
+	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
 	if (source != destination && file::exists(source) && !file::exists(destination))
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);
@@ -328,7 +392,6 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
-
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;

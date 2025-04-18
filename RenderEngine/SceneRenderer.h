@@ -82,7 +82,7 @@ private:
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers
-	ComPtr<ID3D11Buffer> m_ModelBuffer;
+	ComPtr<ID3D11Buffer>				m_ModelBuffer;
 
 	//Textures
 	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };

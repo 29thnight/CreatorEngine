@@ -71,7 +71,8 @@ void HotLoadSystem::ReplaceScriptComponent()
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
 			auto* newScript = CreateMonoBehavior(name.c_str());
-			gameObject->m_components[index] = newScript;
+			//gameObject->m_components[index] = newScript;
+			gameObject->m_components[index].reset(newScript);
 		}
 		m_isReloading = false;
 	}
@@ -94,10 +95,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		scriptFile 
 			<< scriptIncludeString 
 			<< name 
-			<< scriptBodyString 
-			<< scriptToStringFunString 
-			<< name 
-			<< scriptToStringEndString 
+			<< scriptBodyString
 			<< scriptEndString;
 
 		scriptFile.close();

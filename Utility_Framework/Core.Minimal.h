@@ -3,6 +3,7 @@
 #include "Core.Mathf.h"
 #include "Core.Assert.hpp"
 #include "Core.Memory.hpp"
+#include "Core.Coroutine.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include "CSVLoader.h"

@@ -64,25 +64,36 @@ void ShaderResourceSystem::ReloadShaders()
 	HLSLIncludeReloadShaders();
 	CSOCleanup();
 
+	Debug->Log("[Shaders Reload Starting]");
+
 	try
 	{
 		file::path shaderpath = PathFinder::RelativeToShader();
 		file::path precompiledpath = PathFinder::RelativeToPrecompiledShader();
+		std::vector<file::path> hlslFiles;
 		for (auto& dir : file::recursive_directory_iterator(shaderpath))
 		{
-			if (dir.is_directory() || dir.path().extension() != ".hlsl")
-				continue;
+			if (!dir.is_directory() && dir.path().extension() == ".hlsl")
+			{
+				hlslFiles.push_back(dir.path());
+			}
+		}
 
-			file::path cso = precompiledpath.string() + dir.path().stem().string() + ".cso";
+		size_t total = hlslFiles.size();
+		size_t current = 0;
+
+		for (const auto& hlslPath : hlslFiles)
+		{
+			file::path cso = precompiledpath / (hlslPath.stem().string() + ".cso");
 
 			if (file::exists(cso))
 			{
-				auto hlslTime = file::last_write_time(dir.path());
+				auto hlslTime = file::last_write_time(hlslPath);
 				auto csoTime = file::last_write_time(cso);
 
 				if (hlslTime > csoTime)
 				{
-					ReloadShaderFromPath(dir.path());
+					ReloadShaderFromPath(hlslPath);
 				}
 				else
 				{
@@ -91,9 +102,18 @@ void ShaderResourceSystem::ReloadShaders()
 			}
 			else
 			{
-				ReloadShaderFromPath(dir.path());
+				ReloadShaderFromPath(hlslPath);
 			}
+
+			++current;
+			float percent = (static_cast<float>(current) / total) * 100.0f;
+			Debug->Log("Reloading shaders... " + 
+				std::to_string(current) + "/" + 
+				std::to_string(total) + " (" + 
+				std::to_string(percent) + "%)"
+			);
 		}
+
 	}
 	catch (const file::filesystem_error& e)
 	{
@@ -107,6 +127,8 @@ void ShaderResourceSystem::ReloadShaders()
 	m_shaderReloadedDelegate.Broadcast();
 
 	m_isReloading = false;
+
+	Debug->Log("[Shaders Reload Completed]");
 }
 
 void ShaderResourceSystem::HLSLIncludeReloadShaders()

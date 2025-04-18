@@ -6,6 +6,7 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 	m_vertices(_vertices),
 	m_indices(_indices)
 {
+	meta_default(Mesh);
 	/*for (int i = 0; i < m_indices.size(); i += 3)
 	{
 		uint32 index0 = m_indices[i];
@@ -57,6 +58,7 @@ Mesh::Mesh(Mesh&& _other) noexcept :
 	m_vertexBuffer(std::move(_other.m_vertexBuffer)),
 	m_indexBuffer(std::move(_other.m_indexBuffer))
 {
+	meta_default(Mesh);
 }
 
 Mesh::~Mesh()

@@ -2,7 +2,7 @@
 #include "RenderScene.h"
 #include "Skeleton.h"
 #include "SceneManager.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
 

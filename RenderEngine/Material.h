@@ -17,10 +17,10 @@ cbuffer MaterialInfomation
 	bool32		  m_useNormalMap{};
 	bool32		  m_convertToLinearSpace{};
 
-	MaterialInfomation() meta_default(MaterialInfomation);
+	MaterialInfomation() = default;
 	~MaterialInfomation() = default;
 
-	ReflectionField(MaterialInfomation, PropertyOnly)
+	ReflectionField(MaterialInfomation)
 	{
 		PropertyField
 		({
@@ -29,7 +29,7 @@ cbuffer MaterialInfomation
 			meta_property(m_roughness)
 		});
 
-		ReturnReflectionPropertyOnly(MaterialInfomation)
+		FieldEnd(MaterialInfomation, PropertyOnly)
 	};
 };
 
@@ -41,7 +41,7 @@ enum class MaterialRenderingMode
 
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
-class Material : public Meta::IReflectable<Material>
+class Material
 {
 public:
 	Material() = default;
@@ -73,17 +73,20 @@ public:
 	Texture* m_pEmissive{ nullptr };
 
 	MaterialInfomation m_materialInfo;
+	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 
-	ReflectionField(Material, PropertyOnly)
+	ReflectionField(Material)
 	{
 		PropertyField
 		({
+			meta_property(m_name)
+			meta_property(m_fileGuid)
 			meta_property(m_materialInfo)
-			meta_enum_property(m_renderingMode)
+			meta_property(m_renderingMode)
 		});
 
-		ReturnReflectionPropertyOnly(Material)
+		FieldEnd(Material, PropertyOnly)
 	};
 };
 

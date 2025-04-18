@@ -25,6 +25,16 @@ public:
 		m_hash = std::hash<std::string_view>{}(str);
 	}
 
+	HashingString(const std::string_view& str)
+	{
+		if (str.empty())
+		{
+			CORE_ASSERT_MSG(!str.empty(), "Empty string provided to HashingString constructor.");
+		}
+		m_string = str;
+		m_hash = std::hash<std::string_view>{}(str);
+	}
+
 	HashingString& operator=(const char* str)
 	{
 		if (str == nullptr) 
@@ -47,6 +57,17 @@ public:
 		return *this;
 	}
 
+	HashingString& operator=(const std::string_view& str)
+	{
+		if (str.empty())
+		{
+			CORE_ASSERT_MSG(!str.empty(), "Empty string provided in assignment operator for std::string.");
+		}
+		m_string = str;
+		m_hash = std::hash<std::string_view>{}(m_string);
+		return *this;
+	}
+
 	HashingString(const HashingString&) = default;
 	HashingString(HashingString&&) noexcept = default;
 	HashingString& operator=(const HashingString&) = default;
@@ -61,9 +82,13 @@ public:
 
 	bool operator==(const HashingString& other) const 
 	{
-		return m_hash == other.m_hash && m_string == other.m_string;
+		return m_hash == other.m_hash;
 	}
 
+	bool operator!=(const HashingString& other) const
+	{
+		return m_hash != other.m_hash;
+	}
 
 	std::string ToString() const
 	{

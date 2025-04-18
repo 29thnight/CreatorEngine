@@ -11,6 +11,7 @@ private:
     ~SceneManager() = default;
 
 public:
+	void ManagerInitialize();
     void Editor();
     void Initialization();
     void Physics(float deltaSecond);
@@ -27,8 +28,8 @@ public:
     Scene* GetScene(size_t index) { return m_scenes[index]; }
 
     Scene* CreateScene(const std::string_view& name = "SampleScene");
-    Scene* LoadScene(const std::string_view& name);
-    Scene* LoadSceneAsync(const std::string_view& name);
+	Scene* SaveScene(const std::string_view& name = "SampleScene", bool isAsync = false);
+    Scene* LoadScene(const std::string_view& name = "SampleScene", bool isAsync = false);
 
     void AddDontDestroyOnLoad(Object* objPtr);
 
@@ -46,9 +47,13 @@ public:
     Core::Delegate<void>        newSceneCreatedEvent{};
 
 private:
+    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
+
+private:
     std::vector<Scene*>         m_scenes{};
     std::vector<Object*>        m_dontDestroyOnLoadObjects{};
     Scene*                      m_activeScene{};
+	std::string                 m_LoadSceneName{};
     std::atomic_size_t          m_activeSceneIndex{};
 };
 

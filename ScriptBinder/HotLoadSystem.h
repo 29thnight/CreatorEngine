@@ -73,19 +73,6 @@ private:
 		"	virtual void LateUpdate(float tick) override;\n"
 	};
 
-	std::string scriptToStringFunString
-	{
-		"	std::string ToString() const override\n"
-		"	{\n"
-		"		return \""
-	};
-
-	std::string scriptToStringEndString
-	{
-		"\";\n"
-		"	}\n"
-	};
-
 	std::string scriptEndString
 	{
 		"};\n"

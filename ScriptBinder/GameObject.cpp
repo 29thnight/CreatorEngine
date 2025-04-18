@@ -1,6 +1,16 @@
 #include "GameObject.h"
 #include "Scene.h"
 #include "SceneManager.h"
+#include "RenderableComponents.h"
+
+GameObject::GameObject() :
+	Object("GameObject"),
+	m_gameObjectType(Type::Empty),
+	m_index(0),
+	m_parentIndex(0)
+{
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+}
 
 GameObject::GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex) :
     Object(name),
@@ -8,19 +18,35 @@ GameObject::GameObject(const std::string_view& name, GameObject::Type type, Game
     m_index(index), 
     m_parentIndex(parentIndex)
 {
+    m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 }
 
-void GameObject::ComponentsSort()
+GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex) :
+	Object(name, instanceID),
+	m_gameObjectType(type),
+	m_index(index),
+	m_parentIndex(parentIndex)
 {
-    std::ranges::sort(m_components, [&](Component* a, Component* b)
-    {
-        return a->GetOrderID() < b->GetOrderID();
-    });
+	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+}
 
-    std::ranges::for_each(std::views::iota(0, static_cast<int>(m_components.size())), [&](int i)
+std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
+{
+    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == type.typeID; }) != m_components.end())
     {
-        m_componentIds[m_components[i]->GetTypeID()] = i;
-    });
+        return nullptr;
+    }
+
+    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->Create<Component>(type.name));
+	
+    if (component)
+    {
+        m_components.push_back(component);
+        component->SetOwner(this);
+        m_componentIds[component->GetTypeID()] = m_components.size();
+    }
+
+	return component;
 }
 
 GameObject* GameObject::Find(const std::string_view& name)

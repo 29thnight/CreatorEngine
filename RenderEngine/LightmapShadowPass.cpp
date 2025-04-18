@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "ResourceAllocator.h"
 
 LightmapShadowPass::LightmapShadowPass() {

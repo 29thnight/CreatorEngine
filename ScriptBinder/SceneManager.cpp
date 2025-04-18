@@ -1,6 +1,15 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Object.h"
+#include "FileIO.h"
+#include "DataSystem.h"
+#include "ComponentFactory.h"
+#include "RegisterReflect.def"
+
+void SceneManager::ManagerInitialize()
+{
+    REFLECTION_REGISTER_EXECUTE()
+}
 
 void SceneManager::Editor()
 {
@@ -44,6 +53,7 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
+	CoroutineManagers->yield_WaitForEndOfFrame();
 }
 
 void SceneManager::Pausing()
@@ -77,14 +87,62 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
     return allocScene;
 }
 
-Scene* SceneManager::LoadScene(const std::string_view& name)
+Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
-    return nullptr;
+	std::ofstream sceneFileOut("TestScene.yml");
+    MetaYml::Node sceneNode{};
+
+    try
+    {
+        sceneNode = Meta::Serialize(m_activeScene);
+    }
+	catch (const std::exception& e)
+	{
+		Debug->LogError(e.what());
+		return nullptr;
+	}
+
+	sceneFileOut << sceneNode;
 }
 
-Scene* SceneManager::LoadSceneAsync(const std::string_view& name)
+Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 {
-    return nullptr;
+	try
+	{
+        MetaYml::Node sceneNode = MetaYml::LoadFile("TestScene.yml");
+        if (m_activeScene)
+        {
+			Scene* swapScene = m_activeScene;
+			m_activeScene = nullptr;
+			delete swapScene;
+        }
+		m_activeScene = Scene::LoadScene(name);
+
+        for (const auto& objNode : sceneNode["m_SceneObjects"])
+        {
+			const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+			if (!type)
+			{
+				Debug->LogError("Failed to extract type from YAML node.");
+				continue;
+			}
+
+			DesirealizeGameObject(type, objNode);
+        }
+
+
+		m_scenes.push_back(m_activeScene);
+		m_activeSceneIndex = m_scenes.size() - 1;
+
+		activeSceneChangedEvent.Broadcast();
+		sceneLoadedEvent.Broadcast();
+	}
+	catch (const std::exception& e)
+	{
+		Debug->LogError(e.what());
+		return nullptr;
+	}
+	return m_activeScene;
 }
 
 void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
@@ -92,5 +150,31 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     if (objPtr)
     {
         m_dontDestroyOnLoadObjects.push_back(objPtr);
+    }
+}
+
+void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+{
+    if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
+    {
+        auto obj = m_activeScene->LoadGameObject(
+            itNode["m_instanceID"].as<size_t>(),
+            itNode["m_name"].as<std::string>(),
+            GameObject::Type::Empty,
+            itNode["m_parentIndex"].as<GameObject::Index>()
+        ).get();
+
+        if (obj)
+        {
+            Deserialize(obj, itNode);
+        }
+
+        if (itNode["m_components"])
+        {
+            for (const auto& componentNode : itNode["m_components"])
+            {
+                ComponentFactorys->LoadComponent(obj, componentNode);
+            }
+        }
     }
 }

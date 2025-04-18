@@ -3,7 +3,7 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Skeleton.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Scene.h"
 #include "GameObject.h"
 #include "Material.h"
@@ -20,12 +20,16 @@ public:
     static Model* LoadModelToScene(Model* model, Scene& Scene);
     static Model* LoadModel(const std::string_view& filePath);
 
-    void GenerateFileID();
+	Mesh* GetMesh(const std::string_view& name);
+	Mesh* GetMesh(int index);
+	Material* GetMaterial(const std::string_view& name);
+	Material* GetMaterial(int index);
+	Texture* GetTexture(const std::string_view& name);
+	Texture* GetTexture(int index);
 
 public:
     std::string	name{};
     file::path	path{};
-    HashingString m_fileID{};
 
 	Animator*   m_animator{};
     Skeleton*   m_Skeleton{};
@@ -37,7 +41,7 @@ private:
     friend class ModelLoader;
 	friend class DataSystem;
 
-    std::vector<Node*>      m_nodes;
+    std::vector<ModelNode*> m_nodes;
     std::vector<Mesh*>      m_Meshes;
     std::vector<Material*>  m_Materials;
     std::vector<Texture*>   m_Textures;

@@ -1,6 +1,5 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
-#include "IlifeSycle.h"
 #include "GameObjectPool.h"
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
@@ -57,6 +56,40 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	return m_SceneObjects[index];
 }
 
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+{
+    if (name.empty())
+    {
+        return nullptr;
+    }
+
+    if (parentIndex >= m_SceneObjects.size())
+    {
+        parentIndex = 0;
+    }
+
+    std::string uniqueName = GenerateUniqueGameObjectName(name);
+
+    GameObject::Index index = m_SceneObjects.size();
+    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    if (nullptr == ptr)
+    {
+        return nullptr;
+    }
+
+    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
+    {
+        if (obj)
+        {
+            ObjectPool::Deallocate(obj);
+        }
+    });
+
+    m_SceneObjects.push_back(newObj);
+
+    return m_SceneObjects[index];
+}
+
 std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 {
 	if (index < m_SceneObjects.size())
@@ -101,6 +134,7 @@ void Scene::Start()
 void Scene::FixedUpdate(float deltaSecond)
 {
     FixedUpdateEvent.Broadcast(deltaSecond);
+	CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
 void Scene::OnTriggerEnter(ICollider* collider)
@@ -140,7 +174,11 @@ void Scene::Update(float deltaSecond)
 
 void Scene::YieldNull()
 {
+	CoroutineManagers->yield_Null();
 	ScriptManager->ReplaceScriptComponent();
+	CoroutineManagers->yield_WaitForSeconds();
+	CoroutineManagers->yield_OtherEvent();
+	CoroutineManagers->yield_StartCoroutine();
 }
 
 void Scene::LateUpdate(float deltaSecond)

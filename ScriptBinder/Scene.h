@@ -6,17 +6,19 @@ class GameObject;
 class RenderScene;
 class SceneManager;
 struct ICollider;
-class Scene
+class Scene : public Meta::IReflectable<Scene>
 {
 private:
+
+public:
 	Scene() = default;
 	~Scene() = default;
 
-public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
+	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 
@@ -77,7 +79,15 @@ public:
 	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{
 		Scene* allocScene = new Scene();
+		allocScene->m_sceneName = sceneName.data();
 		allocScene->CreateGameObject(sceneName);
+		return allocScene;
+	}
+
+	static Scene* LoadScene(const std::string_view& name)
+	{
+		Scene* allocScene = new Scene();
+		allocScene->m_sceneName = name.data();
 		return allocScene;
 	}
 
@@ -85,7 +95,7 @@ public:
     std::atomic_bool m_isLoaded{ false };
     std::atomic_bool m_isDirty{ false };
     std::atomic_bool m_isEnable{ false };
-    std::atomic_size_t m_buildIndex{ 0 };
+    size_t m_buildIndex{ 0 };
 
 public:
     //TODO : 진짜 이렇게 구현할건지 고민 좀 해보자
@@ -114,7 +124,20 @@ public:
         return m_lightProperties;
     }
 
+    ReflectionField(Scene)
+    {
+		PropertyField
+		({
+			meta_property(m_sceneName)
+			meta_property(m_buildIndex)
+            meta_property(m_SceneObjects)
+		});
+			
+		FieldEnd(Scene, PropertyOnly)
+    }
+
 private:
+	friend class SceneManager;
     std::string GenerateUniqueGameObjectName(const std::string_view& name)
     {
         std::string uniqueName{ name.data() };

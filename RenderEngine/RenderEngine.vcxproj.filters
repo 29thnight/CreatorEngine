@@ -147,6 +147,9 @@
     <Filter Include="Renderer\Interfaces">
       <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
+      <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="LightMap\Algorithm">
       <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
     </Filter>
@@ -414,6 +417,12 @@
     </ClInclude>
     <ClInclude Include="Interfaces\ISceneRenderer.h">
       <Filter>Renderer\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaWather.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaRegistry.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

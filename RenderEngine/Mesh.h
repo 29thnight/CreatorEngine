@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include <assimp/Importer.hpp>
 
-struct Node
+struct ModelNode
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -13,8 +13,8 @@ struct Node
 	uint32 m_numMeshes{};
 	std::vector<uint32> m_meshes;
 
-    Node() = default;
-	Node(const std::string_view& name) : m_name(name) {}
+	ModelNode() = default;
+	ModelNode(const std::string_view& name) : m_name(name) {}
 };
 
 struct Vertex
@@ -63,18 +63,26 @@ public:
 	void Draw();
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
-	const std::string& GetName() { return m_name; }
+	std::string GetName() const { return m_name; }
+
+	ReflectionField(Mesh)
+	{
+		PropertyField
+		({
+			meta_property(m_name)
+			meta_property(m_materialIndex)
+		});
+		FieldEnd(Mesh, PropertyOnly)
+	}
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }
 private:
 	friend class ModelLoader;
+
 	std::string m_name;
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
 	uint32 m_materialIndex{};
-	//Mathf::Matrix m_transform{ XMMatrixIdentity() };
-
-	std::string m_nodeName;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
@@ -160,8 +168,6 @@ struct UIvertex
 	DirectX::XMFLOAT3 position;
 	DirectX::XMFLOAT2 texCoord;
 };
-
-
 
 class UIMesh
 {

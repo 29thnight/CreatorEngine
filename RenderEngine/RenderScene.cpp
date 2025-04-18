@@ -2,12 +2,13 @@
 #include "ImGuiRegister.h"
 #include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
-#include "../ScriptBinder/Renderer.h"
+#include "../ScriptBinder/RenderableComponents.h"
 #include "Skeleton.h"
 #include "Light.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
+#include "SceneManager.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 
@@ -80,6 +81,9 @@ void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
 
 void RenderScene::Update(float deltaSecond)
 {
+	m_currentScene = SceneManagers->GetActiveScene();
+	if (m_currentScene == nullptr) return;
+
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
@@ -165,7 +169,11 @@ void RenderScene::EditorSceneObjectHierarchy()
 
 		if (m_currentScene)
 		{
-			if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			if (0 == m_currentScene->m_SceneObjects.size())
+			{
+				ImGui::Text("No GameObject in Scene");
+			}
+			else if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				for (auto& obj : m_currentScene->m_SceneObjects)
 				{
@@ -249,7 +257,7 @@ void RenderScene::EditorSceneObjectInspector()
 
 				if(ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
 				{
-					Meta::DrawObject(component, *type);
+					Meta::DrawObject(component.get(), *type);
 				}
 			}
 		}
@@ -286,7 +294,7 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
 	if (!m_currentScene) return;
 
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnDoubleClick;
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
 	if (obj.get() == m_selectedSceneObject)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;
@@ -318,7 +326,6 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
 			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-
 			// 부모 변경 로직
 			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
 			{
