@@ -9,6 +9,7 @@
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "ImageComponent.h"
+#include "UIManager.h"
 
 // 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
 int InputTextCallback(ImGuiInputTextCallbackData* data)
@@ -137,7 +138,6 @@ void RenderScene::EditorSceneObjectHierarchy()
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
-
 				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
 				ImageComponent* sprite = nullptr;
 				if (m_selectedSceneObject)
@@ -154,12 +154,7 @@ void RenderScene::EditorSceneObjectHierarchy()
 				else
 				{
 					ImGui::Text("No GameObject Selected");
-					auto rootObject = m_currentScene->CreateGameObject(filename.string().c_str(), GameObject::Type::Mesh);
-					sprite = rootObject->AddComponent<ImageComponent>();
-					if (sprite)
-					{
-						sprite->Load(texture);
-					}
+					UIManagers->MakeImage(filename.string().c_str(), texture);
 				}
 			
 
