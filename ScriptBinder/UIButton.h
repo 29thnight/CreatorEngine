@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "IUpdatable.h"
 #include "UIManager.h"
+#include "UIComponent.h"
 
 //UI Ã³¸®¿ë
 enum class UIColliderType
@@ -12,7 +13,7 @@ enum class UIColliderType
 	Capsule,
 };
 
-class UIButton : public Component, public IUpdatable<UIButton>, public Meta::IReflectable<UIButton>
+class UIButton : public UIComponent, public IUpdatable<UIButton>, public Meta::IReflectable<UIButton>
 {
 public:
 	UIButton(std::function<void()> func);
@@ -28,7 +29,6 @@ public:
 	bool CheckClick(Mathf::Vector2 _mousePos);
 	void SetFunction(std::function<void()> func){ m_clickFunction = func;}
 	void Click(){ m_clickFunction();}
-	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
 	ReflectionField(UIButton, MethodOnly)
 	{
 
@@ -41,7 +41,6 @@ public:
 
 	bool isClick = false;
 private:
-	Canvas* ownerCanvas = nullptr;
 	DirectX::BoundingOrientedBox obBox;
 	UIColliderType type = UIColliderType::Box;
 	std::function<void()> m_clickFunction;

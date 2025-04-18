@@ -239,9 +239,6 @@
     <ClCompile Include="UIPass.cpp">
       <Filter>RenderPass\UIPass</Filter>
     </ClCompile>
-    <ClCompile Include="Text.cpp">
-      <Filter>Resources\UI</Filter>
-    </ClCompile>
     <ClCompile Include="PostProcessingPass.cpp">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClCompile>
@@ -547,9 +544,6 @@
   <ItemGroup>
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
-    </ClInclude>
-    <ClInclude Include="Text.h">
-      <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -748,9 +748,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 
 	
-	auto setcan = UIManagers->MakeCanvas("setting");
-	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("123.png"), []() {std::cout << "soooo angry" << std::endl;} , "setting", { 1360, 540 });
-	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;}, "setting",{ 560,540 });
+	//auto setcan = UIManagers->MakeCanvas("");
+	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("test.jpg"), []() {std::cout << "soooo angry" << std::endl;} , { 1360, 540 });
+	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;},{ 560,540 });
 
 	//UIManagers->SelectUI = Angryy2.get();
 

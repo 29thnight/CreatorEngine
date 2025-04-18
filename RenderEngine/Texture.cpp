@@ -157,6 +157,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 			)
 		);
 	}
+	
     std::cout << "Texture :" << banch3.GetElapsedTime() << std::endl;
     Benchmark banch4;
 	//Texture* texture = new Texture;

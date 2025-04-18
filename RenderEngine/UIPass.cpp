@@ -49,7 +49,7 @@ UIPass::UIPass()
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
 	m_pso->m_blendState = DeviceState::g_pBlendState;
 
-	m_UIBuffer = DirectX11::CreateBuffer(sizeof(UiInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_UIBuffer = DirectX11::CreateBuffer(sizeof(ImageInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
@@ -66,16 +66,12 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	m_pso->Apply();
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, camera.m_renderTarget->m_pDSV);
-
-	
-	
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 	camera.UpdateBuffer();
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-	
-	
+	m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, nullptr, nullptr, nullptr, nullptr, nullptr);
 	std::vector<Canvas*> canvases;
 	for (auto& Canvases : UIManagers->Canvases)
 	{
@@ -83,61 +79,49 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 		if (false == canvas->IsEnabled()) continue;
 		for (auto& uiObj : canvas->UIObjs)
 		{
-			ImageComponent* ui = uiObj->GetComponent<ImageComponent>();
-			if (ui && ui->IsEnabled())
+			std::vector<UIComponent*> uicom = uiObj->GetComponents<UIComponent>();
+			for (auto& ui : uicom)
 			{
-				_2DObjects.push_back(ui);
+				if (ui->IsEnabled() == false) continue;
+				switch (ui->type)
+				{
+				case UItype::Image:
+				{
+					if (auto* img = dynamic_cast<ImageComponent*>(ui))
+						_ImageObjects.push_back(img);
+					break;
+				}
+				case UItype::Text:
+				{
+					if (auto* txt = dynamic_cast<TextComponent*>(ui))
+					_TextObjects.push_back(txt);
+					break;
+				}
+				default:
+					break;
+				}
 			}
 		
 		}
 	}
+	//std::sort(_2DObjects.begin(), _2DObjects.end(), [](ImageComponent* a, ImageComponent* b) {
+	//	if (a->_layerorder != b->_layerorder)
+	//		return a->_layerorder < b->_layerorder;
 
-	for (auto& Canvases : UIManagers->Canvases)
+	//	// 동일한 layer일 경우, CanvasOrder 기준으로 비교
+	//	auto aCanvas = a->GetOwnerCanvas(); 
+	//	auto bCanvas = b->GetOwnerCanvas();
+
+	//	int aOrder = aCanvas ? aCanvas->CanvasOrder : 0;
+	//	int bOrder = bCanvas ? bCanvas->CanvasOrder : 0;
+
+	//	return aOrder < bOrder;
+	//	});
+	//
+	for (auto& Imageobject : _ImageObjects)
 	{
-		Canvas* canvas = Canvases->GetComponent<Canvas>();
-		if (false == canvas->IsEnabled()) continue;
-		for (auto& uiObj : canvas->UIObjs)
-		{
-			TextComponent* text = uiObj->GetComponent<TextComponent>();
-			if (text && text->IsEnabled())
-			{
-				_TextObjects.push_back(text);
-			}
-		}
+		Imageobject->Draw(m_spriteBatch);
 	}
-	std::sort(_2DObjects.begin(), _2DObjects.end(), [](ImageComponent* a, ImageComponent* b) {
-		if (a->_layerorder != b->_layerorder)
-			return a->_layerorder < b->_layerorder;
-
-		// 동일한 layer일 경우, CanvasOrder 기준으로 비교
-		auto aCanvas = a->GetOwnerCanvas(); 
-		auto bCanvas = b->GetOwnerCanvas();
-
-		int aOrder = aCanvas ? aCanvas->CanvasOrder : 0;
-		int bOrder = bCanvas ? bCanvas->CanvasOrder : 0;
-
-		return aOrder < bOrder;
-		});
-
-
-	
-	for (auto& Uiobject : _2DObjects)
-	{
-		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
-		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
-		Uiobject->m_UIMesh->Draw();
-
-	}
-
-
-
-	auto viewc = camera.CalculateView();
-	camera.m_isOrthographic = true;
-	auto projc = camera.CalculateProjection(true);
-	auto vipro = viewc * projc;
-	camera.m_isOrthographic = false;
-	m_spriteBatch->Begin(DirectX::SpriteSortMode_Deferred, DeviceState::g_pBlendState, nullptr, m_NoWriteDepthStencilState.Get(), nullptr,nullptr, vipro);
-	
 	for (auto& Textobject : _TextObjects)
 	{
 		Textobject->Draw(m_spriteBatch);
@@ -150,7 +134,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
 	_TextObjects.clear();
-	_2DObjects.clear();
+	_ImageObjects.clear();
 	
 }
 

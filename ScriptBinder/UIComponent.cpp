@@ -1,11 +1,13 @@
 #include "UIComponent.h"
 #include "GameObject.h"
+
+float MaxOreder = 100.0f;
 UIComponent::UIComponent()
 {
 }
-void UIComponent::SetNavi(Direction dir, GameObject* other)
+void UIComponent::SetNavi(Direction dir, GameObject* otherUI)
 {
-	navigation[dir] = other;
+	navigation[dir] = otherUI;
 }
 
 GameObject* UIComponent::GetNextNavi(Direction dir)

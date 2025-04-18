@@ -30,7 +30,7 @@ private:
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
 	
-	std::vector<ImageComponent*> _2DObjects;
+	std::vector<ImageComponent*> _ImageObjects;
 	std::vector<TextComponent*> _TextObjects;
 };
 

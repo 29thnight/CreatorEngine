@@ -8,11 +8,9 @@
 #include "TextComponent.h"
 std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
 {
-
 	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Empty);
 	newObj->AddComponent<Canvas>();
 	Canvases.push_back(newObj.get());
-
 	needSort = true;
 	return newObj;
 }
@@ -23,7 +21,6 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Te
 		MakeCanvas();
 	if (!canvas)
 		canvas = Canvases[0];
-
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	if(!canvasCom)
 	{
@@ -45,8 +42,6 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name, T
 	if (Canvases.empty())
 		MakeCanvas();
 	int canvasIndex = 0;
-
-	
 	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
 	{
 		if (Canvases[canvasIndex]->ToString() == canvasname)
@@ -68,9 +63,8 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name, T
 }
 
 
-std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos , GameObject* canvas)
 {
-
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
@@ -95,7 +89,6 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 
 std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
-
 	if (Canvases.empty())
 		MakeCanvas();
 	int canvasIndex = 0;
@@ -122,8 +115,6 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 
 std::shared_ptr<GameObject> UIManager::MakeText(const std::string_view& name, SpriteFont* Sfont, GameObject* canvas, Mathf::Vector2 Pos)
 {
-
-
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
@@ -174,8 +165,8 @@ void UIManager::CheckInput()
 	{
 		for (auto& uiObj : curCanvas->UIObjs)
 		{
-			ImageComponent* UI = uiObj->GetComponent<ImageComponent>();
-
+			
+			UIComponent* UI = uiObj->GetComponent<UIComponent>();
 			if (UI && false == UI->IsEnabled()) continue;
 			UIButton* btn = uiObj->GetComponent<UIButton>();
 			if (btn == nullptr || btn->CheckClick(InputManagement->GetMousePos()) == false) continue;
@@ -183,6 +174,7 @@ void UIManager::CheckInput()
 			break;
 		}
 	}
+
 
 	//0을 1p,2p로 바꾸거나 둘다따로 주게 수정필요, 이동마다 대기시간 딜레이 주기 한번에 여러개 못넘어가게 *****
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
