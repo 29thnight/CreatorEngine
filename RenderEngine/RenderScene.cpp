@@ -141,7 +141,7 @@ void RenderScene::EditorSceneObjectHierarchy()
 			{
 				const char* droppedFilePath = (const char*)payload->Data;
 				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
+				file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
 				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
 				ImageComponent* sprite = nullptr;
 				if (m_selectedSceneObject)
