@@ -126,7 +126,7 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 		buf.size = meshRenderer->m_LightMapping.lightmapTiling;
 		buf.lightmapIndex = meshRenderer->m_LightMapping.lightmapIndex;
 		DirectX11::UpdateBuffer(m_cbuffer.Get(), &buf);
-		DirectX11::PSSetConstantBuffer(0, 1, m_cbuffer.GetAddressOf());
+		DirectX11::PSSetConstantBuffer(1, 1, m_cbuffer.GetAddressOf());
 
 		scene.UpdateModel(obj->m_transform.GetWorldMatrix());
 		Animator* animator = scene.GetScene()->m_SceneObjects[obj->m_parentIndex]->GetComponent<Animator>();
@@ -141,7 +141,7 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 
 		Material* mat = meshRenderer->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
-
+		DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 		if (mat->m_pBaseColor)
 		{
 			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);

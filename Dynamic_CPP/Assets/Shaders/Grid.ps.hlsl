@@ -11,6 +11,10 @@ cbuffer UniformBuffer : register(b0)
     float minorLineThickness;
     float minorLineAlpha;
 };
+cbuffer cameraPos : register(b1)
+{
+    float4 cameraPos;
+}
 // 출력 구조체: 클립 좌표와 함께 월드 좌표를 TEXCOORD0로 전달합니다.
 struct VS_OUTPUT
 {
@@ -41,11 +45,14 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     float3 posWorld = input.worldPos;
     
     // 평면상의 거리 계산 (XZ 평면)
-    float distPlanar = distance(posWorld.xz, centerOffset.xz);
+    //float distPlanar = distance(posWorld.xz, centerOffset.xz);
+    float distPlanar = distance(posWorld.xz, (int)cameraPos.xz);
+    
+    float absY = 1;//max(1 - saturate(distPlanar / 70.0), 0.0);
     
     // 메이저 라인과 서브 디비전(마이너) 라인 계산
-    float step_line = grid(posWorld.xz, unitSize, majorLineThickness);
-    step_line += grid(posWorld.xz, unitSize / subdivisions, minorLineThickness) * minorLineAlpha;
+    float step_line = grid(posWorld.xz, unitSize, majorLineThickness * absY);
+    step_line += grid(posWorld.xz, unitSize / subdivisions, minorLineThickness * absY) * minorLineAlpha;
     step_line = saturate(step_line); // clamp(0.0,1.0)와 동일
     
     // 체커보드 패턴 계산
@@ -61,7 +68,8 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     
     // 최종 색상 (프리멀티플라이드 알파 블렌딩)
     float3 color = (checkerColor.rgb /** alphaChec*/) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);
-    if (alpha < 0.5)
+
+    if (alpha < 0.1)
         discard;
     return float4(color, alpha);
 }

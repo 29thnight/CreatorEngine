@@ -11,22 +11,64 @@ struct VertexShaderOutput
     float2 texCoord : TEXCOORD0;
 };
 
-cbuffer CB : register(b0)
+cbuffer PBRMaterial : register(b0)
+{
+    float4 gAlbedo;
+    float gMetallic;
+    float gRoughness;
+
+    int gUseAlbedoMap;
+    int gUseOccMetalRough;
+    int gUseAoMap;
+    int gUseEmmisive;
+    int gNormalState;
+    int gConvertToLinear;
+}
+cbuffer CB : register(b1)
 {
     float2 offset;
     float2 size;
     int lightmapIndex;
 }
 
+Texture2D Albedo : register(t0);
+Texture2D Normals : register(t1);
+Texture2D MetalRough : register(t2);
+Texture2D AO : register(t3);
+Texture2D Emissive : register(t4);
+
 Texture2DArray<float4> lightmap : register(t14);
+
+static const float GAMMA = 2.2;
+static const float INV_GAMMA = 1.0 / GAMMA;
+// sRGB to linear approximation
+// see http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
+float4 SRGBtoLINEAR(float4 srgbIn)
+{
+    return float4(pow(srgbIn.xyz, GAMMA), srgbIn.w);
+}
 
 float4 main(VertexShaderOutput IN) : SV_Target
 {
+    float4 albedo = gAlbedo;
+    
+    float4 emissive = { 0, 0, 0, 0 };
+    if (gUseAlbedoMap)
+    {
+
+        albedo = Albedo.Sample(LinearSampler, IN.texCoord);
+        if (gConvertToLinear)
+            albedo = SRGBtoLINEAR(albedo);
+    }
+    if (gUseEmmisive)
+    {
+        emissive = Emissive.Sample(LinearSampler, IN.texCoord);
+    }
     //float2 lightmapUV = (IN.texCoord - offset) / size;
     float2 lightmapUV = IN.texCoord * size + offset;
     float4 lightmapColor = lightmap.SampleLevel(LinearSampler, float3(lightmapUV, lightmapIndex), 0.0);
 
     //lightmapColor = -lightmapColor + 1;
-    
-    return lightmapColor;
+    float4 finalColor = (albedo / 3.1415926) * lightmapColor + emissive;
+    return finalColor;
 }

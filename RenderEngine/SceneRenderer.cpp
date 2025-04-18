@@ -558,22 +558,10 @@ void SceneRenderer::InitializeImGui()
     });
 
 	ImGui::ContextRegister("LightMap", true, [&]() {
-		static bool useSetting = false;
-		static bool useBakedMaps = false;
+
 		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
 		ImGui::Text("LightMap");
 		if (ImGui::CollapsingHeader("Settings")) {
-			if (ImGui::IsItemToggledOpen()) {
-				useSetting = !useSetting;
-			}
-		}
-		if (ImGui::CollapsingHeader("Baked Maps")) {
-			if (ImGui::IsItemToggledOpen()) {
-				useBakedMaps = !useBakedMaps;
-			}
-		}
-
-		if (useSetting) {
 			ImGui::Text("Position and NormalMap Settings");
 			ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
 			if (ImGui::Button("Clear position normal maps")) {
@@ -587,6 +575,7 @@ void SceneRenderer::InitializeImGui()
 			ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
 			ImGui::DragInt("Padding", &lightMap.padding);
 			ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
+			ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
 		}
 
 		if (ImGui::Button("Generate LightMap"))
@@ -602,14 +591,20 @@ void SceneRenderer::InitializeImGui()
 			m_pLightMapPass->Initialize(lightMap.lightmaps);
 		}
 
-		if (useBakedMaps) {
+		if (ImGui::CollapsingHeader("Baked Maps")) {
 			if (lightMap.imgSRV)
 			{
+				ImGui::Text("LightMaps");
 				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
 					ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
 				}
-				ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
+				ImGui::Text("indirectMaps");
+				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
+					ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
+				}
+				//ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
 				//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
+				ImGui::Text("shadowMaps");
 				for (int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
 					ImGui::Image((ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pSRV,
 						ImVec2(512, 512));
@@ -618,8 +613,35 @@ void SceneRenderer::InitializeImGui()
 				ImGui::Text("No LightMap");
 			}
 		}
+
 		ImGui::EndChild();
 	});
+
+    //Model::LoadModelToScene(model[0], *m_currentScene);
+    model[0] = Model::LoadModel("plane.fbx");
+    model[1] = Model::LoadModel("damit.glb");
+    model[2] = Model::LoadModel("sphere.fbx");
+    model[3] = Model::LoadModel("SkinningTest.fbx");
+    model[4] = Model::LoadModel("bangbooExport.fbx");
+    //model = Model::LoadModel("sphere.fbx");
+    
+
+    ImGui::ContextRegister("Test Add Model", true, [&]()
+    {
+    	static int num = 0;
+    	std::string modelname = "Add : " + model[num]->name;
+    	if (ImGui::Button(modelname.c_str())) {
+    		Model::LoadModelToScene(model[num], *m_currentScene);
+    	}
+    	if (ImGui::Button("+")) {
+    		num++;
+    		if (num > 4) { num = 4; }
+    	}
+    	if (ImGui::Button("-")) {
+    		num--;
+    		if (num < 0) { num = 0; }
+    	}
+    });
 }
 
 void SceneRenderer::InitializeTextures()
@@ -733,7 +755,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
-	model[0] = Model::LoadModel("plane.fbx");
+	/*model[0] = Model::LoadModel("plane.fbx");
 	Model::LoadModelToScene(model[0], *m_currentScene);
 	model[1] = Model::LoadModel("damit.glb");
 	model[2] = Model::LoadModel("sphere.fbx");
@@ -755,7 +777,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 			num--;
 			if (num < 0) { num = 0; }
 		}
-	});
+	});*/
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
