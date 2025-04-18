@@ -13,30 +13,30 @@ enum class UIColliderType
 	Capsule,
 };
 
-class UIButton : public UIComponent, public IUpdatable<UIButton>, public Meta::IReflectable<UIButton>
+class UIButton : public UIComponent, public IUpdatable, public Meta::IReflectable<UIButton>
 {
 public:
-	UIButton(std::function<void()> func);
-	~UIButton() = default;
+	GENERATED_BODY(UIButton)
 	
-	std::string ToString() const override
-	{
-		return std::string("UIButton");
-	}
 	void Update(float deltaSecond) override;
 
+	void SetClickFunction(std::function<void()> func)
+	{
+		m_clickFunction = func;
+	}
 	void UpdateCollider();
 	bool CheckClick(Mathf::Vector2 _mousePos);
 	void SetFunction(std::function<void()> func){ m_clickFunction = func;}
-	void Click(){ m_clickFunction();}
-	ReflectionField(UIButton, MethodOnly)
-	{
+	void Click(){ m_clickFunction(); }
 
+	ReflectionField(UIButton)
+	{
 		MethodField
 		({
 			meta_method(Click)
-			});
-		ReturnReflectionMethodOnly(UIButton)
+		});
+
+		FieldEnd(UIButton, MethodOnly)
 	};
 
 	bool isClick = false;

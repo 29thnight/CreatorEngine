@@ -560,7 +560,7 @@ namespace lm {
 				DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
 
 				if (renderer->m_Mesh == nullptr) continue;
-				auto& meshName = renderer->m_Mesh->GetName();
+				auto meshName = renderer->m_Mesh->GetName();
 				DirectX11::CSSetShaderResources(2, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
 				DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
 

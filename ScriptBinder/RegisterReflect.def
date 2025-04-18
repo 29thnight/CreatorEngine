@@ -1,17 +1,16 @@
 #pragma once
 #include "LightComponent.h"
-#include "SpriteComponent.h"
 #include "RenderableComponents.h"
 #include "ModuleBehavior.h"
 #include "GameObject.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Material.h"
+#include "TextComponent.h"
 
 REFLECTION_REGISTER()
 {
 	AUTO_REGISTER_CLASS(LightComponent);
-	AUTO_REGISTER_CLASS(SpriteComponent);
 	AUTO_REGISTER_CLASS(MeshRenderer);
 	AUTO_REGISTER_CLASS(Animator);
 	AUTO_REGISTER_CLASS(ModuleBehavior);
@@ -25,4 +24,5 @@ REFLECTION_REGISTER()
 	AUTO_REGISTER_CLASS(Material);
 	AUTO_REGISTER_CLASS(Transform);
 	AUTO_REGISTER_CLASS(MaterialInfomation);
+	AUTO_REGISTER_CLASS(TextComponent);
 }

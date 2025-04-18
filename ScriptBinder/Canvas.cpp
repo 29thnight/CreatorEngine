@@ -4,9 +4,9 @@
 #include "UIManager.h"
 #include "TextComponent.h"
 #include "UIButton.h"
+
 Canvas::Canvas()
 {
-	m_orderID = Component::Order2Uint(ComponentOrder::MeshRenderer);
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<Canvas>();
 }
 

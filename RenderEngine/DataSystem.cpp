@@ -233,7 +233,7 @@ void DataSystem::LoadMaterials()
 {
 }
 
-Texture* DataSystem::LoadTexture(FileGuid guid)
+Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 {
 	file::path texturePath = m_assetMetaRegistry->GetPath(guid);
 	std::string name = texturePath.stem().string();

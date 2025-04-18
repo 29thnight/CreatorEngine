@@ -2,12 +2,6 @@
 #include "../RenderEngine/DeviceState.h"
 #include "../InputManager.h"
 #include "ImageComponent.h"
-UIButton::UIButton(std::function<void()> func)
-{
-	m_orderID = Component::Order2Uint(ComponentOrder::BehaviorScript);
-	m_typeID = TypeTrait::GUIDCreator::GetTypeID<UIButton>();
-	m_clickFunction = func;
-}
 
 void UIButton::Update(float deltaSecond)
 {
@@ -18,10 +12,10 @@ void UIButton::UpdateCollider()
 {
 	
 	Transform transform = m_pOwner->m_transform;
-	Mathf::Vector3 pos = transform.position;
-	Mathf::Vector3 scale = transform.scale;
+	Mathf::Vector4 pos = transform.position;
+	Mathf::Vector4 scale = transform.scale;
 	ImageComponent* Image = m_pOwner->GetComponent<ImageComponent>();
-	obBox.Center = Mathf::Vector3{ pos.x, pos.y,0 };
+	obBox.Center = Mathf::Vector3{ pos.x, pos.y, 0 };
 	if (Image)
 	{
 		obBox.Extents.x = Image->uiinfo.size.x / 2 * scale.x;

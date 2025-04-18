@@ -4,16 +4,12 @@
 #include "IRenderable.h"
 #include "IUpdatable.h"
 
-class Canvas : public Component, public IRenderable, public IUpdatable<Canvas>, public Meta::IReflectable<Canvas>
+class Canvas : public Component, public IRenderable, public IUpdatable, public Meta::IReflectable<Canvas>
 {
 public:
 	Canvas();
 	~Canvas() = default;
 
-	std::string ToString() const override
-	{
-		return std::string("Canvas");
-	}
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;
@@ -28,7 +24,7 @@ public:
 	virtual void Update(float tick) override;
 
 
-	ReflectionField(Canvas, PropertyOnly)
+	ReflectionField(Canvas)
 	{
 		PropertyField
 		({
@@ -36,7 +32,7 @@ public:
 			meta_property(CanvasOrder)
 			});
 
-		ReturnReflectionPropertyOnly(Canvas)
+		FieldEnd(Canvas, PropertyOnly)
 	};
 	bool m_IsEnabled = true;
 	int PreCanvasOrder = 0;

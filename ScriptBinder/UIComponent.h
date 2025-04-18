@@ -21,16 +21,13 @@ enum class Direction
 	Left,
 	Right
 };
+
 class UIComponent : public Component, public IRenderable
 {
 public:
 	UIComponent();
 	~UIComponent() = default;
 
-	virtual std::string ToString() const override
-	{
-		return std::string("UIComponent");
-	}
 	bool IsEnabled() const override
 	{
 		return m_IsEnabled;

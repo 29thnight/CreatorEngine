@@ -7,7 +7,6 @@
 #include "../ScriptBinder/SceneManager.h"
 #include "../ScriptBinder/Scene.h"
 #include "../ScriptBinder/RenderableComponents.h"
-#include "../ScriptBinder/SpriteComponent.h"
 #include "../ScriptBinder/ImageComponent.h"
 #include "../ScriptBinder/UIManager.h"
 #include "../ScriptBinder/UIButton.h"
@@ -623,32 +622,6 @@ void SceneRenderer::InitializeImGui()
 
 		ImGui::EndChild();
 	});
-
-    //Model::LoadModelToScene(model[0], *m_currentScene);
-    model[0] = Model::LoadModel("plane.fbx");
-    model[1] = Model::LoadModel("damit.glb");
-    model[2] = Model::LoadModel("sphere.fbx");
-    model[3] = Model::LoadModel("SkinningTest.fbx");
-    model[4] = Model::LoadModel("bangbooExport.fbx");
-    //model = Model::LoadModel("sphere.fbx");
-    
-
-    ImGui::ContextRegister("Test Add Model", true, [&]()
-    {
-    	static int num = 0;
-    	std::string modelname = "Add : " + model[num]->name;
-    	if (ImGui::Button(modelname.c_str())) {
-    		Model::LoadModelToScene(model[num], *m_currentScene);
-    	}
-    	if (ImGui::Button("+")) {
-    		num++;
-    		if (num > 4) { num = 4; }
-    	}
-    	if (ImGui::Button("-")) {
-    		num--;
-    		if (num < 0) { num = 0; }
-    	}
-    });
 }
 
 void SceneRenderer::InitializeTextures()

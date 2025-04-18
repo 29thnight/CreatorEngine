@@ -7,16 +7,12 @@
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
-class TextComponent : public UIComponent, public IUpdatable<TextComponent>, public Meta::IReflectable<TextComponent>
+
+class TextComponent : public UIComponent, public IUpdatable
 {
 public:
 	TextComponent();
 	~TextComponent() = default;
-	
-	std::string ToString() const override
-	{
-		return std::string("TextComponent");
-	}
 
 	virtual void Update(float tick) override;
 
@@ -25,16 +21,17 @@ public:
 	void LoadFont(SpriteFont* _font) { font = _font; }
 	void Draw(SpriteBatch* Sbatch);
 	std::string message;
-	ReflectionField(TextComponent, PropertyOnly)
+
+	ReflectionField(TextComponent)
 	{
 		PropertyField
 		({
 			meta_property(_isTable)
 			meta_property(relpos)
 			meta_property(_layerorder)
-			});
+		});
 
-		ReturnReflectionPropertyOnly(TextComponent)
+		FieldEnd(TextComponent, PropertyOnly)
 	};
 
 

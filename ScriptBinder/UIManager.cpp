@@ -78,7 +78,8 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<ImageComponent>()->Load(texture);
-	newButton->AddComponent<UIButton>(clickfun);
+	auto component = newButton->AddComponent<UIButton>();
+	component->SetClickFunction(clickfun);
 
 	canvasCom->AddUIObject(newButton.get());
 
@@ -106,7 +107,9 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Mesh, canvas->m_index);
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<ImageComponent>()->Load(texture);
-	newButton->AddComponent<UIButton>(clickfun);
+	auto component = newButton->AddComponent<UIButton>();
+	component->SetClickFunction(clickfun);
+
 
 	canvas->GetComponent<Canvas>()->AddUIObject(newButton.get());
 

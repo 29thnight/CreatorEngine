@@ -7,11 +7,8 @@
 
 ImageComponent::ImageComponent()
 {
-	
-		m_orderID = Component::Order2Uint(ComponentOrder::MeshRenderer);
-		m_typeID = TypeTrait::GUIDCreator::GetTypeID<ImageComponent>();
-		type = UItype::Image;
-	
+	m_typeID = TypeTrait::GUIDCreator::GetTypeID<ImageComponent>();
+	type = UItype::Image;
 }
 
 void ImageComponent::Load(Texture* texPtr)
@@ -37,7 +34,7 @@ void ImageComponent::SetTexture(int index)
 void ImageComponent::Update(float tick)
 {
 	Transform transform = m_pOwner->m_transform;
-	pos = transform.position;
+	pos = Mathf::Vector3(transform.position);
 	scale = { transform.scale};
 	auto quat = m_pOwner->m_transform.rotation;
 	float pitch, yaw, roll;

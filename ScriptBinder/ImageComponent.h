@@ -19,17 +19,13 @@ struct alignas(16) ImageInfo
 
 
 //모든 2d이미지 기본?
-class ImageComponent : public UIComponent, public IUpdatable<ImageComponent>, public Meta::IReflectable<ImageComponent>
+class ImageComponent : public UIComponent, public IUpdatable, public Meta::IReflectable<ImageComponent>
 {
 public:
 	ImageComponent();
 	~ImageComponent() = default;
 
 	void Load(Texture* ptr);
-	std::string ToString() const override
-	{
-		return std::string("ImageComponent");
-	}
 	virtual void Update(float tick) override;
 
 	void UpdateTexture();
@@ -39,7 +35,7 @@ public:
 	ImageInfo uiinfo;
 	Texture* m_curtexture{};
 	int curindex = 0;
-	ReflectionField(ImageComponent, PropertyAndMethod)
+	ReflectionField(ImageComponent)
 	{
 		PropertyField
 		({
@@ -53,7 +49,7 @@ public:
 			meta_method(UpdateTexture)
 		});
 
-		ReturnReflection(ImageComponent)
+		FieldEnd(ImageComponent, PropertyAndMethod)
 	};
 	//ndc좌표 {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };

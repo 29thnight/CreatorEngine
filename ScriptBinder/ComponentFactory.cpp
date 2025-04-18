@@ -4,7 +4,6 @@
 #include "LightComponent.h"
 #include "CameraComponent.h"
 #include "DataSystem.h"
-#include "SpriteComponent.h"
 
 void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
 {
