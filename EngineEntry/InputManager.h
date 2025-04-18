@@ -1,7 +1,7 @@
 #pragma once
 #include <GameInput.h>
-#include "Utility_Framework/Core.Definition.h"
-#include "Utility_Framework/Core.Mathf.h"
+#include "Core.Definition.h"
+#include "Core.Mathf.h"
 #include "KeyState.h"
 
 //일단 테스트용으로 몇개만 넣어둠

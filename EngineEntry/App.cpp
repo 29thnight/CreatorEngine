@@ -1,10 +1,9 @@
 #include "App.h"
 #include "InputManager.h"
-#include "Utility_Framework/PathFinder.h"
-#include "Utility_Framework/DumpHandler.h"
-#include "Utility_Framework/CoreWindow.h"
-#include "CustomWindowDefine.h"
-#include "RenderEngine/DataSystem.h"
+#include "PathFinder.h"
+#include "DumpHandler.h"
+#include "CoreWindow.h"
+#include "DataSystem.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>

@@ -1,12 +1,18 @@
 #pragma once
-#include "Utility_Framework/DeviceResources.h"
-#include "Utility_Framework/TimeSystem.h"
-#include "RenderEngine/DataSystem.h"
-#include "RenderEngine/SceneRenderer.h"
-#include "ScriptBinder/Scene.h"
-#include "RenderEngine/ImGuiRenderer.h"
-#include "RenderEngine/Model.h"
+#include "DeviceResources.h"
+#include "TimeSystem.h"
+#include "DataSystem.h"
+#include "SceneRenderer.h"
+#include "Scene.h"
+#include "ImGuiRenderer.h"
+#include "Model.h"
 #include "Delegate.h"
+
+#include "RenderPassWindow.h"
+#include "SceneViewWindow.h"
+#include "GameViewWindow.h"
+#include "MenuBarWindow.h"
+
 #include <memory>
 #include <future>
 
@@ -32,9 +38,15 @@ namespace DirectX11
 	private:
 		std::shared_ptr<DeviceResources> m_deviceResources;
 		TimeSystem m_timeSystem;
+		//Renderer
 		std::shared_ptr<SceneRenderer> m_sceneRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
-
+		//Engine GUI
+		std::unique_ptr<RenderPassWindow> m_renderPassWindow;
+		std::unique_ptr<SceneViewWindow> m_sceneViewWindow;
+		std::unique_ptr<GameViewWindow> m_gameViewWindow;
+		std::unique_ptr<MenuBarWindow> m_menuBarWindow;
+		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_SceneRenderingEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;

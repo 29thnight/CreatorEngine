@@ -1,19 +1,18 @@
 #include "Dx11Main.h"
-#include "Utility_Framework/CoreWindow.h"
+#include "CoreWindow.h"
 #include "InputManager.h"
-#include "ImGuiHelper/ImGuiRegister.h"
-#include "Physics/Common.h"
+#include "ImGuiRegister.h"
+#include "Common.h"
 #include "SoundManager.h"
-#include "Utility_Framework/Benchmark.hpp"
-#include "Utility_Framework/ImGuiLogger.h"
-#include "Utility_Framework/TimeSystem.h"
-#include "ScriptBinder/HotLoadSystem.h"
-#include "RenderEngine/DataSystem.h"
-#include "RenderEngine/ShaderSystem.h"
+#include "Benchmark.hpp"
+#include "ImGuiLogger.h"
+#include "TimeSystem.h"
+#include "HotLoadSystem.h"
+#include "DataSystem.h"
+#include "ShaderSystem.h"
 #include "SceneManager.h"
 #include "EngineSetting.h"
-#include "ScriptBinder/UIManager.h"
-
+#include "UIManager.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -21,8 +20,14 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
+    //init Engine GUI windows
+	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get());
+	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get());
+	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
+	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
+
+    //CreateScene
     SceneManagers->CreateScene();
-	//m_sceneRenderer->NewCreateSceneInitialize();
 
 	Sound->initialize((int)ChannelType::MaxChannel);
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
@@ -89,6 +94,7 @@ void DirectX11::Dx11Main::Update()
         //GameUpdate
         m_timeSystem.Tick([&]
         {
+            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
             //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
         });
     }
@@ -158,6 +164,9 @@ void DirectX11::Dx11Main::OnGui()
     if (!m_isGameView)
     {
         m_imguiRenderer->BeginRender();
+		m_menuBarWindow->RenderMenuBar();
+		m_sceneViewWindow->RenderSceneViewWindow();
+		m_gameViewWindow->RenderGameViewWindow();
         m_sceneRenderer->EditorView();
         m_imguiRenderer->Render();
         m_imguiRenderer->EndRender();

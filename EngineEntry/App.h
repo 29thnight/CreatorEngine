@@ -1,8 +1,8 @@
 #pragma once
 
 #include "resource.h"
-#include "Utility_Framework/CoreWindow.h"
-#include "Utility_Framework/Core.Minimal.h"
+#include "CoreWindow.h"
+#include "Core.Minimal.h"
 #include "Dx11Main.h"
 #include "ProjectSetting.h"
 #include <memory>

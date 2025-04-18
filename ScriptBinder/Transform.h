@@ -39,7 +39,7 @@ public:
 
 private:
 	friend class RenderScene;
-	bool32 m_dirty{};
+	bool32 m_dirty{ true };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };

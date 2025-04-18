@@ -1,2 +1,0 @@
-#pragma once 
-#define ENGINE_VERSION "7b96e90b97597dd55a9775551909b2f141dec55d" 

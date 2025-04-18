@@ -1,7 +1,7 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
-#include "../Utility_Framework/DeviceResources.h"
-#include "../Utility_Framework/Delegate.h"
+#include "Core.Minimal.h"
+#include "DeviceResources.h"
+#include "Delegate.h"
 #include "ForwardPass.h"
 #include "ShadowMapPass.h"
 #include "GBufferPass.h"
@@ -26,13 +26,22 @@
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
 #include "EffectManager.h"
-#include <DirectXTK/SpriteBatch.h>
+
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
 class Scene;
+class RenderPassWindow;
+class SceneViewWindow;
+class MenuBarWindow;
+class GameViewWindow;
 class SceneRenderer
 {
+private:
+	friend class RenderPassWindow;
+	friend class SceneViewWindow;
+	friend class MenuBarWindow;
+	friend class GameViewWindow;
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 
@@ -125,5 +134,4 @@ public:
 	void EditorView();
 	void ShowLogWindow();
 	void ShowGridSettings();
-	void EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam);
 };

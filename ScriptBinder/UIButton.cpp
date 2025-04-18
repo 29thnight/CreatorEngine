@@ -1,6 +1,6 @@
 #include "UIButton.h"
 #include "../RenderEngine/DeviceState.h"
-#include "../InputManager.h"
+#include "InputManager.h"
 #include "ImageComponent.h"
 
 void UIButton::Update(float deltaSecond)

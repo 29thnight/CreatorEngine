@@ -4,8 +4,9 @@
 #include "Canvas.h"
 #include "ImageComponent.h"	
 #include "UIButton.h"
-#include "../InputManager.h"
+#include "InputManager.h"
 #include "TextComponent.h"
+
 std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
 {
 	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObject::Type::Empty);

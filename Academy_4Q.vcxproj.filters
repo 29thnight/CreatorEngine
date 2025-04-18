@@ -27,9 +27,6 @@
     <Filter Include="Manager\InputManager">
       <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Manager\SoundManager">
-      <UniqueIdentifier>{21879e33-f24e-493c-a98a-6d47f4562738}</UniqueIdentifier>
-    </Filter>
     <Filter Include="MD">
       <UniqueIdentifier>{c2a723ce-99f1-49c0-82bf-f2f7a9dafbb8}</UniqueIdentifier>
     </Filter>
@@ -39,75 +36,86 @@
     <Filter Include="Settings">
       <UniqueIdentifier>{49f90f66-26a3-4618-b623-e48586cb8a6b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window\RenderPassWindow">
+      <UniqueIdentifier>{35c19878-b2e3-423c-b393-a6a41fe84247}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\SceneViewWindow">
+      <UniqueIdentifier>{44d730b7-a2d9-489d-ba42-b7411a5e71a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\MenuBarWindow">
+      <UniqueIdentifier>{989f5e39-8d93-418d-8b1c-93b7de678b50}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\GameViewWindow">
+      <UniqueIdentifier>{2d95cbbe-f8c2-45a7-84ee-f5d8c1dac627}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\Settings">
+      <UniqueIdentifier>{4add73c3-841a-4e38-b254-398828c393e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\InspectorWindow">
+      <UniqueIdentifier>{c181b115-61df-489b-8589-9358dd5ee89d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\HierarchyWindow">
+      <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
+      <Filter>Window\GameViewWindow</Filter>
     </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
+      <Filter>Window\MenuBarWindow</Filter>
     </ClInclude>
-    <ClInclude Include="Resource.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineGUIWindow\RenderPassWindow.h">
+      <Filter>Window\RenderPassWindow</Filter>
     </ClInclude>
-    <ClInclude Include="App.h">
+    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
+      <Filter>Window\SceneViewWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
+      <Filter>Window\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
+      <Filter>Window\InspectorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\BT_Editor.h">
+      <Filter>Utill\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\BehaviorTree.h">
+      <Filter>Utill\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\App.h">
       <Filter>App</Filter>
     </ClInclude>
-    <ClInclude Include="Dx11Main.h">
+    <ClInclude Include="EngineEntry\Dx11Main.h">
       <Filter>Dx11Main</Filter>
     </ClInclude>
-    <ClInclude Include="BehaviorTree.h">
-      <Filter>Utill\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="SoundManager.h">
-      <Filter>Manager\SoundManager</Filter>
-    </ClInclude>
-    <ClInclude Include="BT_Editor.h">
-      <Filter>Utill\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="CustomWindowDefine.h">
-      <Filter>Window</Filter>
-    </ClInclude>
-    <ClInclude Include="KeyState.h">
+    <ClInclude Include="EngineEntry\KeyState.h">
       <Filter>Manager\InputManager</Filter>
     </ClInclude>
-    <ClInclude Include="InputManager.h">
+    <ClInclude Include="EngineEntry\InputManager.h">
       <Filter>Manager\InputManager</Filter>
     </ClInclude>
-    <ClInclude Include="ProjectSetting.h">
+    <ClInclude Include="EngineEntry\ProjectSetting.h">
       <Filter>Settings</Filter>
     </ClInclude>
-    <ClInclude Include="EngineSetting.h">
+    <ClInclude Include="EngineEntry\EngineSetting.h">
       <Filter>Settings</Filter>
     </ClInclude>
-    <ClInclude Include="EngineVersion.h">
+    <ClInclude Include="EngineEntry\EngineVersion.h">
       <Filter>Settings</Filter>
     </ClInclude>
-    <ClInclude Include="Hierarchy.h">
-      <Filter>Window</Filter>
+    <ClInclude Include="EngineEntry\Resource.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="SceneView.h">
-      <Filter>Window</Filter>
+    <ClInclude Include="EngineEntry\targetver.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="GameView.h">
-      <Filter>Window</Filter>
+    <ClInclude Include="EngineEntry\framework.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Inspector.h">
-      <Filter>Window</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Academy_4Q.rc">
-      <Filter>리소스 파일</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="small.ico">
-      <Filter>리소스 파일</Filter>
-    </Image>
-    <Image Include="Academy_4Q.ico">
-      <Filter>리소스 파일</Filter>
-    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="Prefab.md">
@@ -118,26 +126,48 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="App.cpp">
+    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
+      <Filter>Window\GameViewWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
+      <Filter>Window\MenuBarWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp">
+      <Filter>Window\RenderPassWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+      <Filter>Window\SceneViewWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\BehaviorTree.cpp">
+      <Filter>Utill\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\BT_Editor.cpp">
+      <Filter>Utill\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\App.cpp">
       <Filter>App</Filter>
     </ClCompile>
-    <ClCompile Include="Dx11Main.cpp">
+    <ClCompile Include="EngineEntry\Dx11Main.cpp">
       <Filter>Dx11Main</Filter>
     </ClCompile>
-    <ClCompile Include="BehaviorTree.cpp">
-      <Filter>Utill\BT</Filter>
-    </ClCompile>
-    <ClCompile Include="SoundManager.cpp">
-      <Filter>Manager\SoundManager</Filter>
-    </ClCompile>
-    <ClCompile Include="BT_Editor.cpp">
-      <Filter>Utill\BT</Filter>
-    </ClCompile>
-    <ClCompile Include="KeyState.cpp">
+    <ClCompile Include="EngineEntry\InputManager.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
-    <ClCompile Include="InputManager.cpp">
+    <ClCompile Include="EngineEntry\KeyState.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="EngineEntry\Academy_4Q.rc">
+      <Filter>리소스 파일</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="EngineEntry\small.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="EngineEntry\Academy_4Q.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 #include "SoundManager.h"
-#include "Utility_Framework/PathFinder.h"
-#include "Utility_Framework/Core.Minimal.h"
+#include "PathFinder.h"
+#include "Core.Minimal.h"
 
 bool SoundManager::initialize(int maxChannels)
 {
