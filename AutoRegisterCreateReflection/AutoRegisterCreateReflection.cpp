@@ -202,7 +202,7 @@ int main()
 {
     std::filesystem::path exeDir = GetExecutablePath();
     std::filesystem::path root = exeDir.parent_path().parent_path();
-    if (root.filename() == "LastProject")
+    if (!root.filename().empty())
     {
         std::cout << "Valid project root: " << root << "\n";
     }
