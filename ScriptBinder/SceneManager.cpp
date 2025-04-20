@@ -166,7 +166,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 
         if (obj)
         {
-            Deserialize(obj, itNode);
+            Meta::Deserialize(obj, itNode);
         }
 
         if (itNode["m_components"])

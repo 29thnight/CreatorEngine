@@ -491,14 +491,14 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//[*] PostProcessPass
-		{
-			DirectX11::BeginEvent(L"PostProcessPass");
-			Benchmark banch;
-			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
+        //[*] PostProcessPass
+        {
+            DirectX11::BeginEvent(L"PostProcessPass");
+            Benchmark banch;
+            m_pPostProcessingPass->Execute(*m_renderScene, *camera);
+            RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
+            DirectX11::EndEvent();
+        }
 
 		//[6] AAPass
 		{

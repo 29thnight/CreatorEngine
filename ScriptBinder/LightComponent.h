@@ -6,7 +6,7 @@
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"
-
+//어차피 다시 만들어야 하니까
 class LightComponent : public Component, public IRenderable
 {
 public:
@@ -51,30 +51,30 @@ public:
     LightStatus m_lightStatus{ Enabled };
     float m_intencity{ 5.f };
 
-    ReflectionFieldInheritance(LightComponent, Component)
-	{
-		PropertyField
-		({
-			meta_property(m_lightIndex)
-			meta_property(m_position)
-			meta_property(m_direction)
-			meta_property(m_color)
-			meta_property(m_constantAttenuation)
-			meta_property(m_linearAttenuation)
-			meta_property(m_quadraticAttenuation)
-			meta_property(m_spotLightAngle)
-			meta_property(m_lightType)
-			meta_property(m_lightStatus)
-			meta_property(m_intencity)
-		});
+ //   ReflectionFieldInheritance(LightComponent, Component)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(m_lightIndex)
+	//		meta_property(m_position)
+	//		meta_property(m_direction)
+	//		meta_property(m_color)
+	//		meta_property(m_constantAttenuation)
+	//		meta_property(m_linearAttenuation)
+	//		meta_property(m_quadraticAttenuation)
+	//		meta_property(m_spotLightAngle)
+	//		meta_property(m_lightType)
+	//		meta_property(m_lightStatus)
+	//		meta_property(m_intencity)
+	//	});
 
-		MethodField
-		({
-			meta_method(UpdateLight)
-		});
+	//	MethodField
+	//	({
+	//		meta_method(UpdateLight)
+	//	});
 
-		FieldEnd(LightComponent, PropertyAndMethodInheritance)
-	}
+	//	FieldEnd(LightComponent, PropertyAndMethodInheritance)
+	//}
 
 private:
     bool m_IsEnabled{ false };

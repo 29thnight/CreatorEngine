@@ -320,19 +320,4 @@ namespace Meta
         }
         return false;
     }
-
-    template<typename Derived>
-    class IReflectable
-    {
-    public:
-        IReflectable()
-        {
-            static bool registered = []()
-            {
-                Meta::Register<Derived>();
-                return true;
-            }();
-            (void)registered;
-        }
-    };
 }

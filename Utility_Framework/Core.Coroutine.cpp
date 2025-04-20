@@ -24,6 +24,41 @@ void CoroutineManager::StopAllCoroutines()
     }
 }
 
+void CoroutineManager::DestroyCoroutine()
+{
+    for (auto it = activeCoroutines.begin(); it != activeCoroutines.end(); ) {
+        CoroutineWrapper* wrapper = *it;
+        if (wrapper->markedForDelete)
+        {
+            nullQueue.Unlink(wrapper);
+            waitForFixedUpdateQueue.Unlink(wrapper);
+            waitForEndOfFrameQueue.Unlink(wrapper);
+            it = activeCoroutines.erase(it);
+            coroutineMap.erase(wrapper->aliasName);
+            delete wrapper;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+void CoroutineManager::DestroyAllCoroutines()
+{
+    for (auto it = activeCoroutines.begin(); it != activeCoroutines.end(); )
+    {
+        CoroutineWrapper* wrapper = *it;
+        nullQueue.Unlink(wrapper);
+        waitForFixedUpdateQueue.Unlink(wrapper);
+        waitForEndOfFrameQueue.Unlink(wrapper);
+        it = activeCoroutines.erase(it);
+        coroutineMap.erase(wrapper->aliasName);
+        delete wrapper;
+    }
+    activeCoroutines.clear();
+}
+
 void CoroutineManager::yield_Null()
 {
     ProcessQueue(nullQueue);

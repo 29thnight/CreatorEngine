@@ -4,18 +4,22 @@
 #include "IUpdatable.h"
 #include "UIManager.h"
 #include "UIComponent.h"
+#include "UIButton.generated.h"
 
-//UI Ã³¸®¿ë
+//UI ì²˜ë¦¬ìš©
 enum class UIColliderType
 {
 	Box,
 	Circle,
 	Capsule,
 };
+AUTO_REGISTER_ENUM(UIColliderType);
 
-class UIButton : public UIComponent, public IUpdatable, public Meta::IReflectable<UIButton>
+class UIButton : public UIComponent, public IUpdatable
 {
 public:
+   ReflectUIButton
+    [[Serializable(Inheritance:UIComponent)]]
 	GENERATED_BODY(UIButton)
 	
 	void Update(float deltaSecond) override;
@@ -26,18 +30,9 @@ public:
 	}
 	void UpdateCollider();
 	bool CheckClick(Mathf::Vector2 _mousePos);
-	void SetFunction(std::function<void()> func){ m_clickFunction = func;}
-	void Click(){ m_clickFunction(); }
-
-	ReflectionField(UIButton)
-	{
-		MethodField
-		({
-			meta_method(Click)
-		});
-
-		FieldEnd(UIButton, MethodOnly)
-	};
+	void SetFunction(std::function<void()> func) { m_clickFunction = func;}
+    [[Method]]
+	void Click() { m_clickFunction(); }
 
 	bool isClick = false;
 private:

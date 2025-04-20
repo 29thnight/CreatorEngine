@@ -1,12 +1,21 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include "Transform.generated.h"
 
 class RenderScene;
-struct Transform : public Meta::IReflectable<Transform>
+struct Transform
 {
 public:
+   ReflectTransform
+    [[Serializable]]
+    Transform() = default;
+    ~Transform() = default;
+
+    [[Property]]
 	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
+    [[Property]]
 	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
+    [[Property]]
 	Mathf::Vector4 scale{ 1.f, 1.f, 1.f, 1.f };
 
 	Transform& SetScale(Mathf::Vector3 scale);
@@ -26,16 +35,16 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
-	ReflectionField(Transform)
-	{
-		PropertyField
-		({
-			meta_property(position)
-			meta_property(rotation)
-			meta_property(scale)
-		});
-		FieldEnd(Transform, PropertyOnly)
-	}
+	//ReflectionField(Transform)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(position)
+	//		meta_property(rotation)
+	//		meta_property(scale)
+	//	});
+	//	FieldEnd(Transform, PropertyOnly)
+	//}
 
 private:
 	friend class RenderScene;

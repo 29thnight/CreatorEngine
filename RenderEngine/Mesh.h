@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "Mesh.generated.h"
 #include <assimp/Importer.hpp>
 
 struct ModelNode
@@ -55,6 +56,8 @@ class ModelLoader;
 class Mesh
 {
 public:
+   ReflectMesh
+    [[Serializable]]
 	Mesh() = default;
 	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(Mesh&& _other) noexcept;
@@ -65,24 +68,28 @@ public:
 
 	std::string GetName() const { return m_name; }
 
-	ReflectionField(Mesh)
-	{
-		PropertyField
-		({
-			meta_property(m_name)
-			meta_property(m_materialIndex)
-		});
-		FieldEnd(Mesh, PropertyOnly)
-	}
+	//ReflectionField(Mesh)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(m_name)
+	//		meta_property(m_materialIndex)
+	//	});
+	//	FieldEnd(Mesh, PropertyOnly)
+	//}
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }
 private:
 	friend class ModelLoader;
 
+    [[Property]]
 	std::string m_name;
+
+    [[Property]]
+	uint32 m_materialIndex{};
+
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
-	uint32 m_materialIndex{};
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;

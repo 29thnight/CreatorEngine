@@ -1,19 +1,23 @@
 #pragma once
 #include "GameObject.h"
 #include "LightProperty.h"
+#include "Scene.generated.h"
 
 class GameObject;
 class RenderScene;
 class SceneManager;
 struct ICollider;
-class Scene : public Meta::IReflectable<Scene>
+class Scene
 {
 private:
 
 public:
+   ReflectScene
+    [[Serializable]]
 	Scene() = default;
 	~Scene() = default;
 
+    [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
@@ -95,6 +99,7 @@ public:
     std::atomic_bool m_isLoaded{ false };
     std::atomic_bool m_isDirty{ false };
     std::atomic_bool m_isEnable{ false };
+    [[Property]]
     size_t m_buildIndex{ 0 };
 
 public:
@@ -124,17 +129,17 @@ public:
         return m_lightProperties;
     }
 
-    ReflectionField(Scene)
-    {
-		PropertyField
-		({
-			meta_property(m_sceneName)
-			meta_property(m_buildIndex)
-            meta_property(m_SceneObjects)
-		});
-			
-		FieldEnd(Scene, PropertyOnly)
-    }
+  //  ReflectionField(Scene)
+  //  {
+		//PropertyField
+		//({
+		//	meta_property(m_sceneName)
+		//	meta_property(m_buildIndex)
+  //          meta_property(m_SceneObjects)
+		//});
+		//	
+		//FieldEnd(Scene, PropertyOnly)
+  //  }
 
 private:
 	friend class SceneManager;
@@ -154,6 +159,7 @@ private:
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
     LightProperties m_lightProperties;
+    [[Property]]
 	HashingString m_sceneName;
     int m_lightCount = 0;
 };

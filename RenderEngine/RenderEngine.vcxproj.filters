@@ -153,6 +153,9 @@
     <Filter Include="LightMap\Algorithm">
       <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\EffectPass\NodeEditor">
+      <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -423,6 +426,12 @@
     </ClInclude>
     <ClInclude Include="AssetMetaRegistry.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="ModuleLink.h">
+      <Filter>RenderPass\EffectPass\NodeEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialInfomation.h">
+      <Filter>Resources\Material</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

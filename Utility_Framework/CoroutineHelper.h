@@ -27,17 +27,17 @@ struct YieldInstruction
     std::function<bool()> condition;
     bool* signal = nullptr;
 
-    friend static YieldInstruction WaitForSeconds(float sec);
+    friend YieldInstruction WaitForSeconds(float sec);
 
-    friend static YieldInstruction WaitForFrames(int frames);
+    friend YieldInstruction WaitForFrames(int frames);
 
-    friend static YieldInstruction WaitUntil(std::function<bool()> func);
+    friend YieldInstruction WaitUntil(std::function<bool()> func);
 
-    friend static YieldInstruction WaitForSignal(bool* signalFlag);
+    friend YieldInstruction WaitForSignal(bool* signalFlag);
 
-    friend static YieldInstruction WaitForFixedUpdate();
+    friend YieldInstruction WaitForFixedUpdate();
 
-    friend static YieldInstruction WaitForEndOfFrame();
+    friend YieldInstruction WaitForEndOfFrame();
 
     bool Tick(float deltaTime)
     {
@@ -57,7 +57,7 @@ struct YieldInstruction
         case YieldInstructionType::WaitForEndOfFrame:
         case YieldInstructionType::Null:
         case YieldInstructionType::None:
-            return true; // Ã³¸® Å¥ ÀüÈ¯ ÈÄ 1ÇÁ·¹ÀÓ ´ë±â
+            return true; // ì²˜ë¦¬ í ì „í™˜ í›„ 1í”„ë ˆì„ ëŒ€ê¸°
         default:
             return true;
         }
