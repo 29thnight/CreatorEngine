@@ -46,13 +46,14 @@ public:
 
     //    FieldEnd(Object, PropertyOnly)
     //}
+public:
+    [[Property]]
+    HashingString     m_name{ "Object" };
 
 protected:
     friend class SceneManager;
     friend class RenderScene;
 	HashedGuid        m_typeID{ TypeTrait::GUIDCreator::GetTypeID<Object>() };
-    [[Property]]
-    HashingString     m_name{ "Object" };
     [[Property]]
     HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
     std::atomic<bool> m_destroyMark{ false };

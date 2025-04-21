@@ -3,6 +3,20 @@
 
 namespace Meta
 {
+	// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
+	inline int InputTextCallback(ImGuiInputTextCallbackData* data)
+	{
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+		{
+			// UserData에 저장된 std::string 포인터를 가져옴
+			std::string* str = static_cast<std::string*>(data->UserData);
+			// 새로운 길이에 맞춰 std::string의 크기 재조정
+			str->resize(data->BufTextLen);
+			data->Buf = const_cast<char*>(str->c_str());
+		}
+		return 0;
+	}
+
     inline void DrawObject(void* instance, const Type& type);
 
     inline void DrawProperties(void* instance, const Type& type)
@@ -15,6 +29,11 @@ namespace Meta
                 int value = std::any_cast<int>(prop.getter(instance));
                 if (ImGui::InputInt(prop.name, &value))
                 {
+                   /* int prevValue = std::any_cast<int>(prop.getter(instance));
+                    UndoCommandManager->Execute(
+                        std::make_unique<PropertyChangeCommand<int>>(instance, prop, prevValue, value)
+                    );*/
+					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -23,6 +42,7 @@ namespace Meta
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S32, &value))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -31,6 +51,7 @@ namespace Meta
                 long long value = std::any_cast<long long>(prop.getter(instance));
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S64, &value))
                 {
+					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -39,6 +60,7 @@ namespace Meta
                 float value = std::any_cast<float>(prop.getter(instance));
                 if (ImGui::InputFloat(prop.name, &value))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -47,14 +69,21 @@ namespace Meta
                 bool value = std::any_cast<bool>(prop.getter(instance));
                 if (ImGui::Checkbox(prop.name, &value))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
             else if (hash == GUIDCreator::GetTypeID<std::string>())
             {
                 std::string value = std::any_cast<std::string>(prop.getter(instance));
-                if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
+				if (ImGui::InputText(prop.name, 
+                    value.data(), 
+                    value.size() + 1, 
+                    ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
+					Meta::InputTextCallback,
+					static_cast<void*>(&value)))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }//[OverWatching]
@@ -63,6 +92,7 @@ namespace Meta
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));
                 if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -71,6 +101,7 @@ namespace Meta
                 auto value = std::any_cast<Mathf::Vector2>(prop.getter(instance));
                 if (ImGui::DragFloat2(prop.name, &value.x, 0.1f))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -79,6 +110,7 @@ namespace Meta
                 auto value = std::any_cast<Mathf::Vector3>(prop.getter(instance));
                 if (ImGui::DragFloat3(prop.name, &value.x, 0.1f))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -88,6 +120,7 @@ namespace Meta
                 auto value = std::any_cast<Mathf::Vector4>(prop.getter(instance));
                 if (ImGui::DragFloat4(prop.name, &value.x, 0.1f))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -96,6 +129,7 @@ namespace Meta
                 auto value = std::any_cast<Mathf::Color4>(prop.getter(instance));
                 if (ImGui::ColorEdit4(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -104,6 +138,7 @@ namespace Meta
                 auto value = std::any_cast<float2>(prop.getter(instance));
                 if (ImGui::DragFloat2(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -112,6 +147,7 @@ namespace Meta
                 auto value = std::any_cast<float3>(prop.getter(instance));
                 if (ImGui::DragFloat3(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -120,6 +156,7 @@ namespace Meta
                 auto value = std::any_cast<float4>(prop.getter(instance));
                 if (ImGui::DragFloat4(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -128,6 +165,7 @@ namespace Meta
                 auto value = std::any_cast<int2>(prop.getter(instance));
                 if (ImGui::InputInt2(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }
@@ -136,6 +174,7 @@ namespace Meta
                 auto value = std::any_cast<int3>(prop.getter(instance));
                 if (ImGui::InputInt3(prop.name, &value.x))
                 {
+                    MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
             }// 다른 타입 추가 가능

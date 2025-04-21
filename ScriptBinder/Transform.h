@@ -3,6 +3,7 @@
 #include "Transform.generated.h"
 
 class RenderScene;
+class InspectorWindow;
 struct Transform
 {
 public:
@@ -48,6 +49,8 @@ public:
 
 private:
 	friend class RenderScene;
+	friend class InspectorWindow;
+	[[Property]]
 	bool32 m_dirty{ true };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };

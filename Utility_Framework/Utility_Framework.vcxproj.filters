@@ -213,6 +213,9 @@
     <ClInclude Include="Trim.h">
       <Filter>Utility</Filter>
     </ClInclude>
+    <ClInclude Include="MetaStateCommand.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

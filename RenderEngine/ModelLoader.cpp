@@ -426,6 +426,21 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_animator->SetEnabled(true);
 			m_animator->m_Skeleton = m_model->m_Skeleton;
 		}
+
+		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+		{
+			uint32 meshId = node->m_meshes[0];
+			Mesh* mesh = m_model->m_Meshes[meshId];
+			Material* material = m_model->m_Materials[meshId];
+			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+			nextIndex = rootObject->m_index;
+			return;
+		}
 	}
 
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)

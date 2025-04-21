@@ -209,7 +209,7 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 
 void PostProcessingPass::GaussianBlurComputeKernel()
 {
-	float sigma = 10.f;
+	float sigma = 5.f;
 	float sigmaRcp = 1.f / sigma;
 	float twoSigmaSq = 2 * sigma * sigma;
 

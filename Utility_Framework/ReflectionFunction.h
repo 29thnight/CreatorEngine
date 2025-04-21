@@ -24,6 +24,10 @@ namespace Meta
         return MetaDataRegistry->Find(name.data());
     }
 
+	static inline const Type* Find(size_t typeID)
+	{
+		return MetaDataRegistry->Find(typeID);
+	}
 
     template <typename Enum, std::size_t... Is>
     auto create_enum_values(std::index_sequence<Is...>)
@@ -320,4 +324,20 @@ namespace Meta
         }
         return false;
     }
+
+	template <typename T>
+    inline void MakePropChangeCommand(void* instance, const Property& prop, const T& value)
+    {
+		T prevValue = std::any_cast<T>(prop.getter(instance));
+		UndoCommandManager->Execute(
+			std::make_unique<PropertyChangeCommand<T>>(instance, prop, prevValue, value)
+		);
+    }
+
+	inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
+	{
+		UndoCommandManager->Execute(
+			std::make_unique<CustomChangeCommand>(undoFunc, redoFunc)
+		);
+	}
 }

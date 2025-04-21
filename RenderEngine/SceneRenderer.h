@@ -35,6 +35,8 @@ class RenderPassWindow;
 class SceneViewWindow;
 class MenuBarWindow;
 class GameViewWindow;
+class HierarchyWindow;
+class InspectorWindow;
 class SceneRenderer
 {
 private:
@@ -42,6 +44,8 @@ private:
 	friend class SceneViewWindow;
 	friend class MenuBarWindow;
 	friend class GameViewWindow;
+	friend class HierarchyWindow;
+	friend class InspectorWindow;
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 

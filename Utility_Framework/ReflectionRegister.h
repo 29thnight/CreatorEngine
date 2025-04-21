@@ -1,6 +1,7 @@
 #pragma once
 #include "ClassProperty.h"
 #include "ReflectionType.h"
+#include "MetaStateCommand.h"
 #include <functional>
 #include <any>
 #include <typeindex>
@@ -12,8 +13,11 @@ namespace Meta
 
     class TypeCaster : public Singleton<TypeCaster>
     {
-    public:
+    private:
+		TypeCaster() = default;
+		~TypeCaster() = default;
         friend Singleton;
+    public:
 
     public:
         template<typename T>
@@ -61,8 +65,11 @@ namespace Meta
 
     class Registry : public Singleton<Registry>
     {
-    public:
+    private:
+		Registry() = default;
+		~Registry() = default;
         friend Singleton;
+    public:
 
         void Register(const std::string& name, const Type& type)
         {
@@ -98,8 +105,11 @@ namespace Meta
 
     class EnumRegistry : public Singleton<EnumRegistry>
     {
-    public:
+    private:
+		EnumRegistry() = default;
+		~EnumRegistry() = default;
 		friend Singleton;
+    public:
         void Register(const std::string& name, const EnumType& enumType)
         {
             if (enumMap.find(name) == enumMap.end())
@@ -123,9 +133,12 @@ namespace Meta
 
     class FactoryRegistry : public Singleton<FactoryRegistry>
     {
-    public:
+    private:
         friend Singleton;
+		FactoryRegistry() = default;
+		~FactoryRegistry() = default;
 
+    public:
         template<typename T>
         void Register()
         {
@@ -164,6 +177,46 @@ namespace Meta
     };
 
     static inline auto& MetaFactoryRegistry = FactoryRegistry::GetInstance();
+
+	class UndoManager : public Singleton<UndoManager>
+	{
+	private:
+		UndoManager() = default;
+		~UndoManager() = default;
+		friend Singleton;
+
+	public:
+		void Execute(std::unique_ptr<IUndoableCommand> cmd)
+		{
+			cmd->Redo();
+			m_undoStack.push(std::move(cmd));
+			while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack ÃÊ±âÈ­
+		}
+
+		void Undo()
+		{
+			if (m_undoStack.empty()) return;
+			auto cmd = std::move(m_undoStack.top());
+			m_undoStack.pop();
+			cmd->Undo();
+			m_redoStack.push(std::move(cmd));
+		}
+
+		void Redo()
+		{
+			if (m_redoStack.empty()) return;
+			auto cmd = std::move(m_redoStack.top());
+			m_redoStack.pop();
+			cmd->Redo();
+			m_undoStack.push(std::move(cmd));
+		}
+
+	private:
+		std::stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
+		std::stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
+	};
+
+	static inline auto& UndoCommandManager = UndoManager::GetInstance();
 
     template <typename Enum>
     struct EnumAutoRegistrar

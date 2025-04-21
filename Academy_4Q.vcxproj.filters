@@ -156,6 +156,12 @@
     <ClCompile Include="EngineEntry\KeyState.cpp">
       <Filter>Manager\InputManager</Filter>
     </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
+      <Filter>Window\InspectorWindow</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EngineEntry\Academy_4Q.rc">
