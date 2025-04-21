@@ -10,6 +10,10 @@
 #include "DataSystem.h"
 #include "PathFinder.h"
 #include "Transform.h"
+#include "ComponentFactory.h"
+
+#include "IconsFontAwesome6.h"
+#include "fa.h"
 
 InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
@@ -87,43 +91,43 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					if (prevScale != scale)
 					{
 						Meta::MakeCustomChangeCommand([=] 
-							{
-								selectedSceneObject->m_transform.scale = prevScale;
-								selectedSceneObject->m_transform.m_dirty = true;
-							},
-							[=]
-							{
-								selectedSceneObject->m_transform.scale = scale;
-								selectedSceneObject->m_transform.m_dirty = true;
-							});
+						{
+							selectedSceneObject->m_transform.scale = prevScale;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.scale = scale;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
 					}
 
 					if (prevRotation != rotation)
 					{
 						Meta::MakeCustomChangeCommand([=]
-							{
-								selectedSceneObject->m_transform.rotation = prevRotation;
-								selectedSceneObject->m_transform.m_dirty = true;
-							},
-							[=]
-							{
-								selectedSceneObject->m_transform.rotation = rotation;
-								selectedSceneObject->m_transform.m_dirty = true;
-							});
+						{
+							selectedSceneObject->m_transform.rotation = prevRotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.rotation = rotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
 					}
 
 					if (prevPosition != position)
 					{
 						Meta::MakeCustomChangeCommand([=]
-							{
-								selectedSceneObject->m_transform.position = prevPosition;
-								selectedSceneObject->m_transform.m_dirty = true;
-							},
-							[=]
-							{
-								selectedSceneObject->m_transform.position = position;
-								selectedSceneObject->m_transform.m_dirty = true;
-							});
+						{
+							selectedSceneObject->m_transform.position = prevPosition;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.position = position;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
 					}
 					selectedSceneObject->m_transform.GetLocalMatrix();
 				}
@@ -136,9 +140,96 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 				if (ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
 				{
-					Meta::DrawObject(component.get(), *type);
+					if(component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>())
+					{
+						MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
+						if (nullptr != meshRenderer)
+						{
+							ImGuiDrawHelperMeshRenderer(meshRenderer);
+						}
+					}
+					else
+					{
+						Meta::DrawObject(component.get(), *type);
+					}
 				}
+			}
+			
+			ImGui::Separator();
+			if (ImGui::Button("Add Component"))
+			{
+				ImGui::OpenPopup("AddComponent");
+			}
+
+			if (ImGui::BeginPopup("AddComponent"))
+			{
+				for (const auto& [type_name, type] : ComponentFactorys->m_componentTypes)
+				{
+					if (ImGui::MenuItem(type_name.c_str()))
+					{
+						auto component = selectedSceneObject->AddComponent(*type);
+					}
+				}
+				ImGui::EndPopup();
 			}
 		}
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
+}
+
+void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
+{
+	if (meshRenderer->m_Material)
+	{
+		if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::Text("Element ");
+			ImGui::SameLine();
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+			ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+			ImGui::Button(meshRenderer->m_Material->m_name.c_str(), ImVec2(250, 0));
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_BOX))
+			{
+				ImGui::GetContext("SelectMatarial").Open();
+			}
+			ImGui::PopStyleVar(2);
+		}
+		if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto& mat_type = Meta::Find("Material");
+			const auto& mat_info_type = Meta::Find("MaterialInfomation");
+			Meta::DrawProperties(&meshRenderer->m_Material->m_materialInfo, *mat_info_type);
+			const auto& mat_render_type = Meta::FindEnum("MaterialRenderingMode");
+			for (auto& enumProp : mat_type->properties)
+			{
+				if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
+				{
+					Meta::DrawEnumProperty((int*)&meshRenderer->m_Material->m_renderingMode, mat_render_type, enumProp);
+					break;
+				}
+			}
+		}
+
+		if (DataSystems->m_trasfarMaterial)
+		{
+			std::string name = meshRenderer->m_Material->m_name;
+			Meta::MakeCustomChangeCommand(
+				[=]
+				{
+					meshRenderer->m_Material = DataSystems->Materials[name].get();
+				},
+				[=]
+				{
+					meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+				}
+			);
+
+			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+			DataSystems->m_trasfarMaterial = nullptr;
+		}
+	}
+	else
+	{
+		ImGui::Text("No Material");
+	}
 }

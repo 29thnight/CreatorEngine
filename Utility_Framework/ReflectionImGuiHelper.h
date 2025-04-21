@@ -27,6 +27,7 @@ namespace Meta
             if (hash == GUIDCreator::GetTypeID<int>())
             {
                 int value = std::any_cast<int>(prop.getter(instance));
+                ImGui::PushID(prop.name);
                 if (ImGui::InputInt(prop.name, &value))
                 {
                    /* int prevValue = std::any_cast<int>(prop.getter(instance));
@@ -36,46 +37,56 @@ namespace Meta
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<unsigned int>())
             {
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S32, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<long long>())
             {
                 long long value = std::any_cast<long long>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputScalar(prop.name, ImGuiDataType_S64, &value))
                 {
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float>())
             {
                 float value = std::any_cast<float>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputFloat(prop.name, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<bool>()|| prop.typeName == "bool32")
             {
                 bool value = std::any_cast<bool>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::Checkbox(prop.name, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<std::string>())
             {
                 std::string value = std::any_cast<std::string>(prop.getter(instance));
+				ImGui::PushID(prop.name);
 				if (ImGui::InputText(prop.name, 
                     value.data(), 
                     value.size() + 1, 
@@ -86,97 +97,118 @@ namespace Meta
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputText(prop.name, value.data(), value.size() + 1))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector2>())
             {
                 auto value = std::any_cast<Mathf::Vector2>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat2(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector3>())
             {
                 auto value = std::any_cast<Mathf::Vector3>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat3(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>()
                 || hash == GUIDCreator::GetTypeID<Mathf::Quaternion>())
             {
                 auto value = std::any_cast<Mathf::Vector4>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat4(prop.name, &value.x, 0.1f))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
             {
                 auto value = std::any_cast<Mathf::Color4>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::ColorEdit4(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float2>())
             {
                 auto value = std::any_cast<float2>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat2(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float3>())
             {
                 auto value = std::any_cast<float3>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat3(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<float4>())
             {
                 auto value = std::any_cast<float4>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::DragFloat4(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<int2>())
             {
                 auto value = std::any_cast<int2>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputInt2(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<int3>())
             {
                 auto value = std::any_cast<int3>(prop.getter(instance));
+				ImGui::PushID(prop.name);
                 if (ImGui::InputInt3(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
+				ImGui::PopID();
             }// 다른 타입 추가 가능
             else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
             {
@@ -192,11 +224,13 @@ namespace Meta
                         current_index = static_cast<int>(i);
                 }
                 // 콤보 박스로 enum 값을 선택할 수 있도록 합니다.
+				ImGui::PushID(prop.name);
                 if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
                 {
                     // 선택된 인덱스에 해당하는 enum 값으로 업데이트합니다.
                     prop.setter(instance, enumType->values[current_index].value);
                 }
+				ImGui::PopID();
             }
             else if (prop.isPointer)
             {
@@ -355,8 +389,43 @@ namespace Meta
         }
     }
 
+	inline void DrawEnumProperty(int* instance, const EnumType* _enumType, const Property& prop)
+	{
+        if (const EnumType* enumType = MetaEnumRegistry->Find(_enumType->name))
+        {
+            std::vector<const char*> items;
+			int prevValue = *instance;
+            int current_index = 0;
+            for (size_t i = 0; i < enumType->values.size(); i++)
+            {
+                items.push_back(enumType->values[i].name);
+                if (enumType->values[i].value == *instance)
+                    current_index = static_cast<int>(i);
+            }
+
+            ImGui::PushID(prop.name);
+            if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
+            {
+				Meta::MakeCustomChangeCommand(
+					[=]
+					{
+						*instance = prevValue;
+					},
+                    [=]
+                    {
+                        *instance = enumType->values[current_index].value;
+                    }
+				);
+                *instance = enumType->values[current_index].value;
+
+            }
+            ImGui::PopID();
+        }
+    }
+
     inline void DrawObject(void* instance, const Type& type)
     {
+		ImGui::PushID(type.name.data());
         if (type.parent)
         {
             DrawObject(instance, *type.parent);
@@ -365,6 +434,7 @@ namespace Meta
         //ImGui::Indent();
         DrawProperties(instance, type);
         DrawMethods(instance, type);
+        ImGui::PopID();
         //ImGui::Unindent();
     }
 }

@@ -50,15 +50,20 @@ public:
     void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
+	//Resource Model
 	void LoadModels();
 	Model* LoadModelGUID(FileGuid guid);
 	void LoadModel(const std::string_view& filePath);
 	Model* LoadCashedModel(const std::string_view& filePath);
+	//Resource Texture
 	void LoadTextures();
-	void LoadMaterials();
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(const std::string_view& filePath);
+	//Resource Material
+	void LoadMaterials();
+	Material* LoadMaterialGUID(FileGuid guid);
     Texture* LoadMaterialTexture(const std::string_view& filePath);
+	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
 
@@ -76,10 +81,9 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	static ImGuiTextFilter filter;
-private:
-	void AddModel(const file::path& filepath, const file::path& dir);
 
-private:
+	Material* m_trasfarMaterial{};
+
 	//--------- Icon for ImGui
 	Texture* TextureIcon{};
 	Texture* ModelIcon{};
@@ -90,6 +94,11 @@ private:
 	Texture* CodeIcon{};
 	ImFont* smallFont{};
 	ImFont* extraSmallFont{};
+
+private:
+	void AddModel(const file::path& filepath, const file::path& dir);
+
+private:
 	//--------- current file count
 	uint32 currModelFileCount = 0;
 	uint32 currShaderFileCount = 0;

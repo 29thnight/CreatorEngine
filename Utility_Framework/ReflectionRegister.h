@@ -6,6 +6,7 @@
 #include <any>
 #include <typeindex>
 
+class ComponentFactory;
 namespace Meta
 {
     // --- TypeCaster: 런타임 타입 -> void* 변환 ---
@@ -69,6 +70,7 @@ namespace Meta
 		Registry() = default;
 		~Registry() = default;
         friend Singleton;
+        friend class ::ComponentFactory;
     public:
 
         void Register(const std::string& name, const Type& type)

@@ -5,6 +5,31 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 
+void ComponentFactory::Initialize()
+{
+   auto& registerMap = Meta::MetaDataRegistry->map;
+
+   for (const auto& [name, type] : registerMap)
+   {
+	   size_t pos = name.find("Component");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("Renderer");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("Animator");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+   }
+
+}
+
 void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
 {
     const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);

@@ -24,6 +24,11 @@ namespace Meta
         return MetaDataRegistry->Find(name.data());
     }
 
+	static inline const EnumType* FindEnum(const std::string_view& name)
+	{
+		return MetaEnumRegistry->Find(name.data());
+	}
+
 	static inline const Type* Find(size_t typeID)
 	{
 		return MetaDataRegistry->Find(typeID);

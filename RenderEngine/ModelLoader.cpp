@@ -258,6 +258,15 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 		material->SetBaseColor(1, 0, 1);
 	}
 
+	auto deleter = [&](Material* mat)
+	{
+		if (mat)
+		{
+			DeallocateResource<Material>(mat);
+		}
+	};
+	DataSystems->Materials[mesh->mName.C_Str()] = std::shared_ptr<Material>(material, deleter);
+
 	return material;
 }
 
