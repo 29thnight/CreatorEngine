@@ -25,22 +25,27 @@ namespace Memory
 		return refCount;
 	}
 
-	//¸Ş¸ğ¸® ÇÒ´ç ¹× º¹»ç
+	//ë©”ëª¨ë¦¬ í• ë‹¹ ë° ë³µì‚¬
 	inline void AllocateAndCopy(void* pDst, const void* pSrc, uint32 size)
 	{
 		pDst = malloc(size);
 		memcpy(pDst, pSrc, size);
 	}
-  //¸Ş¸ğ¸® ÇØÁ¦ : IUnknownÀ» »ó¼Ó¹ŞÀº Å¬·¡½ºÀÇ °æ¿ì Release() È£Ãâ -> ±× ¿Ü delete È£Ãâ
+  //ë©”ëª¨ë¦¬ í•´ì œ : IUnknownì„ ìƒì†ë°›ì€ í´ë˜ìŠ¤ì˜ ê²½ìš° Release() í˜¸ì¶œ -> ê·¸ ì™¸ delete í˜¸ì¶œ
     inline void SafeDelete(Pointer auto& ptr)
     {
-		using PtrType = std::remove_pointer_t<std::remove_reference_t<decltype(ptr)>>;  // ÂüÁ¶ Á¦°ÅÇÑ Å¸ÀÔ
+		using PtrType = std::remove_pointer_t<std::remove_reference_t<decltype(ptr)>>;  // ì°¸ì¡° ì œê±°í•œ íƒ€ì…
 		if constexpr (std::derived_from<PtrType, IUnknown>)
 		{
 			if(0 != GetReferanceCounter(ptr))
 			{
 				ptr->Release();
+                ptr = nullptr;
 			}
+            else
+            {
+                ptr = nullptr;
+            }
 		}
 		else
 		{
@@ -49,7 +54,7 @@ namespace Memory
 		}
     }
 }
-//Áö¿¬ »èÁ¦ÀÚ : ¿¬¼Ó ÄÁÅ×ÀÌ³Ê¿¡ ÀúÀåµÈ ¿ä¼Ò(Æ÷ÀÎÅÍ)µéÀ» ½ºÄÚÇÁ°¡ ¹ş¾î³ª¸é »èÁ¦ÇÏ´Â Å¬·¡½º -> function °´Ã¼¸¦ »ç¿ëÇÏ¿© »èÁ¦ Á¶°ÇÀ» ÁöÁ¤ÇÒ ¼ö ÀÖÀ½
+//ì§€ì—° ì‚­ì œì : ì—°ì† ì»¨í…Œì´ë„ˆì— ì €ì¥ëœ ìš”ì†Œ(í¬ì¸í„°)ë“¤ì„ ìŠ¤ì½”í”„ê°€ ë²—ì–´ë‚˜ë©´ ì‚­ì œí•˜ëŠ” í´ë˜ìŠ¤ -> function ê°ì²´ë¥¼ ì‚¬ìš©í•˜ì—¬ ì‚­ì œ ì¡°ê±´ì„ ì§€ì •í•  ìˆ˜ ìˆìŒ
 template<typename T, typename Container>
 class DeferredDeleter final
 {
@@ -80,7 +85,7 @@ private:
 	Container* _container{};
 	Func m_deleteElementFunc{};
 };
-//ÅÛÇÃ¸´ Ãß·Ğ °¡ÀÌµå
+//í…œí”Œë¦¿ ì¶”ë¡  ê°€ì´ë“œ
 template<typename T, typename Allocator>
 DeferredDeleter(std::vector<T*, Allocator>*, auto) -> DeferredDeleter<T, std::vector<T*, Allocator>>;
 

@@ -3,7 +3,7 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 #include "Light.h"
 
 ShadowMapPass::ShadowMapPass()
@@ -76,9 +76,9 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 		);
 	}
 
-	//¾È¿¡¼­ ¹è¿­Àº 3À¸·Î °íÁ¤Áß ÇÊ¿äÇÏ¸é ¼öÁ¤
+	//ì•ˆì—ì„œ ë°°ì—´ì€ 3ìœ¼ë¡œ ê³ ì •ì¤‘ í•„ìš”í•˜ë©´ ìˆ˜ì •
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
-	m_shadowMapTexture = std::unique_ptr<Texture>(shadowMapTexture);
+	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
 	m_shadowCamera.m_isOrthographic = true;
 }
 

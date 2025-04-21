@@ -1,13 +1,22 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include "Transform.generated.h"
 
 class RenderScene;
 struct Transform
 {
 public:
-	Mathf::xVector position{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::xVector rotation{ 0.f, 0.f, 0.f, 1.f };
-	Mathf::xVector scale{ 1.f, 1.f, 1.f, 1.f };
+   ReflectTransform
+    [[Serializable]]
+    Transform() = default;
+    ~Transform() = default;
+
+    [[Property]]
+	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
+    [[Property]]
+	Mathf::Vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
+    [[Property]]
+	Mathf::Vector4 scale{ 1.f, 1.f, 1.f, 1.f };
 
 	Transform& SetScale(Mathf::Vector3 scale);
 	Transform& SetPosition(Mathf::Vector3 pos);
@@ -26,9 +35,20 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
+	//ReflectionField(Transform)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(position)
+	//		meta_property(rotation)
+	//		meta_property(scale)
+	//	});
+	//	FieldEnd(Transform, PropertyOnly)
+	//}
+
 private:
 	friend class RenderScene;
-	bool32 m_dirty{};
+	bool32 m_dirty{ true };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };

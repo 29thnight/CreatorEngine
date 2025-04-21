@@ -86,7 +86,9 @@ private:
 
 namespace TextureHelper
 {
-	inline std::unique_ptr<Texture> CreateRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
+    extern std::function<void(Texture*)> deleter;
+
+	inline std::unique_ptr<Texture, decltype(deleter)> CreateRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
 	{
 		Texture* tex = Texture::Create(
 			width, 
@@ -97,10 +99,11 @@ namespace TextureHelper
 		);
 		tex->CreateRTV(format);
 		tex->CreateSRV(format);
-		return std::unique_ptr<Texture>(tex);
+
+        return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
 	}
 
-	inline std::unique_ptr<Texture> CreateDepthTexture(int width, int height, const std::string name)
+	inline std::unique_ptr<Texture, decltype(deleter)> CreateDepthTexture(int width, int height, const std::string name)
 	{
 		Texture* tex = Texture::Create(
 			width,
@@ -111,6 +114,18 @@ namespace TextureHelper
 		);
 		tex->CreateDSV(DXGI_FORMAT_D24_UNORM_S8_UINT);
 		tex->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
-		return std::unique_ptr<Texture>(tex);
+
+		return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
 	}
+}
+
+using UniqueTexturePtr = std::unique_ptr<Texture, decltype(TextureHelper::deleter)>;
+
+#ifndef TEXTURE_NULL_INITIALIZER
+#define TEXTURE_NULL_INITIALIZER UniqueTexturePtr(nullptr, TextureHelper::deleter)
+#endif
+
+inline UniqueTexturePtr MakeUniqueTexturePtr(Texture* texture)
+{
+    return UniqueTexturePtr(texture, TextureHelper::deleter);
 }

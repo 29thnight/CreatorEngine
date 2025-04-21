@@ -113,8 +113,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -133,8 +134,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -145,30 +147,56 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ComponentFactory.cpp" />
+    <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
+    <ClCompile Include="Object.cpp" />
     <ClCompile Include="Scene.cpp" />
-    <ClCompile Include="SpriteComponent.cpp" />
+    <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="SoundManager.cpp" />
+    <ClCompile Include="TextComponent.cpp" />
+    <ClCompile Include="UIButton.cpp" />
+    <ClCompile Include="ImageComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
+    <ClCompile Include="UIComponent.cpp" />
+    <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Animator.h" />
+    <ClInclude Include="CameraComponent.h" />
+    <ClInclude Include="Canvas.h" />
     <ClInclude Include="Component.h" />
+    <ClInclude Include="ComponentFactory.h" />
+    <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
-    <ClInclude Include="IComponent.h" />
-    <ClInclude Include="ILifeSycle.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IRenderable.h" />
-    <ClInclude Include="IUpdatable.h" />
     <ClInclude Include="JobManager.h" />
     <ClInclude Include="LightComponent.h" />
+    <ClInclude Include="LightMapping.h" />
     <ClInclude Include="LightProperty.h" />
-    <ClInclude Include="Renderer.h" />
+    <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="Object.h" />
+    <ClInclude Include="RegisterReflect.def" />
+    <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
     <ClInclude Include="Scene.h" />
-    <ClInclude Include="SpriteComponent.h" />
+    <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="SoundManager.h" />
+    <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="TextComponent.h" />
+    <ClInclude Include="UIButton.h" />
+    <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />
-    <ClInclude Include="TypeTrait.h" />
+    <ClInclude Include="IUpdatable.h" />
+    <ClInclude Include="UIComponent.h" />
+    <ClInclude Include="UIManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="GameObejct.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

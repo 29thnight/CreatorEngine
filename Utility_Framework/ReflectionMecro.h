@@ -1,19 +1,18 @@
 #pragma once
-#include "ReflectionFunction.h"
+#include "ReflectionYml.h"
+#include "ReflectionImGuiHelper.h"
 
 #pragma region Reflection Macros
+#define EXPAND(x) x
 
-constexpr uint32_t PropertyAndMethod = 0;
-constexpr uint32_t PropertyOnly = 1;
-constexpr uint32_t MethodOnly = 2;
 #define meta_default(T) { Meta::Register<T>(); }
 
-#define ReflectionField(T, num) using __Ty = T; \
- static constexpr uint32_t ret_option = num; \
+#define ReflectionField(T) public: \
+ using __Ty = T; \
  static const Meta::Type& Reflect()
 
-#define ReflectionFieldInheritance(T, num, Parent) using __Ty = T; using __P_Ty = Parent \
- static constexpr uint32_t ret_option = num; \
+#define ReflectionFieldInheritance(T, Parent) using __Ty = T; \
+ using __P_Ty = Parent; \
  static const Meta::Type& Reflect()
 
 #define PropertyField static const auto properties = std::to_array
@@ -23,41 +22,49 @@ constexpr uint32_t MethodOnly = 2;
 #define meta_enum_property(member) Meta::MakeProperty(#member, &__Ty::member),
 #define meta_method(method, ...) Meta::MakeMethod(#method, &__Ty::method, { __VA_ARGS__ }),
 
-#define ReturnReflection(T) \
-    if constexpr (ret_option == PropertyAndMethod) \
-    { \
-        static const Meta::Type type{ #T, properties, methods, nullptr }; \
-        return type; \
-    } \
+#define PropertyAndMethod \
+    static const Meta::Type type{ type_name.c_str(), properties, methods, nullptr, TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
 
-#define ReturnReflectionPropertyOnly(T) \
-    if constexpr (ret_option == PropertyOnly) \
-    { \
-        static const Meta::Type type{ #T, properties, {}, nullptr }; \
-        return type; \
-    } \
+#define PropertyOnly \
+    static const Meta::Type type{ type_name.c_str(), properties, {}, nullptr, TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
 
-#define ReturnReflectionMethodOnly(T) \
-    if constexpr (ret_option == MethodOnly) \
-    { \
-        static const Meta::Type type{ #T, {}, methods, nullptr }; \
-        return type; \
-    } \
+#define MethodOnly \
+    static const Meta::Type type{ type_name.c_str(), {}, methods, nullptr, TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
 
-#define ReturnReflectionInheritance(T) \
-    if constexpr (ret_option == PropertyAndMethod) \
-    { \
-        static const Meta::Type type{ #T, properties, methods, &__P_Ty::Reflect() }; \
-        return type; \
-    } \
+#define PropertyAndMethodInheritance \
+    static const Meta::Type type{ type_name.c_str(), properties, methods, &__P_Ty::Reflect(), TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
 
-#define ReturnReflectionInheritancePropertyOnly(T) \
-    if constexpr (ret_option == PropertyOnly) \
-    { \
-        static const Meta::Type type{ #T, properties, {}, &__P_Ty::Reflect() }; \
-        return type; \
-    } \
+#define PropertyOnlyInheritance \
+    static const Meta::Type type{ type_name.c_str(), properties, {}, &__P_Ty::Reflect(), TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
+
+#define MethodOnlyInheritance \
+    static const Meta::Type type{ type_name.c_str(), {}, methods, &__P_Ty::Reflect(), TypeTrait::GUIDCreator::GetTypeID<__Ty>() }; \
+    return type; \
+
+#define FieldEnd(T, Mecro) \
+        std::string type_name = #T;\
+        EXPAND(Mecro) \
+
+#define REFLECTION_REGISTER() void RegisterReflect()
+#define REFLECTION_REGISTER_EXECUTE() RegisterReflect();
 
 #define AUTO_REGISTER_ENUM(EnumTypeName) \
     static const Meta::EnumAutoRegistrar<EnumTypeName> autoRegistrar_##EnumTypeName;
+
+#define AUTO_REGISTER_CLASS(ClassTypeName) \
+    Meta::Register<ClassTypeName>();
+
+#define GENERATED_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+    
 #pragma endregion

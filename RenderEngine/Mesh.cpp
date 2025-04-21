@@ -6,6 +6,7 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 	m_vertices(_vertices),
 	m_indices(_indices)
 {
+	//meta_default(Mesh);
 	/*for (int i = 0; i < m_indices.size(); i += 3)
 	{
 		uint32 index0 = m_indices[i];
@@ -57,6 +58,7 @@ Mesh::Mesh(Mesh&& _other) noexcept :
 	m_vertexBuffer(std::move(_other.m_vertexBuffer)),
 	m_indexBuffer(std::move(_other.m_indexBuffer))
 {
+	//meta_default(Mesh);
 }
 
 Mesh::~Mesh()
@@ -109,6 +111,6 @@ void UIMesh::Draw()
 	UINT offset = 0;
 	DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
 	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
 }

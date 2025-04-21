@@ -95,13 +95,13 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
     {
         if (path.extension() == ".dds")
         {
-			m_skyBoxCubeMap = std::unique_ptr<Texture>(Texture::LoadFormPath(fileName));
+			m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
 			m_cubeMapGenerationRequired = false;
         }
         else
         {
-			m_skyBoxTexture = std::unique_ptr<Texture>(Texture::LoadFormPath(fileName));
-            m_skyBoxCubeMap = std::unique_ptr<Texture>(Texture::CreateCube(
+			m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+            m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
                 m_cubeMapSize,
                 "CubeMap",
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -114,7 +114,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
         }
     }
 
-	m_EnvironmentMap = std::unique_ptr<Texture>(Texture::CreateCube(
+	m_EnvironmentMap = MakeUniqueTexturePtr(Texture::CreateCube(
         m_cubeMapSize,
 		"EnvironmentMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -124,7 +124,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 	m_EnvironmentMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
 	m_EnvironmentMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_SpecularMap = std::unique_ptr<Texture>(Texture::CreateCube(
+	m_SpecularMap = MakeUniqueTexturePtr(Texture::CreateCube(
 		m_cubeMapSize,
 		"SpecularMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -135,7 +135,7 @@ void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 	m_SpecularMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE, 6);
 	m_SpecularMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT, 6);
 
-	m_BRDFLUT = std::unique_ptr<Texture>(Texture::Create(
+	m_BRDFLUT = MakeUniqueTexturePtr(Texture::Create(
 		512,
 		512,
 		"BRDF_LUT",

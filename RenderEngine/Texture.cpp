@@ -1,5 +1,14 @@
 #include "Texture.h"
 #include "DeviceState.h"
+#include "ResourceAllocator.h"
+
+std::function<void(Texture*)> TextureHelper::deleter = [](Texture* texture)
+{
+    if (texture)
+    {
+        ResourceAllocator::GetInstance()->DeallocateTexture(texture);
+    }
+};
 
 //static functions
 Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
@@ -22,7 +31,8 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::
 		)
 	);
 
-	return new Texture(texture, name);
+	//return new Texture(texture, name);
+    return AllocateResource<Texture>(texture, name);
 }
 
 Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ uint32 mipLevels, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
@@ -49,7 +59,8 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name
 		)
 	);
 
-	return new Texture(texture, name);
+	//return new Texture(texture, name);
+    return AllocateResource<Texture>(texture, name);
 }
 
 
@@ -74,7 +85,8 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_vie
 		)
 	);
 
-	return new Texture(texture, name);
+	//return new Texture(texture, name);
+    return AllocateResource<Texture>(texture, name);
 }
 
 Texture* Texture::LoadFormPath(_In_ const file::path& path)
@@ -98,6 +110,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 	ScratchImage image{};
 	TexMetadata metadata{};
 
+    Benchmark banch3;
 	if (path.extension() == ".dds")
 	{
 		//load dds
@@ -144,8 +157,12 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 			)
 		);
 	}
-
-	Texture* texture = new Texture;
+	
+    std::cout << "Texture :" << banch3.GetElapsedTime() << std::endl;
+    Benchmark banch4;
+	//Texture* texture = new Texture;
+    Texture* texture = AllocateResource<Texture>();
+    std::cout << "new Texture :" << banch4.GetElapsedTime() << std::endl;
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceView(

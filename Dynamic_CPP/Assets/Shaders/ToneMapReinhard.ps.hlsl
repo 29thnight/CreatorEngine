@@ -32,7 +32,5 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 colour = Colour.Sample(PointSampler, IN.texCoord).rgb;
     float4 toneMapedColor = float4(ReinhardToneMapping(colour), 1.f);
     
-    float4 gammaCorrectedColor = pow(toneMapedColor, 1. / GAMMA);
-    
-    return gammaCorrectedColor;
+    return toneMapedColor;
 }

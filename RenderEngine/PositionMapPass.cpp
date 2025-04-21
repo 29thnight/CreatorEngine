@@ -3,7 +3,8 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
+#include "ResourceAllocator.h"
 struct alignas(16) PositionMapBuffer
 {
 	int positionMapWidth;
@@ -67,7 +68,7 @@ void PositionMapPass::Initialize(uint32 width, uint32 height)
 void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 
-	//ClearTextures();
+	ClearTextures();
 	m_pso->Apply();
 
 	PositionMapBuffer posBuf = { posNormMapSize, posNormMapSize };
@@ -132,12 +133,12 @@ void PositionMapPass::ClearTextures()
 {
 	for (auto& texture : m_positionMapTextures)
 	{
-		delete texture.second;
+		DeallocateResource(texture.second);
 	}
 	m_positionMapTextures.clear();
 	for (auto& texture : m_normalMapTextures)
 	{
-		delete texture.second;
+		DeallocateResource(texture.second);
 	}
 	m_normalMapTextures.clear();
 }

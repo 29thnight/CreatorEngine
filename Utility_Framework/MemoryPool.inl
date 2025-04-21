@@ -113,6 +113,7 @@ inline void MemoryPool<type, BlockSize>::deallocate(type* p, size_t n) noexcept
         Node* slot = reinterpret_cast<Node*>(p);
         slot->next = freeSlots;
         freeSlots = slot;
+        p = nullptr;
     }
 }
 
@@ -136,22 +137,27 @@ inline void MemoryPool<type, BlockSize>::deallocate_element(type* p)
 template<typename type, size_t BlockSize> requires PoolPolicy<type, BlockSize>
 inline size_t MemoryPool<type, BlockSize>::alignment_padding(type* p, size_t align) const noexcept
 {
-    uintptr_t result = reinterpret_cast<uintptr_t>(p);
-    return ((align - result) % align);
+    uintptr_t addr = reinterpret_cast<uintptr_t>(p);
+    size_t misalignment = addr % align;
+    return misalignment == 0 ? 0 : (align - misalignment);
 }
-
 
 
 template<typename type, size_t BlockSize> requires PoolPolicy<type, BlockSize>
 inline void MemoryPool<type, BlockSize>::allocateBlock()
 {
-    type* newBlock = reinterpret_cast<type*>(std::malloc(BlockSize));
-    reinterpret_cast<Node*>(newBlock)->next = currentBlock;
-    currentBlock = reinterpret_cast<Node*>(newBlock);
+    char* rawBlock = reinterpret_cast<char*>(std::malloc(BlockSize));
+    if (!rawBlock)
+    {
+        throw std::bad_alloc();
+    }
+    reinterpret_cast<Node*>(rawBlock)->next = currentBlock;
+    currentBlock = reinterpret_cast<Node*>(rawBlock);
 
-    type* body = newBlock + sizeof(Node*);
-    size_t bodyPadding = alignment_padding(body, alignof(Node));
+    // 바이트 단위로 오프셋 계산
+    char* body = rawBlock + sizeof(Node*);
+    size_t bodyPadding = alignment_padding(reinterpret_cast<type*>(body), alignof(Node));
 
     currentSlot = reinterpret_cast<Node*>(body + bodyPadding);
-    lastSlot = reinterpret_cast<Node*>(newBlock + BlockSize - sizeof(Node) + 1);
+    lastSlot = reinterpret_cast<Node*>(rawBlock + BlockSize - sizeof(Node) + 1);
 }

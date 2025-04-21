@@ -1,4 +1,5 @@
 #include "SkeletonLoader.h"
+#include "ResourceAllocator.h"
 
 SkeletonLoader::SkeletonLoader(const aiScene* scene) :
 	m_scene(scene)
@@ -7,29 +8,23 @@ SkeletonLoader::SkeletonLoader(const aiScene* scene) :
 
 SkeletonLoader::~SkeletonLoader()
 {
-	for (Bone* bone : m_bones)
-	{
-		delete bone;
-	}
-	m_bones.clear();
 	m_boneMap.clear();
 }
 
 Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
 {
-    Skeleton* skeleton = new Skeleton();
+    Skeleton* skeleton = AllocateResource<Skeleton>();
     aiNode* boneRoot = FindBoneRoot(root);
 
     // Parent is not a bone recorded
-    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
+    Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
     m_bones.push_back(parent);
 
     skeleton->m_rootBone = parent;
     ProcessBones(boneRoot, parent);
-    skeleton->m_bones = m_bones;
+    skeleton->m_bones = std::move(m_bones);
     skeleton->m_rootTransform = XMMATRIX(&boneRoot->mTransformation.a1);
 
-    m_bones.clear();
     skeleton->m_globalInverseTransform = XMMatrixInverse(NULL, XMMATRIX(&boneRoot->mTransformation.a1));
 
     LoadAnimations(skeleton);
@@ -41,7 +36,7 @@ int SkeletonLoader::AddBone(aiBone* _bone)
     std::string boneName(_bone->mName.data);
     if (m_boneMap.find(boneName) == m_boneMap.end())
     {
-        Bone* bone = new Bone(boneName, m_bones.size(), XMMatrixTranspose(XMMATRIX(&_bone->mOffsetMatrix.a1)));
+        Bone* bone = AllocateResource<Bone>(boneName, m_bones.size(), XMMatrixTranspose(XMMATRIX(&_bone->mOffsetMatrix.a1)));
         m_bones.push_back(bone);
         m_boneMap.emplace(boneName, bone);
     }
@@ -50,6 +45,8 @@ int SkeletonLoader::AddBone(aiBone* _bone)
 
 void SkeletonLoader::ProcessBones(aiNode* node, Bone* bone)
 {
+    bone->m_children.reserve(node->mNumChildren);
+
     for (UINT i = 0; i < node->mNumChildren; ++i)
     {
         aiNode* child = node->mChildren[i];
@@ -64,6 +61,8 @@ void SkeletonLoader::ProcessBones(aiNode* node, Bone* bone)
 
 void SkeletonLoader::LoadAnimations(Skeleton* skeleton)
 {
+    skeleton->m_animations.reserve(m_scene->mNumAnimations);
+
     for (UINT i = 0; i < m_scene->mNumAnimations; ++i)
     {
         std::optional<Animation> anim = m_animationLoader.LoadAnimation(m_scene->mAnimations[i]);
@@ -85,8 +84,8 @@ aiNode* SkeletonLoader::FindBoneRoot(aiNode* root)
         aiNode* node = queue.front();
         queue.pop();
 
-        std::string nodeName(node->mName.data);
-        if (m_boneMap.find(nodeName) != m_boneMap.end())
+        std::string_view nodeName(node->mName.data);
+        if (m_boneMap.find(nodeName.data()) != m_boneMap.end())
         {
             return node->mParent;
         }

@@ -1,8 +1,9 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "Mesh.generated.h"
 #include <assimp/Importer.hpp>
 
-struct Node
+struct ModelNode
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -13,7 +14,8 @@ struct Node
 	uint32 m_numMeshes{};
 	std::vector<uint32> m_meshes;
 
-	Node(const std::string_view& name) : m_name(name) {}
+	ModelNode() = default;
+	ModelNode(const std::string_view& name) : m_name(name) {}
 };
 
 struct Vertex
@@ -54,6 +56,8 @@ class ModelLoader;
 class Mesh
 {
 public:
+   ReflectMesh
+    [[Serializable]]
 	Mesh() = default;
 	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
 	Mesh(Mesh&& _other) noexcept;
@@ -62,16 +66,30 @@ public:
 	void Draw();
 	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
 
-	const std::string& GetName() { return m_name; }
+	std::string GetName() const { return m_name; }
+
+	//ReflectionField(Mesh)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(m_name)
+	//		meta_property(m_materialIndex)
+	//	});
+	//	FieldEnd(Mesh, PropertyOnly)
+	//}
+	const std::vector<Vertex>& GetVertices() { return m_vertices; }
+	const std::vector<uint32>& GetIndices() { return m_indices; }
 private:
 	friend class ModelLoader;
+
+    [[Property]]
 	std::string m_name;
+
+    [[Property]]
+	uint32 m_materialIndex{};
+
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
-	uint32 m_materialIndex{};
-	//Mathf::Matrix m_transform{ XMMatrixIdentity() };
-
-	std::string m_nodeName;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
@@ -158,8 +176,6 @@ struct UIvertex
 	DirectX::XMFLOAT2 texCoord;
 };
 
-
-
 class UIMesh
 {
 public:
@@ -189,10 +205,10 @@ private:
 
 	std::vector<UIvertex> UIQuad
 	{
-		{ { -1.0f, 1.0f, 0.0f}, { 0.0f, 0.0f } },  // ÁÂ»ó´Ü
-		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // ¿ì»ó´Ü
-		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // ¿ìÇÏ´Ü
-		{ {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f} },    // ÁÂÇÏ´Ü
+		{ {-1.0f,  1.0f, 0.0f}, { 0.0f, 0.0f} },  // ì¢Œìƒë‹¨
+		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // ìš°ìƒë‹¨
+		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // ìš°í•˜ë‹¨
+		{ {-1.0f, -1.0f, 0.0f}, { 0.0f, 1.0f} },    // ì¢Œí•˜ë‹¨
 
 	};
 	std::vector<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };

@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Skeleton.h"
 #include "ShaderSystem.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
 
 WireFramePass::WireFramePass()
 {

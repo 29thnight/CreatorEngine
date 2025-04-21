@@ -1,31 +1,93 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
-#include "IlifeSycle.h"
+#include "GameObjectPool.h"
+
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
+    std::string uniqueName = GenerateUniqueGameObjectName(sceneObject->GetHashedName().ToString());
+
+    sceneObject->SetName(uniqueName);
+
 	m_SceneObjects.push_back(sceneObject);
 
 	const_cast<GameObject::Index&>(sceneObject->m_index) = m_SceneObjects.size() - 1;
 
 	m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
-	sceneObject->SetScene(this);
 
 	return sceneObject;
 }
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
 {
-	GameObject::Index index = m_SceneObjects.size();
+    if (name.empty())
+    {
+        return nullptr;
+    }
+    
+    if (parentIndex >= m_SceneObjects.size())
+    {
+        parentIndex = 0;
+    }
 
-	m_SceneObjects.push_back(std::make_shared<GameObject>(name, type, index, parentIndex));
+    std::string uniqueName = GenerateUniqueGameObjectName(name);
+
+	GameObject::Index index = m_SceneObjects.size();
+    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    if (nullptr == ptr)
+    {
+        return nullptr;
+    }
+
+    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
+    {
+        if (obj)
+        {
+            ObjectPool::Deallocate(obj);
+        }
+    });
+
+	m_SceneObjects.push_back(newObj);
 	auto parentObj = GetGameObject(parentIndex);
 	if (parentObj->m_index != index)
 	{
 		parentObj->m_childrenIndices.push_back(index);
 	}
-	m_SceneObjects.back()->SetScene(this);
 
 	return m_SceneObjects[index];
+}
+
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+{
+    if (name.empty())
+    {
+        return nullptr;
+    }
+
+    if (parentIndex >= m_SceneObjects.size())
+    {
+        parentIndex = 0;
+    }
+
+    std::string uniqueName = GenerateUniqueGameObjectName(name);
+
+    GameObject::Index index = m_SceneObjects.size();
+    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    if (nullptr == ptr)
+    {
+        return nullptr;
+    }
+
+    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
+    {
+        if (obj)
+        {
+            ObjectPool::Deallocate(obj);
+        }
+    });
+
+    m_SceneObjects.push_back(newObj);
+
+    return m_SceneObjects[index];
 }
 
 std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
@@ -50,69 +112,99 @@ std::shared_ptr<GameObject> Scene::GetGameObject(const std::string_view& name)
 	return nullptr;
 }
 
+void Scene::Reset()
+{
+}
+
+void Scene::Awake()
+{
+    AwakeEvent.Broadcast();
+}
+
+void Scene::OnEnable()
+{
+    OnEnableEvent.Broadcast();
+}
+
 void Scene::Start()
 {
-	for (auto& obj : m_SceneObjects)
-	{
-		if (obj->GetType() == GameObject::Type::Empty)
-		{
-			continue;
-		}
-	}
-	m_isPlaying = true;
+    StartEvent.Broadcast();
 }
 
 void Scene::FixedUpdate(float deltaSecond)
 {
+    FixedUpdateEvent.Broadcast(deltaSecond);
+	CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
-void Scene::OnTriggerEnter(ICollider* other)
+void Scene::OnTriggerEnter(ICollider* collider)
 {
+    OnTriggerEnterEvent.Broadcast(collider);
 }
 
-void Scene::OnTriggerStay(ICollider* other)
+void Scene::OnTriggerStay(ICollider* collider)
 {
+    OnTriggerStayEvent.Broadcast(collider);
 }
 
-void Scene::OnTriggerExit(ICollider* other)
+void Scene::OnTriggerExit(ICollider* collider)
 {
+    OnTriggerExitEvent.Broadcast(collider);
 }
 
-void Scene::OnCollisionEnter(ICollider* other)
+void Scene::OnCollisionEnter(ICollider* collider)
 {
+    OnCollisionEnterEvent.Broadcast(collider);
 }
 
-void Scene::OnCollisionStay(ICollider* other)
+void Scene::OnCollisionStay(ICollider* collider)
 {
+    OnCollisionStayEvent.Broadcast(collider);
 }
 
-void Scene::OnCollisionExit(ICollider* other)
+void Scene::OnCollisionExit(ICollider* collider)
 {
+    OnCollisionExitEvent.Broadcast(collider);
 }
 
 void Scene::Update(float deltaSecond)
 {
-	for (auto& obj : m_SceneObjects)
-	{
-		obj->Update(deltaSecond);
-	}
-
+    UpdateEvent.Broadcast(deltaSecond);
 }
 
 void Scene::YieldNull()
 {
+	CoroutineManagers->yield_Null();
 	ScriptManager->ReplaceScriptComponent();
+	CoroutineManagers->yield_WaitForSeconds();
+	CoroutineManagers->yield_OtherEvent();
+	CoroutineManagers->yield_StartCoroutine();
 }
 
 void Scene::LateUpdate(float deltaSecond)
 {
+    LateUpdateEvent.Broadcast(deltaSecond);
 }
 
 void Scene::OnDisable()
 {
+    OnDisableEvent.Broadcast();
+    for (auto& obj : m_SceneObjects)
+    {
+        if (obj->IsDestroyMark())
+        {
+            obj.reset();
+        }
+    }
+
+    std::erase_if(m_SceneObjects, [](const auto& obj)
+    {
+        return nullptr == obj;
+    });
 }
 
 void Scene::OnDestroy()
 {
+    OnDestroyEvent.Broadcast();
 }
 

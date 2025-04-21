@@ -72,8 +72,8 @@ public:
 
 	ComPtr<ID3D11Buffer> m_ViewBuffer;
 	ComPtr<ID3D11Buffer> m_ProjBuffer;
-	std::unique_ptr<Texture> m_renderTarget{};
-	std::unique_ptr<Texture> m_depthStencil{};
+    UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
+    UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
 };
 
 class SceneRenderer;

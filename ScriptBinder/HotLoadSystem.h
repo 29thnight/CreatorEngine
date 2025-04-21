@@ -24,7 +24,7 @@ public:
 
 	void CreateScriptFile(const std::string_view& name);
 
-	ModuleBehavior* CreateMonoBehavior(const char* name)
+	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
 		return m_scriptFactoryFunc(name);
 	}
@@ -71,19 +71,6 @@ private:
 		"	virtual void OnCollisionExit(ICollider* other) override;\n"
 		"	virtual void Update(float tick) override;\n"
 		"	virtual void LateUpdate(float tick) override;\n"
-	};
-
-	std::string scriptToStringFunString
-	{
-		"	std::string ToString() const override\n"
-		"	{\n"
-		"		return \""
-	};
-
-	std::string scriptToStringEndString
-	{
-		"\";\n"
-		"	}\n"
 	};
 
 	std::string scriptEndString

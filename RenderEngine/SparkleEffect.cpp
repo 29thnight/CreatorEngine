@@ -23,7 +23,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
     m_sparkleParams->range = Mathf::Vector2(4.0f, 2.0f);
     SetParameters(m_sparkleParams);
 
-    // ·»´õ ¸ğµâ ¼³Á¤
+    // ë Œë” ëª¨ë“ˆ ì„¤ì •
     m_billboardModule = AddRenderModule<BillboardModule>();
     m_billboardModule->Initialize();
     BillboardVertex vertex;
@@ -32,7 +32,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
 
     m_billboardModule->GetPSO()->m_pixelShader = &ShaderSystem->PixelShaders["Sparkle"];
 
-    // ½ÇÁ¦ ÅØ½ºÃ³ »çÁø
+    // ì‹¤ì œ í…ìŠ¤ì²˜ ì‚¬ì§„
     m_sparkleTexture = std::shared_ptr<Texture>(Texture::LoadFormPath("God.jpg"));
 
     {
@@ -104,7 +104,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
                         ImGui::ColorEdit3("Color", &m_sparkleParams->color.x);
                         ImGui::SliderFloat2("Size", &m_sparkleParams->size.x, 0.1f, 10.0f);
 
-                        // À§Ä¡ Á¶Á¤ UI
+                        // ìœ„ì¹˜ ì¡°ì • UI
                         ImGui::Text("Position");
                         ImGui::SliderFloat("X", &m_position.x, -50.0f, 50.0f);
                         ImGui::SliderFloat("Y", &m_position.y, -50.0f, 50.0f);
@@ -142,18 +142,18 @@ SparkleEffect::~SparkleEffect()
 
 void SparkleEffect::InitializeModules()
 {
-    // ½ºÆù ¸ğµâ Ãß°¡ (ÀÌÆåÆ®ÀÇ À§Ä¡´Â m_position)
+    // ìŠ¤í° ëª¨ë“ˆ ì¶”ê°€ (ì´í™íŠ¸ì˜ ìœ„ì¹˜ëŠ” m_position)
     m_spawnModule = AddModule<SpawnModule>(m_maxParticles, EmitterType::point);
     m_spawnModule->m_particleTemplate.lifeTime = 0.0f;
 
-    // ¼ö¸í ¸ğµâ Ãß°¡
+    // ìˆ˜ëª… ëª¨ë“ˆ ì¶”ê°€
     AddModule<LifeModule>();
 
-    // ¿òÁ÷ÀÓ ¸ğµâ Ãß°¡ (Áß·Â ¾øÀ½, ÀÚÀ¯·Ó°Ô ¿òÁ÷ÀÌ´Â ¹İÂ¦ÀÓ)
+    // ì›€ì§ì„ ëª¨ë“ˆ ì¶”ê°€ (ì¤‘ë ¥ ì—†ìŒ, ììœ ë¡­ê²Œ ì›€ì§ì´ëŠ” ë°˜ì§ì„)
     auto movementModule = AddModule<MovementModule>();
     movementModule->SetUseGravity(false);
 
-    // »ö»ó ¸ğµâ Ãß°¡ (¹İÂ¦ÀÌ´Â È¿°ú¸¦ À§ÇÑ Åõ¸íµµ º¯È­)
+    // ìƒ‰ìƒ ëª¨ë“ˆ ì¶”ê°€ (ë°˜ì§ì´ëŠ” íš¨ê³¼ë¥¼ ìœ„í•œ íˆ¬ëª…ë„ ë³€í™”)
     //auto colorModule = AddModule<ColorModule>();
     //colorModule->SetColorGradient({
     //    {0.0f, Mathf::Vector4(m_sparkleParams->color.x, m_sparkleParams->color.y, m_sparkleParams->color.z, 0.0f)},
@@ -163,25 +163,25 @@ void SparkleEffect::InitializeModules()
     //    {1.0f, Mathf::Vector4(m_sparkleParams->color.x * 0.5f, m_sparkleParams->color.y * 0.5f, m_sparkleParams->color.z * 0.5f, 0.0f)}
     //    });
     
-    // ¹«Áö°³ »ö
+    // ë¬´ì§€ê°œ ìƒ‰
     //std::vector<std::pair<float, Mathf::Vector4>> rainbowGradient = {
-    //{0.0f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)},  // »¡°­
-    //{0.16f, Mathf::Vector4(1.0f, 0.5f, 0.0f, 1.0f)}, // ÁÖÈ²
-    //{0.33f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f)}, // ³ë¶û
-    //{0.5f, Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f)},  // ÃÊ·Ï
-    //{0.66f, Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)}, // ÆÄ¶û
-    //{0.83f, Mathf::Vector4(0.3f, 0.0f, 0.5f, 1.0f)}, // ³²»ö
-    //{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.5f, 1.0f)}   // º¸¶ó
+    //{0.0f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)},  // ë¹¨ê°•
+    //{0.16f, Mathf::Vector4(1.0f, 0.5f, 0.0f, 1.0f)}, // ì£¼í™©
+    //{0.33f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f)}, // ë…¸ë‘
+    //{0.5f, Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f)},  // ì´ˆë¡
+    //{0.66f, Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)}, // íŒŒë‘
+    //{0.83f, Mathf::Vector4(0.3f, 0.0f, 0.5f, 1.0f)}, // ë‚¨ìƒ‰
+    //{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.5f, 1.0f)}   // ë³´ë¼
     //};
     //
     //colorModule->SetColorGradient(rainbowGradient);
 
-    // Å©±â ¸ğµâ Ãß°¡ (±ôºıÀÌ´Â È¿°ú)
+    // í¬ê¸° ëª¨ë“ˆ ì¶”ê°€ (ê¹œë¹¡ì´ëŠ” íš¨ê³¼)
     //auto sizeModule = AddModule<SizeModule>();
     //sizeModule->SetStartSize(0.2f);
     //sizeModule->SetEndSize(1.0f);
     //sizeModule->SetSizeOverLifeFunction([this](float t) {
-    //    // ¹İÂ¦ÀÌ´Â È¿°ú¸¦ À§ÇÑ »çÀÎ ÆÄµ¿
+    //    // ë°˜ì§ì´ëŠ” íš¨ê³¼ë¥¼ ìœ„í•œ ì‚¬ì¸ íŒŒë™
     //    float pulse = 0.7f + 0.3f * sin(t * m_sparkleParams->speed * 10.0f);
     //    float baseSize = 0.2f + t * (0.05f - 0.2f);
     //    return Mathf::Vector2(baseSize * pulse, baseSize * pulse);
@@ -193,7 +193,7 @@ void SparkleEffect::Update(float delta)
     if (!m_isRunning)
         return;
 
-    // ½Ã°£ ¾÷µ¥ÀÌÆ®
+    // ì‹œê°„ ì—…ë°ì´íŠ¸
     m_delta += delta;
     if (m_delta > 10000.0f) {
         m_delta = 0.0f;
@@ -205,7 +205,7 @@ void SparkleEffect::Update(float delta)
 
     UpdateInstanceData();
 
-    // ±âº» ¾÷µ¥ÀÌÆ® È£Ãâ (¸ğµâ ¾÷µ¥ÀÌÆ® Æ÷ÇÔ)
+    // ê¸°ë³¸ ì—…ë°ì´íŠ¸ í˜¸ì¶œ (ëª¨ë“ˆ ì—…ë°ì´íŠ¸ í¬í•¨)
     EffectModules::Update(delta);
 }
 
@@ -235,10 +235,10 @@ void SparkleEffect::Render(RenderScene& scene, Camera& camera)
 
 void SparkleEffect::SpawnSparklesBurst(int count)
 {
-    // º¸À¯ÇÑ ÆÄÆ¼Å¬ Áß ºñÈ°¼º »óÅÂÀÎ °ÍÀ» Ã£¾Æ È°¼ºÈ­
+    // ë³´ìœ í•œ íŒŒí‹°í´ ì¤‘ ë¹„í™œì„± ìƒíƒœì¸ ê²ƒì„ ì°¾ì•„ í™œì„±í™”
     int spawned = 0;
 
-    // ¾ÈÀüÇÏ°Ô »ç¿ë °¡´ÉÇÑ ÆÄÆ¼Å¬ ¼ö¸¦ Ã¼Å©
+    // ì•ˆì „í•˜ê²Œ ì‚¬ìš© ê°€ëŠ¥í•œ íŒŒí‹°í´ ìˆ˜ë¥¼ ì²´í¬
     int availableSlots = m_maxParticles - m_activeParticleCount;
     int actualSpawnCount = std::min(count, availableSlots);
 
@@ -252,8 +252,8 @@ void SparkleEffect::SpawnSparklesBurst(int count)
             );
             particle.acceleration = Mathf::Vector3(0.0f, 0.0f, 0.0f);
             particle.age = 0.0f;
-            particle.lifeTime = 0.5f + (rand() / (float)RAND_MAX) * 1.0f; // 0.5 ~ 1.5ÃÊ
-            particle.rotation = rand() / (float)RAND_MAX * 6.28f;  // 0 ~ 2¥ğ
+            particle.lifeTime = 0.5f + (rand() / (float)RAND_MAX) * 1.0f; // 0.5 ~ 1.5ì´ˆ
+            particle.rotation = rand() / (float)RAND_MAX * 6.28f;  // 0 ~ 2Ï€
             particle.rotatespeed = (rand() / (float)RAND_MAX - 0.5f) * 2.0f;
             particle.size = Mathf::Vector2(0.2f, 0.2f);
             particle.color = Mathf::Vector4(
@@ -264,7 +264,7 @@ void SparkleEffect::SpawnSparklesBurst(int count)
             );
             particle.isActive = true;
 
-            // È°¼º ÆÄÆ¼Å¬ Ä«¿îÆ® Áõ°¡
+            // í™œì„± íŒŒí‹°í´ ì¹´ìš´íŠ¸ ì¦ê°€
             m_activeParticleCount++;
             spawned++;
         }
@@ -285,13 +285,13 @@ void SparkleEffect::UpdateConstantBuffer()
 
 void SparkleEffect::UpdateInstanceData()
 {
-    // º¤ÅÍ Å©±â Á¶Á¤ Àü¿¡ m_activeParticleCount°¡ 0º¸´Ù Å«Áö È®ÀÎ
+    // ë²¡í„° í¬ê¸° ì¡°ì • ì „ì— m_activeParticleCountê°€ 0ë³´ë‹¤ í°ì§€ í™•ì¸
     if (m_activeParticleCount <= 0) {
         m_instanceData.clear();
         return;
     }
 
-    // ÀÎ½ºÅÏ½º µ¥ÀÌÅÍ ¹è¿­ Å©±â Á¶Á¤
+    // ì¸ìŠ¤í„´ìŠ¤ ë°ì´í„° ë°°ì—´ í¬ê¸° ì¡°ì •
     m_instanceData.resize(m_activeParticleCount);
 
     int instanceIndex = 0;
@@ -301,7 +301,7 @@ void SparkleEffect::UpdateInstanceData()
     {
         if (particle.isActive)
         {
-            // ¹üÀ§ Ã¼Å© Ãß°¡
+            // ë²”ìœ„ ì²´í¬ ì¶”ê°€
             if (instanceIndex >= m_activeParticleCount) {
                 std::cout << "Warning: instanceIndex (" << instanceIndex
                     << ") exceeds m_activeParticleCount (" << m_activeParticleCount << ")" << std::endl;
@@ -323,7 +323,7 @@ void SparkleEffect::UpdateInstanceData()
         }
     }
 
-    // ½ÇÁ¦ È°¼º ÆÄÆ¼Å¬ ¼ö¿Í Ä«¿îÆ®°¡ ÀÏÄ¡ÇÏÁö ¾Ê´Â °æ¿ì Á¶Á¤
+    // ì‹¤ì œ í™œì„± íŒŒí‹°í´ ìˆ˜ì™€ ì¹´ìš´íŠ¸ê°€ ì¼ì¹˜í•˜ì§€ ì•ŠëŠ” ê²½ìš° ì¡°ì •
     if (instanceIndex != m_activeParticleCount) {
         std::cout << "Adjusting m_activeParticleCount from " << m_activeParticleCount
             << " to " << instanceIndex << std::endl;

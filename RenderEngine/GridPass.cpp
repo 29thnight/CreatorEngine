@@ -18,6 +18,10 @@ uint32 indices[] =
 	0, 2, 3,
 };
 
+struct alignas(16) CameraPos {
+	Mathf::xVector camPos;
+};
+
 GridPass::GridPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
@@ -73,6 +77,12 @@ GridPass::GridPass()
 		&m_gridUniform
 	);
 
+	m_pCamPosBuffer = DirectX11::CreateBuffer(
+		sizeof(CameraPos),
+		D3D11_BIND_CONSTANT_BUFFER,
+		nullptr
+	);
+
 	DirectX::SetName(m_pUniformBuffer, "GridUniformBuffer");
 }
 
@@ -102,8 +112,12 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
     UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)
 	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, blendFactor, sampleMask);
 
+	CameraPos camPos = { camera.m_eyePosition };
+    DirectX11::UpdateBuffer(m_pCamPosBuffer.Get(), &camPos);
     DirectX11::VSSetConstantBuffer(0, 1, m_pGridConstantBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_pUniformBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(1, 1, m_pCamPosBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(1, 1, m_pCamPosBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_pGridConstantBuffer.Get(), &m_gridConstant);
 	DirectX11::UpdateBuffer(m_pUniformBuffer.Get(), &m_gridUniform);
 

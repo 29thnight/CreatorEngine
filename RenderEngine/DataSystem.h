@@ -5,7 +5,9 @@
 //#include "Billboards.h"
 #include "Model.h"
 #include "ImGuiRegister.h"
-
+#include "AssetMetaWather.h"
+#include <DirectXTK/SpriteFont.h>
+#include <DirectXTK/SpriteBatch.h>
 // Main system for storing runtime data
 class DataSystem : public Singleton<DataSystem>
 {
@@ -20,7 +22,7 @@ public:
 		CSharpScript,
 		Sound,
 	};
-	//¿œ¥‹ ¿Ã¥Î∑Œ ¡¯«‡
+	//ÏùºÎã® Ïù¥ÎåÄÎ°ú ÏßÑÌñâ
 	enum class AssetType
 	{
 		Model,
@@ -45,15 +47,19 @@ private:
 	~DataSystem();
 public:
 	void Initialize();
+    void Finalize();
 	void RenderForEditer();
 	void MonitorFiles();
 	void LoadModels();
+	Model* LoadModelGUID(FileGuid guid);
 	void LoadModel(const std::string_view& filePath);
 	Model* LoadCashedModel(const std::string_view& filePath);
 	void LoadTextures();
 	void LoadMaterials();
+	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(const std::string_view& filePath);
-
+    Texture* LoadMaterialTexture(const std::string_view& filePath);
+	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
 
 	void OpenContentsBrowser();
@@ -68,8 +74,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
+	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	static ImGuiTextFilter filter;
-
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 
@@ -94,6 +100,9 @@ private:
 	file::path m_dragDropPath{};
 
 	file::path currentDirectory{};
+	efsw::FileWatcher* m_watcher{};
+	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
+	std::shared_ptr<AssetMetaWatcher> m_assetMetaWatcher{};
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();

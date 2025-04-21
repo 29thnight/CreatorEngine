@@ -4,7 +4,8 @@
 #include "Mesh.h"
 #include "Light.h"
 #include "Sampler.h"
-#include "Renderer.h"
+#include "RenderableComponents.h"
+#include "ResourceAllocator.h"
 
 LightmapShadowPass::LightmapShadowPass() {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -131,6 +132,7 @@ void LightmapShadowPass::Execute(RenderScene& scene, Camera& camera)
 			if (!renderer->IsEnabled()) continue;
 
 			scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+			scene.UseModel();
 			renderer->m_Mesh->Draw();
 		}
 

@@ -74,6 +74,11 @@ public:
 		return logSink->m_backLogMessage;
 	}
 
+	std::string& WriteBackLogMessage()
+	{
+		return logSink->m_backLogMessage;
+	}
+
 	std::vector<LogEntry> get_entries()
 	{
 		return logSink->ringBuffer_.get_all();

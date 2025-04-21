@@ -4,7 +4,8 @@
 #include "Mesh.h"
 #include "Scene.h"
 #include "../ScriptBinder/GameObject.h"
-#include "../ScriptBinder/SpriteComponent.h"
+#include "../ScriptBinder/UIManager.h"
+#include "../ScriptBinder/Canvas.h"
 UIPass::UIPass()
 {
 
@@ -36,7 +37,8 @@ UIPass::UIPass()
 
 	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc{ CD3D11_DEFAULT() };
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateDepthStencilState(
 			&depthStencilDesc,
@@ -47,60 +49,98 @@ UIPass::UIPass()
 	m_pso->m_depthStencilState = m_NoWriteDepthStencilState.Get();
 	m_pso->m_blendState = DeviceState::g_pBlendState;
 
-	m_UIBuffer = DirectX11::CreateBuffer(sizeof(UiInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	m_UIBuffer = DirectX11::CreateBuffer(sizeof(ImageInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
-void UIPass::Initialize(Texture* renderTargetView)
+void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
 {
 	m_renderTarget = renderTargetView;
+	m_spriteBatch = spriteBatch;
 }
 
 
 void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
+
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
-
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, nullptr);
-	
+	DirectX11::OMSetRenderTargets(1, &view, camera.m_renderTarget->m_pDSV);
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 	camera.UpdateBuffer();
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-
-	
-	for (auto& Obj : scene.GetScene()->m_SceneObjects)
+	m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, nullptr, nullptr, nullptr, nullptr, nullptr);
+	std::vector<Canvas*> canvases;
+	for (auto& Canvases : UIManagers->Canvases)
 	{
-		auto a = scene.GetScene();
-		SpriteComponent* ui = Obj->GetComponent<SpriteComponent>();
-		if (ui == nullptr) continue;
-		if (false == ui->IsEnabled()) continue;
-		_2DObjects.push_back(ui);
-
+		Canvas* canvas = Canvases->GetComponent<Canvas>();
+		if (false == canvas->IsEnabled()) continue;
+		for (auto& uiObj : canvas->UIObjs)
+		{
+			std::vector<UIComponent*> uicom = uiObj->GetComponents<UIComponent>();
+			for (auto& ui : uicom)
+			{
+				if (ui->IsEnabled() == false) continue;
+				switch (ui->type)
+				{
+				case UItype::Image:
+				{
+					if (auto* img = dynamic_cast<ImageComponent*>(ui))
+						_ImageObjects.push_back(img);
+					break;
+				}
+				case UItype::Text:
+				{
+					if (auto* txt = dynamic_cast<TextComponent*>(ui))
+					_TextObjects.push_back(txt);
+					break;
+				}
+				default:
+					break;
+				}
+			}
+		
+		}
 	}
+	//std::sort(_2DObjects.begin(), _2DObjects.end(), [](ImageComponent* a, ImageComponent* b) {
+	//	if (a->_layerorder != b->_layerorder)
+	//		return a->_layerorder < b->_layerorder;
 
-	std::sort(_2DObjects.begin(), _2DObjects.end(), compareLayer);
-	for (auto& Uiobject : _2DObjects)
+	//	// 동일한 layer일 경우, CanvasOrder 기준으로 비교
+	//	auto aCanvas = a->GetOwnerCanvas(); 
+	//	auto bCanvas = b->GetOwnerCanvas();
+
+	//	int aOrder = aCanvas ? aCanvas->CanvasOrder : 0;
+	//	int bOrder = bCanvas ? bCanvas->CanvasOrder : 0;
+
+	//	return aOrder < bOrder;
+	//	});
+	//
+	for (auto& Imageobject : _ImageObjects)
 	{
-		DirectX11::PSSetShaderResources(0, 1, &Uiobject->m_curtexture->m_pSRV);
-		DirectX11::UpdateBuffer(m_UIBuffer.Get(), &Uiobject->uiinfo);
-		Uiobject->m_UIMesh->Draw();
+		Imageobject->Draw(m_spriteBatch);
 	}
-
+	for (auto& Textobject : _TextObjects)
+	{
+		Textobject->Draw(m_spriteBatch);
+	}
+	m_spriteBatch->End();
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
-	_2DObjects.clear();
+	_TextObjects.clear();
+	_ImageObjects.clear();
+	
 }
 
-bool UIPass::compareLayer(SpriteComponent* a, SpriteComponent* b)
+bool UIPass::compareLayer(int  a, int  b)
 {
-	return a->_layerorder < b->_layerorder;
+	return a  < b ;
 }
 
 void UIPass::ControlPanel()

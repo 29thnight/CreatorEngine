@@ -2,12 +2,15 @@
 #include "ImGuiRegister.h"
 #include "../ScriptBinder/Scene.h"
 #include "LightProperty.h"
-#include "../ScriptBinder/Renderer.h"
+#include "../ScriptBinder/RenderableComponents.h"
 #include "Skeleton.h"
 #include "Light.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
+#include "SceneManager.h"
+#include "ImageComponent.h"
+#include "UIManager.h"
 
 // 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
 int InputTextCallback(ImGuiInputTextCallbackData* data)
@@ -43,32 +46,32 @@ void RenderScene::Initialize()
 	EditorSceneObjectHierarchy();
 	EditorSceneObjectInspector();
 
-	animationJobThread = std::thread([&]
-	{
-		using namespace std::chrono;
+	//animationJobThread = std::thread([&]
+	//{
+	//	using namespace std::chrono;
 
-		auto prev = high_resolution_clock::now();
+	//	auto prev = high_resolution_clock::now();
 
-		while (true)
-		{
-			auto now = high_resolution_clock::now();
-			duration<float> elapsed = now - prev;
+	//	while (true)
+	//	{
+	//		auto now = high_resolution_clock::now();
+	//		duration<float> elapsed = now - prev;
 
-			// 16.6ms ~ 60fps 에 맞춰 제한
-			if (elapsed.count() >= (1.0f / 60.0f))
-			{
-				prev = now;
-				float delta = elapsed.count();
-				m_animationJob.Update(*this, delta);
-			}
-			else
-			{
-				std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
-			}
-		}
-	});
+	//		// 16.6ms ~ 60fps 에 맞춰 제한
+	//		if (elapsed.count() >= (1.0f / 60.0f))
+	//		{
+	//			prev = now;
+	//			float delta = elapsed.count();
+	//			m_animationJob.Update(delta);
+	//		}
+	//		else
+	//		{
+	//			std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
+	//		}
+	//	}
+	//});
 
-	animationJobThread.detach();
+	//animationJobThread.detach();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -78,6 +81,9 @@ void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
 
 void RenderScene::Update(float deltaSecond)
 {
+	m_currentScene = SceneManagers->GetActiveScene();
+	if (m_currentScene == nullptr) return;
+
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
@@ -86,7 +92,7 @@ void RenderScene::Update(float deltaSecond)
 
 void RenderScene::ShadowStage(Camera& camera)
 {
-	m_LightController->SetEyePosition(m_MainCamera.m_eyePosition);
+	m_LightController->SetEyePosition(camera.m_eyePosition);
 	m_LightController->Update();
 	m_LightController->RenderAnyShadowMap(*this, camera);
 }
@@ -131,12 +137,43 @@ void RenderScene::EditorSceneObjectHierarchy()
 				
 				Model::LoadModelToScene(DataSystems->LoadCashedModel(filepath.string().c_str()), *m_currentScene);
 			}
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+			{
+				const char* droppedFilePath = (const char*)payload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
+				Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
+				ImageComponent* sprite = nullptr;
+				if (m_selectedSceneObject)
+				{
+					if (ImageComponent* hasSprite = m_selectedSceneObject->GetComponent<ImageComponent>())
+						sprite = hasSprite;
+					else		
+						sprite = m_selectedSceneObject->AddComponent<ImageComponent>();
+					if (sprite)
+					{
+						sprite->Load(texture);
+					}
+				}
+				else
+				{
+					ImGui::Text("No GameObject Selected");
+					UIManagers->MakeImage(filename.string().c_str(), texture);
+				}
+			
+
+			}
 			ImGui::EndDragDropTarget();
 		}
 
+
 		if (m_currentScene)
 		{
-			if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			if (0 == m_currentScene->m_SceneObjects.size())
+			{
+				ImGui::Text("No GameObject in Scene");
+			}
+			else if (ImGui::TreeNodeEx(m_currentScene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				for (auto& obj : m_currentScene->m_SceneObjects)
 				{
@@ -220,7 +257,7 @@ void RenderScene::EditorSceneObjectInspector()
 
 				if(ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
 				{
-					Meta::DrawObject(component, *type);
+					Meta::DrawObject(component.get(), *type);
 				}
 			}
 		}
@@ -257,7 +294,7 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
 	if (!m_currentScene) return;
 
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnDoubleClick;
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
 	if (obj.get() == m_selectedSceneObject)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;
@@ -289,7 +326,6 @@ void RenderScene::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
 			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-
 			// 부모 변경 로직
 			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
 			{

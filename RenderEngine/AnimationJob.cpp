@@ -1,7 +1,8 @@
 #include "AnimationJob.h"
 #include "RenderScene.h"
 #include "Skeleton.h"
-#include "Renderer.h"
+#include "SceneManager.h"
+#include "RenderableComponents.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
 
@@ -29,20 +30,22 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
 AnimationJob::AnimationJob() :
     m_UpdateThreadPool(8)
 {
+    m_AnimationUpdateHandle = SceneManagers->InternalAnimationUpdateEvent.AddRaw(this, &AnimationJob::Update);
 }
 
 AnimationJob::~AnimationJob()
 {
 }
 
-void AnimationJob::Update(RenderScene& scene, float deltaTime)
+void AnimationJob::Update(float deltaTime)
 {
-    uint32 currSize = scene.GetScene()->m_SceneObjects.size();
+    Scene* scene = SceneManagers->GetActiveScene();
+    uint32 currSize = scene->m_SceneObjects.size();
     if(m_objectSize != currSize)
     {
         if(0 == m_objectSize)
         {
-            for (auto& sceneObj : scene.GetScene()->m_SceneObjects)
+            for (auto& sceneObj : scene->m_SceneObjects)
             {
                 Animator* animator = sceneObj->GetComponent<Animator>();
                 if (nullptr == animator || !animator->IsEnabled()) continue;
@@ -54,7 +57,7 @@ void AnimationJob::Update(RenderScene& scene, float deltaTime)
         {
             for (uint32 i = m_objectSize - 1; i < currSize; ++i)
             {
-                Animator* animator = scene.GetScene()->m_SceneObjects[i]->GetComponent<Animator>();
+                Animator* animator = scene->m_SceneObjects[i]->GetComponent<Animator>();
                 if (nullptr == animator || !animator->IsEnabled()) continue;
 
                 m_currAnimator.push_back(animator);

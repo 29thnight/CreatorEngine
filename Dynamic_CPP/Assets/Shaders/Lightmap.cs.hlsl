@@ -47,7 +47,6 @@ struct Vertex
 };
 
 // s, u, t, b
-//SamplerState litSample : register(s0);
 RWTexture2D<float4> TargetTexture : register(u0); // 타겟 텍스처 (UAV)
 
 Texture2DArray<float> shadowMapTextures : register(t0); // 소스 텍스처 (SRV)
@@ -104,6 +103,16 @@ float3 LinearToGamma(float3 color)
     return pow(color, 1.0 / 2.2);
 }
 
+// 이 함수는 큐브맵 샘플링하는 것이 아님. 정육면체 전개로 샘플링 하는거인듯?
+static const float2 invAtan = float2(0.1591, 0.3183);
+float2 SampleSphericalMap(float3 v)
+{
+    float2 uv = float2(atan2(v.z, v.x), -asin(v.y));
+    uv *= invAtan;
+    uv += 0.5;
+    return uv;
+}
+
 [numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
@@ -116,17 +125,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
         return;
 
     // 타겟 텍스처 좌표를 0~1로 정규화 // targetpos 0~lightmapSize, offset
-    float2 localUV = (targetPos - Offset) / Size;
-
-    // UV 좌표를 소스 텍스처 범위에 매핑
-    //float2 sourceUV = localUV;
-    //float2 sourceUV = UVOffset + (localUV * UVSize);
-    
-    
+    float2 localUV = (targetPos - Offset) / Size; 
     
     float4 localpos = Sampling(positionMapTexture, LinearSampler, localUV, float2(2048, 2048));
-    float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
-    
+    float4 localNormal = normalMapTexture.SampleLevel(LinearSampler, localUV, 0);
     
     
     //float4 localpos = positionMapTexture.SampleLevel(LinearSampler, localUV, 0);
@@ -151,17 +153,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
         
         float4 lightSpaceView = mul(light.litView, worldpos);
-        float4 lightSpaceProj = mul(light.litProj, lightSpaceView);    
-
-        //float2 shadowUV = (lightSpaceProj.xy / lightSpaceProj.w) * 0.5 + 0.5;
-        
-        //// 섀도우맵에서 깊이 값 샘플링
-        //float shadowDepth = shadowMapTextures.SampleLevel(litSample, float3(shadowUV, i), 0.0).r;
-        
-        //// 그림자 여부 결정 (bias 추가)
-        //bool inShadow = (shadowDepth < (lightSpaceProj.z / lightSpaceProj.w)/* - bias*/);
-
-        
+        float4 lightSpaceProj = mul(light.litProj, lightSpaceView);
         
         float shadow = 0;
         float3 projCoords = lightSpaceProj.xyz / lightSpaceProj.w;
@@ -177,7 +169,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             for (int y = -4; y < 5; ++y)
             {
                 float closestDepth = shadowMapTextures.SampleLevel(LinearSampler, float3(projCoords.xy + (float2(x, y) * shadowMaptexelSize), i), 0.0).r;
-                shadow += (closestDepth < currentDepth - bias);
+                shadow += (closestDepth < currentDepth - bias) ? 1.0 : 0.0;
             }
         }
 
@@ -185,16 +177,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
         // 라이트의 영향을 계산 (Directional Light)
         float3 lightDir = normalize(light.direction.xyz);
-        float NdotL = max(dot(worldNormal.xyz, -lightDir), 0.0);
+        float NdotL = max(dot(normalize(worldNormal.xyz), -lightDir), 0.0);
 
         // 라이트 색상과 강도 적용
-        float3 lightContribution = light.color.rgb * NdotL * (1 - shadow); //(inShadow ? 0.0 : 1.0);
+        float3 lightContribution = light.color.rgb * NdotL * (1 - shadow) * 3.0; //(inShadow ? 0.0 : 1.0);
         color.rgb += lightContribution;
     }
     
     SurfaceInfo surf;
     surf.posW = worldpos;
-    surf.N = worldNormal.rgb;
+    surf.N = normalize(worldNormal.xyz);
     float4 ambient = globalAmbient;
     if (useEnvMap)
     {
@@ -206,25 +198,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     ambient *= ao;// * occlusion;
     
-    // 타겟 텍스처에 기록
     
-    //for (int x = -1; x < 2; ++x)
-    //{
-    //    for (int y = -1; y < 2; ++y)
-    //    {
-    //        if (TargetTexture[DTid.xy + float2(x, y)].a < 0.01)
-    //        {
-    //            TargetTexture[DTid.xy + float2(x, y)] = color;
-    //        }
-    //    }
-    //}
-    
-    float4 finalColor = color + ambient;
+    float4 finalColor = color;
+    //  finalColor.rgb += ambient;
     //finalColor.rgb = LinearToGamma(finalColor.rgb);
     TargetTexture[DTid.xy] = finalColor;
     
-    //TargetTexture[DTid.xy + float2(0, 1300)] = worldNormal;
-    //TargetTexture[DTid.xy + float2(0, 2600)] = worldpos;
+    //TargetTexture[DTid.xy + float2(0, 500)] = float4(surf.N, 1);
+    //TargetTexture[DTid.xy + float2(0, 1000)] = worldpos;
 }
 
 /*

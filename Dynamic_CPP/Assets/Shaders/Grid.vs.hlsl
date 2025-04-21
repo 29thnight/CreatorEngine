@@ -6,6 +6,11 @@ cbuffer GridConstantBuffer : register(b0)
     matrix projection;
 }
 
+cbuffer cameraPos : register(b1)
+{
+    float4 cameraPos;
+}
+
 // 입력 정점 구조체: 간단히 월드 좌표상의 위치만 전달
 struct VS_INPUT
 {
@@ -24,8 +29,11 @@ VS_OUTPUT main(VS_INPUT input)
 {
     VS_OUTPUT output;
     
+    int3 cPos = cameraPos;
+    cPos.y = 0;
+    
     // 입력 정점을 월드 공간으로 변환
-    float4 worldPos = mul(world, float4(input.pos, 1.0));
+    float4 worldPos = mul(world, float4(input.pos + cPos.xyz, 1.0));
     output.worldPos = worldPos.xyz;
     
     // 월드 좌표를 뷰, 프로젝션을 거쳐 클립 공간으로 변환

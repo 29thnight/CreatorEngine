@@ -89,7 +89,7 @@ void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth
     data.SysMemPitch = 4 * 4; // 4 pixels width, 4 bytes (32 bits)
     Texture* tex = Texture::Create(4, 4, "Noise Tex", DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_BIND_SHADER_RESOURCE, &data);
     tex->CreateSRV(DXGI_FORMAT_R8G8B8A8_SNORM);
-    m_NoiseTexture = std::unique_ptr<Texture>(tex);
+    m_NoiseTexture = MakeUniqueTexturePtr(tex);
 }
 
 void SSAOPass::Execute(RenderScene& scene, Camera& camera)

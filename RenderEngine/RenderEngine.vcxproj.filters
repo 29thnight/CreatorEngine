@@ -12,9 +12,6 @@
     <Filter Include="RenderPass">
       <UniqueIdentifier>{230947ab-b02d-49f2-aefe-e05ef6691e9c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Scene">
-      <UniqueIdentifier>{8b8366c0-580e-4d7e-99ec-036acc7e136b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Objects">
       <UniqueIdentifier>{36a2a674-df76-4d7a-b8ab-1374e79bdb88}</UniqueIdentifier>
     </Filter>
@@ -59,9 +56,6 @@
     </Filter>
     <Filter Include="Resources\Sampler">
       <UniqueIdentifier>{5893fed1-64e8-4139-8627-eaa18d6b68b3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\DeviceHelper">
-      <UniqueIdentifier>{c638d479-f697-49ee-8b0c-12ffea6245df}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\GBufferPass">
       <UniqueIdentifier>{acb920c8-f53c-4a40-b23e-aa9dfdca5a2d}</UniqueIdentifier>
@@ -132,14 +126,35 @@
     <Filter Include="LightMap\Result">
       <UniqueIdentifier>{76b9fbf7-7a07-447f-ba7e-c2fe118fd105}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\CommonCompute">
-      <UniqueIdentifier>{047ea2b8-ab27-4fbc-a074-81ca85211213}</UniqueIdentifier>
+    <Filter Include="Shaders\LightMap">
+      <UniqueIdentifier>{c9f09488-f6e4-4b2e-8dca-b0a57d59bd4f}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\EffectPass">
       <UniqueIdentifier>{740ca344-887d-4335-98e7-00b5831f77b5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Shaders\Effect">
       <UniqueIdentifier>{42155f28-f404-4149-8689-61a9f1ecafec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ResourceAllocator">
+      <UniqueIdentifier>{ea994bc9-a2bd-4eb1-b992-ec5f941bc061}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderScene">
+      <UniqueIdentifier>{8b8366c0-580e-4d7e-99ec-036acc7e136b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\DeviceState">
+      <UniqueIdentifier>{c638d479-f697-49ee-8b0c-12ffea6245df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\Interfaces">
+      <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
+      <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LightMap\Algorithm">
+      <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\EffectPass\NodeEditor">
+      <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -171,7 +186,7 @@
       <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="RenderScene.cpp">
-      <Filter>Scene</Filter>
+      <Filter>RenderScene</Filter>
     </ClCompile>
     <ClCompile Include="Material.cpp">
       <Filter>Resources\Material</Filter>
@@ -195,7 +210,7 @@
       <Filter>Resources\Sampler</Filter>
     </ClCompile>
     <ClCompile Include="DeviceState.cpp">
-      <Filter>Renderer\DeviceHelper</Filter>
+      <Filter>Renderer\DeviceState</Filter>
     </ClCompile>
     <ClCompile Include="GBufferPass.cpp">
       <Filter>RenderPass\GBufferPass</Filter>
@@ -232,12 +247,6 @@
     </ClCompile>
     <ClCompile Include="UIPass.cpp">
       <Filter>RenderPass\UIPass</Filter>
-    </ClCompile>
-    <ClCompile Include="Text.cpp">
-      <Filter>Resources\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="UIsprite.cpp">
-      <Filter>Resources\UI</Filter>
     </ClCompile>
     <ClCompile Include="PostProcessingPass.cpp">
       <Filter>RenderPass\PostProcessingPass</Filter>
@@ -281,7 +290,7 @@
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="RenderScene.h">
-      <Filter>Scene</Filter>
+      <Filter>RenderScene</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Objects</Filter>
@@ -305,9 +314,6 @@
       <Filter>Asset\JobSystem</Filter>
     </ClInclude>
     <ClInclude Include="Light.h">
-      <Filter>Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderType.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
@@ -335,7 +341,7 @@
       <Filter>Resources\Sampler</Filter>
     </ClInclude>
     <ClInclude Include="DeviceState.h">
-      <Filter>Renderer\DeviceHelper</Filter>
+      <Filter>Renderer\DeviceState</Filter>
     </ClInclude>
     <ClInclude Include="GBufferPass.h">
       <Filter>RenderPass\GBufferPass</Filter>
@@ -397,9 +403,6 @@
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="UIsprite.h">
-      <Filter>Resources\UI</Filter>
-    </ClInclude>
     <ClInclude Include="EffectManager.h">
       <Filter>RenderPass\EffectPass</Filter>
     </ClInclude>
@@ -411,6 +414,24 @@
     </ClInclude>
     <ClInclude Include="RenderModules.h">
       <Filter>RenderPass\EffectPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceAllocator.h">
+      <Filter>Asset\ResourceAllocator</Filter>
+    </ClInclude>
+    <ClInclude Include="Interfaces\ISceneRenderer.h">
+      <Filter>Renderer\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaWather.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetMetaRegistry.h">
+      <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="ModuleLink.h">
+      <Filter>RenderPass\EffectPass\NodeEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialInfomation.h">
+      <Filter>Resources\Material</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -465,25 +486,7 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IrradianceMap.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NeighborSampling.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NormalMap.vs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PixelShader.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\RectToCubeMap.ps.hlsl">
@@ -526,13 +529,25 @@
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IndirectLightMap.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.ps.hlsl">
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LightmapEdgeCover.cs.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NeighborSampling.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.ps.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PositionMap.vs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
       <Filter>Shaders\Effect</Filter>
@@ -543,13 +558,16 @@
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MSAA.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AddTextureColor.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="UIPass.h">
       <Filter>RenderPass\UIPass</Filter>
-    </ClInclude>
-    <ClInclude Include="Text.h">
-      <Filter>Resources\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

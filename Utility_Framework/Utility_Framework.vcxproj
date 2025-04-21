@@ -19,12 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\framework.h" />
-    <ClInclude Include="..\Resource.h" />
-    <ClInclude Include="..\targetver.h" />
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
+    <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
@@ -33,6 +31,7 @@
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.hpp" />
     <ClInclude Include="CoreWindow.h" />
+    <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
@@ -47,21 +46,27 @@
     <ClInclude Include="LogSink.h" />
     <ClInclude Include="LogSystem.h" />
     <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="MetaAlias.h" />
     <ClInclude Include="MetaUtility.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
+    <ClInclude Include="ReflectionImGuiHelper.h" />
     <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
+    <ClInclude Include="ReflectionYml.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="TimeSystem.h" />
+    <ClInclude Include="Trim.h" />
     <ClInclude Include="TypeDefinition.h" />
+    <ClInclude Include="TypeTrait.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
@@ -71,13 +76,6 @@
   <ItemGroup>
     <None Include="Delegate.inl" />
     <None Include="MemoryPool.inl" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="..\Academy_4Q.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="..\Academy_4Q.ico" />
-    <Image Include="..\small.ico" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -175,8 +173,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>
-      </AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)EngineEntry\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -185,6 +182,9 @@
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -200,6 +200,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(SolutionDir)EngineEntry\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -208,6 +209,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(SolutionDir)$(Platform)\HeaderTool\MetaGenerator.exe"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

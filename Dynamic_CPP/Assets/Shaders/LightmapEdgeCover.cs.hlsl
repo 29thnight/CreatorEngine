@@ -9,7 +9,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     float4 color = InputTexture.Load(int3(uv, 0));
     
-        TargetTexture[uv] = color;
+    TargetTexture[uv] = color;
 
     
 }
