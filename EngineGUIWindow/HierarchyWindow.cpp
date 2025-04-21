@@ -35,14 +35,17 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				return;
 			}
 
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+			if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) 
 			{
-				ImGui::OpenPopup("HierarchyMenu");
-			}
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+				{
+					ImGui::OpenPopup("HierarchyMenu");
+				}
 
-			if (false == ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-			{
-				renderScene->m_selectedSceneObject = nullptr;
+				if (false == ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
+					renderScene->m_selectedSceneObject = nullptr;
+				}
 			}
 
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
@@ -186,11 +189,15 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 	bool opened = ImGui::TreeNodeEx(obj->m_name.ToString().c_str(), flags);
 
-	if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
 	{
-		if (selectedSceneObject != obj.get())
-			selectedSceneObject = obj.get();
+		if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+		{
+			if (selectedSceneObject != obj.get())
+				selectedSceneObject = obj.get();
+		}
 	}
+
 
 	if (ImGui::BeginDragDropSource())
 	{
