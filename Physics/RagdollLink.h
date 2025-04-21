@@ -1,9 +1,16 @@
 #pragma once
+#include "../Utility_Framework/Core.Minimal.h"
 #include <physx/PxPhysicsAPI.h>
 #include "PhysicsCommon.h"
 #include "PhysicsHelper.h"
 #include "RagdollJoint.h"
 
+
+
+struct CollisionData;
+struct LinkInfo;
+class RagdollLink;
+class RagdollJoint;
 
 class RagdollLink
 {

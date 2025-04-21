@@ -4,6 +4,7 @@
 
 constexpr float CircularMeasure = 0.01744f;
 
+class RagdollLink;
 class RagdollJoint
 {
 public:

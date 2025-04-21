@@ -54,23 +54,14 @@
     <ClInclude Include="Physx.h">
       <Filter>Main</Filter>
     </ClInclude>
-    <ClInclude Include="IRigidbody.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
     <ClInclude Include="PhysicsEventCallback.h">
       <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsInfo.h">
-      <Filter>Data</Filter>
     </ClInclude>
     <ClInclude Include="Func.h">
       <Filter>Func</Filter>
     </ClInclude>
     <ClInclude Include="ICollider.h">
       <Filter>Interface</Filter>
-    </ClInclude>
-    <ClInclude Include="Common.h">
-      <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsCommon.h">
       <Filter>Common</Filter>
@@ -130,9 +121,6 @@
     </ClCompile>
     <ClCompile Include="PhysicsEventCallback.cpp">
       <Filter>Main</Filter>
-    </ClCompile>
-    <ClCompile Include="Common.cpp">
-      <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="RigidBody.cpp">
       <Filter>PhysicsActor</Filter>

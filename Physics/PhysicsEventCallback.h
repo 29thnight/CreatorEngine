@@ -1,11 +1,19 @@
 #pragma once
 #include <physx/PxPhysicsAPI.h>
+#include <set>
+#include <unordered_map>
+#include <functional>
+#include "PhysicsCommon.h"
+
 using namespace physx;
+
+struct CollisionData;
+enum class ECollisionEventType;
 
 class PhysicsEventCallback : public PxSimulationEventCallback
 {
 public:
-	PhysicsEventCallback();
+	PhysicsEventCallback() = default;
 	~PhysicsEventCallback();
 
 	void Initialize();
@@ -20,11 +28,11 @@ public:
 
 	void StartTrigger();
 
-	void SettingCollisionData(const physx::PxContactPairHeader& pair);
+	void SettingCollisionData(const physx::PxContactPairHeader& pairHeader, const physx::PxContactPair* pairs, const ECollisionEventType& eventType);
 
-	void SettiingTriggerData();
+	void SettingTriggerData(const physx::PxTriggerPair* pairs,const ECollisionEventType& eventType);
 
-	void CountTrigger();
+	void CountTrigger(unsigned int triggerId, unsigned int otherId, const ECollisionEventType& eventType);
 
 	inline void SetCallbackFunction(std::function<void(CollisionData, ECollisionEventType)> callbackFunction)
 	{

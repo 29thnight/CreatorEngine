@@ -7,34 +7,20 @@
 #include <physx/characterkinematic/PxCapsuleController.h>
 #include <physx/characterkinematic/PxControllerManager.h>
 #include <vector>
-#include "PhysicsInfo.h"
 #include "PhysicsCommon.h"
+#include "PhysicsEventCallback.h"
 #include "StaticRigidBody.h"
 #include "DynamicRigidBody.h"
 #include "CharacterController.h"
 #include "RagdollPhysics.h"
 
-//class PhysicsBufferPool {
-//public:
-//	std::vector<RigidbodyInfo*> buffers[2]; //
-//	std::atomic<int> activeBuffer{ 0 }; // 
-//
-//	std::vector<RigidbodyInfo*>& GetWriteBuffer() {
-//		return buffers[activeBuffer.load() ^ 1]; // 
-//	}
-//
-//	std::vector<RigidbodyInfo*>& GetReadBuffer() {
-//		return buffers[activeBuffer.load()]; // 
-//	}
-//
-//	void SwapBuffers() {
-//		activeBuffer.store(activeBuffer.load() ^ 1); // 
-//	}
-//};
 
-
+class PhysicsEventCallback;
+class ColliderInfo;
+ 
 class PhysicX : public Singleton<PhysicX>
 {
+	friend class Singleton;
 private:
 	PhysicX() = default;
 	~PhysicX() = default;
@@ -57,12 +43,12 @@ public:
 	physx::PxPhysics* GetPhysics() { return m_physics; }
 	physx::PxScene* GetPxScene() { return m_scene; }
 	physx::PxMaterial* GetDefaultMaterial() { return m_defaultMaterial; }
-	physx::PxControllerManager* GetControllerManager() { return m_controllerManager; }
+	//physx::PxControllerManager* GetControllerManager() { return m_controllerManager; }
 	//물리엔진 클리어 업데이트
 	void FinalUpdate();
 
 	//콜리전 이벤트 등록
-	void SetCallBackCollisionFunction(std::function<void(CollisionData, EColliderType)> func);
+	void SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func);
 
 	//물리엔진 정보 수정
 	void SetPhysicsInfo();
@@ -170,6 +156,8 @@ public:
 	//collision data ->  4quest CollisionDataManager 대응
 	void CollisionDataUpdate();
 	CollisionData* FindCollisionData(const unsigned int& id);
+	void CreateCollisionData(const unsigned int& id, CollisionData* data);
+	void RemoveCollisionData(const unsigned int& id);
 
 
 
@@ -181,14 +169,14 @@ private:
 	physx::PxPvd* pvd = nullptr;
 	physx::PxFoundation* m_foundation = nullptr;
 	physx::PxPhysics* m_physics = nullptr;
-	physx::PxPvd* pvd = nullptr;
+
 	physx::PxScene* m_scene = nullptr;
 
 	physx::PxDefaultCpuDispatcher* gDispatcher = nullptr;
 
 	physx::PxMaterial* m_defaultMaterial = nullptr;
 
-	physx::PxControllerManager* m_controllerManager = nullptr;
+	//physx::PxControllerManager* m_controllerManager = nullptr;
 	
 	//===========================================================================================
 	PhysicsEventCallback* m_eventCallback;
@@ -224,9 +212,8 @@ private:
 
 public:
 	bool recordMemoryAllocations = true; // 디버그용 메모리 할당 추적
-	void ShowNotRelease();
 
-	void GetShapes(std::vector<BoxShape>& out);
+	
 	physx::PxCudaContextManager* m_cudaContextManager = nullptr;
 	physx::PxCudaContext* m_cudaContext = nullptr;
 

@@ -36,12 +36,7 @@ void RagdollPhysics::Update(float deltaTime)
 	for (auto& [name, link] : m_linkContainer)
 	{
 		if (m_bIsRagdoll) {
-			/*
-			if (!link->Update())
-			{
-				return false;
-			}
-			*/
+			link->Update();
 		}
 	}
 }
@@ -218,4 +213,6 @@ bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const Mathf
 	CopyMatrixDxToPx(dxTransform, pxTransform);
 
 	m_pxArticulation->setRootGlobalPose(pxTransform);
+
+	return true;
 }

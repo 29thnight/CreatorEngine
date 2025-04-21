@@ -22,6 +22,7 @@ public:
 	}
 
 	inline physx::PxController* GetController() { return m_controller; }
+	inline void SetController(physx::PxController* controller) { m_controller = controller; }
 	inline const unsigned int& GetID() const { return m_id; }
 	inline const unsigned int& GetLayerNumber() const { return m_layerNumber; }
 	inline CharacterMovement* GetCharacterMovement() { return m_characterMovement; }

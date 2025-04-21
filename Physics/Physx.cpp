@@ -1,6 +1,5 @@
 #include "Physx.h"
 #include "PhysicsHelper.h"
-#include "IRigidbody.h"
 #include "PhysicsInfo.h"
 #include "PhysicsEventCallback.h"
 #include "ConvexMeshResource.h"
@@ -18,15 +17,6 @@
 #include <cuda_runtime.h>
 
 
-
-// block(default), player, enemy, interact
-
-bool intersectionMatrix[3][3] = {
-	{1, 1, 1},
-	{1, 1, 1},
-	{1, 1, 0},
-};
-
 PxFilterFlags CustomFilterShader(
 	PxFilterObjectAttributes at0,
 	PxFilterData fd0,
@@ -34,23 +24,35 @@ PxFilterFlags CustomFilterShader(
 	PxFilterData fd1,
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
-	int group0 = fd0.word0;
-	int group1 = fd1.word0;
+	
+	if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
+	{
+		if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
+				| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+				| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
+			return physx::PxFilterFlag::eDEFAULT;
+		}
+	}
 
-	//if (!collisionMatrix[group0][group1]) {
-	//	return PxFilterFlag::eSUPPRESS; 
-	//}
+	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
+			| physx::PxPairFlag::eDETECT_CCD_CONTACT
+			| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
+			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
+			| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
+			| physx::PxPairFlag::eCONTACT_EVENT_POSE
+			| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+		return physx::PxFilterFlag::eDEFAULT;
+	}
+	else {
+		pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT; 
+		return physx::PxFilterFlag::eSUPPRESS;
+	}
+	
 
-
-	pairFlags = PxPairFlag::eCONTACT_DEFAULT;
-	pairFlags |= PxPairFlag::eTRIGGER_DEFAULT;
-
-	pairFlags |= PxPairFlag::eNOTIFY_TOUCH_FOUND;
-	pairFlags |= PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	pairFlags |= PxPairFlag::eNOTIFY_TOUCH_LOST;
-	pairFlags |= PxPairFlag::eNOTIFY_CONTACT_POINTS;
-
-	return PxFilterFlag::eDEFAULT;
+	
 }
 
 void PhysicX::Initialize()
@@ -104,6 +106,8 @@ void PhysicX::Initialize()
 	}
 
 
+	//충돌 처리에 대한 콜백 설정
+	m_eventCallback = new PhysicsEventCallback();
 
 
 	// Scene 셍성
@@ -115,7 +119,7 @@ void PhysicX::Initialize()
 	//sceneDesc.filterShader = PxDefaultSimulationFilterShader;
 	sceneDesc.filterShader = CustomFilterShader;
 
-	sceneDesc.simulationEventCallback = &eventCallback;
+	sceneDesc.simulationEventCallback = m_eventCallback;
 
 	sceneDesc.flags |= physx::PxSceneFlag::eENABLE_ACTIVE_ACTORS; // 활성 액터만 업데이트
 	//sceneDesc.kineKineFilteringMode = PxPairFilteringMode::eKEEP;
@@ -126,7 +130,7 @@ void PhysicX::Initialize()
 
 	m_scene = m_physics->createScene(sceneDesc); //
 
-	m_controllerManager = PxCreateControllerManager(*m_scene);
+	m_characterControllerManager = PxCreateControllerManager(*m_scene);
 }
 //void PhysicX::HasConvexMeshResource(const unsigned int& hash)
 //{
@@ -145,25 +149,141 @@ void PhysicX::UnInitialize() {
 }
 
 
-
-
-
-
-
-
 void PhysicX::Update(float fixedDeltaTime)
 {
+	// PxScene 업데이트
+	RemoveActors();
+	//천 및 의상 시뮬레이션 업데이트 -> 차후 생각
+	{
+		//콜라이더 업데이트
+		//업데이트 할 액터들을 모두 씬에 추가
+		for (RigidBody* body : m_updateActors) {
+			DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+			if (dynamicBody) {
+				m_scene->addActor(*dynamicBody->GetRigidDynamic());
+			}
+			StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+			if (staticBody) {
+				m_scene->addActor(*staticBody->GetRigidStatic());
+			}
+		}
+		m_updateActors.clear();
+	}
+	{
+		//케릭터 업데이트
+		//케릭터 컨트롤러 업데이트
+		for (const auto& controller : m_characterControllerContainer) {
+			controller.second->Update(fixedDeltaTime);
+		}
+		//생성 예정인 케릭터 컨트롤러를 씬에 추가
+		for (auto& [contrllerInfo, movementInfo] : m_updateCCTList)
+		{
+			CollisionData* collisionData = new CollisionData();
 
+			physx::PxCapsuleControllerDesc desc;
+
+			CharacterController* controller = new CharacterController();
+			controller->Initialize(contrllerInfo, movementInfo, m_characterControllerManager, m_defaultMaterial, collisionData, m_collisionMatrix);
+
+			desc.height = contrllerInfo.height;
+			desc.radius = contrllerInfo.radius;
+			desc.contactOffset = contrllerInfo.contactOffset;
+			desc.stepOffset = contrllerInfo.stepOffset;
+			desc.slopeLimit = contrllerInfo.slopeLimit;
+			desc.position.x = contrllerInfo.position.x;
+			desc.position.y = contrllerInfo.position.y;
+			desc.position.z = contrllerInfo.position.z;
+			desc.maxJumpHeight = 100.0f;
+			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
+			desc.material = m_defaultMaterial;
+
+			physx::PxController* pxController = m_characterControllerManager->createController(desc);
+
+			physx::PxRigidDynamic* body = pxController->getActor();
+			physx::PxShape* shape;
+			int shapeSize = body->getNbShapes();
+			body->getShapes(&shape, shapeSize);
+			body->setSolverIterationCounts(8, 4);
+			shape->setContactOffset(0.02f);
+			shape->setRestOffset(0.01f);
+
+			physx::PxFilterData filterData;
+			filterData.word0 = contrllerInfo.layerNumber;
+			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
+			shape->setSimulationFilterData(filterData);
+
+			collisionData->thisId = contrllerInfo.id;
+			collisionData->thisLayerNumber = contrllerInfo.layerNumber;
+			shape->userData = collisionData;
+			body->userData = collisionData;
+
+			controller->SetController(pxController);
+
+			CreateCollisionData(contrllerInfo.id, collisionData);
+			m_characterControllerContainer.insert({ controller->GetID(), controller });
+		}
+		m_updateCCTList.clear();
+
+		//대기중인 케릭터 컨트롤러를 생성예정 리스트에 추가
+		for (auto& controllerInfo : m_waittingCCTList) {
+			m_waittingCCTList.push_back(controllerInfo);
+		}
+		m_waittingCCTList.clear();
+	}
+	{
+		//콜리전 업데이트
+		//삭제 예정인 콜리전 데이터 삭제
+		for (unsigned int& removeID : m_removeCollisionIds) {
+			auto iter = m_collisionDataContainer.find(removeID);
+			if (iter != m_collisionDataContainer.end()) {
+				m_collisionDataContainer.erase(iter);
+			}
+		}
+		m_removeCollisionIds.clear();
+
+		for (auto& collisionData : m_collisionDataContainer) {
+			if (collisionData.second->isDead == true)
+			{
+				m_removeCollisionIds.push_back(collisionData.first);
+			}
+		}
+	}
+	{
+	//ragdoll 업데이트
+		for (auto& [id,ragdoll] : m_ragdollContainer) {
+		
+			ragdoll->Update(fixedDeltaTime);
+		}
+	}
+	//Scene 시뮬레이션
+	if (!m_scene->simulate(fixedDeltaTime))
+	{
+		Debug->LogCritical("physic m_scene simulate failed");
+		return;
+	}
+	//시뮬레이션 결과 받기
+	if (!m_scene->fetchResults(true))
+	{
+		Debug->LogCritical("physic m_scene fetchResults failed");
+		return;
+	}
+	//콜백 이벤트 처리
+	m_eventCallback->StartTrigger();
+	//에러 처리
+	if (cudaGetLastError() != cudaError::cudaSuccess)
+	{
+		Debug->LogError("cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
+	}
 }
 
 void PhysicX::FinalUpdate()
 {
-	//rigidbody
+	//왜 있는지 모르겠다. 일단 남겨놔 보자	
 }
 
-void PhysicX::SetCallBackCollisionFunction(std::function<void(CollisionData, EColliderType)> func)
+void PhysicX::SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func)
 {
-	eventCallback.SetCallbackFunction(func);
+	m_eventCallback->SetCallbackFunction(func);
 }
 
 void PhysicX::SetPhysicsInfo()
@@ -175,12 +295,14 @@ void PhysicX::SetPhysicsInfo()
 
 void PhysicX::ChangeScene()
 {
-		
-	//DeformableSurface
-		
+	// 씬 체인지 시에 씬에 있는 모든 물리엔진 객체 삭제
+	RemoveAllRigidBody(m_scene,m_removeActorList);
+	RemoveAllCCT();
+	RemoveAllCharacterInfo();
+	//옷 시뮬레이션 삭제도 추가시 삭제
 }
 
-RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic = false)
+RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
@@ -991,6 +1113,57 @@ void PhysicX::ConnectPVD()
     PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
     auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
     std::cout << "pvd connected : " << isconnected << std::endl;
+}
+
+void PhysicX::CollisionDataUpdate()
+{
+	//삭제예정 데이터 삭제
+	for (auto& removeId : m_removeCollisionIds) {
+		auto iter = m_collisionDataContainer.find(removeId);
+		if (iter != m_collisionDataContainer.end())
+		{
+			m_collisionDataContainer.erase(iter);
+		}
+	}
+	m_removeCollisionIds.clear();
+
+	//충돌 삭제 예정 데이터 등록
+	for (auto& collisionIter : m_collisionDataContainer) {
+		if (collisionIter.second->isDead == true) {
+			m_removeCollisionIds.push_back(collisionIter.first);
+		}
+	}
+}
+
+CollisionData* PhysicX::FindCollisionData(const unsigned int& id)
+{
+	auto iter = m_collisionDataContainer.find(id);
+	if (iter != m_collisionDataContainer.end())
+	{
+		return iter->second;
+	}
+	else
+	{
+		Debug->LogError("PhysicX::FindCollisionData() : id is not exist id :" + std::to_string(id));
+		return nullptr;
+	}
+}
+
+void PhysicX::CreateCollisionData(const unsigned int& id, CollisionData* data)
+{
+	m_collisionDataContainer.insert(std::make_pair(id, data));
+}
+
+void PhysicX::RemoveCollisionData(const unsigned int& id)
+{
+	//충돌 데이터가 등록되어 있는지 검사
+	for (unsigned int& removeId : m_removeCollisionIds) {
+		if (removeId == id) {
+			return;
+		}
+	}
+
+	m_removeCollisionIds.push_back(id);
 }
 
 void PhysicX::ShowNotRelease()

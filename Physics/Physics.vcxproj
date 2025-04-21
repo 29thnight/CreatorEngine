@@ -154,20 +154,17 @@
   <ItemGroup>
     <ClInclude Include="CharacterController.h" />
     <ClInclude Include="CharacterMovement.h" />
-    <ClInclude Include="Common.h" />
     <ClInclude Include="ConvexMeshResource.h" />
     <ClInclude Include="DynamicRigidBody.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Func.h" />
     <ClInclude Include="HeightFieldResource.h" />
     <ClInclude Include="ICollider.h" />
-    <ClInclude Include="IRigidbody.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PhysicsCommon.h" />
     <ClInclude Include="PhysicsDebug.h" />
     <ClInclude Include="PhysicsEventCallback.h" />
     <ClInclude Include="PhysicsHelper.h" />
-    <ClInclude Include="PhysicsInfo.h" />
     <ClInclude Include="Physx.h" />
     <ClInclude Include="RagdollJoint.h" />
     <ClInclude Include="RagdollLink.h" />
@@ -180,7 +177,6 @@
   <ItemGroup>
     <ClCompile Include="CharacterController.cpp" />
     <ClCompile Include="CharacterMovement.cpp" />
-    <ClCompile Include="Common.cpp" />
     <ClCompile Include="ConvexMeshResource.cpp" />
     <ClCompile Include="DynamicRigidBody.cpp" />
     <ClCompile Include="HeightFieldResource.cpp" />
