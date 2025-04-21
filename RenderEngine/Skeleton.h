@@ -12,6 +12,9 @@ public:
 	std::vector<Bone*> m_bones;
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;
+
+	//[[Serializable]]
+	Skeleton() = default;
 	~Skeleton();
 	static constexpr uint32 MAX_BONES{ 512 };
 

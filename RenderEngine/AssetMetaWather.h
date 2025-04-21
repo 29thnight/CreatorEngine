@@ -163,6 +163,13 @@ private:
         {
             try 
             {
+				if (deletedFile.extension() == ".meta")
+				{
+					FileGuid guid = LoadGuidFromMeta(deletedFile);
+					m_assetMetaRegistry->Unregister(guid);
+					m_assetMetaRegistry->Unregister(deletedFile);
+				}
+
                 fs::remove(metaFile);
                 std::cout << "[Meta Deleted] " << metaFile << std::endl;
             }
@@ -170,13 +177,6 @@ private:
             {
                 std::cerr << "Error deleting .meta file: " << e.what() << std::endl;
             }
-        }
-
-        if (deletedFile.extension() == ".meta")
-        {
-            FileGuid guid = LoadGuidFromMeta(deletedFile);
-            m_assetMetaRegistry->Unregister(guid);
-			m_assetMetaRegistry->Unregister(deletedFile);
         }
     }
 
