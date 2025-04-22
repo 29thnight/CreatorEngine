@@ -93,13 +93,20 @@ void DirectX11::Dx11Main::Update()
     m_timeSystem.Tick([&]
     {
         InfoWindow();
-        SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
         if(!SceneManagers->m_isGameStart)
         {
+            SceneManagers->Editor();
+            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
             SceneManagers->GameLogic(0);
         }
         else
         {
+#ifdef EDITOR
+			SceneManagers->Editor();
+#endif // !EDITOR
+            SceneManagers->Initialization();
+			SceneManagers->Physics(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
             SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
         }
     });
