@@ -1,6 +1,6 @@
 #pragma once
 #include <physx/PxPhysicsAPI.h>
-#include "../Utility_Framework/Core.Minimal.h"
+//#include "../Utility_Framework/Core.Minimal.h"
 #include "ResourceBase.h"
 
 class HeightFieldResource : public ResourceBase

@@ -20,15 +20,15 @@ bool RagdollJoint::Initialize(RagdollLink* paranthLink,RagdollLink* ownerLink, c
 	m_pxJoint->setMaxJointVelocity(5.0f);
 	m_pxJoint->setFrictionCoefficient(0.1f);
 
-	Mathf::Vector3 scale;
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 position;
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
 	m_localTransform.Decompose(scale, rotation, position);
-	m_localTransform = Mathf::Matrix::CreateScale(scale) * Mathf::Matrix::CreateFromQuaternion(rotation) * Mathf::Matrix::CreateTranslation(position);
+	m_localTransform = DirectX::SimpleMath::Matrix::CreateScale(scale) * DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	physx::PxTransform pxLocalTransform;
 	
-	Mathf::Matrix parentLocalTransform = m_localTransform * ownerLink->GetLocalTransform();
+	DirectX::SimpleMath::Matrix parentLocalTransform = m_localTransform * ownerLink->GetLocalTransform();
 
 	CopyMatrixDxToPx(m_localTransform, pxLocalTransform);
 	m_pxJoint->setChildPose(pxLocalTransform);
@@ -97,8 +97,8 @@ bool RagdollJoint::Update(const physx::PxArticulationLink* paranthLink)
 	physx::PxTransform JointGlobalPose = childGlobalPose * JointLocalPoseInChild;
 
 	//physX global 포즈를 dx 트렌스폼으로 변환
-	Mathf::Matrix dxParentJointGlobalTransform;
-	Mathf::Matrix dxChildJointGlobalTransform;
+	DirectX::SimpleMath::Matrix dxParentJointGlobalTransform;
+	DirectX::SimpleMath::Matrix dxChildJointGlobalTransform;
 
 	CopyMatrixPxToDx(parentJointGlobalPose, dxParentJointGlobalTransform);
 	CopyMatrixPxToDx(JointGlobalPose, dxChildJointGlobalTransform);

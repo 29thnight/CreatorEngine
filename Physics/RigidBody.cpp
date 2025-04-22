@@ -7,9 +7,9 @@ RigidBody::RigidBody(EColliderType collidreType, unsigned int id, unsigned int l
 	, m_radius()
 	, m_halfHeight()
 	, m_Extent()
-	, m_scale(Mathf::Vector3(1.0f, 1.0f, 1.0f))
-	, m_offsetRotation(Mathf::Matrix::Identity)
-	, m_offsetTranslation(Mathf::Matrix::Identity)
+	, m_scale(DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f))
+	, m_offsetRotation(DirectX::SimpleMath::Matrix{})
+	, m_offsetTranslation(DirectX::SimpleMath::Matrix{})
 {
 
 }

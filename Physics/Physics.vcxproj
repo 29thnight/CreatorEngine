@@ -24,6 +24,8 @@
     <ProjectGuid>{2584186c-912c-4e2f-a8a3-f79a22591bca}</ProjectGuid>
     <RootNamespace>Physics</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <CudaToolkitCustomDir>
+    </CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -71,6 +73,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PublicIncludeDirectories>
+    </PublicIncludeDirectories>
+    <AllProjectBMIsArePublic>false</AllProjectBMIsArePublic>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -127,6 +134,18 @@
     <Lib>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)$(CudaToolkitLibDir);</AdditionalLibraryDirectories>
     </Lib>
+    <CudaLink>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+    </CudaLink>
+    <CudaCompile>
+      <Include>
+      </Include>
+      <AdditionalDeps>
+      </AdditionalDeps>
+      <CudaRuntime>Static</CudaRuntime>
+      <AdditionalOptions>-std=c++20 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -157,7 +176,6 @@
     <ClInclude Include="ConvexMeshResource.h" />
     <ClInclude Include="DynamicRigidBody.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="Func.h" />
     <ClInclude Include="HeightFieldResource.h" />
     <ClInclude Include="ICollider.h" />
     <ClInclude Include="pch.h" />

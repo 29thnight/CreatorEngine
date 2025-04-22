@@ -1,6 +1,6 @@
 #include "ConvexMeshResource.h"
 
-ConvexMeshResource::ConvexMeshResource(physx::PxPhysics* physics, Mathf::Vector3* vertices, int vertexSize, int polygonLimit) : ResourceBase(EResourceType::CONVRX_MESH)
+ConvexMeshResource::ConvexMeshResource(physx::PxPhysics* physics, DirectX::SimpleMath::Vector3* vertices, int vertexSize, int polygonLimit) : ResourceBase(EResourceType::CONVRX_MESH)
 {
 	//컨벡스 매쉬 생성
 	physx::PxConvexMeshDesc convexDesc;

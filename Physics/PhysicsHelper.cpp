@@ -1,29 +1,29 @@
 #include "PhysicsHelper.h"
 
-void CopyMatrixPxToDx(const physx::PxTransform & pxTransform, Mathf::Matrix & dxMatrix)
+void CopyMatrixPxToDx(const physx::PxTransform & pxTransform, DirectX::SimpleMath::Matrix & dxMatrix)
 {
-	Mathf::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
-	Mathf::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
+	DirectX::SimpleMath::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
+	DirectX::SimpleMath::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
 	dxMatrix = DirectX::XMMatrixAffineTransformation(DirectX::XMVectorSet(1.0f, 1.0f, 1.0f, 0.0f), DirectX::XMVectorZero(), rotation, translation);
 }
 
-void CopyMatrixXYZPxToDx(const physx::PxTransform& pxTransform, Mathf::Matrix& dxMatrix)
+void CopyMatrixXYZPxToDx(const physx::PxTransform& pxTransform, DirectX::SimpleMath::Matrix& dxMatrix)
 {
-	Mathf::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
-	Mathf::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
-	Mathf::Vector3 scale = { 1.f, 1.f, 1.f };
+	DirectX::SimpleMath::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
+	DirectX::SimpleMath::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
+	DirectX::SimpleMath::Vector3 scale = { 1.f, 1.f, 1.f };
 	dxMatrix = DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) * DirectX::XMMatrixRotationQuaternion(rotation) * DirectX::XMMatrixTranslation(translation.x, translation.y, translation.z);
 
 }
 
-void CopyVectorPxToDx(const physx::PxVec3& pxVector, Mathf::Vector3& dxVector)
+void CopyVectorPxToDx(const physx::PxVec3& pxVector, DirectX::SimpleMath::Vector3& dxVector)
 {
 	dxVector.x = pxVector.x;
 	dxVector.y = pxVector.y;
 	dxVector.z = pxVector.z;
 }
 
-void CopyMatrixDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTransform)
+void CopyMatrixDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform)
 {
 	pxTransform.p.x = dxMatrix._41;
 	pxTransform.p.y = dxMatrix._42;
@@ -37,13 +37,13 @@ void CopyMatrixDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTrans
 
 }
 
-void CopyMatrixXYZDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTransform)
+void CopyMatrixXYZDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform)
 {
-	Mathf::Matrix copyMatrix = dxMatrix;
+	DirectX::SimpleMath::Matrix copyMatrix = dxMatrix;
 
-	Mathf::Vector3 position;
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 scale;
+	DirectX::SimpleMath::Vector3 position;
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 scale;
 
 	copyMatrix.Decompose(scale, rotation, position);
 
@@ -57,7 +57,7 @@ void CopyMatrixXYZDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTr
 
 }
 
-void CopyVectorDxToPx(const Mathf::Vector3& dxVector, physx::PxVec3& pxVector)
+void CopyVectorDxToPx(const DirectX::SimpleMath::Vector3& dxVector, physx::PxVec3& pxVector)
 {
 	pxVector.x = dxVector.x;
 	pxVector.y = dxVector.y;

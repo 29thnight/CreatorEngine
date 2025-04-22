@@ -1,5 +1,5 @@
-#include "pch.h"
 #include "HeightFieldResource.h"
+#include <vector>
 
 HeightFieldResource::HeightFieldResource(physx::PxPhysics* physics, const int* height, const unsigned int& numCols, const unsigned int& numRows) : ResourceBase(EResourceType::HEIGHT_FIELD)
 {

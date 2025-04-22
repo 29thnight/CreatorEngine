@@ -14,7 +14,7 @@ class PhysicsEventCallback : public PxSimulationEventCallback
 {
 public:
 	PhysicsEventCallback() = default;
-	~PhysicsEventCallback();
+	~PhysicsEventCallback() = default;
 
 	void Initialize();
 

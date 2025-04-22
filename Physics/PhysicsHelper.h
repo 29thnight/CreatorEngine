@@ -1,6 +1,7 @@
 
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
+//#include "../Utility_Framework/Core.Minimal.h"
+#include <directxtk/SimpleMath.h>
 #include <physx/PxPhysicsAPI.h>
 
 //PhysX는 오른손 좌표계를 사용합니다.
@@ -10,15 +11,15 @@
 //그에 따라 PhysX와 DirectX의 좌표계를 변환하는 함수를 정의합니다.
 
 //PhysX -> DirectX Matrix
-void CopyMatrixPxToDx(const physx::PxTransform & pxTransform, Mathf::Matrix & dxMatrix);
-void CopyMatrixXYZPxToDx(const physx::PxTransform& pxTransform, Mathf::Matrix& dxMatrix);
+void CopyMatrixPxToDx(const physx::PxTransform & pxTransform, DirectX::SimpleMath::Matrix & dxMatrix);
+void CopyMatrixXYZPxToDx(const physx::PxTransform& pxTransform, DirectX::SimpleMath::Matrix& dxMatrix);
 
 //PhysX -> DirectX Vector
-void CopyVectorPxToDx(const physx::PxVec3& pxVector, Mathf::Vector3& dxVector);
+void CopyVectorPxToDx(const physx::PxVec3& pxVector, DirectX::SimpleMath::Vector3& dxVector);
 
 //DirectX Matrix -> PhysX
-void CopyMatrixDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTransform);
-void CopyMatrixXYZDxToPx(const Mathf::Matrix& dxMatrix, physx::PxTransform& pxTransform);
+void CopyMatrixDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform);
+void CopyMatrixXYZDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform);
 
 //DirectX Vector -> PhysX
-void CopyVectorDxToPx(const Mathf::Vector3& dxVector, physx::PxVec3& pxVector);
+void CopyVectorDxToPx(const DirectX::SimpleMath::Vector3& dxVector, physx::PxVec3& pxVector);

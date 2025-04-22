@@ -22,9 +22,6 @@
     <Filter Include="Data">
       <UniqueIdentifier>{4ef4efaf-7369-4103-94c9-245ab631aceb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Func">
-      <UniqueIdentifier>{d8de44da-4d37-41de-a79c-3f99125f4baa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Common">
       <UniqueIdentifier>{1cc72946-c63f-40a6-9003-a5d95b767ca0}</UniqueIdentifier>
     </Filter>
@@ -56,9 +53,6 @@
     </ClInclude>
     <ClInclude Include="PhysicsEventCallback.h">
       <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="Func.h">
-      <Filter>Func</Filter>
     </ClInclude>
     <ClInclude Include="ICollider.h">
       <Filter>Interface</Filter>

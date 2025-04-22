@@ -1,7 +1,7 @@
 #pragma once
 #include "PhysicsHelper.h"
 #include "RigidBody.h"
-
+#include "../Utility_Framework/LogSystem.h"
 class StaticRigidBody : public RigidBody
 {
 public:
@@ -13,7 +13,7 @@ public:
 
 	void ChangeLayerNumber(const unsigned int& layerNumber, int* collisionMatrix);
 
-	void SetConvertScale(const Mathf::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix) override;
+	void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix) override;
 
 	physx::PxRigidStatic* GetRigidStatic() const { return m_rigidStatic; } // 
 

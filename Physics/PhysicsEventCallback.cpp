@@ -111,7 +111,7 @@ void PhysicsEventCallback::SettingCollisionData(const physx::PxContactPairHeader
 	//받은 충돌 쌍
 	const physx::PxContactPair& contactPair = pairs[0];
 	//라이브러리에서 제공할 충돌 쌍의 충돌 지점 정보
-	std::vector<Mathf::Vector3> points;
+	std::vector<DirectX::SimpleMath::Vector3> points;
 
 
 	//충돌 쌍의 충돌 지점 정보의 갯수 만큼 벡터를 할당

@@ -31,7 +31,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	shape->setContactOffset(0.02f);
 	shape->setRestOffset(0.01f);
 
-	Mathf::Matrix transform = colliderInfo.collsionTransform.GetWorldMatrix();
+	DirectX::SimpleMath::Matrix transform = colliderInfo.collsionTransform.worldMatrix;
 	physx::PxTransform transformPx;
 	CopyMatrixDxToPx(transform, transformPx);
 
@@ -86,7 +86,7 @@ void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* c
 	data->thisLayerNumber = m_layerNumber;
 }
 
-void DynamicRigidBody::SetConvertScale(const Mathf::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix)
+void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix)
 {
 	//현제 스케일이 NaN인지 체크
 	if (std::isnan(m_scale.x) || std::isnan(m_scale.y) || std::isnan(m_scale.z))
@@ -131,7 +131,7 @@ void DynamicRigidBody::SetConvertScale(const Mathf::Vector3& scale, physx::PxPhy
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eSPHERE)
 	{
 		physx::PxSphereGeometry sphereGeometry = static_cast<const physx::PxSphereGeometry&>(shape->getGeometry());
-		float maxRadius = std::max<float>(scale.x, std::max(scale.y, scale.z));
+		float maxRadius = std::max<float>(scale.x, std::max<float>(scale.y, scale.z));
 		sphereGeometry.radius = m_radius * maxRadius;
 		m_rigidDynamic->detachShape(*shape);
 		UpdateShapeGeometry(m_rigidDynamic, sphereGeometry, physics, material, collisionMatrix, userData);
@@ -139,7 +139,7 @@ void DynamicRigidBody::SetConvertScale(const Mathf::Vector3& scale, physx::PxPhy
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCAPSULE)
 	{
 		physx::PxCapsuleGeometry capsuleGeometry = static_cast<const physx::PxCapsuleGeometry&>(shape->getGeometry());
-		float maxScale =  std::max(scale.y, scale.z);
+		float maxScale =  std::max<float>(scale.y, scale.z);
 		capsuleGeometry.radius = m_radius * maxScale;
 
 		capsuleGeometry.halfHeight = m_halfHeight * scale.x;

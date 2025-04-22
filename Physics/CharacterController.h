@@ -1,6 +1,6 @@
 #pragma once
 #include <physx/PxPhysicsAPI.h>
-#include "../Utility_Framework/Core.Minimal.h"
+//#include "../Utility_Framework/Core.Minimal.h"
 #include "PhysicsCommon.h"
 #include "CharacterMovement.h"
 
@@ -13,7 +13,7 @@ public:
 	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData,int * collisionMatrix);
 	void Update(float deltaTime);
 
-	void AddMovementInput(const Mathf::Vector3& input, bool isDynamic);
+	void AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic);
 
 	bool ChangeLayerNumber(const unsigned int& newLayerNumber,int* collisionMatrix);
 
@@ -26,12 +26,12 @@ public:
 	inline const unsigned int& GetID() const { return m_id; }
 	inline const unsigned int& GetLayerNumber() const { return m_layerNumber; }
 	inline CharacterMovement* GetCharacterMovement() { return m_characterMovement; }
-	inline void GetPosition(Mathf::Vector3& position) const {
+	inline void GetPosition(DirectX::SimpleMath::Vector3& position) const {
 		position.x = m_controller->getPosition().x;
 		position.y = m_controller->getPosition().y;
 		position.z = m_controller->getPosition().z;
 	}
-	inline void SetPosition(const Mathf::Vector3& position) {
+	inline void SetPosition(const DirectX::SimpleMath::Vector3& position) {
 		m_controller->setPosition(physx::PxExtendedVec3(position.x, position.y, position.z));
 	}
 
@@ -41,7 +41,7 @@ protected:
 	unsigned int m_id; //컨트롤러 ID
 	unsigned int m_layerNumber; //충돌 레이어 번호
 
-	Mathf::Vector3 m_inputMove; 
+	DirectX::SimpleMath::Vector3 m_inputMove; 
 	bool m_IsDynamic;
 	std::array<bool, 4> m_bMoveRestrict;
 

@@ -1,6 +1,5 @@
 #pragma once
 #include <physx/PxPhysicsAPI.h>
-#include "../Utility_Framework/Core.Minimal.h"
 #include "PhysicsCommon.h"
 
 
@@ -11,16 +10,16 @@ public:
 	~CharacterMovement();
 	
 	void Initialize(const CharacterMovementInfo& info);
-	void Update(float deltaTime,const Mathf::Vector3& input,bool isDynamic);
+	void Update(float deltaTime,const DirectX::SimpleMath::Vector3& input,bool isDynamic);
 	void Jump();
 
 	void CumputeMovement(float deltaTime);
 	void LimitVelocity();
 	void OutputPxVector3(physx::PxVec3& dir);
 
-	inline const Mathf::Vector3& GetOutVector() const { return m_outVector; }
+	inline const DirectX::SimpleMath::Vector3& GetOutVector() const { return m_outVector; }
 	
-	inline const Mathf::Vector3& GetVelocity() const { return m_velocity; }
+	inline const DirectX::SimpleMath::Vector3& GetVelocity() const { return m_velocity; }
 	inline const bool& GetIsFall() const { return m_isFall; }
 	inline const float& GetSpeed() const { return m_speed; }
 	inline const float& GetMaxSpeed() const { return m_maxSpeed; }
@@ -31,7 +30,7 @@ public:
 	inline const float& GetJumpXZAcceleration() const { return m_jumpXZAcceleration; }
 	inline const float& GetJumpXZDeceleration() const { return m_jumpXZDeceleration; }
 	inline const float& GetGravityWeight() const { return m_gravityWeight; }
-	inline void SetVelocity(const Mathf::Vector3& velocity) { m_velocity = velocity; }
+	inline void SetVelocity(const DirectX::SimpleMath::Vector3& velocity) { m_velocity = velocity; }
 	inline void SetIsFall(const bool& isFall) { m_isFall = isFall; }
 	inline void SetMaxSpeed(const float& maxSpeed) { m_maxSpeed = maxSpeed; }
 	inline void SetAcceleration(const float& acceleration) { m_acceleration = acceleration; }
@@ -46,8 +45,8 @@ public:
 private:
 	bool m_isFall;
 
-	Mathf::Vector3 m_velocity;
-	Mathf::Vector3 m_outVector;
+	DirectX::SimpleMath::Vector3 m_velocity;
+	DirectX::SimpleMath::Vector3 m_outVector;
 
 	float m_speed;
 	float m_maxSpeed;

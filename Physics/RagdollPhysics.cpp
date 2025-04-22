@@ -41,7 +41,7 @@ void RagdollPhysics::Update(float deltaTime)
 	}
 }
 
-bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const Mathf::Vector3& extend)
+bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const DirectX::SimpleMath::Vector3& extend)
 {
 	RagdollLink* link = new RagdollLink();
 
@@ -177,36 +177,36 @@ bool RagdollPhysics::ChangeLayerNumber(const unsigned int& newLayerNumber, int* 
 
 }
 
-void RagdollPhysics::SetWorldTransform(const Mathf::Matrix& worldTransform)
+void RagdollPhysics::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform)
 {
 	m_worldTransform = worldTransform;
-	Mathf::Vector3 scale = { 1.0f,1.0f,1.0f };
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 position;
+	DirectX::SimpleMath::Vector3 scale = { 1.0f,1.0f,1.0f };
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
 	m_worldTransform.Decompose(scale, rotation, position);
 
-	Mathf::Matrix dxTransform = Mathf::Matrix::CreateFromQuaternion(rotation) *
-		Mathf::Matrix::CreateTranslation(position);
+	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+		DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	physx::PxTransform pxTransform;
 	CopyMatrixDxToPx(dxTransform, pxTransform);
 	m_pxArticulation->setRootGlobalPose(pxTransform);
 }
 
-bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const Mathf::Matrix& boneWorldTransform)
+bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const DirectX::SimpleMath::Matrix& boneWorldTransform)
 {
 	auto link = m_linkContainer.find(name);
 	
 	link->second->SetWorldTransform(boneWorldTransform);
 
 	m_worldTransform = boneWorldTransform;
-	Mathf::Vector3 scale = { 1.0f,1.0f,1.0f };
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 position;
+	DirectX::SimpleMath::Vector3 scale = { 1.0f,1.0f,1.0f };
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
 	m_worldTransform.Decompose(scale, rotation, position);
 
-	Mathf::Matrix dxTransform = Mathf::Matrix::CreateFromQuaternion(rotation) *
-		Mathf::Matrix::CreateTranslation(position);
+	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+		DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	physx::PxTransform pxTransform;
 

@@ -8,13 +8,15 @@
 #include "GameObject.h"
 #include "Animator.h"
 #include "Mesh.h"
-#include "ImageComponent.h"
 #include "Canvas.h"
+#include "BoxColliderComponent.h"
+#include "ImageComponent.h"
 #include "LightMapping.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "Object.h"
+#include "RigidBodyComponent.h"
 #include "Scene.h"
 #include "TextComponent.h"
 #include "UIButton.h"
@@ -23,6 +25,7 @@
 REFLECTION_REGISTER()
 {
     AUTO_REGISTER_CLASS(Animator);
+    AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Canvas);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(GameObject);
@@ -33,6 +36,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(TextComponent);

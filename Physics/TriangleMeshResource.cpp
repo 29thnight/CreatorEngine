@@ -1,6 +1,6 @@
 #include "TriangleMeshResource.h"
 
-TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const Mathf::Vector3* vertices, const unsigned int& vertexSize, const unsigned int* indices, const unsigned int& indexSize) :ResourceBase(EResourceType::TRIANGLE_MESH)
+TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const DirectX::SimpleMath::Vector3* vertices, const unsigned int& vertexSize, const unsigned int* indices, const unsigned int& indexSize) :ResourceBase(EResourceType::TRIANGLE_MESH)
 {
 	physx::PxTolerancesScale scale;
 	physx::PxCookingParams params(scale);
@@ -12,7 +12,7 @@ TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const Ma
 
 	physx::PxTriangleMeshDesc meshDesc;
 	meshDesc.points.count = vertexSize;
-	meshDesc.points.stride = sizeof(Mathf::Vector3);
+	meshDesc.points.stride = sizeof(DirectX::SimpleMath::Vector3);
 	meshDesc.points.data = (void*)vertices;
 
 	meshDesc.triangles.count = indexSize / 3;

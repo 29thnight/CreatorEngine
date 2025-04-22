@@ -1,18 +1,20 @@
 #pragma once
 #include "../Utility_Framework/ClassProperty.h"
-#include "../Utility_Framework/Core.Minimal.h"
+#include <directxtk/SimpleMath.h>
 #include <physx/PxPhysics.h>
 #include <physx/PxPhysicsAPI.h>
 #include <physx/characterkinematic/PxController.h>
 #include <physx/characterkinematic/PxCapsuleController.h>
 #include <physx/characterkinematic/PxControllerManager.h>
 #include <vector>
-#include "PhysicsCommon.h"
+
 #include "PhysicsEventCallback.h"
 #include "StaticRigidBody.h"
 #include "DynamicRigidBody.h"
 #include "CharacterController.h"
 #include "RagdollPhysics.h"
+
+
 
 
 class PhysicsEventCallback;
@@ -114,7 +116,7 @@ public:
 	void RemoveAllCharacterInfo();
 
 	//관절에 링크 및 조인트 추가
-	void AddArticulationLink(unsigned int id, LinkInfo& info, const Mathf::Vector3& extent);
+	void AddArticulationLink(unsigned int id, LinkInfo& info, const DirectX::SimpleMath::Vector3& extent);
 	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& radius);
 	void AddArticulationLink(unsigned int id, LinkInfo& info, const float& halfHeight,const float& radius);
 	void AddArticulationLink(unsigned int id, LinkInfo& info);

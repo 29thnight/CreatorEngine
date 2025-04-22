@@ -1,6 +1,6 @@
 #include "Physx.h"
+#include "PhysicsCommon.h"
 #include "PhysicsHelper.h"
-#include "PhysicsInfo.h"
 #include "PhysicsEventCallback.h"
 #include "ConvexMeshResource.h"
 #include "TriangleMeshResource.h"
@@ -15,7 +15,7 @@
 
 #include "ICollider.h"
 #include <cuda_runtime.h>
-
+#include <cuda_runtime_api.h>
 
 PxFilterFlags CustomFilterShader(
 	PxFilterObjectAttributes at0,
@@ -270,10 +270,10 @@ void PhysicX::Update(float fixedDeltaTime)
 	//콜백 이벤트 처리
 	m_eventCallback->StartTrigger();
 	//에러 처리
-	if (cudaGetLastError() != cudaError::cudaSuccess)
-	{
-		Debug->LogError("cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
-	}
+	//if (cudaGetLastError() != cudaError::cudaSuccess)
+	//{
+	//	Debug->LogError("cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
+	//}
 }
 
 void PhysicX::FinalUpdate()
@@ -427,8 +427,8 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, collisionMatrix);
-	staticBody->SetOffsetRotation(Mathf::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
-	staticBody->SetOffsetTranslation(Mathf::Matrix::CreateTranslation(Mathf::Vector3(info.rowScale * info.numRows * 0.5f, 0.0f, -info.colScale * info.numCols * 0.5f)));
+	staticBody->SetOffsetRotation(DirectX::SimpleMath::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
+	staticBody->SetOffsetTranslation(DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3(info.rowScale * info.numRows * 0.5f, 0.0f, -info.colScale * info.numCols * 0.5f)));
 
 	shape->release();
 
@@ -600,9 +600,9 @@ void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyDat
 	if (dynamicBody)
 	{
 		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
-		Mathf::Matrix dxMatrix;
+		DirectX::SimpleMath::Matrix dxMatrix;
 		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
-		rigidBodyData.transform = Mathf::Matrix::CreateScale(dynamicBody->GetScale()) * dxMatrix * dynamicBody->GetOffsetTranslation();
+		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(dynamicBody->GetScale()) * dxMatrix * dynamicBody->GetOffsetTranslation();
 		CopyVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
 		CopyVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
 
@@ -620,9 +620,9 @@ void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyDat
 	if (staticBody)
 	{
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
-		Mathf::Matrix dxMatrix;
+		DirectX::SimpleMath::Matrix dxMatrix;
 		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
-		rigidBodyData.transform = Mathf::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
+		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
 	}
 }
 
@@ -641,7 +641,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 	if (dynamicBody)
 	{
 		//받은 데이터로 pxBody의 transform과 속도와 각속도 설정
-		Mathf::Matrix dxMatrix = rigidBodyData.transform;
+		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxTransform;
 		physx::PxVec3 pxLinearVelocity;
 		physx::PxVec3 pxAngularVelocity;
@@ -664,11 +664,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
-		Mathf::Vector3 position;
-		Mathf::Vector3 scale = { 1.0f, 1.0f, 1.0f };
-		Mathf::Quaternion rotation;
+		DirectX::SimpleMath::Vector3 position;
+		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Quaternion rotation;
 		dxMatrix.Decompose(scale, rotation, position);
-		dxMatrix = Mathf::Matrix::CreateScale(1.0f) * Mathf::Matrix::CreateFromQuaternion(rotation) * Mathf::Matrix::CreateTranslation(position);
+		dxMatrix = DirectX::SimpleMath::Matrix::CreateScale(1.0f) * DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 		CopyMatrixDxToPx(dxMatrix, pxTransform);
 		pxBody->setGlobalPose(pxTransform);
@@ -687,18 +687,18 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 	if (staticBody)
 	{
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
-		Mathf::Matrix dxMatrix = rigidBodyData.transform;
+		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
 		physx::PxTransform pxCurrTransform;
 		
-		Mathf::Vector3 position;
-		Mathf::Vector3 scale = { 1.0f, 1.0f, 1.0f };
-		Mathf::Quaternion rotation;
+		DirectX::SimpleMath::Vector3 position;
+		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Quaternion rotation;
 
 		dxMatrix.Decompose(scale, rotation, position);
-		dxMatrix = Mathf::Matrix::CreateScale(1.0f) * 
-			Mathf::Matrix::CreateFromQuaternion(rotation) * staticBody->GetOffsetRotation().Invert() *
-			Mathf::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
+		dxMatrix = DirectX::SimpleMath::Matrix::CreateScale(1.0f) * 
+			DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * staticBody->GetOffsetRotation().Invert() *
+			DirectX::SimpleMath::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
 
 		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
 	}
@@ -987,7 +987,7 @@ void PhysicX::RemoveAllCharacterInfo()
 	m_ragdollContainer.clear();
 }
 
-void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const Mathf::Vector3& extent)
+void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const DirectX::SimpleMath::Vector3& extent)
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
@@ -1045,7 +1045,7 @@ ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
 	auto ragdoll = articulationIter->second;
 
 	physx::PxTransform pxTransform = ragdoll->GetPxArticulation()->getRootGlobalPose();
-	Mathf::Matrix dxMatrix;
+	DirectX::SimpleMath::Matrix dxMatrix;
 	CopyMatrixPxToDx(pxTransform, dxMatrix);
 
 	data.WorldTransform = dxMatrix;

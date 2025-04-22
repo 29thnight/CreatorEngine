@@ -8,18 +8,18 @@ bool RagdollLink::Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink, 
 	m_parentLink = parentLink;
 
 	physx::PxTransform pxLocalTransform;
-	Mathf::Vector3 scale;
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 position;
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
 	m_localTransform.Decompose(scale, rotation, position);
 
 	//왜 스케일 적용을 안하는지? --> // 물리엔진에서 스케일을 적용하지 않기 때문
-	Mathf::Matrix dxTransform = Mathf::Matrix::CreateFromQuaternion(rotation) *
-		Mathf::Matrix::CreateTranslation(position);
+	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+		DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	if (parentLink == nullptr) {
 		//부모가 없는 경우
-		dxTransform *= Mathf::Matrix::CreateRotationZ(3.14f);
+		dxTransform *= DirectX::SimpleMath::Matrix::CreateRotationZ(3.14f);
 		CopyMatrixDxToPx(dxTransform, pxLocalTransform);
 
 		m_pxLink = pxArtriculation->createLink(nullptr, pxLocalTransform);
@@ -50,10 +50,10 @@ bool RagdollLink::Update()
 	return m_myJoint->Update(m_parentLink->GetPxLink());
 }
 
-physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const Mathf::Vector3& extent, CollisionData* collisionData)
+physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const DirectX::SimpleMath::Vector3& extent, CollisionData* collisionData)
 {
 	physx::PxVec3 pxExtent;
-	std::memcpy(&pxExtent, &extent, sizeof(Mathf::Vector3));
+	std::memcpy(&pxExtent, &extent, sizeof(DirectX::SimpleMath::Vector3));
 
 	physx::PxShape* shape = physx::PxRigidActorExt::createExclusiveShape(*m_pxLink, physx::PxBoxGeometry(pxExtent), *material);
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_pxLink, m_density);
@@ -118,17 +118,17 @@ bool RagdollLink::ChangeLayerNumber(const physx::PxFilterData& fillterData, Coll
 
 
 
-void RagdollLink::SetWorldTransform(const Mathf::Matrix& worldTransform)
+void RagdollLink::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTransform)
 {
-	Mathf::Matrix obejctTransform = worldTransform;
+	DirectX::SimpleMath::Matrix obejctTransform = worldTransform;
 
-	Mathf::Vector3 scale;
-	Mathf::Quaternion rotation;
-	Mathf::Vector3 position;
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
 	obejctTransform.Decompose(scale, rotation, position);
 
-	Mathf::Matrix dxTransform = Mathf::Matrix::CreateFromQuaternion(rotation) *
-		Mathf::Matrix::CreateTranslation(position) *
+	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+		DirectX::SimpleMath::Matrix::CreateTranslation(position) *
 		m_myJoint->GetLocalTransform().Invert();
 
 	physx::PxTransform pxTransform;

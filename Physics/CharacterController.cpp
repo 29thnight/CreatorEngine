@@ -78,7 +78,7 @@ void CharacterController::Update(float deltaTime)
 
 }
 
-void CharacterController::AddMovementInput(const Mathf::Vector3& input, bool isDynamic)
+void CharacterController::AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic)
 {
 	if (std::abs(input.x)>0)
 	{

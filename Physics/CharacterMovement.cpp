@@ -1,4 +1,5 @@
 #include "CharacterMovement.h"
+#include <algorithm>
 
 CharacterMovement::CharacterMovement() 
 	: m_isFall(false)
@@ -12,8 +13,8 @@ CharacterMovement::CharacterMovement()
 	, m_jumpXZDeceleration(0.0f)
 	, m_gravityWeight(0.0f)
 	, m_minDistance(0.1f)
-	, m_velocity(Mathf::Vector3::Zero)
-	, m_outVector(Mathf::Vector3::Zero)
+	, m_velocity(DirectX::SimpleMath::Vector3{})
+	, m_outVector(DirectX::SimpleMath::Vector3{})
 {
 }
 
@@ -34,7 +35,7 @@ void CharacterMovement::Initialize(const CharacterMovementInfo& info)
 	m_minDistance = 0.1f;
 }
 
-void CharacterMovement::Update(float deltaTime, const Mathf::Vector3& input, bool isDynamic)
+void CharacterMovement::Update(float deltaTime, const DirectX::SimpleMath::Vector3& input, bool isDynamic)
 {
 	if (!m_isFall)
 	{
