@@ -192,6 +192,7 @@ namespace Meta
 		{
 			cmd->Redo();
 			m_undoStack.push(std::move(cmd));
+            std::cout << "Execute" << std::endl;
 			while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack ÃÊ±âÈ­
 		}
 

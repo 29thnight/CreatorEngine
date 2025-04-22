@@ -118,7 +118,14 @@ void Scene::DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject)
 	{
 		return;
 	}
+
+	RemoveGameObjectName(sceneObject->GetHashedName().ToString());
+
 	sceneObject->Destroy();
+    for (auto& childIndex : sceneObject->m_childrenIndices)
+    {
+		DestroyGameObject(childIndex);
+    }
 }
 
 void Scene::DestroyGameObject(GameObject::Index index)
@@ -128,7 +135,13 @@ void Scene::DestroyGameObject(GameObject::Index index)
 		auto obj = m_SceneObjects[index];
 		if (nullptr != obj)
 		{
+            RemoveGameObjectName(obj->GetHashedName().ToString());
 			obj->Destroy();
+
+			for (auto& childIndex : obj->m_childrenIndices)
+			{
+				DestroyGameObject(childIndex);
+			}
 		}
 	}
 	else
@@ -214,31 +227,79 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::OnDisable()
 {
     OnDisableEvent.Broadcast();
-    for (auto& obj : m_SceneObjects)
-    {
-        if (obj->IsDestroyMark())
-        {
-			auto index = obj->m_index;
-            auto parentObj = GetGameObject(obj->m_parentIndex);
-            if (parentObj->m_index != index)
-            {
-                std::erase_if(parentObj->m_childrenIndices, [index](GameObject::Index childIndex)
-                {
-                    return childIndex == index;
-                });
-            }
-            obj.reset();
-        }
-    }
-
-    std::erase_if(m_SceneObjects, [](const auto& obj)
-    {
-        return nullptr == obj;
-    });
+    DestroyGameObjects();
 }
 
 void Scene::OnDestroy()
 {
     OnDestroyEvent.Broadcast();
+
+}
+
+void Scene::DestroyGameObjects()
+{
+    std::unordered_set<uint32_t> deletedIndices;
+    for (const auto& obj : m_SceneObjects)
+    {
+        if (obj && obj->IsDestroyMark())
+            deletedIndices.insert(obj->m_index);
+    }
+
+	if (deletedIndices.empty())
+		return;
+
+    for (const auto& obj : m_SceneObjects)
+    {
+        if (obj && deletedIndices.contains(obj->m_index))
+        {
+            for (auto childIdx : obj->m_childrenIndices)
+            {
+                if (GameObject::IsValidIndex(childIdx) &&
+                    childIdx < m_SceneObjects.size() &&
+                    m_SceneObjects[childIdx])
+                {
+                    m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
+                }
+            }
+        }
+    }
+
+    for (auto& obj : m_SceneObjects)
+    {
+        if (obj && deletedIndices.contains(obj->m_index))
+        {
+            obj->m_childrenIndices.clear();
+            obj.reset();
+        }
+    }
+    std::erase_if(m_SceneObjects, [](const auto& obj) { return obj == nullptr; });
+
+    std::unordered_map<uint32_t, uint32_t> indexMap;
+    for (uint32_t i = 0; i < m_SceneObjects.size(); ++i)
+    {
+        indexMap[m_SceneObjects[i]->m_index] = i;
+    }
+
+    for (auto& obj : m_SceneObjects)
+    {
+        uint32_t oldIndex = obj->m_index;
+
+        if (indexMap.contains(obj->m_parentIndex))
+            obj->m_parentIndex = indexMap[obj->m_parentIndex];
+        else
+            obj->m_parentIndex = GameObject::INVALID_INDEX;
+
+        for (auto& childIndex : obj->m_childrenIndices)
+        {
+            if (indexMap.contains(childIndex))
+                childIndex = indexMap[childIndex];
+            else
+                childIndex = GameObject::INVALID_INDEX;
+        }
+
+        std::erase_if(obj->m_childrenIndices, GameObject::IsInvalidIndex);
+
+        obj->m_index = indexMap[oldIndex];
+    }
 }
 

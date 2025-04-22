@@ -41,6 +41,13 @@ void AnimationJob::Update(float deltaTime)
 {
     Scene* scene = SceneManagers->GetActiveScene();
     uint32 currSize = scene->m_SceneObjects.size();
+
+    if (currSize < m_objectSize)
+    {
+        m_currAnimator.clear();
+        m_objectSize = 0;
+    }
+
     if(m_objectSize != currSize)
     {
         if(0 == m_objectSize)

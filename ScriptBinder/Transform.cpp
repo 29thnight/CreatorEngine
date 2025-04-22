@@ -74,6 +74,7 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	XMStoreFloat4(&scale, _scale);
 	XMStoreFloat4(&rotation, _rotation);
 
+
 	m_dirty = false;
 }
 

@@ -9,8 +9,6 @@ class SceneManager;
 struct ICollider;
 class Scene
 {
-private:
-
 public:
    ReflectScene
     [[Serializable]]
@@ -131,20 +129,8 @@ public:
         return m_lightProperties;
     }
 
-  //  ReflectionField(Scene)
-  //  {
-		//PropertyField
-		//({
-		//	meta_property(m_sceneName)
-		//	meta_property(m_buildIndex)
-  //          meta_property(m_SceneObjects)
-		//});
-		//	
-		//FieldEnd(Scene, PropertyOnly)
-  //  }
-
 private:
-	friend class SceneManager;
+    void DestroyGameObjects();
     std::string GenerateUniqueGameObjectName(const std::string_view& name)
     {
         std::string uniqueName{ name.data() };
@@ -157,6 +143,11 @@ private:
         m_gameObjectNameSet.insert(uniqueName);
         return uniqueName;
     }
+
+	void RemoveGameObjectName(const std::string_view& name)
+	{
+		m_gameObjectNameSet.erase(name.data());
+	}
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

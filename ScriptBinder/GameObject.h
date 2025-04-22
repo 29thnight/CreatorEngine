@@ -5,6 +5,8 @@
 #include "Transform.h"
 #include "GameObject.generated.h"
 
+
+
 class Scene;
 class Bone;
 class RenderScene;
@@ -15,7 +17,7 @@ class GameObject : public Object
 {
 public:
 	using Index = int;
-
+	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	enum class Type
 	{
 		Empty,
@@ -73,12 +75,22 @@ public:
 
     static GameObject* Find(const std::string_view& name);
 
+	static inline bool IsValidIndex(Index index)
+	{
+		return index != INVALID_INDEX;
+	}
+
+	static inline bool IsInvalidIndex(Index index)
+	{
+		return index == INVALID_INDEX;
+	}
+
     [[Property]]
 	Transform m_transform{};
     [[Property]]
-	GameObject::Index m_index;
+	GameObject::Index m_index{ INVALID_INDEX };
     [[Property]]
-	GameObject::Index m_parentIndex;
+	GameObject::Index m_parentIndex{ INVALID_INDEX };
 	//for bone update
     [[Property]]
 	GameObject::Index m_rootIndex{ 0 };
