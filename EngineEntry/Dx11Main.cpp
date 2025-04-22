@@ -25,6 +25,8 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get());
 	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
 	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
+	m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
+	m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
 
     //CreateScene
     SceneManagers->CreateScene();
@@ -38,6 +40,15 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
+        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_Z))
+        {
+			Meta::UndoCommandManager->Undo();
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_Y))
+        {
+			Meta::UndoCommandManager->Redo();
+        }
         //Mathf::Vector2 mousePos = InputManagement->GetMousePos();
         /*if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
           UIManagers->m_clickEvent.Broadcast(mousePos);*/
@@ -171,6 +182,11 @@ void DirectX11::Dx11Main::OnGui()
         m_imguiRenderer->Render();
         m_imguiRenderer->EndRender();
     }
+}
+
+void DirectX11::Dx11Main::DisableOrEnable()
+{
+	SceneManagers->DisableOrEnable();
 }
 
 // 릴리스가 필요한 디바이스 리소스를 렌더러에 알립니다.

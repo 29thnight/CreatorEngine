@@ -13,7 +13,7 @@ class MeshRenderer : public Component, public IRenderable
 public:
    ReflectMeshRenderer
     [[Serializable(Inheritance:Component)]]
-    GENERATED_BODY(MeshRenderer)
+   GENERATED_BODY(MeshRenderer);
 
     bool IsEnabled() const override
     {
@@ -30,8 +30,6 @@ public:
     Material* m_Material{ nullptr };
     [[Property]]
     Mesh* m_Mesh{ nullptr };
-    [[Property]]
-    Animator* m_Animator{ nullptr };
     [[Property]]
     LightMapping m_LightMapping;
 

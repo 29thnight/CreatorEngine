@@ -8,7 +8,8 @@
 
 void SceneManager::ManagerInitialize()
 {
-    REFLECTION_REGISTER_EXECUTE()
+    REFLECTION_REGISTER_EXECUTE();
+	ComponentFactorys->Initialize();
 }
 
 void SceneManager::Editor()

@@ -156,6 +156,12 @@
     <Filter Include="RenderPass\EffectPass\NodeEditor">
       <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Skeleton\Bone">
+      <UniqueIdentifier>{dedebb22-4667-41cf-a65e-94cc10e22ea1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Skeleton\Animation">
+      <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">

@@ -57,6 +57,9 @@
     <Filter Include="Window\HierarchyWindow">
       <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Window\ProjectCachedResourcesWindow">
+      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
@@ -155,6 +158,12 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\KeyState.cpp">
       <Filter>Manager\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
+      <Filter>Window\InspectorWindow</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

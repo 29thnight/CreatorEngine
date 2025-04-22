@@ -47,6 +47,7 @@
     <ClInclude Include="LogSystem.h" />
     <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="MetaAlias.h" />
+    <ClInclude Include="MetaStateCommand.h" />
     <ClInclude Include="MetaUtility.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />

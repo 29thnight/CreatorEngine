@@ -7,10 +7,12 @@
 class GameObject;
 class Scene;
 class LightController;
+class HierarchyWindow;
+class InspectorWindow;
 class RenderScene
 {
 public:
-	RenderScene();
+	RenderScene() = default;
 	~RenderScene();
 
 	Camera m_MainCamera;
@@ -28,15 +30,13 @@ public:
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
-	void EditorSceneObjectHierarchy();
-	void EditorSceneObjectInspector();
-
 	Scene* GetScene() { return m_currentScene; }
 	GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
 
 private:
+	friend class HierarchyWindow;
+	friend class InspectorWindow;
 	void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
-	void DrawSceneObject(const std::shared_ptr<GameObject>& obj);
 	
 	Scene* m_currentScene{};
 	AnimationJob m_animationJob{};

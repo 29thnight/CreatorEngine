@@ -258,6 +258,15 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 		material->SetBaseColor(1, 0, 1);
 	}
 
+	auto deleter = [&](Material* mat)
+	{
+		if (mat)
+		{
+			DeallocateResource<Material>(mat);
+		}
+	};
+	DataSystems->Materials[mesh->mName.C_Str()] = std::shared_ptr<Material>(material, deleter);
+
 	return material;
 }
 
@@ -425,6 +434,21 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
 			m_animator->m_Skeleton = m_model->m_Skeleton;
+		}
+
+		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+		{
+			uint32 meshId = node->m_meshes[0];
+			Mesh* mesh = m_model->m_Meshes[meshId];
+			Material* material = m_model->m_Materials[meshId];
+			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+			nextIndex = rootObject->m_index;
+			return;
 		}
 	}
 

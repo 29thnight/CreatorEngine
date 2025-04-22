@@ -134,23 +134,25 @@ private:
         fs::path newPath = dir / newName;
         fs::path oldMeta = oldPath.string() + ".meta";
         fs::path newMeta = newPath.string() + ".meta";
+        try
+        {
+            if (fs::exists(oldMeta)) 
+            {
 
-        if (fs::exists(oldMeta)) 
-        {
-            try 
-            {
-                fs::rename(oldMeta, newMeta);
-                std::cout << "[Meta Moved] " << oldMeta << " -> " << newMeta << std::endl;
+                    fs::rename(oldMeta, newMeta);
+                    std::cout << "[Meta Moved] " << oldMeta << " -> " << newMeta << std::endl;
+
             }
-            catch (const std::exception& e) 
+            else if (!fs::exists(newMeta)) 
             {
-                std::cerr << "Error moving .meta file: " << e.what() << std::endl;
+                CreateYamlMeta(newPath);
+                std::cout << "[Meta Created] " << newMeta << std::endl;
             }
+
         }
-        else if (!fs::exists(newMeta)) 
+        catch (const std::exception& e)
         {
-            CreateYamlMeta(newPath);
-            std::cout << "[Meta Created] " << newMeta << std::endl;
+            std::cerr << "Error moving .meta file: " << e.what() << std::endl;
         }
     }
 
@@ -163,6 +165,13 @@ private:
         {
             try 
             {
+				if (deletedFile.extension() == ".meta")
+				{
+					FileGuid guid = LoadGuidFromMeta(deletedFile);
+					m_assetMetaRegistry->Unregister(guid);
+					m_assetMetaRegistry->Unregister(deletedFile);
+				}
+
                 fs::remove(metaFile);
                 std::cout << "[Meta Deleted] " << metaFile << std::endl;
             }
@@ -170,13 +179,6 @@ private:
             {
                 std::cerr << "Error deleting .meta file: " << e.what() << std::endl;
             }
-        }
-
-        if (deletedFile.extension() == ".meta")
-        {
-            FileGuid guid = LoadGuidFromMeta(deletedFile);
-            m_assetMetaRegistry->Unregister(guid);
-			m_assetMetaRegistry->Unregister(deletedFile);
         }
     }
 

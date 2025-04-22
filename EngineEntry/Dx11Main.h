@@ -12,6 +12,8 @@
 #include "SceneViewWindow.h"
 #include "GameViewWindow.h"
 #include "MenuBarWindow.h"
+#include "HierarchyWindow.h"
+#include "InspectorWindow.h"
 
 #include <memory>
 #include <future>
@@ -29,6 +31,7 @@ namespace DirectX11
 		bool Render();
         void InfoWindow();
         void OnGui();
+		void DisableOrEnable();
 		void SceneFinalize();
 
 		// IDeviceNotify
@@ -46,6 +49,8 @@ namespace DirectX11
 		std::unique_ptr<SceneViewWindow> m_sceneViewWindow;
 		std::unique_ptr<GameViewWindow> m_gameViewWindow;
 		std::unique_ptr<MenuBarWindow> m_menuBarWindow;
+		std::unique_ptr<HierarchyWindow> m_hierarchyWindow;
+		std::unique_ptr<InspectorWindow> m_inspectorWindow;
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_SceneRenderingEventHandle;

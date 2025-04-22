@@ -76,6 +76,86 @@ void DataSystem::Finalize()
 
 void DataSystem::RenderForEditer()
 {
+	ImGui::ContextRegister("SelectMatarial", true, [&]()
+	{
+		static ImGuiTextFilter searchFilter;
+		float availableWidth = ImGui::GetContentRegionAvail().x;
+
+		static Material* select_material = nullptr;
+
+		const float tileWidth = 100.f;
+
+		int tileColumns = (int)(availableWidth / tileWidth);
+		tileColumns = (tileColumns > 0) ? tileColumns : 1;
+
+		searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+
+		ImTextureID iconTexture = (ImTextureID)ModelIcon->m_pSRV;
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), true, ImGuiWindowFlags_AlwaysUseWindowPadding))
+		{
+			const float tileSize = 100.0f;
+			float avail = ImGui::GetContentRegionAvail().x;
+			int columns = (int)(avail / tileSize);
+			if (columns < 1) columns = 1;
+
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
+			int count = 0;
+
+			for (auto& [name, Material] : Materials)
+			{
+				if (!searchFilter.PassFilter(name.c_str()))
+					continue;
+
+				if (count % columns != 0)
+					ImGui::SameLine();
+
+				ImGui::BeginGroup();
+
+				if (ImGui::ImageButton(name.c_str(), iconTexture, ImVec2(70, 70)))
+				{
+					if (ImGui::IsItemHovered())
+					{
+						select_material = Material.get();
+					}
+				}
+
+				ImGui::PushID(name.c_str());
+				ImGui::Button(name.c_str(), ImVec2(80, 30));
+				ImGui::PopID();
+				ImGui::EndGroup();
+
+				if (nullptr != select_material && 
+					ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				{
+					m_trasfarMaterial = select_material;
+					ImGui::GetContext("SelectMatarial").Close();
+				}
+
+				count++;
+			}
+
+			ImGui::PopStyleVar();
+		}
+		ImGui::EndChild();
+
+		ImGui::BeginChild("FileList", ImVec2(0, 50), true);
+		if (nullptr != select_material)
+		{
+			ImGui::Text(select_material->m_name.c_str());
+			ImGui::Text(select_material->m_fileGuid.ToString().c_str());
+		}
+		else
+		{
+			ImGui::Text("No Material Selected");
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+
+	}, ImGuiWindowFlags_NoScrollbar);
+	ImGui::GetContext("SelectMatarial").Close();
+
+
 	ImGui::ContextRegister(ICON_FA_FOLDER_OPEN " Content Browser", true, [&]()
 	{
 		static file::path DataDirectory = PathFinder::Relative();

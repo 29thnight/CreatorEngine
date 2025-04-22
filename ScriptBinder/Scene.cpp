@@ -112,6 +112,31 @@ std::shared_ptr<GameObject> Scene::GetGameObject(const std::string_view& name)
 	return nullptr;
 }
 
+void Scene::DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject)
+{
+	if (nullptr == sceneObject)
+	{
+		return;
+	}
+	sceneObject->Destroy();
+}
+
+void Scene::DestroyGameObject(GameObject::Index index)
+{
+	if (index < m_SceneObjects.size())
+	{
+		auto obj = m_SceneObjects[index];
+		if (nullptr != obj)
+		{
+			obj->Destroy();
+		}
+	}
+	else
+	{
+		return;
+	}
+}
+
 void Scene::Reset()
 {
 }
@@ -193,6 +218,15 @@ void Scene::OnDisable()
     {
         if (obj->IsDestroyMark())
         {
+			auto index = obj->m_index;
+            auto parentObj = GetGameObject(obj->m_parentIndex);
+            if (parentObj->m_index != index)
+            {
+                std::erase_if(parentObj->m_childrenIndices, [index](GameObject::Index childIndex)
+                {
+                    return childIndex == index;
+                });
+            }
             obj.reset();
         }
     }

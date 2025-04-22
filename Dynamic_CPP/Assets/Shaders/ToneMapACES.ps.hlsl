@@ -203,6 +203,6 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         toneMapped = colour.rgb;
         toneMapped = LinearToPQ(toneMapped);
     }
-        
+
     return float4(toneMapped, 1.f);
 }

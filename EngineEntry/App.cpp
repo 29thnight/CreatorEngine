@@ -82,6 +82,7 @@ void Core::App::Run()
 		{
 			m_deviceResources->Present();
 		}
+		m_main->DisableOrEnable();
 	});
 }
 

@@ -39,20 +39,7 @@ public:
 	Texture* m_curtexture{};
     [[Property]]
 	int curindex = 0;
-	//ReflectionFieldInheritance(ImageComponent, UIComponent)
-	//{
-	//	PropertyField
-	//	({
-	//		meta_property(curindex)
-	//	});
 
-	//	MethodField
-	//	({
-	//		meta_method(UpdateTexture)
-	//	});
-
-	//	FieldEnd(ImageComponent, PropertyAndMethodInheritance)
-	//};
 	//ndc좌표 {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };

@@ -25,6 +25,8 @@ public:
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
+	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
+	void DestroyGameObject(GameObject::Index index);
 
 private:
     friend class SceneManager;
