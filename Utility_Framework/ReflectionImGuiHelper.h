@@ -30,10 +30,6 @@ namespace Meta
                 ImGui::PushID(prop.name);
                 if (ImGui::InputInt(prop.name, &value))
                 {
-                   /* int prevValue = std::any_cast<int>(prop.getter(instance));
-                    UndoCommandManager->Execute(
-                        std::make_unique<PropertyChangeCommand<int>>(instance, prop, prevValue, value)
-                    );*/
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }

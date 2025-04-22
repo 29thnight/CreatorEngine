@@ -52,9 +52,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				selectedSceneObject->m_name.SetString(name);
 			}
-			Mathf::Vector4 position = selectedSceneObject->m_transform.position;
-			Mathf::Vector4 rotation = selectedSceneObject->m_transform.rotation;
-			Mathf::Vector4 scale = selectedSceneObject->m_transform.scale;
+			// 현재 트랜스폼 값
+			Mathf::Vector4& position = selectedSceneObject->m_transform.position;
+			Mathf::Vector4& rotation = selectedSceneObject->m_transform.rotation;
+			Mathf::Vector4& scale = selectedSceneObject->m_transform.scale;
+
+			// ===== POSITION =====
+			static bool editingPosition = false;
+			static Mathf::Vector4 prevPosition{};
 
 			float pyr[3]; // pitch yaw roll
 			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
@@ -68,54 +73,17 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				ImGui::Text("Position ");
 				ImGui::SameLine();
-				ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000);
-				ImGui::Text("Rotation");
-				ImGui::SameLine();
-				ImGui::DragFloat3("##Rotation", &pyr[0], 0.1f);
-				ImGui::Text("Scale     ");
-				ImGui::SameLine();
-				ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 10);
-
+				if (ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000))
 				{
-					for (float& i : pyr)
+					if (!editingPosition)
 					{
-						i *= Mathf::Deg2Rad;
+						prevPosition = position;
+						editingPosition = true;
 					}
-
-					rotation = XMQuaternionRotationRollPitchYaw(pyr[0], pyr[1], pyr[2]);
-
-					Mathf::Vector4 prevPosition = selectedSceneObject->m_transform.position;
-					Mathf::Vector4 prevRotation = selectedSceneObject->m_transform.rotation;
-					Mathf::Vector4 prevScale = selectedSceneObject->m_transform.scale;
-
-					if (prevScale != scale)
-					{
-						Meta::MakeCustomChangeCommand([=] 
-						{
-							selectedSceneObject->m_transform.scale = prevScale;
-							selectedSceneObject->m_transform.m_dirty = true;
-						},
-						[=]
-						{
-							selectedSceneObject->m_transform.scale = scale;
-							selectedSceneObject->m_transform.m_dirty = true;
-						});
-					}
-
-					if (prevRotation != rotation)
-					{
-						Meta::MakeCustomChangeCommand([=]
-						{
-							selectedSceneObject->m_transform.rotation = prevRotation;
-							selectedSceneObject->m_transform.m_dirty = true;
-						},
-						[=]
-						{
-							selectedSceneObject->m_transform.rotation = rotation;
-							selectedSceneObject->m_transform.m_dirty = true;
-						});
-					}
-
+					selectedSceneObject->m_transform.m_dirty = true;
+				}
+				if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
+				{
 					if (prevPosition != position)
 					{
 						Meta::MakeCustomChangeCommand([=]
@@ -129,6 +97,86 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							selectedSceneObject->m_transform.m_dirty = true;
 						});
 					}
+					editingPosition = false;
+				}
+
+				static bool editingRotation = false;
+				static Mathf::Vector4 prevRotation{};
+				static float prevEuler[3] = {};
+
+				float pyr[3];
+				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+				for (float& i : pyr) i *= Mathf::Rad2Deg;
+
+				ImGui::Text("Rotation ");
+				ImGui::SameLine();
+				if (ImGui::DragFloat3("##Rotation", pyr, 0.1f))
+				{
+					if (!editingRotation)
+					{
+						prevRotation = rotation;
+						prevEuler[0] = pyr[0];
+						prevEuler[1] = pyr[1];
+						prevEuler[2] = pyr[2];
+						editingRotation = true;
+					}
+					Mathf::Vector3 radianEuler(pyr[0] * Mathf::Deg2Rad, pyr[1] * Mathf::Deg2Rad, pyr[2] * Mathf::Deg2Rad);
+					rotation = XMQuaternionRotationRollPitchYaw(radianEuler.x, radianEuler.y, radianEuler.z);
+					selectedSceneObject->m_transform.m_dirty = true;
+				}
+				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
+				{
+					Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
+					Mathf::Vector4 compare = XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
+					if (compare != rotation)
+					{
+						Meta::MakeCustomChangeCommand([=]
+						{
+							selectedSceneObject->m_transform.rotation = prevRotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.rotation = rotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
+					}
+					editingRotation = false;
+				}
+
+				static bool editingScale = false;
+				static Mathf::Vector4 prevScale{};
+
+				ImGui::Text("Scale     ");
+				ImGui::SameLine();
+				if (ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
+				{
+					if (!editingScale)
+					{
+						prevScale = scale;
+						editingScale = true;
+					}
+					selectedSceneObject->m_transform.m_dirty = true;
+				}
+				if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
+				{
+					if (prevScale != scale)
+					{
+						Meta::MakeCustomChangeCommand([=]
+						{
+							selectedSceneObject->m_transform.scale = prevScale;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.scale = scale;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
+					}
+					editingScale = false;
+				}
+
+				{
 					selectedSceneObject->m_transform.GetLocalMatrix();
 				}
 			}

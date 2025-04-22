@@ -276,17 +276,48 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 	}
 
-	if (obj && !selectMode)
+if (obj && !selectMode)
+{
+	static XMMATRIX oldLocalMatrix{};
+	static bool wasDragging = false;
+
+	bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+	bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+	bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+
+	if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 	{
-		// 기즈모로 변환 후 오브젝트에 적용.
-		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
-
-		auto parentMat = m_sceneRenderer->m_currentScene->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-
-		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
-		obj->m_transform.SetLocalMatrix(newLocalMatrix);
+		oldLocalMatrix = obj->m_transform.GetLocalMatrix();
 	}
+
+	ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
+		nullptr, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+
+	XMMATRIX parentMat = m_sceneRenderer->m_currentScene->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+
+	bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
+
+	if (isWindowHovered && wasDragging && mouseReleased && matrixChanged)
+	{
+		Meta::MakeCustomChangeCommand(
+			[=] 
+			{ 
+				XMMATRIX copy = oldLocalMatrix;
+				obj->m_transform.SetLocalMatrix(copy);
+			},
+			[=] 
+			{ 
+				XMMATRIX copy = newLocalMatrix;
+				obj->m_transform.SetLocalMatrix(copy);
+			}
+		);
+	}
+
+	obj->m_transform.SetLocalMatrix(newLocalMatrix);
+	wasDragging = isDragging;
+}
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
 

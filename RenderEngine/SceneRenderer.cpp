@@ -578,6 +578,8 @@ void SceneRenderer::PrepareRender()
 
 		Material* mat = meshRenderer->m_Material;
 
+		if (nullptr == mat) continue;
+
 		switch (mat->m_renderingMode)
 		{
 		case MaterialRenderingMode::Opaque:
