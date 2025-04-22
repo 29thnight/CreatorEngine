@@ -62,7 +62,7 @@ inline float3 CalcNormalFromBumpMap(Texture2D bumpMap, float2 uv, SurfaceInfo su
 inline void CalcCommonLightInfo(SurfaceInfo surf, inout LightingInfo li)
 {
     li.H = normalize(li.L + surf.V);
-    li.NdotH = dot(surf.N, li.H);
+    li.NdotH = normalize(dot(surf.N, li.H));
     li.NdotL = dot(surf.N, li.L);
 }
 

@@ -59,6 +59,20 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 ImGui::EndMenu();
             }
+
+            float availRegion = ImGui::GetContentRegionAvail().x;
+
+            ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 0));
+
+            if (ImGui::Button(SceneManagers->m_isGameStart ? ICON_FA_STOP : ICON_FA_PLAY))
+            {
+				SceneManagers->m_isGameStart = !SceneManagers->m_isGameStart;
+            }
+
+			if (ImGui::Button(ICON_FA_PAUSE))
+			{
+			}
+
             ImGui::EndMainMenuBar();
         }
         ImGui::End();

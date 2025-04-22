@@ -12,20 +12,6 @@
 #include "ImageComponent.h"
 #include "UIManager.h"
 
-// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
-//int InputTextCallback(ImGuiInputTextCallbackData* data)
-//{
-//	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-//	{
-//		// UserData에 저장된 std::string 포인터를 가져옴
-//		std::string* str = static_cast<std::string*>(data->UserData);
-//		// 새로운 길이에 맞춰 std::string의 크기 재조정
-//		str->resize(data->BufTextLen);
-//		data->Buf = const_cast<char*>(str->c_str());
-//	}
-//	return 0;
-//}
-
 RenderScene::~RenderScene()
 {
 	//TODO : ComPtr이라 자동 해제 -> default로 변경할 것
@@ -39,35 +25,6 @@ void RenderScene::Initialize()
 {
 	m_MainCamera.RegisterContainer();
 	m_LightController = new LightController();
-	//EditorSceneObjectHierarchy();
-	//EditorSceneObjectInspector();
-
-	//animationJobThread = std::thread([&]
-	//{
-	//	using namespace std::chrono;
-
-	//	auto prev = high_resolution_clock::now();
-
-	//	while (true)
-	//	{
-	//		auto now = high_resolution_clock::now();
-	//		duration<float> elapsed = now - prev;
-
-	//		// 16.6ms ~ 60fps 에 맞춰 제한
-	//		if (elapsed.count() >= (1.0f / 60.0f))
-	//		{
-	//			prev = now;
-	//			float delta = elapsed.count();
-	//			m_animationJob.Update(delta);
-	//		}
-	//		else
-	//		{
-	//			std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
-	//		}
-	//	}
-	//});
-
-	//animationJobThread.detach();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)

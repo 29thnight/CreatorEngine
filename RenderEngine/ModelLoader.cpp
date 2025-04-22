@@ -427,11 +427,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	if (true == isRoot)
 	{
 		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObject::Type::Mesh, nextIndex);
-		if (nullptr != rootObject)
-		{
-
-		}
-
+		m_gameObjects.push_back(rootObject);
 		nextIndex = rootObject->m_index;
 		m_modelRootIndex = rootObject->m_index;
 
@@ -461,7 +457,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
-
+		m_gameObjects.push_back(object);
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[meshId];
@@ -477,6 +473,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
+		m_gameObjects.push_back(object);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -502,6 +499,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObject::Type::Bone, nextIndex);
+			m_gameObjects.push_back(boneObject);
 		}
 		else
 		{

@@ -66,6 +66,8 @@ private:
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
 	SkeletonLoader m_skeletonLoader;
 
+	std::vector<std::shared_ptr<GameObject>> m_gameObjects{};
+
 	Mathf::Vector3 min{};
 	Mathf::Vector3 max{};
 
