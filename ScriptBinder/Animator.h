@@ -17,6 +17,10 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
+    [[property]]
+    std::vector<std::string> aniName;
+   /* [[property]]
+    std::string aniName;*/
 
 public:
    ReflectAnimator

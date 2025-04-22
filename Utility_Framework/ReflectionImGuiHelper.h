@@ -99,6 +99,39 @@ namespace Meta
                 }
 				ImGui::PopID();
             }//[OverWatching]
+            else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
+            {
+                std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));
+                if (value.empty()) return;
+
+                int selectedIndex = 0; // 안전하게 관리할 방법이 있다면 외부에서 가져와도 됨
+
+                if (selectedIndex >= value.size())
+                    selectedIndex = 0;
+
+                const char* currentLabel = value[selectedIndex].c_str();
+
+                ImGui::PushID(prop.name);
+                if (ImGui::BeginCombo("Ani list", currentLabel))
+                {
+                    for (int i = 0; i < value.size(); ++i)
+                    {
+                        const bool isSelected = (selectedIndex == i);
+                        if (ImGui::Selectable(value[i].c_str(), isSelected))
+                        {
+                            selectedIndex = i;
+                            if (prop.setter)
+                                prop.setter(instance, value[i]);
+                        }
+
+                        if (isSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+
+                    ImGui::EndCombo();
+                }
+                ImGui::PopID();
+            }
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));
