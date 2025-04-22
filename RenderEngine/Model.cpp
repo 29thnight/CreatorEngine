@@ -156,6 +156,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	file::path path_ = model->path;
 
 	Benchmark banch;
+
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{

@@ -5,6 +5,7 @@
 #include "ResourceAllocator.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
+#include "SceneManager.h"
 
 ModelLoader::ModelLoader()
 {
@@ -426,6 +427,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	if (true == isRoot)
 	{
 		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObject::Type::Mesh, nextIndex);
+		if (nullptr != rootObject)
+		{
+
+		}
+
 		nextIndex = rootObject->m_index;
 		m_modelRootIndex = rootObject->m_index;
 

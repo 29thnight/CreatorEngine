@@ -257,6 +257,11 @@ void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 				}
 			}
 		}
+		if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto& lightmap_type = Meta::Find("LightMapping");
+			Meta::DrawProperties(&meshRenderer->m_LightMapping, *lightmap_type);
+		}
 
 		if (DataSystems->m_trasfarMaterial)
 		{
