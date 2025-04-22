@@ -13,6 +13,8 @@ public:
     void StartCoroutine(Coroutine<> coroutine);
     void StartCoroutine(const std::string& alias, Coroutine<> coroutine);
     void StopAllCoroutines();
+    void DestroyCoroutine();
+    void DestroyAllCoroutines();
     void yield_Null();
     void yield_StartCoroutine();
     void yield_WaitForSeconds();
@@ -100,4 +102,9 @@ inline YieldInstruction WaitForFixedUpdate()
 inline YieldInstruction WaitForEndOfFrame()
 {
     return YieldInstruction{ YieldInstructionType::WaitForEndOfFrame };
+}
+
+inline YieldInstruction ReturnNull()
+{
+    return YieldInstruction{ YieldInstructionType::Null };
 }

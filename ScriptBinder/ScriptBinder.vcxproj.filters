@@ -58,6 +58,15 @@
     <Filter Include="Classes\Components\UI">
       <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\UIManager">
+      <UniqueIdentifier>{4a6b8d53-6659-416d-b82d-18961450a23f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\SoundManager">
+      <UniqueIdentifier>{1c5fb144-16fb-4465-9b04-6989fed786ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent">
+      <UniqueIdentifier>{73674677-6778-4028-8951-143f6440393b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -78,9 +87,6 @@
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
     </ClCompile>
-    <ClCompile Include="UIManager.cpp">
-      <Filter>Managers</Filter>
-    </ClCompile>
     <ClCompile Include="ImageComponent.cpp">
       <Filter>Classes\Components\UI</Filter>
     </ClCompile>
@@ -99,6 +105,12 @@
     <ClCompile Include="ComponentFactory.cpp">
       <Filter>Classes\Components\ComponentFactory</Filter>
     </ClCompile>
+    <ClCompile Include="UIManager.cpp">
+      <Filter>Managers\UIManager</Filter>
+    </ClCompile>
+    <ClCompile Include="SoundManager.cpp">
+      <Filter>Managers\SoundManager</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
@@ -106,9 +118,6 @@
     </ClInclude>
     <ClInclude Include="IObject.h">
       <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderableComponents.h">
-      <Filter>Classes\Components</Filter>
     </ClInclude>
     <ClInclude Include="IRenderable.h">
       <Filter>Interfaces</Filter>
@@ -155,9 +164,6 @@
     <ClInclude Include="IFixedUpdatable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
-    <ClInclude Include="UIManager.h">
-      <Filter>Managers</Filter>
-    </ClInclude>
     <ClInclude Include="ImageComponent.h">
       <Filter>Classes\Components\UI</Filter>
     </ClInclude>
@@ -178,6 +184,27 @@
     </ClInclude>
     <ClInclude Include="ComponentFactory.h">
       <Filter>Classes\Components\ComponentFactory</Filter>
+    </ClInclude>
+    <ClInclude Include="UIManager.h">
+      <Filter>Managers\UIManager</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundManager.h">
+      <Filter>Managers\SoundManager</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderableComponents.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRenderer.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="LightMapping.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteRenderer.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="Animator.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -4,317 +4,26 @@
 #include "ImGuiRegister.h"
 #include "Benchmark.hpp"
 #include "RenderScene.h"
-#include "../ScriptBinder/SceneManager.h"
-#include "../ScriptBinder/Scene.h"
-#include "../ScriptBinder/RenderableComponents.h"
-#include "../ScriptBinder/ImageComponent.h"
-#include "../ScriptBinder/UIManager.h"
-#include "../ScriptBinder/UIButton.h"
-#include "../ScriptBinder/TextComponent.h"
+#include "SceneManager.h"
+#include "Scene.h"
+#include "RenderableComponents.h"
+#include "ImageComponent.h"
+#include "UIManager.h"
+#include "UIButton.h"
+#include "TextComponent.h"
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "TimeSystem.h"
-#include "../InputManager.h"
+#include "InputManager.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-
+#include "Trim.h"
 
 #include <iostream>
 #include <string>
 #include <regex>
 
 using namespace lm;
-#pragma region ImGuizmo
-#include "ImGuizmo.h"
-
-// Trim from the start (left)
-std::string ltrim(const std::string& s) {
-	std::string result = s;
-	result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char ch) {
-		return !std::isspace(ch);
-		}));
-	return result;
-}
-
-// Trim from the end (right)
-std::string rtrim(const std::string& s) {
-	std::string result = s;
-	result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char ch) {
-		return !std::isspace(ch);
-		}).base(), result.end());
-	return result;
-}
-
-// Trim from both ends
-std::string trim(const std::string& s) {
-	return ltrim(rtrim(s));
-}
-
-enum class SelectGuizmoMode
-{
-    Select,
-    Translate,
-    Rotate,
-    Scale
-};
-
-static const float identityMatrix[16] = { 
-	1.f, 0.f, 0.f, 0.f,
-	0.f, 1.f, 0.f, 0.f,
-	0.f, 0.f, 1.f, 0.f,
-	0.f, 0.f, 0.f, 1.f 
-};
-bool useWindow = true;
-bool editWindow = true;
-int gizmoCount = 1;
-float camDistance = 8.f;
-static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-
-
-void SceneRenderer::EditTransform(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, GameObject* obj, Camera* cam)
-{
-	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
-	static bool useSnap = false;
-	static float snap[3] = { 1.f, 1.f, 1.f };
-	static float bounds[] = { -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f };
-	static float boundsSnap[] = { 0.1f, 0.1f, 0.1f };
-	static bool boundSizing = false;
-	static bool boundSizingSnap = false;
-    static bool selectMode = false;
-    static enum class SelectGuizmoMode selectGizmoMode = SelectGuizmoMode::Translate;
-    static const char* buttons[] = {
-        ICON_FA_EYE,
-        ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
-        ICON_FA_ARROWS_ROTATE,
-        ICON_FA_GROUP_ARROWS_ROTATE
-    };
-    static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
-
-	ImGuizmo::SetOrthographic(m_pEditorCamera->m_isOrthographic);
-	ImGuizmo::BeginFrame();
-
-    if (ImGui::IsKeyPressed(ImGuiKey_T))
-        selectGizmoMode = SelectGuizmoMode::Translate;
-    if (ImGui::IsKeyPressed(ImGuiKey_R))
-        selectGizmoMode = SelectGuizmoMode::Rotate;
-    if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
-        selectGizmoMode = SelectGuizmoMode::Scale;
-    if (ImGui::IsKeyPressed(ImGuiKey_F))
-        useSnap = !useSnap;
-    if (ImGui::IsKeyPressed(ImGuiKey_V))
-        selectGizmoMode = SelectGuizmoMode::Select;
-
-	ImGuiIO& io = ImGui::GetIO();
-	float viewManipulateRight = io.DisplaySize.x;
-	float viewManipulateTop = 0;
-	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-	if (useWindow)
-	{
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 1.f));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0,0));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
-		ImGui::Begin(ICON_FA_USERS_VIEWFINDER "  Scene      ", 0, gizmoWindowFlags);
-		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
-		ImGuizmo::SetDrawlist();
-
-		float windowWidth = (float)ImGui::GetWindowWidth();
-		float windowHeight = (float)ImGui::GetWindowHeight();
-		ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
-		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
-		viewManipulateTop = ImGui::GetWindowPos().y;
-		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
-
-		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
-		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
-
-		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
-
-        ImVec2 imagePos = ImGui::GetItemRectMin();
-        ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
-
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
-		if(ImGui::Button(ICON_FA_CHART_BAR))
-		{
-			ImGui::OpenPopup("RenderStatistics");
-		}
-		ImGui::PopStyleVar();
-
-		ImGui::SameLine();
-		ImVec2 currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-		if (ImGui::Button(ICON_FA_BARS " Grid"))
-		{
-			m_bShowGridSettings = true;
-		}
-
-		ImGui::SameLine();
-
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-
-		if (ImGui::Button(m_pEditorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
-		{
-			m_pEditorCamera->m_isOrthographic = !m_pEditorCamera->m_isOrthographic;
-		}
-
-        ImGui::SameLine();
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-
-		if (ImGui::Button(ICON_FA_CAMERA " Camera"))
-		{
-            ImGui::OpenPopup("CameraSettings");
-		}
-
-        ImGui::SameLine();
-        currentPos = ImGui::GetCursorScreenPos();
-        ImGui::SetCursorScreenPos(ImVec2(windowWidth - 250.f, currentPos.y));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
-        for (int i = 0; i < buttonCount; i++)
-        {
-            // 선택된 버튼은 활성화 색상, 나머지는 비활성화 색상으로 설정합니다.
-            if (i == (int)selectGizmoMode)
-            {
-                // 활성화된 버튼 색상 (예: 녹색 계열)
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
-            }
-            else
-            {
-                // 비활성화된 버튼 색상 (예: 회색 계열)
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
-            }
-
-            // 버튼 렌더링: 버튼을 클릭하면 선택된 인덱스를 업데이트합니다.
-            if (ImGui::Button(buttons[i]))
-            {
-                selectGizmoMode = (SelectGuizmoMode)i;
-            }
-
-            ImGui::SameLine();
-            currentPos = ImGui::GetCursorScreenPos();
-            ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
-
-            // PushStyleColor 호출마다 PopStyleColor를 호출해 원래 상태로 복원합니다.
-            ImGui::PopStyleColor();
-        }
-        ImGui::PopStyleVar(1);
-
-
-        if (editTransformDecomposition)
-        {
-            switch (selectGizmoMode)
-            {
-            case SelectGuizmoMode::Select:
-                selectMode = true;
-                break;
-            case SelectGuizmoMode::Translate:
-                mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-                selectMode = false;
-                break;
-            case SelectGuizmoMode::Rotate:
-                mCurrentGizmoOperation = ImGuizmo::ROTATE;
-                selectMode = false;
-                break;
-            case SelectGuizmoMode::Scale:
-                mCurrentGizmoOperation = ImGuizmo::SCALE;
-                selectMode = false;
-                break;
-            default:
-                break;
-            }
-        }
-
-		ImGui::PopStyleVar(2);
-
-		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.f);
-		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.1f, 0.1f, 0.1f, 0.8f));
-		ImGui::PushFont(DataSystems->GetSmallFont());
-        if (ImGui::BeginPopup("CameraSettings"))
-        {
-            ImGui::Text("Camera Settings");
-            ImGui::Separator();
-            ImGui::InputFloat("FOV  ", &cam->m_fov);
-			if (0 == cam->m_fov)
-			{
-				cam->m_fov = 1.f;
-			}
-            ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
-            ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
-            ImGui::EndPopup();
-        }
-
-		if (ImGui::BeginPopup("RenderStatistics"))
-		{
-			ImGui::Text("Render Statistics");
-			ImGui::Separator();
-			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
-			ImGui::Text("Screen Size: %d x %d", (int)DeviceState::g_ClientRect.width, (int)DeviceState::g_ClientRect.height);
-			//Draw Call Count
-			ImGui::Text("Draw Call Count: %d", DirectX11::GetDrawCallCount());
-			ImGui::Separator();
-			ImGui::Text("ShadowMapPass: %.5f ms", RenderStatistics->GetRenderState("ShadowMapPass"));
-			ImGui::Text("GBufferPass: %.5f ms", RenderStatistics->GetRenderState("GBufferPass"));
-			ImGui::Text("SSAOPass: %.5f ms", RenderStatistics->GetRenderState("SSAOPass"));
-			ImGui::Text("DeferredPass: %.5f ms", RenderStatistics->GetRenderState("DeferredPass"));
-			ImGui::Text("ForwardPass: %.5f ms", RenderStatistics->GetRenderState("ForwardPass"));
-			ImGui::Text("LightMapPass: %.5f ms", RenderStatistics->GetRenderState("LightMapPass"));
-			ImGui::Text("WireFramePass: %.5f ms", RenderStatistics->GetRenderState("WireFramePass"));
-			ImGui::Text("SkyBoxPass: %.5f ms", RenderStatistics->GetRenderState("SkyBoxPass"));
-			ImGui::Text("PostProcessPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
-			ImGui::Text("AAPass: %.5f ms", RenderStatistics->GetRenderState("AAPass"));
-			ImGui::Text("ToneMapPass: %.5f ms", RenderStatistics->GetRenderState("ToneMapPass"));
-			ImGui::Text("GridPass: %.5f ms", RenderStatistics->GetRenderState("GridPass"));
-			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
-			ImGui::Text("UIPass: %.5f ms", RenderStatistics->GetRenderState("UIPass"));
-			ImGui::Text("BlitPass: %.5f ms", RenderStatistics->GetRenderState("BlitPass"));
-			ImGui::EndPopup();
-		}
-		ImGui::PopFont();
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
-	}
-	else
-	{
-		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-	}
-
-	if (obj && !selectMode)
-	{
-		// 기즈모로 변환 후 오브젝트에 적용.
-		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix, NULL, useSnap ? &snap[0] : NULL, boundSizing ? bounds : NULL, boundSizingSnap ? boundsSnap : NULL);
-
-		auto parentMat = m_currentScene->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
-		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-
-		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
-		obj->m_transform.SetLocalMatrix(newLocalMatrix);
-	}
-
-	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
-
-	{
-		// 기즈모로 변환된 카메라 위치, 회전 적용
-		XMVECTOR poss;
-		XMVECTOR rots;
-		XMVECTOR scales;
-		XMMatrixDecompose(&scales, &rots, &poss, XMMatrixInverse(nullptr, XMMATRIX(cameraView)));
-		cam->m_eyePosition = poss;
-		cam->m_rotation = rots;
-
-		XMVECTOR rotDir = XMVector3Rotate(cam->FORWARD, rots);
-
-		cam->m_forward = rotDir;
-	}
-
-	if (useWindow)
-	{
-		ImGui::End();
-		ImGui::PopStyleColor(2);
-	}
-}
-#pragma endregion
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
 	m_deviceResources(deviceResources)
@@ -434,11 +143,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
     m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
-
-	
-
 }
-
 
 void SceneRenderer::InitializeDeviceState()
 {
@@ -459,67 +164,6 @@ void SceneRenderer::InitializeDeviceState()
 void SceneRenderer::InitializeImGui()
 {
     static int lightIndex = 0;
-
-	ImGui::ContextRegister("RenderPass", true, [&]()
-	{
-		if (ImGui::CollapsingHeader("ShadowPass"))
-		{
-			m_renderScene->m_LightController->m_shadowMapPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("SSAOPass"))
-		{
-			m_pSSAOPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("DeferredPass"))
-		{
-			m_pDeferredPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("SkyBoxPass"))
-		{
-			m_pSkyBoxPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("ToneMapPass"))
-		{
-			m_pToneMapPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("SpritePass"))
-		{
-			m_pSpritePass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("AAPass"))
-		{
-			m_pAAPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("BlitPass"))
-		{
-			m_pBlitPass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("WireFramePass"))
-		{
-			m_pWireFramePass->ControlPanel();
-		}
-
-		if (ImGui::CollapsingHeader("GridPass"))
-		{
-			m_pGridPass->ControlPanel();
-		}
-
-		ImGui::Spacing();
-		if (ImGui::CollapsingHeader("PostProcessPass"))
-		{
-			m_pPostProcessingPass->ControlPanel();
-		}
-	});
-
-	ImGui::GetContext("RenderPass").Close();
 
     ImGui::ContextRegister("Light", true, [&]()
     {
@@ -717,21 +361,16 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-
-	
-	
-	std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("test.jpg"), []() {std::cout << "soooo angry" << std::endl;} , { 1360, 540 });
-	std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;},{ 560,540 });
-	UIManagers->SelectUI = Angryy2.get();
-	Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
-	Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
-	std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImagegg2", DataSystems->LoadTexture("test2.png"));
-	test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"DNF2.SFont"));
-	test->GetComponent<TextComponent>()->SetMessage("안녕");
-	std::shared_ptr<GameObject> text = UIManagers->MakeText("Text", DataSystems->LoadSFont(L"DNF2.SFont"));
-	text->GetComponent<TextComponent>()->SetMessage("그건 불가능함");
-
-
+	//std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("test.jpg"), []() {std::cout << "soooo angry" << std::endl;} , { 1360, 540 });
+	//std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;},{ 560,540 });
+	//UIManagers->SelectUI = Angryy2.get();
+	//Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
+	//Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
+	//std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImagegg2", DataSystems->LoadTexture("test2.png"));
+	//test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"DNF2.SFont"));
+	//test->GetComponent<TextComponent>()->SetMessage("안녕");
+	//std::shared_ptr<GameObject> text = UIManagers->MakeText("Text", DataSystems->LoadSFont(L"DNF2.SFont"));
+	//text->GetComponent<TextComponent>()->SetMessage("그건 불가능함");
 
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
@@ -749,29 +388,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
-
-	//model[0] = Model::LoadModel(PathFinder::Relative("Models\\plane.fbx").string());
-	//model[1] = Model::LoadModel(PathFinder::Relative("Models\\damit.glb").string());
-	//model[2] = Model::LoadModel(PathFinder::Relative("Models\\sphere.fbx").string());
-	//model[3] = Model::LoadModel(PathFinder::Relative("Models\\SkinningTest.fbx").string());
-	//model[4] = Model::LoadModel(PathFinder::Relative("Models\\bangbooExport.fbx").string());
-
-	//ImGui::ContextRegister("Test Add Model", true, [&]()
-	//{
-	//	static int num = 0;
-	//	std::string modelname = "Add : " + model[num]->name;
-	//	if (ImGui::Button(modelname.c_str())) {
-	//		Model::LoadModelToScene(model[num], *m_currentScene);
-	//	}
-	//	if (ImGui::Button("+")) {
-	//		num++;
-	//		if (num > 4) { num = 4; }
-	//	}
-	//	if (ImGui::Button("-")) {
-	//		num--;
-	//		if (num < 0) { num = 0; }
-	//	}
-	//});
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -875,14 +491,14 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//[*] PostProcessPass
-		{
-			DirectX11::BeginEvent(L"PostProcessPass");
-			Benchmark banch;
-			m_pPostProcessingPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
+        //[*] PostProcessPass
+        {
+            DirectX11::BeginEvent(L"PostProcessPass");
+            Benchmark banch;
+            m_pPostProcessingPass->Execute(*m_renderScene, *camera);
+            RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
+            DirectX11::EndEvent();
+        }
 
 		//[6] AAPass
 		{
@@ -1011,91 +627,6 @@ void SceneRenderer::ReloadShaders()
 
 void SceneRenderer::EditorView()
 {
-    ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
-    float height = ImGui::GetFrameHeight();
-
-    if (ImGui::BeginViewportSideBar("##MainMenuBar", viewport, ImGuiDir_Up, height, window_flags))
-    {
-        if (ImGui::BeginMainMenuBar())
-        {
-            if (ImGui::BeginMenu("File"))
-            {
-				if (ImGui::MenuItem("Save Current Scene"))
-				{
-					//Test
-					SceneManagers->SaveScene();
-				}
-				if (ImGui::MenuItem("Load Scene"))
-				{
-					SceneManagers->LoadScene();
-				}
-                if (ImGui::MenuItem("Exit"))
-                {
-                    // Exit action
-                    PostQuitMessage(0);
-                }
-                ImGui::EndMenu();
-
-            }
-
-            if (ImGui::BeginMenu("Edit"))
-            {
-                if (ImGui::MenuItem("Pipeline Setting"))
-                {
-                    if (!ImGui::GetContext("RenderPass").IsOpened())
-                    {
-                        ImGui::GetContext("RenderPass").Open();
-                    }
-                }
-
-                ImGui::EndMenu();
-            }
-
-			if (ImGui::BeginMenu("Bake Lightmap"))
-			{
-				if (ImGui::MenuItem("LightMap Window"))
-				{
-					if (!ImGui::GetContext("LightMap").IsOpened())
-					{
-						ImGui::GetContext("LightMap").Open();
-					}
-				}
-				ImGui::EndMenu();
-			}
-            ImGui::EndMainMenuBar();
-        }
-        ImGui::End();
-    }
-	static bool m_bShowContentsBrowser = false;
-    if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
-        if (ImGui::BeginMenuBar())
-        {
-			if (ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer"))
-			{
-				m_bShowContentsBrowser = !m_bShowContentsBrowser;
-			}
-
-			if (m_bShowContentsBrowser)
-			{
-				DataSystems->OpenContentsBrowser();
-			}
-			else
-			{
-				DataSystems->CloseContentsBrowser();
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_CODE " Output Log "))
-			{
-				m_bShowLogWindow = true;
-			}
-
-            ImGui::EndMenuBar();
-        }
-        ImGui::End();
-    }
-
 	if (m_bShowLogWindow)
 	{
 		ShowLogWindow();
@@ -1105,61 +636,6 @@ void SceneRenderer::EditorView()
 	{
 		ShowGridSettings();
 	}
-
-	auto obj = m_renderScene->GetSelectSceneObject();
-	if (obj) 
-	{
-		auto mat = obj->m_transform.GetWorldMatrix();
-		XMFLOAT4X4 objMat;
-		XMStoreFloat4x4(&objMat, mat);
-		auto view = m_pEditorCamera->CalculateView();
-		XMFLOAT4X4 floatMatrix;
-		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_pEditorCamera->CalculateProjection();
-		XMFLOAT4X4 projMatrix;
-		XMStoreFloat4x4(&projMatrix, proj);
-
-		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &objMat.m[0][0], true, obj, m_pEditorCamera.get());
-
-	}
-	else
-	{
-		auto view = m_pEditorCamera->CalculateView();
-		XMFLOAT4X4 floatMatrix;
-		XMStoreFloat4x4(&floatMatrix, view);
-		auto proj = m_pEditorCamera->CalculateProjection();
-		XMFLOAT4X4 projMatrix;
-		XMStoreFloat4x4(&projMatrix, proj);
-		XMFLOAT4X4 identityMatrix;
-		XMStoreFloat4x4(&identityMatrix, XMMatrixIdentity());
-
-		EditTransform(&floatMatrix.m[0][0], &projMatrix.m[0][0], &identityMatrix.m[0][0], false, nullptr, m_pEditorCamera.get());
-	}
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin(ICON_FA_GAMEPAD "  Game        ", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
-	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
-	{
-		ImVec2 windowPos = ImGui::GetWindowPos();
-		ImVec2 availRegion = ImGui::GetContentRegionAvail();
-
-		float imageHeight = availRegion.y;
-		float imageWidth = imageHeight * DeviceState::g_aspectRatio;
-
-		if (imageWidth > availRegion.x) {
-			imageWidth = availRegion.x;
-			imageHeight = imageWidth / DeviceState::g_aspectRatio;
-		}
-
-		ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
-		ImVec2 offset = ImVec2((availRegion.x - imageSize.x) * 0.5f, (availRegion.y - imageSize.y) * 0.5f);
-		ImVec2 currentPos = ImGui::GetCursorPos();
-		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
-
-		ImGui::Image((ImTextureID)m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, imageSize);
-	}
-	ImGui::End();
-	ImGui::PopStyleVar();
 }
 
 void SceneRenderer::ShowLogWindow()
@@ -1237,8 +713,6 @@ void SceneRenderer::ShowLogWindow()
 	}
 
 	ImGui::End();
-
-
 }
 
 void SceneRenderer::ShowGridSettings()

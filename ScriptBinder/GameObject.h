@@ -1,8 +1,9 @@
 #pragma once
+#include "HotLoadSystem.h"
 #include "Object.h"
 #include "Component.h"
 #include "Transform.h"
-#include "HotLoadSystem.h"
+#include "GameObject.generated.h"
 
 class Scene;
 class Bone;
@@ -10,7 +11,7 @@ class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
 class LightComponent;
-class GameObject : public Object, public Meta::IReflectable<GameObject>
+class GameObject : public Object
 {
 public:
 	using Index = int;
@@ -25,7 +26,10 @@ public:
 		TypeMax
 	};
 
+   ReflectGameObject
+    [[Serializable(Inheritance:Object)]]
 	GameObject();
+
 	GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
@@ -69,45 +73,32 @@ public:
 
     static GameObject* Find(const std::string_view& name);
 
+    [[Property]]
 	Transform m_transform{};
+    [[Property]]
 	GameObject::Index m_index;
+    [[Property]]
 	GameObject::Index m_parentIndex;
 	//for bone update
+    [[Property]]
 	GameObject::Index m_rootIndex{ 0 };
+    [[Property]]
 	std::vector<GameObject::Index> m_childrenIndices;
 
-    ReflectionFieldInheritance(GameObject, Object)
-    {
-        PropertyField
-        ({
-			meta_property(m_transform)
-            meta_property(m_index)
-            meta_property(m_parentIndex)
-            meta_property(m_rootIndex)
-            meta_property(m_childrenIndices)
-			meta_property(m_components)
-        });
-
-        FieldEnd(GameObject, PropertyOnlyInheritance)
-    }
-
-	friend class SceneManager;
-	friend class RenderScene;
-	friend class ModelLoader;
-	friend class HotLoadSystem;
-
-private:
+public:
 	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
 	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	
 	HashingString m_tag{};
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
+    [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
 
 	//debug layer
 	Bone* selectedBone{ nullptr };
 };
+
 
 #include "GameObejct.inl"
 

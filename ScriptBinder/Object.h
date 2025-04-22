@@ -3,11 +3,15 @@
 #include "IObject.h"
 #include "TypeTrait.h"
 #include "HashingString.h"
+#include "Object.generated.h"
 
+class RenderScene;
 class SceneManager;
 class Object : public IObject
 {
 public:
+   ReflectObject
+    [[Serializable]]
     Object() = default;
     virtual ~Object() = default;
 
@@ -32,22 +36,26 @@ public:
 
     void SetDontDestroyOnLoad(Object* objPtr);
 
-    ReflectionField(Object)
-    {
-        PropertyField
-        ({
-            meta_property(m_name)
-            meta_property(m_instanceID)
-        });
+    //ReflectionField(Object)
+    //{
+    //    PropertyField
+    //    ({
+    //        meta_property(m_name)
+    //        meta_property(m_instanceID)
+    //    });
 
-        FieldEnd(Object, PropertyOnly)
-    }
+    //    FieldEnd(Object, PropertyOnly)
+    //}
+public:
+    [[Property]]
+    HashingString     m_name{ "Object" };
 
 protected:
-    friend SceneManager;
+    friend class SceneManager;
+    friend class RenderScene;
 	HashedGuid        m_typeID{ TypeTrait::GUIDCreator::GetTypeID<Object>() };
+    [[Property]]
     HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-    HashingString     m_name{ "Object" };
     std::atomic<bool> m_destroyMark{ false };
     std::atomic<bool> m_dontDestroyOnLoad{ false };
 };

@@ -28,6 +28,16 @@ public:
         return result;
     }
 
+    T operator()(void)
+    {
+        return this->Generate();
+    }
+
+    std::vector<T> operator()(size_t count)
+    {
+        return this->Generate(count);
+    }
+
 private:
     std::random_device  _device;
     std::mt19937        _generator;

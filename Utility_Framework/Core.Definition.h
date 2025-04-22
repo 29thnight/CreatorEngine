@@ -14,6 +14,7 @@
 #include <d3dcommon.h>
 #include <directxtk/DDSTextureLoader.h>
 #include <directxtk/WICTextureLoader.h>
+#include <DirectXTK/SpriteBatch.h>
 #include <DirectXTex.h>
 #include <DirectXMath.h>
 #include <directxtk/simplemath.h>

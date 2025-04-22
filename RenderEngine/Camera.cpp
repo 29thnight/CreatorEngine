@@ -1,5 +1,5 @@
 #include "Camera.h"
-#include "../InputManager.h"
+#include "InputManager.h"
 #include "DeviceState.h"
 #include "ImGuiRegister.h"
 

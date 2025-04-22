@@ -3,10 +3,11 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
+#include "UIComponent.generated.h"
 
 extern float MaxOreder;
 
-//æ∆¡˜æ»æ∏ 
+//ÏïÑÏßÅÏïàÏîÄ 
 enum class UItype
 {
 	Image,
@@ -25,6 +26,8 @@ enum class Direction
 class UIComponent : public Component, public IRenderable
 {
 public:
+   ReflectUIComponent
+    [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(UIComponent)
 
 	bool IsEnabled() const override
@@ -42,24 +45,14 @@ public:
 	void SetNavi(Direction dir, GameObject* otherUI);
 	GameObject* GetNextNavi(Direction dir);
 
-	
+    [[Property]]
 	int _layerorder;
 	Mathf::Vector3 pos{ 960,540,0 };
 	Mathf::Vector2 scale{ 1,1};
 	UItype type = UItype::None;
 
-	ReflectionField(UIComponent)
-	{
-		PropertyField
-		({
-			meta_property(m_IsEnabled)
-			meta_property(_layerorder)
-		});
-
-		FieldEnd(UIComponent, PropertyOnly)
-	}
-
 protected:
+    [[Property]]
 	bool m_IsEnabled = true;
 private:
 	std::unordered_map<Direction, GameObject*> navigation;

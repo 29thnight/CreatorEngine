@@ -197,11 +197,158 @@ namespace lm {
 		//std::cout << "Efficiency: " << efficiency << "%\n";
 	}
 
-	void LightMap::DrawRectangles(
+	int LightMap::DrawRectangles(
 		const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
 		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
 	)
 	{
+		// vector size 초기화.
+		int indices = 0;
+		m_trianglesInScene.clear();
+		m_triIndices.clear();
+		bvhNodes.clear();
+		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
+			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
+			if (meshrenderer == nullptr) continue;
+			if (meshrenderer->m_Mesh == nullptr) continue;
+			indices += meshrenderer->m_Mesh->GetIndices().size() - 2;
+		}
+		m_trianglesInScene.reserve(indices);
+		m_triIndices.reserve(indices);
+
+		int index = 0;
+		// 씬의 모든 삼각형을 가져옴.
+		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
+			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
+			if (meshrenderer == nullptr) continue;
+			auto& m = meshrenderer->m_Mesh;
+			//auto& name = m->GetName();
+			auto& indices = m->GetIndices();
+			auto& vertices = m->GetVertices();
+			auto worldMatrix = mesh->m_transform.GetWorldMatrix();
+			for (int i = 0; i < indices.size() - 2; i++) {
+				Triangle t{};
+				int i0 = indices[i];
+				int i1 = indices[i + 1];
+				int i2 = indices[i + 2];
+				t.v0 = XMVector4Transform(XMVectorSet(vertices[i0].position.x, vertices[i0].position.y, vertices[i0].position.z, 1.f), worldMatrix);
+				t.v1 = XMVector4Transform(XMVectorSet(vertices[i1].position.x, vertices[i1].position.y, vertices[i1].position.z, 1.f), worldMatrix);
+				t.v2 = XMVector4Transform(XMVectorSet(vertices[i2].position.x, vertices[i2].position.y, vertices[i2].position.z, 1.f), worldMatrix);
+				t.n0 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i0].normal.x, vertices[i0].normal.y, vertices[i0].normal.z, 0.f), worldMatrix));
+				t.n1 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i1].normal.x, vertices[i1].normal.y, vertices[i1].normal.z, 0.f), worldMatrix));
+				t.n2 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i2].normal.x, vertices[i2].normal.y, vertices[i2].normal.z, 0.f), worldMatrix));
+				t.v0.m128_f32[3] = 1;
+				t.v1.m128_f32[3] = 1;
+				t.v2.m128_f32[3] = 1;
+				t.n0.m128_f32[3] = 0;
+				t.n1.m128_f32[3] = 0;
+				t.n2.m128_f32[3] = 0;
+				auto& litmaping = meshrenderer->m_LightMapping;
+				t.uv0 = (vertices[i0].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.uv1 = (vertices[i1].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.uv2 = (vertices[i2].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV0 = (vertices[i0].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV1 = (vertices[i1].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV2 = (vertices[i2].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapIndex = litmaping.lightmapIndex;
+				m_trianglesInScene.push_back(t);
+				m_triIndices.push_back(index++);
+			}
+		}
+
+		BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size() - 1);
+
+		// triangle buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(Triangle) * m_trianglesInScene.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(Triangle);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = m_trianglesInScene.data();
+
+			ID3D11Buffer* triangleBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &triangleBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)m_trianglesInScene.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(triangleBuffer, &srvDesc, &TriangleBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for triangle buffer.");
+			else {
+				Debug->Log("Triangle buffer created successfully.");
+			}
+		}
+		// indice buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(int) * m_triIndices.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(int);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = m_triIndices.data();
+
+			ID3D11Buffer* indiceBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &indiceBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)m_triIndices.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(indiceBuffer, &srvDesc, &TriangleIndiceBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for Indice buffer.");
+			else {
+				Debug->Log("Indice buffer created successfully.");
+			}
+		}
+		// BVH buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(BVHNode) * bvhNodes.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(BVHNode);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = bvhNodes.data();
+
+			ID3D11Buffer* bvhBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &bvhBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)bvhNodes.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(bvhBuffer, &srvDesc, &BVHBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for BVH buffer.");
+			else {
+				Debug->Log("BVH buffer created successfully.");
+			}
+		}
+
+		DirectX11::CSSetShaderResources(10, 1, &TriangleBufferSRV);
+		DirectX11::CSSetShaderResources(11, 1, &TriangleIndiceBufferSRV);
+		DirectX11::CSSetShaderResources(12, 1, &BVHBufferSRV);
+
+
+
 		int lightmapIndex = 0;
 
 		for (auto& lightmap : lightmaps)
@@ -396,97 +543,13 @@ namespace lm {
 			DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
 		}
 
-
+		return indices;
 	}
 
-	void LightMap::DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
+	void LightMap::DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass, int indices)
 	{
-		// vector size 초기화.
-		int indices = 0;
-		m_trianglesInScene.clear();
-		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
-			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
-			if (meshrenderer == nullptr) continue;
-			if (meshrenderer->m_Mesh == nullptr) continue;
-			indices += meshrenderer->m_Mesh->GetIndices().size() - 2;
-		}
-		m_trianglesInScene.reserve(indices);
-		m_triIndices.reserve(indices);
-
-		int index = 0;
-		// 씬의 모든 삼각형을 가져옴.
-		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
-			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
-			if (meshrenderer == nullptr) continue;
-			auto& m = meshrenderer->m_Mesh;
-			//auto& name = m->GetName();
-			auto& indices = m->GetIndices();
-			auto& vertices = m->GetVertices();
-			auto worldMatrix = mesh->m_transform.GetWorldMatrix();
-			for (int i = 0; i < indices.size() - 2; i++) {
-				Triangle t{};
-				int i0 = indices[i];
-				int i1 = indices[i + 1];
-				int i2 = indices[i + 2];
-				t.v0 = XMVector4Transform(XMVectorSet(vertices[i0].position.x, vertices[i0].position.y, vertices[i0].position.z, 1.f), worldMatrix);
-				t.v1 = XMVector4Transform(XMVectorSet(vertices[i1].position.x, vertices[i1].position.y, vertices[i1].position.z, 1.f), worldMatrix);
-				t.v2 = XMVector4Transform(XMVectorSet(vertices[i2].position.x, vertices[i2].position.y, vertices[i2].position.z, 1.f), worldMatrix);
-				t.n0 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i0].normal.x, vertices[i0].normal.y, vertices[i0].normal.z, 0.f), worldMatrix));
-				t.n1 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i1].normal.x, vertices[i1].normal.y, vertices[i1].normal.z, 0.f), worldMatrix));
-				t.n2 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i2].normal.x, vertices[i2].normal.y, vertices[i2].normal.z, 0.f), worldMatrix));
-				t.v0.m128_f32[3] = 1;
-				t.v1.m128_f32[3] = 1;
-				t.v2.m128_f32[3] = 1;
-				t.n0.m128_f32[3] = 0;
-				t.n1.m128_f32[3] = 0;
-				t.n2.m128_f32[3] = 0;
-				auto& litmaping = meshrenderer->m_LightMapping;
-				t.uv0			= (vertices[i0].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.uv1			= (vertices[i1].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.uv2			= (vertices[i2].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV0	= (vertices[i0].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV1	= (vertices[i1].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV2	= (vertices[i2].uv * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapIndex = litmaping.lightmapIndex;
-				m_trianglesInScene.push_back(t);
-				m_triIndices.push_back(index++);
-			}
-		}
-
-		//BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size() - 1);
-		//auto& nodes = bvhNodes;
-
-		// 삼각형 버퍼
-		D3D11_BUFFER_DESC bufferDesc = {};
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		bufferDesc.ByteWidth = sizeof(Triangle) * m_trianglesInScene.size();
-		bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		bufferDesc.StructureByteStride = sizeof(Triangle);
-
-		D3D11_SUBRESOURCE_DATA initData = {};
-		initData.pSysMem = m_trianglesInScene.data();
-
-		ID3D11Buffer* triangleBuffer = nullptr;
-		DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &triangleBuffer);
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = (UINT)m_trianglesInScene.size();
-
-		auto hr = DeviceState::g_pDevice->CreateShaderResourceView(triangleBuffer, &srvDesc, &thisTriangleBufferSRV);
-		if (!SUCCEEDED(hr))
-			Debug->LogError("Failed to create Shader Resource View for triangle buffer.");
-		else {
-			Debug->Log("Triangle buffer created successfully.");
-		}
-
-
-
+		
 		for(int i = 0; i < indirectCount; i++){
-			DirectX11::CSSetShaderResources(0, 1, &thisTriangleBufferSRV);
 			// triangleCount, sampleCount Update
 			indirectBuf ind = {};
 			ind.Resolution = { canvasSize, canvasSize };
@@ -521,7 +584,7 @@ namespace lm {
 				);
 			}
 
-			srvDesc = {};
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 			srvDesc.Format = desc.Format;
 			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
 			srvDesc.Texture2DArray.MipLevels = 1;
@@ -639,40 +702,40 @@ namespace lm {
 
 
 
-		//// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
-		//D3D11_TEXTURE2D_DESC desc = {};
-		//desc.Width = canvasSize;
-		//desc.Height = canvasSize;
-		//desc.MipLevels = 1;
-		//desc.ArraySize = 1;
-		//desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		//desc.SampleDesc.Count = 1;
-		//desc.Usage = D3D11_USAGE_DYNAMIC;  // CPU에서 업데이트 가능
-		//desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		//desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = canvasSize;
+		desc.Height = canvasSize;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DYNAMIC;  // CPU에서 업데이트 가능
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-		//DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &imgTexture);
+		DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &imgTexture);
 
-		//// Shader Resource View (SRV) 생성 (ImGui에서 사용하기 위해 필요)
-		//srvDesc = {};
-		//srvDesc.Format = desc.Format;
-		//srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		//srvDesc.Texture2D.MipLevels = 1;
+		// Shader Resource View (SRV) 생성 (ImGui에서 사용하기 위해 필요)
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = desc.Format;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
 
-		//DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
+		DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
 
-		//for (int i = 0; i < lightmaps.size(); i++) {
-		//	DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[i]->m_pTexture);
+		for (int i = 0; i < lightmaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[i]->m_pTexture);
 
-		//	// 텍스쳐 저장
-		//	DirectX::ScratchImage image;
-		//	HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-		//	std::wstring filename = L"Lightmap" + std::to_wstring(i) + L".png";
-		//	DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
-		//		GUID_ContainerFormatPng, filename.data());
-		//}
-		//imgTexture->Release();
-		//imgTexture = nullptr;
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Lightmap" + std::to_wstring(i) + L".png";
+			DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE,
+				GUID_ContainerFormatPng, filename.data());
+		}
+		imgTexture->Release();
+		imgTexture = nullptr;
 	}
 
 	void LightMap::CreateLightMap()
@@ -739,9 +802,9 @@ namespace lm {
 		//TestPrepare();
 		PrepareRectangles();
 		CalculateRectangles();
-		DrawRectangles(m_pLightmapShadowPass, m_pPositionMapPass);
+		int indices = DrawRectangles(m_pLightmapShadowPass, m_pPositionMapPass);
 
-		DrawIndirectLight(m_pPositionMapPass);
+		DrawIndirectLight(m_pPositionMapPass, indices);
 	}
 }
 

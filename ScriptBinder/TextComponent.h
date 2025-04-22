@@ -7,39 +7,30 @@
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
+#include "TextComponent.generated.h"
 
 class TextComponent : public UIComponent, public IUpdatable, public Meta::IReflectable<TextComponent>
 {
 public:
+   ReflectTextComponent
+    [[Serializable(Inheritance:UIComponent)]]
 	TextComponent();
 	~TextComponent() = default;
 
 	virtual void Update(float tick) override;
 
-	//ÇÑ±ÛÀÌ ¾È³ª¿Ã½Ã sfont Á¦´ë·Î ¸¸µé¾ú´ÂÁö È®ÀÎ
+	//í•œê¸€ì´ ì•ˆë‚˜ì˜¬ì‹œ sfont ì œëŒ€ë¡œ ë§Œë“¤ì—ˆëŠ”ì§€ í™•ì¸
 	void SetMessage(std::string_view _message) { message = _message.data(); }
 	void LoadFont(SpriteFont* _font) { font = _font; }
 	void Draw(SpriteBatch* Sbatch);
 	std::string message;
 
-	ReflectionFieldInheritance(TextComponent, UIComponent)
-	{
-		PropertyField
-		({
-			meta_property(_isTable)
-			meta_property(relpos)
-			meta_property(message)
-		});
-
-		FieldEnd(TextComponent, PropertyOnlyInheritance)
-	};
-
-
-
 private:
+    [[Property]]
 	bool _isTable = true;
 	Mathf::Vector2 pos{ 0,0};
-	//»óÀ§ui À§Ä¡±âÁØ Ãß°¡°ª
+	//ìƒìœ„ui ìœ„ì¹˜ê¸°ì¤€ ì¶”ê°€ê°’
+    [[Property]]
 	Mathf::Vector2 relpos{ 0,0 };
 	SpriteFont* font = nullptr;
 	DirectX::XMVECTORF32 color = DirectX::Colors::Black;

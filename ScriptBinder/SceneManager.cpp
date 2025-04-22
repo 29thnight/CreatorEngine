@@ -8,7 +8,8 @@
 
 void SceneManager::ManagerInitialize()
 {
-    REFLECTION_REGISTER_EXECUTE()
+    REFLECTION_REGISTER_EXECUTE();
+	ComponentFactorys->Initialize();
 }
 
 void SceneManager::Editor()
@@ -166,7 +167,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 
         if (obj)
         {
-            Deserialize(obj, itNode);
+            Meta::Deserialize(obj, itNode);
         }
 
         if (itNode["m_components"])

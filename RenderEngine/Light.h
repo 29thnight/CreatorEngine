@@ -9,6 +9,7 @@ class ForwardPass;
 class GBufferPass;
 class SceneRenderer;
 class RenderScene;
+class RenderPassWindow;
 //class lm::LightMap;
 class LightController
 {
@@ -39,6 +40,7 @@ private:
 	friend class GBufferPass;
 	friend class ShadowMapPass;
 	friend class SceneRenderer;
+	friend class RenderPassWindow;
 	//friend class lm::LightMap;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };

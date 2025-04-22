@@ -46,7 +46,8 @@ namespace lm {
 		int right = -1;
 		int start = -1;  // triangle index range
 		int end = -1;
-		bool isLeaf = false;
+		bool32 isLeaf = false;
+		int pad = 0;
 	};
 
 
@@ -71,12 +72,12 @@ namespace lm {
 		void Prepare();
 		void PrepareRectangles();
 		void CalculateRectangles();
-		void DrawRectangles(
+		int DrawRectangles(
 			const std::unique_ptr<LightmapShadowPass>& m_pLightmapShadowPass,
 			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
 		);
 
-		void DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass);
+		void DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass, int indices);
 
 	private:
 		void CreateLightMap();
@@ -138,7 +139,9 @@ namespace lm {
 		std::vector<Triangle> m_trianglesInScene;
 		std::vector<int> m_triIndices;
 		//std::unordered_map<std::string, std::vector<Triangle>> m_meshesTriangles;
-		ID3D11ShaderResourceView* thisTriangleBufferSRV = nullptr;
+		ID3D11ShaderResourceView* TriangleBufferSRV = nullptr;
+		ID3D11ShaderResourceView* TriangleIndiceBufferSRV = nullptr;
+		ID3D11ShaderResourceView* BVHBufferSRV = nullptr;
 
 		inline int BuildBVH(std::vector<Triangle>& tris, std::vector<int>& triIndices, int start, int end, int depth = 0)
 		{

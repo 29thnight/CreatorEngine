@@ -5,6 +5,31 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 
+void ComponentFactory::Initialize()
+{
+   auto& registerMap = Meta::MetaDataRegistry->map;
+
+   for (const auto& [name, type] : registerMap)
+   {
+	   size_t pos = name.find("Component");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("Renderer");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+	   pos = name.find("Animator");
+	   if (pos != std::string::npos)
+	   {
+		   m_componentTypes[name] = &type;
+	   }
+   }
+
+}
+
 void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
 {
     const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
@@ -33,13 +58,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
                 meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
-            Deserialize(meshRenderer, itNode);
+            Meta::Deserialize(meshRenderer, itNode);
             meshRenderer->SetEnabled(true);
         }
 		else if (componentType->typeID == GUIDCreator::GetTypeID<LightComponent>())
 		{
 			auto lightComponent = static_cast<LightComponent*>(component);
-			Deserialize(lightComponent, itNode);
+            Meta::Deserialize(lightComponent, itNode);
 			lightComponent->SetEnabled(true);
 		}
 		//else if (componentType->typeID == GUIDCreator::GetTypeID<CameraComponent>())
@@ -58,12 +83,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				FileGuid guid = spriteNode["m_fileGuid"].as<std::string>();
 				
 			}
-			Deserialize(spriteRenderer, itNode);
+            Meta::Deserialize(spriteRenderer, itNode);
 			spriteRenderer->SetEnabled(true);
 		}
 		else
 		{
-			Deserialize(component, itNode);
+            Meta::Deserialize(component, itNode);
 		}
     }
 }

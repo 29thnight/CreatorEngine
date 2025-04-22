@@ -3,10 +3,13 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
+#include "Canvas.generated.h"
 
-class Canvas : public Component, public IRenderable, public IUpdatable, public Meta::IReflectable<Canvas>
+class Canvas : public Component, public IRenderable, public IUpdatable
 {
 public:
+   ReflectCanvas
+    [[Serializable(Inheritance:Component)]]
 	Canvas();
 	~Canvas() = default;
 
@@ -24,22 +27,24 @@ public:
 	virtual void Update(float tick) override;
 
 
-	ReflectionField(Canvas)
-	{
-		PropertyField
-		({
-			meta_property(m_IsEnabled)
-			meta_property(CanvasOrder)
-			});
+	//ReflectionField(Canvas)
+	//{
+	//	PropertyField
+	//	({
+	//		meta_property(m_IsEnabled)
+	//		meta_property(CanvasOrder)
+	//	});
 
-		FieldEnd(Canvas, PropertyOnly)
-	};
+	//	FieldEnd(Canvas, PropertyOnly)
+	//};
+    [[Property]]
 	bool m_IsEnabled = true;
 	int PreCanvasOrder = 0;
+    [[Property]]
 	int CanvasOrder = 0;
 	std::vector<GameObject*> UIObjs;
 
-	//ÇöÀç ¼±ÅÃÁßÀÎ UI
+	//í˜„ì¬ ì„ íƒì¤‘ì¸ UI
 	GameObject* SelectUI = nullptr;
 };
 
