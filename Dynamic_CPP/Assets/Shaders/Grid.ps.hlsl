@@ -45,7 +45,6 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     float3 posWorld = input.worldPos;
     
     // 평면상의 거리 계산 (XZ 평면)
-    //float distPlanar = distance(posWorld.xz, centerOffset.xz);
     float distPlanar = distance(posWorld.xz, (int)cameraPos.xz);
     
     float absY = 1;//max(1 - saturate(distPlanar / 70.0), 0.0);

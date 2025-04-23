@@ -1,6 +1,10 @@
 #pragma once
 #include "ReflectionFunction.h"
+#include "ReflectionRegister.h"
+#include "SceneManager.h"
+#include "TypeTrait.h"
 
+using namespace TypeTrait;
 namespace Meta
 {
 	// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
@@ -94,7 +98,7 @@ namespace Meta
                     prop.setter(instance, value);
                 }
 				ImGui::PopID();
-            }//[OverWatching]
+            }
             else if (hash == GUIDCreator::GetTypeID<HashingString>())
             {
                 HashingString value = std::any_cast<HashingString>(prop.getter(instance));

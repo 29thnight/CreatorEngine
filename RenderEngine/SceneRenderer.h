@@ -17,7 +17,7 @@
 #include "PostProcessingPass.h"
 
 #include "Model.h"
-#include "Light.h"
+#include "LightController.h"
 #include "Camera.h"
 #include "UIPass.h"
 
@@ -65,7 +65,6 @@ private:
 
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
 
-	Scene*       m_currentScene{};
 	RenderScene* m_renderScene{};
 
 	ID3D11DepthStencilView*     m_depthStencilView{};
@@ -112,8 +111,6 @@ private:
 
 	//Editor Camera
 	std::unique_ptr<Camera> m_pEditorCamera{};
-
-	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	lm::LightMap lightMap;
 

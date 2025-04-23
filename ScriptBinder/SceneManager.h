@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ReflectionYml.h"
 
 class Scene;
 class Object;
@@ -34,6 +35,8 @@ public:
     void AddDontDestroyOnLoad(Object* objPtr);
 
 public:
+	//for Editor
+	Core::Delegate<void>        PlayModeEvent{};
     //for Game Logic
     Core::Delegate<void, float> InputEvent{};
     //for RenderEngine

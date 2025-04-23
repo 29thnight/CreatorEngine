@@ -1,6 +1,6 @@
 #include "DeferredPass.h"
 #include "Scene.h"
-#include "Light.h"
+#include "LightController.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 

@@ -10,6 +10,7 @@
 #include "Mesh.h"
 #include "ImageComponent.h"
 #include "Canvas.h"
+#include "LightComponent.h"
 #include "LightMapping.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
@@ -27,6 +28,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(GameObject);
     AUTO_REGISTER_CLASS(ImageComponent);
+    AUTO_REGISTER_CLASS(LightComponent);
     AUTO_REGISTER_CLASS(LightMapping);
     AUTO_REGISTER_CLASS(Material);
     AUTO_REGISTER_CLASS(MaterialInfomation);

@@ -15,6 +15,7 @@
 #include "RenderState.h"
 #include "TimeSystem.h"
 #include "InputManager.h"
+#include "LightComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -138,7 +139,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pLightMapPass = std::make_unique<LightMapPass>();
 
 	m_renderScene = new RenderScene();
-
+	m_renderScene->Initialize();
+	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
@@ -321,39 +323,44 @@ void SceneRenderer::InitializeTextures()
 
 void SceneRenderer::NewCreateSceneInitialize()
 {
-	m_currentScene = SceneManagers->GetActiveScene();
-	m_renderScene->SetScene(m_currentScene);
-	m_renderScene->Initialize();
+	auto scene = SceneManagers->GetActiveScene();
+	m_renderScene->SetScene(scene);
+	//이제 곧 변경된다 라이트
+	//auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-		
-	Light pointLight;
-	pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
-	pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
-	pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
-	pointLight.m_lightType = LightType::DirectionalLight;
+	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
+	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
+	lightComponent1->Awake();
+	//Light pointLight;
+	//pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
+	//pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
+	//pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
+	//pointLight.m_lightType = LightType::DirectionalLight;
 
-	Light dirLight;
-	dirLight.m_color = lightColour;
-	dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
-	dirLight.m_lightType = LightType::DirectionalLight;
+	//Light dirLight;
+	//dirLight.m_color = lightColour;
+	//dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
+	//dirLight.m_lightType = LightType::DirectionalLight;
 
-	Light spotLight;
-	spotLight.m_color = XMFLOAT4(Colors::Magenta);
-	spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
-	spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
-	spotLight.m_lightType = LightType::SpotLight;
-	spotLight.m_spotLightAngle = 3.142 / 4.0;
+	//Light spotLight;
+	//spotLight.m_color = XMFLOAT4(Colors::Magenta);
+	//spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
+	//spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
+	//spotLight.m_lightType = LightType::SpotLight;
+	//spotLight.m_spotLightAngle = 3.142 / 4.0;
 
-	m_renderScene->m_LightController
-		->AddLight(dirLight)
-		.AddLight(pointLight)
-		.AddLight(spotLight)
-		.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+	//m_renderScene->m_LightController
+	//	->AddLight(dirLight)
+	//	.AddLight(pointLight)
+	//	.AddLight(spotLight)
+	//	.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+
+	scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
+
 
 	ShadowMapRenderDesc desc;
 	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-	desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
+	desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } * -50.f;
 	desc.m_viewWidth = 100;
 	desc.m_viewHeight = 100;
 	desc.m_nearPlane = 0.1f;
@@ -375,8 +382,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-	m_renderScene->SetScene(m_currentScene);
-	m_renderScene->SetBuffers(m_ModelBuffer.Get());
+
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
@@ -570,6 +576,7 @@ void SceneRenderer::SceneRendering()
 
 void SceneRenderer::PrepareRender()
 {
+	auto m_currentScene = SceneManagers->GetActiveScene();
 	for (auto& obj : m_currentScene->m_SceneObjects)
 	{
 		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();

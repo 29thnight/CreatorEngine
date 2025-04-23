@@ -3,7 +3,7 @@
 
 #include "Sampler.hlsli"
 
-#define MAX_LIGHTS 4
+#define MAX_LIGHTS 255
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
@@ -41,7 +41,7 @@ cbuffer ShadowMapConstants : register(b2) // supports one
     float mapWidth;
     float mapHeight;
    
-    float4x4 lightViewProjection[3];\
+    float4x4 lightViewProjection[3];
 
     float m_casCadeEnd1;
     float m_casCadeEnd2;

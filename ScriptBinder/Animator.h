@@ -17,6 +17,8 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
+    [[Property]]
+    FileGuid m_Motion{};
 
 public:
    ReflectAnimator

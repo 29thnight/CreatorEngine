@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Sampler.h"
 #include "RenderableComponents.h"
-#include "Light.h"
+#include "LightController.h"
 
 ShadowMapPass::ShadowMapPass()
 {
@@ -245,6 +245,14 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;
+		if (LightDir == Mathf::Vector4{ 0.f, 0.f, 0.f, 1.f })
+		{
+			LightDir = { 0.f, 0.f, -1.f, 0.f };
+		}
+		else
+		{
+			LightDir.Normalize();
+		}
 		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * minExtents.z;
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });

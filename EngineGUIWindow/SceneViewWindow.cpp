@@ -293,7 +293,7 @@ if (obj && !selectMode)
 	ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 		nullptr, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 
-	XMMATRIX parentMat = m_sceneRenderer->m_currentScene->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+	XMMATRIX parentMat = SceneManagers->GetActiveScene()->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
 	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 

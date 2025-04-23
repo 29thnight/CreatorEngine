@@ -33,7 +33,7 @@ private:
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
 	Mesh* GenerateMesh(aiMesh* mesh);
 	void ProcessMaterials();
-	Material* GenerateMaterial(aiMesh* mesh);
+	Material* GenerateMaterial(int index = -1);
 
 	//Save To InHouse Format
 	void ParseModel();
@@ -58,6 +58,7 @@ private:
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory{};
 	std::string m_metaDirectory{};
+	FileGuid m_fileGuid{};
 
 	Model* m_model{};
 	Material* m_material{};

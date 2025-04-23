@@ -1,7 +1,8 @@
 #pragma once
 #include "ReflectionFunction.h"
 #include "ReflectionRegister.h"
-#include "../ScriptBinder/IObject.h"
+#include "IObject.h"
+#include "DataSystem.h"
 #include <yaml-cpp/yaml.h>
 
 namespace Meta
@@ -285,6 +286,25 @@ namespace Meta
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<float*>(element));
+						}
+						else if (ty_name == HashingString("bool"))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<bool*>(element));
+						}
+						else if (ty_name == HashingString("std::string"))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(*static_cast<std::string*>(element));
+						}
+						else if (ty_name == HashingString("HashingString"))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(static_cast<HashingString*>(element)->ToString());
+						}
+						else
+						{
+							Debug->LogError("Serialize: Unsupported vector element type");
 						}
 					}
 

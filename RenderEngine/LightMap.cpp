@@ -3,7 +3,7 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "LightProperty.h"
-#include "Light.h"
+#include "LightController.h"
 #include "RenderableComponents.h"
 #include "RenderScene.h"
 #include "Material.h"
@@ -413,8 +413,8 @@ namespace lm {
 				// CB light
 				CBLight cblit = {};
 				auto& light = m_renderscene->m_LightController->GetLight(i);
-				cblit.view = light.GetViewMatrix();
-				cblit.proj = light.GetProjectionMatrix(0.1f, 100.f);
+				cblit.view = light.GetLightViewMatrix();
+				cblit.proj = light.GetLightProjectionMatrix(0.1f, 100.f);
 				cblit.position = light.m_position;
 				cblit.direction = light.m_direction;
 				cblit.color = light.m_color;

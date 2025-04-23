@@ -206,6 +206,9 @@
     <ClInclude Include="Animator.h">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
+    <ClInclude Include="IAwakable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

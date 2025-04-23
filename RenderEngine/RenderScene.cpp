@@ -4,7 +4,7 @@
 #include "LightProperty.h"
 #include "../ScriptBinder/RenderableComponents.h"
 #include "Skeleton.h"
-#include "Light.h"
+#include "LightController.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
@@ -36,6 +36,8 @@ void RenderScene::Update(float deltaSecond)
 {
 	m_currentScene = SceneManagers->GetActiveScene();
 	if (m_currentScene == nullptr) return;
+
+	m_currentScene->UpdateLight(m_LightController->m_lightProperties);
 
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{

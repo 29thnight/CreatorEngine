@@ -2,7 +2,7 @@
 #include "ShaderSystem.h"
 #include "Scene.h"
 #include "Mesh.h"
-#include "Light.h"
+#include "LightController.h"
 #include "Sampler.h"
 #include "RenderableComponents.h"
 #include "ResourceAllocator.h"

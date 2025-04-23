@@ -32,7 +32,6 @@ void MenuBarWindow::RenderMenuBar()
                     PostQuitMessage(0);
                 }
                 ImGui::EndMenu();
-
             }
 
             if (ImGui::BeginMenu("Edit"))
@@ -66,7 +65,9 @@ void MenuBarWindow::RenderMenuBar()
 
             if (ImGui::Button(SceneManagers->m_isGameStart ? ICON_FA_STOP : ICON_FA_PLAY))
             {
+                Meta::UndoCommandManager->ClearGameMode();
 				SceneManagers->m_isGameStart = !SceneManagers->m_isGameStart;
+				Meta::UndoCommandManager->m_isGameMode = SceneManagers->m_isGameStart;
             }
 
 			if (ImGui::Button(ICON_FA_PAUSE))
