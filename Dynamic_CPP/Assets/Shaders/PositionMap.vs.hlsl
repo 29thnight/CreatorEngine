@@ -2,7 +2,8 @@ struct VS_Input
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
+    float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float4 boneIds : BLENDINDICES;
@@ -28,10 +29,10 @@ PS_INPUT main(VS_Input input)
     
     float2 texelSize = float2(1.0 / posMapWidth, 1.0 / posMapHeight);
     
-    float2 uv = input.texCoord;// + texelSize * 0.5;
+    float2 uv = input.texCoord1 - texelSize * 1.25;
     
     //output.position = float4(input.texCoord * 2.0 - 1.0, 0, 1);
-    output.position = float4((uv.x - 0.5f) * 2, -(uv.y - 0.5f) * 2, 0, 1);
+    output.position = float4((uv.x - 0.5f) * 2.0, -(uv.y - 0.5f) * 2.0, 0, 1);
     // 월드 좌표 전달
     output.localPos = input.position;
     output.localNor = input.normal;

@@ -21,26 +21,41 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 uv = DTid.xy;
     
-    float edge = SobelEdgeDetection(InputTexture, uv);
+    //float edge = SobelEdgeDetection(InputTexture, uv);
     
     float4 color = InputTexture[uv];
 
-    // ¿§Áö ÇÈ¼¿ÀÌ¶ó¸é ÁÖº¯ ÇÈ¼¿ °¡Á®¿À±â (ÆØÃ¢ È¿°ú)
-    if (edge > 0.1)
+    //// ¿§Áö ÇÈ¼¿ÀÌ¶ó¸é ÁÖº¯ ÇÈ¼¿ °¡Á®¿À±â (ÆØÃ¢ È¿°ú)
+    //if (edge > 0.1)
+    //{
+    //    for (int y = -1; y <= 1; y++)
+    //    {
+    //        for (int x = -1; x <= 1; x++)
+    //        {
+    //            float4 neighborColor = InputTexture[uv + int2(x, y)];
+    //            if (neighborColor.a > 0.8)
+    //            {
+    //                color = neighborColor;
+    //                break;
+    //            }
+    //        }
+    //    }
+    //    //color /= 9.0;
+    //}
+    //TargetTexture[uv] = color;
+    
+    
+    //TargetTexture[uv] = InputTexture.Load(float3(uv, 0)) / 9.0;
+    for (int y = -1; y <= 1; y++)
     {
-        for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++)
         {
-            for (int x = -1; x <= 1; x++)
+            float4 neighborColor = InputTexture[uv + int2(x, y)];
+            if (neighborColor.a > 0.0)
             {
-                float4 neighborColor = InputTexture[uv + int2(x, y)];
-                if (neighborColor.a > 0.8)
-                {
-                    color = neighborColor;
-                    break;
-                }
+                color = neighborColor;
+                TargetTexture[uv] = color;
             }
         }
-        //color /= 9.0;
     }
-    TargetTexture[uv] = color;
 }

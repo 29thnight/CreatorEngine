@@ -25,6 +25,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
 			m_sceneRenderer->m_pSkyBoxPass->ControlPanel();
 		}
 
+		if(ImGui::CollapsingHeader("ScreenSpaceReflectionPass"))
+		{
+			m_sceneRenderer->m_pScreenSpaceReflectionPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("ToneMapPass"))
 		{
 			m_sceneRenderer->m_pToneMapPass->ControlPanel();
