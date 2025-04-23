@@ -75,7 +75,6 @@ void AnimationJob::Update(float deltaTime)
 
             animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
             animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-           //***** animator->aniName;
             XMMATRIX rootTransform = skeleton->m_rootTransform;
             UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
         });

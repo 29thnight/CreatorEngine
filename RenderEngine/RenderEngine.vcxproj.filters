@@ -287,6 +287,9 @@
     <ClCompile Include="RenderModules.cpp">
       <Filter>RenderPass\EffectPass</Filter>
     </ClCompile>
+    <ClCompile Include="TestPlayer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -438,6 +441,9 @@
     </ClInclude>
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="TestPlayer.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

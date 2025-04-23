@@ -27,6 +27,7 @@
 #include "LightMapPass.h"
 #include "EffectManager.h"
 
+#include "TestPlayer.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -115,6 +116,8 @@ private:
 
 	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
+	GameObject* testt;
+	TestPlayer player;
 	lm::LightMap lightMap;
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;

@@ -147,6 +147,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="aniFSM.cpp" />
+    <ClCompile Include="Animator.cpp" />
+    <ClCompile Include="aniState.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
@@ -163,7 +166,9 @@
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="aniFSM.h" />
     <ClInclude Include="Animator.h" />
+    <ClInclude Include="aniState.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Canvas.h" />
     <ClInclude Include="Component.h" />

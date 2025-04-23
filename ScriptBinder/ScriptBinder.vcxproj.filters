@@ -111,6 +111,15 @@
     <ClCompile Include="SoundManager.cpp">
       <Filter>Managers\SoundManager</Filter>
     </ClCompile>
+    <ClCompile Include="Animator.cpp">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="aniFSM.cpp">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="aniState.cpp">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
@@ -204,6 +213,12 @@
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
     <ClInclude Include="Animator.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="aniFSM.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="aniState.h">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
   </ItemGroup>

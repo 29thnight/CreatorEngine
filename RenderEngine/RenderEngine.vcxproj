@@ -160,6 +160,7 @@
     <ClCompile Include="LightmapShadowPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />
     <ClCompile Include="SparkleEffect.cpp" />
+    <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -210,6 +211,7 @@
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
     <ClInclude Include="SparkleEffect.h" />
+    <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
     <ClInclude Include="DeferredPass.h" />

@@ -21,7 +21,11 @@ public:
     std::vector<std::string> aniName;
    /* [[property]]
     std::string aniName;*/
-
+    
+    [[Property]]
+    int m_AnimIndex{};
+    void SetAnimation(int index);
+    void UpdateAnimation();
 public:
    ReflectAnimator
     [[Serializable(Inheritance:Component)]]
