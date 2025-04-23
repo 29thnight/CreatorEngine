@@ -50,10 +50,12 @@ void ShaderResourceSystem::LoadShaders()
 	catch (const file::filesystem_error& e)
 	{
 		Debug->LogWarning("Could not load shaders" + std::string(e.what()));
+		std::cout << "Could not load shaders" << e.what() << std::endl;
 	}
 	catch (const std::exception& e)
 	{
 		Debug->LogWarning("Error" + std::string(e.what()));
+		std::cout << "Error" << e.what() << std::endl;
 	}
 }
 
