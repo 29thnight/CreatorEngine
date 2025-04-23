@@ -45,8 +45,10 @@ public:
     Core::Delegate<void>        sceneLoadedEvent{};
     Core::Delegate<void>        sceneUnloadedEvent{};
     Core::Delegate<void>        newSceneCreatedEvent{};
-
+    bool                        m_isGameStart{ false };
+	size_t 					    m_EditorSceneIndex{ 0 };
 private:
+    void CreatePlayScene();
     void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
 
 private:

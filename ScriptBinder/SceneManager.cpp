@@ -154,6 +154,40 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     }
 }
 
+void SceneManager::CreatePlayScene()
+{
+    MetaYml::Node sceneNode{};
+
+    try
+    {
+        sceneNode = Meta::Serialize(m_activeScene);
+		Scene* playScene = Scene::CreateNewScene("PlayScene");
+        for (const auto& objNode : sceneNode["m_SceneObjects"])
+        {
+            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            if (!type)
+            {
+                Debug->LogError("Failed to extract type from YAML node.");
+                continue;
+            }
+
+            DesirealizeGameObject(type, objNode);
+        }
+
+		m_scenes.push_back(playScene);
+		m_activeSceneIndex = m_scenes.size() - 1;
+		m_activeScene = playScene;
+
+		activeSceneChangedEvent.Broadcast();
+		sceneLoadedEvent.Broadcast();
+    }
+    catch (const std::exception& e)
+    {
+        Debug->LogError(e.what());
+        return;
+    }
+}
+
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
 {
     if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())

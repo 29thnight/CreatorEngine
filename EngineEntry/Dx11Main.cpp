@@ -40,12 +40,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
-        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_Z))
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
         {
 			Meta::UndoCommandManager->Undo();
         }
 
-        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_LeftShift) && ImGui::IsKeyPressed(ImGuiKey_Z))
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Y))
         {
 			Meta::UndoCommandManager->Redo();
         }
@@ -94,21 +94,15 @@ void DirectX11::Dx11Main::Update()
     {
         InfoWindow();
         SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-        if(!m_isGameStart)
+        if(!SceneManagers->m_isGameStart)
         {
             SceneManagers->GameLogic(0);
         }
-    });
-
-    if(m_isGameStart)
-    {
-        //GameUpdate
-        m_timeSystem.Tick([&]
+        else
         {
             SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
-            //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
-        });
-    }
+        }
+    });
 
 #ifdef EDITOR
 	if (InputManagement->IsKeyReleased(VK_F5))

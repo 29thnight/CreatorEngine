@@ -26,6 +26,11 @@ public:
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 
+	inline void InsertGameObjects(std::vector<std::shared_ptr<GameObject>>& gameObjects)
+	{
+		m_SceneObjects.insert(m_SceneObjects.end(), gameObjects.begin(), gameObjects.end());
+	}
+
 private:
     friend class SceneManager;
     //for Editor
@@ -103,7 +108,6 @@ public:
     size_t m_buildIndex{ 0 };
 
 public:
-    //TODO : 진짜 이렇게 구현할건지 고민 좀 해보자
     void UpdateLight(LightProperties& lightProperties) const
     {
         lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;

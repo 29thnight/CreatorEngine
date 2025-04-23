@@ -259,7 +259,7 @@ namespace Meta
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))
-            {
+            {                
                 // 기존 인스턴스의 주소에서 해당 오프셋을 더합니다.
                 void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 

@@ -193,8 +193,19 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	{
 		if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
 		{
-			if (selectedSceneObject != obj.get())
-				selectedSceneObject = obj.get();
+			GameObject* prevSelection = selectedSceneObject; // 선택되기 전 값
+			GameObject* newSelection = obj.get();            // 선택될 값
+
+			if (prevSelection != newSelection)
+			{
+				Meta::MakeCustomChangeCommand(
+					[=]() { m_sceneRenderer->m_renderScene->m_selectedSceneObject = prevSelection; },
+					[=]() { m_sceneRenderer->m_renderScene->m_selectedSceneObject = newSelection; }
+				);
+
+				// 즉시 반영
+				selectedSceneObject = newSelection;
+			}
 		}
 	}
 

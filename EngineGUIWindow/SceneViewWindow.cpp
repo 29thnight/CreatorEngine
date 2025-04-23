@@ -299,7 +299,7 @@ if (obj && !selectMode)
 
 	bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
 
-	if (isWindowHovered && wasDragging && mouseReleased && matrixChanged)
+	if (wasDragging && mouseReleased && matrixChanged)
 	{
 		Meta::MakeCustomChangeCommand(
 			[=] 
