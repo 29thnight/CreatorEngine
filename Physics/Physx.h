@@ -64,18 +64,18 @@ public:
 	//==========================================================================================
 	//rigid body
 	//»ý¼º
-	void CreateStaticBody(const BoxColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateStaticBody(const SphereColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateStaticBody(const CapsuleColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateStaticBody(const ConvexMeshColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateStaticBody(const TriangleMeshColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateStaticBody(const HeightFieldColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix);
-	void CreateDynamicBody(const BoxColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
-	void CreateDynamicBody(const SphereColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
-	void CreateDynamicBody(const CapsuleColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
-	void CreateDynamicBody(const ConvexMeshColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
-	void CreateDynamicBody(const TriangleMeshColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
-	void CreateDynamicBody(const HeightFieldColliderInfo& info, const EColliderType& colliderType, int* collisionMatrix, bool isKinematic);
+	void CreateStaticBody(const BoxColliderInfo& info, const EColliderType& colliderType);
+	void CreateStaticBody(const SphereColliderInfo& info, const EColliderType& colliderType);
+	void CreateStaticBody(const CapsuleColliderInfo& info, const EColliderType& colliderType);
+	void CreateStaticBody(const ConvexMeshColliderInfo& info, const EColliderType& colliderType);
+	void CreateStaticBody(const TriangleMeshColliderInfo& info, const EColliderType& colliderType);
+	void CreateStaticBody(const HeightFieldColliderInfo& info, const EColliderType& colliderType);
+	void CreateDynamicBody(const BoxColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
+	void CreateDynamicBody(const SphereColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
+	void CreateDynamicBody(const CapsuleColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
+	void CreateDynamicBody(const ConvexMeshColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
+	void CreateDynamicBody(const TriangleMeshColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
+	void CreateDynamicBody(const HeightFieldColliderInfo& info, const EColliderType& colliderType, bool isKinematic);
 
 
 	//StaticRigidBody* SettingStaticBody(physx::PxShape* shape,const ColliderInfo& colInfo,const  EColliderType& collideType,int* collisionMatrix,bool isGpuscene = false);
