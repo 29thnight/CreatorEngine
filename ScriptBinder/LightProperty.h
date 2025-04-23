@@ -51,9 +51,9 @@ cbuffer Light
         case LightType::DirectionalLight:
             return XMMatrixOrthographicLH(width, height, _near, _far);
         case LightType::PointLight:
-            return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         case LightType::SpotLight:
-            return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         default:
             return XMMatrixIdentity();
         }

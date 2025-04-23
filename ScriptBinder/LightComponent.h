@@ -36,13 +36,13 @@ public:
 		m_lightIndex = scene->AddLightCount();
 		Light& light = scene->GetLightProperties().m_lights[m_lightIndex];
 		light.m_position = m_pOwner->m_transform.position;
-		light.m_direction = m_pOwner->m_transform.rotation;
+		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
         light.m_direction.Normalize();
 		light.m_color = m_color * m_intencity;
 		light.m_constantAttenuation = m_constantAttenuation;
 		light.m_linearAttenuation = m_linearAttenuation;
 		light.m_quadraticAttenuation = m_quadraticAttenuation;
-		light.m_spotLightAngle = m_spotLightAngle;
+		light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
 		light.m_lightType = static_cast<int>(m_lightType);
 		light.m_lightStatus = static_cast<int>(m_lightStatus);
 		light.m_intencity = m_intencity;
@@ -52,13 +52,13 @@ public:
     {
         Light& light = SceneManagers->GetActiveScene()->GetLightProperties().m_lights[m_lightIndex];
         light.m_position = m_pOwner->m_transform.position;
-		light.m_direction = m_pOwner->m_transform.rotation;
+		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
 		light.m_direction.Normalize();
         light.m_color = m_color * m_intencity;
         light.m_constantAttenuation = m_constantAttenuation;
         light.m_linearAttenuation = m_linearAttenuation;
         light.m_quadraticAttenuation = m_quadraticAttenuation;
-        light.m_spotLightAngle = m_spotLightAngle;
+        light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
         light.m_lightType = static_cast<int>(m_lightType);
         light.m_lightStatus = static_cast<int>(m_lightStatus);
         light.m_intencity = m_intencity;
