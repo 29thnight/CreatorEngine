@@ -14,7 +14,7 @@ class LightComponent : public Component, public IRenderable, public IUpdatable, 
 {
 public:
    ReflectLightComponent
-    [[Serializable]]
+    [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(LightComponent)
 
     bool IsEnabled() const override

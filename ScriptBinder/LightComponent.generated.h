@@ -1,7 +1,7 @@
 #pragma once
 
 #define ReflectLightComponent \
-ReflectionField(LightComponent) \
+ReflectionFieldInheritance(LightComponent, Component) \
 { \
 	PropertyField \
 	({ \
@@ -15,5 +15,5 @@ ReflectionField(LightComponent) \
 		meta_property(m_lightStatus) \
 		meta_property(m_intencity) \
 	}); \
-	FieldEnd(LightComponent, PropertyOnly) \
+	FieldEnd(LightComponent, PropertyOnlyInheritance) \
 };

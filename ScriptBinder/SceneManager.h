@@ -17,7 +17,7 @@ public:
     void Initialization();
     void Physics(float deltaSecond);
     void InputEvents(float deltaSecond);
-    void GameLogic(float deltaSecond);
+    void GameLogic(float deltaSecond = 0);
     void SceneRendering(float deltaSecond);
     void GUIRendering();
     void EndOfFrame();

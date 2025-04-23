@@ -97,7 +97,7 @@ void DirectX11::Dx11Main::Update()
         {
             SceneManagers->Editor();
             SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->GameLogic(0);
+            SceneManagers->GameLogic();
         }
         else
         {

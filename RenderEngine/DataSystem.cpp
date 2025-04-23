@@ -112,6 +112,11 @@ void DataSystem::RenderForEditer()
 
 				ImGui::BeginGroup();
 
+				if (name.empty())
+				{
+					const_cast<std::string&>(name) = "None";
+				}
+
 				if (ImGui::ImageButton(name.c_str(), iconTexture, ImVec2(70, 70)))
 				{
 					if (ImGui::IsItemHovered())

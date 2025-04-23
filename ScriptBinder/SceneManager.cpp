@@ -241,7 +241,15 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         {
             for (const auto& componentNode : itNode["m_components"])
             {
-                ComponentFactorys->LoadComponent(obj, componentNode);
+                try
+                {
+                    ComponentFactorys->LoadComponent(obj, componentNode);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(e.what());
+                    continue;
+                }
             }
         }
     }

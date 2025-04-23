@@ -428,6 +428,11 @@ namespace Meta
 					void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 					Deserialize(subInstance, *subType, node[prop.name]);
 				}
+				else if (const EnumType* enumType = MetaEnumRegistry->Find(prop.typeName))
+				{
+					int enumValue = node[prop.name].as<int>();
+					prop.setter(instance, enumValue);
+				}
 				else
 				{
 					YamlNodeToProperty(prop, instance, node);
