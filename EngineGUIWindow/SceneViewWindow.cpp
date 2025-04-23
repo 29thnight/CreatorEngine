@@ -125,6 +125,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
 		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
 
+		/*m_sceneRenderer->m_pEditorCamera->m_viewWidth = windowWidth;
+		m_sceneRenderer->m_pEditorCamera->m_viewHeight = windowHeight;
+		auto view = m_sceneRenderer->m_pEditorCamera->CalculateView();
+		XMFLOAT4X4 floatMatrix;
+		XMStoreFloat4x4(&floatMatrix, view);
+		cameraView = &floatMatrix.m[0][0];*/
+
 		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
 
 		ImVec2 imagePos = ImGui::GetItemRectMin();
@@ -238,6 +245,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			}
 			ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
 			ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
+			ImGui::InputFloat("Width", &cam->m_viewWidth);
+			ImGui::InputFloat("Hight", &cam->m_viewHeight);
 			ImGui::EndPopup();
 		}
 

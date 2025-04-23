@@ -19,8 +19,8 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 
 		Mathf::Vector3 edge0 = vertex1.position - vertex0.position;
 		Mathf::Vector3 edge1 = vertex2.position - vertex0.position;
-		Mathf::Vector2 dUV0 = vertex1.uv - vertex0.uv;
-		Mathf::Vector2 dUV1 = vertex2.uv - vertex0.uv;
+		Mathf::Vector2 dUV0 = vertex1.uv0 - vertex0.uv0;
+		Mathf::Vector2 dUV1 = vertex2.uv0 - vertex0.uv0;
 
 		float f = 1.0f / (dUV0.x * dUV1.y - dUV1.x * dUV0.y);
 		Mathf::Vector3 tangent

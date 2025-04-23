@@ -151,7 +151,14 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		vertex.bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
 		if (hasTexCoords)
 		{
-			vertex.uv = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+			vertex.uv0 = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+
+			if (mesh->mTextureCoords[1]) {
+				vertex.uv1 = { mesh->mTextureCoords[1][i].x, mesh->mTextureCoords[1][i].y };
+			}
+			else {
+				vertex.uv1 = vertex.uv0;
+			}
 		} 
 
 		vertices.push_back(vertex);
@@ -191,6 +198,12 @@ void ModelLoader::ProcessMaterials()
 
 Material* ModelLoader::GenerateMaterial(int index)
 {
+	auto tempMaterial = DataSystems->Materials.find(m_AIScene->mMaterials[index]->GetName().C_Str());
+	if (tempMaterial != DataSystems->Materials.end())
+	{
+		return tempMaterial->second.get();
+	}
+
 	Material* material = AllocateResource<Material>();
 	material->m_name = m_AIScene->mMaterials[index]->GetName().C_Str();
 

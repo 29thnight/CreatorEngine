@@ -9,6 +9,7 @@ struct VertexShaderOutput
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
 };
 
 cbuffer PBRMaterial : register(b0)
@@ -56,19 +57,19 @@ float4 main(VertexShaderOutput IN) : SV_Target
     if (gUseAlbedoMap)
     {
 
-        albedo = Albedo.Sample(LinearSampler, IN.texCoord);
+        albedo = Albedo.Sample(LinearSampler, IN.texCoord1);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
     }
     if (gUseEmmisive)
     {
-        emissive = Emissive.Sample(LinearSampler, IN.texCoord);
+        emissive = Emissive.Sample(LinearSampler, IN.texCoord1);
     }
-    //float2 lightmapUV = (IN.texCoord - offset) / size;
-    float2 lightmapUV = IN.texCoord * size + offset;
+    //float2 lightmapUV = (IN.texCoord1 - offset) / size;
+    float2 lightmapUV = IN.texCoord1 * size + offset;
     float4 lightmapColor = lightmap.SampleLevel(LinearSampler, float3(lightmapUV, lightmapIndex), 0.0);
 
     //lightmapColor = -lightmapColor + 1;
-    float4 finalColor = (albedo / 3.1415926) * lightmapColor + emissive;
+    float4 finalColor = (albedo ) * lightmapColor + emissive;
     return finalColor;
 }

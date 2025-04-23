@@ -162,6 +162,9 @@
     <Filter Include="Resources\Skeleton\Animation">
       <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\ScreenSpaceReflectionPass">
+      <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SceneRenderer.cpp">
@@ -184,9 +187,6 @@
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
-    </ClCompile>
-    <ClCompile Include="Light.cpp">
-      <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>Objects</Filter>
@@ -260,9 +260,6 @@
     <ClCompile Include="LightMap.cpp">
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
-    <ClCompile Include="LightmapShadowPass.cpp">
-      <Filter>LightMap\Calculate</Filter>
-    </ClCompile>
     <ClCompile Include="PositionMapPass.cpp">
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
@@ -286,6 +283,12 @@
     </ClCompile>
     <ClCompile Include="RenderModules.cpp">
       <Filter>RenderPass\EffectPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ScreenSpaceReflectionPass.cpp">
+      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+    </ClCompile>
+    <ClCompile Include="LightController.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -318,9 +321,6 @@
     </ClInclude>
     <ClInclude Include="AnimationJob.h">
       <Filter>Asset\JobSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="Light.h">
-      <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Resources\Shader</Filter>
@@ -394,9 +394,6 @@
     <ClInclude Include="LightMap.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
-    <ClInclude Include="LightmapShadowPass.h">
-      <Filter>LightMap\Calculate</Filter>
-    </ClInclude>
     <ClInclude Include="PositionMapPass.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
@@ -424,9 +421,6 @@
     <ClInclude Include="ResourceAllocator.h">
       <Filter>Asset\ResourceAllocator</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ISceneRenderer.h">
-      <Filter>Renderer\Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="AssetMetaWather.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
@@ -438,6 +432,12 @@
     </ClInclude>
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenSpaceReflectionPass.h">
+      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+    </ClInclude>
+    <ClInclude Include="LightController.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -569,6 +569,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AddTextureColor.cs.hlsl">
       <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
