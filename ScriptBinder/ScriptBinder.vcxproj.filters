@@ -70,6 +70,12 @@
     <Filter Include="Classes\Components\RenderableComponent\UI">
       <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\PhysicsComponent">
+      <UniqueIdentifier>{4f393d3c-4f3d-40a0-933b-e3fb5a3ccd0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\PhysicsManager">
+      <UniqueIdentifier>{0540bf1d-a624-42a1-8866-71e4b6926ae0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -125,6 +131,9 @@
     </ClCompile>
     <ClCompile Include="AniTransition.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsManager.cpp">
+      <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +241,21 @@
     </ClInclude>
     <ClInclude Include="IAwakable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="BoxColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="ColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidBodyComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="IColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsManager.h">
+      <Filter>Managers\PhysicsManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
