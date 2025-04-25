@@ -14,12 +14,21 @@ void SceneManager::ManagerInitialize()
 
 void SceneManager::Editor()
 {
+    if(SceneManagers->m_isGameStart && false == m_isEditorSceneLoaded)
+    {
+        CreateEditorOnlyPlayScene();
+		m_isEditorSceneLoaded = true;
+    }
+    else if (false == SceneManagers->m_isGameStart && m_isEditorSceneLoaded)
+    {
+        DeleteEditorOnlyPlayScene();
+    }
     m_activeScene->Reset();
 }
 
 void SceneManager::Initialization()
 {
-    m_activeScene->Awake();
+	m_activeScene->Awake();
     m_activeScene->OnEnable();
     m_activeScene->Start();
 }
@@ -131,7 +140,6 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 			DesirealizeGameObject(type, objNode);
         }
 
-
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
 
@@ -154,14 +162,18 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     }
 }
 
-void SceneManager::CreatePlayScene()
+void SceneManager::CreateEditorOnlyPlayScene()
 {
     MetaYml::Node sceneNode{};
 
     try
     {
         sceneNode = Meta::Serialize(m_activeScene);
-		Scene* playScene = Scene::CreateNewScene("PlayScene");
+		Scene* playScene = Scene::LoadScene("PlayScene");
+        m_scenes.push_back(playScene);
+        m_activeSceneIndex = m_scenes.size() - 1;
+        m_activeScene = playScene;
+
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
@@ -174,10 +186,6 @@ void SceneManager::CreatePlayScene()
             DesirealizeGameObject(type, objNode);
         }
 
-		m_scenes.push_back(playScene);
-		m_activeSceneIndex = m_scenes.size() - 1;
-		m_activeScene = playScene;
-
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
     }
@@ -186,6 +194,31 @@ void SceneManager::CreatePlayScene()
         Debug->LogError(e.what());
         return;
     }
+}
+
+void SceneManager::DeleteEditorOnlyPlayScene()
+{
+	if (m_activeScene)
+	{
+		m_activeScene->OnDisable();
+		m_activeScene->OnDestroy();
+		m_activeScene = nullptr;
+	}
+	for (auto& scene : m_scenes)
+	{
+		if (scene && scene->m_sceneName == "PlayScene")
+		{
+			delete scene;
+			scene = nullptr;
+		}
+	}
+	std::erase_if(m_scenes, [](const auto& scene) { return scene == nullptr; });
+
+	m_activeSceneIndex = 0;
+	m_isEditorSceneLoaded = false;
+	activeSceneChangedEvent.Broadcast();
+	sceneUnloadedEvent.Broadcast();
+	m_activeScene = m_scenes[m_EditorSceneIndex];
 }
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)

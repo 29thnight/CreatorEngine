@@ -19,7 +19,7 @@ struct alignas(16) ImageInfo
 };
 
 
-//ëª¨ë“  2dì´ë¯¸ì§€ ê¸°ë³¸?
+//¸ğµç 2dÀÌ¹ÌÁö ±âº»?
 class ImageComponent : public UIComponent, public IUpdatable
 {
 public:
@@ -40,11 +40,11 @@ public:
     [[Property]]
 	int curindex = 0;
 
-	//ndcì¢Œí‘œ {-1,1}
+	//ndcÁÂÇ¥ {-1,1}
 	Mathf::Vector3 trans{ 0,0,0 };
 	Mathf::Vector3 rotat{ 0,0,0 };
 private:
-	float rotate;
+	float rotate =0;
 	std::vector<Texture*> textures;
 	XMFLOAT2 origin{};
 

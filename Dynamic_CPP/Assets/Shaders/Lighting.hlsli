@@ -41,7 +41,7 @@ cbuffer ShadowMapConstants : register(b2) // supports one
     float mapWidth;
     float mapHeight;
    
-    float4x4 lightViewProjection[3];\
+    float4x4 lightViewProjection[3];
 
     float m_casCadeEnd1;
     float m_casCadeEnd2;

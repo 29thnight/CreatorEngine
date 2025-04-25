@@ -82,6 +82,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	}
 }
 
+
 Mesh* Model::GetMesh(const std::string_view& name)
 {
 	std::string meshName = name.data();
@@ -172,4 +173,26 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 
 
 	return model;
+}
+
+
+GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
+{
+	if (nullptr == model)
+	{
+		return nullptr;
+	}
+
+	ModelLoader loader = ModelLoader(model, &Scene);
+	file::path path_ = model->path;
+
+	Benchmark banch;
+	
+	auto rootObj =loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
+	if (model->m_hasBones)
+	{
+		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+	}
+
+	return rootObj;
 }

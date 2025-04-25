@@ -15,18 +15,20 @@
 #include "GridPass.h"
 #include "AAPass.h"
 #include "PostProcessingPass.h"
+#include "ScreenSpaceReflectionPass.h"
+#include "SubsurfaceScatteringPass.h"
 
 #include "Model.h"
-#include "Light.h"
+#include "LightController.h"
 #include "Camera.h"
 #include "UIPass.h"
 
 #include "LightMap.h"
-#include "LightmapShadowPass.h"
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
 #include "EffectManager.h"
 
+#include "TestPlayer.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -65,7 +67,6 @@ private:
 
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
 
-	Scene*       m_currentScene{};
 	RenderScene* m_renderScene{};
 
 	ID3D11DepthStencilView*     m_depthStencilView{};
@@ -89,9 +90,10 @@ private:
 	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
 	std::unique_ptr<EffectManager>      m_pEffectPass{};
 
-	std::unique_ptr<LightmapShadowPass> m_pLightmapShadowPass{};
 	std::unique_ptr<PositionMapPass>    m_pPositionMapPass{};
 	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
+	std::unique_ptr<ScreenSpaceReflectionPass> m_pScreenSpaceReflectionPass{};
+	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers
@@ -115,6 +117,8 @@ private:
 
 	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
+	GameObject* testt;
+	TestPlayer player;
 	lm::LightMap lightMap;
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;

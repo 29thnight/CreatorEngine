@@ -147,12 +147,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="aniFSM.cpp" />
+    <ClCompile Include="Animator.cpp" />
+    <ClCompile Include="aniState.cpp" />
+    <ClCompile Include="AniTransition.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="Object.cpp" />
-    <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
@@ -164,14 +167,15 @@
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="aniFSM.h" />
     <ClInclude Include="Animator.h" />
-    <ClInclude Include="BoxColliderComponent.h" />
+    <ClInclude Include="aniState.h" />
+    <ClInclude Include="AniTransition.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Canvas.h" />
-    <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
-    <ClInclude Include="IColliderComponent.h" />
+    <ClInclude Include="IAwakable.h" />
     <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
@@ -184,11 +188,9 @@
     <ClInclude Include="LightProperty.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="Object.h" />
-    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
-    <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SoundManager.h" />

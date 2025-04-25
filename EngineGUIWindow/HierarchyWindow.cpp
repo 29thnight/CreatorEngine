@@ -24,7 +24,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 		if (m_sceneRenderer)
 		{
-			scene = m_sceneRenderer->m_currentScene;
+			scene = SceneManagers->GetActiveScene();
 			renderScene = m_sceneRenderer->m_renderScene;
 			selectedSceneObject = renderScene->m_selectedSceneObject;
 
@@ -169,7 +169,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
-	auto& scene = m_sceneRenderer->m_currentScene;
+	auto scene = SceneManagers->GetActiveScene();
 	auto& selectedSceneObject = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
 
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;

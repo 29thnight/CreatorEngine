@@ -207,6 +207,7 @@ Texture::~Texture()
 	Memory::SafeDelete(m_pTexture);
 	Memory::SafeDelete(m_pSRV);
 	Memory::SafeDelete(m_pDSV);
+	Memory::SafeDelete(m_pUAV);
 	for (auto& rtv : m_pRTVs)
 	{
 		Memory::SafeDelete(rtv);

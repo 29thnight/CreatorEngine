@@ -5,6 +5,7 @@
 #include <functional>
 #include <any>
 #include <typeindex>
+#include <stack>
 
 class ComponentFactory;
 namespace Meta
@@ -190,32 +191,81 @@ namespace Meta
 	public:
 		void Execute(std::unique_ptr<IUndoableCommand> cmd)
 		{
-			cmd->Redo();
-			m_undoStack.push(std::move(cmd));
-			while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack 초기화
+			if (false == m_isGameMode)
+            {
+                cmd->Redo();
+                m_undoStack.push(std::move(cmd));
+                while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack 초기화
+            }
+			else
+			{
+				cmd->Redo();
+                m_gameModeUndoStack.push(std::move(cmd));
+				while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
+			}
 		}
 
 		void Undo()
 		{
-			if (m_undoStack.empty()) return;
-			auto cmd = std::move(m_undoStack.top());
-			m_undoStack.pop();
-			cmd->Undo();
-			m_redoStack.push(std::move(cmd));
+			if (false == m_isGameMode)
+			{
+				if (m_undoStack.empty()) return;
+				auto cmd = std::move(m_undoStack.top());
+				m_undoStack.pop();
+				cmd->Undo();
+				m_redoStack.push(std::move(cmd));
+			}
+			else
+			{
+				if (m_gameModeUndoStack.empty()) return;
+				auto cmd = std::move(m_gameModeUndoStack.top());
+				m_gameModeUndoStack.pop();
+				cmd->Undo();
+				m_gameModeRedoStack.push(std::move(cmd));
+			}
 		}
 
 		void Redo()
 		{
-			if (m_redoStack.empty()) return;
-			auto cmd = std::move(m_redoStack.top());
-			m_redoStack.pop();
-			cmd->Redo();
-			m_undoStack.push(std::move(cmd));
+			if (false == m_isGameMode)
+			{
+				if (m_redoStack.empty()) return;
+				auto cmd = std::move(m_redoStack.top());
+				m_redoStack.pop();
+				cmd->Redo();
+				m_undoStack.push(std::move(cmd));
+			}
+			else
+			{
+				if (m_gameModeRedoStack.empty()) return;
+				auto cmd = std::move(m_gameModeRedoStack.top());
+				m_gameModeRedoStack.pop();
+				cmd->Redo();
+				m_gameModeUndoStack.push(std::move(cmd));
+			}
 		}
+
+		void Clear()
+		{
+			while (!m_undoStack.empty()) m_undoStack.pop();
+			while (!m_redoStack.empty()) m_redoStack.pop();
+		}
+
+		void ClearGameMode()
+		{
+			while (!m_gameModeUndoStack.empty()) m_gameModeUndoStack.pop();
+			while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
+		}
+
+		bool m_isGameMode = false;
 
 	private:
 		std::stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
 		std::stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
+
+        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeUndoStack;
+        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
+
 	};
 
 	static inline auto& UndoCommandManager = UndoManager::GetInstance();

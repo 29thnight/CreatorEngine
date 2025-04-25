@@ -33,7 +33,7 @@ private:
 	void ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices);
 	Mesh* GenerateMesh(aiMesh* mesh);
 	void ProcessMaterials();
-	Material* GenerateMaterial(aiMesh* mesh);
+	Material* GenerateMaterial(int index = -1);
 
 	//Save To InHouse Format
 	void ParseModel();
@@ -51,6 +51,9 @@ private:
 	Model* LoadModel();
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
 	void GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
+
+	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
+	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
 	Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
 	//여기 좀 정리가 필요할 듯
 	//std::shared_ptr<Assimp::Importer> m_importer{};
@@ -58,6 +61,7 @@ private:
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory{};
 	std::string m_metaDirectory{};
+	FileGuid m_fileGuid{};
 
 	Model* m_model{};
 	Material* m_material{};

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ReflectionYml.h"
 
 class Scene;
 class Object;
@@ -34,6 +35,8 @@ public:
     void AddDontDestroyOnLoad(Object* objPtr);
 
 public:
+	//for Editor
+	Core::Delegate<void>        PlayModeEvent{};
     //for Game Logic
     Core::Delegate<void, float> InputEvent{};
     //for RenderEngine
@@ -48,7 +51,8 @@ public:
     bool                        m_isGameStart{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
 private:
-    void CreatePlayScene();
+    void CreateEditorOnlyPlayScene();
+	void DeleteEditorOnlyPlayScene();
     void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
 
 private:
@@ -57,6 +61,7 @@ private:
     Scene*                      m_activeScene{};
 	std::string                 m_LoadSceneName{};
     std::atomic_size_t          m_activeSceneIndex{};
+	bool						m_isEditorSceneLoaded{ false };
 };
 
 static auto& SceneManagers = SceneManager::GetInstance();

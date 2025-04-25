@@ -13,7 +13,7 @@ struct alignas(16) GridConstantBuffer
 struct alignas(16) GridVertex
 {
     XMFLOAT3 pos;
-	XMFLOAT2 uv;
+	XMFLOAT2 uv0;
 };
 
 struct alignas(16) GridUniformBuffer

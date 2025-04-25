@@ -1,5 +1,5 @@
-#include "GameObject.h"
 #pragma once
+#include "GameObject.h"
 
 template<typename T>
 inline T* GameObject::AddComponent()
@@ -73,6 +73,19 @@ inline T* GameObject::GetComponent()
             return castedComponent.get();
     }
     return nullptr;
+}
+
+template<typename T>
+inline bool GameObject::HasComponent()
+{
+	for (auto& [typeID, index ] : m_componentIds)
+	{
+		if (typeID == TypeTrait::GUIDCreator::GetTypeID<T>())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 template<typename T>

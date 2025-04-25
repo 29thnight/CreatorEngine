@@ -12,7 +12,6 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
-class LightComponent;
 class GameObject : public Object
 {
 public:
@@ -58,6 +57,9 @@ public:
 
 	template<typename T>
 	T* GetComponent();
+
+	template<typename T>
+	bool HasComponent();
 
 	template<typename T>
 	std::vector<T*> GetComponents();

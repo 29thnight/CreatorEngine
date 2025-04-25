@@ -18,13 +18,15 @@ struct Triangle
 struct BVHNode
 {
     float3 boundsMin;
+    int pad1;
     float3 boundsMax;
+    int pad2;
     int left; // child index
     int right; // child index
     int start; // index range for triangles
     int end;
     bool isLeaf;
-    int pad;
+    int3 pad3;
 };
 
 struct Ray
@@ -96,7 +98,7 @@ float3x3 BuildTBN(float3 n)
 
 inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out float t, out float3 bary)
 {
-    //float3 origin = orig + dir * 0.001; // 자신을 때리는 경우 방지.
+    float3 origin = orig + dir * 0.01; // 자신을 때리는 경우 방지.
     
     float3 v0 = tri.v0, v1 = tri.v1, v2 = tri.v2;
     float3 edge1 = v1 - v0;
@@ -107,7 +109,7 @@ inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out floa
         return false;
 
     float invDet = 1.0 / det;
-    float3 tvec = orig - v0;
+    float3 tvec = origin - v0;
     float u = dot(tvec, pvec) * invDet;
     if (u < 0 || u > 1)
         return false;
@@ -187,12 +189,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     //float2 uv = (dispatchThreadID.xy + 0.5) / Resolution;
     //float3 pos = Sampling(this_PositionMap, LinearSampler, localUV, float2(2048, 2048)).xyz;
-    float4 pos = this_PositionMap.SampleLevel(LinearSampler, localUV, 0);
+    float4 pos = this_PositionMap.SampleLevel(PointSampler, localUV, 0);
     float4 normal = normalize(this_NormalMap.SampleLevel(LinearSampler, localUV, 0));
     
     float4 worldPos = mul(worldMat, pos);
     float3 worldNor = mul(worldMat, float4(normal.xyz, 0)).xyz;
 
+    if(worldPos.w == 0.0)
+        return;
+    
     float3x3 TBN = BuildTBN(normalize(worldNor));
     float3 indirect = float3(0, 0, 0);
     
@@ -207,44 +212,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float hitT;// = 0;
     float3 bary;// = { 0, 0, 0 };
     
-    //for (uint i = 0; i < 512; ++i)
-    //{
-    //     xi = HammersleySample(i, 512);
-    //     localDir = SampleHemisphere(xi);
-    //     worldDir = mul(localDir, TBN);
-
-    //    minT = 1e20;
-    //    color = float3(0, 0, 0);
-    //      //g_IndirectLightMap[DTid.xy] = float4(0, 1, 0, 1);
-        
-    //    hitT = 0;
-    //    bary = float3(0, 0, 0);
-    //    [fastopt]
-    //    for (int t = triangleCount - 1; t >= 0; --t)
-    //    {
-    //        if (RayTriangleIntersect(worldPos.xyz, worldDir, triangles[t], hitT, bary))
-    //        {
-    //            if (hitT < minT)
-    //            {
-    //                minT = hitT;
-    //                //float3 n0 = triangles[t].n0;
-    //                //float3 n1 = triangles[t].n1;
-    //                //float3 n2 = triangles[t].n2;
-    //                //float3 interpNormal = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
-
-    //                float2 interpUV = bary.x * triangles[t].lightmapUV0 + bary.y * triangles[t].lightmapUV1 + bary.z * triangles[t].lightmapUV2;
-                    
-    //                color = lightMap.SampleLevel(LinearSampler, float3(interpUV, triangles[t].lightmapIndex), 0.0).rgb;
-    //                // 단순 노멀 컬러 (디버그용)
-    //                //color = interpNormal;
-    //            }
-    //        }
-    //    }
-
-    //    indirect += color;
-    //}
-    for (int i = 0; i < 256; ++i){
-        float2 xi = HammersleySample(i, 256);
+    for (int i = 0; i < 512; ++i){
+        float2 xi = HammersleySample(i, 512);
         float3 localDir = SampleHemisphere(xi);
         float3 worldDir = mul(localDir, TBN);
 
@@ -304,14 +273,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
             hitBary.y * hitTri.lightmapUV1 +
             hitBary.z * hitTri.lightmapUV2;
 
-            finalColor = lightMap.SampleLevel(LinearSampler, float3(interpUV, hitTri.lightmapIndex), 0.0).rgb;
+            finalColor = lightMap.SampleLevel(PointSampler, float3(interpUV, hitTri.lightmapIndex), 0.0).rgb;
         }
-
-        indirect += finalColor;
+        float distance = minT; // 이미 계산된 ray hit 거리
+        float attenuation = 1.0 / (distance + 0.01);
+        indirect += finalColor * attenuation;
     }
 
-    GroupMemoryBarrierWithGroupSync();
-    indirect /= 256;
+    //GroupMemoryBarrierWithGroupSync();
+    indirect /= 512;
     g_IndirectLightMap[DTid.xy] = float4(indirect, 1);
 }
 

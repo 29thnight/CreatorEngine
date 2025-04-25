@@ -15,6 +15,7 @@
 #include "RenderState.h"
 #include "TimeSystem.h"
 #include "InputManager.h"
+#include "LightComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -22,6 +23,8 @@
 #include <iostream>
 #include <string>
 #include <regex>
+
+#include "Animator.h"
 
 using namespace lm;
 
@@ -117,14 +120,25 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//GridPass
     m_pGridPass = std::make_unique<GridPass>();
 
-	//LightmapShadowPass
-	m_pLightmapShadowPass = std::make_unique<LightmapShadowPass>();
-
 	//PositionMapPass
 	m_pPositionMapPass = std::make_unique<PositionMapPass>();
 
 	//LightMap
 	lightMap.Initialize();
+
+	//SSR
+	m_pScreenSpaceReflectionPass = std::make_unique<ScreenSpaceReflectionPass>();
+	m_pScreenSpaceReflectionPass->Initialize(m_diffuseTexture.get(),
+		m_metalRoughTexture.get(),
+		m_normalTexture.get(),
+		m_emissiveTexture.get()
+	);
+
+	//SSS
+	m_pSubsurfaceScatteringPass = std::make_unique<SubsurfaceScatteringPass>();
+	m_pSubsurfaceScatteringPass->Initialize(m_diffuseTexture.get(),
+		m_metalRoughTexture.get()
+	);
 
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
@@ -138,7 +152,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pLightMapPass = std::make_unique<LightMapPass>();
 
 	m_renderScene = new RenderScene();
-
+	m_renderScene->Initialize();
+	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
@@ -217,15 +232,17 @@ void SceneRenderer::InitializeImGui()
 			if (ImGui::Button("Clear position normal maps")) {
 				m_pPositionMapPass->ClearTextures();
 			}
-			ImGui::Text("LightMap Shadow Settings");
-			ImGui::DragInt("ShadowMap Size", &m_pLightmapShadowPass->shadowmapSize, 128, 512, 8192);
-
+			
 			ImGui::Text("LightMap Bake Settings");
 			ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
 			ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
 			ImGui::DragInt("Padding", &lightMap.padding);
 			ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
+			ImGui::DragInt("LeafCount", &lightMap.leafCount, 1, 0, 1024);
 			ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
+			ImGui::DragInt("Dilate Count", &lightMap.dilateCount, 1, 0, 16);
+			ImGui::DragInt("Direct MSAA Count", &lightMap.directMSAACount, 1, 0, 16);
+			ImGui::DragInt("Indirect MSAA Count", &lightMap.indirectMSAACount, 1, 0, 16);
 		}
 
 		if (ImGui::Button("Generate LightMap"))
@@ -233,12 +250,10 @@ void SceneRenderer::InitializeImGui()
 			Camera c{};
 			// 메쉬별로 positionMap 생성
 			m_pPositionMapPass->Execute(*m_renderScene, c);
-			// lightMap에 사용할 shadowMap 생성
-			m_pLightmapShadowPass->Execute(*m_renderScene, c);
 			// lightMap 생성
-			lightMap.GenerateLightMap(m_renderScene, m_pLightmapShadowPass, m_pPositionMapPass);
+			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
 
-			m_pLightMapPass->Initialize(lightMap.lightmaps);
+			//m_pLightMapPass->Initialize(lightMap.lightmaps);
 		}
 
 		if (ImGui::CollapsingHeader("Baked Maps")) {
@@ -246,7 +261,9 @@ void SceneRenderer::InitializeImGui()
 			{
 				ImGui::Text("LightMaps");
 				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-					ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+					if (ImGui::ImageButton("LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
+						ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+					}
 				}
 				ImGui::Text("indirectMaps");
 				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
@@ -254,10 +271,6 @@ void SceneRenderer::InitializeImGui()
 				}
 				//ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
 				//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
-				ImGui::Text("shadowMaps");
-				for (int i = 0; i < m_pLightmapShadowPass->m_shadowmapTextures.size(); i++)
-					ImGui::Image((ImTextureID)m_pLightmapShadowPass->m_shadowmapTextures[i]->m_pSRV,
-						ImVec2(512, 512));
 			}
 			else {
 				ImGui::Text("No LightMap");
@@ -321,39 +334,44 @@ void SceneRenderer::InitializeTextures()
 
 void SceneRenderer::NewCreateSceneInitialize()
 {
-	m_currentScene = SceneManagers->GetActiveScene();
-	m_renderScene->SetScene(m_currentScene);
-	m_renderScene->Initialize();
+	auto scene = SceneManagers->GetActiveScene();
+	m_renderScene->SetScene(scene);
+	//이제 곧 변경된다 라이트
+	//auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-		
-	Light pointLight;
-	pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
-	pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
-	pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
-	pointLight.m_lightType = LightType::DirectionalLight;
+	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
+	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
+	lightComponent1->Awake();
+	//Light pointLight;
+	//pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
+	//pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
+	//pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
+	//pointLight.m_lightType = LightType::DirectionalLight;
 
-	Light dirLight;
-	dirLight.m_color = lightColour;
-	dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
-	dirLight.m_lightType = LightType::DirectionalLight;
+	//Light dirLight;
+	//dirLight.m_color = lightColour;
+	//dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
+	//dirLight.m_lightType = LightType::DirectionalLight;
 
-	Light spotLight;
-	spotLight.m_color = XMFLOAT4(Colors::Magenta);
-	spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
-	spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
-	spotLight.m_lightType = LightType::SpotLight;
-	spotLight.m_spotLightAngle = 3.142 / 4.0;
+	//Light spotLight;
+	//spotLight.m_color = XMFLOAT4(Colors::Magenta);
+	//spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
+	//spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
+	//spotLight.m_lightType = LightType::SpotLight;
+	//spotLight.m_spotLightAngle = 3.142 / 4.0;
 
-	m_renderScene->m_LightController
-		->AddLight(dirLight)
-		.AddLight(pointLight)
-		.AddLight(spotLight)
-		.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+	//m_renderScene->m_LightController
+	//	->AddLight(dirLight)
+	//	.AddLight(pointLight)
+	//	.AddLight(spotLight)
+	//	.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
+
+	scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
+
 
 	ShadowMapRenderDesc desc;
 	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-	desc.m_eyePosition = ((m_renderScene->m_LightController->GetLight(0).m_direction)) * -50;
+	desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } * -50.f;
 	desc.m_viewWidth = 100;
 	desc.m_viewHeight = 100;
 	desc.m_nearPlane = 0.1f;
@@ -361,22 +379,12 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-	//std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("test.jpg"), []() {std::cout << "soooo angry" << std::endl;} , { 1360, 540 });
-	//std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;},{ 560,540 });
-	//UIManagers->SelectUI = Angryy2.get();
-	//Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
-	//Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
-	//std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImagegg2", DataSystems->LoadTexture("test2.png"));
-	//test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"DNF2.SFont"));
-	//test->GetComponent<TextComponent>()->SetMessage("안녕");
-	//std::shared_ptr<GameObject> text = UIManagers->MakeText("Text", DataSystems->LoadSFont(L"DNF2.SFont"));
-	//text->GetComponent<TextComponent>()->SetMessage("그건 불가능함");
+
 
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-	m_renderScene->SetScene(m_currentScene);
-	m_renderScene->SetBuffers(m_ModelBuffer.Get());
+
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
@@ -392,6 +400,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
+	
 	if(ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
@@ -425,17 +434,26 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		if(!useTestLightmap)
-        {
-			//[2] GBufferPass
-			{
-				DirectX11::BeginEvent(L"GBufferPass");
-				Benchmark banch;
-				m_pGBufferPass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
-				DirectX11::EndEvent();
-			}
+		//[2] GBufferPass
+		{
+			DirectX11::BeginEvent(L"GBufferPass");
+			Benchmark banch;
+			m_pGBufferPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+		if (useTestLightmap)
+		{
+			DirectX11::BeginEvent(L"LightMapPass");
+			Benchmark banch;
+			m_pLightMapPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 
+		if (!useTestLightmap)
+        {
+			
 			//[3] SSAOPass
 			{
 				DirectX11::BeginEvent(L"SSAOPass");
@@ -444,7 +462,6 @@ void SceneRenderer::SceneRendering()
 				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
 			}
-
 			//[4] DeferredPass
 			{
 				DirectX11::BeginEvent(L"DeferredPass");
@@ -454,14 +471,6 @@ void SceneRenderer::SceneRendering()
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
 			}
-		}
-		else
-        {
-			DirectX11::BeginEvent(L"LightMapPass");
-			Benchmark banch;
-			m_pLightMapPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
 		}
 
 		{
@@ -481,6 +490,22 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+		//SSS
+		{
+			DirectX11::BeginEvent(L"SubsurfaceScatteringPass");
+			Benchmark banch;
+			m_pSubsurfaceScatteringPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SubsurfaceScatteringPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+		//SSR
+		{
+			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
+			Benchmark banch;
+			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 
 		//[5] skyBoxPass
 		{
@@ -493,12 +518,14 @@ void SceneRenderer::SceneRendering()
 
         //[*] PostProcessPass
         {
-            DirectX11::BeginEvent(L"PostProcessPass");
-            Benchmark banch;
+			DirectX11::BeginEvent(L"PostProcessPass");
+			Benchmark banch;
             m_pPostProcessingPass->Execute(*m_renderScene, *camera);
             RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
             DirectX11::EndEvent();
         }
+
+
 
 		//[6] AAPass
 		{
@@ -570,6 +597,7 @@ void SceneRenderer::SceneRendering()
 
 void SceneRenderer::PrepareRender()
 {
+	auto m_currentScene = SceneManagers->GetActiveScene();
 	for (auto& obj : m_currentScene->m_SceneObjects)
 	{
 		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();

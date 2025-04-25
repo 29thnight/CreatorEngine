@@ -34,6 +34,7 @@ struct PixelShaderInput
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
 };
 
 struct GBufferOutput

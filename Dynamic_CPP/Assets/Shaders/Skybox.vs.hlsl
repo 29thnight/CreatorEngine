@@ -17,7 +17,8 @@ struct AppData
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
+    float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float4 boneIds : BLENDINDICES;

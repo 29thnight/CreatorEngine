@@ -30,11 +30,15 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
 AnimationJob::AnimationJob() :
     m_UpdateThreadPool(8)
 {
+	m_sceneLoadedHandle = SceneManagers->sceneLoadedEvent.AddRaw(this, &AnimationJob::PrepareAnimation);
     m_AnimationUpdateHandle = SceneManagers->InternalAnimationUpdateEvent.AddRaw(this, &AnimationJob::Update);
+	m_sceneUnloadedHandle = SceneManagers->sceneUnloadedEvent.AddRaw(this, &AnimationJob::CleanUp);
 }
 
 AnimationJob::~AnimationJob()
 {
+	SceneManagers->sceneLoadedEvent.Remove(m_sceneLoadedHandle);
+	SceneManagers->InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
 }
 
 void AnimationJob::Update(float deltaTime)
@@ -88,6 +92,31 @@ void AnimationJob::Update(float deltaTime)
     }
 
     m_UpdateThreadPool.NotifyAllAndWait();
+}
+
+void AnimationJob::PrepareAnimation()
+{
+    m_currAnimator.clear();
+    Scene* scene = SceneManagers->GetActiveScene();
+	if (nullptr == scene) return;
+
+    uint32 currSize = scene->m_SceneObjects.size();
+
+    for (uint32 i = 0; i < currSize; ++i)
+    {
+        Animator* animator = scene->m_SceneObjects[i]->GetComponent<Animator>();
+        if (nullptr == animator) continue;
+		animator->SetEnabled(true);
+
+        m_currAnimator.push_back(animator);
+    }
+	m_objectSize = currSize;
+}
+
+void AnimationJob::CleanUp()
+{
+    m_currAnimator.clear();
+	m_objectSize = 0;
 }
 
 void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)

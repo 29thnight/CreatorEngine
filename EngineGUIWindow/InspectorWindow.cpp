@@ -11,9 +11,13 @@
 #include "PathFinder.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
+#include "ReflectionImGuiHelper.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+
+constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
+constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
 InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
@@ -28,7 +32,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		if (m_sceneRenderer)
 		{
-			scene = m_sceneRenderer->m_currentScene;
+			scene = SceneManagers->GetActiveScene();
 			renderScene = m_sceneRenderer->m_renderScene;
 			selectedSceneObject = renderScene->m_selectedSceneObject;
 
@@ -105,6 +109,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				static float prevEuler[3] = {};
 
 				float pyr[3];
+				float deltaEuler[3] = { 0, 0, 0 };
 				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
 				for (float& i : pyr) i *= Mathf::Rad2Deg;
 
@@ -112,25 +117,46 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::SameLine();
 				if (ImGui::DragFloat3("##Rotation", pyr, 0.1f))
 				{
-					if (!editingRotation)
-					{
-						prevRotation = rotation;
-						prevEuler[0] = pyr[0];
-						prevEuler[1] = pyr[1];
-						prevEuler[2] = pyr[2];
-						editingRotation = true;
-					}
-					Mathf::Vector3 radianEuler(pyr[0] * Mathf::Deg2Rad, pyr[1] * Mathf::Deg2Rad, pyr[2] * Mathf::Deg2Rad);
-					rotation = XMQuaternionRotationRollPitchYaw(radianEuler.x, radianEuler.y, radianEuler.z);
+					// 변화량 계산
+					deltaEuler[0] = pyr[0] - prevEuler[0]; // pitch
+					deltaEuler[1] = pyr[1] - prevEuler[1]; // yaw
+					deltaEuler[2] = pyr[2] - prevEuler[2]; // roll
+
+					// 저장
+					prevEuler[0] = pyr[0];
+					prevEuler[1] = pyr[1];
+					prevEuler[2] = pyr[2];
+
+					// 라디안 변환
+					float deltaPitch = deltaEuler[0] * Mathf::Deg2Rad;
+					float deltaYaw = deltaEuler[1] * Mathf::Deg2Rad;
+					float deltaRoll = deltaEuler[2] * Mathf::Deg2Rad;
+
+					// 축 업데이트
+					XMVECTOR forward = XMVector3Normalize(XMVector3Rotate(FORWARD, selectedSceneObject->m_transform.rotation));
+					XMVECTOR up = UP;
+					XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, forward));
+
+					// 회전 쿼터니언 생성
+					XMVECTOR pitchQuat = XMQuaternionRotationAxis(right, deltaPitch);
+					XMVECTOR yawQuat = XMQuaternionRotationAxis(up, deltaYaw);
+					XMVECTOR rollQuat = XMQuaternionRotationAxis(forward, deltaRoll);
+
+					// 회전 누적 적용: Yaw → Pitch → Roll
+					XMVECTOR deltaRot = XMQuaternionMultiply(yawQuat, pitchQuat);
+					deltaRot = XMQuaternionMultiply(rollQuat, deltaRot);
+
+					// 기존 쿼터니언에 적용
+					selectedSceneObject->m_transform.rotation = XMQuaternionMultiply(deltaRot, selectedSceneObject->m_transform.rotation);
+					selectedSceneObject->m_transform.rotation = XMQuaternionNormalize(selectedSceneObject->m_transform.rotation);
 					selectedSceneObject->m_transform.m_dirty = true;
+
+					editingRotation = true;
 				}
+
 				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 				{
-					Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
-					Mathf::Vector4 compare = XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
-					if (compare != rotation)
-					{
-						Meta::MakeCustomChangeCommand([=]
+					Meta::MakeCustomChangeCommand([=]
 						{
 							selectedSceneObject->m_transform.rotation = prevRotation;
 							selectedSceneObject->m_transform.m_dirty = true;
@@ -140,7 +166,6 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							selectedSceneObject->m_transform.rotation = rotation;
 							selectedSceneObject->m_transform.m_dirty = true;
 						});
-					}
 					editingRotation = false;
 				}
 

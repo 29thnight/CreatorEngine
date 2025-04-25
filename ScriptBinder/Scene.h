@@ -112,10 +112,7 @@ public:
     {
         lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
         lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
-        for (int i = 0; i < MAX_LIGHTS; ++i)
-        {
-            lightProperties.m_lights[i] = m_lightProperties.m_lights[i];
-        }
+        Memory::MemoryCopy(lightProperties.m_lights, m_lightProperties.m_lights, MAX_LIGHTS);
     }
 
     int AddLightCount()

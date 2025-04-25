@@ -1,4 +1,4 @@
-#include "Light.h"
+#include "LightController.h"
 #include "DeviceState.h"
 #include "Camera.h"
 #include "ShadowMapPass.h"
