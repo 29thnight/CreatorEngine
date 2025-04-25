@@ -1,6 +1,8 @@
 #pragma once
 #include "../physics/Physx.h"
 #include "../physics/ICollider.h"
+#include "GameObject.h"
+#include "Component.h"
 
 class ICollider;
 class PhysicsManager

@@ -87,7 +87,7 @@ public:
 	//반환
 	void GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData);
 	//수정
-	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData,int* collisionMatrix);
+	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData);
 	//삭제
 	void RemoveRigidBody(const unsigned int& id,physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
 	//전체 삭제

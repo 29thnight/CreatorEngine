@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "GameObject.h"
+#include "Transform.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 
@@ -89,7 +90,13 @@ void PhysicsManager::OnLoadScene()
 				//pxScene에 엑터 추가
 				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
 				//콜라이더 정보 저장
-				//m_colliderContainer.insert({ colliderID, boxInfo });
+				m_colliderContainer.insert({ colliderID, {
+					m_boxTypeId,
+					box,
+					box->GetOwner(),
+					box,
+					false
+					} });
 			}
 			else {
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
@@ -186,9 +193,36 @@ void PhysicsManager::SetPhysicData()
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 
-		if (colliderInfo.id == )
+		//box collider
+		if (colliderInfo.id == m_boxTypeId)
 		{
+			RigidBodyGetSetData data;
+			data.transform = transform.GetWorldMatrix();
+			data.angularVelocity = rigidbody->GetAngularVelocity();
+			data.linearVelocity = rigidbody->GetLinearVelocity();
+			data.isLockLinearX = rigidbody->IsLockLinearX();
+			data.isLockLinearY = rigidbody->IsLockLinearY();
+			data.isLockLinearZ = rigidbody->IsLockLinearZ();
+			data.isLockAngularX = rigidbody->IsLockAngularX();
+			data.isLockAngularY = rigidbody->IsLockAngularY();
+			data.isLockAngularZ = rigidbody->IsLockAngularZ();
 
+			if (offset != DirectX::SimpleMath::Vector3::Zero) {
+				data.transform._41 = 0.0f;
+				data.transform._42 = 0.0f;
+				data.transform._43 = 0.0f;
+
+				auto pos = transform.GetWorldPosition();
+				auto vecPos = DirectX::SimpleMath::Vector3(pos);
+				offset = DirectX::SimpleMath::Vector3::Transform(offset, data.transform);
+				data.transform._41 = pos.x + offset.x;
+
+
+				
+
+			}
+			
+			
 		}
 	
 
