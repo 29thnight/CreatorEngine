@@ -15,9 +15,13 @@ public:
     ~AnimationJob();
     void Update(float deltaTime);
 private:
+	void PrepareAnimation();
+    void CleanUp();
     void UpdateBones(Animator& animator);
     void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& transform, float time);
 
+	Core::DelegateHandle m_sceneLoadedHandle;
+	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;
     ThreadPool m_UpdateThreadPool;
     std::vector<Animator*> m_currAnimator;

@@ -26,6 +26,9 @@ public:
     int m_AnimIndex{};
     void SetAnimation(int index);
     void UpdateAnimation();
+    [[Property]]
+    FileGuid m_Motion{};
+
 public:
    ReflectAnimator
     [[Serializable(Inheritance:Component)]]

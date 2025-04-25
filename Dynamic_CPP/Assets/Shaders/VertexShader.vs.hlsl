@@ -22,7 +22,8 @@ struct AppData
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
+    float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float4 boneIds : BLENDINDICES;
@@ -38,6 +39,7 @@ struct VertexShaderOutput
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
 };
 
 VertexShaderOutput main(AppData IN)
@@ -61,6 +63,7 @@ VertexShaderOutput main(AppData IN)
     OUT.position = mul(vp, OUT.wPosition);
     OUT.pos = OUT.position;
     OUT.texCoord = IN.texCoord;
+    OUT.texCoord1 = IN.texCoord1;
 
     // assume a uniform scaling is observed
     // otherwise have have to multiply by transpose(inverse(model))

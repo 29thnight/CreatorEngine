@@ -40,12 +40,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
-        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_Z))
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
         {
 			Meta::UndoCommandManager->Undo();
         }
 
-        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_Y))
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Y))
         {
 			Meta::UndoCommandManager->Redo();
         }
@@ -93,23 +93,23 @@ void DirectX11::Dx11Main::Update()
     m_timeSystem.Tick([&]
     {
         InfoWindow();
-        SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-        if(!m_isGameStart)
+        if(!SceneManagers->m_isGameStart)
         {
-            //SceneManagers->GameLogic(0);
+            SceneManagers->Editor();
+            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->GameLogic(0);
+        }
+        else
+        {
+#ifdef EDITOR
+			SceneManagers->Editor();
+#endif // !EDITOR
+            SceneManagers->Initialization();
+			SceneManagers->Physics(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
             SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
         }
     });
-
-    if(m_isGameStart)
-    {
-        //GameUpdate
-        m_timeSystem.Tick([&]
-        {
-            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
-            //InputManagement->UpdateControllerVibration(m_timeSystem.GetElapsedSeconds()); //패드 진동 업데이트*****
-        });
-    }
 
 #ifdef EDITOR
 	if (InputManagement->IsKeyReleased(VK_F5))

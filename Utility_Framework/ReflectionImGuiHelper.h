@@ -1,6 +1,10 @@
 #pragma once
 #include "ReflectionFunction.h"
+#include "ReflectionRegister.h"
+#include "SceneManager.h"
+#include "TypeTrait.h"
 
+using namespace TypeTrait;
 namespace Meta
 {
 	// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
@@ -30,10 +34,6 @@ namespace Meta
                 ImGui::PushID(prop.name);
                 if (ImGui::InputInt(prop.name, &value))
                 {
-                   /* int prevValue = std::any_cast<int>(prop.getter(instance));
-                    UndoCommandManager->Execute(
-                        std::make_unique<PropertyChangeCommand<int>>(instance, prop, prevValue, value)
-                    );*/
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
                 }
@@ -296,7 +296,7 @@ namespace Meta
                 }
             }
             else if (nullptr != MetaDataRegistry->Find(prop.typeName))
-            {
+            {                
                 // 기존 인스턴스의 주소에서 해당 오프셋을 더합니다.
                 void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
 

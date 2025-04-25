@@ -9,8 +9,6 @@ class SceneManager;
 struct ICollider;
 class Scene
 {
-private:
-
 public:
    ReflectScene
     [[Serializable]]
@@ -27,6 +25,11 @@ public:
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
+
+	inline void InsertGameObjects(std::vector<std::shared_ptr<GameObject>>& gameObjects)
+	{
+		m_SceneObjects.insert(m_SceneObjects.end(), gameObjects.begin(), gameObjects.end());
+	}
 
 private:
     friend class SceneManager;
@@ -105,15 +108,11 @@ public:
     size_t m_buildIndex{ 0 };
 
 public:
-    //TODO : 진짜 이렇게 구현할건지 고민 좀 해보자
     void UpdateLight(LightProperties& lightProperties) const
     {
         lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
         lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
-        for (int i = 0; i < MAX_LIGHTS; ++i)
-        {
-            lightProperties.m_lights[i] = m_lightProperties.m_lights[i];
-        }
+        Memory::MemoryCopy(lightProperties.m_lights, m_lightProperties.m_lights, MAX_LIGHTS);
     }
 
     int AddLightCount()
@@ -131,20 +130,8 @@ public:
         return m_lightProperties;
     }
 
-  //  ReflectionField(Scene)
-  //  {
-		//PropertyField
-		//({
-		//	meta_property(m_sceneName)
-		//	meta_property(m_buildIndex)
-  //          meta_property(m_SceneObjects)
-		//});
-		//	
-		//FieldEnd(Scene, PropertyOnly)
-  //  }
-
 private:
-	friend class SceneManager;
+    void DestroyGameObjects();
     std::string GenerateUniqueGameObjectName(const std::string_view& name)
     {
         std::string uniqueName{ name.data() };
@@ -157,6 +144,11 @@ private:
         m_gameObjectNameSet.insert(uniqueName);
         return uniqueName;
     }
+
+	void RemoveGameObjectName(const std::string_view& name)
+	{
+		m_gameObjectNameSet.erase(name.data());
+	}
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

@@ -230,6 +230,9 @@
     <ClInclude Include="AniTransition.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
+    <ClInclude Include="IAwakable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

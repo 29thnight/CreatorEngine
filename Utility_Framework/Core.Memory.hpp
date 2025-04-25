@@ -25,6 +25,15 @@ namespace Memory
 		return refCount;
 	}
 
+	template<typename T>
+	inline void MemoryCopy(T* pDst, const T* pSrc, uint32 size)
+	{
+		if (pDst && pSrc)
+		{
+			memcpy(pDst, pSrc, sizeof(T) * size);
+		}
+	}
+
 	//메모리 할당 및 복사
 	inline void AllocateAndCopy(void* pDst, const void* pSrc, uint32 size)
 	{

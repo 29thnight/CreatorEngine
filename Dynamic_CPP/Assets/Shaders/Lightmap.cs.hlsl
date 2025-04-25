@@ -8,6 +8,8 @@
 #define LIGHT_ENABLED 1
 #define LIGHT_ENABLED_W_SHADOWMAP 2
 
+#define FLT_MAX 3.402823466E+38f
+
 struct SurfaceInfo
 {
     float4 posW;
@@ -39,7 +41,8 @@ struct Vertex
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
+    float2 texCoord : TEXCOORD0;
+    float2 texCoord1 : TEXCOORD1;
     float3 tangent : TANGENT;
     float3 binormal : BINORMAL;
     float4 boneIds : BLENDINDICES;
@@ -58,13 +61,15 @@ struct Triangle
 struct BVHNode
 {
     float3 boundsMin;
+    int pad1;
     float3 boundsMax;
+    int pad2;
     int left; // child index
     int right; // child index
     int start; // index range for triangles
     int end;
     bool isLeaf;
-    int pad;
+    int3 pad3;
 };
 
 struct Ray
@@ -90,14 +95,11 @@ StructuredBuffer<BVHNode> BVHNodes : register(t12);
 
 cbuffer lightMapSetting : register(b0)
 {
+    float4 globalAmbient;
     float bias;
     int lightSize;
-    int2 shadowmapSize;
-    
-    float4 globalAmbient;
-    
     int useEnvMap;
-
+    int pad;
 }
 
 cbuffer CB : register(b1)
@@ -151,7 +153,7 @@ inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out floa
     float3 edge2 = v2 - v0;
     float3 pvec = cross(dir, edge2);
     float det = dot(edge1, pvec);
-    if (det < 1e-4)
+    if (det < 1e-6)
         return false;
 
     float invDet = 1.0 / det;
@@ -180,7 +182,8 @@ bool IntersectAABB(Ray ray, float3 bmin, float3 bmax)
     float3 tmax = max(t1, t2);
     float tEnter = max(max(tmin.x, tmin.y), tmin.z);
     float tExit = min(min(tmax.x, tmax.y), tmax.z);
-    return tEnter <= tExit && tExit > 0;
+    return tEnter <= tExit && tExit > 0 && tEnter < tExit;
+   
 }
 bool TraceShadow(float3 origin, float3 dir, float maxDist)
 {
@@ -195,8 +198,8 @@ bool TraceShadow(float3 origin, float3 dir, float maxDist)
     {
         uint nodeIndex = stack[--stackPtr];
         BVHNode node = BVHNodes[nodeIndex];
-
         Ray ray = { origin, dir };
+
         if (!IntersectAABB(ray, node.boundsMin, node.boundsMax))
             continue;
 
@@ -204,7 +207,8 @@ bool TraceShadow(float3 origin, float3 dir, float maxDist)
         {
             for (uint i = node.start; i < node.end; ++i)
             {
-                Triangle tri = triangles[i];
+                int triIndex = TriIndices[i];
+                Triangle tri = triangles[triIndex];
                 if (RayTriangleIntersect(origin, dir, tri, hitT, bary) && hitT < maxDist)
                     return true;
             }
@@ -228,98 +232,31 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 범위 내 픽셀인지 체크 
     if (targetPos.x < Offset.x || targetPos.x > (Offset.x + Size.x) ||
         targetPos.y < Offset.y || targetPos.y > (Offset.y + Size.y))
+    {
+        //TargetTexture[DTid.xy] = float4(0, 0, 0, 0);
         return;
+    }
 
     // 타겟 텍스처 좌표를 0~1로 정규화 // targetpos 0~lightmapSize, offset
     float2 localUV = (targetPos - Offset) / Size; 
     
-    float4 localpos = Sampling(positionMapTexture, LinearSampler, localUV, float2(2048, 2048));
+    // 주변값을 샘플링하게 되면 급격한 위치변화 때문에 그림자가 번지듯이 나옴
+    //float4 localpos = Sampling(positionMapTexture, LinearSampler, localUV, float2(2048, 2048));
     float4 localNormal = normalMapTexture.SampleLevel(LinearSampler, localUV, 0);
     
     
-    //float4 localpos = positionMapTexture.SampleLevel(LinearSampler, localUV, 0);
+    float4 localpos = positionMapTexture.SampleLevel(PointSampler, localUV, 0);
+    
+    //if (localpos.w == 0)
+    //{
+    //    float3 temp = TargetTexture[DTid.xy].rgb;
+    //    return;
+    //}
     //float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
-    
-    
-    
-    
-    
-    //float4 worldpos = mul(worldMat, localpos);
-    //float4 worldNormal = mul(worldMat, localNormal);
-    
-    //float4 color = float4(0, 0, 0, 1); // 초기화
-    
-    //float2 shadowMaptexelSize = float2(1, 1) / shadowmapSize;
-    
-    //for (int i = 0; i < MAX_LIGHTS; ++i)
-    //{
-    //    Light light = g_Lights[i];
-       
-    //    if (light.status == LIGHT_DISABLED || light.lightType != DIRECTIONAL_LIGHT)
-    //        continue;
-        
-    //    float4 lightSpaceView = mul(light.litView, worldpos);
-    //    float4 lightSpaceProj = mul(light.litProj, lightSpaceView);
-        
-    //    float shadow = 0;
-    //    float3 projCoords = lightSpaceProj.xyz / lightSpaceProj.w;
-    //    float currentDepth = projCoords.z;
-    //    projCoords = projCoords * 0.5 + 0.5;
-    //    projCoords.y = -projCoords.y;
-        
-    //    //float epsilon = 0.01f;
-    //    //[unroll]
-    //    for (int x = -4; x < 5; ++x)
-    //    {
-    //    //[unroll]
-    //        for (int y = -4; y < 5; ++y)
-    //        {
-    //            float closestDepth = shadowMapTextures.SampleLevel(LinearSampler, float3(projCoords.xy + (float2(x, y) * shadowMaptexelSize), i), 0.0).r;
-    //            shadow += (closestDepth < currentDepth - bias) ? 1.0 : 0.0;
-    //        }
-    //    }
-
-    //    shadow /= 81; // float으로 나누면 sphere의 그림자에 계단현상. 하지만 float으로 해야 부드러운 셰도우 샘플링 가능
-        
-    //    // 라이트의 영향을 계산 (Directional Light)
-    //    float3 lightDir = normalize(light.direction.xyz);
-    //    float NdotL = max(dot(normalize(worldNormal.xyz), -lightDir), 0.0);
-
-    //    // 라이트 색상과 강도 적용
-    //    float3 lightContribution = light.color.rgb * NdotL * (1 - shadow) * 3.0; //(inShadow ? 0.0 : 1.0);
-    //    color.rgb += lightContribution;
-    //}
-    
-    //SurfaceInfo surf;
-    //surf.posW = worldpos;
-    //surf.N = normalize(worldNormal.xyz);
-    //float4 ambient = globalAmbient;
-    //if (useEnvMap)
-    //{
-    //    float3 irradiance = EnvMap.SampleLevel(LinearSampler, surf.N, 0.0).rgb;
-    //    float3 diffuse = irradiance;
-    //    ambient.rgb = diffuse;
-    //}
-    //float ao = useAO ? AoMap.SampleLevel(PointSampler, localUV.xy, 0.0).r : 1.0;
-    
-    //ambient *= ao;// * occlusion;
-    
-    
-    //float4 finalColor = color;
-    //finalColor.rgb += ambient;
-    ////finalColor.rgb = LinearToGamma(finalColor.rgb);
-    //TargetTexture[DTid.xy] = finalColor;
-    
-    ////TargetTexture[DTid.xy + float2(0, 500)] = float4(surf.N, 1);
-    ////TargetTexture[DTid.xy + float2(0, 1000)] = worldpos;
-    
-    
-    
     
     float3 worldPos = (mul(worldMat, localpos)).xyz; // 라이트맵 PositionMap에서 가져온 월드 좌표
     float3 normal = (normalize(mul(worldMat, localNormal))).xyz; // 라이트맵 NormalMap 또는 기하 정보에서 유도
-    float3 finalColor = float3(0, 0, 0);
-
+    float4 finalColor = float4(0, 0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; ++i)
     {
         Light light = g_Lights[i];
@@ -327,7 +264,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
 
         float3 toLight;
-        float distance = 1.0;
+        float distance = 10000.0;
         float attenuation = 1.0;
         float NdotL = 0.0;
 
@@ -353,22 +290,28 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             float3 lightDir = normalize(-light.direction.xyz);
             float spotCos = dot(toLight, lightDir);
-            if (spotCos < light.spotAngle)
+            float minCos = cos(light.spotAngle);
+            float maxCos = (minCos + 1.0f) / 2.0f; // squash between [0, 1]
+            if (spotCos < minCos)
                 continue; // outside cone
             // optional: smoothstep for soft edge
+            float smoothFactor = smoothstep(minCos, maxCos, spotCos);
+            attenuation *= smoothFactor;
+            if (attenuation <= 0)
+                continue;
         }
 
         // Shadow check (BVH traversal)
         bool blocked = TraceShadow(worldPos + normal * bias, toLight, distance);
         if (!blocked)
         {
-            float3 lightColor = light.color.rgb;
-            finalColor += NdotL * attenuation * lightColor;
+            finalColor.rgb += NdotL * attenuation * light.color.rgb;
+            finalColor.a = 1;
         }
     }
     SurfaceInfo surf;
-    surf.N = normalize(normal.xyz);
-    float4 ambient = globalAmbient;
+    surf.N = normal.xyz;
+    float3 ambient = globalAmbient;
     if (useEnvMap)
     {
         float3 irradiance = EnvMap.SampleLevel(LinearSampler, surf.N, 0.0).rgb;
@@ -379,7 +322,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     ambient *= ao; // * occlusion;
     finalColor.rgb += ambient;
-    TargetTexture[DTid.xy] = float4(finalColor, 1.0);
+    
+    TargetTexture[DTid.xy] = finalColor;
+    //for (int y = -1; y <= 1; y++)
+    //{
+        //for (int x = -1; x <= 1; x++)
+        //{
+        //}
+    //}
 }
 
 /*

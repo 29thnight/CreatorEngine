@@ -155,13 +155,22 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
-
 	Benchmark banch;
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
+
+	Meta::MakeCustomChangeCommand([=] 
+	{
+	
+	}, 
+	[=] 
+	{
+	
+	});
+
 
 	return model;
 }

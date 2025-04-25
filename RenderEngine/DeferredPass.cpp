@@ -1,6 +1,6 @@
 #include "DeferredPass.h"
 #include "Scene.h"
-#include "Light.h"
+#include "LightController.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 
@@ -24,6 +24,7 @@ DeferredPass::DeferredPass()
 		{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",     1, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TANGENT",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BINORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -76,7 +77,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
 
-    DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
+    //DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
     ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &view, nullptr);
 

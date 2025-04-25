@@ -5,6 +5,8 @@
 #include "ResourceAllocator.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
+#include "ReflectionYml.h"
+#include "SceneManager.h"
 
 ModelLoader::ModelLoader()
 {
@@ -122,6 +124,7 @@ Model* ModelLoader::LoadModel()
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 			m_model->m_Skeleton = skeleton;
 			Animator* animator = m_model->m_animator;
+			animator->m_Motion = m_fileGuid;
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 
@@ -149,7 +152,14 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		vertex.bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
 		if (hasTexCoords)
 		{
-			vertex.uv = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+			vertex.uv0 = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+
+			if (mesh->mTextureCoords[1]) {
+				vertex.uv1 = { mesh->mTextureCoords[1][i].x, mesh->mTextureCoords[1][i].y };
+			}
+			else {
+				vertex.uv1 = vertex.uv0;
+			}
 		} 
 
 		vertices.push_back(vertex);
@@ -174,24 +184,38 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 void ModelLoader::ProcessMaterials()
 {
-	for (UINT i = 0; i < m_AIScene->mNumMeshes; i++)
+	if (m_AIScene->mNumMaterials == 0)
 	{
-		aiMesh* mesh = m_AIScene->mMeshes[i];
-		m_model->m_Materials.push_back(GenerateMaterial(mesh));
+		m_model->m_Materials.push_back(GenerateMaterial());
+	}
+	else
+	{
+		for (UINT i = 0; i < m_AIScene->mNumMaterials; i++)
+		{
+			m_model->m_Materials.push_back(GenerateMaterial(i));
+		}
 	}
 }
 
-Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
+Material* ModelLoader::GenerateMaterial(int index)
 {
+	auto tempMaterial = DataSystems->Materials.find(m_AIScene->mMaterials[index]->GetName().C_Str());
+	if (tempMaterial != DataSystems->Materials.end())
+	{
+		return tempMaterial->second.get();
+	}
+
 	Material* material = AllocateResource<Material>();
-	material->m_name = mesh->mName.C_Str();
+	material->m_name = m_AIScene->mMaterials[index]->GetName().C_Str();
 
 	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
-	material->m_fileGuid = modelFileNode["guid"].as<std::string>();
+	material->m_fileGuid = m_fileGuid = modelFileNode["guid"].as<std::string>();
 
-	if (mesh->mMaterialIndex >= 0)
+
+
+	if (index > -1)
 	{
-		aiMaterial* mat = m_AIScene->mMaterials[mesh->mMaterialIndex];
+		aiMaterial* mat = m_AIScene->mMaterials[index];
 
 		Texture* normal = GenerateTexture(mat, aiTextureType_NORMALS);
 		Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
@@ -229,11 +253,11 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 			Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
 			if (albedo)
 			{
-				 material->UseBaseColorMap(albedo);
-				 if (albedo->IsTextureAlpha())
-				 {
-					 material->m_renderingMode = MaterialRenderingMode::Transparent;
-				 }
+				material->UseBaseColorMap(albedo);
+				if (albedo->IsTextureAlpha())
+				{
+					material->m_renderingMode = MaterialRenderingMode::Transparent;
+				}
 			}
 
 			aiColor3D colour;
@@ -266,7 +290,7 @@ Material* ModelLoader::GenerateMaterial(aiMesh* mesh)
 			DeallocateResource<Material>(mat);
 		}
 	};
-	DataSystems->Materials[mesh->mName.C_Str()] = std::shared_ptr<Material>(material, deleter);
+	DataSystems->Materials[material->m_name] = std::shared_ptr<Material>(material, deleter);
 
 	return material;
 }
@@ -423,10 +447,12 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 
 void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex)
 {
+	static int modelSeparator = 0;
 	int nextIndex = parentIndex;
 	if (true == isRoot)
 	{
 		auto rootObject = m_scene->CreateGameObject(m_model->name, GameObject::Type::Mesh, nextIndex);
+		m_gameObjects.push_back(rootObject);
 		nextIndex = rootObject->m_index;
 		m_modelRootIndex = rootObject->m_index;
 
@@ -434,6 +460,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		{
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
+			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
 
 			for (auto ani : m_model->m_Skeleton->m_animations)
@@ -447,7 +474,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		{
 			uint32 meshId = node->m_meshes[0];
 			Mesh* mesh = m_model->m_Meshes[meshId];
-			Material* material = m_model->m_Materials[meshId];
+			Material* material = m_model->m_Materials[mesh->m_materialIndex];
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			meshRenderer->SetEnabled(true);
@@ -462,10 +489,10 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
-
+		m_gameObjects.push_back(object);
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[meshId];
+		Material* material = m_model->m_Materials[mesh->m_materialIndex];
 		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
 		meshRenderer->SetEnabled(true);
@@ -478,6 +505,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObject::Type::Mesh, nextIndex);
+		m_gameObjects.push_back(object);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -503,6 +531,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObject::Type::Bone, nextIndex);
+			m_gameObjects.push_back(boneObject);
 		}
 		else
 		{

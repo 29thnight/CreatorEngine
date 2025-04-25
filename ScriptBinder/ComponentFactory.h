@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ReflectionYml.h"
 
 class GameObject;
 class ComponentFactory : public Singleton<ComponentFactory>

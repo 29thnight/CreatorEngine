@@ -1,11 +1,11 @@
 m_SceneObjects:
   - GameObject: 2166264123
     m_name: SampleScene
-    m_instanceID: 734311849
+    m_instanceID: 3061538015
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
-      rotation: {x: -0, y: 0, z: -0, w: 1}
-      scale: {x: 1, y: 1, z: 1, w: 0}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
       m_dirty: 1
     m_index: 0
     m_parentIndex: 0
@@ -14,7 +14,7 @@ m_SceneObjects:
     m_components: ~
   - GameObject: 2166264123
     m_name: DamagedHelmet
-    m_instanceID: 3364017360
+    m_instanceID: 3226778247
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -27,7 +27,7 @@ m_SceneObjects:
     m_components:
       - MeshRenderer: 659998325
         m_name: MeshRenderer
-        m_instanceID: 186957110
+        m_instanceID: 3703788410
         m_Material:
           m_name: mesh_helmet_LP_13930damagedHelmet
           m_materialInfo:
@@ -39,7 +39,6 @@ m_SceneObjects:
         m_Mesh:
           m_name: mesh_helmet_LP_13930damagedHelmet
           m_materialIndex: 0
-        m_Animator: ~
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0

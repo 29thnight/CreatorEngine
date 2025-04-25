@@ -61,6 +61,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             Meta::Deserialize(meshRenderer, itNode);
             meshRenderer->SetEnabled(true);
         }
+		else if (componentType->typeID == GUIDCreator::GetTypeID<Animator>())
+		{
+			auto animator = static_cast<Animator*>(component);
+			Model* model = nullptr;
+
+			if (itNode["m_Motion"])
+			{
+				FileGuid guid = itNode["m_Motion"].as<std::string>();
+				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+			}
+		}
 		else if (componentType->typeID == GUIDCreator::GetTypeID<LightComponent>())
 		{
 			auto lightComponent = static_cast<LightComponent*>(component);

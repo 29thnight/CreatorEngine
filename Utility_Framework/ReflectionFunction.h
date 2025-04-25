@@ -162,7 +162,6 @@ namespace Meta
                     [member](void* instance) -> std::unique_ptr<IVectorIterator>
                     {
                         auto vecPtr = &(static_cast<ClassT*>(instance)->*member);
-						std::cout << "vecPtr: " << vecPtr << std::endl;
                         return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
                     },
                     GetVectorElementTypeName<ElementType>(),

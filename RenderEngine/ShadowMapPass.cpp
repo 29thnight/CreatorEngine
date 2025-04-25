@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Sampler.h"
 #include "RenderableComponents.h"
-#include "Light.h"
+#include "LightController.h"
 
 ShadowMapPass::ShadowMapPass()
 {
@@ -17,6 +17,7 @@ ShadowMapPass::ShadowMapPass()
 		{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",     1, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TANGENT",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BINORMAL",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -245,6 +246,14 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;
+		if (LightDir == Mathf::Vector4{ 0.f, 0.f, 0.f, 1.f })
+		{
+			LightDir = { 0.f, 0.f, -1.f, 0.f };
+		}
+		else
+		{
+			LightDir.Normalize();
+		}
 		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * minExtents.z;
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });

@@ -4,27 +4,13 @@
 #include "LightProperty.h"
 #include "../ScriptBinder/RenderableComponents.h"
 #include "Skeleton.h"
-#include "Light.h"
+#include "LightController.h"
 #include "Benchmark.hpp"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
-
-// 콜백 함수: 입력 텍스트 버퍼 크기가 부족할 때 std::string을 재조정
-//int InputTextCallback(ImGuiInputTextCallbackData* data)
-//{
-//	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-//	{
-//		// UserData에 저장된 std::string 포인터를 가져옴
-//		std::string* str = static_cast<std::string*>(data->UserData);
-//		// 새로운 길이에 맞춰 std::string의 크기 재조정
-//		str->resize(data->BufTextLen);
-//		data->Buf = const_cast<char*>(str->c_str());
-//	}
-//	return 0;
-//}
 
 RenderScene::~RenderScene()
 {
@@ -39,35 +25,6 @@ void RenderScene::Initialize()
 {
 	m_MainCamera.RegisterContainer();
 	m_LightController = new LightController();
-	//EditorSceneObjectHierarchy();
-	//EditorSceneObjectInspector();
-
-	//animationJobThread = std::thread([&]
-	//{
-	//	using namespace std::chrono;
-
-	//	auto prev = high_resolution_clock::now();
-
-	//	while (true)
-	//	{
-	//		auto now = high_resolution_clock::now();
-	//		duration<float> elapsed = now - prev;
-
-	//		// 16.6ms ~ 60fps 에 맞춰 제한
-	//		if (elapsed.count() >= (1.0f / 60.0f))
-	//		{
-	//			prev = now;
-	//			float delta = elapsed.count();
-	//			m_animationJob.Update(delta);
-	//		}
-	//		else
-	//		{
-	//			std::this_thread::sleep_for(microseconds(1)); // CPU 낭비 방지
-	//		}
-	//	}
-	//});
-
-	//animationJobThread.detach();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -79,6 +36,8 @@ void RenderScene::Update(float deltaSecond)
 {
 	m_currentScene = SceneManagers->GetActiveScene();
 	if (m_currentScene == nullptr) return;
+
+	m_currentScene->UpdateLight(m_LightController->m_lightProperties);
 
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{

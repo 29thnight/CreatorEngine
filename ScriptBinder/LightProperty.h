@@ -2,7 +2,7 @@
 #include "Core.Mathf.h"
 #include "Reflection.hpp"
 
-constexpr int MAX_LIGHTS = 4;
+constexpr int MAX_LIGHTS = 255;
 
 enum LightType
 {
@@ -39,21 +39,21 @@ cbuffer Light
     int m_lightStatus{};
     float m_intencity{ 5.f };
 
-    Mathf::Matrix GetViewMatrix() const
+    Mathf::Matrix GetLightViewMatrix() const
     {
         return XMMatrixLookAtLH(m_direction * -50.f, XMVectorSet(0, 0, 0, 1), { 0, 1, 0, 0 });
     }
 
-    Mathf::Matrix GetProjectionMatrix(float _near, float _far, float width = 32.f, float height = 32.f) const
+    Mathf::Matrix GetLightProjectionMatrix(float _near, float _far, float width = 32.f, float height = 32.f) const
     {
         switch (m_lightType)
         {
         case LightType::DirectionalLight:
             return XMMatrixOrthographicLH(width, height, _near, _far);
         case LightType::PointLight:
-            return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         case LightType::SpotLight:
-            return XMMatrixPerspectiveFovLH(m_spotLightAngle, 1.0f, _near, _far);
+            return XMMatrixPerspectiveFovLH(XMConvertToRadians(m_spotLightAngle), 1.0f, _near, _far);
         default:
             return XMMatrixIdentity();
         }

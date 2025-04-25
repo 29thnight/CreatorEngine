@@ -22,7 +22,8 @@ struct Vertex
 {
 	Mathf::Vector3 position;
 	Mathf::Vector3 normal;
-	Mathf::Vector2 uv;
+	Mathf::Vector2 uv0;
+	Mathf::Vector2 uv1;
 	Mathf::Vector3 tangent;
 	Mathf::Vector3 bitangent;
 	Mathf::Vector4 boneIndices;
@@ -32,7 +33,8 @@ struct Vertex
 	Vertex(
 		const Mathf::Vector3& _position, 
 		const Mathf::Vector3& _normal, 
-		const Mathf::Vector2& _uv, 
+		const Mathf::Vector2& _uv0, 
+		const Mathf::Vector2& _uv1, 
 		const Mathf::Vector3& _tangent, 
 		const Mathf::Vector3& _bitangent, 
 		const Mathf::Vector4& _boneIndices, 
@@ -40,14 +42,15 @@ struct Vertex
 	) :
 		position(_position), 
 		normal(_normal), 
-		uv(_uv), 
+		uv0(_uv0),
+		uv1(_uv1),
 		tangent(_tangent), 
 		bitangent(_bitangent), 
 		boneIndices(_boneIndices), 
 		boneWeights(_boneWeights) {}
 
 	Vertex(const Mathf::Vector3& _position, const Mathf::Vector3& _normal, const Mathf::Vector2& _uv) :
-		position(_position), normal(_normal), uv(_uv) {}
+		position(_position), normal(_normal), uv0(_uv) {}
 };
 
 class Texture;

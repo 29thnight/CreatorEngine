@@ -5,7 +5,7 @@
 #include "Scene.h"
 #include "RenderableComponents.h"
 #include "Mesh.h"
-#include "Light.h"
+#include "LightController.h"
 #include "LightProperty.h"
 
 struct alignas(16) CB {
@@ -25,6 +25,7 @@ LightMapPass::LightMapPass()
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -60,6 +61,8 @@ LightMapPass::LightMapPass()
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_cbuffer = DirectX11::CreateBuffer(sizeof(CB), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	DirectX::SetName(m_cbuffer.Get(), "bind lightmapping data");
+	DirectX::SetName(m_materialBuffer.Get(), "materialData");
 }
 
 void LightMapPass::Initialize(std::vector<Texture*>& lightmaps)
@@ -100,7 +103,7 @@ void LightMapPass::Initialize(std::vector<Texture*>& lightmaps)
 	ID3D11ShaderResourceView* textureArraySRV = nullptr;
 	hr = DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
 
-	DirectX11::PSSetShaderResources(14, 1, &textureArraySRV); // shadowmap texture array 0
+	DirectX11::PSSetShaderResources(14, 1, &textureArraySRV);
 }
 
 void LightMapPass::Execute(RenderScene& scene, Camera& camera)
@@ -108,8 +111,10 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 	m_pso->Apply();
 
 	auto& deviceContext = DeviceState::g_pDeviceContext;
+	//DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::White);
+	DirectX11::ClearDepthStencilView(camera.m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
 
 	camera.UpdateBuffer();
 	scene.UseModel();

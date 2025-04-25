@@ -150,9 +150,6 @@
     <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
       <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="LightMap\Algorithm">
-      <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\NodeEditor">
       <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
@@ -161,6 +158,12 @@
     </Filter>
     <Filter Include="Resources\Skeleton\Animation">
       <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\ScreenSpaceReflectionPass">
+      <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\SubSurfaceScatteringPass">
+      <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -184,9 +187,6 @@
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
-    </ClCompile>
-    <ClCompile Include="Light.cpp">
-      <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>Objects</Filter>
@@ -260,9 +260,6 @@
     <ClCompile Include="LightMap.cpp">
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
-    <ClCompile Include="LightmapShadowPass.cpp">
-      <Filter>LightMap\Calculate</Filter>
-    </ClCompile>
     <ClCompile Include="PositionMapPass.cpp">
       <Filter>LightMap\Calculate</Filter>
     </ClCompile>
@@ -286,6 +283,15 @@
     </ClCompile>
     <ClCompile Include="RenderModules.cpp">
       <Filter>RenderPass\EffectPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ScreenSpaceReflectionPass.cpp">
+      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+    </ClCompile>
+    <ClCompile Include="LightController.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SubsurfaceScatteringPass.cpp">
+      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
     </ClCompile>
     <ClCompile Include="TestPlayer.cpp">
       <Filter>소스 파일</Filter>
@@ -321,9 +327,6 @@
     </ClInclude>
     <ClInclude Include="AnimationJob.h">
       <Filter>Asset\JobSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="Light.h">
-      <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Resources\Shader</Filter>
@@ -397,9 +400,6 @@
     <ClInclude Include="LightMap.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
-    <ClInclude Include="LightmapShadowPass.h">
-      <Filter>LightMap\Calculate</Filter>
-    </ClInclude>
     <ClInclude Include="PositionMapPass.h">
       <Filter>LightMap\Calculate</Filter>
     </ClInclude>
@@ -427,9 +427,6 @@
     <ClInclude Include="ResourceAllocator.h">
       <Filter>Asset\ResourceAllocator</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ISceneRenderer.h">
-      <Filter>Renderer\Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="AssetMetaWather.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
@@ -441,6 +438,15 @@
     </ClInclude>
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenSpaceReflectionPass.h">
+      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+    </ClInclude>
+    <ClInclude Include="LightController.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="SubsurfaceScatteringPass.h">
+      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
     </ClInclude>
     <ClInclude Include="TestPlayer.h">
       <Filter>헤더 파일</Filter>
@@ -575,6 +581,12 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AddTextureColor.cs.hlsl">
       <Filter>Shaders\LightMap</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSS.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
