@@ -1,9 +1,11 @@
 #include "TestPlayer.h"
 #include "InputManager.h"
 #include "Animator.h"
+#include "aniFSM.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
+	player->AddComponent<aniFSM>();
 }
 
 void TestPlayer::Update(float deltaTime)
@@ -46,5 +48,5 @@ void TestPlayer::Update(float deltaTime)
 	}
 	if (speed >= maxSpeed)
 		speed = maxSpeed;
-	player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });
+	//player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });
 }

@@ -55,9 +55,6 @@
     <Filter Include="Classes\Components\ComponentFactory">
       <UniqueIdentifier>{25bd8b3d-610a-4fc6-87f7-0a1e660d89c6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\UI">
-      <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\UIManager">
       <UniqueIdentifier>{4a6b8d53-6659-416d-b82d-18961450a23f}</UniqueIdentifier>
     </Filter>
@@ -66,6 +63,12 @@
     </Filter>
     <Filter Include="Classes\Components\RenderableComponent">
       <UniqueIdentifier>{73674677-6778-4028-8951-143f6440393b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\AniMation">
+      <UniqueIdentifier>{c4ebd2f5-0acb-4d51-9e35-55964ddb90a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\UI">
+      <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -88,19 +91,19 @@
       <Filter>Classes\Object</Filter>
     </ClCompile>
     <ClCompile Include="ImageComponent.cpp">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="Canvas.cpp">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="UIButton.cpp">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="TextComponent.cpp">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="UIComponent.cpp">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
     <ClCompile Include="ComponentFactory.cpp">
       <Filter>Classes\Components\ComponentFactory</Filter>
@@ -111,14 +114,17 @@
     <ClCompile Include="SoundManager.cpp">
       <Filter>Managers\SoundManager</Filter>
     </ClCompile>
-    <ClCompile Include="Animator.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClCompile>
     <ClCompile Include="aniFSM.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animator.cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
     <ClCompile Include="aniState.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
+    <ClCompile Include="AniTransition.cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -174,19 +180,19 @@
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="ImageComponent.h">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="Canvas.h">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="UIButton.h">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="TextComponent.h">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="UIComponent.h">
-      <Filter>Classes\Components\UI</Filter>
+      <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="RegisterReflect.def">
       <Filter>Managers\EngineReflect</Filter>
@@ -212,14 +218,17 @@
     <ClInclude Include="SpriteRenderer.h">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
-    <ClInclude Include="Animator.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
     <ClInclude Include="aniFSM.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animator.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="aniState.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AniTransition.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

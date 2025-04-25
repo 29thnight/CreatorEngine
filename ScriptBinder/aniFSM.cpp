@@ -11,6 +11,7 @@ void aniFSM::SetNextState(std::string stateName)
 
 void aniFSM::Update(float tick)
 {
+	
 	if (CurState != NextState)
 	{
 		if (CurState != nullptr)
@@ -22,6 +23,7 @@ void aniFSM::Update(float tick)
 	}
 	else
 	{
-		CurState->Update(DeltaTime);
+		if (CurState == nullptr) return;
+		CurState->Update(tick);
 	}
 }
