@@ -4,6 +4,15 @@
 #include <string>
 #include <vector>
 #include <array>
+
+//type id 
+const static uint32_t m_boxTypeId = 9001;
+
+
+
+
+
+
 //==========================================================
 // EnumClass
 //콜라이더 타입 //트리거 : 충돌되지 않고 겹치면 이벤트 발생 , 콜리전 : 충돌되면 이벤트 발생

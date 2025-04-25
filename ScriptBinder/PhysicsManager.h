@@ -1,6 +1,8 @@
 #pragma once
 #include "../physics/Physx.h"
+#include "../physics/ICollider.h"
 
+class ICollider;
 class PhysicsManager
 {
 	//todo : 
@@ -10,6 +12,21 @@ class PhysicsManager
 	// - Object를 순회하며 물리컴포넌트를 찾아 생성 및 업데이트 및 삭제
 	// - 물리엔진 콜리전 이벤트를 찾아서 콜백함수 호출
 	// - 물리엔지 컴포넌트의 데이터를 기반으로 디버그 정보 드로우
+	using ColliderID = unsigned int;
+	struct ColliderInfo
+	{
+		uint32_t id;
+		Component* component;
+		GameObject* gameObject;
+		ICollider* collider;
+		bool bIsDestroyed = false;
+		bool bIsRemoveBody = false;
+	};
+
+	struct CollisionCallbackInfo {
+		CollisionData data;
+		ECollisionEventType Type;
+	};
 
 public:
 	PhysicsManager() = default;
@@ -33,7 +50,8 @@ public:
 
 
 
-	//디버그 정보 드로우
+	//디버그 정보 드로우 //[[maybe_unused]] todo : DebugSystem 통합
+	[[maybe_unused]] 
 	void DrawDebugInfo();
 
 private:
@@ -54,6 +72,10 @@ private:
 
 	unsigned int m_lastColliderID{ 0 };
 	
+	//물리엔진 객체
+	std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
 
+	//콜리전 콜백 
+	std::vector<CollisionCallbackInfo> m_callbacks;
 };
 

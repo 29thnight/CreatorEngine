@@ -52,6 +52,7 @@ private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
 
+
 	bool m_isLockLinearX;
 	bool m_isLockLinearY;
 	bool m_isLockLinearZ;

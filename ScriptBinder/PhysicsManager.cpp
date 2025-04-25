@@ -1,10 +1,36 @@
 #include "PhysicsManager.h"
 #include "SceneManager.h"
 #include "Scene.h"
+#include "GameObject.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 
 class Scene;
+void PhysicsManager::Initialize()
+{
+	//물리엔진 초기화
+	m_bIsInitialized = Physics->Initialize();
+}
+void PhysicsManager::Update(float fixedDeltaTime)
+{
+	if (m_bPlay) {
+		//물리씬에 데이터 셋
+		SetPhysicData();
+
+		//물리씬 업데이트
+		Physics->Update(fixedDeltaTime);
+
+		//물리씬에 데이터 가져오기
+		GetPhysicData();
+	}
+}
+void PhysicsManager::Shutdown()
+{
+
+}
+void PhysicsManager::ChangeScene()
+{
+}
 void PhysicsManager::OnLoadScene()
 {
 	//todo : 물리씬 초기화
@@ -60,6 +86,7 @@ void PhysicsManager::OnLoadScene()
 			box->SetBoxInfoMation(boxInfo);
 			
 			if (bodyType == EBodyType::STATIC) {
+				//pxScene에 엑터 추가
 				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
 				//콜라이더 정보 저장
 				//m_colliderContainer.insert({ colliderID, boxInfo });
@@ -106,4 +133,69 @@ void PhysicsManager::OnLoadScene()
 
 	};
 	
+}
+
+void PhysicsManager::OnUnloadScene()
+{
+}
+
+
+void PhysicsManager::DrawDebugInfo()
+{
+	//collider 정보를 수집하여 render에서 wireframe로 그려줄 수 있도록 한다.
+	//DebugRender debug;
+
+	//물리씬에 있는 객체를 순회하며 콜리전 정보를 가져온다.
+
+	//DebugData dd;
+	//// 컴포넌트별 데이터 수집
+	//for (auto* rb : m_rigidBodies)
+	//	rb->FillDebugData(dd);
+
+	//// 매니저가 처리하는 Raycast 디버그 추가
+	//for (auto& rq : m_raycastSystem->GetRequests())
+	//{
+	//	if (rq.hit)
+	//	{
+	//		dd.lines.push_back({ rq.origin, rq.origin + rq.direction * rq.distance, {1,1,0,1} });
+	//		dd.points.push_back({ rq.hitPosition, {1,0,0,1} });
+	//	}
+	//}
+
+	//// IDebugRenderer에 제출
+	//for (auto& l : dd.lines)   debug->DrawLine(l);
+	//for (auto& s : dd.spheres) debug->DrawSphere(s);
+	//for (auto& p : dd.points)  debug->DrawPoint(p);
+	//for (auto& b : dd.boxes)   debug->DrawBox(b);
+	//for (auto& c : dd.capsules) debug->DrawCapsule(c);
+	//for (auto& m : dd.convexes) debug->DrawConvexMesh(c);
+	//debug->Flush();
+	
+}
+
+void PhysicsManager::SetPhysicData()
+{
+	for (auto& [id, colliderInfo] : m_colliderContainer) {
+	
+		if (colliderInfo.bIsDestroyed)
+		{
+			continue;
+		}
+
+		auto transform = colliderInfo.gameObject->m_transform;
+		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
+		auto offset = colliderInfo.collider->GetPositionOffset();
+
+		if (colliderInfo.id == )
+		{
+
+		}
+	
+
+
+	}
+}
+
+void PhysicsManager::GetPhysicData()
+{
 }

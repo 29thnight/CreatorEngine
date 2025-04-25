@@ -84,7 +84,7 @@ public:
 	}
 };
 
-void PhysicX::Initialize()
+bool PhysicX::Initialize()
 {
 	m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_allocator, m_errorCallback);     
 
@@ -98,6 +98,10 @@ void PhysicX::Initialize()
 
 	//m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 40.f), recordMemoryAllocations, pvd);  
 	m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 10.f), true, pvd);  // 피직스 초기화
+	if (m_physics == nullptr)
+	{
+		return false;
+	}
 
 	// physics 사용 코어 수
 	UINT MaxThread = 8;
@@ -160,6 +164,8 @@ void PhysicX::Initialize()
 	m_scene = m_physics->createScene(sceneDesc); //
 
 	m_characterControllerManager = PxCreateControllerManager(*m_scene);
+
+	return true;
 }
 //void PhysicX::HasConvexMeshResource(const unsigned int& hash)
 //{
@@ -1224,6 +1230,52 @@ void PhysicX::RemoveCollisionData(const unsigned int& id)
 	}
 
 	m_removeCollisionIds.push_back(id);
+}
+
+void PhysicX::extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape, std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon)
+{
+	const physx::PxConvexMeshGeometry& convexMeshGeom = static_cast<const physx::PxConvexMeshGeometry&>(shape->getGeometry());
+
+	DirectX::SimpleMath::Matrix dxMatrix;
+	DirectX::SimpleMath::Matrix matrix;
+
+	std::vector<std::vector<DirectX::SimpleMath::Vector3>> polygon;
+
+	//convexMesh의 정점과 인덱스 정보 가져오기
+	const physx::PxVec3* convexMeshVertices = convexMeshGeom.convexMesh->getVertices();
+	const physx::PxU32 vertexCount = convexMeshGeom.convexMesh->getNbVertices();
+
+	const physx::PxU8* convexMeshIndices = convexMeshGeom.convexMesh->getIndexBuffer();
+	const physx::PxU32 polygonCount = convexMeshGeom.convexMesh->getNbPolygons();
+
+	//내보내기 위한 polygon 정보 생성
+	polygon.reserve(polygonCount);
+
+	for (PxU32 i = 0; i < polygonCount-1; i++)
+	{
+		physx::PxHullPolygon pxPolygon;
+		convexMeshGeom.convexMesh->getPolygonData(i, pxPolygon);
+		int totalVertexCount = pxPolygon.mNbVerts;
+		int startIndex = pxPolygon.mIndexBase;
+
+		std::vector<DirectX::SimpleMath::Vector3> vertices;
+		vertices.reserve(totalVertexCount);
+
+		for (int j = 0; j < totalVertexCount; j++)
+		{
+			DirectX::SimpleMath::Vector3 vertex;
+			vertex.x = convexMeshVertices[convexMeshIndices[startIndex + j]].x;
+			vertex.y = convexMeshVertices[convexMeshIndices[startIndex + j]].y;
+			vertex.z = convexMeshVertices[convexMeshIndices[startIndex + j]].z;
+
+			vertex = DirectX::SimpleMath::Vector3::Transform(vertex, dxMatrix);
+
+			vertices.push_back(vertex);
+		}
+
+		debuPolygon.push_back(vertices);
+	}
+
 }
 
 void PhysicX::ShowNotRelease()

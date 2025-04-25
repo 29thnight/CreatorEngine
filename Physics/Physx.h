@@ -23,6 +23,7 @@ class ColliderInfo;
 class PhysicX : public Singleton<PhysicX>
 {
 	friend class Singleton;
+	using PolygonMesh = std::vector<std::vector<DirectX::SimpleMath::Vector3>>*;
 private:
 	PhysicX() = default;
 	~PhysicX() = default;
@@ -30,7 +31,7 @@ public:
 	// IPhysicsSystem
 	//core
 	//물리엔진 세팅
-	void Initialize();
+	bool Initialize();
 	
 
 	
@@ -161,6 +162,8 @@ public:
 	void CreateCollisionData(const unsigned int& id, CollisionData* data);
 	void RemoveCollisionData(const unsigned int& id);
 
+	//===========================================================================================
+	//debug data 대응
 
 
 private:
@@ -209,6 +212,17 @@ private:
 	//Ragdoll 관리용
 	std::unordered_map<unsigned int, RagdollPhysics*> m_ragdollContainer; //ragdoll 관리용
 	std::unordered_map<unsigned int, RagdollPhysics*> m_simulationRagdollContainer; //ragdoll 시뮬레이션 관리용
+
+	//=================================================================================
+	//Debug data 관리용
+	std::unordered_map<unsigned int, PolygonMesh> mDebugPolygon;
+
+	std::unordered_map<unsigned int, std::vector<unsigned int>> mDebugIndices;
+	std::unordered_map<unsigned int, std::vector<DirectX::SimpleMath::Vector3>> mDebugVertices;
+
+	std::unordered_map<unsigned int, std::vector<std::pair<DirectX::SimpleMath::Vector3, DirectX::SimpleMath::Vector3>>> mDebugHeightField;
+
+	void extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape,std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon);
 
 
 
