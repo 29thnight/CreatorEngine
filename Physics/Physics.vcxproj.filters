@@ -22,11 +22,23 @@
     <Filter Include="Data">
       <UniqueIdentifier>{4ef4efaf-7369-4103-94c9-245ab631aceb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Func">
-      <UniqueIdentifier>{d8de44da-4d37-41de-a79c-3f99125f4baa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Common">
       <UniqueIdentifier>{1cc72946-c63f-40a6-9003-a5d95b767ca0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PhysicsActor">
+      <UniqueIdentifier>{4e72ddb1-1d48-460a-95ee-1e1534b14ff0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Helper">
+      <UniqueIdentifier>{775e5a04-abc5-4072-8086-1f922a21ee31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ResourceBase">
+      <UniqueIdentifier>{8141cf32-cbb0-4926-8b82-3465871d37b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Character">
+      <UniqueIdentifier>{16c9c28e-1d20-40ec-95e6-09bb9b963213}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ragdoll">
+      <UniqueIdentifier>{bd9da527-b3aa-4d7a-b70f-79094c5fe763}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -39,23 +51,56 @@
     <ClInclude Include="Physx.h">
       <Filter>Main</Filter>
     </ClInclude>
-    <ClInclude Include="IRigidbody.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
     <ClInclude Include="PhysicsEventCallback.h">
       <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsInfo.h">
-      <Filter>Data</Filter>
-    </ClInclude>
-    <ClInclude Include="Func.h">
-      <Filter>Func</Filter>
     </ClInclude>
     <ClInclude Include="ICollider.h">
       <Filter>Interface</Filter>
     </ClInclude>
-    <ClInclude Include="Common.h">
+    <ClInclude Include="PhysicsCommon.h">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="StaticRigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="DynamicRigidBody.h">
+      <Filter>PhysicsActor</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsHelper.h">
+      <Filter>Helper</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsDebug.h">
+      <Filter>Helper</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceBase.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="ConvexMeshResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="HeightFieldResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="TriangleMeshResource.h">
+      <Filter>ResourceBase</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterController.h">
+      <Filter>Character</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterMovement.h">
+      <Filter>Character</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollPhysics.h">
+      <Filter>Ragdoll</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollJoint.h">
+      <Filter>Ragdoll</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollLink.h">
+      <Filter>Ragdoll</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -71,8 +116,50 @@
     <ClCompile Include="PhysicsEventCallback.cpp">
       <Filter>Main</Filter>
     </ClCompile>
-    <ClCompile Include="Common.cpp">
-      <Filter>Common</Filter>
+    <ClCompile Include="RigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
     </ClCompile>
+    <ClCompile Include="StaticRigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
+    </ClCompile>
+    <ClCompile Include="DynamicRigidBody.cpp">
+      <Filter>PhysicsActor</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsHelper.cpp">
+      <Filter>Helper</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsDebug.cpp">
+      <Filter>Helper</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceBase.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="ConvexMeshResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="HeightFieldResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="TriangleMeshResource.cpp">
+      <Filter>ResourceBase</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterController.cpp">
+      <Filter>Character</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterMovement.cpp">
+      <Filter>Character</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollPhysics.cpp">
+      <Filter>Ragdoll</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollJoint.cpp">
+      <Filter>Ragdoll</Filter>
+    </ClCompile>
+    <ClCompile Include="RagdollLink.cpp">
+      <Filter>Ragdoll</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="PhysicsFlags.txt" />
   </ItemGroup>
 </Project>

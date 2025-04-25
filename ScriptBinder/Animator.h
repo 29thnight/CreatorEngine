@@ -17,6 +17,15 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
+    [[property]]
+    std::vector<std::string> aniName;
+   /* [[property]]
+    std::string aniName;*/
+    
+    [[Property]]
+    int m_AnimIndex{};
+    void SetAnimation(int index);
+    void UpdateAnimation();
     [[Property]]
     FileGuid m_Motion{};
 

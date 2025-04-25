@@ -24,6 +24,8 @@
 #include <string>
 #include <regex>
 
+#include "Animator.h"
+
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -130,6 +132,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_metalRoughTexture.get(),
 		m_normalTexture.get(),
 		m_emissiveTexture.get()
+	);
+
+	//SSS
+	m_pSubsurfaceScatteringPass = std::make_unique<SubsurfaceScatteringPass>();
+	m_pSubsurfaceScatteringPass->Initialize(m_diffuseTexture.get(),
+		m_metalRoughTexture.get()
 	);
 
 	m_pUIPass = std::make_unique<UIPass>();
@@ -243,9 +251,9 @@ void SceneRenderer::InitializeImGui()
 			// 메쉬별로 positionMap 생성
 			m_pPositionMapPass->Execute(*m_renderScene, c);
 			// lightMap 생성
-			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass);
+			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
 
-			m_pLightMapPass->Initialize(lightMap.lightmaps);
+			//m_pLightMapPass->Initialize(lightMap.lightmaps);
 		}
 
 		if (ImGui::CollapsingHeader("Baked Maps")) {
@@ -374,16 +382,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-	//std::shared_ptr<GameObject> Angryy2 = UIManagers->MakeButton("Angry", DataSystems->LoadTexture("test.jpg"), []() {std::cout << "soooo angry" << std::endl;} , { 1360, 540 });
-	//std::shared_ptr<GameObject> Bian = UIManagers->MakeButton("Biang", DataSystems->LoadTexture("bianca.png"), []() {std::cout << "Biangggggg" << std::endl;},{ 560,540 });
-	//UIManagers->SelectUI = Angryy2.get();
-	//Angryy2->GetComponent<UIComponent>()->SetNavi(Direction::Left, Bian.get());
-	//Bian->GetComponent<UIComponent>()->SetNavi(Direction::Right, Angryy2.get());
-	//std::shared_ptr<GameObject> test = UIManagers->MakeImage("TestImagegg2", DataSystems->LoadTexture("test2.png"));
-	//test->AddComponent<TextComponent>()->LoadFont(DataSystems->LoadSFont(L"DNF2.SFont"));
-	//test->GetComponent<TextComponent>()->SetMessage("안녕");
-	//std::shared_ptr<GameObject> text = UIManagers->MakeText("Text", DataSystems->LoadSFont(L"DNF2.SFont"));
-	//text->GetComponent<TextComponent>()->SetMessage("그건 불가능함");
+
 
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
@@ -402,6 +401,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
+	
 	if(ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
@@ -443,7 +443,6 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
-
 		if (useTestLightmap)
 		{
 			DirectX11::BeginEvent(L"LightMapPass");
@@ -452,7 +451,8 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
-		else
+
+		if (!useTestLightmap)
         {
 			
 			//[3] SSAOPass
@@ -482,6 +482,14 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+		//SSS
+		{
+			DirectX11::BeginEvent(L"SubsurfaceScatteringPass");
+			Benchmark banch;
+			m_pSubsurfaceScatteringPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SubsurfaceScatteringPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 		//SSR
 		{
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
@@ -502,8 +510,8 @@ void SceneRenderer::SceneRendering()
 
         //[*] PostProcessPass
         {
-            DirectX11::BeginEvent(L"PostProcessPass");
-            Benchmark banch;
+			DirectX11::BeginEvent(L"PostProcessPass");
+			Benchmark banch;
             m_pPostProcessingPass->Execute(*m_renderScene, *camera);
             RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
             DirectX11::EndEvent();

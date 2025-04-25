@@ -8,7 +8,9 @@ ReflectionFieldInheritance(Animator, Component) \
 		meta_property(m_Skeleton) \
 		meta_property(m_TimeElapsed) \
 		meta_property(m_AnimIndexChosen) \
+		meta_property(m_AnimIndex) \
 		meta_property(m_Motion) \
+		meta_property(aniName) \
 	}); \
 	FieldEnd(Animator, PropertyOnlyInheritance) \
 };

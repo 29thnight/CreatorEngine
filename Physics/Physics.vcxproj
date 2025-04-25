@@ -24,6 +24,8 @@
     <ProjectGuid>{2584186c-912c-4e2f-a8a3-f79a22591bca}</ProjectGuid>
     <RootNamespace>Physics</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <CudaToolkitCustomDir>
+    </CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -54,6 +56,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -70,6 +73,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PublicIncludeDirectories>
+    </PublicIncludeDirectories>
+    <AllProjectBMIsArePublic>false</AllProjectBMIsArePublic>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -110,8 +118,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -122,6 +131,21 @@
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)$(CudaToolkitLibDir);</AdditionalLibraryDirectories>
+    </Lib>
+    <CudaLink>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+    </CudaLink>
+    <CudaCompile>
+      <Include>
+      </Include>
+      <AdditionalDeps>
+      </AdditionalDeps>
+      <CudaRuntime>Static</CudaRuntime>
+      <AdditionalOptions>-std=c++20 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -147,18 +171,33 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h" />
+    <ClInclude Include="CharacterController.h" />
+    <ClInclude Include="CharacterMovement.h" />
+    <ClInclude Include="ConvexMeshResource.h" />
+    <ClInclude Include="DynamicRigidBody.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="Func.h" />
+    <ClInclude Include="HeightFieldResource.h" />
     <ClInclude Include="ICollider.h" />
-    <ClInclude Include="IRigidbody.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="PhysicsCommon.h" />
+    <ClInclude Include="PhysicsDebug.h" />
     <ClInclude Include="PhysicsEventCallback.h" />
-    <ClInclude Include="PhysicsInfo.h" />
+    <ClInclude Include="PhysicsHelper.h" />
     <ClInclude Include="Physx.h" />
+    <ClInclude Include="RagdollJoint.h" />
+    <ClInclude Include="RagdollLink.h" />
+    <ClInclude Include="RagdollPhysics.h" />
+    <ClInclude Include="ResourceBase.h" />
+    <ClInclude Include="RigidBody.h" />
+    <ClInclude Include="StaticRigidBody.h" />
+    <ClInclude Include="TriangleMeshResource.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Common.cpp" />
+    <ClCompile Include="CharacterController.cpp" />
+    <ClCompile Include="CharacterMovement.cpp" />
+    <ClCompile Include="ConvexMeshResource.cpp" />
+    <ClCompile Include="DynamicRigidBody.cpp" />
+    <ClCompile Include="HeightFieldResource.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -166,15 +205,28 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Physics.cpp" />
+    <ClCompile Include="PhysicsDebug.cpp" />
     <ClCompile Include="PhysicsEventCallback.cpp" />
+    <ClCompile Include="PhysicsHelper.cpp" />
     <ClCompile Include="Physx.cpp" />
+    <ClCompile Include="RagdollJoint.cpp" />
+    <ClCompile Include="RagdollLink.cpp" />
+    <ClCompile Include="RagdollPhysics.cpp" />
+    <ClCompile Include="ResourceBase.cpp" />
+    <ClCompile Include="RigidBody.cpp" />
+    <ClCompile Include="StaticRigidBody.cpp" />
+    <ClCompile Include="TriangleMeshResource.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="PhysicsFlags.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.targets" />
   </ImportGroup>
 </Project>

@@ -6,13 +6,15 @@ TextComponent::TextComponent()
 	m_name = "TextComponent";
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<TextComponent>();
 	type = UItype::Text;
+
+	
 }
 
 void TextComponent::Update(float tick)
 {
 	pos = Mathf::Vector2(m_pOwner->m_transform.position);
 	pos += relpos;
-	m_IsEnabled = _isTable;
+	//m_IsEnabled = _isTable;
 	
 	auto  image = GetOwner()->GetComponent<ImageComponent>();
 	if (image)

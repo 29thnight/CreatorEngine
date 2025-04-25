@@ -33,6 +33,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pScreenSpaceReflectionPass->ControlPanel();
 		}
 
+		if(ImGui::CollapsingHeader("SubsurfaceScatteringPass"))
+		{
+			m_sceneRenderer->m_pSubsurfaceScatteringPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("ToneMapPass"))
 		{
 			m_sceneRenderer->m_pToneMapPass->ControlPanel();

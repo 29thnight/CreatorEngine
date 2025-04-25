@@ -23,11 +23,12 @@ public:
 	void SetMessage(std::string_view _message) { message = _message.data(); }
 	void LoadFont(SpriteFont* _font) { font = _font; }
 	void Draw(SpriteBatch* Sbatch);
+	[[Property]]
 	std::string message;
 
 private:
     [[Property]]
-	bool _isTable = true;
+	//bool _isTable = true;
 	Mathf::Vector2 pos{ 0,0};
 	//상위ui 위치기준 추가값
     [[Property]]
