@@ -57,7 +57,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &Mathf::xMatrixIdentity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
 
-	m_pEditorCamera = std::make_unique<Camera>();
+	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
 
@@ -106,17 +106,17 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//spritePass
 	m_pSpritePass = std::make_unique<SpritePass>();
-	m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
+	//m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
 
 	//blitPass
 	m_pBlitPass = std::make_unique<BlitPass>();
 	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
 
 	//WireFramePass
-	m_pWireFramePass = std::make_unique<WireFramePass>();
+	//m_pWireFramePass = std::make_unique<WireFramePass>();
 
 	//GridPass
-    m_pGridPass = std::make_unique<GridPass>();
+    //m_pGridPass = std::make_unique<GridPass>();
 
 	//PositionMapPass
 	m_pPositionMapPass = std::make_unique<PositionMapPass>();
@@ -315,13 +315,13 @@ void SceneRenderer::InitializeTextures()
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
 
-	auto gridTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"GridRTV",
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-    m_gridTexture.swap(gridTexture);
+	//auto gridTexture = TextureHelper::CreateRenderTexture(
+	//	DeviceState::g_ClientRect.width,
+	//	DeviceState::g_ClientRect.height,
+	//	"GridRTV",
+	//	DXGI_FORMAT_R16G16B16A16_FLOAT
+	//);
+ //   m_gridTexture.swap(gridTexture);
 }
 
 void SceneRenderer::NewCreateSceneInitialize()
@@ -333,6 +333,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
+	auto lightGizmo = lightObj1->AddComponent<SpriteRenderer>();
+	lightGizmo->m_Sprite = DataSystems->MainLightIcon;
+	lightGizmo->SetGizmoEnabled(true).SetEnabled(true);
 	lightComponent1->Awake();
 	//Light pointLight;
 	//pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
@@ -385,8 +388,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-
-
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
@@ -434,7 +435,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		
 		//[2] GBufferPass
 		{
 			DirectX11::BeginEvent(L"GBufferPass");
@@ -474,7 +474,6 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
-
 		{
 			DirectX11::BeginEvent(L"ForwardPass");
 			Benchmark banch;
@@ -483,15 +482,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//[*] WireFramePass
-		if (useWireFrame)
-		{
-			DirectX11::BeginEvent(L"WireFramePass");
-			Benchmark banch;
-			m_pWireFramePass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
 		//SSR
 		{
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
@@ -519,8 +509,6 @@ void SceneRenderer::SceneRendering()
             DirectX11::EndEvent();
         }
 
-
-
 		//[6] AAPass
 		{
 			DirectX11::BeginEvent(L"AAPass");
@@ -547,22 +535,17 @@ void SceneRenderer::SceneRendering()
 			//DirectX11::EndEvent();
 		}
 
-		//[*] GridPass
+		//[7] SpritePass(InGameSprite)
 		{
-			DirectX11::BeginEvent(L"GridPass");
-			Benchmark banch;
-			m_pGridPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
-
-		//[7] SpritePass
-		{
-			DirectX11::BeginEvent(L"SpritePass");
-			Benchmark banch;
-			m_pSpritePass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
+			if (camera != m_pEditorCamera.get())
+			{
+				DirectX11::BeginEvent(L"SpritePass");
+				Benchmark banch;
+				m_pSpritePass->SetGizmoRendering(false);
+				m_pSpritePass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
+				DirectX11::EndEvent();
+			}
 		}
 
 		//[]  UIPass
@@ -582,6 +565,14 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
+		//{
+		//	DirectX11::BeginEvent(L"GridPass");
+		//	Benchmark banch;
+		//	m_pGridPass->Execute(*m_renderScene, *camera);
+		//	RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
+		//	DirectX11::EndEvent();
+		//}
 		DirectX11::EndEvent();
 	}
 

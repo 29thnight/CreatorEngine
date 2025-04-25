@@ -3,6 +3,7 @@
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneRenderer.h"
+#include "GizmoRenderer.h"
 #include "Scene.h"
 #include "ImGuiRenderer.h"
 #include "Model.h"
@@ -43,6 +44,7 @@ namespace DirectX11
 		TimeSystem m_timeSystem;
 		//Renderer
 		std::shared_ptr<SceneRenderer> m_sceneRenderer;
+		std::shared_ptr<GizmoRenderer> m_gizmoRenderer;
 		std::unique_ptr<ImGuiRenderer> m_imguiRenderer;
 		//Engine GUI
 		std::unique_ptr<RenderPassWindow> m_renderPassWindow;
@@ -54,6 +56,7 @@ namespace DirectX11
 		//DelegateHandle
         Core::DelegateHandle m_InputEvenetHandle;
         Core::DelegateHandle m_SceneRenderingEventHandle;
+		Core::DelegateHandle m_OnGizmoEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
 
 		std::thread m_renderThread;

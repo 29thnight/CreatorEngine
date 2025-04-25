@@ -7,23 +7,24 @@ interface IUpdatable
 {
     IUpdatable()
     {
-        Scene* currentScene = SceneManagers->GetActiveScene();
-        if (!currentScene)
+        subscribedScene = SceneManagers->GetActiveScene();
+        if (!subscribedScene)
         {
             return;
         }
-        m_updateEventHandle = currentScene->UpdateEvent.AddLambda([this](float deltaSecond)
+        m_updateEventHandle = subscribedScene->UpdateEvent.AddLambda([this](float deltaSecond)
         {
             Update(deltaSecond);
         });
     }
     virtual ~IUpdatable()
     {
-        SceneManagers->GetActiveScene()->UpdateEvent.Remove(m_updateEventHandle);
+        subscribedScene->UpdateEvent.Remove(m_updateEventHandle);
     }
 
     virtual void Update(float deltaSecond) = 0;
 
 protected:
+    Scene* subscribedScene{};
     Core::DelegateHandle m_updateEventHandle{};
 };

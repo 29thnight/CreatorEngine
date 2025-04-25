@@ -1,7 +1,10 @@
 #include "RenderPassWindow.h"
 #include "SceneRenderer.h"
+#include "GizmoRenderer.h"
 
-RenderPassWindow::RenderPassWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
+RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) : 
+	m_sceneRenderer(ptr),
+	m_gizmoRenderer(gizmo_ptr)
 {
 	ImGui::ContextRegister("RenderPass", true, [&]()
 	{
@@ -37,7 +40,15 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
 
 		if (ImGui::CollapsingHeader("SpritePass"))
 		{
-			m_sceneRenderer->m_pSpritePass->ControlPanel();
+			if(ImGui::CollapsingHeader("SceneRenderer"))
+			{
+				m_sceneRenderer->m_pSpritePass->ControlPanel();
+			}
+
+			if (ImGui::CollapsingHeader("GizmoRenderer"))
+			{
+				m_gizmoRenderer->m_pGizmoPass->ControlPanel();
+			}
 		}
 
 		if (ImGui::CollapsingHeader("AAPass"))
@@ -52,12 +63,12 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
 
 		if (ImGui::CollapsingHeader("WireFramePass"))
 		{
-			m_sceneRenderer->m_pWireFramePass->ControlPanel();
+			m_gizmoRenderer->m_pWireFramePass->ControlPanel();
 		}
 
 		if (ImGui::CollapsingHeader("GridPass"))
 		{
-			m_sceneRenderer->m_pGridPass->ControlPanel();
+			m_gizmoRenderer->m_pGridPass->ControlPanel();
 		}
 
 		ImGui::Spacing();
@@ -65,7 +76,7 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
 		{
 			m_sceneRenderer->m_pPostProcessingPass->ControlPanel();
 		}
-	});
+	}, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
 	ImGui::GetContext("RenderPass").Close();
 }

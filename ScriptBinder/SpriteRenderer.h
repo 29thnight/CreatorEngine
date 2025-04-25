@@ -27,17 +27,20 @@ public:
         m_IsEnabled = able;
     }
 
-    //ReflectionFieldInheritance(SpriteRenderer, Component)
-    //{
-    //    PropertyField
-    //    ({
-    //        meta_property(m_Sprite)
-    //    });
+	bool IsGizmoEnabled() const
+	{
+		return m_IsGizmoEnabled;
+	}
 
-    //    FieldEnd(SpriteRenderer, PropertyOnlyInheritance)
-    //}
+    SpriteRenderer& SetGizmoEnabled(bool able)
+    {
+		m_IsGizmoEnabled = able;
+
+		return *this;
+    }
 
 private:
     [[Property]]
     bool m_IsEnabled = false;
+	bool m_IsGizmoEnabled = false;
 };

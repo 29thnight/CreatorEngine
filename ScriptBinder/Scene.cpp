@@ -2,6 +2,14 @@
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 
+Scene::~Scene()
+{
+    for (auto& gameObject : m_SceneObjects)
+    {
+        gameObject.reset();
+    }
+}
+
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
     std::string uniqueName = GenerateUniqueGameObjectName(sceneObject->GetHashedName().ToString());

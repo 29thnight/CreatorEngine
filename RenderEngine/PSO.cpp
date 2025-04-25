@@ -3,40 +3,71 @@
 
 namespace PSOHelper
 {
+	ID3D11VertexShader* nullVertexShader = nullptr;
+	ID3D11PixelShader* nullPixelShader = nullptr;
+	ID3D11HullShader* nullHullShader = nullptr;
+	ID3D11DomainShader* nullDomainShader = nullptr;
+	ID3D11GeometryShader* nullGeometryShader = nullptr;
+	ID3D11ComputeShader* nullComputeShader = nullptr;
+
 	inline void VSSetShader(VertexShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->VSSetShader(nullVertexShader, nullptr, 0);
+			return;
+		}
 
 		DeviceState::g_pDeviceContext->VSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
 	inline void PSSetShader(PixelShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->PSSetShader(nullPixelShader, nullptr, 0);
+			return;
+		}
 		DeviceState::g_pDeviceContext->PSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
 	inline void HSSetShader(HullShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->HSSetShader(nullHullShader, nullptr, 0);
+			return;
+		}
 		DeviceState::g_pDeviceContext->HSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
 	inline void DSSetShader(DomainShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->DSSetShader(nullDomainShader, nullptr, 0);
+			return;
+		}
 		DeviceState::g_pDeviceContext->DSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
 	inline void GSSetShader(GeometryShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->GSSetShader(nullGeometryShader, nullptr, 0);
+			return;
+		}
 		DeviceState::g_pDeviceContext->GSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
 	inline void CSSetShader(ComputeShader* shader)
 	{
-		if (!shader) return;
+		if (!shader)
+		{
+			DeviceState::g_pDeviceContext->CSSetShader(nullComputeShader, nullptr, 0);
+			return;
+		}
 		DeviceState::g_pDeviceContext->CSSetShader(shader->GetShader(), nullptr, 0);
 	}
 

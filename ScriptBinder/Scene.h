@@ -13,7 +13,7 @@ public:
    ReflectScene
     [[Serializable]]
 	Scene() = default;
-	~Scene() = default;
+	~Scene();
 
     [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;

@@ -56,6 +56,11 @@ void SceneManager::SceneRendering(float deltaSecond)
     SceneRenderingEvent.Broadcast(deltaSecond);
 }
 
+void SceneManager::OnDrawGizmos()
+{
+	OnDrawGizmosEvent.Broadcast();
+}
+
 void SceneManager::GUIRendering()
 {
     GUIRenderingEvent.Broadcast();
@@ -171,6 +176,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
         sceneNode = Meta::Serialize(m_activeScene);
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
+        m_EditorSceneIndex = m_activeSceneIndex;
         m_activeSceneIndex = m_scenes.size() - 1;
         m_activeScene = playScene;
 
@@ -214,7 +220,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	}
 	std::erase_if(m_scenes, [](const auto& scene) { return scene == nullptr; });
 
-	m_activeSceneIndex = 0;
+	m_activeSceneIndex = m_EditorSceneIndex;
 	m_isEditorSceneLoaded = false;
 	activeSceneChangedEvent.Broadcast();
 	sceneUnloadedEvent.Broadcast();

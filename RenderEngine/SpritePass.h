@@ -10,13 +10,13 @@ public:
 	SpritePass();
 	~SpritePass();
 
-	void Initialize(Texture* renderTarget);
+	void SetGizmoRendering(bool isGizmoRendering) { m_isGizmoRendering = isGizmoRendering; }
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize() override;
 
 private:
-	Texture* m_RenderTarget{};
+	bool m_isGizmoRendering{ false };
 	std::unique_ptr<Mesh> m_QuadMesh{};
 	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
 };
