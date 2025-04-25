@@ -186,10 +186,10 @@ void PhysicsManager::SetPhysicData()
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 
-		if (colliderInfo.id == )
-		{
+		//if (colliderInfo.id == )
+		//{
 
-		}
+		//}
 	
 
 

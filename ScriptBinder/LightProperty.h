@@ -8,8 +8,7 @@ enum LightType
 {
     DirectionalLight,
     PointLight,
-    SpotLight,
-    LightsTypeMax
+    SpotLight
 };
 
 AUTO_REGISTER_ENUM(LightType)
