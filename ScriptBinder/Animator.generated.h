@@ -8,12 +8,8 @@ ReflectionFieldInheritance(Animator, Component) \
 		meta_property(m_Skeleton) \
 		meta_property(m_TimeElapsed) \
 		meta_property(m_AnimIndexChosen) \
-		meta_property(m_Motion) \
 		meta_property(m_AnimIndex) \
+		meta_property(m_Motion) \
 	}); \
-	MethodField \
-	({ \
-		meta_method(UpdateAnimation) \
-	}); \
-	FieldEnd(Animator, PropertyAndMethodInheritance) \
+	FieldEnd(Animator, PropertyOnlyInheritance) \
 };
