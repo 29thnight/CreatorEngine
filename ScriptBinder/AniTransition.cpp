@@ -1,9 +1,29 @@
 #include "AniTransition.h"
 
-AniTransition::AniTransition()
-{
-}
 
+AniTransition::AniTransition(std::string curStatename, std::string nextStatename)
+	:curState(curStatename),nextState(nextStatename)
+{
+
+}
 AniTransition::~AniTransition()
 {
 }
+
+bool AniTransition::CheckTransiton()
+{
+	for (auto& condition : conditions)
+	{
+		bool result = std::visit([](auto& cond) {
+			return cond.CheckTrans();
+		}, condition);
+
+		if (!result)
+			return false; 
+	}
+
+	return true;
+}
+
+
+

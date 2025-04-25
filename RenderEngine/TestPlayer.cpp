@@ -2,10 +2,22 @@
 #include "InputManager.h"
 #include "Animator.h"
 #include "aniFSM.h"
+#include "AniTransition.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
-	player->AddComponent<aniFSM>();
+	auto fsm = player->AddComponent<aniFSM>();
+	fsm->SetAnimator(player->GetComponent<Animator>());
+	fsm->CreateState<IdleAni>("Idle");
+	fsm->CreateState<WalkAni>("Walk");
+	fsm->CreateState<RunAni>("Run");
+	fsm->SetCurState("Idle");
+
+	fsm->CreateTransition("Idle", "Walk")->AddCondition(&speed, 0.3f, conditionType::Greater);
+	fsm->CreateTransition("Walk", "Idle")->AddCondition(&speed, 0.3f, conditionType::Less);
+	/*AniTransition movetoRun;
+	bool canRun = true;
+	movetoRun.AddCondition(&canRun, true, conditionType::Equal);*/
 }
 
 void TestPlayer::Update(float deltaTime)
@@ -30,22 +42,19 @@ void TestPlayer::Update(float deltaTime)
 	if (InputManagement->IsKeyPressed(VK_RIGHT))
 	{
 		dir = 1.0f;
-		speed += 0.001;
+		speed += 0.01;
 	}
 	else if(InputManagement->IsKeyPressed(VK_LEFT))
 	{
 		dir = -1.0f;
-		speed += 0.001;
+		speed += 0.01;
 	}
 	else
 	{
 		speed = 0;
 	}
 
-	if (speed >= maxSpeed)
-	{
-		ani->SetAnimation(1);
-	}
+	
 	if (speed >= maxSpeed)
 		speed = maxSpeed;
 	//player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });

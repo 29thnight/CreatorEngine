@@ -18,6 +18,7 @@ public:
 class IdleAni : public aniState
 {
 public:
+	IdleAni(aniFSM* Owner, std::string Name) : aniState(Owner,Name){}
 	virtual void Enter()
 	{
 		Owner->GetAnimator()->SetAnimation(0);
@@ -34,6 +35,7 @@ public:
 class WalkAni : public aniState
 {
 public:
+	WalkAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
 	virtual void Enter()
 	{
 		Owner->GetAnimator()->SetAnimation(2);
@@ -50,6 +52,7 @@ public:
 class RunAni : public aniState
 {
 public:
+	RunAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
 	virtual void Enter()
 	{
 		Owner->GetAnimator()->SetAnimation(1);
