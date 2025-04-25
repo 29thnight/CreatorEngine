@@ -151,6 +151,7 @@
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="aniState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
+    <ClCompile Include="ColliderComponent.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />

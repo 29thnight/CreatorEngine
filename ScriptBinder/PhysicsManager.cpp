@@ -215,14 +215,13 @@ void PhysicsManager::SetPhysicData()
 				auto pos = transform.GetWorldPosition();
 				auto vecPos = DirectX::SimpleMath::Vector3(pos);
 				offset = DirectX::SimpleMath::Vector3::Transform(offset, data.transform);
-				data.transform._41 = pos.x + offset.x;
-
-
-				
+				data.transform._41 = vecPos.x + offset.x;
+				data.transform._42 = vecPos.y + offset.y;
+				data.transform._43 = vecPos.z + offset.z;
 
 			}
 			
-			
+			Physics->SetRigidBodyData(id, data);
 		}
 	
 
