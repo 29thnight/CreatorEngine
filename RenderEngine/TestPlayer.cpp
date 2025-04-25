@@ -22,7 +22,9 @@ void TestPlayer::GetPlayer(GameObject* _player)
 
 void TestPlayer::Update(float deltaTime)
 {
-	auto ani = player->GetComponent<Animator>();
+	auto _player = GameObject::Find("aniTest");
+	auto ani = _player->GetComponent<Animator>();
+	auto fsm = _player->GetComponent<aniFSM>();
 	if (InputManagement->IsKeyDown('1'))
 	{
 		std::cout << "press 1" << std::endl;

@@ -3,7 +3,7 @@
 #include "Transform.h"
 #include "aniState.h"
 #include "aniFSM.h"
-class TestPlayer
+class TestPlayer : Component 
 {
 
 public:

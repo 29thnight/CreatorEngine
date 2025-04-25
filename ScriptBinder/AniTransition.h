@@ -9,9 +9,15 @@ enum class conditionType
 	Equal,
 	NotEqual,
 };
+AUTO_REGISTER_ENUM(conditionType)
 
-
-
+enum class valueType
+{
+	Float,
+	Int,
+	Bool,
+};
+AUTO_REGISTER_ENUM(valueType)
 //using ParameterValue = std::variant<float, int, bool>;
 template <typename T>
 class TransCondition

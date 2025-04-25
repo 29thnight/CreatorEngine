@@ -559,6 +559,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		{
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
+			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
 
 			for (auto ani : m_model->m_Skeleton->m_animations)

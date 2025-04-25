@@ -43,6 +43,7 @@ void aniFSM::UpdateState()
 		CurState = NextState;
 		NextState = nullptr;
 	}
+	
 }
 void aniFSM::Update(float tick)
 {
