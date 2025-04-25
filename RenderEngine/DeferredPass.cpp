@@ -77,7 +77,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
 
-    DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
+    //DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
     ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &view, nullptr);
 

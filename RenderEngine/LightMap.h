@@ -4,13 +4,13 @@
 #include "Texture.h"
 #include "Sampler.h"
 #include "Shader.h"
+#include "Core.Coroutine.h"
 // Guillotine Algorithm
 // 배치할 위치를 찾고 공간을 나눔.
 
 class RenderScene;
 class PositionMapPass;
-class NormalMapPass;
-class LightmapShadowPass;
+class LightMapPass;
 namespace lm {
 	struct Rect {
 		int x = 0, y = 0, w = 0, h = 0;
@@ -69,7 +69,8 @@ namespace lm {
 
 		void GenerateLightMap(
 			RenderScene* scene,
-			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
+			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+			const std::unique_ptr<LightMapPass>& m_pLightMapPass
 		);
 	private:
 		void SetScene(RenderScene* scene) { m_renderscene = scene; }
@@ -149,6 +150,12 @@ namespace lm {
 
 		ID3D11Buffer* structuredLightBuffer = nullptr;
 		ID3D11ShaderResourceView* structuredLightBufferSRV = nullptr;
+
+		Coroutine<> GenerateLightmapCoroutine(
+			RenderScene* scene,
+			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+			const std::unique_ptr<LightMapPass>& m_pLightMapPass
+		);
 
 		inline int BuildBVH(std::vector<Triangle>& tris, std::vector<int>& triIndices, int start, int end, int depth = 0)
 		{

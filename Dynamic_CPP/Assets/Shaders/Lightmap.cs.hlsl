@@ -8,6 +8,8 @@
 #define LIGHT_ENABLED 1
 #define LIGHT_ENABLED_W_SHADOWMAP 2
 
+#define FLT_MAX 3.402823466E+38f
+
 struct SurfaceInfo
 {
     float4 posW;
@@ -262,7 +264,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
 
         float3 toLight;
-        float distance = 1.0;
+        float distance = 10000.0;
         float attenuation = 1.0;
         float NdotL = 0.0;
 

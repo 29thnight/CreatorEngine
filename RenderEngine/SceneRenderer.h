@@ -16,6 +16,7 @@
 #include "AAPass.h"
 #include "PostProcessingPass.h"
 #include "ScreenSpaceReflectionPass.h"
+#include "SubsurfaceScatteringPass.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -91,6 +92,7 @@ private:
 	std::unique_ptr<PositionMapPass>    m_pPositionMapPass{};
 	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
 	std::unique_ptr<ScreenSpaceReflectionPass> m_pScreenSpaceReflectionPass{};
+	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers

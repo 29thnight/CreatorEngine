@@ -9,6 +9,7 @@
 #include "Material.h"
 #include "Core.Random.h"
 #include "PositionMapPass.h"
+#include "LightmapPass.h"
 #include "ResourceAllocator.h"
 
 namespace lm {
@@ -202,7 +203,7 @@ namespace lm {
 			int face = meshrenderer->m_Mesh->GetIndices().size();
 			triangleCount += face /3;
 		}
-		triangleCount *= 2;
+		//triangleCount *= 2;
 		m_trianglesInScene.reserve(triangleCount);
 		m_triIndices.reserve(triangleCount);
 
@@ -246,22 +247,22 @@ namespace lm {
 				m_trianglesInScene.push_back(t);
 				m_triIndices.push_back(index++);
 
-				Triangle backFace{};
-				backFace.v0 = t.v2;
-				backFace.v1 = t.v1;
-				backFace.v2 = t.v0;
-				backFace.n0 = -t.n2; // 노멀 반전
-				backFace.n1 = -t.n1;
-				backFace.n2 = -t.n0;
-				backFace.uv0 = t.uv2;
-				backFace.uv1 = t.uv1;
-				backFace.uv2 = t.uv0;
-				backFace.lightmapUV0 = t.lightmapUV2;
-				backFace.lightmapUV1 = t.lightmapUV1;
-				backFace.lightmapUV2 = t.lightmapUV0;
-				backFace.lightmapIndex = t.lightmapIndex;
-				m_trianglesInScene.push_back(backFace);
-				m_triIndices.push_back(index++);
+				//Triangle backFace{};
+				//backFace.v0 = t.v2;
+				//backFace.v1 = t.v1;
+				//backFace.v2 = t.v0;
+				//backFace.n0 = -t.n2; // 노멀 반전
+				//backFace.n1 = -t.n1;
+				//backFace.n2 = -t.n0;
+				//backFace.uv0 = t.uv2;
+				//backFace.uv1 = t.uv1;
+				//backFace.uv2 = t.uv0;
+				//backFace.lightmapUV0 = t.lightmapUV2;
+				//backFace.lightmapUV1 = t.lightmapUV1;
+				//backFace.lightmapUV2 = t.lightmapUV0;
+				//backFace.lightmapIndex = t.lightmapIndex;
+				//m_trianglesInScene.push_back(backFace);
+				//m_triIndices.push_back(index++);
 			}
 		}
 
@@ -393,7 +394,7 @@ namespace lm {
 				cblit.constantAtt = light.m_constantAttenuation;
 				cblit.linearAtt = light.m_linearAttenuation;
 				cblit.quadAtt = light.m_quadraticAttenuation;
-				cblit.spotAngle = XMConvertToRadians(light.m_spotLightAngle);
+				cblit.spotAngle = light.m_spotLightAngle;
 				cblit.lightType = light.m_lightType;
 				cblit.status = light.m_lightStatus;
 
@@ -738,20 +739,50 @@ namespace lm {
 	{
 	}
 
-	void LightMap::GenerateLightMap(
+	Coroutine<> LightMap::GenerateLightmapCoroutine(
 		RenderScene* scene,
-		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass
-	)
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+		const std::unique_ptr<LightMapPass>& m_pLightMapPass)
 	{
+
 		SetScene(scene);
 
 		Prepare();
+		Debug->Log("Prepare");
+		co_yield ReturnNull();
 		//TestPrepare();
 		PrepareRectangles();
+		Debug->Log("PrepareRectangles");
+		co_yield ReturnNull();
 		CalculateRectangles();
+		Debug->Log("CalculateRectangles");
+		co_yield ReturnNull();
 		int indices = DrawRectangles(m_pPositionMapPass);
+		Debug->Log("DrawRectangles");
+		co_yield ReturnNull();
 
 		DrawIndirectLight(m_pPositionMapPass, indices);
+		Debug->Log("Complete Bake Lightmap");
+
+		m_pLightMapPass->Initialize(lightmaps);
+	}
+
+	void LightMap::GenerateLightMap(
+		RenderScene* scene,
+		const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
+		const std::unique_ptr<LightMapPass>& m_pLightMapPass
+	)
+	{
+		StartCoroutine(GenerateLightmapCoroutine(scene, m_pPositionMapPass, m_pLightMapPass));
+		//SetScene(scene);
+
+		//Prepare();
+		////TestPrepare();
+		//PrepareRectangles();
+		//CalculateRectangles();
+		//int indices = DrawRectangles(m_pPositionMapPass);
+
+		//DrawIndirectLight(m_pPositionMapPass, indices);
 	}
 }
 

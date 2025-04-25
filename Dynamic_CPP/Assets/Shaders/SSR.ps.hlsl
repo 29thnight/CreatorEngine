@@ -133,14 +133,14 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float4 worldSpacePosition = float4(ReconstructWorldPosFromDepth(IN.texCoord, depth, InvProjMatrix, InvViewMatrix), 1.0f);
     float3 camDir = normalize(worldSpacePosition.xyz - CameraPosition.xyz);
-    float3 refDir = (normalize(reflect(normalize(camDir), normal))).rgb;
+    float3 refDir = (normalize(reflect(camDir, normal))).rgb;
     
-    float reflectFactor = (1.0 - roughness * roughness * 2.0) * (0.04 * (1.0 - metallic) + metallic);
+    float reflectFactor = (1.0 - roughness) * (0.04 * (1.0 - metallic) + metallic);
     
     float4 reflectedColor = Raytrace(refDir, MaxRayCount, StepSize, worldSpacePosition.rgb, IN.texCoord);
 
-    float edgeFade = 1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f);
-    reflectFactor *= edgeFade;
+    //float edgeFade = 1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f);
+    //reflectFactor *= edgeFade;
     
     //return float4(depth, depth, depth, 1);
     return color + reflectedColor * reflectFactor;

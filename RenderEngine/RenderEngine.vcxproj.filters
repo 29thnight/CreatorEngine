@@ -150,9 +150,6 @@
     <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
       <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="LightMap\Algorithm">
-      <UniqueIdentifier>{451539ae-9222-4719-8bad-140b715cf15c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\NodeEditor">
       <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
@@ -164,6 +161,9 @@
     </Filter>
     <Filter Include="RenderPass\ScreenSpaceReflectionPass">
       <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\SubSurfaceScatteringPass">
+      <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -289,6 +289,9 @@
     </ClCompile>
     <ClCompile Include="LightController.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SubsurfaceScatteringPass.cpp">
+      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -439,6 +442,9 @@
     <ClInclude Include="LightController.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="SubsurfaceScatteringPass.h">
+      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
@@ -571,6 +577,9 @@
       <Filter>Shaders\LightMap</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSS.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>

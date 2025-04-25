@@ -132,6 +132,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_emissiveTexture.get()
 	);
 
+	//SSS
+	m_pSubsurfaceScatteringPass = std::make_unique<SubsurfaceScatteringPass>();
+	m_pSubsurfaceScatteringPass->Initialize(m_diffuseTexture.get(),
+		m_metalRoughTexture.get()
+	);
+
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
 
@@ -243,9 +249,9 @@ void SceneRenderer::InitializeImGui()
 			// 메쉬별로 positionMap 생성
 			m_pPositionMapPass->Execute(*m_renderScene, c);
 			// lightMap 생성
-			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass);
+			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
 
-			m_pLightMapPass->Initialize(lightMap.lightmaps);
+			//m_pLightMapPass->Initialize(lightMap.lightmaps);
 		}
 
 		if (ImGui::CollapsingHeader("Baked Maps")) {
@@ -434,7 +440,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		
 		//[2] GBufferPass
 		{
 			DirectX11::BeginEvent(L"GBufferPass");
@@ -443,7 +448,6 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
-
 		if (useTestLightmap)
 		{
 			DirectX11::BeginEvent(L"LightMapPass");
@@ -452,7 +456,8 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
-		else
+
+		if (!useTestLightmap)
         {
 			
 			//[3] SSAOPass
@@ -474,7 +479,6 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
-
 		{
 			DirectX11::BeginEvent(L"ForwardPass");
 			Benchmark banch;
@@ -490,6 +494,14 @@ void SceneRenderer::SceneRendering()
 			Benchmark banch;
 			m_pWireFramePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("WireFramePass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+		//SSS
+		{
+			DirectX11::BeginEvent(L"SubsurfaceScatteringPass");
+			Benchmark banch;
+			m_pSubsurfaceScatteringPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SubsurfaceScatteringPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
 		//SSR
@@ -512,8 +524,8 @@ void SceneRenderer::SceneRendering()
 
         //[*] PostProcessPass
         {
-            DirectX11::BeginEvent(L"PostProcessPass");
-            Benchmark banch;
+			DirectX11::BeginEvent(L"PostProcessPass");
+			Benchmark banch;
             m_pPostProcessingPass->Execute(*m_renderScene, *camera);
             RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
             DirectX11::EndEvent();
