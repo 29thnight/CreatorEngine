@@ -17,6 +17,7 @@
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "Object.h"
+#include "RigidBodyComponent.h"
 #include "Scene.h"
 #include "TextComponent.h"
 #include "UIButton.h"
@@ -36,6 +37,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(TextComponent);

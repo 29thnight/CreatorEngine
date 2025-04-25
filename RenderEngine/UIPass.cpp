@@ -55,7 +55,7 @@ UIPass::UIPass()
 void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
 {
 	m_renderTarget = renderTargetView;
-	m_spriteBatch = spriteBatch;
+	//m_spriteBatch = spriteBatch;
 }
 
 
@@ -71,7 +71,7 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	camera.UpdateBuffer();
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-	m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, nullptr, nullptr, nullptr, nullptr, nullptr);
+	//m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, nullptr, nullptr, nullptr, nullptr, nullptr);
 	std::vector<Canvas*> canvases;
 	for (auto& Canvases : UIManagers->Canvases)
 	{
@@ -120,13 +120,13 @@ void UIPass::Execute(RenderScene& scene, Camera& camera)
 	//
 	for (auto& Imageobject : _ImageObjects)
 	{
-		Imageobject->Draw(m_spriteBatch);
+	//	Imageobject->Draw(m_spriteBatch);
 	}
 	for (auto& Textobject : _TextObjects)
 	{
-		Textobject->Draw(m_spriteBatch);
+		//Textobject->Draw(m_spriteBatch);
 	}
-	m_spriteBatch->End();
+	//m_spriteBatch->End();
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
