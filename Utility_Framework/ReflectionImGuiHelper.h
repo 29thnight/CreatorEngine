@@ -101,7 +101,17 @@ namespace Meta
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
             {
-                std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));
+                auto iter = prop.createVectorIterator(instance);
+                std::vector<std::string> value;
+                int size = 0;
+                while (iter->IsValid())
+                {
+                    std::string str = *static_cast<std::string*>(iter->Get());
+                    value.push_back(str);
+                    iter->Next();
+                }
+
+               /* std::vector<std::string> value = std::any_cast<std::vector<std::string>>(prop.getter(instance));*/
                 if (value.empty()) return;
 
                 int selectedIndex = 0; // 안전하게 관리할 방법이 있다면 외부에서 가져와도 됨
@@ -125,7 +135,10 @@ namespace Meta
                         }
 
                         if (isSelected)
-                            ImGui::SetItemDefaultFocus();
+                        {
+
+                        }
+                            //ImGui::SetItemDefaultFocus();
                     }
 
                     ImGui::EndCombo();
