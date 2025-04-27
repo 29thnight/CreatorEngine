@@ -66,6 +66,11 @@ cbuffer LightProperties
     Light m_lights[MAX_LIGHTS];
 };
 
+cbuffer LightCount
+{
+    uint32 m_lightCount{};
+};
+
 cbuffer ShadowMapConstant
 {
    float m_shadowMapWidth{};

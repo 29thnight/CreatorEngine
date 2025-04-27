@@ -130,7 +130,7 @@ namespace Meta
 		}
 		else
 		{
-			node[prop.name] = "[not suport type]"; // ±âÅ¸ ¹ÌÁö¿ø Å¸ÀÔ
+			node[prop.name] = "[not suport type]"; // ê¸°íƒ€ ë¯¸ì§€ì› íƒ€ì…
 		}
 	}
 
@@ -185,6 +185,16 @@ namespace Meta
 				)
 				);
 			}
+            else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Color4>())
+            {
+                prop.setter(instance, Mathf::Color4(
+                    node[prop.name]["r"].as<float>(), 
+                    node[prop.name]["g"].as<float>(), 
+                    node[prop.name]["b"].as<float>(), 
+                    node[prop.name]["a"].as<float>()
+                )
+                );
+            }
 			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Quaternion>())
 			{
 				prop.setter(instance, Mathf::Quaternion(
@@ -209,7 +219,7 @@ namespace Meta
 			}
 			else
 			{
-				// ±âÅ¸ ¹ÌÁö¿ø Å¸ÀÔ
+				// ê¸°íƒ€ ë¯¸ì§€ì› íƒ€ì…
 				Debug->LogError("YamlNodeToProperty: Unsupported type");
 			}
 		}
@@ -229,7 +239,7 @@ namespace Meta
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
 		}
 
-		// ºÎ¸ğ ¸ÕÀú Á÷·ÄÈ­
+		// ë¶€ëª¨ ë¨¼ì € ì§ë ¬í™”
 		if (type.parent)
 		{
 			MetaYml::Node parentNode = Serialize(instance, *type.parent);
@@ -239,12 +249,12 @@ namespace Meta
 			}
 		}
 
-		// ÇÁ·ÎÆÛÆ¼ ¼øÈ¸
+		// í”„ë¡œí¼í‹° ìˆœíšŒ
 		for (const auto& prop : type.properties)
 		{
 			std::any value = prop.getter(instance);
 
-			// º¤ÅÍ Ã³¸®
+			// ë²¡í„° ì²˜ë¦¬
 			if (prop.isVector)
 			{
 				auto iter = prop.createVectorIterator(instance);
@@ -315,7 +325,7 @@ namespace Meta
 				continue;
 			}
 
-			// Æ÷ÀÎÅÍ Ã³¸®
+			// í¬ì¸í„° ì²˜ë¦¬
 			if (prop.isPointer)
 			{
 				void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, value);
@@ -337,14 +347,14 @@ namespace Meta
 				continue;
 			}
 
-			// enum Ã³¸®
+			// enum ì²˜ë¦¬
 			if (MetaEnumRegistry->Find(prop.typeName))
 			{
 				node[prop.name] = std::any_cast<int>(value);
 				continue;
 			}
 
-			// struct Ã³¸®
+			// struct ì²˜ë¦¬
 			if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
 			{
 				void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
@@ -352,7 +362,7 @@ namespace Meta
 				continue;
 			}
 
-			// ±âº» Å¸ÀÔ Ã³¸®
+			// ê¸°ë³¸ íƒ€ì… ì²˜ë¦¬
 			PropertyToYamlNode(prop, node, value);
 		}
 
@@ -370,7 +380,7 @@ namespace Meta
 		if (!node || !node.IsMap())
 			return nullptr;
 
-		// 1. key°¡ typeNameÀÌ°í, value°¡ typeIDÀÏ °¡´É¼º ¡æ ¿ì¼±¼øÀ§ ³ô°Ô
+		// 1. keyê°€ typeNameì´ê³ , valueê°€ typeIDì¼ ê°€ëŠ¥ì„± â†’ ìš°ì„ ìˆœìœ„ ë†’ê²Œ
 		for (const auto& kv : node)
 		{
 			if (kv.first.IsScalar() && kv.second.IsScalar())
@@ -381,12 +391,12 @@ namespace Meta
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);
 				if (type && type->typeID == typeID)
 				{
-					return type;  // ÀÌ¸§µµ ¸Â°í IDµµ ¸ÂÀ¸¸é È®Á¤
+					return type;  // ì´ë¦„ë„ ë§ê³  IDë„ ë§ìœ¼ë©´ í™•ì •
 				}
 			}
 		}
 
-		// 2. fallback: key°¡ typeNameÀÌ°í value°¡ mapÀÎ °æ¿ì (Unreal ½ºÅ¸ÀÏ)
+		// 2. fallback: keyê°€ typeNameì´ê³  valueê°€ mapì¸ ê²½ìš° (Unreal ìŠ¤íƒ€ì¼)
 		for (const auto& kv : node)
 		{
 			if (kv.first.IsScalar() && kv.second.IsMap())
@@ -396,7 +406,7 @@ namespace Meta
 			}
 		}
 
-		// 3. fallback: typeID ÇÊµå°¡ ÀÖ´Â °æ¿ì
+		// 3. fallback: typeID í•„ë“œê°€ ìˆëŠ” ê²½ìš°
 		if (node["typeID"])
 		{
 			std::size_t id = node["typeID"].as<std::size_t>();
@@ -408,12 +418,12 @@ namespace Meta
 
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
 	{
-		// ºÎ¸ğ ¸ÕÀú ¿ªÁ÷·ÄÈ­
+		// ë¶€ëª¨ ë¨¼ì € ì—­ì§ë ¬í™”
 		if (type.parent)
 		{
 			Deserialize(instance, *type.parent, node);
 		}
-		// ÇÁ·ÎÆÛÆ¼ ¼øÈ¸
+		// í”„ë¡œí¼í‹° ìˆœíšŒ
 		for (const auto& prop : type.properties)
 		{
 			if (node[prop.name])

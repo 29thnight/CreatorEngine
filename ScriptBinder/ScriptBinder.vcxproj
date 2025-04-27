@@ -191,6 +191,7 @@
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="IObject.h" />
+    <ClInclude Include="IOnDisable.h" />
     <ClInclude Include="IRenderable.h" />
     <ClInclude Include="JobManager.h" />
     <ClInclude Include="LightComponent.h" />

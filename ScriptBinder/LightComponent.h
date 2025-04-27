@@ -63,32 +63,6 @@ public:
         light.m_lightType = static_cast<int>(m_lightType);
         light.m_lightStatus = static_cast<int>(m_lightStatus);
         light.m_intencity = m_intencity;
-		Texture*& icon = m_pOwner->GetComponent<SpriteRenderer>()->m_Sprite;
-
-        if (icon != nullptr)
-        {
-            switch (m_lightType)
-            {
-            case DirectionalLight:
-                if (m_lightIndex == 0)
-                {
-                    icon = DataSystems->MainLightIcon;
-                }
-                else
-                {
-					icon = DataSystems->DirectionalLightIcon;
-                }
-                break;
-            case PointLight:
-				icon = DataSystems->PointLightIcon;
-                break;
-            case SpotLight:
-				icon = DataSystems->SpotLightIcon;
-                break;
-            default:
-                break;
-            }
-        }
     }
 
     [[Property]]

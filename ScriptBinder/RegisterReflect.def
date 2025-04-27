@@ -8,9 +8,8 @@
 #include "GameObject.h"
 #include "Animator.h"
 #include "Mesh.h"
-#include "Canvas.h"
-#include "aniFSM.h"
 #include "ImageComponent.h"
+#include "Canvas.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
 #include "Transform.h"
@@ -44,5 +43,4 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Transform);
     AUTO_REGISTER_CLASS(UIButton);
     AUTO_REGISTER_CLASS(UIComponent);
-    AUTO_REGISTER_CLASS(aniFSM);
 }

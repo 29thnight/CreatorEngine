@@ -84,6 +84,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     auto& lightManager = scene.m_LightController;
 
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
+    DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
     if (lightManager->hasLightWithShadows)
     {
         DirectX11::PSSetConstantBuffer(2, 1, &lightManager->m_shadowMapBuffer);

@@ -71,7 +71,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);
 
-    for (int i = 0; i < 4; ++i)
+	uint light_count = lightCount;
+
+    for (int i = 0; i < light_count; ++i)
     {
         Light light = Lights[i];
         if (light.status == LIGHT_DISABLED)

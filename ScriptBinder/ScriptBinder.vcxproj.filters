@@ -257,6 +257,9 @@
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
     </ClInclude>
+    <ClInclude Include="IOnDisable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

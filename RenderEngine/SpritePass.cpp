@@ -90,8 +90,7 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 		[&isGizmoRendering](const std::shared_ptr<GameObject>& object)
 		{
 			return nullptr != object->GetComponent<SpriteRenderer>() 
-				&& object->GetComponent<SpriteRenderer>()->IsEnabled() 
-				&& object->GetComponent<SpriteRenderer>()->IsGizmoEnabled() == isGizmoRendering;
+				&& object->GetComponent<SpriteRenderer>()->IsEnabled();
 		}
 	);
 

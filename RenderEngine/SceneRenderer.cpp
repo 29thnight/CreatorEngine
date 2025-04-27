@@ -178,50 +178,6 @@ void SceneRenderer::InitializeDeviceState()
 
 void SceneRenderer::InitializeImGui()
 {
-    static int lightIndex = 0;
-
-    ImGui::ContextRegister("Light", true, [&]()
-    {
-        ImGui::Text("Light Index : %d", lightIndex);
-        if (ImGui::Button("Add Light"))
-        {
-            Light light;
-            light.m_color = XMFLOAT4(1, 1, 1, 1);
-            light.m_position = XMFLOAT4(0, 0, 0, 0);
-            light.m_lightType = LightType::PointLight;
-
-            m_renderScene->m_LightController->AddLight(light);
-        }
-        if (ImGui::Button("Light index + "))
-        {
-            lightIndex++;
-            if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
-        }
-        if (ImGui::Button("Light index - "))
-        {
-            lightIndex--;
-            if (lightIndex < 0) lightIndex = 0;
-        }
-        if (ImGui::Button("Light On"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
-        }
-        if (ImGui::Button("StaticShadow On"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::StaticShadows;
-        }
-        if (ImGui::Button("Light Off"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
-        }
-
-        ImGui::DragFloat3("Light Pos", &m_renderScene->m_LightController->GetLight(lightIndex).m_position.x, 0.1f, -10, 10);
-        ImGui::DragFloat3("Light Dir", &m_renderScene->m_LightController->GetLight(lightIndex).m_direction.x, 0.1f, -1, 1);
-        ImGui::DragFloat("Light colorX", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorY", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorZ", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
-    });
-
 	ImGui::ContextRegister("LightMap", true, [&]() {
 
 		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
@@ -322,14 +278,6 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
-
-	//auto gridTexture = TextureHelper::CreateRenderTexture(
-	//	DeviceState::g_ClientRect.width,
-	//	DeviceState::g_ClientRect.height,
-	//	"GridRTV",
-	//	DXGI_FORMAT_R16G16B16A16_FLOAT
-	//);
- //   m_gridTexture.swap(gridTexture);
 }
 
 void SceneRenderer::NewCreateSceneInitialize()
@@ -337,39 +285,12 @@ void SceneRenderer::NewCreateSceneInitialize()
 	auto scene = SceneManagers->GetActiveScene();
 	m_renderScene->SetScene(scene);
 	//이제 곧 변경된다 라이트
-	//auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
-	auto lightGizmo = lightObj1->AddComponent<SpriteRenderer>();
-	lightGizmo->m_Sprite = DataSystems->MainLightIcon;
-	lightGizmo->SetGizmoEnabled(true).SetEnabled(true);
-	lightComponent1->Awake();
-	//Light pointLight;
-	//pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
-	//pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
-	//pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
-	//pointLight.m_lightType = LightType::DirectionalLight;
+	//lightComponent1->Awake();
 
-	//Light dirLight;
-	//dirLight.m_color = lightColour;
-	//dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
-	//dirLight.m_lightType = LightType::DirectionalLight;
-
-	//Light spotLight;
-	//spotLight.m_color = XMFLOAT4(Colors::Magenta);
-	//spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
-	//spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
-	//spotLight.m_lightType = LightType::SpotLight;
-	//spotLight.m_spotLightAngle = 3.142 / 4.0;
-
-	//m_renderScene->m_LightController
-	//	->AddLight(dirLight)
-	//	.AddLight(pointLight)
-	//	.AddLight(spotLight)
-	//	.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
-
-	scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
+	//scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
 
 
 	ShadowMapRenderDesc desc;
@@ -381,8 +302,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_farPlane = 1000.0f;
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
-
-
 
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
