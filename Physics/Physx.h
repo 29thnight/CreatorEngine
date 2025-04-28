@@ -85,7 +85,7 @@ public:
 	DynamicRigidBody* SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix, bool isKinematic);
 
 	//반환
-	void GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData);
+	RigidBodyGetSetData GetRigidBodyData(unsigned int id);
 	//수정
 	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData);
 	//삭제

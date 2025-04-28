@@ -657,8 +657,10 @@ bool TransformDifferent(const physx::PxTransform& first, physx::PxTransform& sec
 }
 
 
-void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData)
+RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 {
+	RigidBodyGetSetData rigidBodyData;
+
 	auto body = m_rigidBodyContainer.find(id)->second;
 	
 	//dynamicBody ÀÇ °æ¿ì
@@ -690,6 +692,8 @@ void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyDat
 		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
 		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
 	}
+
+	return rigidBodyData;
 }
 
 void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData)
