@@ -1,67 +1,33 @@
 #pragma once
 #include "Core.Minimal.h"
-#include <variant>
+#include "TransCondition.h"
+#include "AniTransition.generated.h"
 
-enum class conditionType
-{
-	Greater,
-	Less,
-	Equal,
-	NotEqual,
-};
-AUTO_REGISTER_ENUM(conditionType)
-
-enum class valueType
-{
-	Float,
-	Int,
-	Bool,
-};
-AUTO_REGISTER_ENUM(valueType)
-//using ParameterValue = std::variant<float, int, bool>;
-//template <typename T>
-class TransCondition
-{
-public:
-	TransCondition(float* value, float Comparevalue, conditionType cType) : FValue(value), FCompareValue(Comparevalue), cType(cType) { vType = valueType::Float; };
-	TransCondition(int* value, int Comparevalue, conditionType cType) : IValue(value), ICompareValue(Comparevalue), cType(cType) { vType = valueType::Int; };
-	TransCondition(bool* value, bool Comparevalue, conditionType cType) : BValue(value), BCompareValue(Comparevalue), cType(cType) { vType = valueType::Bool; };
-	bool CheckTrans();
-	//타입 ,값 ,함수
-	conditionType cType = conditionType::Equal;
-	valueType vType = valueType::Float;
-	//내가 들고있을값
-	//T* value;
-	//T Comparevalue;
-
-	int* IValue;
-	int ICompareValue;
-
-	float* FValue;
-	float FCompareValue;
-
-	bool* BValue;
-	bool BCompareValue;
-		
-};
-
+#include "aniStruct.h"
 //using TransConditionVariant = std::variant<TransCondition<int>, TransCondition<float>, TransCondition<bool>>;
+class aniFSM;
 class AniTransition
 {
 public:
+   ReflectAniTransition
+	[[Serializable]]
+	AniTransition() = default;
 	AniTransition(std::string curStatename, std::string nextStatename);
 	~AniTransition();
 
-	void AddCondition(float* value, float Comparevalue, conditionType cType)
+	void AddCondition(std::string ownerValueName,float Comparevalue, conditionType cType,valueType vType)
 	{
 		for (const auto& cond : conditions)
 		{
-			if (cond.FValue == value && cond.FCompareValue == Comparevalue && cond.cType == cType)
+			if (cond.CompareParameter.fValue == Comparevalue && cond.valueName == ownerValueName && cond.cType == cType)
 			{
-				return; // 이미 있으면 아무것도 안 하고 return
+				return; // 이미 있으면 아무것도 안 하고 return 나중에 지우기 ******
 			}
 		}
-		conditions.push_back(TransCondition(value, Comparevalue, cType));
+		TransCondition newTrans(Comparevalue,cType,vType);
+		newTrans.valueName = ownerValueName;
+		newTrans.ownerFSM = owner;
+		conditions.push_back(newTrans);
 	}
 	void SetCurState(std::string curStatename) {curState = curStatename;}
 	void SetNextState(std::string nextStatename) { nextState = nextStatename; }
@@ -69,15 +35,24 @@ public:
 	std::string GetNextState()const { return nextState; }
 	bool CheckTransiton();
 
+
+	[[Property]]
+	std::vector<TransCondition> conditions;
+
+	aniFSM* owner{};
 private:
+	[[Property]]
 	std::string curState;
+	[[Property]]
 	std::string nextState;
 	// 전이시간이자 블렌딩될 시간
+	[[Property]]
 	float tranTime =0.f;
 	// 애니메이션 탈출 최소시간
+	[[Property]]
 	float exitTime =0.f;
 
 	//std::vector<TransConditionVariant> conditions;
-	std::vector<TransCondition> conditions;
+	
 };
 

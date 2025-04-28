@@ -167,6 +167,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="TextComponent.cpp" />
+    <ClCompile Include="TransCondition.cpp" />
     <ClCompile Include="UIButton.cpp" />
     <ClCompile Include="ImageComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
@@ -177,6 +178,7 @@
     <ClInclude Include="aniFSM.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="aniState.h" />
+    <ClInclude Include="aniStruct.h" />
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
@@ -202,12 +204,14 @@
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TextComponent.h" />
+    <ClInclude Include="TransCondition.h" />
     <ClInclude Include="UIButton.h" />
     <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />

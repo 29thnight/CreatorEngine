@@ -195,6 +195,7 @@ namespace Meta
                         return std::make_unique<VectorIteratorImpl<ElementType>>(vecPtr->begin(), vecPtr->end());
                     },
                     GetVectorElementTypeName<ElementType>(),
+                    TypeTrait::GUIDCreator::GetTypeID<ElementType>(),
                     isElementPointer
                 };
             }

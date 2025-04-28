@@ -4,6 +4,7 @@
 #include "LightComponent.h"
 #include "CameraComponent.h"
 #include "DataSystem.h"
+#include "aniFSM.h"
 
 void ComponentFactory::Initialize()
 {
@@ -86,16 +87,71 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		//}
 		else if (componentType->typeID == GUIDCreator::GetTypeID<SpriteRenderer>())
 		{
-			auto spriteRenderer = static_cast<SpriteRenderer*>(component);
-			Texture* texture = nullptr;
-			if (itNode["m_Sprite"])
+			//auto spriteRenderer = static_cast<SpriteRenderer*>(component);
+			//Texture* texture = nullptr;
+			//if (itNode["m_Sprite"])
+			//{
+			//	auto spriteNode = itNode["m_Sprite"];
+			//	FileGuid guid = spriteNode["m_fileGuid"].as<std::string>();
+			//}
+   //         Meta::Deserialize(spriteRenderer, itNode);
+			//spriteRenderer->SetEnabled(true);
+		}
+		else if (componentType->typeID == GUIDCreator::GetTypeID<aniFSM>())
+		{
+			auto aniFSMcomponent = static_cast<aniFSM*>(component);
+			if (itNode["StateVec"])
 			{
-				auto spriteNode = itNode["m_Sprite"];
-				FileGuid guid = spriteNode["m_fileGuid"].as<std::string>();
-				
+				auto& FSMNode = itNode["StateVec"];
+
+				for(auto& fsm : FSMNode)
+				{
+					std::shared_ptr<aniState> sharedState = std::make_shared<aniState>();
+
+					Meta::Deserialize(sharedState.get(), fsm);
+					aniFSMcomponent->StateVec.push_back(sharedState);
+					aniFSMcomponent->States.insert(std::make_pair(sharedState->Name, aniFSMcomponent->StateVec.size()-1));
+
+					if (fsm["Transitions"])
+					{
+						auto& transitionNode = fsm["Transitions"];
+						for (auto& transition : transitionNode)
+						{
+							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
+							Meta::Deserialize(sharedTransition.get(), transition);
+							sharedState->Transitions.push_back(sharedTransition);
+							sharedState->Owner = aniFSMcomponent;
+
+							if (transition["conditions"])
+							{
+								auto& conditionNode = transition["conditions"];
+								for (auto& condition : conditionNode)
+								{
+									TransCondition newcondition;
+									Meta::Deserialize(&newcondition, condition);
+									sharedTransition->conditions.push_back(newcondition);
+								}
+							}
+						}
+					}
+
+			
+
+
+
+				}
+
 			}
-            Meta::Deserialize(spriteRenderer, itNode);
-			spriteRenderer->SetEnabled(true);
+			if (itNode["CurState"])
+			{
+				auto& curNode = itNode["CurState"];
+
+				std::string name = curNode["Name"].as<std::string>();
+				aniFSMcomponent->CurState = aniFSMcomponent->StateVec[aniFSMcomponent->States[name]].get();
+			}
+
+			Meta::Deserialize(aniFSMcomponent, itNode);
+			
 		}
 		else
 		{

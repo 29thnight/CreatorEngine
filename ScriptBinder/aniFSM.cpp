@@ -3,35 +3,38 @@
 
 void aniFSM::SetNextState(std::string stateName)
 {
-	auto it = States.find(stateName);
+	/*auto it = States.find(stateName);
 	if (it != States.end())
 	{
-		NextState = it->second.get();
-	}
+		NextState = StateVec[States[stateName]].get();
+	}*/
+	NextState = StateVec[States[stateName]].get();
 }
 
 void aniFSM::SetCurState(std::string stateName)
 {
-	auto it = States.find(stateName);
-	if (it != States.end())
-	{
-		CurState = it->second.get();
-	}
+	//auto it = States.find(stateName);
+	//if (it != States.end())
+	//{
+	//	//CurState = it->second.get();
+	//	CurState = StateVec[States[stateName]].get();
+	//}
+	CurState = StateVec[States[stateName]].get();
 }
 
 std::shared_ptr<AniTransition> aniFSM::CheckTransition()
 {
-	if (Transitions.empty()) return nullptr;
+	if (!CurState)
+	{
+
+		CurState = StateVec[States["Idle"]].get();
+	}
+	if (CurState->Transitions.empty()) return nullptr;
 	else
 	{
-		if (!CurState)
-
-		{
-			auto it = States.find("Idle");
-			CurState = it->second.get();
-		}
+		
 	}
-	for (auto& iter : Transitions[CurState->Name])
+	for (auto& iter : CurState->Transitions)
 	{
 		if (true == iter->CheckTransiton())
 		{
@@ -47,7 +50,7 @@ void aniFSM::UpdateState()
 
 	if (nullptr != trans)
 	{
-		NextState = States[trans->GetNextState()].get();
+		NextState = StateVec[States[trans->GetNextState()]].get();
 		CurState->Exit();
 		NextState->Enter();
 		CurState = NextState;

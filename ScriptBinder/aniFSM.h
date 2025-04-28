@@ -3,9 +3,14 @@
 #include "IUpdatable.h"
 #include "Animator.h"
 #include "AniTransition.h"
+#include "aniStruct.h"
 #include "aniFSM.generated.h"
+#include "aniState.h"
+
 class aniState;
 class AniTransition;
+
+
 class aniFSM : public Component, public IUpdatable
 {
 	using TransitionMap = std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>>;
@@ -15,15 +20,20 @@ public:
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(aniFSM);
 
-
+	[[Property]]
 	aniState* CurState = nullptr;
+
 	aniState* NextState = nullptr;
 
+	std::unordered_map<std::string, /*std::shared_ptr<aniState>*/size_t> States;
+
 	[[Property]]
-	std::unordered_map<std::string, std::shared_ptr<aniState>> States;
+	std::vector<std::shared_ptr<aniState>> StateVec;
+
 	[[Property]]
-	std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>> Transitions;
-	
+	std::vector<aniParameter> Parameters;
+	//std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>> Transitions;
+	//std::vector<std::shared_ptr<AniTransition>> abvcd;
 	//void Update();
 	void SetAnimator(Animator* _animator) { animator = _animator; }
 	Animator* GetAnimator() { return animator; };
@@ -37,42 +47,55 @@ public:
 	template<typename T>
 	T* CreateState(const std::string& stateName)
 	{
+		
 		auto it = States.find(stateName);
 		if (it != States.end())
 		{
-			return dynamic_cast<T*>(it->second.get()); 
-
+			return dynamic_cast<T*>(StateVec[it->second].get());
 		}
 		std::shared_ptr<T> state = std::make_shared<T>(this, stateName);
- 		States.insert(std::make_pair(stateName, state));
+		States.insert(std::make_pair(stateName, StateVec.size()));
+		StateVec.push_back(state);
+		StateVec.back()->index = StateVec.size() - 1;
+
 
 		return state.get();
 	}
+
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName)
 	{
-		auto it = Transitions.find(curStateName);
-		if (it != Transitions.end())
+		
+		for (auto& trans : StateVec[States[curStateName]]->Transitions)
 		{
-			// curStateName에 해당하는 트랜지션 목록을 뒤져서
-			for (const auto& transition : it->second)
+			if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
+				return trans.get();
+			
+		}
+		
+		auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
+		transition->owner = this;
+		StateVec[States[curStateName]]->Transitions.push_back(transition);
+		return transition.get();
+	}
+
+	void AddParameter(const std::string valuename, float value, valueType vType)
+	{
+		Parameters.push_back(aniParameter(value, vType, valuename));
+	}
+
+	template<typename T>
+	void SetParameter(const std::string valuename,T Value)
+	{
+		for (auto& param : Parameters)
+		{
+			if (param.name == valuename)
 			{
-				if (transition->GetNextState() == nextStateName)
-				{
-					return transition.get();
-				}
+				param.UpdateParameter(Value);
 			}
 		}
-
-		// 없으면 새로 생성
-		auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
-		Transitions[curStateName].push_back(transition);
-
-		return transition.get();
 	}
 private:
 	Animator* animator;
-	[[Property]]
-	bool abc;
 	[[Property]]
 	std::string curName = "None";
 };
