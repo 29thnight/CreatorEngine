@@ -13,8 +13,8 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	fsm->CreateState<RunAni>("Run");
 	fsm->SetCurState("Idle");
 
-	fsm->CreateTransition("Idle", "Walk")->AddCondition(&speed, 0.3f, conditionType::Greater);
-	fsm->CreateTransition("Walk", "Idle")->AddCondition(&speed, 0.3f, conditionType::Less);
+	fsm->CreateTransition("Idle", "Walk")->AddCondition(&player->speed, 0.3f, conditionType::Greater);
+	fsm->CreateTransition("Walk", "Idle")->AddCondition(&player->speed, 0.3f, conditionType::Less);
 	/*AniTransition movetoRun;
 	bool canRun = true;
 	movetoRun.AddCondition(&canRun, true, conditionType::Equal);*/
@@ -25,6 +25,11 @@ void TestPlayer::Update(float deltaTime)
 	auto _player = GameObject::Find("aniTest");
 	auto ani = _player->GetComponent<Animator>();
 	auto fsm = _player->GetComponent<aniFSM>();
+	fsm->CreateState<IdleAni>("Idle");
+	fsm->CreateState<WalkAni>("Walk");
+	fsm->CreateState<RunAni>("Run");
+	fsm->CreateTransition("Idle", "Walk")->AddCondition(&player->speed, 0.3f, conditionType::Greater);
+	fsm->CreateTransition("Walk", "Idle")->AddCondition(&player->speed, 0.3f, conditionType::Less);
 	if (InputManagement->IsKeyDown('1'))
 	{
 		std::cout << "press 1" << std::endl;
@@ -41,23 +46,25 @@ void TestPlayer::Update(float deltaTime)
 		ani->SetAnimation(1);
 	}
 	float dir{};
-	if (InputManagement->IsKeyPressed(VK_RIGHT))
+	if (InputManagement->IsKeyPressed('P'))
 	{
 		dir = 1.0f;
-		speed += 0.01;
+		player->speed += 0.01;
 	}
-	else if(InputManagement->IsKeyPressed(VK_LEFT))
+	else if(InputManagement->IsKeyPressed('O'))
 	{
 		dir = -1.0f;
-		speed += 0.01;
+		player->speed += 0.01;
 	}
 	else
 	{
-		speed = 0;
+		player->speed = 0;
 	}
 
 	
-	if (speed >= maxSpeed)
-		speed = maxSpeed;
+	if (player->speed >= maxSpeed)
+		player->speed = maxSpeed;
+
+	std::cout << player->speed << std::endl;
 	//player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });
 }

@@ -15,6 +15,8 @@ class ModuleBehavior;
 class GameObject : public Object
 {
 public:
+	[[property]]
+	float speed = 0; //*****
 	using Index = int;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	enum class Type

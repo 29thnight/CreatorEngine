@@ -22,6 +22,15 @@ void aniFSM::SetCurState(std::string stateName)
 std::shared_ptr<AniTransition> aniFSM::CheckTransition()
 {
 	if (Transitions.empty()) return nullptr;
+	else
+	{
+		if (!CurState)
+
+		{
+			auto it = States.find("Idle");
+			CurState = it->second.get();
+		}
+	}
 	for (auto& iter : Transitions[CurState->Name])
 	{
 		if (true == iter->CheckTransiton())
@@ -49,7 +58,8 @@ void aniFSM::UpdateState()
 void aniFSM::Update(float tick)
 {
 	UpdateState();
-
+	States.size();
+	//curName = CurState->Name;
 	if (CurState == nullptr) return;
 		CurState->Update(tick);
 }

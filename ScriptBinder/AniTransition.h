@@ -52,10 +52,16 @@ public:
 	AniTransition(std::string curStatename, std::string nextStatename);
 	~AniTransition();
 
-	template <typename T>
-	void AddCondition(T* value, T Comparevalue, conditionType cType)
+	void AddCondition(float* value, float Comparevalue, conditionType cType)
 	{
-			conditions.push_back(TransCondition(value, Comparevalue, cType));
+		for (const auto& cond : conditions)
+		{
+			if (cond.FValue == value && cond.FCompareValue == Comparevalue && cond.cType == cType)
+			{
+				return; // 이미 있으면 아무것도 안 하고 return
+			}
+		}
+		conditions.push_back(TransCondition(value, Comparevalue, cType));
 	}
 	void SetCurState(std::string curStatename) {curState = curStatename;}
 	void SetNextState(std::string nextStatename) { nextState = nextStatename; }

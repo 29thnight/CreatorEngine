@@ -26,7 +26,7 @@ public:
 private:
 	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
 	ComPtr<ID3D11Buffer> m_UIBuffer;
-	//SpriteBatch* m_spriteBatch = nullptr;
+	SpriteBatch* m_spriteBatch = nullptr;
 	Texture* m_renderTarget = nullptr;
 	float m_delta;
 	
