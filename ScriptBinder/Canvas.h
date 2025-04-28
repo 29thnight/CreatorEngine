@@ -26,17 +26,6 @@ public:
 	void AddUIObject(GameObject* obj);
 	virtual void Update(float tick) override;
 
-
-	//ReflectionField(Canvas)
-	//{
-	//	PropertyField
-	//	({
-	//		meta_property(m_IsEnabled)
-	//		meta_property(CanvasOrder)
-	//	});
-
-	//	FieldEnd(Canvas, PropertyOnly)
-	//};
     [[Property]]
 	bool m_IsEnabled = true;
 	int PreCanvasOrder = 0;

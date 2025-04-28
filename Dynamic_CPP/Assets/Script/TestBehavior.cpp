@@ -15,27 +15,27 @@ void TestBehavior::FixedUpdate(float fixedTick)
 {
 }
 
-void TestBehavior::OnTriggerEnter(ICollider* other)
+void TestBehavior::OnTriggerEnter(const Collision& collider)
 {
 }
 
-void TestBehavior::OnTriggerStay(ICollider* other)
+void TestBehavior::OnTriggerStay(const Collision& collider)
 {
 }
 
-void TestBehavior::OnTriggerExit(ICollider* other)
+void TestBehavior::OnTriggerExit(const Collision& collider)
 {
 }
 
-void TestBehavior::OnCollisionEnter(ICollider* other)
+void TestBehavior::OnCollisionEnter(const Collision& collider)
 {
 }
 
-void TestBehavior::OnCollisionStay(ICollider* other)
+void TestBehavior::OnCollisionStay(const Collision& collider)
 {
 }
 
-void TestBehavior::OnCollisionExit(ICollider* other)
+void TestBehavior::OnCollisionExit(const Collision& collider)
 {
 }
 

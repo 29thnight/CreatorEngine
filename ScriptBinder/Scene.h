@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include "LightProperty.h"
+#include "PhysicsManager.h"
 #include "Scene.generated.h"
 
 class GameObject;
@@ -45,12 +46,12 @@ public:
 
     //Physics
     Core::Delegate<void, float>      FixedUpdateEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerEnterEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerStayEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerExitEvent{};
-    Core::Delegate<void, ICollider*> OnCollisionEnterEvent{};
-	Core::Delegate<void, ICollider*> OnCollisionStayEvent{};
-	Core::Delegate<void, ICollider*> OnCollisionExitEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerEnterEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerStayEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerExitEvent{};
+    Core::Delegate<void, const Collision&> OnCollisionEnterEvent{};
+	Core::Delegate<void, const Collision&> OnCollisionStayEvent{};
+	Core::Delegate<void, const Collision&> OnCollisionExitEvent{};
 
     //Game logic
     Core::Delegate<void, float> UpdateEvent{};
@@ -69,12 +70,12 @@ public:
 
     //Physics
     void FixedUpdate(float deltaSecond);
-    void OnTriggerEnter(ICollider* collider);
-    void OnTriggerStay(ICollider* collider);
-    void OnTriggerExit(ICollider* collider);
-    void OnCollisionEnter(ICollider* collider);
-    void OnCollisionStay(ICollider* collider);
-    void OnCollisionExit(ICollider* collider);
+    void OnTriggerEnter(const Collision& collider);
+    void OnTriggerStay(const Collision& collider);
+    void OnTriggerExit(const Collision& collider);
+    void OnCollisionEnter(const Collision& collider);
+    void OnCollisionStay(const Collision& collider);
+    void OnCollisionExit(const Collision& collider);
 
     //Game logic
     void Update(float deltaSecond);

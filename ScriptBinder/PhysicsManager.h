@@ -6,7 +6,8 @@
 
 
 
-struct Collision {
+struct Collision 
+{
 	GameObject* thisObj;
 	GameObject* otherObj;
 

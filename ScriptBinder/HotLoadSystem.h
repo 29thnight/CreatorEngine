@@ -63,12 +63,12 @@ private:
 		"	"
 		"	virtual void Start() override;\n"
 		"	virtual void FixedUpdate(float fixedTick) override;\n"
-		"	virtual void OnTriggerEnter(ICollider* other) override;\n"
-		"	virtual void OnTriggerStay(ICollider* other) override;\n"
-		"	virtual void OnTriggerExit(ICollider* other) override;\n"
-		"	virtual void OnCollisionEnter(ICollider* other) override;\n"
-		"	virtual void OnCollisionStay(ICollider* other) override;\n"
-		"	virtual void OnCollisionExit(ICollider* other) override;\n"
+		"	virtual void OnTriggerEnter(const Collision& collision) override;\n"
+		"	virtual void OnTriggerStay(const Collision& collision) override;\n"
+		"	virtual void OnTriggerExit(const Collision& collision) override;\n"
+		"	virtual void OnCollisionEnter(const Collision& collision) override;\n"
+		"	virtual void OnCollisionStay(const Collision& collision) override;\n"
+		"	virtual void OnCollisionExit(const Collision& collision) override;\n"
 		"	virtual void Update(float tick) override;\n"
 		"	virtual void LateUpdate(float tick) override;\n"
 	};
@@ -111,7 +111,7 @@ private:
 
 	std::string scriptCppEndOnTriggerEnterString
 	{
-		"::OnTriggerEnter(ICollider* other)\n"
+		"::OnTriggerEnter(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"
@@ -120,7 +120,7 @@ private:
 
 	std::string scriptCppEndOnTriggerStayString
 	{
-		"::OnTriggerStay(ICollider* other)\n"
+		"::OnTriggerStay(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"
@@ -129,7 +129,7 @@ private:
 
 	std::string scriptCppEndOnTriggerExitString
 	{
-		"::OnTriggerExit(ICollider* other)\n"
+		"::OnTriggerExit(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"
@@ -138,7 +138,7 @@ private:
 
 	std::string scriptCppEndOnCollisionEnterString
 	{
-		"::OnCollisionEnter(ICollider* other)\n"
+		"::OnCollisionEnter(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"
@@ -147,7 +147,7 @@ private:
 
 	std::string scriptCppEndOnCollisionStayString
 	{
-		"::OnCollisionStay(ICollider* other)\n"
+		"::OnCollisionStay(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"
@@ -156,7 +156,7 @@ private:
 
 	std::string scriptCppEndOnCollisionExitString
 	{
-		"::OnCollisionExit(ICollider* other)\n"
+		"::OnCollisionExit(const Collision& collision)\n"
 		"{\n"
 		"}\n"
 		"\n"

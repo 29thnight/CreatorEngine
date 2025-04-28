@@ -8,27 +8,27 @@ void TestScriptClass::FixedUpdate(float fixedTick)
 {
 }
 
-void TestScriptClass::OnTriggerEnter(ICollider* other)
+void TestScriptClass::OnTriggerEnter(const Collision& collider)
 {
 }
 
-void TestScriptClass::OnTriggerStay(ICollider* other)
+void TestScriptClass::OnTriggerStay(const Collision& collider)
 {
 }
 
-void TestScriptClass::OnTriggerExit(ICollider* other)
+void TestScriptClass::OnTriggerExit(const Collision& collider)
 {
 }
 
-void TestScriptClass::OnCollisionEnter(ICollider* other)
+void TestScriptClass::OnCollisionEnter(const Collision& collider)
 {
 }
 
-void TestScriptClass::OnCollisionStay(ICollider* other)
+void TestScriptClass::OnCollisionStay(const Collision& collider)
 {
 }
 
-void TestScriptClass::OnCollisionExit(ICollider* other)
+void TestScriptClass::OnCollisionExit(const Collision& collider)
 {
 }
 

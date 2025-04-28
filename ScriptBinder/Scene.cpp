@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
+#include "ModuleBehavior.h"
 
 Scene::~Scene()
 {
@@ -187,34 +188,64 @@ void Scene::FixedUpdate(float deltaSecond)
 	// OnTriggerEvent.Broadcast(); ÀÛ¼º
 }
 
-void Scene::OnTriggerEnter(ICollider* collider)
+void Scene::OnTriggerEnter(const Collision& collider)
 {
-    OnTriggerEnterEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerEnterEvent.TargetInvoke(
+            target->m_onTriggerEnterEventHandle,collider);
+    }
 }
 
-void Scene::OnTriggerStay(ICollider* collider)
+void Scene::OnTriggerStay(const Collision& collider)
 {
-    OnTriggerStayEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerStayEvent.TargetInvoke(
+            target->m_onTriggerStayEventHandle, collider);
+    }
 }
 
-void Scene::OnTriggerExit(ICollider* collider)
+void Scene::OnTriggerExit(const Collision& collider)
 {
-    OnTriggerExitEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerExitEvent.TargetInvoke(
+            target->m_onTriggerExitEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionEnter(ICollider* collider)
+void Scene::OnCollisionEnter(const Collision& collider)
 {
-    OnCollisionEnterEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionEnterEvent.TargetInvoke(
+            target->m_onCollisionEnterEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionStay(ICollider* collider)
+void Scene::OnCollisionStay(const Collision& collider)
 {
-    OnCollisionStayEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionStayEvent.TargetInvoke(
+            target->m_onCollisionStayEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionExit(ICollider* collider)
+void Scene::OnCollisionExit(const Collision& collider)
 {
-    OnCollisionExitEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionExitEvent.TargetInvoke(
+            target->m_onCollisionExitEventHandle, collider);
+    }
 }
 
 void Scene::Update(float deltaSecond)

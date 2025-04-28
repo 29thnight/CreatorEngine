@@ -70,6 +70,19 @@ namespace Core
 		}
 	}
 
+	template<typename Ret, typename ...Args>
+	inline void Delegate<Ret, Args...>::TargetInvoke(DelegateHandle& DelegateHandle, Args ...args)
+	{
+		SpinLock lock(atomic_flag_);
+		auto it = std::find_if(callbacks_.begin(), callbacks_.end(),
+			[&DelegateHandle](const CallbackInfo& info) { return info.handle == DelegateHandle; });
+		if (it != callbacks_.end())
+		{
+			try { it->callback(args...); }
+			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; }
+		}
+	}
+
 	template <typename Ret, typename... Args>
 	template <typename R>
 	auto Delegate<Ret, Args...>::AsyncBroadcast(Args... args) -> std::vector<std::future<R>>

@@ -44,6 +44,7 @@ namespace Core
 		void Remove(const DelegateHandle& handle);
 		void Clear();
 		void Broadcast(Args... args);
+		void TargetInvoke(DelegateHandle& DelegateHandle, Args... args);
 		template <typename R = Ret>
 		std::vector<std::future<R>> AsyncBroadcast(Args... args);
 
