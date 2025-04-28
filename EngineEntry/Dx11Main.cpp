@@ -18,24 +18,26 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 {
 	m_deviceResources->RegisterDeviceNotify(this);
 
-
+    //init SceneRenderer
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
+	//init GizmoRenderer
+	m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
     //init Engine GUI windows
-	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get());
+	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
 	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get());
 	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
 	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
 	m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
 
+	ScriptManager->Initialize();
+	DataSystems->Initialize();
     //CreateScene
     SceneManagers->CreateScene();
 
 	Sound->initialize((int)ChannelType::MaxChannel);
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
 
-	ScriptManager->Initialize();
-	DataSystems->Initialize();
 
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
@@ -49,9 +51,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         {
 			Meta::UndoCommandManager->Redo();
         }
-        //Mathf::Vector2 mousePos = InputManagement->GetMousePos();
-        /*if(InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-          UIManagers->m_clickEvent.Broadcast(mousePos);*/
 		UIManagers->Update();
         Sound->update();
     });
@@ -61,6 +60,11 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         m_sceneRenderer->OnWillRenderObject(deltaSecond);
         m_sceneRenderer->SceneRendering();
     });
+
+	m_OnGizmoEventHandle = SceneManagers->OnDrawGizmosEvent.AddLambda([&]()
+	{
+		m_gizmoRenderer->OnDrawGizmos();
+	});
 
     m_GUIRenderingEventHandle = SceneManagers->GUIRenderingEvent.AddLambda([&]()
     {
@@ -97,7 +101,7 @@ void DirectX11::Dx11Main::Update()
         {
             SceneManagers->Editor();
             SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->GameLogic(0);
+            SceneManagers->GameLogic();
         }
         else
         {
@@ -119,12 +123,12 @@ void DirectX11::Dx11Main::Update()
 
 	if (InputManagement->IsKeyReleased(VK_F6))
 	{
-		//loadlevel = 0;
+		//TODO: build key
 	}
 
-	if (InputManagement->IsKeyDown(VK_F11)) 
+	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))
 	{
-		m_sceneRenderer->SetWireFrame();
+        m_gizmoRenderer->SetWireFrame();
 	}
 
 	if (InputManagement->IsKeyDown(VK_F10))
@@ -145,11 +149,11 @@ bool DirectX11::Dx11Main::Render()
 	if (m_timeSystem.GetFrameCount() == 0) return false;
 	{
         SceneManagers->SceneRendering(m_timeSystem.GetElapsedSeconds());
-	}
-
 #if defined(EDITOR)
-    SceneManagers->GUIRendering();
+		SceneManagers->OnDrawGizmos();
+        SceneManagers->GUIRendering();
 #endif // !EDITOR
+	}
 
 	return true;
 }

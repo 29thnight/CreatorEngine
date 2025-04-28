@@ -8,13 +8,14 @@
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"
+#include "DataSystem.h"
 #include "LightComponent.generated.h"
 //어차피 다시 만들어야 하니까
 class LightComponent : public Component, public IRenderable, public IUpdatable, public IAwakable
 {
 public:
    ReflectLightComponent
-    [[Serializable]]
+    [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(LightComponent)
 
     bool IsEnabled() const override

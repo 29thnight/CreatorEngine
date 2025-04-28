@@ -36,6 +36,11 @@ cbuffer LightProperties : register(b1)
     Light Lights[MAX_LIGHTS];
 }
 
+cbuffer LightCount : register(b11)
+{
+    uint lightCount;
+}
+
 cbuffer ShadowMapConstants : register(b2) // supports one
 {
     float mapWidth;
@@ -55,11 +60,6 @@ cbuffer CameraView : register(b10)
 {
     matrix cameraview;
 }
-
-
-
-
-
 
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
 {

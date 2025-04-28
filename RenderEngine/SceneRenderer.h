@@ -39,6 +39,7 @@ class MenuBarWindow;
 class GameViewWindow;
 class HierarchyWindow;
 class InspectorWindow;
+class GizmoRenderer;
 class SceneRenderer
 {
 private:
@@ -48,6 +49,7 @@ private:
 	friend class GameViewWindow;
 	friend class HierarchyWindow;
 	friend class InspectorWindow;
+	friend class GizmoRenderer;
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 
@@ -106,14 +108,14 @@ private:
 	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
-    UniqueTexturePtr m_gridTexture             { TEXTURE_NULL_INITIALIZER };
+    //UniqueTexturePtr m_gridTexture             { TEXTURE_NULL_INITIALIZER };
 
 	//sampler
 	Sampler* m_linearSampler{};
 	Sampler* m_pointSampler{};
 
 	//Editor Camera
-	std::unique_ptr<Camera> m_pEditorCamera{};
+	std::shared_ptr<Camera> m_pEditorCamera{};
 
 	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 

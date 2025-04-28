@@ -239,6 +239,17 @@ namespace DirectX11
 	}
 
 	//[unsafe]
+	inline void GSSetConstantBuffer(uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->GSSetConstantBuffers(slot, numBuffers, buffer);
+	}
+
+	//[unsafe]
 	inline void CSSetConstantBuffer(uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
 	{
 		if (!DeviceState::g_pDeviceContext)

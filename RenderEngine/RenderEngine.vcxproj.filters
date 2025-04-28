@@ -144,9 +144,6 @@
     <Filter Include="Renderer\DeviceState">
       <UniqueIdentifier>{c638d479-f697-49ee-8b0c-12ffea6245df}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Renderer\Interfaces">
-      <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
       <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
     </Filter>
@@ -162,22 +159,34 @@
     <Filter Include="RenderPass\ScreenSpaceReflectionPass">
       <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Renderer\ImGuiRenderer">
+      <UniqueIdentifier>{a7936112-fd34-4f36-b1ee-2bb11a3de982}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\SceneRenderer">
+      <UniqueIdentifier>{5c05a1c7-f367-4093-992b-0585043522f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\GizmoRenderer">
+      <UniqueIdentifier>{b2db100b-1cee-4b78-ae1f-2a5b5e5a354e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer\RenderState">
+      <UniqueIdentifier>{de3c7e02-c901-4df2-837b-51979ec790aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\LightController">
+      <UniqueIdentifier>{9001a36e-355a-4f7b-9a27-fcef4b5a514d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\GizmoPass">
+      <UniqueIdentifier>{c8c1c404-6da8-4472-9aad-a873ceb917f2}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RenderPass\SubSurfaceScatteringPass">
       <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SceneRenderer.cpp">
-      <Filter>Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="AnimationLoader.cpp">
       <Filter>Asset\Loader</Filter>
     </ClCompile>
     <ClCompile Include="SkeletonLoader.cpp">
       <Filter>Asset\Loader</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiRenderer.cpp">
-      <Filter>Renderer</Filter>
     </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
@@ -287,8 +296,20 @@
     <ClCompile Include="ScreenSpaceReflectionPass.cpp">
       <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiRenderer.cpp">
+      <Filter>Renderer\ImGuiRenderer</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneRenderer.cpp">
+      <Filter>Renderer\SceneRenderer</Filter>
+    </ClCompile>
+    <ClCompile Include="GizmoRenderer.cpp">
+      <Filter>Renderer\GizmoRenderer</Filter>
+    </ClCompile>
     <ClCompile Include="LightController.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>Resources\LightController</Filter>
+    </ClCompile>
+    <ClCompile Include="GizmoPass.cpp">
+      <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
     <ClCompile Include="SubsurfaceScatteringPass.cpp">
       <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
@@ -300,9 +321,6 @@
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
       <Filter>RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneRenderer.h">
-      <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="RenderScene.h">
       <Filter>RenderScene</Filter>
@@ -318,9 +336,6 @@
     </ClInclude>
     <ClInclude Include="SkeletonLoader.h">
       <Filter>Asset\Loader</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiRenderer.h">
-      <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
@@ -406,9 +421,6 @@
     <ClInclude Include="LightMapPass.h">
       <Filter>LightMap\Result</Filter>
     </ClInclude>
-    <ClInclude Include="RenderState.h">
-      <Filter>Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
@@ -442,8 +454,23 @@
     <ClInclude Include="ScreenSpaceReflectionPass.h">
       <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiRenderer.h">
+      <Filter>Renderer\ImGuiRenderer</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneRenderer.h">
+      <Filter>Renderer\SceneRenderer</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderState.h">
+      <Filter>Renderer\RenderState</Filter>
+    </ClInclude>
+    <ClInclude Include="GizmoRenderer.h">
+      <Filter>Renderer\GizmoRenderer</Filter>
+    </ClInclude>
     <ClInclude Include="LightController.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Resources\LightController</Filter>
+    </ClInclude>
+    <ClInclude Include="GizmoPass.h">
+      <Filter>RenderPass\GizmoPass</Filter>
     </ClInclude>
     <ClInclude Include="SubsurfaceScatteringPass.h">
       <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
@@ -584,6 +611,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.ps.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.gs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.vs.hlsl">
+      <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSS.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>

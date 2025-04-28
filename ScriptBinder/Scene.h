@@ -13,7 +13,7 @@ public:
    ReflectScene
     [[Serializable]]
 	Scene() = default;
-	~Scene() = default;
+	~Scene();
 
     [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
@@ -108,11 +108,23 @@ public:
     size_t m_buildIndex{ 0 };
 
 public:
-    void UpdateLight(LightProperties& lightProperties) const
+    uint32 UpdateLight(LightProperties& lightProperties) const
     {
         lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
         lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
-        Memory::MemoryCopy(lightProperties.m_lights, m_lightProperties.m_lights, MAX_LIGHTS);
+
+        memset(lightProperties.m_lights, 0, sizeof(Light) * MAX_LIGHTS);
+
+        uint32 count{};
+        for (int i = 0; i < MAX_LIGHTS; ++i)
+        {
+            if (LightStatus::Enabled == m_lightProperties.m_lights[i].m_lightStatus)
+            {
+                lightProperties.m_lights[count++] = m_lightProperties.m_lights[i];
+            }
+        }
+
+        return count;
     }
 
     int AddLightCount()

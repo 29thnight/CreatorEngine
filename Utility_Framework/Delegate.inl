@@ -1,4 +1,6 @@
 #pragma once
+#include "SpinLock.h"
+#include "Delegate.h"
 
 namespace Core
 {
@@ -32,7 +34,7 @@ namespace Core
 	template <typename Ret, typename... Args>
 	auto Delegate<Ret, Args...>::AddInternal(std::function<Ret(Args...)> func, int priority) -> DelegateHandle
 	{
-		std::lock_guard lock(mutex_);
+		SpinLock lock(atomic_flag_);
 		DelegateHandle handle(nextID_++);
 		CallbackInfo info{ handle, std::move(func), priority };
 		auto it = std::lower_bound(callbacks_.begin(), callbacks_.end(), info, [](const CallbackInfo& a, const CallbackInfo& b) {
@@ -45,7 +47,7 @@ namespace Core
 	template <typename Ret, typename... Args>
 	void Delegate<Ret, Args...>::Remove(const DelegateHandle& handle)
 	{
-		std::lock_guard lock(mutex_);
+		SpinLock lock(atomic_flag_);
 		callbacks_.erase(std::remove_if(callbacks_.begin(), callbacks_.end(),
 			[&handle](const CallbackInfo& info) { return info.handle == handle; }), callbacks_.end());
 	}
@@ -53,14 +55,14 @@ namespace Core
 	template <typename Ret, typename... Args>
 	void Delegate<Ret, Args...>::Clear()
 	{
-		std::lock_guard lock(mutex_);
+		SpinLock lock(atomic_flag_);
 		callbacks_.clear();
 	}
 
 	template <typename Ret, typename... Args>
 	void Delegate<Ret, Args...>::Broadcast(Args... args)
 	{
-		std::lock_guard lock(mutex_);
+		SpinLock lock(atomic_flag_);
 		for (auto& info : callbacks_)
 		{
 			try { info.callback(args...); }
@@ -74,7 +76,7 @@ namespace Core
 	{
 		std::vector<CallbackInfo> localCallbacks;
 		{
-			std::lock_guard lock(mutex_);
+			SpinLock lock(atomic_flag_);
 			localCallbacks = callbacks_;
 		}
 		std::vector<std::future<R>> futures;

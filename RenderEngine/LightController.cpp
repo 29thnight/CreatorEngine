@@ -23,6 +23,24 @@ void LightController::Initialize()
         )
     );
 
+    DirectX::SetName(m_pLightBuffer, "Light Buffer");
+
+    CD3D11_BUFFER_DESC counterDesc{
+        sizeof(LightCount),
+        D3D11_BIND_CONSTANT_BUFFER
+    };
+
+    DirectX11::ThrowIfFailed(
+        DeviceState::g_pDevice->CreateBuffer(
+            &counterDesc, 
+            nullptr, 
+            &m_pLightCountBuffer
+        )
+    );
+
+    DirectX::SetName(m_pLightCountBuffer, "Light Count Buffer");
+
+
 	m_shadowMapPass = std::make_unique<ShadowMapPass>();
 }
 
@@ -36,6 +54,16 @@ void LightController::Update()
 		0,
 		0
 	);
+
+    m_lightCountStruct.m_lightCount = m_lightCount;
+    DeviceState::g_pDeviceContext->UpdateSubresource(
+        m_pLightCountBuffer,
+        0,
+        nullptr,
+        &m_lightCountStruct,
+        0,
+        0
+    );
 }
 
 Light& LightController::GetLight(uint32 index)

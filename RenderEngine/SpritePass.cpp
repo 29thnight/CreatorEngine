@@ -62,11 +62,6 @@ SpritePass::~SpritePass()
 {
 }
 
-void SpritePass::Initialize(Texture* renderTarget)
-{
-	m_RenderTarget = renderTarget;
-}
-
 void SpritePass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (false == camera.m_applyRenderPipelinePass.m_SpritePass)
@@ -83,18 +78,19 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
-
 	camera.UpdateBuffer();
     scene.UseModel();
 
     std::vector<std::shared_ptr<GameObject>> sprites;
+	bool isGizmoRendering = m_isGizmoRendering;
 	std::copy_if(
 		scene.GetScene()->m_SceneObjects.begin(),
 		scene.GetScene()->m_SceneObjects.end(),
 		std::back_inserter(sprites),
-		[](const std::shared_ptr<GameObject>& object)
+		[&isGizmoRendering](const std::shared_ptr<GameObject>& object)
 		{
-			return nullptr != object->GetComponent<SpriteRenderer>() && object->GetComponent<SpriteRenderer>()->IsEnabled();
+			return nullptr != object->GetComponent<SpriteRenderer>() 
+				&& object->GetComponent<SpriteRenderer>()->IsEnabled();
 		}
 	);
 

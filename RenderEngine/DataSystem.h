@@ -92,6 +92,13 @@ public:
 	Texture* UnknownIcon{};
 	Texture* ShaderIcon{};
 	Texture* CodeIcon{};
+
+	Texture* MainLightIcon{};
+	Texture* PointLightIcon{};
+	Texture* SpotLightIcon{};
+	Texture* DirectionalLightIcon{};
+	Texture* CameraIcon{};
+
 	ImFont* smallFont{};
 	ImFont* extraSmallFont{};
 

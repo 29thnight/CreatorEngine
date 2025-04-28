@@ -77,6 +77,7 @@ namespace DirectX11
 		ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3DUserDefinedAnnotation> m_annotation;
 		ComPtr<ID3D11Debug> m_debugDevice;
+		ComPtr<ID3D11InfoQueue> m_infoQueue;
 
 		ComPtr<ID3D11RenderTargetView1> m_d3dRenderTargetView;
 		ComPtr<ID3D11Texture2D1> m_backBuffer;

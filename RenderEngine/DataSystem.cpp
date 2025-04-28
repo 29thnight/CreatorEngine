@@ -45,6 +45,12 @@ void DataSystem::Initialize()
 	ShaderIcon = Texture::LoadFormPath(iconpath.string() + "Shader.png");
 	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Code.png");
 
+	MainLightIcon = Texture::LoadFormPath(iconpath.string() + "Main Light Gizmo.png");
+	PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLight Gizmo.png");
+	SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLight Gizmo.png");
+	DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLight Gizmo.png");
+	CameraIcon = Texture::LoadFormPath(iconpath.string() + "Camera Gizmo.png");
+
 	smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
 
@@ -111,6 +117,11 @@ void DataSystem::RenderForEditer()
 					ImGui::SameLine();
 
 				ImGui::BeginGroup();
+
+				if (name.empty())
+				{
+					const_cast<std::string&>(name) = "None";
+				}
 
 				if (ImGui::ImageButton(name.c_str(), iconTexture, ImVec2(70, 70)))
 				{

@@ -211,8 +211,6 @@ Material* ModelLoader::GenerateMaterial(int index)
 	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
 	material->m_fileGuid = m_fileGuid = modelFileNode["guid"].as<std::string>();
 
-
-
 	if (index > -1)
 	{
 		aiMaterial* mat = m_AIScene->mMaterials[index];

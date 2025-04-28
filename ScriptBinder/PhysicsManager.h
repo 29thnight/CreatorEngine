@@ -5,6 +5,8 @@
 #include "Component.h"
 
 class ICollider;
+class Component;
+class GameObject;
 class PhysicsManager
 {
 	//todo : 

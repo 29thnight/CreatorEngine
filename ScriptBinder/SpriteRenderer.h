@@ -27,16 +27,6 @@ public:
         m_IsEnabled = able;
     }
 
-    //ReflectionFieldInheritance(SpriteRenderer, Component)
-    //{
-    //    PropertyField
-    //    ({
-    //        meta_property(m_Sprite)
-    //    });
-
-    //    FieldEnd(SpriteRenderer, PropertyOnlyInheritance)
-    //}
-
 private:
     [[Property]]
     bool m_IsEnabled = false;

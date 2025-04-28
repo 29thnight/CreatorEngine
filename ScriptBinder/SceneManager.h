@@ -17,8 +17,9 @@ public:
     void Initialization();
     void Physics(float deltaSecond);
     void InputEvents(float deltaSecond);
-    void GameLogic(float deltaSecond);
+    void GameLogic(float deltaSecond = 0);
     void SceneRendering(float deltaSecond);
+	void OnDrawGizmos();
     void GUIRendering();
     void EndOfFrame();
     void Pausing();
@@ -41,6 +42,7 @@ public:
     Core::Delegate<void, float> InputEvent{};
     //for RenderEngine
     Core::Delegate<void, float> SceneRenderingEvent{};
+	Core::Delegate<void>        OnDrawGizmosEvent{};
     Core::Delegate<void>        GUIRenderingEvent{};
     Core::Delegate<void, float> InternalAnimationUpdateEvent{};
     //Manager Events

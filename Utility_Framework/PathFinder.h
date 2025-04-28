@@ -29,7 +29,6 @@ namespace InternalPath
 
         ExecuteablePath = p.remove_filename();
 
-
         auto base = file::path(ExecuteablePath);
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
 		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
@@ -65,6 +64,22 @@ namespace InternalPath
 		if (!file::exists(MaterialSourcePath))
 		{
 			file::create_directories(MaterialSourcePath);
+		}
+		if (!file::exists(UISourcePath))
+		{
+			file::create_directories(UISourcePath);
+		}
+		if (!file::exists(IconPath))
+		{
+			file::create_directories(IconPath);
+		}
+		if (!file::exists(DynamicSolutionDir))
+		{
+			file::create_directories(DynamicSolutionDir);
+		}
+		if (!file::exists(PrecompiledShaderPath))
+		{
+			file::create_directories(PrecompiledShaderPath);
 		}
     }
 };

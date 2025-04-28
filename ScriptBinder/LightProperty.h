@@ -8,8 +8,7 @@ enum LightType
 {
     DirectionalLight,
     PointLight,
-    SpotLight,
-    LightsTypeMax
+    SpotLight
 };
 
 AUTO_REGISTER_ENUM(LightType)
@@ -65,6 +64,11 @@ cbuffer LightProperties
     Mathf::Vector4 m_eyePosition{};
     Mathf::Color4 m_globalAmbient{};
     Light m_lights[MAX_LIGHTS];
+};
+
+cbuffer LightCount
+{
+    uint32 m_lightCount{};
 };
 
 cbuffer ShadowMapConstant

@@ -34,6 +34,7 @@ namespace Core
 	{
 	public:
 		Delegate() : nextID_(1) {}
+		~Delegate() = default;
 
 		DelegateHandle AddLambda(CallableWithSignature<Ret, Args...> auto&& func, int priority = 0);
 		template <typename T>
@@ -56,9 +57,10 @@ namespace Core
 
 		DelegateHandle AddInternal(std::function<Ret(Args...)> func, int priority);
 
+		std::atomic_flag atomic_flag_ = ATOMIC_FLAG_INIT;
 		std::vector<CallbackInfo> callbacks_;
 		std::size_t nextID_;
-		std::mutex mutex_;
+		//std::mutex mutex_;
 	};
 }
 

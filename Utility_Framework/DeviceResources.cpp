@@ -271,6 +271,19 @@ void DirectX11::DeviceResources::CreateDeviceResources()
 	// 디버그 레이어를 사용하여 디바이스를 만들면 디버그 레이어에 대한 포인터를 가져옵니다.
     DirectX11::ThrowIfFailed(device->QueryInterface(IID_PPV_ARGS(&m_debugDevice)));
 
+    DirectX11::ThrowIfFailed(device->QueryInterface(IID_PPV_ARGS(&m_infoQueue)));
+    {
+        // WARNING 메시지에 Breakpoint
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, TRUE);
+
+        // ERROR 메시지에 Breakpoint
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
+
+        // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+
+        m_infoQueue->Release();
+    }
 
     if (FAILED(hr))
     {
