@@ -21,6 +21,7 @@ void aniFSM::SetCurState(std::string stateName)
 
 std::shared_ptr<AniTransition> aniFSM::CheckTransition()
 {
+	if (Transitions.empty()) return nullptr;
 	for (auto& iter : Transitions[CurState->Name])
 	{
 		if (true == iter->CheckTransiton())

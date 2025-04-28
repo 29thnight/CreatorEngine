@@ -19,39 +19,33 @@ enum class valueType
 };
 AUTO_REGISTER_ENUM(valueType)
 //using ParameterValue = std::variant<float, int, bool>;
-template <typename T>
+//template <typename T>
 class TransCondition
 {
 public:
-	TransCondition(T* value, T Comparevalue, conditionType cType) : value(value), Comparevalue(Comparevalue), cType(cType) {};
-
-	bool CheckTrans()
-		{
-			if (!value)
-				return false;
-
-			switch (cType)
-			{
-			case conditionType::Greater:
-				return *value > Comparevalue;
-			case conditionType::Less:
-				return *value < Comparevalue;
-			case conditionType::Equal:
-				return *value == Comparevalue;
-			case conditionType::NotEqual:
-				return *value != Comparevalue;
-			default:
-				return false;
-			}
-		}
+	TransCondition(float* value, float Comparevalue, conditionType cType) : FValue(value), FCompareValue(Comparevalue), cType(cType) { vType = valueType::Float; };
+	TransCondition(int* value, int Comparevalue, conditionType cType) : IValue(value), ICompareValue(Comparevalue), cType(cType) { vType = valueType::Int; };
+	TransCondition(bool* value, bool Comparevalue, conditionType cType) : BValue(value), BCompareValue(Comparevalue), cType(cType) { vType = valueType::Bool; };
+	bool CheckTrans();
 	//타입 ,값 ,함수
 	conditionType cType = conditionType::Equal;
+	valueType vType = valueType::Float;
 	//내가 들고있을값
-	T* value;
-	T Comparevalue;
+	//T* value;
+	//T Comparevalue;
+
+	int* IValue;
+	int ICompareValue;
+
+	float* FValue;
+	float FCompareValue;
+
+	bool* BValue;
+	bool BCompareValue;
+		
 };
 
-using TransConditionVariant = std::variant<TransCondition<int>, TransCondition<float>, TransCondition<bool>>;
+//using TransConditionVariant = std::variant<TransCondition<int>, TransCondition<float>, TransCondition<bool>>;
 class AniTransition
 {
 public:
@@ -77,6 +71,7 @@ private:
 	// 애니메이션 탈출 최소시간
 	float exitTime =0.f;
 
-	std::vector<TransConditionVariant> conditions;
+	//std::vector<TransConditionVariant> conditions;
+	std::vector<TransCondition> conditions;
 };
 

@@ -3,5 +3,9 @@
 #define ReflectaniFSM \
 ReflectionFieldInheritance(aniFSM, Component) \
 { \
-	FieldEnd(aniFSM, NoneInheritance) \
+	PropertyField \
+	({ \
+		meta_property(abc) \
+	}); \
+	FieldEnd(aniFSM, PropertyOnlyInheritance) \
 };

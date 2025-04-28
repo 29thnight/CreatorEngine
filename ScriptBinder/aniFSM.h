@@ -3,6 +3,7 @@
 #include "IUpdatable.h"
 #include "Animator.h"
 #include "AniTransition.h"
+#include "aniFSM.generated.h"
 class aniState;
 class AniTransition;
 class aniFSM : public Component, public IUpdatable
@@ -10,8 +11,11 @@ class aniFSM : public Component, public IUpdatable
 	using TransitionMap = std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>>;
 	using TransitionIter = TransitionMap::iterator;
 public:
+   ReflectaniFSM
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(aniFSM);
+
+
 	aniState* CurState = nullptr;
 	aniState* NextState = nullptr;
 
@@ -46,5 +50,7 @@ public:
 	}
 private:
 	Animator* animator;
+	[[Property]]
+	bool abc;
 };
 
