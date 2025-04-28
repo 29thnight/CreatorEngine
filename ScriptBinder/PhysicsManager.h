@@ -1,6 +1,17 @@
 #pragma once
 #include "../physics/Physx.h"
 #include "../physics/ICollider.h"
+#include "GameObject.h"
+#include "Component.h"
+
+
+
+struct Collision {
+	GameObject* thisObj;
+	GameObject* otherObj;
+
+	const std::vector<DirectX::SimpleMath::Vector3>& contactPoints;
+};
 
 class ICollider;
 class Component;
@@ -25,6 +36,7 @@ class PhysicsManager
 		bool bIsRemoveBody = false;
 	};
 
+	
 	struct CollisionCallbackInfo {
 		CollisionData data;
 		ECollisionEventType Type;
@@ -50,6 +62,8 @@ public:
 	//씬 언로드
 	void OnUnloadScene();
 
+	//등록된 콜백함수 실행
+	void ProcessCallback();
 
 
 	//디버그 정보 드로우 //[[maybe_unused]] todo : DebugSystem 통합
@@ -65,6 +79,19 @@ private:
 
 	//디버그 드로우 여부
 	bool m_bDebugDraw{ false };
+
+	//씬로드 완료 여부
+	bool m_bIsLoaded{ false };
+
+	//
+	void AddCollider(GameObject* object);
+	void RemoveCollider(GameObject* object);
+	void RemoveRagdollCollider(GameObject* object);
+	void CallbackEvent(CollisionData data, ECollisionEventType type);
+	//
+	void CalculateOffset(DirectX::SimpleMath::Vector3 offset, GameObject* object);
+
+
 
 	//pre update  GameObject data -> pxScene data
 	void SetPhysicData();

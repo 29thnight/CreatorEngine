@@ -135,6 +135,9 @@
     <ClCompile Include="PhysicsManager.cpp">
       <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
+    <ClCompile Include="ColliderComponent.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
