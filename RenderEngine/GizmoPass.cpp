@@ -4,22 +4,9 @@
 #include "RenderableComponents.h"
 #include "LightComponent.h"
 #include "Scene.h"
+#include "GizmoCbuffer.h"
 
-cbuffer GizmoCameraBuffer
-{
-	Mathf::xMatrix VP{};
-	float3 eyePosition{};
-};
-
-cbuffer GizmoPos
-{
-	float3 pos{};
-};
-
-cbuffer GizmoSize
-{
-	float size{};
-};
+constexpr int MAIN_LIGHT_INDEX = 0;
 
 GizmoPass::GizmoPass()
 {
@@ -87,7 +74,7 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
@@ -107,7 +94,7 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_gizmoCameraBuffer.Get(), &cameraBuffer);
 
 	std::vector<std::pair<int, std::shared_ptr<GameObject>>> gizmoTargetComponent;
-    gizmoTargetComponent.reserve(scene.GetScene()->m_SceneObjects.size()); // 최대 크기 예약
+    gizmoTargetComponent.reserve(scene.GetScene()->m_SceneObjects.size());
 
     for (auto& object : scene.GetScene()->m_SceneObjects)
     {
@@ -129,9 +116,10 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
         switch (type)
         {
         case 0:
+			icon = CameraIcon;
             break;
         case 1:
-            isMainLight = 0 == object->GetComponent<LightComponent>()->m_lightIndex;
+			isMainLight = (MAIN_LIGHT_INDEX == object->GetComponent<LightComponent>()->m_lightIndex);
             icon = GetLightIcon(object->GetComponent<LightComponent>()->m_lightType, isMainLight);
             break;
         default:
@@ -143,6 +131,7 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
             DirectX11::PSSetShaderResources(0, 1, &icon->m_pSRV);
         }
 		GizmoPos _pos{ .pos = Mathf::Vector3(object->m_transform.GetWorldPosition()) };
+		_pos.pos.y -= 0.5f;
 		DirectX11::UpdateBuffer(m_positionBuffer.Get(), &_pos);
 		DirectX11::UpdateBuffer(m_sizeBuffer.Get(), &size);
 

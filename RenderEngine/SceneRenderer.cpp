@@ -114,12 +114,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBlitPass = std::make_unique<BlitPass>();
 	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
 
-	//WireFramePass
-	//m_pWireFramePass = std::make_unique<WireFramePass>();
-
-	//GridPass
-    //m_pGridPass = std::make_unique<GridPass>();
-
 	//PositionMapPass
 	m_pPositionMapPass = std::make_unique<PositionMapPass>();
 
@@ -286,12 +280,8 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->SetScene(scene);
 	//이제 곧 변경된다 라이트
 
-	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
+	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
-	//lightComponent1->Awake();
-
-	//scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
-
 
 	ShadowMapRenderDesc desc;
 	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -373,7 +363,6 @@ void SceneRenderer::SceneRendering()
 
 		if (!useTestLightmap)
         {
-			
 			//[3] SSAOPass
 			{
 				DirectX11::BeginEvent(L"SSAOPass");
@@ -464,15 +453,12 @@ void SceneRenderer::SceneRendering()
 
 		//[7] SpritePass(InGameSprite)
 		{
-			if (camera != m_pEditorCamera.get())
-			{
-				DirectX11::BeginEvent(L"SpritePass");
-				Benchmark banch;
-				m_pSpritePass->SetGizmoRendering(false);
-				m_pSpritePass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
-				DirectX11::EndEvent();
-			}
+			DirectX11::BeginEvent(L"SpritePass");
+			Benchmark banch;
+			m_pSpritePass->SetGizmoRendering(false);
+			m_pSpritePass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[]  UIPass
@@ -493,13 +479,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//{
-		//	DirectX11::BeginEvent(L"GridPass");
-		//	Benchmark banch;
-		//	m_pGridPass->Execute(*m_renderScene, *camera);
-		//	RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
-		//	DirectX11::EndEvent();
-		//}
 		DirectX11::EndEvent();
 	}
 

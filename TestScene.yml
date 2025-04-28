@@ -1,7 +1,7 @@
 m_SceneObjects:
   - GameObject: 2166264123
     m_name: SampleScene
-    m_instanceID: 3061538015
+    m_instanceID: 3887239062
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: 0, y: 0, z: 0, w: 1}
@@ -10,11 +10,11 @@ m_SceneObjects:
     m_index: 0
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [1]
+    m_childrenIndices: [1, 2]
     m_components: ~
   - GameObject: 2166264123
-    m_name: DamagedHelmet
-    m_instanceID: 3226778247
+    m_name: DirectionalLight
+    m_instanceID: 772723417
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -25,20 +25,1097 @@ m_SceneObjects:
     m_rootIndex: 0
     m_childrenIndices: ~
     m_components:
+      - LightComponent: 3107428038
+        m_name: LightComponent
+        m_instanceID: 3573423078
+        m_lightIndex: 0
+        m_color: {r: 1, g: 1, b: 1, a: 1}
+        m_constantAttenuation: 1
+        m_linearAttenuation: 0.0900000036
+        m_quadraticAttenuation: 0.0320000015
+        m_spotLightAngle: 60
+        m_lightType: 0
+        m_lightStatus: 1
+        m_intencity: 5
+  - GameObject: 2166264123
+    m_name: bangbooExport
+    m_instanceID: 3471008571
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: 0, y: 0, z: 0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 1}
+      m_dirty: 0
+    m_index: 2
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 41, 42, 43, 44, 45]
+    m_components:
+      - Animator: 1291484284
+        m_name: Animator
+        m_instanceID: 3693647381
+        m_Skeleton: ~
+        m_TimeElapsed: 0
+        m_AnimIndexChosen: 0
+        m_AnimIndex: 0
+        m_Motion: "{00000000-0000-0000-0000-000000000000}"
+  - GameObject: 2166264123
+    m_name: jacket
+    m_instanceID: 39449078
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 3
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
       - MeshRenderer: 659998325
         m_name: MeshRenderer
-        m_instanceID: 3703788410
+        m_instanceID: 3861127788
         m_Material:
-          m_name: mesh_helmet_LP_13930damagedHelmet
+          m_name: bangboo
           m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 1
-            m_roughness: 1
-          m_fileGuid: "{7B261F08-83C7-4779-A987-90763B846DA0}"
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
           m_renderingMode: 0
         m_Mesh:
-          m_name: mesh_helmet_LP_13930damagedHelmet
+          m_name: jacket
           m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: jacketButtons
+    m_instanceID: 1647194530
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 4
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 3435067154
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: jacketButtons
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: trim
+    m_instanceID: 3436998328
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 5
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2391257356
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: trim
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: arms
+    m_instanceID: 939702095
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 6
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 392345300
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: arms
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: body
+    m_instanceID: 2407269454
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 7
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 3146953135
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: body
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: handkerchief
+    m_instanceID: 2785526090
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 8
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2733913337
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: handkerchief
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: eyes
+    m_instanceID: 1274773956
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 9
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 4045791601
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: eyes
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: earsScrews
+    m_instanceID: 1219057786
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 10
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 1068531313
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: earsScrews
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: zipperFront
+    m_instanceID: 66273180
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 11
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 195336219
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: zipperFront
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: knot
+    m_instanceID: 664119623
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 12
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 492125433
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: knot
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: terminalUpper
+    m_instanceID: 3415373211
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 13
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2050182272
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: terminalUpper
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: terminalLower
+    m_instanceID: 386339317
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 14
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2940072371
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: terminalLower
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: plug
+    m_instanceID: 427825067
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 15
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 3023903467
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: plug
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: zipperBackRight
+    m_instanceID: 671577463
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 16
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 1498673980
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: zipperBackRight
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: zipperBackLeft
+    m_instanceID: 1687788628
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 17
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2932258067
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: zipperBackLeft
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: armsStitching
+    m_instanceID: 3397180361
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 18
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2365702486
+        m_Material:
+          m_name: bangboo
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: armsStitching
+          m_materialIndex: 0
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: hips
+    m_instanceID: 3862277173
+    m_transform:
+      position: {x: -0.10381522, y: 1.84928191, z: -0.473966449, w: 1}
+      rotation: {x: 0.679739833, y: 0.733377874, z: -0.00714902068, w: 0.00771308318}
+      scale: {x: 1.00000012, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 19
+    m_parentIndex: 2
+    m_rootIndex: 2
+    m_childrenIndices: [20, 35, 38]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: spine_01
+    m_instanceID: 3423102651
+    m_transform:
+      position: {x: 1.41021061, y: 9.15716396e-13, z: -1.92450222e-14, w: 1}
+      rotation: {x: 1.57426445e-08, y: 0.0464019962, z: -3.38901089e-07, w: 0.998922884}
+      scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 20
+    m_parentIndex: 19
+    m_rootIndex: 2
+    m_childrenIndices: [21]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: spine_02
+    m_instanceID: 1303624943
+    m_transform:
+      position: {x: 1.19214308, y: -9.2845978e-19, z: -7.21644966e-16, w: 1}
+      rotation: {x: -0, y: 0.0601471364, z: -0, w: 0.998189509}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 21
+    m_parentIndex: 20
+    m_rootIndex: 2
+    m_childrenIndices: [22, 29, 32]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: head
+    m_instanceID: 3409067907
+    m_transform:
+      position: {x: 2.07202148, y: -0.00906924345, z: -0.0227838047, w: 1}
+      rotation: {x: -0.0665848106, y: -0.184688777, z: 0.332555771, w: 0.922422469}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 22
+    m_parentIndex: 21
+    m_rootIndex: 2
+    m_childrenIndices: [23, 26]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftEar_01
+    m_instanceID: 1944506085
+    m_transform:
+      position: {x: 1.6105355, y: 9.36750677e-16, z: 2.77555756e-17, w: 1}
+      rotation: {x: -0.00648434693, y: 0.041450575, z: -0.320749611, w: 0.946234345}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 23
+    m_parentIndex: 22
+    m_rootIndex: 2
+    m_childrenIndices: [24]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftEar_02
+    m_instanceID: 2712021778
+    m_transform:
+      position: {x: 1.12970626, y: -1.57946572e-15, z: -8.32667268e-17, w: 1}
+      rotation: {x: 0.0574539267, y: -0.00748204719, z: 0.179259807, w: 0.982094169}
+      scale: {x: 1, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 24
+    m_parentIndex: 23
+    m_rootIndex: 2
+    m_childrenIndices: [25]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftEar_03
+    m_instanceID: 3466683189
+    m_transform:
+      position: {x: 1.41428185, y: 3.48679419e-16, z: 1.38777878e-16, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 25
+    m_parentIndex: 24
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightEar_01
+    m_instanceID: 3366683921
+    m_transform:
+      position: {x: 0.298975289, y: -1.58254206, z: -1.02698618e-06, w: 1}
+      rotation: {x: -0.0189897362, y: 0.0366479941, z: -0.61667347, w: 0.78613621}
+      scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 26
+    m_parentIndex: 22
+    m_rootIndex: 2
+    m_childrenIndices: [27]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightEar_02
+    m_instanceID: 4290122309
+    m_transform:
+      position: {x: 1.12970233, y: 1.1969592e-15, z: -8.32667268e-17, w: 1}
+      rotation: {x: 0.00475986209, y: -0.00160224875, z: 0.277070016, w: 0.960836649}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 27
+    m_parentIndex: 26
+    m_rootIndex: 2
+    m_childrenIndices: [28]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightEar_03
+    m_instanceID: 3442332996
+    m_transform:
+      position: {x: 1.41431355, y: -2.70616862e-16, z: 1.94289029e-16, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 28
+    m_parentIndex: 27
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftArm
+    m_instanceID: 3415066420
+    m_transform:
+      position: {x: -0.751929164, y: 2.23375416, z: -0.257202685, w: 1}
+      rotation: {x: 0.155368641, y: 0.97875464, z: 0.0260086861, w: 0.131238312}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 29
+    m_parentIndex: 21
+    m_rootIndex: 2
+    m_childrenIndices: [30]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftForearm
+    m_instanceID: 1346438463
+    m_transform:
+      position: {x: 1.63955128, y: -3.85975973e-17, z: -5.55111512e-17, w: 1}
+      rotation: {x: -0.0139211463, y: -0.0578135848, z: -0.0913446248, w: 0.994042218}
+      scale: {x: 1, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 30
+    m_parentIndex: 29
+    m_rootIndex: 2
+    m_childrenIndices: [31]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftHand
+    m_instanceID: 4047900789
+    m_transform:
+      position: {x: 1.78032184, y: -4.94396191e-16, z: 1.66533454e-16, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 31
+    m_parentIndex: 30
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightArm
+    m_instanceID: 2454767425
+    m_transform:
+      position: {x: -0.751932502, y: -2.23375177, z: -0.257203817, w: 1}
+      rotation: {x: -0.124006093, y: 0.984159529, z: -0.0107083982, w: 0.126244903}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 32
+    m_parentIndex: 21
+    m_rootIndex: 2
+    m_childrenIndices: [33]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightForearm
+    m_instanceID: 1348435401
+    m_transform:
+      position: {x: 1.6395539, y: -5.96744876e-16, z: -1.2490009e-16, w: 1}
+      rotation: {x: 0.0139762508, y: -0.0546380952, z: 0.0863001049, w: 0.994671643}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 33
+    m_parentIndex: 32
+    m_rootIndex: 2
+    m_childrenIndices: [34]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightHand
+    m_instanceID: 3032716961
+    m_transform:
+      position: {x: 1.78031886, y: 7.89299182e-16, z: 4.4408921e-16, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 34
+    m_parentIndex: 33
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftLeg
+    m_instanceID: 1451267483
+    m_transform:
+      position: {x: -0.763370574, y: 0.717469096, z: 0.0247127898, w: 1}
+      rotation: {x: -0.0729411319, y: 0.947885931, z: -0.188536838, w: -0.24626334}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 35
+    m_parentIndex: 19
+    m_rootIndex: 2
+    m_childrenIndices: [36]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftKnee
+    m_instanceID: 1043138830
+    m_transform:
+      position: {x: 0.641590536, y: -5.36680075e-17, z: 6.24500451e-17, w: 1}
+      rotation: {x: 0.0643972978, y: -0.469131857, z: 0.192730933, w: 0.859431803}
+      scale: {x: 1, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 36
+    m_parentIndex: 35
+    m_rootIndex: 2
+    m_childrenIndices: [37]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: leftFoot
+    m_instanceID: 431692775
+    m_transform:
+      position: {x: 0.681616068, y: -5.49130732e-17, z: -1.38777878e-17, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 37
+    m_parentIndex: 36
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightLeg
+    m_instanceID: 1272213536
+    m_transform:
+      position: {x: -0.763373315, y: -0.717467129, z: 0.0247124005, w: 1}
+      rotation: {x: 0.0300325826, y: 0.931628406, z: 0.168673664, w: -0.320493013}
+      scale: {x: 0.99999994, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 38
+    m_parentIndex: 19
+    m_rootIndex: 2
+    m_childrenIndices: [39]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightKnee
+    m_instanceID: 273952300
+    m_transform:
+      position: {x: 0.641589046, y: -3.68628739e-18, z: -2.77555756e-17, w: 1}
+      rotation: {x: -0.112590656, y: -0.575972676, z: -0.233180895, w: 0.775374413}
+      scale: {x: 1, y: 1, z: 0.99999994, w: 0}
+      m_dirty: 0
+    m_index: 39
+    m_parentIndex: 38
+    m_rootIndex: 2
+    m_childrenIndices: [40]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: rightFoot
+    m_instanceID: 292821296
+    m_transform:
+      position: {x: 0.681616485, y: -7.97882008e-17, z: 3.74700271e-16, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 40
+    m_parentIndex: 39
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: ikHandle1
+    m_instanceID: 3586369018
+    m_transform:
+      position: {x: 0.658292532, y: 0.00320622348, z: -0.422611356, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 41
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: ikHandle2
+    m_instanceID: 882736304
+    m_transform:
+      position: {x: -0.658293009, y: 0.00320620579, z: -0.422610998, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 42
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: ikHandle3
+    m_instanceID: 794203044
+    m_transform:
+      position: {x: 2.98117423, y: 0.605790019, z: 0.143205628, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 43
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: ikHandle4
+    m_instanceID: 788491022
+    m_transform:
+      position: {x: -2.75344515, y: 0.121280655, z: 0.100467451, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 44
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: stool1
+    m_instanceID: 1682511569
+    m_transform:
+      position: {x: 0, y: -7.96375418, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 0.553588748, y: 0.553588748, z: 0.553588748, w: 0}
+      m_dirty: 0
+    m_index: 45
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: [46, 47, 48, 49, 50]
+    m_components: ~
+  - GameObject: 2166264123
+    m_name: seat
+    m_instanceID: 38859454
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 46
+    m_parentIndex: 45
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 3199951766
+        m_Material:
+          m_name: stool
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: seat
+          m_materialIndex: 1
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: upperArmature
+    m_instanceID: 2551004970
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 47
+    m_parentIndex: 45
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2134474151
+        m_Material:
+          m_name: stool
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: upperArmature
+          m_materialIndex: 1
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: legs
+    m_instanceID: 1136268934
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 48
+    m_parentIndex: 45
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 1745860423
+        m_Material:
+          m_name: stool
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: legs
+          m_materialIndex: 1
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: lowerArmature
+    m_instanceID: 2335293205
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 49
+    m_parentIndex: 45
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 4191620566
+        m_Material:
+          m_name: stool
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: lowerArmature
+          m_materialIndex: 1
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_IsEnabled: true
+  - GameObject: 2166264123
+    m_name: rivets
+    m_instanceID: 371545168
+    m_transform:
+      position: {x: 0, y: 0, z: -0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_dirty: 0
+    m_index: 50
+    m_parentIndex: 45
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_components:
+      - MeshRenderer: 659998325
+        m_name: MeshRenderer
+        m_instanceID: 2195972666
+        m_Material:
+          m_name: stool
+          m_materialInfo:
+            m_baseColor: {r: 0.800000012, g: 0.800000012, b: 0.800000012, a: 1}
+            m_metallic: 0
+            m_roughness: 0.899999976
+          m_fileGuid: "{FED060F7-3450-41E9-B96A-3AC7D6EE2D4D}"
+          m_renderingMode: 0
+        m_Mesh:
+          m_name: rivets
+          m_materialIndex: 1
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0

@@ -4,14 +4,15 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IAwakable.h"
+#include "IOnDisable.h"
 #include "IUpdatable.h"
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
-//어차피 다시 만들어야 하니까
-class LightComponent : public Component, public IRenderable, public IUpdatable, public IAwakable
+
+class LightComponent : public Component, public IRenderable, public IUpdatable, public IAwakable, public IOnDisable
 {
 public:
    ReflectLightComponent
@@ -34,11 +35,16 @@ public:
 		{
 			return;
 		}
-		m_lightIndex = scene->AddLightCount();
-		Light& light = scene->GetLightProperties().m_lights[m_lightIndex];
+		//m_lightIndex = scene->AddLightCount();
+		//Light& light = scene->GetLightProperties().m_lights[m_lightIndex];
+        auto pair = scene->AddLight();
+		m_lightIndex = pair.first;
+        Light& light = pair.second;
+
 		light.m_position = m_pOwner->m_transform.position;
 		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
         light.m_direction.Normalize();
+        m_direction = light.m_direction;
 		light.m_color = m_color * m_intencity;
 		light.m_constantAttenuation = m_constantAttenuation;
 		light.m_linearAttenuation = m_linearAttenuation;
@@ -51,10 +57,11 @@ public:
 
     void Update(float deltaSeconds) override
     {
-        Light& light = SceneManagers->GetActiveScene()->GetLightProperties().m_lights[m_lightIndex];
+        Light& light = SceneManagers->GetActiveScene()->GetLight(m_lightIndex);
         light.m_position = m_pOwner->m_transform.position;
 		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
 		light.m_direction.Normalize();
+		m_direction = light.m_direction;
         light.m_color = m_color * m_intencity;
         light.m_constantAttenuation = m_constantAttenuation;
         light.m_linearAttenuation = m_linearAttenuation;
@@ -64,6 +71,15 @@ public:
         light.m_lightStatus = static_cast<int>(m_lightStatus);
         light.m_intencity = m_intencity;
     }
+
+	void OnDisable() override
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (scene != nullptr && m_pOwner->IsDestroyMark())
+		{
+            scene->RemoveLight(m_lightIndex);
+		}
+	}
 
     [[Property]]
     int m_lightIndex{ 0 };

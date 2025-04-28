@@ -8,7 +8,8 @@ enum LightType
 {
     DirectionalLight,
     PointLight,
-    SpotLight
+    SpotLight,
+	InVaild
 };
 
 AUTO_REGISTER_ENUM(LightType)
@@ -17,8 +18,7 @@ enum LightStatus
 {
     Disabled,
     Enabled,
-    StaticShadows,
-    LightsStatusMax
+    StaticShadows
 };
 
 AUTO_REGISTER_ENUM(LightStatus)

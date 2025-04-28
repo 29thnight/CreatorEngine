@@ -270,7 +270,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Text("PostProcessPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
 			ImGui::Text("AAPass: %.5f ms", RenderStatistics->GetRenderState("AAPass"));
 			ImGui::Text("ToneMapPass: %.5f ms", RenderStatistics->GetRenderState("ToneMapPass"));
-			ImGui::Text("GridPass: %.5f ms", RenderStatistics->GetRenderState("GridPass"));
 			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
 			ImGui::Text("UIPass: %.5f ms", RenderStatistics->GetRenderState("UIPass"));
 			ImGui::Text("BlitPass: %.5f ms", RenderStatistics->GetRenderState("BlitPass"));

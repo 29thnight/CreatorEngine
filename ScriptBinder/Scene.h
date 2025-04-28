@@ -108,64 +108,20 @@ public:
     size_t m_buildIndex{ 0 };
 
 public:
-    uint32 UpdateLight(LightProperties& lightProperties) const
-    {
-        lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
-        lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
-
-        memset(lightProperties.m_lights, 0, sizeof(Light) * MAX_LIGHTS);
-
-        uint32 count{};
-        for (int i = 0; i < MAX_LIGHTS; ++i)
-        {
-            if (LightStatus::Enabled == m_lightProperties.m_lights[i].m_lightStatus)
-            {
-                lightProperties.m_lights[count++] = m_lightProperties.m_lights[i];
-            }
-        }
-
-        return count;
-    }
-
-    int AddLightCount()
-    {
-        if (m_lightCount >= MAX_LIGHTS)
-        {
-            m_lightCount = MAX_LIGHTS;
-        }
-
-        return m_lightCount++;
-    }
-
-    LightProperties& GetLightProperties()
-    {
-        return m_lightProperties;
-    }
+    uint32 UpdateLight(LightProperties& lightProperties) const;
+    std::pair<size_t, Light&> AddLight();
+	Light& GetLight(size_t index);
+    void RemoveLight(size_t index);
+	void DistroyLight();
 
 private:
     void DestroyGameObjects();
-    std::string GenerateUniqueGameObjectName(const std::string_view& name)
-    {
-        std::string uniqueName{ name.data() };
-        std::string baseName{ name.data() };
-        int count = 1;
-        while (m_gameObjectNameSet.find(uniqueName) != m_gameObjectNameSet.end())
-        {
-            uniqueName = baseName + std::string(" (") + std::to_string(count++) + std::string(")");
-        }
-        m_gameObjectNameSet.insert(uniqueName);
-        return uniqueName;
-    }
-
-	void RemoveGameObjectName(const std::string_view& name)
-	{
-		m_gameObjectNameSet.erase(name.data());
-	}
+    std::string GenerateUniqueGameObjectName(const std::string_view& name);
+	void RemoveGameObjectName(const std::string_view& name);
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-    LightProperties m_lightProperties;
+	std::vector<Light> m_lights;
     [[Property]]
 	HashingString m_sceneName;
-    int m_lightCount = 0;
 };

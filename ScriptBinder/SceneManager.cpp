@@ -14,16 +14,20 @@ void SceneManager::ManagerInitialize()
 
 void SceneManager::Editor()
 {
-    if(SceneManagers->m_isGameStart && false == m_isEditorSceneLoaded)
+    if(true == m_isGameStart && false == m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
 		m_isEditorSceneLoaded = true;
     }
-    else if (false == SceneManagers->m_isGameStart && m_isEditorSceneLoaded)
+    else if (false == m_isGameStart && m_isEditorSceneLoaded)
     {
         DeleteEditorOnlyPlayScene();
     }
     m_activeScene->Reset();
+    if (!m_isGameStart)
+    {
+		m_activeScene->Awake();
+	}
 }
 
 void SceneManager::Initialization()

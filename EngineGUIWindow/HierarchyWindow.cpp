@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "GameObject.h"
 #include "Model.h"
+#include "LightComponent.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
@@ -61,10 +62,39 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 						renderScene->m_selectedSceneObject = nullptr;
 					}
 				}
+				ImGui::Separator();
+
 				if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 				{
 					scene->CreateGameObject("GameObject", GameObject::Type::Empty);
 				}
+
+				if (ImGui::BeginMenu("		Light"))
+				{
+					if (ImGui::MenuItem("		Directional Light"))
+					{
+						auto obj = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
+						auto comp = obj->AddComponent<LightComponent>();
+						comp->m_lightType = LightType::DirectionalLight;
+						comp->m_lightStatus = LightStatus::Enabled;
+					}
+					if (ImGui::MenuItem("		Point Light")) 
+					{
+						auto obj = scene->CreateGameObject("Point Light", GameObject::Type::Light);
+						auto comp = obj->AddComponent<LightComponent>();
+						comp->m_lightType = LightType::PointLight;
+						comp->m_lightStatus = LightStatus::Enabled;
+					}
+					if (ImGui::MenuItem("		Spot Light"))
+					{
+						auto obj = scene->CreateGameObject("Spot Light", GameObject::Type::Light);
+						auto comp = obj->AddComponent<LightComponent>();
+						comp->m_lightType = LightType::SpotLight;
+						comp->m_lightStatus = LightStatus::Enabled;
+					}
+					ImGui::EndMenu();
+				}
+
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar();

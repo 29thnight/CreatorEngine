@@ -15,7 +15,6 @@ interface IAwakable
 
 		m_awakeEventHandle = subscribedScene->AwakeEvent.AddLambda([this]
 		{
-			static bool isAwakeCalled = false;
 			if (false == isAwakeCalled)
 			{
 				Awake();
@@ -34,4 +33,5 @@ interface IAwakable
 protected:
 	Scene* subscribedScene{};
 	Core::DelegateHandle m_awakeEventHandle{};
+	bool isAwakeCalled = false;
 };

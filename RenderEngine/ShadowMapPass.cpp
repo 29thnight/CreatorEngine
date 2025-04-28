@@ -246,7 +246,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;
-		if (LightDir == Mathf::Vector4{ 0.f, 0.f, 0.f, 1.f })
+		if (Mathf::Vector3(LightDir) == Mathf::Vector3::Zero)
 		{
 			LightDir = { 0.f, 0.f, -1.f, 0.f };
 		}

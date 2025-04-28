@@ -3,6 +3,7 @@
 #include "DeviceResources.h"
 #include "GridPass.h"
 #include "GizmoPass.h"
+#include "GizmoLinePass.h"
 #include "WireFramePass.h"
 #include "SpritePass.h"
 
@@ -26,6 +27,7 @@ private:
 	std::unique_ptr<GizmoPass>      m_pGizmoPass{};
 	std::unique_ptr<WireFramePass>  m_pWireFramePass{};
 	std::unique_ptr<GridPass>       m_pGridPass{};
+	std::unique_ptr<GizmoLinePass>  m_pGizmoLinePass{};
 
 	bool useWireFrame{ false };
 };

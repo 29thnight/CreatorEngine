@@ -2,12 +2,6 @@
 #include "IRenderPass.h"
 #include "Texture.h"
 
-enum class GizmoType
-{
-    Light,
-    Camera,
-};
-
 class GizmoPass : public IRenderPass
 {
 public:

@@ -10,6 +10,8 @@ GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_pGridPass = std::make_unique<GridPass>();
 	m_pWireFramePass = std::make_unique<WireFramePass>();
 	m_pGizmoPass = std::make_unique<GizmoPass>();
+	m_pGizmoLinePass = std::make_unique<GizmoLinePass>();
+
 }
 
 GizmoRenderer::~GizmoRenderer()
@@ -43,6 +45,15 @@ void GizmoRenderer::OnDrawGizmos()
 		Benchmark banch;
 		m_pGizmoPass->Execute(*m_renderScene, *m_pEditorCamera);
 		RenderStatistics->UpdateRenderState("GizmoPass", banch.GetElapsedTime());
+		DirectX11::EndEvent();
+	}
+
+	//[*] GizmoLinePass
+	{
+		DirectX11::BeginEvent(L"GizmoLinePass");
+		Benchmark banch;
+		m_pGizmoLinePass->Execute(*m_renderScene, *m_pEditorCamera);
+		RenderStatistics->UpdateRenderState("GizmoLinePass", banch.GetElapsedTime());
 		DirectX11::EndEvent();
 	}
 }

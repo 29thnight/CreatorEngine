@@ -180,6 +180,12 @@
     <Filter Include="RenderPass\SubSurfaceScatteringPass">
       <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\EditorUseShader\GizmoRender">
+      <UniqueIdentifier>{9f8de7d0-f498-4164-a010-dda9fb1c7b49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\GizmoPass\cbuffers">
+      <UniqueIdentifier>{75ed02cd-cac8-4239-b9be-61d8f6773f6c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -316,6 +322,9 @@
     </ClCompile>
     <ClCompile Include="TestPlayer.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GizmoLinePass.cpp">
+      <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -478,6 +487,12 @@
     <ClInclude Include="TestPlayer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="GizmoLinePass.h">
+      <Filter>RenderPass\GizmoPass</Filter>
+    </ClInclude>
+    <ClInclude Include="GizmoCbuffer.h">
+      <Filter>RenderPass\GizmoPass\cbuffers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
@@ -564,12 +579,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.ps.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.ps.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.vs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
       <Filter>Shaders\EditorUseShader</Filter>
     </FxCompile>
@@ -612,17 +621,29 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.ps.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.gs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.vs.hlsl">
-      <Filter>Shaders\EditorUseShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSS.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.vs.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.gs.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_billboard.ps.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.ps.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Grid.vs.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_Line.vs.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_Line.ps.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

@@ -25,7 +25,7 @@ interface IOnDisable
     }
     virtual ~IOnDisable()
     {
-        subscribedScene->UpdateEvent.Remove(m_onDisableEventHandle);
+        subscribedScene->OnDisableEvent.Remove(m_onDisableEventHandle);
     }
 
     virtual void OnDisable() = 0;
