@@ -124,15 +124,17 @@ struct Coroutine {
         return !handle.done();
     }
 
-    T current() const 
+    T& current() const 
     {
+        static T nullValue = T{};
+
         if (handle.promise().current_value.has_value())
         {
             return handle.promise().current_value.value();
         }
         else
         {
-            return T{};
+			return nullValue;
         }
     }
 
