@@ -207,6 +207,7 @@
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ModuleLink.h" />
+    <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ScreenSpaceReflectionPass.h" />

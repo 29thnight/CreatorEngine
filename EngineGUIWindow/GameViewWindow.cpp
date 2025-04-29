@@ -1,5 +1,6 @@
 #include "GameViewWindow.h"
 #include "SceneRenderer.h"
+#include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -25,7 +26,7 @@ void GameViewWindow::RenderGameViewWindow()
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
 
-		ImGui::Image((ImTextureID)m_sceneRenderer->m_renderScene->m_MainCamera.m_renderTarget->m_pSRV, imageSize);
+		ImGui::Image((ImTextureID)CameraManagement->GetLastCamera()->m_renderTarget->m_pSRV, imageSize);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

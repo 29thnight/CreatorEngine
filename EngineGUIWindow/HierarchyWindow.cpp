@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "LightComponent.h"
 #include "ImageComponent.h"
+#include "CameraComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
@@ -88,12 +89,18 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					if (ImGui::MenuItem("		Spot Light"))
 					{
 						auto obj = scene->CreateGameObject("Spot Light", GameObject::Type::Light);
-						//obj->m_transform.SetRotation({});
+						obj->m_transform.SetRotation({ 0.7, 0, 0, 1 });
 						auto comp = obj->AddComponent<LightComponent>();
 						comp->m_lightType = LightType::SpotLight;
 						comp->m_lightStatus = LightStatus::Enabled;
 					}
 					ImGui::EndMenu();
+				}
+
+				if (ImGui::BeginMenu("		Camera"))
+				{
+					auto obj = scene->CreateGameObject("Camera", GameObject::Type::Camera);
+					auto comp = obj->AddComponent<CameraComponent>();
 				}
 
 				ImGui::EndPopup();

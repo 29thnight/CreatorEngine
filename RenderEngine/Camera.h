@@ -1,25 +1,14 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
-#include "../Utility_Framework/DeviceResources.h"
+#include "ProjectionType.h"
+#include "DeviceResources.h"
 #include "Texture.h"
-
-struct ApplyRenderPipelinePass
-{
-	bool m_ShadowPass{ true };
-	bool m_GBufferPass{ true };
-	bool m_SSAOPass{ true };
-	bool m_DeferredPass{ true };
-	bool m_SkyBoxPass{ true };
-	bool m_ToneMapPass{ true };
-	bool m_SpritePass{ true };
-	bool m_WireFramePass{ true };
-	bool m_GridPass{ false };
-	bool m_BlitPass{ false };
-};
+#include "Camera.generated.h"
 
 class Camera
 {
 public:
+   ReflectCamera
+	[[Serializable]]
 	Camera();
 	~Camera();
 
@@ -38,6 +27,9 @@ public:
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
 	void ClearRenderTarget();
 
+	[[Property]]
+	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
+
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
 	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
@@ -49,14 +41,15 @@ public:
 	Mathf::xVector m_lookAt{ m_eyePosition + m_forward };
 	Mathf::xVector m_rotation{ 0.f, 0.f, 0.f, 1.f };
 
-	float m_pitch{ 0.f };
-	float m_yaw{ 0.f };
-	float m_roll{ 0.f };
+	[[Property]]
 	float m_nearPlane{ 0.1f };
+	[[Property]]
 	float m_farPlane{ 500.f };
+	[[Property]]
 	float m_speed{ 10.f };
 
 	float m_aspectRatio{};
+	[[Property]]
 	float m_fov{ 60.f };
 
 	float m_viewWidth{ 1.f };
@@ -116,6 +109,18 @@ public:
 			return m_cameras[index];
 		}
 
+		return nullptr;
+	}
+
+	Camera* GetLastCamera()
+	{
+		for (int i = m_cameras.size() - 1; i >= 0; --i)
+		{
+			if (nullptr != m_cameras[i] && m_cameras[i]->m_isActive)
+			{
+				return m_cameras[i];
+			}
+		}
 		return nullptr;
 	}
 

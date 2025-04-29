@@ -493,6 +493,9 @@
     <ClInclude Include="GizmoCbuffer.h">
       <Filter>RenderPass\GizmoPass\cbuffers</Filter>
     </ClInclude>
+    <ClInclude Include="ProjectionType.h">
+      <Filter>Objects</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">

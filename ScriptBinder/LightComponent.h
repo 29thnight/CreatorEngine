@@ -96,7 +96,7 @@ public:
     [[Property]]
     float m_quadraticAttenuation{ 0.032f };
     [[Property]]
-    float m_spotLightAngle{ 60.f };
+    float m_spotLightAngle{ 30.f };
 
     [[Property]]
     LightType m_lightType{ DirectionalLight };

@@ -2,6 +2,7 @@
 #include "GizmoCbuffer.h"
 #include "ShaderSystem.h"
 #include "LightComponent.h"
+#include "CameraComponent.h"
 
 float GetGizmoScale(Mathf::Vector3 gizmoPosition, const Camera& camera, float targetScreenHeightRatio)
 {
@@ -12,7 +13,6 @@ float GetGizmoScale(Mathf::Vector3 gizmoPosition, const Camera& camera, float ta
     float verticalFovRadians = camera.m_fov * Mathf::Rad2Deg;
     float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
-    // 화면 전체 높이 대비 몇 %로 Gizmo를 보이게 할건지 (ex: 0.05 = 5%)
     float gizmoSizeInWorld = screenHeight * targetScreenHeightRatio;
 
     return gizmoSizeInWorld;
@@ -74,9 +74,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 	if (nullptr == selectedObject) return;
 
     ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
-
-    deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+    DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
     GizmoCameraBuffer cameraBuffer{
     .VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()),
@@ -92,18 +90,17 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 	{
 		auto lightComponent = selectedObject->GetComponent<LightComponent>();
 		if (nullptr == lightComponent) return;
-		// Directional Light
+
         const Mathf::Vector3 worldPosition = selectedObject->m_transform.GetWorldPosition();
         const Mathf::Vector3 lightDirection = Mathf::Vector3(lightComponent->m_direction);
-        Mathf::Vector3 UpVec = Mathf::Vector3(0, 1, 0);
+
         float gizmoScale = GetGizmoScale(worldPosition, camera, 0.05f);
 
         switch (lightComponent->m_lightType)
         {
         case LightType::DirectionalLight:
-            DrawWireCircle(worldPosition, gizmoScale, UpVec, { 1, 0, 1, 1 });
-            DrawDirectionalLightGizmo(worldPosition, lightDirection, gizmoScale, { 1, 0, 1, 1 });
-            break;
+            DrawWireCircleAndLines(worldPosition, gizmoScale, lightDirection, lightDirection, { 1, 0, 1, 1 });
+			break;
         case LightType::PointLight:
             DrawWireSphere(worldPosition, lightComponent->m_range, { 1, 1, 0, 1 });
             break;
@@ -111,9 +108,19 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
             DrawWireCone(worldPosition, lightDirection, lightComponent->m_range, lightComponent->m_spotLightAngle, { 0, 1, 1, 1 });
             break;
         }
-
 	}
 	break;
+    case GameObject::Type::Camera:
+    {
+        auto cameraComponent = selectedObject->GetComponent<CameraComponent>();
+        if(nullptr == cameraComponent) return;
+
+        auto camera = cameraComponent->GetCamera();
+		if (nullptr == camera || camera->m_isOrthographic) return; // 카메라가 orthographic일 경우나 없을 경우 throughpass
+        
+        DrawBoundingFrustum(camera->GetFrustum(), { 1, 0, 1, 1 });
+    }
+    break;
     }
 
     m_pso->Reset();
@@ -127,28 +134,36 @@ void GizmoLinePass::Resize()
 {
 }
 
-void GizmoLinePass::DrawDirectionalLightGizmo(const Mathf::Vector3& center, const Mathf::Vector3& direction, float radius, const Mathf::Color4& color)
+void GizmoLinePass::DrawWireCircleAndLines(const Mathf::Vector3& center, float radius, const Mathf::Vector3& up, const Mathf::Vector3& direction, const Mathf::Color4& color)
 {
+    using namespace Mathf;
     const int segmentCount = 9;
     const float lineLength = radius * 3.f;
 
+    Vector3 right = XMVector3Normalize(XMVector3Cross(up, Vector3(0, 1, 0)));
+    if (XMVectorGetX(XMVector3LengthSq(right)) < 1e-5f)
+        right = XMVector3Normalize(XMVector3Cross(up, Vector3(1, 0, 0)));
+    Vector3 forward = XMVector3Normalize(XMVector3Cross(right, up));
+
     std::vector<LineVertex> vertices;
-    vertices.reserve(segmentCount * 2); // 선 하나당 2개의 버텍스
+    vertices.reserve(segmentCount * 4);
 
     for (int i = 0; i < segmentCount; ++i)
     {
-        float theta = XM_2PI * (i / (float)segmentCount);
-        float x = radius * cosf(theta);
-        float z = radius * sinf(theta);
+        float angle0 = XM_2PI * (i / (float)segmentCount);
+        float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
 
-        Mathf::Vector3 pointOnCircle = center + Mathf::Vector3(x, 0, z);
-        Mathf::Vector3 normalizedDirection = direction;	normalizedDirection.Normalize();
-        Mathf::Vector3 endPoint = pointOnCircle + normalizedDirection * lineLength;
+        Vector3 p0 = center + radius * (cosf(angle0) * right + sinf(angle0) * forward);
+        Vector3 p1 = center + radius * (cosf(angle1) * right + sinf(angle1) * forward);
 
-        // 시작점
-        vertices.push_back(LineVertex{ pointOnCircle, color });
+        vertices.push_back(LineVertex{ p0, color });
+        vertices.push_back(LineVertex{ p1, color });
 
-        // 끝점
+        Vector3 dirNormalized = direction;
+        dirNormalized.Normalize();
+        Vector3 endPoint = p0 + dirNormalized * lineLength;
+
+        vertices.push_back(LineVertex{ p0, color });
         vertices.push_back(LineVertex{ endPoint, color });
     }
 
@@ -185,10 +200,8 @@ void GizmoLinePass::DrawWireCircle(const Mathf::Vector3& center, float radius, c
 
 void GizmoLinePass::DrawLines(LineVertex* vertices, uint32_t vertexCount)
 {
-    // 1. 버퍼 생성 (혹은 재사용)
     if (!m_lineVertexBuffer || m_lineVertexCount < vertexCount)
     {
-        // 새 버퍼 만들어야 함
         if (m_lineVertexBuffer)
             m_lineVertexBuffer.Reset();
 
@@ -206,20 +219,17 @@ void GizmoLinePass::DrawLines(LineVertex* vertices, uint32_t vertexCount)
     }
     else
     {
-        // 버퍼가 충분하면 Map/Unmap만
         D3D11_MAPPED_SUBRESOURCE mapped = {};
         DeviceState::g_pDeviceContext->Map(m_lineVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         memcpy(mapped.pData, vertices, sizeof(LineVertex) * vertexCount);
         DeviceState::g_pDeviceContext->Unmap(m_lineVertexBuffer.Get(), 0);
     }
 
-    // 3. Set vertex buffer
     UINT stride = sizeof(LineVertex);
     UINT offset = 0;
     ID3D11Buffer* buffers[] = { m_lineVertexBuffer.Get() };
     DeviceState::g_pDeviceContext->IASetVertexBuffers(0, 1, buffers, &stride, &offset);
 
-    // 5. Draw
     DeviceState::g_pDeviceContext->Draw(vertexCount, 0);
 }
 
@@ -251,7 +261,6 @@ void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector
 
     float radius = height * tanf(outerConeAngle * 0.5f);
 
-    // 원기둥의 바닥 원을 그림
     for (int i = 0; i < segmentCount; ++i)
     {
         float angle0 = XM_2PI * (i / (float)segmentCount);
@@ -260,14 +269,52 @@ void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector
         Vector3 p0 = apex + dir * height + radius * (cosf(angle0) * right + sinf(angle0) * forward);
         Vector3 p1 = apex + dir * height + radius * (cosf(angle1) * right + sinf(angle1) * forward);
 
-        // 원 둘레 연결
         coneVertices.push_back(LineVertex{ p0, color });
         coneVertices.push_back(LineVertex{ p1, color });
 
-        // 꼭짓점 연결
         coneVertices.push_back(LineVertex{ apex, color });
         coneVertices.push_back(LineVertex{ p0, color });
     }
 
     DrawLines(coneVertices.data(), (uint32_t)coneVertices.size());
+}
+
+void GizmoLinePass::DrawBoundingFrustum(const DirectX::BoundingFrustum& frustum, const Mathf::Color4& color)
+{
+    using namespace DirectX;
+    using namespace Mathf;
+
+    XMFLOAT3 corners[BoundingFrustum::CORNER_COUNT];
+    frustum.GetCorners(reinterpret_cast<XMFLOAT3*>(corners));
+
+    LineVertex vertices[24] = {};
+
+    vertices[0] = { corners[0], color };
+    vertices[1] = { corners[1], color };
+    vertices[2] = { corners[1], color };
+    vertices[3] = { corners[2], color };
+    vertices[4] = { corners[2], color };
+    vertices[5] = { corners[3], color };
+    vertices[6] = { corners[3], color };
+    vertices[7] = { corners[0], color };
+
+    vertices[8] = { corners[0], color };
+    vertices[9] = { corners[4], color };
+    vertices[10] = { corners[1], color };
+    vertices[11] = { corners[5], color };
+    vertices[12] = { corners[2], color };
+    vertices[13] = { corners[6], color };
+    vertices[14] = { corners[3], color };
+    vertices[15] = { corners[7], color };
+
+    vertices[16] = { corners[4], color };
+    vertices[17] = { corners[5], color };
+    vertices[18] = { corners[5], color };
+    vertices[19] = { corners[6], color };
+    vertices[20] = { corners[6], color };
+    vertices[21] = { corners[7], color };
+    vertices[22] = { corners[7], color };
+    vertices[23] = { corners[4], color };
+
+    DrawLines(vertices, 24);
 }

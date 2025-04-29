@@ -76,6 +76,12 @@
     <Filter Include="Managers\PhysicsManager">
       <UniqueIdentifier>{0540bf1d-a624-42a1-8866-71e4b6926ae0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\LightComponent">
+      <UniqueIdentifier>{728d21fd-e845-469e-9325-f646fb22f63e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\CameraComponent">
+      <UniqueIdentifier>{89b93491-3dc7-498f-8fa1-5063dec42141}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -155,9 +161,6 @@
     <ClInclude Include="JobManager.h">
       <Filter>Managers</Filter>
     </ClInclude>
-    <ClInclude Include="LightComponent.h">
-      <Filter>Classes\Components</Filter>
-    </ClInclude>
     <ClInclude Include="HotLoadSystem.h">
       <Filter>Classes\HotLoadSystem</Filter>
     </ClInclude>
@@ -166,9 +169,6 @@
     </ClInclude>
     <ClInclude Include="GameObjectPool.h">
       <Filter>Managers</Filter>
-    </ClInclude>
-    <ClInclude Include="CameraComponent.h">
-      <Filter>Classes\Components</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Classes\Components\ComponentBase</Filter>
@@ -262,6 +262,12 @@
     </ClInclude>
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="LightComponent.h">
+      <Filter>Classes\Components\LightComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraComponent.h">
+      <Filter>Classes\Components\CameraComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

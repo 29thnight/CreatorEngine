@@ -16,6 +16,7 @@
 #include "TimeSystem.h"
 #include "InputManager.h"
 #include "LightComponent.h"
+#include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -278,7 +279,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	m_renderScene->SetScene(scene);
-	//이제 곧 변경된다 라이트
+
+	auto cameraObj = scene->CreateGameObject("Main Camera", GameObject::Type::Camera);
+	auto cameraComponent = cameraObj->AddComponent<CameraComponent>();
 
 	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();

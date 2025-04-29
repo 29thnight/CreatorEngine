@@ -14,11 +14,12 @@ public:
 	void Resize() override;
 
 private:
-	void DrawDirectionalLightGizmo(const Mathf::Vector3& center, const Mathf::Vector3& direction, float radius, const Mathf::Color4& color);
+	void DrawWireCircleAndLines(const Mathf::Vector3& center, float radius, const Mathf::Vector3& up, const Mathf::Vector3& direction, const Mathf::Color4& color);
 	void DrawWireCircle(const Mathf::Vector3& center, float radius, const Mathf::Vector3& up, const Mathf::Color4& color);
 	void DrawLines(LineVertex* vertices, uint32_t vertexCount);
 	void DrawWireSphere(const Mathf::Vector3& center, float radius, const Mathf::Color4& color);
 	void DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color);
+	void DrawBoundingFrustum(const DirectX::BoundingFrustum& frustum, const Mathf::Color4& color);
 
 private:
 	ComPtr<ID3D11Buffer> m_gizmoCameraBuffer{};

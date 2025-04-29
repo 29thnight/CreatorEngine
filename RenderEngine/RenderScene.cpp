@@ -23,7 +23,9 @@ RenderScene::~RenderScene()
 
 void RenderScene::Initialize()
 {
-	m_MainCamera.RegisterContainer();
+	//TODO : 곧 컴포넌트로 빠져야함.
+	//m_MainCamera.RegisterContainer();
+
 	m_LightController = new LightController();
 }
 

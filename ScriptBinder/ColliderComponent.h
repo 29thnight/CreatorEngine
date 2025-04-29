@@ -18,8 +18,6 @@ private:
 	DirectX::SimpleMath::Vector3 m_offsetTransform{ 0.0f, 0.0f, 0.0f };
 	DirectX::SimpleMath::Vector3 m_offsetRotation{ 0.0f, 0.0f, 0.0f };
 
-
-
 	// ICollider을(를) 통해 상속됨
 	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override;
 

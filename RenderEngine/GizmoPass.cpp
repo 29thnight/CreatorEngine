@@ -2,6 +2,7 @@
 #include "ShaderSystem.h"
 #include "RenderScene.h"
 #include "RenderableComponents.h"
+#include "CameraComponent.h"
 #include "LightComponent.h"
 #include "Scene.h"
 #include "GizmoCbuffer.h"
@@ -98,11 +99,11 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 
     for (auto& object : scene.GetScene()->m_SceneObjects)
     {
-/*        if (object->GetComponent<CameraComponent>() != nullptr)
+        if (object->GetComponent<CameraComponent>() != nullptr)
         {
             gizmoTargetComponent.emplace_back(0, object);
         }
-        else*/ if (object->GetComponent<LightComponent>() != nullptr)
+        else if (object->GetComponent<LightComponent>() != nullptr)
         {
             gizmoTargetComponent.emplace_back(1, object);
         }

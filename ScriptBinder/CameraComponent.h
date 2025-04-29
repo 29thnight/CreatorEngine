@@ -2,11 +2,17 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
+#include "IAwakable.h"
+#include "IOnDisable.h"
+#include "IUpdatable.h"
+#include "Camera.h"
+#include "CameraComponent.generated.h"
 
-class Camera;
-class CameraComponent : public Component, public IRenderable
+class CameraComponent : public Component, public IRenderable, public IAwakable, public IUpdatable, public IOnDisable
 {
 public:
+   ReflectCameraComponent
+	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(CameraComponent)
 
 	bool IsEnabled() const override
@@ -17,9 +23,59 @@ public:
 	void SetEnabled(bool able) override
 	{
 		m_IsEnabled = able;
+		if (m_pCamera)
+		{
+			m_pCamera->m_isActive = m_IsEnabled;
+		}
+	}
+
+	void Awake() override
+	{
+		if (m_cameraIndex != -1)
+		{
+			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+		}
+		else
+		{
+			m_pCamera = new Camera();
+			m_cameraIndex = CameraManagement->AddCamera(m_pCamera);
+			m_pCamera->RegisterContainer();
+		}		
+	}
+
+	void Update(float deltaSeconds) override
+	{
+		if (m_pCamera)
+		{
+			m_pCamera->m_eyePosition = m_pOwner->m_transform.position;
+			XMVECTOR rotationQuat = m_pOwner->m_transform.rotation;
+			rotationQuat = XMQuaternionNormalize(rotationQuat);
+
+			static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
+			static const XMVECTOR UP = XMVectorSet(0, 1, 0, 0);
+			static const XMVECTOR RIGHT = XMVectorSet(1, 0, 0, 0);
+
+			m_pCamera->m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, rotationQuat));
+			m_pCamera->m_up = XMVector3Normalize(XMVector3Rotate(UP, rotationQuat));
+			m_pCamera->m_right = XMVector3Normalize(XMVector3Rotate(RIGHT, rotationQuat));
+			m_pCamera->m_lookAt = m_pCamera->m_eyePosition + m_pCamera->m_forward;
+		}
+	}
+
+	void OnDisable() override
+	{
+		delete m_pCamera;
+	}
+
+	Camera* GetCamera() const
+	{
+		return m_pCamera;
 	}
 
 private:
+	[[Property]]
 	Camera* m_pCamera{ nullptr };
+	[[Property]]
+	int m_cameraIndex{ -1 };
 	bool m_IsEnabled{ false };
 };

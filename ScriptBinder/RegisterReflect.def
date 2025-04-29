@@ -2,14 +2,16 @@
 
 #pragma once
 
+#include "Camera.h"
 #include "Material.h"
 #include "Component.h"
 #include "MaterialInfomation.h"
-#include "GameObject.h"
 #include "Animator.h"
 #include "Mesh.h"
-#include "ImageComponent.h"
+#include "CameraComponent.h"
 #include "Canvas.h"
+#include "GameObject.h"
+#include "ImageComponent.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
 #include "Transform.h"
@@ -25,6 +27,8 @@
 REFLECTION_REGISTER()
 {
     AUTO_REGISTER_CLASS(Animator);
+    AUTO_REGISTER_CLASS(Camera);
+    AUTO_REGISTER_CLASS(CameraComponent);
     AUTO_REGISTER_CLASS(Canvas);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(GameObject);
