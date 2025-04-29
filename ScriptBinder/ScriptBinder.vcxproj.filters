@@ -138,6 +138,9 @@
     <ClCompile Include="TransCondition.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
+    <ClCompile Include="anibegvioutFatory,cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
@@ -267,6 +270,12 @@
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="aniStruct.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AniBehaviour.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="anibegvioutFatory.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
   </ItemGroup>

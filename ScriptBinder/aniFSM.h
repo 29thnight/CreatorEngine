@@ -25,16 +25,16 @@ public:
 
 	aniState* NextState = nullptr;
 
-	std::unordered_map<std::string, /*std::shared_ptr<aniState>*/size_t> States;
+	bool needBlend;
+	std::unordered_map<std::string, size_t> States;
 
 	[[Property]]
 	std::vector<std::shared_ptr<aniState>> StateVec;
 
 	[[Property]]
 	std::vector<aniParameter> Parameters;
-	//std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>> Transitions;
-	//std::vector<std::shared_ptr<AniTransition>> abvcd;
-	//void Update();
+
+	bool BlendingAnimation(float tick);
 	void SetAnimator(Animator* _animator) { animator = _animator; }
 	Animator* GetAnimator() { return animator; };
 	void SetCurState(std::string stateName);
@@ -44,16 +44,18 @@ public:
 	void UpdateState();
 	virtual void Update(float tick) override;
 
-	template<typename T>
-	T* CreateState(const std::string& stateName)
+
+	aniState* CreateState(const std::string& stateName)
 	{
 		
 		auto it = States.find(stateName);
 		if (it != States.end())
 		{
-			return dynamic_cast<T*>(StateVec[it->second].get());
+			return (StateVec[it->second].get());
 		}
-		std::shared_ptr<T> state = std::make_shared<T>(this, stateName);
+		auto state = std::make_shared<aniState>(this, stateName);
+		
+		state->SetBehaviour(stateName);
 		States.insert(std::make_pair(stateName, StateVec.size()));
 		StateVec.push_back(state);
 		StateVec.back()->index = StateVec.size() - 1;
@@ -80,6 +82,11 @@ public:
 
 	void AddParameter(const std::string valuename, float value, valueType vType)
 	{
+		for (auto& parm : Parameters)
+		{
+			if (parm.name == valuename)
+				return;
+		}
 		Parameters.push_back(aniParameter(value, vType, valuename));
 	}
 
@@ -95,8 +102,12 @@ public:
 		}
 	}
 private:
-	Animator* animator;
 	[[Property]]
-	std::string curName = "None";
+	Animator* animator;
+
+
+	float blendingTime =0;
+	//지금일어나는중인 전이 - 블렌드시간 탈출시간등 알려고
+	AniTransition* curTrans;
 };
 

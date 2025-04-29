@@ -103,15 +103,14 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			if (itNode["StateVec"])
 			{
 				auto& FSMNode = itNode["StateVec"];
-
 				for(auto& fsm : FSMNode)
 				{
 					std::shared_ptr<aniState> sharedState = std::make_shared<aniState>();
-
 					Meta::Deserialize(sharedState.get(), fsm);
 					aniFSMcomponent->StateVec.push_back(sharedState);
 					aniFSMcomponent->States.insert(std::make_pair(sharedState->Name, aniFSMcomponent->StateVec.size()-1));
-
+					sharedState->Owner = aniFSMcomponent;
+					sharedState->SetBehaviour(sharedState->Name);
 					if (fsm["Transitions"])
 					{
 						auto& transitionNode = fsm["Transitions"];
@@ -120,8 +119,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 							Meta::Deserialize(sharedTransition.get(), transition);
 							sharedState->Transitions.push_back(sharedTransition);
-							sharedState->Owner = aniFSMcomponent;
-
+							sharedTransition->owner = aniFSMcomponent;				
 							if (transition["conditions"])
 							{
 								auto& conditionNode = transition["conditions"];
@@ -129,29 +127,37 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 								{
 									TransCondition newcondition;
 									Meta::Deserialize(&newcondition, condition);
+									newcondition.ownerFSM = aniFSMcomponent;
 									sharedTransition->conditions.push_back(newcondition);
 								}
 							}
 						}
 					}
-
-			
-
-
-
 				}
+			}
+			if (itNode["Parameters"])
+			{
+				auto& paramNode = itNode["Parameters"];
 
+				for (auto& param : paramNode)
+				{
+					aniParameter aniParam;
+					Meta::Deserialize(&aniParam, param);
+					aniFSMcomponent->Parameters.push_back(aniParam);
+				}
 			}
 			if (itNode["CurState"])
 			{
 				auto& curNode = itNode["CurState"];
-
 				std::string name = curNode["Name"].as<std::string>();
 				aniFSMcomponent->CurState = aniFSMcomponent->StateVec[aniFSMcomponent->States[name]].get();
 			}
-
+			if (itNode["animator"])
+			{
+				auto ani = aniFSMcomponent->GetOwner()->GetComponent<Animator>();
+				aniFSMcomponent->SetAnimator(ani);
+			}
 			Meta::Deserialize(aniFSMcomponent, itNode);
-			
 		}
 		else
 		{

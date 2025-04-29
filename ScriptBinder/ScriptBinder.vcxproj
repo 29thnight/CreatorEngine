@@ -153,6 +153,7 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="anibegvioutFatory,cpp" />
     <ClCompile Include="aniFSM.cpp" />
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="aniState.cpp" />
@@ -175,6 +176,8 @@
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="anibegvioutFatory.h" />
+    <ClInclude Include="AniBehaviour.h" />
     <ClInclude Include="aniFSM.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="aniState.h" />

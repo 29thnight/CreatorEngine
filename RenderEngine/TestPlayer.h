@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "aniState.h"
 #include "aniFSM.h"
+#include "AniBehaviour.h"
 class TestPlayer : Component 
 {
 
@@ -15,53 +16,55 @@ public:
 	float maxSpeed = 1.5f;
 };
 
-class IdleAni : public aniState
+class IdleAni : public AniBehaviour
 {
 public:
-	IdleAni(aniFSM* Owner, std::string Name) : aniState(Owner,Name){}
-	virtual void Enter()
+	IdleAni() { name = "Idle"; };
+	virtual void Enter() override
 	{
 		Owner->GetAnimator()->SetAnimation(0);
 	};
-	virtual void Update(float DeltaTime)
+	virtual void Update(float DeltaTime) override
 	{
 
 	};
-	virtual void Exit()
+	virtual void Exit() override
 	{
 
 	};
 };
-class WalkAni : public aniState
+class WalkAni : public AniBehaviour
 {
 public:
-	WalkAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
-	virtual void Enter()
+	WalkAni() { name = "Walk"; }
+	virtual void Enter() override
 	{
 		Owner->GetAnimator()->SetAnimation(2);
 	};
-	virtual void Update(float DeltaTime)
+	virtual void Update(float DeltaTime) override
 	{
 
-	};
-	virtual void Exit()
+	}; 
+	virtual void Exit() override
 	{
 
 	};
 };
-class RunAni : public aniState
+
+class RunAni : public AniBehaviour
 {
 public:
-	RunAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
-	virtual void Enter()
+	RunAni()  {name = "Run";}
+	virtual void Enter() override
 	{
-		Owner->GetAnimator()->SetAnimation(1);
+		Owner->GetAnimator()->nextAnimIndex =1;
+		Owner->GetAnimator()->SetAnimation(1); 
 	};
-	virtual void Update(float DeltaTime)
+	virtual void Update(float DeltaTime)override
 	{
 
 	};
-	virtual void Exit()
+	virtual void Exit()override
 	{
 
 	};

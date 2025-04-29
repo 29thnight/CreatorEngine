@@ -18,6 +18,9 @@ private:
 	void PrepareAnimation();
     void CleanUp();
     void UpdateBones(Animator& animator);
+
+    //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
+    void BlendAnimation();
     void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& transform, float time);
 
 	Core::DelegateHandle m_sceneLoadedHandle;

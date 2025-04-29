@@ -17,13 +17,23 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
+  /*  [[property]]
+    std::vector<std::string> aniName;*/
     [[property]]
-    std::vector<std::string> aniName;
+    std::string curAniName;
    /* [[property]]
     std::string aniName;*/
     
+
+    //현재애니 이름반환
+    std::string GetcurAnimation();
+
+    [[property]]
+    bool isLoof = false;
     [[Property]]
     int m_AnimIndex{};
+    [[Property]]
+    int nextAnimIndex = -1;
     void SetAnimation(int index);
     void UpdateAnimation();
     [[Property]]

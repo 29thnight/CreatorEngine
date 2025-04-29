@@ -2,6 +2,11 @@
 
 
 
+std::string Animator::GetcurAnimation()
+{
+	return m_Skeleton->m_animations[m_AnimIndexChosen].m_name;
+}
+
 void Animator::SetAnimation(int index)
 {
 	m_AnimIndex = index;
@@ -19,4 +24,5 @@ void Animator::UpdateAnimation()
 
 	m_AnimIndexChosen = m_AnimIndex;
 	m_TimeElapsed = 0;
+	
 }

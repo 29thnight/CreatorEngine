@@ -34,7 +34,8 @@ public:
 	std::string GetCurState()const { return curState; }
 	std::string GetNextState()const { return nextState; }
 	bool CheckTransiton();
-
+	float GetBlendTime() { return blendTime; }
+	float GetExitTime() { return exitTime; }
 
 	[[Property]]
 	std::vector<TransCondition> conditions;
@@ -47,7 +48,7 @@ private:
 	std::string nextState;
 	// 전이시간이자 블렌딩될 시간
 	[[Property]]
-	float tranTime =0.f;
+	float blendTime =0.f;
 	// 애니메이션 탈출 최소시간
 	[[Property]]
 	float exitTime =0.f;

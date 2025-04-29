@@ -8,7 +8,7 @@ ReflectionFieldInheritance(aniFSM, Component) \
 		meta_property(CurState) \
 		meta_property(StateVec) \
 		meta_property(Parameters) \
-		meta_property(curName) \
+		meta_property(animator) \
 	}); \
 	FieldEnd(aniFSM, PropertyOnlyInheritance) \
 };
