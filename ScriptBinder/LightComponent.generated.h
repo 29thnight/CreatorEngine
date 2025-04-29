@@ -14,6 +14,7 @@ ReflectionFieldInheritance(LightComponent, Component) \
 		meta_property(m_lightType) \
 		meta_property(m_lightStatus) \
 		meta_property(m_intencity) \
+		meta_property(m_range) \
 	}); \
 	FieldEnd(LightComponent, PropertyOnlyInheritance) \
 };

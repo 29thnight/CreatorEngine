@@ -2,7 +2,8 @@
 
 #include "Component.h"
 #include "IColliderComponent.h"
-#include "../physics/Physx.h"
+#include "ICollider.h"
+#include "Physx.h"
 
 class ColliderComponent : public Component, public ICollider
 {

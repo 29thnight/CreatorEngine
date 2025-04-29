@@ -286,7 +286,7 @@ uint32 Scene::UpdateLight(LightProperties& lightProperties) const
 	uint32 count{};
 	for (int i = 0; i < m_lights.size(); ++i)
 	{
-		if (LightStatus::Enabled == m_lights[i].m_lightStatus)
+		if (LightStatus::Disabled != m_lights[i].m_lightStatus)
 		{
 			lightProperties.m_lights[count++] = m_lights[i];
 		}

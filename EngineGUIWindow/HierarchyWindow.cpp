@@ -88,6 +88,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					if (ImGui::MenuItem("		Spot Light"))
 					{
 						auto obj = scene->CreateGameObject("Spot Light", GameObject::Type::Light);
+						//obj->m_transform.SetRotation({});
 						auto comp = obj->AddComponent<LightComponent>();
 						comp->m_lightType = LightType::SpotLight;
 						comp->m_lightStatus = LightStatus::Enabled;

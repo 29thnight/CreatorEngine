@@ -22,6 +22,7 @@ class Camera
 public:
 	Camera();
 	~Camera();
+
 	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
 	Mathf::Vector4 RayCast(Mathf::Vector2 screenPosition);

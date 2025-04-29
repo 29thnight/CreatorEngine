@@ -184,7 +184,7 @@ void PhysicsManager::ProcessCallback()
 		switch (type)
 		{
 		case ECollisionEventType::ENTER_OVERLAP:
-			SceneManagers->GetActiveScene()->OnCollisionEnter(rhsObj);
+			//SceneManagers->GetActiveScene()->OnCollisionEnter(rhsObj);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
 			break;

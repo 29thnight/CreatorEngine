@@ -76,6 +76,8 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
 
+    deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+
     GizmoCameraBuffer cameraBuffer{
     .VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()),
     .eyePosition = Mathf::Vector3(camera.m_eyePosition)
@@ -84,8 +86,6 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::VSSetConstantBuffer(0, 1, m_gizmoCameraBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_gizmoCameraBuffer.Get(), &cameraBuffer);
 
-
-
     switch (selectedObject->m_gameObjectType)
     {
 	case GameObject::Type::Light:
@@ -93,13 +93,25 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 		auto lightComponent = selectedObject->GetComponent<LightComponent>();
 		if (nullptr == lightComponent) return;
 		// Directional Light
-		if (lightComponent->m_lightType == LightType::DirectionalLight)
-		{
-			Mathf::Vector3 UpVec = Mathf::Vector3(0, 1, 0);
-			float gizmoScale = GetGizmoScale(selectedObject->m_transform.GetWorldPosition(), camera, 0.05f);
-			DrawWireCircle(selectedObject->m_transform.GetWorldPosition(), gizmoScale, UpVec, { 1, 1, 1, 1 });
-            DrawDirectionalLightGizmo(selectedObject->m_transform.GetWorldPosition(), Mathf::Vector3(lightComponent->m_direction), gizmoScale, { 1, 1, 1, 1 });
-		}
+        const Mathf::Vector3 worldPosition = selectedObject->m_transform.GetWorldPosition();
+        const Mathf::Vector3 lightDirection = Mathf::Vector3(lightComponent->m_direction);
+        Mathf::Vector3 UpVec = Mathf::Vector3(0, 1, 0);
+        float gizmoScale = GetGizmoScale(worldPosition, camera, 0.05f);
+
+        switch (lightComponent->m_lightType)
+        {
+        case LightType::DirectionalLight:
+            DrawWireCircle(worldPosition, gizmoScale, UpVec, { 1, 0, 1, 1 });
+            DrawDirectionalLightGizmo(worldPosition, lightDirection, gizmoScale, { 1, 0, 1, 1 });
+            break;
+        case LightType::PointLight:
+            DrawWireSphere(worldPosition, lightComponent->m_range, { 1, 1, 0, 1 });
+            break;
+        case LightType::SpotLight:
+            DrawWireCone(worldPosition, lightDirection, lightComponent->m_range, lightComponent->m_spotLightAngle, { 0, 1, 1, 1 });
+            break;
+        }
+
 	}
 	break;
     }
@@ -209,4 +221,53 @@ void GizmoLinePass::DrawLines(LineVertex* vertices, uint32_t vertexCount)
 
     // 5. Draw
     DeviceState::g_pDeviceContext->Draw(vertexCount, 0);
+}
+
+void GizmoLinePass::DrawWireSphere(const Mathf::Vector3& center, float radius, const Mathf::Color4& color)
+{
+    // XY, YZ, XZ 평면에 각각 원을 그려서 구처럼 보이게
+    DrawWireCircle(center, radius, Mathf::Vector3(0, 1, 0), color); // XZ plane
+    DrawWireCircle(center, radius, Mathf::Vector3(1, 0, 0), color); // YZ plane
+    DrawWireCircle(center, radius, Mathf::Vector3(0, 0, 1), color); // XY plane
+}
+
+void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color)
+{
+    using namespace Mathf;
+
+    const int segmentCount = 32;
+    std::vector<LineVertex> coneVertices;
+    coneVertices.reserve(segmentCount * 2);
+
+    Vector3 dir = direction;
+    dir.Normalize();
+
+    Vector3 up = Vector3(0, 1, 0);
+    if (fabs(XMVectorGetX(XMVector3Dot(up, dir))) > 0.99f)
+        up = Vector3(1, 0, 0);
+
+    Vector3 right = XMVector3Normalize(XMVector3Cross(dir, up));
+    Vector3 forward = XMVector3Normalize(XMVector3Cross(right, dir));
+
+    float radius = height * tanf(outerConeAngle * 0.5f);
+
+    // 원기둥의 바닥 원을 그림
+    for (int i = 0; i < segmentCount; ++i)
+    {
+        float angle0 = XM_2PI * (i / (float)segmentCount);
+        float angle1 = XM_2PI * ((i + 1) / (float)segmentCount);
+
+        Vector3 p0 = apex + dir * height + radius * (cosf(angle0) * right + sinf(angle0) * forward);
+        Vector3 p1 = apex + dir * height + radius * (cosf(angle1) * right + sinf(angle1) * forward);
+
+        // 원 둘레 연결
+        coneVertices.push_back(LineVertex{ p0, color });
+        coneVertices.push_back(LineVertex{ p1, color });
+
+        // 꼭짓점 연결
+        coneVertices.push_back(LineVertex{ apex, color });
+        coneVertices.push_back(LineVertex{ p0, color });
+    }
+
+    DrawLines(coneVertices.data(), (uint32_t)coneVertices.size());
 }
