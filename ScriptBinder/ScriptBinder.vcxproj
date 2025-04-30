@@ -157,6 +157,9 @@
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="aniState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
+    <ClCompile Include="BoxColliderComponent.cpp" />
+    <ClCompile Include="CapsuleColliderComponent.cpp" />
+    <ClCompile Include="CharacterControllerComponent.cpp" />
     <ClCompile Include="ColliderComponent.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
@@ -182,11 +185,13 @@
     <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Canvas.h" />
-    <ClInclude Include="ColliderComponent.h" />
+    <ClInclude Include="CapsuleColliderComponent.h" />
+    <ClInclude Include="CharacterControllerComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
+    <ClInclude Include="ConvexMeshColliderComponent.h" />
+    <ClInclude Include="HeightFieldColliderComponent.h" />
     <ClInclude Include="IAwakable.h" />
-    <ClInclude Include="IColliderComponent.h" />
     <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
@@ -201,6 +206,8 @@
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PhysicsManager.h" />
+    <ClInclude Include="RagdollComponent.h" />
+    <ClInclude Include="RaycastComponent.h" />
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
@@ -208,6 +215,7 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SoundManager.h" />
+    <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="UIButton.h" />

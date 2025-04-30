@@ -64,8 +64,8 @@ void PhysicsManager::OnLoadScene()
 		if (box) {
 			unsigned int colliderID = ++m_lastColliderID;
 			auto boxInfo = box->m_Info;
-			auto tranformOffset = box->GetOffsetTransform();
-			auto rotationOffset = box->GetOffsetRotation();
+			auto tranformOffset = box->GetPositionOffset();
+			auto rotationOffset = box->GetRotationOffset();
 
 			boxInfo.colliderInfo.id = colliderID;
 			boxInfo.colliderInfo.layerNumber = 0;
@@ -176,15 +176,15 @@ void PhysicsManager::ProcessCallback()
 			continue;
 		}
 
-		auto lhsObj = lhs->second.collider;
-		auto rhsObj = rhs->second.collider;
+		auto lhsObj = lhs->second.gameObject;
+		auto rhsObj = rhs->second.gameObject;
 
-		//Collision collision{ lhsObj,rhsObj,data.contactPoints };
+		Collision collision{ lhsObj,rhsObj,data.contactPoints };
 
 		switch (type)
 		{
 		case ECollisionEventType::ENTER_OVERLAP:
-			SceneManagers->GetActiveScene()->OnCollisionEnter(rhsObj);
+			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
 			break;
@@ -326,6 +326,11 @@ void PhysicsManager::RemoveCollider(GameObject* object)
 		m_colliderContainer.at(id).bIsDestroyed = true;
 	}
 
+}
+
+void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
+{
+	m_callbacks.push_back({ data,type });
 }
 
 void PhysicsManager::SetPhysicData()

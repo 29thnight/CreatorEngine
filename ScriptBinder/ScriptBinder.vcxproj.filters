@@ -138,6 +138,15 @@
     <ClCompile Include="ColliderComponent.cpp">
       <Filter>Classes</Filter>
     </ClCompile>
+    <ClCompile Include="BoxColliderComponent.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="CapsuleColliderComponent.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterControllerComponent.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
@@ -248,13 +257,7 @@
     <ClInclude Include="BoxColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="ColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="RigidBodyComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="IColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
@@ -262,6 +265,27 @@
     </ClInclude>
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="SphereColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="CapsuleColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="ConvexMeshColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="HeightFieldColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterControllerComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RaycastComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
