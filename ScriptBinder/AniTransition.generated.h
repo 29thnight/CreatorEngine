@@ -8,7 +8,7 @@ ReflectionField(AniTransition) \
 		meta_property(conditions) \
 		meta_property(curState) \
 		meta_property(nextState) \
-		meta_property(tranTime) \
+		meta_property(blendTime) \
 		meta_property(exitTime) \
 	}); \
 	FieldEnd(AniTransition, PropertyOnly) \

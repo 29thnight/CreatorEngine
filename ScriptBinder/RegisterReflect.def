@@ -8,7 +8,7 @@
 #include "Material.h"
 #include "Animator.h"
 #include "Mesh.h"
-#include "aniFSM.h"
+#include "AnimationController.h"
 #include "aniState.h"
 #include "AniTransition.h"
 #include "Canvas.h"
@@ -30,6 +30,7 @@
 REFLECTION_REGISTER()
 {
     AUTO_REGISTER_CLASS(AniTransition);
+    AUTO_REGISTER_CLASS(AnimationController);
     AUTO_REGISTER_CLASS(Animator);
     AUTO_REGISTER_CLASS(Canvas);
     AUTO_REGISTER_CLASS(Component);
@@ -50,7 +51,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Transform);
     AUTO_REGISTER_CLASS(UIButton);
     AUTO_REGISTER_CLASS(UIComponent);
-    AUTO_REGISTER_CLASS(aniFSM);
     AUTO_REGISTER_CLASS(aniParameter);
     AUTO_REGISTER_CLASS(aniState);
 }

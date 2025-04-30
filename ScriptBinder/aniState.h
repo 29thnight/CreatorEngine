@@ -2,7 +2,7 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "AniTransition.h"
 #include "aniState.generated.h"
-class aniFSM;
+class AnimationController;
 class AniBehaviour;
 class aniState 
 {	
@@ -10,7 +10,7 @@ public:
     ReflectaniState
 	[[Serializable]]
     aniState() = default;
-	aniState(aniFSM* Owner, std::string Name) : Owner(Owner), Name(Name) {}
+	aniState(AnimationController* Owner, std::string Name) : Owner(Owner), Name(Name) {}
 
 
 	void SetBehaviour(std::string name);
@@ -19,7 +19,7 @@ public:
 
 	std::string behaviourName{};
 	AniBehaviour* behaviour{};
-	aniFSM* Owner{};
+	AnimationController* Owner{};
 	[[Property]]
 	std::vector<std::shared_ptr<AniTransition>> Transitions;
 	[[Property]]

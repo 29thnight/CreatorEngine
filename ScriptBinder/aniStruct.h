@@ -27,10 +27,22 @@ public:
    ReflectaniParameter
 	[[Serializable]]
 	aniParameter() = default;
-	aniParameter(float value, valueType _vType, std::string _name = "None")
-		: fValue(value),vType(_vType), name(_name)
+	template<typename T>
+	aniParameter(T value, valueType _vType, std::string _name = "None")
+		: vType(_vType), name(_name)
 	{
-		
+		switch (vType)
+		{
+		case valueType::Float:
+			fValue = static_cast<float>(value);
+			break;
+		case valueType::Int:
+			iValue = static_cast<int>(value);
+			break;
+		case valueType::Bool:
+			bValue = static_cast<bool>(value);
+			break;
+		}
 	}
 
 	template<typename T>

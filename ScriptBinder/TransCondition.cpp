@@ -1,5 +1,5 @@
 #include "TransCondition.h"
-#include "aniFSM.h"
+#include "AnimationController.h"
 bool TransCondition::CheckTrans()
 {
 	

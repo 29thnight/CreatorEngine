@@ -5,7 +5,7 @@
 
 #include "aniStruct.h"
 //using TransConditionVariant = std::variant<TransCondition<int>, TransCondition<float>, TransCondition<bool>>;
-class aniFSM;
+class AnimationController;
 class AniTransition
 {
 public:
@@ -40,7 +40,7 @@ public:
 	[[Property]]
 	std::vector<TransCondition> conditions;
 
-	aniFSM* owner{};
+	AnimationController* owner{};
 private:
 	[[Property]]
 	std::string curState;
@@ -48,7 +48,7 @@ private:
 	std::string nextState;
 	// 전이시간이자 블렌딩될 시간
 	[[Property]]
-	float blendTime =0.f;
+	float blendTime =0.2f;
 	// 애니메이션 탈출 최소시간
 	[[Property]]
 	float exitTime =0.f;

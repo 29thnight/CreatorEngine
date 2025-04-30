@@ -1,14 +1,13 @@
 #pragma once
 
 #define ReflectaniFSM \
-ReflectionFieldInheritance(aniFSM, Component) \
+ReflectionFieldInheritance(AnimationController, Component) \
 { \
 	PropertyField \
 	({ \
 		meta_property(CurState) \
 		meta_property(StateVec) \
 		meta_property(Parameters) \
-		meta_property(animator) \
 	}); \
-	FieldEnd(aniFSM, PropertyOnlyInheritance) \
+	FieldEnd(AnimationController, PropertyOnlyInheritance) \
 };

@@ -4,7 +4,7 @@
 #include "LightComponent.h"
 #include "CameraComponent.h"
 #include "DataSystem.h"
-#include "aniFSM.h"
+#include "AnimationController.h"
 
 void ComponentFactory::Initialize()
 {
@@ -62,6 +62,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             Meta::Deserialize(meshRenderer, itNode);
             meshRenderer->SetEnabled(true);
         }
+
 		else if (componentType->typeID == GUIDCreator::GetTypeID<Animator>())
 		{
 			auto animator = static_cast<Animator*>(component);
@@ -71,6 +72,69 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			{
 				FileGuid guid = itNode["m_Motion"].as<std::string>();
 				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+			}
+
+			if(itNode["m_animationController"])
+			{
+				auto& animationControllerNode = itNode["m_animationController"];
+
+				AnimationController* animationController = new AnimationController();
+				Meta::Deserialize(animationController, animationControllerNode);
+				animationController->m_owner = animator;
+				animator->m_animationController = animationController;
+				if (animationControllerNode["StateVec"])
+				{
+					
+					auto& StatesNode = animationControllerNode["StateVec"];
+					for (auto& state : StatesNode)
+					{
+						std::shared_ptr<aniState> sharedState = std::make_shared<aniState>();
+						Meta::Deserialize(sharedState.get(), state);
+						animationController->StateVec.push_back(sharedState);
+						animationController->States.insert(std::make_pair(sharedState->Name, animationController->StateVec.size() - 1));
+						sharedState->Owner = animationController;
+						sharedState->SetBehaviour(sharedState->Name);
+						if (state["Transitions"])
+						{
+							auto& transitionNode = state["Transitions"];
+							for (auto& transition : transitionNode)
+							{
+								std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
+								Meta::Deserialize(sharedTransition.get(), transition);
+								sharedState->Transitions.push_back(sharedTransition);
+								sharedTransition->owner = animationController;
+								if (transition["conditions"])
+								{
+									auto& conditionNode = transition["conditions"];
+									for (auto& condition : conditionNode)
+									{
+										TransCondition newcondition;
+										Meta::Deserialize(&newcondition, condition);
+										newcondition.ownerFSM = animationController;
+										sharedTransition->conditions.push_back(newcondition);
+									}
+								}
+							}
+						}
+					}
+				}
+				if (animationControllerNode["Parameters"])
+				{
+					auto& paramNode = animationControllerNode["Parameters"];
+
+					for (auto& param : paramNode)
+					{
+						aniParameter aniParam;
+						Meta::Deserialize(&aniParam, param);
+						animationController->Parameters.push_back(aniParam);
+					}
+				}
+				if (animationControllerNode["CurState"])
+				{
+					auto& curNode = animationControllerNode["CurState"];
+					std::string name = curNode["Name"].as<std::string>();
+					animationController->m_curState = animationController->StateVec[animationController->States[name]].get();
+				}
 			}
 		}
 		else if (componentType->typeID == GUIDCreator::GetTypeID<LightComponent>())
@@ -97,9 +161,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
    //         Meta::Deserialize(spriteRenderer, itNode);
 			//spriteRenderer->SetEnabled(true);
 		}
-		else if (componentType->typeID == GUIDCreator::GetTypeID<aniFSM>())
+		/*else if (componentType->typeID == GUIDCreator::GetTypeID<AnimationController>())
 		{
-			auto aniFSMcomponent = static_cast<aniFSM*>(component);
+			auto aniFSMcomponent = static_cast<AnimationController*>(component);
 			if (itNode["StateVec"])
 			{
 				auto& FSMNode = itNode["StateVec"];
@@ -152,13 +216,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				std::string name = curNode["Name"].as<std::string>();
 				aniFSMcomponent->CurState = aniFSMcomponent->StateVec[aniFSMcomponent->States[name]].get();
 			}
-			if (itNode["animator"])
-			{
-				auto ani = aniFSMcomponent->GetOwner()->GetComponent<Animator>();
-				aniFSMcomponent->SetAnimator(ani);
-			}
 			Meta::Deserialize(aniFSMcomponent, itNode);
-		}
+		}*/
 		else
 		{
             Meta::Deserialize(component, itNode);

@@ -1,5 +1,5 @@
 #pragma once
-class aniFsm;
+class AnimationController;
 class AniBehaviour
 {
 public:
@@ -7,6 +7,6 @@ public:
 	virtual void Enter() {};
 	virtual void Update(float deltaTime) {};
 	virtual void Exit() {};
-	aniFSM* Owner{};
+	AnimationController* Owner{};
 	std::string name{};
 };

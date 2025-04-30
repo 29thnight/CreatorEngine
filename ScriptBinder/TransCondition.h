@@ -3,7 +3,7 @@
 #include "TransCondition.generated.h"
 #include "aniStruct.h"
 
-class aniFSM;
+class AnimationController;
 class TransCondition
 {
 public:
@@ -26,6 +26,6 @@ public:
 	[[Property]]
 	aniParameter CompareParameter;
 
-	aniFSM* ownerFSM{};
+	AnimationController* ownerFSM{};
 };
 

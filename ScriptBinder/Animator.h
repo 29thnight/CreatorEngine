@@ -7,6 +7,7 @@
 
 constexpr uint32 MAX_BONES{ 512 };
 
+class AnimationController;
 class Animator : public Component, public IRenderable
 {
 public:
@@ -17,33 +18,48 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
-  /*  [[property]]
-    std::vector<std::string> aniName;*/
-    [[property]]
+    [[Property]]
     std::string curAniName;
-   /* [[property]]
-    std::string aniName;*/
     
 
     //현재애니 이름반환
     std::string GetcurAnimation();
-
-    [[property]]
-    bool isLoof = false;
+   
+    bool m_isBlend = false;
+    float blendT = 0;
+    [[Property]]
+    bool m_isLoof{ false };
     [[Property]]
     int m_AnimIndex{};
-    [[Property]]
     int nextAnimIndex = -1;
+    [[Property]]
+    float m_nextTimeElapsed{};
     void SetAnimation(int index);
+    [[Method]]
     void UpdateAnimation();
     [[Property]]
     FileGuid m_Motion{};
-
+    
+    [[Property]]
+    AnimationController* m_animationController{};
+    void CreateController();
+    AnimationController* GetController() { return m_animationController; }
 public:
    ReflectAnimator
     [[Serializable(Inheritance:Component)]]
-    GENERATED_BODY(Animator)
+   Animator() 
+   {
+       m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
+   } 
+   virtual ~Animator()
+   {
+       if (m_animationController)
+       {
+           delete m_animationController;
+       }
+   }
 
+    XMMATRIX blendtransform;
     bool IsEnabled() const override
     {
         return m_IsEnabled;
@@ -56,4 +72,5 @@ public:
 
 private:
     bool m_IsEnabled = false;
+    
 };

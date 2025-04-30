@@ -2,7 +2,7 @@
 #include "GameObject.h"
 #include "Transform.h"
 #include "aniState.h"
-#include "aniFSM.h"
+#include "AnimationController.h"
 #include "AniBehaviour.h"
 class TestPlayer : Component 
 {
@@ -13,7 +13,7 @@ public:
 	GameObject* player;
 	float speed = 0.1f;
 
-	float maxSpeed = 1.5f;
+	float maxSpeed = 15.0f;
 };
 
 class IdleAni : public AniBehaviour
@@ -22,7 +22,8 @@ public:
 	IdleAni() { name = "Idle"; };
 	virtual void Enter() override
 	{
-		Owner->GetAnimator()->SetAnimation(0);
+		Owner->GetOwner()->nextAnimIndex = 0;
+		//Owner->GetAnimator()->SetAnimation(0);
 	};
 	virtual void Update(float DeltaTime) override
 	{
@@ -39,7 +40,8 @@ public:
 	WalkAni() { name = "Walk"; }
 	virtual void Enter() override
 	{
-		Owner->GetAnimator()->SetAnimation(2);
+		Owner->GetOwner()->nextAnimIndex = 2;
+		//Owner->GetAnimator()->SetAnimation(2);
 	};
 	virtual void Update(float DeltaTime) override
 	{
@@ -57,8 +59,8 @@ public:
 	RunAni()  {name = "Run";}
 	virtual void Enter() override
 	{
-		Owner->GetAnimator()->nextAnimIndex =1;
-		Owner->GetAnimator()->SetAnimation(1); 
+		Owner->GetOwner()->nextAnimIndex = 1;
+		//Owner->GetAnimator()->SetAnimation(1); 
 	};
 	virtual void Update(float DeltaTime)override
 	{

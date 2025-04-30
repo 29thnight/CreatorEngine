@@ -1,9 +1,9 @@
 #include "aniState.h"
-#include "anibegvioutFatory.h"
+#include "AnimationBehviourFatory.h"
 
 void aniState::SetBehaviour(std::string name)
 {
-	behaviour = aniFactory->CreateBehaviour(name);
+	behaviour = AnimationFactorys->CreateBehaviour(name);
 	behaviourName = behaviour->name;
 	behaviour->Owner = this->Owner;
 }

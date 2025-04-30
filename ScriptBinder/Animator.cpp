@@ -1,5 +1,5 @@
 #include "Animator.h"
-
+#include "AnimationController.h"
 
 
 std::string Animator::GetcurAnimation()
@@ -25,4 +25,11 @@ void Animator::UpdateAnimation()
 	m_AnimIndexChosen = m_AnimIndex;
 	m_TimeElapsed = 0;
 	
+}
+
+void Animator::CreateController()
+{
+	//m_animationController = std::make_shared<AnimationController>();
+	m_animationController = new AnimationController();
+	m_animationController->m_owner = this;
 }
