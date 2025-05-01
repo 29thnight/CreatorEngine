@@ -150,12 +150,6 @@
     <Filter Include="RenderPass\EffectPass\NodeEditor">
       <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resources\Skeleton\Bone">
-      <UniqueIdentifier>{dedebb22-4667-41cf-a65e-94cc10e22ea1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resources\Skeleton\Animation">
-      <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\ScreenSpaceReflectionPass">
       <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
     </Filter>
@@ -498,19 +492,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureEval.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\AutoExposureHistogram.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomUpsample.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\FXAA.cs.hlsl">

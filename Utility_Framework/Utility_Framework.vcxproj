@@ -35,6 +35,7 @@
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
+    <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />

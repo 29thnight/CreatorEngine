@@ -17,6 +17,7 @@ namespace Core
 		void Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height);
 		void Finalize();
 		void SetWindow(CoreWindow& coreWindow);
+        void RegisterHandler(CoreWindow& coreWindow);
 		void Load();
 		void Run();
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);

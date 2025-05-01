@@ -62,9 +62,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     surf.NdotV = dot(surf.N, surf.V);
 
     float4 albedo = gAlbedo;
+    [branch]
     if (gUseAlbedoMap)
     {
-
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
@@ -74,6 +74,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float metallic = gMetallic;
     float roughness = gRoughness;
+    [branch]
     if (gUseOccMetalRough)
     {
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
@@ -83,6 +84,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     }
     
     float4 emissive = float4(0.0, 0.0, 0.0, 0.0);
+    [branch]
     if (gUseEmmisive)
     {
         emissive = Emissive.Sample(LinearSampler, IN.texCoord);

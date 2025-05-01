@@ -141,7 +141,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	std::vector<uint32> indices;
 	bool hasTexCoords = mesh->mTextureCoords[0];
     vertices.reserve(mesh->mNumVertices);
-    indices.reserve(mesh->mNumFaces * 3); // Assuming each face is a triangle
+    indices.reserve(mesh->mNumFaces * 3);
 
 	for (uint32 i = 0; i < mesh->mNumVertices; i++)
 	{
@@ -199,17 +199,37 @@ void ModelLoader::ProcessMaterials()
 
 Material* ModelLoader::GenerateMaterial(int index)
 {
-	auto tempMaterial = DataSystems->Materials.find(m_AIScene->mMaterials[index]->GetName().C_Str());
-	if (tempMaterial != DataSystems->Materials.end())
-	{
-		return tempMaterial->second.get();
-	}
+    std::string baseName = m_AIScene->mMaterials[index]->GetName().C_Str();
+    std::string uniqueName = baseName;
 
-	Material* material = AllocateResource<Material>();
-	material->m_name = m_AIScene->mMaterials[index]->GetName().C_Str();
+    MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
+    m_fileGuid = modelFileNode["guid"].as<std::string>();
+    int suffix = 1;
 
-	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
-	material->m_fileGuid = m_fileGuid = modelFileNode["guid"].as<std::string>();
+    while (true)
+    {
+        auto iter = DataSystems->Materials.find(uniqueName);
+        if (iter != DataSystems->Materials.end())
+        {
+            if (iter->second->m_fileGuid == m_fileGuid)
+            {
+                return iter->second.get();
+            }
+            else
+            {
+                // 이름 충돌 발생 → 이름 뒤에 (숫자) 붙이기
+                uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    Material* material = AllocateResource<Material>();
+    material->m_name = uniqueName;
+	material->m_fileGuid = m_fileGuid;
 
 	if (index > -1)
 	{
@@ -270,7 +290,6 @@ Material* ModelLoader::GenerateMaterial(int index)
 			res = mat->Get(AI_MATKEY_SHININESS, shininess);
 			if (res == aiReturn_SUCCESS)
 			{
-				// convert shininess to roughness
 				float roughness = sqrt(2.0f / (shininess + 2.0f));
 				material->SetRoughness(roughness);
 			}
@@ -564,7 +583,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			for (auto ani : m_model->m_Skeleton->m_animations)
 			{
 				m_animator->m_aniName.push_back(ani.m_name);
-				//m_animator->aniName = ani.m_name;
 			}
 		}
 

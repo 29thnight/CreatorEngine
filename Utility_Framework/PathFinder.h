@@ -16,6 +16,7 @@ namespace InternalPath
 	inline file::path MaterialSourcePath{};
 	inline file::path PrecompiledShaderPath{};
 	inline std::string VS2022Path{ "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\"" };
+    inline std::wstring MSBuildPath{ L"\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe\"" };
     inline file::path DynamicSolutionDir{};
 	inline file::path BaseProjectPath{};
 
@@ -30,7 +31,7 @@ namespace InternalPath
         ExecuteablePath = p.remove_filename();
 
         auto base = file::path(ExecuteablePath);
-		//TODO Áö±İÀº ÀÌ·±½ÄÀ¸·Î ºÒ·¯¿À°í ³ªÁß¿¡´Â ±âº» ini ¼³Á¤°ªÀ» Á¤ÇØ¼­ ÀĞ¾î¿À´Â °É·Î ÇÕ½Ã´Ù.
+		//TODO ì§€ê¸ˆì€ ì´ëŸ°ì‹ìœ¼ë¡œ ë¶ˆëŸ¬ì˜¤ê³  ë‚˜ì¤‘ì—ëŠ” ê¸°ë³¸ ini ì„¤ì •ê°’ì„ ì •í•´ì„œ ì½ì–´ì˜¤ëŠ” ê±¸ë¡œ í•©ì‹œë‹¤.
 		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
         DataPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
 
@@ -141,6 +142,11 @@ public:
 	{
 		return InternalPath::VS2022Path;
 	}
+
+    static inline std::wstring MSBuildPath()
+    {
+        return InternalPath::MSBuildPath;
+    }
 
 	static inline file::path DynamicSolutionPath(const std::string_view& path)
 	{

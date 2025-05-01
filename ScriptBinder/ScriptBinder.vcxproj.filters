@@ -28,9 +28,6 @@
     <Filter Include="Classes\HotLoadSystem">
       <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Resources\Camera">
-      <UniqueIdentifier>{570dd58d-4c44-448c-a051-1a1a5689f7c2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Resources\Light">
       <UniqueIdentifier>{044c4c77-9762-42ae-9e91-6e8e20d089b0}</UniqueIdentifier>
     </Filter>
@@ -142,7 +139,7 @@
       <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
     <ClCompile Include="ColliderComponent.cpp">
-      <Filter>Classes</Filter>
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

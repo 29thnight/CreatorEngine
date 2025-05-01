@@ -15,7 +15,6 @@ public:
 	RenderScene() = default;
 	~RenderScene();
 
-	//Camera m_MainCamera;
 	LightController* m_LightController{};
 
 	void Initialize();

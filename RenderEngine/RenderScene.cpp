@@ -23,17 +23,9 @@ RenderScene::~RenderScene()
 
 void RenderScene::Initialize()
 {
-	//TODO : 곧 컴포넌트로 빠져야함.
-	//m_MainCamera.RegisterContainer();
-
 	m_LightController = new LightController();
 
-	SceneManagers->resetSelectedObjectEvent.AddLambda(
-		[this]()
-		{
-			m_selectedSceneObject = nullptr;
-		}
-	);
+	SceneManagers->resetSelectedObjectEvent.AddRaw(this, &RenderScene::ResetSelectedSceneObject);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)

@@ -5,6 +5,19 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
+    m_sceneRenderer(ptr)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+    ImFontConfig icons_config;
+    ImFontConfig font_config;
+    icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
+    m_koreanFont = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 16.0f, nullptr, io.Fonts->GetGlyphRangesKorean());
+    io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
+    io.Fonts->Build();
+}
+
 void MenuBarWindow::RenderMenuBar()
 {
     ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
@@ -62,7 +75,7 @@ void MenuBarWindow::RenderMenuBar()
 
             float availRegion = ImGui::GetContentRegionAvail().x;
 
-            ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 0));
+            ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
 
             if (ImGui::Button(SceneManagers->m_isGameStart ? ICON_FA_STOP : ICON_FA_PLAY))
             {
@@ -70,6 +83,9 @@ void MenuBarWindow::RenderMenuBar()
 				SceneManagers->m_isGameStart = !SceneManagers->m_isGameStart;
 				Meta::UndoCommandManager->m_isGameMode = SceneManagers->m_isGameStart;
             }
+
+            ImVec2 curPos = ImGui::GetCursorPos();
+            ImGui::SetCursorPos(ImVec2(curPos.x, 1));
 
 			if (ImGui::Button(ICON_FA_PAUSE))
 			{
@@ -101,11 +117,96 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_CODE " Output Log "))
             {
-                m_sceneRenderer->m_bShowLogWindow = true;
+                m_bShowLogWindow = true;
             }
 
             ImGui::EndMenuBar();
         }
         ImGui::End();
     }
+
+    if (m_bShowLogWindow)
+    {
+        ShowLogWindow();
+    }
+}
+
+void MenuBarWindow::ShowLogWindow()
+{
+    static int levelFilter = spdlog::level::trace;
+    bool isClear = Debug->IsClear();
+    ImGui::PushFont(m_koreanFont);
+
+    ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
+    if (ImGui::Button("Clear"))
+    {
+        Debug->Clear();
+    }
+    ImGui::SameLine();
+    ImGui::Combo("Log Filter", &levelFilter,
+        "Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
+
+    float sizeX = ImGui::GetContentRegionAvail().x;
+    float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
+
+    if (isClear)
+    {
+        Debug->toggleClear();
+        ImGui::End();
+        return;
+    }
+
+    auto entries = Debug->get_entries();
+    for (size_t i = 0; i < entries.size(); i++)
+    {
+        const auto& entry = entries[i];
+        bool is_selected = (i == m_selectedLogIndex);
+
+        if (entry.level != spdlog::level::trace && entry.level < levelFilter)
+            continue;
+
+        ImVec4 color;
+        switch (entry.level)
+        {
+        case spdlog::level::info: color = ImVec4(1, 1, 1, 1); break;
+        case spdlog::level::warn: color = ImVec4(1, 1, 0, 1); break;
+        case spdlog::level::err:  color = ImVec4(1, 0.4f, 0.4f, 1); break;
+        default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+        }
+
+        if (is_selected)
+            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
+
+        int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
+
+        ImGui::PushID(i);
+        if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
+            is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
+        {
+            m_selectedLogIndex = i;
+            std::regex pattern(R"(([A-Za-z]:\\.*))");
+            std::istringstream iss(entry.message);
+            std::string line;
+
+            while (std::getline(iss, line))
+            {
+                std::smatch match;
+                if (std::regex_search(line, match, pattern) && entry.level != spdlog::level::debug)
+                {
+                    std::string fileDirectory = match[1].str();
+                    DataSystems->OpenFile(fileDirectory);
+                }
+            }
+        }
+        ImGui::PopStyleColor();
+
+        if (is_selected)
+            ImGui::PopStyleColor();
+        ImGui::PopID();
+    }
+
+    ImGui::End();
+    ImGui::PopFont();
 }

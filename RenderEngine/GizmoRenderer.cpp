@@ -18,6 +18,21 @@ GizmoRenderer::~GizmoRenderer()
 {
 }
 
+void GizmoRenderer::EditorView()
+{
+    if (m_bShowGridSettings)
+    {
+        ShowGridSettings();
+    }
+}
+
+void GizmoRenderer::ShowGridSettings()
+{
+    ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
+    m_pGridPass->GridSetting();
+    ImGui::End();
+}
+
 void GizmoRenderer::OnDrawGizmos()
 {
 	//[*] GridPass
@@ -30,7 +45,7 @@ void GizmoRenderer::OnDrawGizmos()
 	}
 
 	//[*] WireFramePass
-	if (useWireFrame)
+	if (m_buseWireFrame)
 	{
 		DirectX11::BeginEvent(L"WireFramePass");
 		Benchmark banch;

@@ -234,6 +234,9 @@
     <ClInclude Include="ReflectionVectorInvoker.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="DebugStreamBuf.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

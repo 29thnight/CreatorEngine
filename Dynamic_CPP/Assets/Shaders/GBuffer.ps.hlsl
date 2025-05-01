@@ -68,6 +68,7 @@ GBufferOutput main(PixelShaderInput IN)
 
     // PACK GBUFFER
     float4 albedo = gAlbedo;
+    [branch]
     if (gUseAlbedoMap)
     {
 
@@ -80,6 +81,7 @@ GBufferOutput main(PixelShaderInput IN)
 
     float metallic = gMetallic;
     float roughness = gRoughness;
+    [branch]
     if (gUseOccMetalRough)
     {
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
@@ -88,12 +90,14 @@ GBufferOutput main(PixelShaderInput IN)
         metallic = occRoughMetal.b;
     }
 
+    [branch]
     if (gUseAoMap)
     {
         occlusion = AoMap.Sample(LinearSampler, IN.texCoord).r;
     }
 
     float4 emissive = float4(0.0, 0.0, 0.0, 0.0);
+    [branch]
     if (gUseEmmisive)
     {
         emissive = Emissive.Sample(LinearSampler, IN.texCoord);

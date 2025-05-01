@@ -102,6 +102,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float3 ambient = globalAmbient.rgb * albedo;
     
+    [branch]
     if (useEnvMap)
     {
         float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
