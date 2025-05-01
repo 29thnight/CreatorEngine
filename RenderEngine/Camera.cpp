@@ -120,8 +120,6 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 {
 	DirectX::BoundingFrustum frustum;
 	frustum.CreateFromMatrix(frustum, CalculateProjection());
-	frustum.Transform(frustum, CalculateView());
-	frustum.Origin = Mathf::Vector3(m_eyePosition);
 
 	return frustum;
 }

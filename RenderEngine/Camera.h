@@ -102,6 +102,20 @@ public:
 		}
 	}
 
+	void ReplaceCamera(uint32 index, Camera* camera)
+	{
+		if (index < m_cameras.size())
+		{
+			if (nullptr != m_cameras[index])
+			{
+				delete m_cameras[index];
+			}
+
+			m_cameras[index] = camera;
+			m_cameras[index]->m_cameraIndex = index;
+		}
+	}
+
 	Camera* GetCamera(uint32 index)
 	{
 		if (index < m_cameras.size())

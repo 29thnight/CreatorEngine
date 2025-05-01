@@ -225,6 +225,15 @@
     <ClInclude Include="Core.OctreeManager.h">
       <Filter>Core.Octree</Filter>
     </ClInclude>
+    <ClInclude Include="ReflectionVectorFactory.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionVectorMapper.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionVectorInvoker.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

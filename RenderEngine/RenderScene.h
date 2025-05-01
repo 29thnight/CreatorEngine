@@ -33,6 +33,8 @@ public:
 	Scene* GetScene() { return m_currentScene; }
 	GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
 
+	void ResetSelectedSceneObject();
+
 private:
 	friend class HierarchyWindow;
 	friend class InspectorWindow;

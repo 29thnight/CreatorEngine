@@ -26,7 +26,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 	return sceneObject;
 }
 
-std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -65,7 +65,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	return m_SceneObjects[index];
 }
 
-std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -381,9 +381,14 @@ void Scene::DestroyGameObjects()
         uint32_t oldIndex = obj->m_index;
 
         if (indexMap.contains(obj->m_parentIndex))
+        {
             obj->m_parentIndex = indexMap[obj->m_parentIndex];
+			obj->m_rootIndex = indexMap[obj->m_rootIndex];
+        }
         else
+        {
             obj->m_parentIndex = GameObject::INVALID_INDEX;
+        }
 
         for (auto& childIndex : obj->m_childrenIndices)
         {

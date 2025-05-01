@@ -269,6 +269,9 @@
     <ClInclude Include="CameraComponent.h">
       <Filter>Classes\Components\CameraComponent</Filter>
     </ClInclude>
+    <ClInclude Include="GameObjectType.h">
+      <Filter>Classes\GameObject</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

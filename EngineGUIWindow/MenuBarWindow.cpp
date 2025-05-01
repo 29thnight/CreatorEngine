@@ -24,6 +24,7 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::MenuItem("Load Scene"))
                 {
+					SceneManagers->resetSelectedObjectEvent.Broadcast();
                     SceneManagers->LoadScene();
                 }
                 if (ImGui::MenuItem("Exit"))

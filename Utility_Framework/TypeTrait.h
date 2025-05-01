@@ -263,3 +263,5 @@ namespace TypeTrait
 		}
 	};
 } // namespace TypeTrait
+
+#define type_guid(T) TypeTrait::GUIDCreator::GetTypeID<T>()

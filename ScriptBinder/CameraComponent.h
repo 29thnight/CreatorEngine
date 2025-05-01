@@ -33,7 +33,14 @@ public:
 	{
 		if (m_cameraIndex != -1)
 		{
-			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+			if (nullptr == m_pCamera)
+			{
+				m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+			}
+			else
+			{
+				CameraManagement->ReplaceCamera(m_cameraIndex, m_pCamera);
+			}
 		}
 		else
 		{
@@ -70,6 +77,14 @@ public:
 	Camera* GetCamera() const
 	{
 		return m_pCamera;
+	}
+
+	DirectX::BoundingFrustum GetFrustum() const
+	{
+		DirectX::BoundingFrustum frustum = m_pCamera->GetFrustum();
+		frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
+
+		return frustum;
 	}
 
 private:

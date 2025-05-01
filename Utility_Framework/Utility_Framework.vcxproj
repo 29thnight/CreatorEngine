@@ -58,6 +58,9 @@
     <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
+    <ClInclude Include="ReflectionVectorFactory.h" />
+    <ClInclude Include="ReflectionVectorInvoker.h" />
+    <ClInclude Include="ReflectionVectorMapper.h" />
     <ClInclude Include="ReflectionYml.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="Serializer.h" />

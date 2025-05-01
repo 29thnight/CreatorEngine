@@ -280,10 +280,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 	auto scene = SceneManagers->GetActiveScene();
 	m_renderScene->SetScene(scene);
 
-	auto cameraObj = scene->CreateGameObject("Main Camera", GameObject::Type::Camera);
+	auto cameraObj = scene->CreateGameObject("Main Camera", GameObjectType::Camera);
 	auto cameraComponent = cameraObj->AddComponent<CameraComponent>();
 
-	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
+	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObjectType::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
 
 	ShadowMapRenderDesc desc;

@@ -6,7 +6,6 @@
 #include "Animator.generated.h"
 
 constexpr uint32 MAX_BONES{ 512 };
-
 class Animator : public Component, public IRenderable
 {
 public:
@@ -17,10 +16,8 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
-    [[property]]
-    std::vector<std::string> aniName;
-   /* [[property]]
-    std::string aniName;*/
+    [[Property]]
+    std::vector<std::string> m_aniName;
     
     [[Property]]
     int m_AnimIndex{};

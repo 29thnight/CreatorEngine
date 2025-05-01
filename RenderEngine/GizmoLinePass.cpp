@@ -86,7 +86,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 
     switch (selectedObject->m_gameObjectType)
     {
-	case GameObject::Type::Light:
+	case GameObjectType::Light:
 	{
 		auto lightComponent = selectedObject->GetComponent<LightComponent>();
 		if (nullptr == lightComponent) return;
@@ -110,7 +110,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
         }
 	}
 	break;
-    case GameObject::Type::Camera:
+    case GameObjectType::Camera:
     {
         auto cameraComponent = selectedObject->GetComponent<CameraComponent>();
         if(nullptr == cameraComponent) return;
@@ -118,7 +118,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
         auto camera = cameraComponent->GetCamera();
 		if (nullptr == camera || camera->m_isOrthographic) return; // 카메라가 orthographic일 경우나 없을 경우 throughpass
         
-        DrawBoundingFrustum(camera->GetFrustum(), { 1, 0, 1, 1 });
+        DrawBoundingFrustum(cameraComponent->GetFrustum(), { 1, 0, 1, 1 });
     }
     break;
     }
