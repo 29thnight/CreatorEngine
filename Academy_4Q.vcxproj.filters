@@ -57,7 +57,7 @@
     <Filter Include="Window\AssetBundleWindow">
       <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\InitProgressWindow">
+    <Filter Include="Window\ProgressWindow">
       <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -120,7 +120,7 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\ProgressWindow.h">
-      <Filter>Window\InitProgressWindow</Filter>
+      <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

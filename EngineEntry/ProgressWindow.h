@@ -1,8 +1,15 @@
 #pragma once
 #include "Core.Minimal.h"
+#include <wingdi.h>
 #include <commctrl.h>
 
 #pragma comment(lib, "comctl32.lib")
+
+enum class ProgressWindowStyle
+{
+    Basic,         // 텍스트 + 프로그레스바
+    InitStyle     // 배경이미지 + 프로그레스바
+};
 
 class ProgressWindow : public Singleton<ProgressWindow>
 {
@@ -12,8 +19,10 @@ private:
     ~ProgressWindow() = default;
 
 public:
-    void Launch()
+    void Launch(ProgressWindowStyle style = ProgressWindowStyle::Basic, const std::wstring& imagePath = L"")
     {
+        m_style = style;
+        m_imagePath = imagePath;
         InitCommonControls();
         m_hThread = CreateThread(nullptr, 0, ThreadProc, this, 0, nullptr);
     }
@@ -41,6 +50,16 @@ public:
             CloseHandle(m_hThread);
             m_hThread = nullptr;
         }
+        if (m_hBitmap)
+        {
+            DeleteObject(m_hBitmap);
+            m_hBitmap = nullptr;
+        }
+        if (m_hFont)
+        {
+            DeleteObject(m_hFont);
+            m_hFont = nullptr;
+        }
     }
 
 private:
@@ -54,74 +73,159 @@ private:
         wc.lpszClassName = L"ProgressWindowClass";
         RegisterClass(&wc);
 
-        const int width = 550;
-        const int height = 150;
+        if (self->m_style == ProgressWindowStyle::Basic)
+        {
+            self->CreateBasicUI();
+        }
+        else
+        {
+            self->CreateInitUI();
+        }
 
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        int x = (screenWidth - width) / 2;
-        int y = (screenHeight - height) / 2;
-
-        self->m_hWnd = CreateWindowEx(
-            WS_EX_TOPMOST,
-            wc.lpszClassName, L"Initializing...",
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-            x, y, width, height,
-            nullptr, nullptr, wc.hInstance, self
-        );
-
-        self->m_hText = CreateWindowEx(0, L"STATIC", L"Loading...",
-            WS_CHILD | WS_VISIBLE,
-            20, 20, width - 40, 20,
-            self->m_hWnd, nullptr, wc.hInstance, nullptr);
-
-        self->m_hProgress = CreateWindowEx(0, PROGRESS_CLASS, nullptr,
-            WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-            20, 50, width - 60, 25,
-            self->m_hWnd, nullptr, wc.hInstance, nullptr);
-
-        SendMessage(self->m_hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
-
-        // 맨 앞으로 보여줌
-        ShowWindow(self->m_hWnd, SW_SHOWNORMAL);
-        SetWindowPos(self->m_hWnd, HWND_TOPMOST, x, y, width, height, SWP_SHOWWINDOW);
-
-        // 메시지 루프
         MSG msg;
         while (GetMessage(&msg, nullptr, 0, 0))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-
         return 0;
     }
 
-    static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    void CreateBasicUI()
     {
-        if (msg == WM_CREATE)
+        const int width = 450;
+        const int height = 150;
+        int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+        int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
+
+        m_hWnd = CreateWindowEx(WS_EX_TOPMOST, L"ProgressWindowClass", L"Initializing...",
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+            x, y, width, height, nullptr, nullptr, GetModuleHandle(nullptr), this);
+
+        m_hFont = CreateFont(18, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"맑은 고딕");
+
+        m_hText = CreateWindowEx(0, L"STATIC", L"Loading...",
+            WS_CHILD | WS_VISIBLE,
+            20, 20, width - 40, 20,
+            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
+
+        SendMessage(m_hText, WM_SETFONT, (WPARAM)m_hFont, TRUE);
+
+        m_hProgress = CreateWindowEx(0, PROGRESS_CLASS, nullptr,
+            WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
+            20, 50, width - 60, 25,
+            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
+
+        SendMessage(m_hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+        ShowWindow(m_hWnd, SW_SHOWNORMAL);
+        UpdateWindow(m_hWnd);
+    }
+
+    void CreateInitUI()
+    {
+        const int width = 512;
+        const int height = 300;
+        int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+        int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
+
+        m_hWnd = CreateWindowEx(WS_EX_TOPMOST, L"ProgressWindowClass", nullptr,
+            WS_POPUP,
+            x, y, width, height, nullptr, nullptr, GetModuleHandle(nullptr), this);
+
+        if (!m_imagePath.empty())
         {
-            CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(cs->lpCreateParams));
+            m_hBitmap = (HBITMAP)LoadImage(nullptr, m_imagePath.c_str(), IMAGE_BITMAP,
+                                           0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
         }
 
-        if (ProgressWindow* self = reinterpret_cast<ProgressWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA)))
+        m_hFont = CreateFont(18, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"맑은 고딕");
+
+        m_hText = CreateWindowEx(0, L"STATIC", L"Loading...",
+            WS_CHILD | WS_VISIBLE,
+            20, height - 60, width - 40, 20,
+            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
+
+        SendMessage(m_hText, WM_SETFONT, (WPARAM)m_hFont, TRUE);
+
+        m_hProgress = CreateWindowEx(0, PROGRESS_CLASS, nullptr,
+            WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
+            0, height - 5, width, 5,
+            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
+
+        SendMessage(m_hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+        ShowWindow(m_hWnd, SW_SHOWNORMAL);
+        UpdateWindow(m_hWnd);
+    }
+
+
+    static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+        ProgressWindow* self = reinterpret_cast<ProgressWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+        switch (msg)
         {
-            switch (msg)
+        case WM_CREATE:
+        {
+            CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+            self = reinterpret_cast<ProgressWindow*>(cs->lpCreateParams);
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+            return 0;
+        }
+        case WM_CTLCOLORSTATIC:
+        {
+            if ((HWND)lParam == self->m_hText && self->m_style == ProgressWindowStyle::InitStyle)
             {
-            case WM_DESTROY:
-                PostQuitMessage(0);
+                SetTextColor((HDC)wParam, RGB(255, 255, 255));
+                SetBkColor((HDC)wParam, RGB(0, 0, 0));
+                static HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 0));
+                return (INT_PTR)hBrush;
+            }
+            break;
+        }
+        case WM_PAINT:
+        {
+            if (self && self->m_style == ProgressWindowStyle::InitStyle && self->m_hBitmap)
+            {
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(hwnd, &ps);
+                HDC memDC = CreateCompatibleDC(hdc);
+                HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, self->m_hBitmap);
+
+                BITMAP bmp;
+                GetObjectW(self->m_hBitmap, sizeof(BITMAP), &bmp);
+
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                StretchBlt(hdc, 0, 0, clientRect.right, clientRect.bottom,
+                           memDC, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY);
+
+                SelectObject(memDC, oldBmp);
+                DeleteDC(memDC);
+                EndPaint(hwnd, &ps);
                 return 0;
             }
+            break;
+        }
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
         }
 
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
 private:
+    ProgressWindowStyle m_style = ProgressWindowStyle::Basic;
+    file::path m_imagePath = L"";
     HWND m_hWnd = nullptr;
     HWND m_hProgress = nullptr;
     HWND m_hText = nullptr;
+    HBITMAP m_hBitmap = nullptr;
+    HFONT m_hFont = nullptr;
     HANDLE m_hThread = nullptr;
 };
 

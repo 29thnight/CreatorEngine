@@ -38,11 +38,13 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
-    g_progressWindow->Launch();
+    std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
+    g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
     g_progressWindow->SetStatusText(L"Initializing Core...");
 
 	CoreWindow coreWindow(hInstance, title, width, height);
 	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);
+    m_hWnd = coreWindow.GetHandle();
 
     g_progressWindow->SetProgress(10);
 
@@ -88,11 +90,9 @@ void Core::App::Load()
 
 void Core::App::Run()
 {
-    HWND handle = CoreWindow::GetForCurrentInstance()->GetHandle();
-
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
-        InputManagement->Initialize(handle);
+        InputManagement->Initialize(m_hWnd);
 	})
 	.Then([&]
 	{
