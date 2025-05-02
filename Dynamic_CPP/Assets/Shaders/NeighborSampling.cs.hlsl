@@ -16,7 +16,7 @@ float SobelEdgeDetection(Texture2D<float4> tex, int2 uv)
     return length(Gx.rgb + Gy.rgb);
 }
 
-[numthreads(32, 32, 1)]
+[numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     int2 uv = DTid.xy;
@@ -50,8 +50,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         for (int x = -1; x <= 1; x++)
         {
+            if (x == 0 && y == 0)
+                continue;
             float4 neighborColor = InputTexture[uv + int2(x, y)];
-            if (neighborColor.a > 0.0)
+            if (neighborColor.a > 0)
             {
                 color = neighborColor;
                 TargetTexture[uv] = color;

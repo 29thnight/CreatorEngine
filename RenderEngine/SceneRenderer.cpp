@@ -135,6 +135,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_metalRoughTexture.get()
 	);
 
+	//Vignette
+	m_pVignettePass = std::make_unique<VignettePass>();
+
+	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
+	m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
+
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
 
@@ -212,13 +218,21 @@ void SceneRenderer::InitializeImGui()
 			{
 				ImGui::Text("LightMaps");
 				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-					if (ImGui::ImageButton("LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
-						ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+					if (ImGui::ImageButton("##LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
+						//ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
 					}
 				}
 				ImGui::Text("indirectMaps");
 				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
-					ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
+					if (ImGui::ImageButton("##IndirectMap", (ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
+						//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
+					}
+				}
+				ImGui::Text("environmentMaps");
+				for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
+					if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
+						//ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
+					}
 				}
 			}
 			else {
@@ -405,14 +419,6 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("SubsurfaceScatteringPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
-		//SSR
-		{
-			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
-			Benchmark banch;
-			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
 
 		//[5] skyBoxPass
 		{
@@ -420,6 +426,14 @@ void SceneRenderer::SceneRendering()
 			Benchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+		//SSR
+		{
+			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
+			Benchmark banch;
+			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
 
@@ -447,6 +461,25 @@ void SceneRenderer::SceneRendering()
 			Benchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
+
+		//Vignette
+		{
+			DirectX11::BeginEvent(L"VignettePass");
+			Benchmark banch;
+			m_pVignettePass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("VignettePass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
+		//m_pColorGradingPass
+		{
+			DirectX11::BeginEvent(L"ColorGradingPass");
+			Benchmark banch;
+			m_pColorGradingPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("ColorGradingPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
 
@@ -553,4 +586,9 @@ void SceneRenderer::ReloadShaders()
 	ShaderSystem->ReloadShaders();
 }
 
+	auto entries = Debug->get_entries();
+	for (size_t i = 0; i < entries.size(); i++)
+	{
+		const auto& entry = entries[i];
+		bool is_selected = (i == selected_log_index);
 

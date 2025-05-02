@@ -171,7 +171,7 @@ bool IntersectAABB(Ray ray, float3 bmin, float3 bmax)
 }
 
 // === 메인 커널 ===
-[numthreads(32, 32, 1)]
+[numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     float2 targetPos = float2(DTid.xy);
@@ -201,16 +201,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3x3 TBN = BuildTBN(normalize(worldNor));
     float3 indirect = float3(0, 0, 0);
     
-    float2 xi;
-    float3 localDir;
-    float3 worldDir;
+    //float2 xi;
+    //float3 localDir;
+    //float3 worldDir;
 
-    float minT;// = 1e20;
-    float3 color;// = float3(0, 0, 0);
+    //float minT;// = 1e20;
+    //float3 color;// = float3(0, 0, 0);
                 //g_IndirectLightMap[DTid.xy] = float4(0, 1, 0, 1);
         
-    float hitT;// = 0;
-    float3 bary;// = { 0, 0, 0 };
+    //float hitT;// = 0;
+    //float3 bary;// = { 0, 0, 0 };
     
     for (int i = 0; i < 512; ++i){
         float2 xi = HammersleySample(i, 512);
@@ -272,16 +272,25 @@ void main(uint3 DTid : SV_DispatchThreadID)
             hitBary.x * hitTri.lightmapUV0 +
             hitBary.y * hitTri.lightmapUV1 +
             hitBary.z * hitTri.lightmapUV2;
+            
+            float3 hitNormal =
+            hitBary.x * hitTri.n0 +
+            hitBary.y * hitTri.n1 +
+            hitBary.z * hitTri.n2;
+            //hitNormal = normalize(hitNormal);
+            
+            float diffuseFactor = max(dot(worldNor, worldDir), 0.0f) * max(dot(hitNormal, -worldDir), 0.0f);
 
             finalColor = lightMap.SampleLevel(PointSampler, float3(interpUV, hitTri.lightmapIndex), 0.0).rgb;
+            finalColor *= diffuseFactor;
         }
         float distance = minT; // 이미 계산된 ray hit 거리
-        float attenuation = 1.0 / (distance + 0.01);
+        float attenuation = 1.0 / (distance * distance + 1.0);
         indirect += finalColor * attenuation;
     }
 
     //GroupMemoryBarrierWithGroupSync();
-    indirect /= 512;
+    indirect /= 512.0;
     g_IndirectLightMap[DTid.xy] = float4(indirect, 1);
 }
 

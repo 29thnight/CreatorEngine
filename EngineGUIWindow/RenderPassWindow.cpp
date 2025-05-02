@@ -38,9 +38,19 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pSubsurfaceScatteringPass->ControlPanel();
 		}
 
+		if (ImGui::CollapsingHeader("VignettePass"))
+		{
+			m_sceneRenderer->m_pVignettePass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("ToneMapPass"))
 		{
 			m_sceneRenderer->m_pToneMapPass->ControlPanel();
+		}
+
+		if (ImGui::CollapsingHeader("ColorGradingPass"))
+		{
+			m_sceneRenderer->m_pColorGradingPass->ControlPanel();
 		}
 
 		if (ImGui::CollapsingHeader("SpritePass"))
