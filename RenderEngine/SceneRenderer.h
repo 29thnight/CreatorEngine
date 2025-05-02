@@ -17,6 +17,8 @@
 #include "PostProcessingPass.h"
 #include "ScreenSpaceReflectionPass.h"
 #include "SubsurfaceScatteringPass.h"
+#include "VignettePass.h"
+#include "ColorGradingPass.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -94,6 +96,8 @@ private:
 	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
 	std::unique_ptr<ScreenSpaceReflectionPass> m_pScreenSpaceReflectionPass{};
 	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
+	std::unique_ptr<VignettePass> m_pVignettePass{};
+	std::unique_ptr<ColorGradingPass> m_pColorGradingPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers

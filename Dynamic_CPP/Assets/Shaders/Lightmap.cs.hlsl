@@ -20,9 +20,6 @@ struct SurfaceInfo
 
 struct Light
 {
-    float4x4 litView;
-    float4x4 litProj;
-    
     float4 position;
     float4 direction;
     float4 color;
@@ -79,6 +76,8 @@ struct Ray
 };
 // s, u, t, b
 RWTexture2D<float4> TargetTexture : register(u0); // 타겟 텍스처 (UAV)
+//RWTexture2D<float4> TargetEnvironmentTexture : register(u7); // 타겟 텍스처 (UAV)
+RWTexture2D<float4> TargetEnvironmentTexture : register(u1);
 
 Texture2DArray<float> shadowMapTextures : register(t0); // 소스 텍스처 (SRV)
 Texture2D<float4> positionMapTexture : register(t1); // 소스 텍스처 (SRV)
@@ -148,12 +147,12 @@ inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out floa
 {
     //float3 origin = orig + dir * 0.001; // 자신을 때리는 경우 방지.
     
-    float3 v0 = tri.v0, v1 = tri.v1, v2 = tri.v2;
+    float3 v0 = tri.v0.xyz, v1 = tri.v1.xyz, v2 = tri.v2.xyz;
     float3 edge1 = v1 - v0;
     float3 edge2 = v2 - v0;
-    float3 pvec = cross(dir, edge2);
-    float det = dot(edge1, pvec);
-    if (det < 1e-6)
+    float3 pvec = cross(dir, edge2);    // 평행한 직선은 외적이 0이 되므로 오류 발생 가능성 있음.
+    float det = dot(edge1, pvec);       // 크기가 0인 벡터와의 내적은 0임. 아래에서 처리하므로 문제없음.
+    if (abs(det) < 1e-6)                // 앞 뒷면 모두 계산하기 위함.
         return false;
 
     float invDet = 1.0 / det;
@@ -205,7 +204,7 @@ bool TraceShadow(float3 origin, float3 dir, float maxDist)
 
         if (node.isLeaf)
         {
-            for (uint i = node.start; i < node.end; ++i)
+            for (int i = node.start; i <= node.end; ++i)
             {
                 int triIndex = TriIndices[i];
                 Triangle tri = triangles[triIndex];
@@ -223,7 +222,7 @@ bool TraceShadow(float3 origin, float3 dir, float maxDist)
     return false;
 }
 
-[numthreads(32, 32, 1)]
+[numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     // 타겟 텍스처 좌표
@@ -246,6 +245,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     
     float4 localpos = positionMapTexture.SampleLevel(PointSampler, localUV, 0);
+    
+    if(localpos.a != 1)
+    {
+        TargetTexture[DTid.xy] = float4(0, 0, 0, 0);
+        //TargetEnvironmentTexture[DTid.xy] = float4(1, 0, 0, 1);
+        return;
+    }
     
     //if (localpos.w == 0)
     //{
@@ -303,15 +309,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
         // Shadow check (BVH traversal)
         bool blocked = TraceShadow(worldPos + normal * bias, toLight, distance);
+        finalColor.a = 1;
         if (!blocked)
         {
             finalColor.rgb += NdotL * attenuation * light.color.rgb;
-            finalColor.a = 1;
         }
     }
     SurfaceInfo surf;
     surf.N = normal.xyz;
-    float3 ambient = globalAmbient;
+    float3 ambient = globalAmbient.rgb;
     if (useEnvMap)
     {
         float3 irradiance = EnvMap.SampleLevel(LinearSampler, surf.N, 0.0).rgb;
@@ -321,9 +327,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float ao = useAO ? AoMap.SampleLevel(PointSampler, localUV.xy, 0.0).r : 1.0;
     
     ambient *= ao; // * occlusion;
-    finalColor.rgb += ambient;
+    //finalColor.rgb += ambient;
     
     TargetTexture[DTid.xy] = finalColor;
+    TargetEnvironmentTexture[DTid.xy] = float4(ambient, 1);
+    //TargetEnvironmentTexture[DTid.xy] = float4(ambient, 1);
     //for (int y = -1; y <= 1; y++)
     //{
         //for (int x = -1; x <= 1; x++)

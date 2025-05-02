@@ -78,9 +78,15 @@ namespace lm {
 		void Prepare();
 		void PrepareRectangles();
 		void CalculateRectangles();
-		int DrawRectangles(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass);
 
-		void DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass, int indices);
+		void PrepareTriangles();
+
+		void DrawRectangles(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass);
+
+		void DilateLightMap(); // 외각선방향으로 확장이지만 아직 수정해야함.
+		void DirectBlur();
+
+		void DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass);
 
 	private:
 		void CreateLightMap();
@@ -89,6 +95,7 @@ namespace lm {
 	public:
 		std::vector<Texture*> lightmaps;
 		std::vector<Texture*> indirectMaps;
+		std::vector<Texture*> environmentMaps;
 		Texture* tempTexture = nullptr;
 		Texture* envMap = nullptr;
 

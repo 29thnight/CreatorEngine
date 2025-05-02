@@ -24,9 +24,6 @@ namespace lm {
 	};
 
 	struct alignas(16) CBLight {
-		Mathf::Matrix view;
-		Mathf::Matrix proj;
-
 		Mathf::Vector4 position;
 		Mathf::Vector4 direction;
 		Mathf::Color4  color;
@@ -188,7 +185,7 @@ namespace lm {
 		//std::cout << "Efficiency: " << efficiency << "%\n";
 	}
 
-	int LightMap::DrawRectangles(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
+	void LightMap::PrepareTriangles()
 	{
 		// vector size 초기화.
 		int triangleCount = 0;
@@ -201,72 +198,15 @@ namespace lm {
 			if (!meshrenderer->IsEnabled()) continue;
 			if (meshrenderer->m_Mesh == nullptr) continue;
 			int face = meshrenderer->m_Mesh->GetIndices().size();
-			triangleCount += face /3;
+			triangleCount += face / 3;
 		}
 		//triangleCount *= 2;
 		m_trianglesInScene.reserve(triangleCount);
 		m_triIndices.reserve(triangleCount);
+	}
 
-		int index = 0; // 삼각형에 id부여.
-		// 씬의 모든 삼각형을 가져옴.
-		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
-			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
-			if (meshrenderer == nullptr) continue;
-			if (!meshrenderer->IsEnabled()) continue;
-			if (meshrenderer->m_Mesh == nullptr) continue;
-			auto& m = meshrenderer->m_Mesh;
-			//auto& name = m->GetName();
-			auto& indices = m->GetIndices();
-			auto& vertices = m->GetVertices();
-			auto worldMatrix = mesh->m_transform.GetWorldMatrix();
-			for (int i = 0; i < indices.size() / 3; i++) {
-				Triangle t{};
-				int i0 = indices[i * 3];
-				int i1 = indices[i * 3 + 1];
-				int i2 = indices[i * 3 + 2];
-				t.v0 = XMVector4Transform(XMVectorSet(vertices[i0].position.x, vertices[i0].position.y, vertices[i0].position.z, 1.f), worldMatrix);
-				t.v1 = XMVector4Transform(XMVectorSet(vertices[i1].position.x, vertices[i1].position.y, vertices[i1].position.z, 1.f), worldMatrix);
-				t.v2 = XMVector4Transform(XMVectorSet(vertices[i2].position.x, vertices[i2].position.y, vertices[i2].position.z, 1.f), worldMatrix);
-				t.n0 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i0].normal.x, vertices[i0].normal.y, vertices[i0].normal.z, 0.f), worldMatrix));
-				t.n1 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i1].normal.x, vertices[i1].normal.y, vertices[i1].normal.z, 0.f), worldMatrix));
-				t.n2 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i2].normal.x, vertices[i2].normal.y, vertices[i2].normal.z, 0.f), worldMatrix));
-				t.v0.m128_f32[3] = 1;
-				t.v1.m128_f32[3] = 1;
-				t.v2.m128_f32[3] = 1;
-				t.n0.m128_f32[3] = 0;
-				t.n1.m128_f32[3] = 0;
-				t.n2.m128_f32[3] = 0;
-				auto& litmaping = meshrenderer->m_LightMapping;
-				t.uv0 = (vertices[i0].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.uv1 = (vertices[i1].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.uv2 = (vertices[i2].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV1 = (vertices[i1].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapUV2 = (vertices[i2].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
-				t.lightmapIndex = litmaping.lightmapIndex;
-				m_trianglesInScene.push_back(t);
-				m_triIndices.push_back(index++);
-
-				//Triangle backFace{};
-				//backFace.v0 = t.v2;
-				//backFace.v1 = t.v1;
-				//backFace.v2 = t.v0;
-				//backFace.n0 = -t.n2; // 노멀 반전
-				//backFace.n1 = -t.n1;
-				//backFace.n2 = -t.n0;
-				//backFace.uv0 = t.uv2;
-				//backFace.uv1 = t.uv1;
-				//backFace.uv2 = t.uv0;
-				//backFace.lightmapUV0 = t.lightmapUV2;
-				//backFace.lightmapUV1 = t.lightmapUV1;
-				//backFace.lightmapUV2 = t.lightmapUV0;
-				//backFace.lightmapIndex = t.lightmapIndex;
-				//m_trianglesInScene.push_back(backFace);
-				//m_triIndices.push_back(index++);
-			}
-		}
-
-		int bvh = BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size() - 1);
+	void LightMap::DrawRectangles(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
+	{
 
 		// triangle buffer
 		{
@@ -359,16 +299,19 @@ namespace lm {
 
 
 
-		int lightmapIndex = 0;
+		int lightmapIndex = -1;
 
 		for (auto& lightmap : lightmaps)
 			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(lightmap->m_pUAV, Colors::Transparent);
+		for (auto& env : environmentMaps)
+			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(env->m_pUAV, Colors::Transparent);
 
 		DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 		DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
 		DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 1
 
-		DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
+		//DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
+		//DirectX11::CSSetUnorderedAccessViews(7, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
 
 		CBSetting cbset = {};
 		cbset.lightsize = MAX_LIGHTS;
@@ -386,8 +329,6 @@ namespace lm {
 				// CB light
 				CBLight cblit = {};
 				auto& light = m_renderscene->m_LightController->GetLight(i);
-				cblit.view = light.GetLightViewMatrix();
-				cblit.proj = light.GetLightProjectionMatrix(0.1f, 100.f);
 				cblit.position = light.m_position;
 				cblit.direction = light.m_direction;
 				cblit.color = light.m_color;
@@ -437,6 +378,7 @@ namespace lm {
 			if (lightmapIndex != renderer->m_LightMapping.lightmapIndex) {
 				lightmapIndex = renderer->m_LightMapping.lightmapIndex;
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
+				DirectX11::CSSetUnorderedAccessViews(1, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
 			}
 
 			// CB 업데이트
@@ -462,12 +404,17 @@ namespace lm {
 				DirectX11::CSSetShaderResources(5, 1, &renderer->m_Material->m_AOMap->m_pSRV);
 
 			// 컴퓨트 셰이더 실행
-			UINT numGroupsX = (UINT)ceil(canvasSize / 32.0f);
-			UINT numGroupsY = (UINT)ceil(canvasSize / 32.0f);
+			UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
+			UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
 			DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
 		}
 
+		ID3D11UnorderedAccessView* nullUAV[2] = { nullptr, nullptr };
+		DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+	}
 
+	void LightMap::DilateLightMap()
+	{
 		for (auto& lightmap : lightmaps) {
 			for (int i = 0; i < dilateCount; i++) {
 				// 엣지 설정.
@@ -475,16 +422,19 @@ namespace lm {
 				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
 				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 
 				// 엣지로 덮어쓰기.
 				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
 				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-				DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 			}
 		}
+	}
 
+	void LightMap::DirectBlur()
+	{
 		for (auto& lightmap : lightmaps) {
 			ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 
@@ -495,7 +445,7 @@ namespace lm {
 				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
 				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 
 
 				// msaa 덮어쓰기.
@@ -503,21 +453,19 @@ namespace lm {
 				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
 				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-				DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 			}
 		}
-
-		return triangleCount;
 	}
 
-	void LightMap::DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass, int indices)
+	void LightMap::DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
 	{
 		
 		for(int i = 0; i < indirectCount; i++){
 			// triangleCount, sampleCount Update
 			indirectBuf ind = {};
 			ind.Resolution = { canvasSize, canvasSize };
-			ind.triangleCount = indices;
+			ind.triangleCount = m_trianglesInScene.size();
 			ind.g_SampleCount = sampleCount;
 			DirectX11::UpdateBuffer(m_indirect1.Get(), &ind);
 			DirectX11::CSSetConstantBuffer(0, 1, m_indirect1.GetAddressOf());
@@ -592,8 +540,8 @@ namespace lm {
 				DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
 
 				// 컴퓨트 셰이더 실행
-				UINT numGroupsX = (UINT)ceil(canvasSize / 32.0f);
-				UINT numGroupsY = (UINT)ceil(canvasSize / 32.0f);
+				UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
+				UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
 				DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
 			}
 
@@ -607,7 +555,7 @@ namespace lm {
 					DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-					DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 
 
 					// msaa 덮어쓰기.
@@ -615,7 +563,7 @@ namespace lm {
 					DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-					DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 				}
 			}
 
@@ -627,7 +575,7 @@ namespace lm {
 				DirectX11::CSSetShaderResources(0, 1, nullSRV);
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
 				DirectX11::CSSetShaderResources(0, 1, &indirectMaps[i]->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 32.f, canvasSize / 32.f, 1);
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
 				//
 				//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
 			}
@@ -636,6 +584,8 @@ namespace lm {
 			textureArray->Release();
 		}
 
+
+		
 
 
 		// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
@@ -666,7 +616,27 @@ namespace lm {
 			// 텍스쳐 저장
 			DirectX::ScratchImage image;
 			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-			std::wstring filename = L"Lightmap" + std::to_wstring(i) + L".hdr";
+			std::wstring filename = L"direct" + std::to_wstring(i) + L".hdr";
+			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
+			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
+		}
+		for (int i = 0; i < indirectMaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, indirectMaps[i]->m_pTexture);
+
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Indirect" + std::to_wstring(i) + L".hdr";
+			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
+			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
+		}
+		for (int i = 0; i < environmentMaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, environmentMaps[i]->m_pTexture);
+
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Env" + std::to_wstring(i) + L".hdr";
 			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
 			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
 		}
@@ -689,15 +659,27 @@ namespace lm {
 		Texture* indirect = Texture::Create(
 			canvasSize,
 			canvasSize,
-			"indirectMap",
+			"IndirectMap",
 			DXGI_FORMAT_R32G32B32A32_FLOAT,
 			D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
 		);
 		indirect->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 		indirect->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
+		Texture* environment = Texture::Create(
+			canvasSize,
+			canvasSize,
+			"Environment",
+			DXGI_FORMAT_R32G32B32A32_FLOAT,
+			D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+		);
+		environment->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+		environment->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+
 		lightmaps.push_back(tex);
 		indirectMaps.push_back(indirect);
+		environmentMaps.push_back(environment);
 	}
 
 	void LightMap::ClearLightMaps()
@@ -710,8 +692,13 @@ namespace lm {
 		{
 			DeallocateResource(indirect);
 		}
+		for (auto& env : environmentMaps)
+		{
+			DeallocateResource(env);
+		}
 		lightmaps.clear();
 		indirectMaps.clear();
+		environmentMaps.clear();
 		DeallocateResource(tempTexture);
 		tempTexture = nullptr;
 
@@ -757,14 +744,87 @@ namespace lm {
 		CalculateRectangles();
 		Debug->Log("CalculateRectangles");
 		co_yield ReturnNull();
-		int indices = DrawRectangles(m_pPositionMapPass);
-		Debug->Log("DrawRectangles");
+		PrepareTriangles();
+
+
+		int index = 0; // 삼각형에 id부여.
+		// 씬의 모든 삼각형을 가져옴.
+		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
+			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
+			if (meshrenderer == nullptr) continue;
+			if (!meshrenderer->IsEnabled()) continue;
+			if (meshrenderer->m_Mesh == nullptr) continue;
+			auto& m = meshrenderer->m_Mesh;
+			//auto& name = m->GetName();
+			auto& indices = m->GetIndices();
+			auto& vertices = m->GetVertices();
+			auto worldMatrix = mesh->m_transform.GetWorldMatrix();
+			for (int i = 0; i < indices.size() / 3; i++) {
+				Triangle t{};
+				int i0 = indices[i * 3];
+				int i1 = indices[i * 3 + 1];
+				int i2 = indices[i * 3 + 2];
+				t.v0 = XMVector4Transform(XMVectorSet(vertices[i0].position.x, vertices[i0].position.y, vertices[i0].position.z, 1.f), worldMatrix);
+				t.v1 = XMVector4Transform(XMVectorSet(vertices[i1].position.x, vertices[i1].position.y, vertices[i1].position.z, 1.f), worldMatrix);
+				t.v2 = XMVector4Transform(XMVectorSet(vertices[i2].position.x, vertices[i2].position.y, vertices[i2].position.z, 1.f), worldMatrix);
+				t.n0 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i0].normal.x, vertices[i0].normal.y, vertices[i0].normal.z, 0.f), worldMatrix));
+				t.n1 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i1].normal.x, vertices[i1].normal.y, vertices[i1].normal.z, 0.f), worldMatrix));
+				t.n2 = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(vertices[i2].normal.x, vertices[i2].normal.y, vertices[i2].normal.z, 0.f), worldMatrix));
+				t.v0.m128_f32[3] = 1;
+				t.v1.m128_f32[3] = 1;
+				t.v2.m128_f32[3] = 1;
+				t.n0.m128_f32[3] = 0;
+				t.n1.m128_f32[3] = 0;
+				t.n2.m128_f32[3] = 0;
+				auto& litmaping = meshrenderer->m_LightMapping;
+				t.uv0 = (vertices[i0].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.uv1 = (vertices[i1].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.uv2 = (vertices[i2].uv0 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV1 = (vertices[i1].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapUV2 = (vertices[i2].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
+				t.lightmapIndex = litmaping.lightmapIndex;
+				m_trianglesInScene.push_back(t);
+				m_triIndices.push_back(index++);
+			}
+			co_yield ReturnNull();
+		}
+
+		int bvh = BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size() - 1);
 		co_yield ReturnNull();
 
-		DrawIndirectLight(m_pPositionMapPass, indices);
+		DrawRectangles(m_pPositionMapPass);
+		Debug->Log("DrawRectangles");
+		co_yield ReturnNull();// ReturnNull();
+
+		DilateLightMap();
+		co_yield ReturnNull();
+
+		DirectBlur();
+		co_yield ReturnNull();
+
+		DrawIndirectLight(m_pPositionMapPass);
 		Debug->Log("Complete Bake Lightmap");
+		co_yield ReturnNull();
+
+		DirectX11::CSSetShader(m_AddTextureColor->GetShader(), nullptr, 0);
+		for (int i = 0; i < lightmaps.size(); i++) {
+			ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+		
+			// AddTextureColor
+			DirectX11::CSSetShaderResources(0, 1, nullSRV);
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
+			DirectX11::CSSetShaderResources(0, 1, &environmentMaps[i]->m_pSRV); // 라이트맵 텍스처
+			DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+			//
+			//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
+		}
+		co_yield ReturnNull();
+
 
 		m_pLightMapPass->Initialize(lightmaps);
+
+		co_return;
 	}
 
 	void LightMap::GenerateLightMap(

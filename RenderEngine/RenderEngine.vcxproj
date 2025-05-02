@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
+    <ClCompile Include="ColorGradingPass.cpp" />
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectModules.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
@@ -192,6 +193,7 @@
     <ClCompile Include="AAPass.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="ToneMapPass.cpp" />
+    <ClCompile Include="VignettePass.cpp" />
     <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -199,6 +201,7 @@
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
+    <ClInclude Include="ColorGradingPass.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectModules.h" />
     <ClInclude Include="GizmoCbuffer.h" />
@@ -250,6 +253,7 @@
     <ClInclude Include="AAPass.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ToneMapPass.h" />
+    <ClInclude Include="VignettePass.h" />
     <ClInclude Include="WireFramePass.h" />
     <ClInclude Include="GridPass.h" />
   </ItemGroup>
@@ -578,6 +582,10 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0_level_9_3</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Vignette.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
