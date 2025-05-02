@@ -157,7 +157,6 @@
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
-    <ClCompile Include="ColliderComponent.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />

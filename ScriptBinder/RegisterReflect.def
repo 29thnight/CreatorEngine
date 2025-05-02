@@ -14,6 +14,7 @@
 #include "AvatarMask.h"
 #include "CameraComponent.h"
 #include "Canvas.h"
+#include "CharacterControllerComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
 #include "GameObject.h"

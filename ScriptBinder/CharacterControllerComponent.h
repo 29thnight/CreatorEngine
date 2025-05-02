@@ -3,6 +3,7 @@
 #include "GameObject.h"
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
+#include "../physics/Physx.h"
 #include "../Physics/ICollider.h"
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
