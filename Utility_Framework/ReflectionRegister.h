@@ -6,6 +6,7 @@
 #include <any>
 #include <typeindex>
 #include <stack>
+#include <yaml-cpp/yaml.h>
 
 class ComponentFactory;
 namespace Meta
@@ -53,14 +54,36 @@ namespace Meta
             }
         }
 
+        template<typename T>
+        void RegisterMakeAny()
+        {
+            _makeAny[typeid(T*)] = [](void* ptr) -> std::any {
+                return static_cast<T*>(ptr);
+                };
+
+            _makeAny[typeid(std::shared_ptr<T>)] = [](void* ptr) -> std::any {
+                return std::shared_ptr<T>(static_cast<T*>(ptr));
+                };
+        }
+
         void* ToVoidPtr(const std::type_info& ti, const std::any& a)
         {
             auto it = _casters.find(ti);
             return (it != _casters.end()) ? it->second(a) : nullptr;
         }
 
+        std::any MakeAnyFromRaw(const std::type_info& ti, void* ptr)
+        {
+            auto it = _makeAny.find(ti);
+            if (it != _makeAny.end())
+                return it->second(ptr);
+
+            return {}; // 변환 실패
+        }
+
     private:
         std::unordered_map<std::type_index, AnyCaster> _casters;
+        std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
     };
 
     static inline auto& TypeCast = TypeCaster::GetInstance();

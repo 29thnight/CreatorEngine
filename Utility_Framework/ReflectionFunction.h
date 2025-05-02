@@ -3,6 +3,8 @@
 #include "MetaUtility.h"
 #include "ReflectionType.h"
 #include "ReflectionRegister.h"
+#include "ReflectionVectorFactory.h"
+#include "ReflectionVectorInvoker.h"
 #include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
@@ -17,6 +19,13 @@ namespace Meta
         const Type& type = T::Reflect();
         MetaDataRegistry->Register(type.name, type);
         MetaFactoryRegistry->Register<T>();
+        TypeCast->RegisterMakeAny<T>();
+
+        if constexpr (std::is_move_constructible_v<T>)
+		{
+			VectorFactory->Register<T>();
+			VectorInvoker->Register<T>();
+		}
     }
 
     static inline const Type* Find(const std::string_view& name)

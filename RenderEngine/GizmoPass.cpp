@@ -2,26 +2,23 @@
 #include "ShaderSystem.h"
 #include "RenderScene.h"
 #include "RenderableComponents.h"
+#include "CameraComponent.h"
+#include "LightComponent.h"
 #include "Scene.h"
+#include "GizmoCbuffer.h"
 
-cbuffer GizmoCameraBuffer
-{
-	Mathf::xMatrix VP{};
-	float3 eyePosition{};
-};
-
-cbuffer GizmoPos
-{
-	float3 pos{};
-};
-
-cbuffer GizmoSize
-{
-	float size{};
-};
+constexpr int MAIN_LIGHT_INDEX = 0;
 
 GizmoPass::GizmoPass()
 {
+    file::path iconpath = PathFinder::IconPath();
+
+    MainLightIcon = Texture::LoadFormPath(iconpath.string() + "Main Light Gizmo.png");
+    PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLight Gizmo.png");
+    SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLight Gizmo.png");
+    DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLight Gizmo.png");
+    CameraIcon = Texture::LoadFormPath(iconpath.string() + "Camera Gizmo.png");
+
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Gizmo_billboard"];
@@ -78,7 +75,7 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
@@ -97,28 +94,45 @@ void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::UpdateBuffer(m_gizmoCameraBuffer.Get(), &cameraBuffer);
 
-	std::vector<std::shared_ptr<GameObject>> sprites;
-	std::copy_if(
-		scene.GetScene()->m_SceneObjects.begin(),
-		scene.GetScene()->m_SceneObjects.end(),
-		std::back_inserter(sprites),
-		[](const std::shared_ptr<GameObject>& object)
-		{
-			return nullptr != object->GetComponent<SpriteRenderer>()
-				&& object->GetComponent<SpriteRenderer>()->IsEnabled()
-				&& object->GetComponent<SpriteRenderer>()->IsGizmoEnabled();
-		}
-	);
+	std::vector<std::pair<int, std::shared_ptr<GameObject>>> gizmoTargetComponent;
+    gizmoTargetComponent.reserve(scene.GetScene()->m_SceneObjects.size());
+
+    for (auto& object : scene.GetScene()->m_SceneObjects)
+    {
+        if (object->GetComponent<CameraComponent>() != nullptr)
+        {
+            gizmoTargetComponent.emplace_back(0, object);
+        }
+        else if (object->GetComponent<LightComponent>() != nullptr)
+        {
+            gizmoTargetComponent.emplace_back(1, object);
+        }
+    }
 
 	GizmoSize size{ .size = 1.f };
-	for (auto& sprite : sprites)
+    Texture* icon = nullptr;
+	for (auto& [type, object] : gizmoTargetComponent)
 	{
-		auto spriteRenderer = sprite->GetComponent<SpriteRenderer>();
-		if (spriteRenderer == nullptr) continue;
-		if (spriteRenderer->m_Sprite == nullptr) continue;
+        bool isMainLight = false;
+        switch (type)
+        {
+        case 0:
+			icon = CameraIcon;
+            break;
+        case 1:
+			isMainLight = (MAIN_LIGHT_INDEX == object->GetComponent<LightComponent>()->m_lightIndex);
+            icon = GetLightIcon(object->GetComponent<LightComponent>()->m_lightType, isMainLight);
+            break;
+        default:
+            continue;
+        }
 
-		DirectX11::PSSetShaderResources(0, 1, &spriteRenderer->m_Sprite->m_pSRV);
-		GizmoPos _pos{ .pos = Mathf::Vector3(sprite->m_transform.GetWorldPosition()) };
+        if(nullptr != icon)
+        {
+            DirectX11::PSSetShaderResources(0, 1, &icon->m_pSRV);
+        }
+		GizmoPos _pos{ .pos = Mathf::Vector3(object->m_transform.GetWorldPosition()) };
+		_pos.pos.y -= 0.5f;
 		DirectX11::UpdateBuffer(m_positionBuffer.Get(), &_pos);
 		DirectX11::UpdateBuffer(m_sizeBuffer.Get(), &size);
 
@@ -141,4 +155,19 @@ void GizmoPass::ControlPanel()
 
 void GizmoPass::Resize()
 {
+}
+
+Texture* GizmoPass::GetLightIcon(int lightType, bool isMainLight) const
+{
+    switch (lightType)
+    {
+    case DirectionalLight:
+        return isMainLight ? DataSystems->MainLightIcon : DataSystems->DirectionalLightIcon;
+    case PointLight:
+        return DataSystems->PointLightIcon;
+    case SpotLight:
+        return DataSystems->SpotLightIcon;
+    default:
+        return nullptr;
+    }
 }

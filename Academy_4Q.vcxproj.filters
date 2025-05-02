@@ -27,9 +27,6 @@
     <Filter Include="Manager\InputManager">
       <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MD">
-      <UniqueIdentifier>{c2a723ce-99f1-49c0-82bf-f2f7a9dafbb8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
@@ -57,8 +54,11 @@
     <Filter Include="Window\HierarchyWindow">
       <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\ProjectCachedResourcesWindow">
+    <Filter Include="Window\AssetBundleWindow">
       <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\ProgressWindow">
+      <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -119,14 +119,9 @@
     <ClInclude Include="EngineEntry\framework.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Prefab.md">
-      <Filter>MD</Filter>
-    </None>
-    <None Include="README.md">
-      <Filter>MD</Filter>
-    </None>
+    <ClInclude Include="EngineEntry\ProgressWindow.h">
+      <Filter>Window\ProgressWindow</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">

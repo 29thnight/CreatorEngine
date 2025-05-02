@@ -3,6 +3,7 @@
 #include "DeviceResources.h"
 #include "GridPass.h"
 #include "GizmoPass.h"
+#include "GizmoLinePass.h"
 #include "WireFramePass.h"
 #include "SpritePass.h"
 
@@ -17,15 +18,22 @@ public:
 	~GizmoRenderer();
 	void OnDrawGizmos();
 
-	void SetWireFrame() { useWireFrame = !useWireFrame; }
+    void EditorView();
+
+	void SetWireFrame() { m_buseWireFrame = !m_buseWireFrame; }
 
 	RenderScene* m_renderScene{};
 	Camera* m_pEditorCamera{};
 
 private:
+    void ShowGridSettings();
+
+private:
 	std::unique_ptr<GizmoPass>      m_pGizmoPass{};
 	std::unique_ptr<WireFramePass>  m_pWireFramePass{};
 	std::unique_ptr<GridPass>       m_pGridPass{};
+	std::unique_ptr<GizmoLinePass>  m_pGizmoLinePass{};
 
-	bool useWireFrame{ false };
+	bool m_buseWireFrame{ false };
+    bool m_bShowGridSettings{ true };
 };

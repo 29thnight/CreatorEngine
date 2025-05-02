@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
+#include "ModuleBehavior.h"
 
 Scene::~Scene()
 {
@@ -25,7 +26,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 	return sceneObject;
 }
 
-std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -64,7 +65,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	return m_SceneObjects[index];
 }
 
-std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -187,34 +188,64 @@ void Scene::FixedUpdate(float deltaSecond)
 	// OnTriggerEvent.Broadcast(); ÀÛ¼º
 }
 
-void Scene::OnTriggerEnter(ICollider* collider)
+void Scene::OnTriggerEnter(const Collision& collider)
 {
-    OnTriggerEnterEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerEnterEvent.TargetInvoke(
+            target->m_onTriggerEnterEventHandle,collider);
+    }
 }
 
-void Scene::OnTriggerStay(ICollider* collider)
+void Scene::OnTriggerStay(const Collision& collider)
 {
-    OnTriggerStayEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerStayEvent.TargetInvoke(
+            target->m_onTriggerStayEventHandle, collider);
+    }
 }
 
-void Scene::OnTriggerExit(ICollider* collider)
+void Scene::OnTriggerExit(const Collision& collider)
 {
-    OnTriggerExitEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnTriggerExitEvent.TargetInvoke(
+            target->m_onTriggerExitEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionEnter(ICollider* collider)
+void Scene::OnCollisionEnter(const Collision& collider)
 {
-    OnCollisionEnterEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionEnterEvent.TargetInvoke(
+            target->m_onCollisionEnterEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionStay(ICollider* collider)
+void Scene::OnCollisionStay(const Collision& collider)
 {
-    OnCollisionStayEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionStayEvent.TargetInvoke(
+            target->m_onCollisionStayEventHandle, collider);
+    }
 }
 
-void Scene::OnCollisionExit(ICollider* collider)
+void Scene::OnCollisionExit(const Collision& collider)
 {
-    OnCollisionExitEvent.Broadcast(collider);
+    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
+    if (nullptr != target)
+    {
+        OnCollisionExitEvent.TargetInvoke(
+            target->m_onCollisionExitEventHandle, collider);
+    }
 }
 
 void Scene::Update(float deltaSecond)
@@ -238,6 +269,7 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::OnDisable()
 {
     OnDisableEvent.Broadcast();
+    DistroyLight();
     DestroyGameObjects();
 }
 
@@ -245,6 +277,59 @@ void Scene::OnDestroy()
 {
     OnDestroyEvent.Broadcast();
 
+}
+
+uint32 Scene::UpdateLight(LightProperties& lightProperties) const
+{
+	memset(lightProperties.m_lights, 0, sizeof(Light) * MAX_LIGHTS);
+
+	uint32 count{};
+	for (int i = 0; i < m_lights.size(); ++i)
+	{
+		if (LightStatus::Disabled != m_lights[i].m_lightStatus)
+		{
+			lightProperties.m_lights[count++] = m_lights[i];
+		}
+	}
+
+	return count;
+}
+
+std::pair<size_t, Light&> Scene::AddLight()
+{
+	Light& light = m_lights.emplace_back();
+	light.m_lightStatus = LightStatus::Enabled;
+	size_t index = m_lights.size() - 1;
+
+	return std::pair<size_t, Light&>(index, light);
+}
+
+Light& Scene::GetLight(size_t index)
+{
+	if (index < m_lights.size())
+	{
+		return m_lights[index];
+	}
+	return m_lights[0];
+}
+
+void Scene::RemoveLight(size_t index)
+{
+	if (index < m_lights.size())
+	{
+		m_lights[index].m_lightType = LightType::InVaild;
+		m_lights[index].m_lightStatus = LightStatus::Disabled;
+		m_lights[index].m_intencity = 0.f;
+		m_lights[index].m_color = { 0,0,0,0 };
+	}
+}
+
+void Scene::DistroyLight()
+{
+    std::erase_if(m_lights, [](const Light& light) 
+	{
+		return light.m_lightType == LightType::InVaild;
+	});
 }
 
 void Scene::DestroyGameObjects()
@@ -296,9 +381,14 @@ void Scene::DestroyGameObjects()
         uint32_t oldIndex = obj->m_index;
 
         if (indexMap.contains(obj->m_parentIndex))
+        {
             obj->m_parentIndex = indexMap[obj->m_parentIndex];
+			obj->m_rootIndex = indexMap[obj->m_rootIndex];
+        }
         else
+        {
             obj->m_parentIndex = GameObject::INVALID_INDEX;
+        }
 
         for (auto& childIndex : obj->m_childrenIndices)
         {
@@ -312,5 +402,23 @@ void Scene::DestroyGameObjects()
 
         obj->m_index = indexMap[oldIndex];
     }
+}
+
+std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
+{
+	std::string uniqueName{ name.data() };
+	std::string baseName{ name.data() };
+	int count = 1;
+	while (m_gameObjectNameSet.find(uniqueName) != m_gameObjectNameSet.end())
+	{
+		uniqueName = baseName + std::string(" (") + std::to_string(count++) + std::string(")");
+	}
+	m_gameObjectNameSet.insert(uniqueName);
+	return uniqueName;
+}
+
+void Scene::RemoveGameObjectName(const std::string_view& name)
+{
+	m_gameObjectNameSet.erase(name.data());
 }
 

@@ -8,7 +8,8 @@ enum LightType
 {
     DirectionalLight,
     PointLight,
-    SpotLight
+    SpotLight,
+	InVaild
 };
 
 AUTO_REGISTER_ENUM(LightType)
@@ -17,8 +18,7 @@ enum LightStatus
 {
     Disabled,
     Enabled,
-    StaticShadows,
-    LightsStatusMax
+    StaticShadows
 };
 
 AUTO_REGISTER_ENUM(LightStatus)
@@ -36,6 +36,7 @@ cbuffer Light
 
     int m_lightType{};
     int m_lightStatus{};
+    float m_range{ 10.f };
     float m_intencity{ 5.f };
 
     Mathf::Matrix GetLightViewMatrix() const
@@ -64,6 +65,11 @@ cbuffer LightProperties
     Mathf::Vector4 m_eyePosition{};
     Mathf::Color4 m_globalAmbient{};
     Light m_lights[MAX_LIGHTS];
+};
+
+cbuffer LightCount
+{
+    uint32 m_lightCount{};
 };
 
 cbuffer ShadowMapConstant

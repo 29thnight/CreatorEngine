@@ -155,7 +155,7 @@ void ShadowMapPass::ControlPanel()
 {
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(512, 512));
+	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
 	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
@@ -246,7 +246,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;
-		if (LightDir == Mathf::Vector4{ 0.f, 0.f, 0.f, 1.f })
+		if (Mathf::Vector3(LightDir) == Mathf::Vector3::Zero)
 		{
 			LightDir = { 0.f, 0.f, -1.f, 0.f };
 		}

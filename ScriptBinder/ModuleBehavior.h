@@ -21,12 +21,24 @@ public:
 public:
 	virtual void Start() {};
 	virtual void FixedUpdate(float fixedTick) {};
-	virtual void OnTriggerEnter(ICollider* other) {};
-	virtual void OnTriggerStay(ICollider* other) {};
-	virtual void OnTriggerExit(ICollider* other) {};
-	virtual void OnCollisionEnter(ICollider* other) {};
-	virtual void OnCollisionStay(ICollider* other) {};
-	virtual void OnCollisionExit(ICollider* other) {};
+	virtual void OnTriggerEnter(const Collision& collider) {};
+	virtual void OnTriggerStay(const Collision& collider) {};
+	virtual void OnTriggerExit(const Collision& collider) {};
+	virtual void OnCollisionEnter(const Collision& collider) {};
+	virtual void OnCollisionStay(const Collision& collider) {};
+	virtual void OnCollisionExit(const Collision& collider) {};
 	virtual void Update(float tick) {};
 	virtual void LateUpdate(float tick) {};
+
+public:
+	Core::DelegateHandle m_startEventHandle{};
+	Core::DelegateHandle m_fixedUpdateEventHandle{};
+	Core::DelegateHandle m_onTriggerEnterEventHandle{};
+	Core::DelegateHandle m_onTriggerStayEventHandle{};
+	Core::DelegateHandle m_onTriggerExitEventHandle{};
+	Core::DelegateHandle m_onCollisionEnterEventHandle{};
+	Core::DelegateHandle m_onCollisionStayEventHandle{};
+	Core::DelegateHandle m_onCollisionExitEventHandle{};
+	Core::DelegateHandle m_updateEventHandle{};
+	Core::DelegateHandle m_lateUpdateEventHandle{};
 };

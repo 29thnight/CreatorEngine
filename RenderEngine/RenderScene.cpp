@@ -23,8 +23,9 @@ RenderScene::~RenderScene()
 
 void RenderScene::Initialize()
 {
-	m_MainCamera.RegisterContainer();
 	m_LightController = new LightController();
+
+	SceneManagers->resetSelectedObjectEvent.AddRaw(this, &RenderScene::ResetSelectedSceneObject);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -37,7 +38,7 @@ void RenderScene::Update(float deltaSecond)
 	m_currentScene = SceneManagers->GetActiveScene();
 	if (m_currentScene == nullptr) return;
 
-	m_currentScene->UpdateLight(m_LightController->m_lightProperties);
+    m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
 
 	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
 	{
@@ -72,6 +73,11 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
 }
 
+void RenderScene::ResetSelectedSceneObject()
+{
+	m_selectedSceneObject = nullptr;
+}
+
 void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
 	if(!m_currentScene) return;
@@ -83,7 +89,7 @@ void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatri
 		return;
 	}
 
-	if(GameObject::Type::Bone == obj->GetType())
+	if(GameObjectType::Bone == obj->GetType())
 	{
 		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
 		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());

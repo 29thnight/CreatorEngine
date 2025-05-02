@@ -4,15 +4,14 @@
 #include "DumpHandler.h"
 #include "CoreWindow.h"
 #include "DataSystem.h"
+#include "DebugStreamBuf.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
 
-#ifdef UNICODE
-#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console")
-#else
-#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
-#endif
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
@@ -25,6 +24,9 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return 0;
 	});
 
+    static DebugStreamBuf debugBuf(std::cout.rdbuf());
+    std::cout.rdbuf(&debugBuf);
+
 	Core::App app;
 	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
 	app.Finalize();
@@ -36,11 +38,25 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+    std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
+    g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
+    g_progressWindow->SetStatusText(L"Initializing Core...");
+
 	CoreWindow coreWindow(hInstance, title, width, height);
 	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);
+    m_hWnd = coreWindow.GetHandle();
+
+    g_progressWindow->SetProgress(10);
+
+    g_progressWindow->SetStatusText(L"Initializing Dx11 Device...");
 	m_deviceResources = std::make_shared<DirectX11::DeviceResources>();
+    g_progressWindow->SetProgress(20);
+
+    g_progressWindow->SetStatusText(L"Initializing Windows API...");
 	SetWindow(coreWindow);
-	InputManagement->Initialize(coreWindow.GetHandle());
+    g_progressWindow->SetProgress(30);
+    RegisterHandler(coreWindow);
+    g_progressWindow->SetProgress(40);
 	Load();
 	Run();
 }
@@ -54,10 +70,14 @@ void Core::App::Finalize()
 void Core::App::SetWindow(CoreWindow& coreWindow)
 {
 	m_deviceResources->SetWindow(coreWindow);
-	coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
-	coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
-	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
-	coreWindow.RegisterHandler(WM_DROPFILES, this, &App::HandleDropFileEvent);
+}
+
+void Core::App::RegisterHandler(CoreWindow& coreWindow)
+{
+    coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
+    coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
+    coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
+    coreWindow.RegisterHandler(WM_DROPFILES, this, &App::HandleDropFileEvent);
 }
 
 void Core::App::Load()
@@ -72,7 +92,7 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
-		// 초기화 작업
+        InputManagement->Initialize(m_hWnd);
 	})
 	.Then([&]
 	{
@@ -170,6 +190,19 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			{
 				DataSystems->LoadTexture(filePath.string());
 			}
+            else if (".dmp")
+            {
+               file::path dumpGitHash = GetDumpGitHashADS(filePath);
+               if (!dumpGitHash.empty())
+               {
+                   Debug->LogDebug("Git Hash in dump: " + dumpGitHash.string());
+                   DataSystems->OpenFile(filePath);
+               }
+               else
+               {
+                   Debug->LogWarning("No Git hash found in ADS stream.");
+               }
+            }
 		}
 	}
 

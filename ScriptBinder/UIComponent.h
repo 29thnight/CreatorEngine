@@ -46,7 +46,7 @@ public:
 	GameObject* GetNextNavi(Direction dir);
 
     [[Property]]
-	int _layerorder =0;
+	int _layerorder{};
 	Mathf::Vector3 pos{ 960,540,0 };
 	Mathf::Vector2 scale{ 1,1};
 	UItype type = UItype::None;

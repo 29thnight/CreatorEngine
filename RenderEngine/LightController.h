@@ -10,7 +10,6 @@ class GBufferPass;
 class SceneRenderer;
 class RenderScene;
 class RenderPassWindow;
-//class lm::LightMap;
 class LightController
 {
 public:
@@ -42,12 +41,13 @@ private:
 	friend class SceneRenderer;
 	friend class RenderPassWindow;
 	friend class RenderScene;
-	//friend class lm::LightMap;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
+    ID3D11Buffer* m_pLightCountBuffer{ nullptr };
 	ShadowMapRenderDesc m_shadowMapRenderDesc;
 	ShadowMapConstant m_shadowMapConstant;
 	LightProperties m_lightProperties;
+    LightCount m_lightCountStruct;
 	bool hasLightWithShadows{ false };
 	ID3D11Buffer* m_shadowMapBuffer{ nullptr };
 	std::unique_ptr<ShadowMapPass> m_shadowMapPass;

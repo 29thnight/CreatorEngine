@@ -27,6 +27,7 @@ struct Light
 
     int lightType;
     int status;
+    float range;
 };
 
 cbuffer LightProperties : register(b1)
@@ -34,6 +35,11 @@ cbuffer LightProperties : register(b1)
     float4 eyePosition;
     float4 globalAmbient;
     Light Lights[MAX_LIGHTS];
+}
+
+cbuffer LightCount : register(b11)
+{
+    uint lightCount;
 }
 
 cbuffer ShadowMapConstants : register(b2) // supports one
@@ -56,17 +62,11 @@ cbuffer CameraView : register(b10)
     matrix cameraview;
 }
 
-
-
-
-
-
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
 {
     
     int shadowIndex = 0;
     
-  
     float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
     float m_casCadeEnd[3] = { m_casCadeEnd1, m_casCadeEnd2, m_casCadeEnd3 };
     shadowIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :

@@ -44,6 +44,7 @@ namespace Core
 		void Remove(const DelegateHandle& handle);
 		void Clear();
 		void Broadcast(Args... args);
+		void TargetInvoke(DelegateHandle& DelegateHandle, Args... args);
 		template <typename R = Ret>
 		std::vector<std::future<R>> AsyncBroadcast(Args... args);
 
@@ -60,7 +61,6 @@ namespace Core
 		std::atomic_flag atomic_flag_ = ATOMIC_FLAG_INIT;
 		std::vector<CallbackInfo> callbacks_;
 		std::size_t nextID_;
-		//std::mutex mutex_;
 	};
 }
 

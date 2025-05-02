@@ -15,6 +15,7 @@
 #include "MenuBarWindow.h"
 #include "HierarchyWindow.h"
 #include "InspectorWindow.h"
+#include "ProgressWindow.h"
 
 #include <memory>
 #include <future>
@@ -69,5 +70,6 @@ namespace DirectX11
 
 		bool m_isSelectUI = false;
 		bool m_isSelectText = false;
+
 	};
 }

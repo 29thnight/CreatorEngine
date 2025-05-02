@@ -146,7 +146,7 @@ namespace Meta
 		//}
 		else
 		{
-			node[prop.name] = "[not suport type]"; // ±‚≈∏ πÃ¡ˆø¯ ≈∏¿‘
+			node[prop.name] = "[not suport type]"; // Í∏∞ÌÉÄ ÎØ∏ÏßÄÏõê ÌÉÄÏûÖ
 		}
 	}
 
@@ -154,35 +154,35 @@ namespace Meta
 	{
 		if (node[prop.name])
 		{
-			if (prop.typeID == GUIDCreator::GetTypeID<int>())
+			if (prop.typeID == type_guid(int))
 			{
 				prop.setter(instance, node[prop.name].as<int>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<float>())
+			else if (prop.typeID == type_guid(float))
 			{
 				prop.setter(instance, node[prop.name].as<float>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<bool>())
+			else if (prop.typeID == type_guid(bool))
 			{
 				prop.setter(instance, node[prop.name].as<bool>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<std::string>())
+			else if (prop.typeID == type_guid(std::string))
 			{
 				prop.setter(instance, node[prop.name].as<std::string>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<HashingString>())
+			else if (prop.typeID == type_guid(HashingString))
 			{
 				prop.setter(instance, HashingString(node[prop.name].as<std::string>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<HashedGuid>())
+			else if (prop.typeID == type_guid(HashedGuid))
 			{
 				prop.setter(instance, HashedGuid(node[prop.name].as<uint32_t>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector2>())
+			else if (prop.typeID == type_guid(Mathf::Vector2))
 			{
 				prop.setter(instance, Mathf::Vector2(node[prop.name]["x"].as<float>(), node[prop.name]["y"].as<float>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector3>())
+			else if (prop.typeID == type_guid(Mathf::Vector3))
 			{
 				prop.setter(instance, Mathf::Vector3(
 						node[prop.name]["x"].as<float>(), 
@@ -191,7 +191,7 @@ namespace Meta
 					)
 				);
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector4>())
+			else if (prop.typeID == type_guid(Mathf::Vector4))
 			{
 				prop.setter(instance, Mathf::Vector4(
 					node[prop.name]["x"].as<float>(),
@@ -201,7 +201,17 @@ namespace Meta
 				)
 				);
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Quaternion>())
+            else if (prop.typeID == type_guid(Mathf::Color4))
+            {
+                prop.setter(instance, Mathf::Color4(
+                    node[prop.name]["r"].as<float>(), 
+                    node[prop.name]["g"].as<float>(), 
+                    node[prop.name]["b"].as<float>(), 
+                    node[prop.name]["a"].as<float>()
+                )
+                );
+            }
+			else if (prop.typeID == type_guid(Mathf::Quaternion))
 			{
 				prop.setter(instance, Mathf::Quaternion(
 						node[prop.name]["x"].as<float>(), 
@@ -211,21 +221,13 @@ namespace Meta
 					)
 				);
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<std::vector<int>>())
-			{
-				if(!node[prop.name].IsNull())
-				{
-					auto vec = node[prop.name].as<std::vector<int>>();
-					prop.setter(instance, &vec);
-				}
-			}
 			else if (prop.typeID == GUIDCreator::GetTypeID<FileGuid>())
 			{
 				prop.setter(instance, FileGuid(node[prop.name].as<std::string>()));
 			}
 			else
 			{
-				// ±‚≈∏ πÃ¡ˆø¯ ≈∏¿‘
+				// Í∏∞ÌÉÄ ÎØ∏ÏßÄÏõê ÌÉÄÏûÖ
 				Debug->LogError("YamlNodeToProperty: Unsupported type");
 			}
 		}
@@ -245,7 +247,7 @@ namespace Meta
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
 		}
 
-		// ∫Œ∏ ∏’¿˙ ¡˜∑ƒ»≠
+		// Î∂ÄÎ™® Î®ºÏ†Ä ÏßÅÎ†¨Ìôî
 		if (type.parent)
 		{
 			MetaYml::Node parentNode = Serialize(instance, *type.parent);
@@ -255,12 +257,12 @@ namespace Meta
 			}
 		}
 
-		// «¡∑Œ∆€∆º º¯»∏
+		// ÌîÑÎ°úÌçºÌã∞ ÏàúÌöå
 		for (const auto& prop : type.properties)
 		{
 			std::any value = prop.getter(instance);
 
-			// ∫§≈Õ √≥∏Æ
+			// Î≤°ÌÑ∞ Ï≤òÎ¶¨
 			if (prop.isVector)
 			{
 				auto iter = prop.createVectorIterator(instance);
@@ -291,29 +293,29 @@ namespace Meta
 					}
 					else
 					{
-						HashingString ty_name = prop.elementTypeName.c_str();
+						HashedGuid ty_name = prop.elementTypeID;
 
-						if (ty_name == HashingString("int"))
+						if (ty_name == type_guid(int))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<int*>(element));
 						}
-						else if (ty_name == HashingString("float"))
+						else if (ty_name == type_guid(float))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<float*>(element));
 						}
-						else if (ty_name == HashingString("bool"))
+						else if (ty_name == type_guid(bool))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<bool*>(element));
 						}
-						else if (ty_name == HashingString("std::string"))
+						else if (ty_name == type_guid(std::string))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<std::string*>(element));
 						}
-						else if (ty_name == HashingString("HashingString"))
+						else if (ty_name == GUIDCreator::GetTypeID<HashingString>())
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(static_cast<HashingString*>(element)->ToString());
@@ -331,7 +333,7 @@ namespace Meta
 				continue;
 			}
 
-			// ∆˜¿Œ≈Õ √≥∏Æ
+			// Ìè¨Ïù∏ÌÑ∞ Ï≤òÎ¶¨
 			if (prop.isPointer)
 			{
 				void* ptr = TypeCast->ToVoidPtr(prop.typeInfo, value);
@@ -353,14 +355,14 @@ namespace Meta
 				continue;
 			}
 
-			// enum √≥∏Æ
+			// enum Ï≤òÎ¶¨
 			if (MetaEnumRegistry->Find(prop.typeName))
 			{
 				node[prop.name] = std::any_cast<int>(value);
 				continue;
 			}
 
-			// struct √≥∏Æ
+			// struct Ï≤òÎ¶¨
 			if (const Type* subType = MetaDataRegistry->Find(prop.typeName))
 			{
 				void* subInstance = reinterpret_cast<void*>(reinterpret_cast<char*>(instance) + prop.offset);
@@ -368,7 +370,7 @@ namespace Meta
 				continue;
 			}
 
-			// ±‚∫ª ≈∏¿‘ √≥∏Æ
+			// Í∏∞Î≥∏ ÌÉÄÏûÖ Ï≤òÎ¶¨
 			PropertyToYamlNode(prop, node, value);
 		}
 
@@ -386,7 +388,7 @@ namespace Meta
 		if (!node || !node.IsMap())
 			return nullptr;
 
-		// 1. key∞° typeName¿Ã∞Ì, value∞° typeID¿œ ∞°¥…º∫ °Ê øÏº±º¯¿ß ≥Ù∞‘
+		// 1. keyÍ∞Ä typeNameÏù¥Í≥†, valueÍ∞Ä typeIDÏùº Í∞ÄÎä•ÏÑ± ‚Üí Ïö∞ÏÑ†ÏàúÏúÑ ÎÜíÍ≤å
 		for (const auto& kv : node)
 		{
 			if (kv.first.IsScalar() && kv.second.IsScalar())
@@ -397,12 +399,12 @@ namespace Meta
 				const Meta::Type* type = MetaDataRegistry->Find(typeName);
 				if (type && type->typeID == typeID)
 				{
-					return type;  // ¿Ã∏ßµµ ∏¬∞Ì IDµµ ∏¬¿∏∏È »Æ¡§
+					return type;  // Ïù¥Î¶ÑÎèÑ ÎßûÍ≥† IDÎèÑ ÎßûÏúºÎ©¥ ÌôïÏ†ï
 				}
 			}
 		}
 
-		// 2. fallback: key∞° typeName¿Ã∞Ì value∞° map¿Œ ∞ÊøÏ (Unreal Ω∫≈∏¿œ)
+		// 2. fallback: keyÍ∞Ä typeNameÏù¥Í≥† valueÍ∞Ä mapÏù∏ Í≤ΩÏö∞ (Unreal Ïä§ÌÉÄÏùº)
 		for (const auto& kv : node)
 		{
 			if (kv.first.IsScalar() && kv.second.IsMap())
@@ -412,7 +414,7 @@ namespace Meta
 			}
 		}
 
-		// 3. fallback: typeID « µÂ∞° ¿÷¥¬ ∞ÊøÏ
+		// 3. fallback: typeID ÌïÑÎìúÍ∞Ä ÏûàÎäî Í≤ΩÏö∞
 		if (node["typeID"])
 		{
 			std::size_t id = node["typeID"].as<std::size_t>();
@@ -424,19 +426,112 @@ namespace Meta
 
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
 	{
-		// ∫Œ∏ ∏’¿˙ ø™¡˜∑ƒ»≠
+		// Î∂ÄÎ™® Î®ºÏ†Ä Ïó≠ÏßÅÎ†¨Ìôî
 		if (type.parent)
 		{
 			Deserialize(instance, *type.parent, node);
 		}
-		// «¡∑Œ∆€∆º º¯»∏
+		// ÌîÑÎ°úÌçºÌã∞ ÏàúÌöå
 		for (const auto& prop : type.properties)
 		{
 			if (node[prop.name])
 			{
 				if (prop.isPointer)
 				{
+					const MetaYml::Node& subNode = node[prop.name];
+					if (!subNode || !subNode.IsMap()) continue;
+
+					// 1. ÌÉÄÏûÖ Ï†ïÎ≥¥ Ï∂îÏ∂ú
+					const Type* subType = MetaDataRegistry->Find(prop.typeName);
+					if (!subType)
+					{
+						Debug->LogError("Deserialize Pointer: Type not found");
+						continue;
+					}
+
+					// 2. Ïù∏Ïä§ÌÑ¥Ïä§ ÏÉùÏÑ±
+					void* newPtr = MetaFactoryRegistry->Create(prop.typeName);
+					if (!newPtr)
+					{
+						Debug->LogError("Deserialize Pointer: Factory create failed");
+						continue;
+					}
+
+					// 3. Ïó≠ÏßÅÎ†¨Ìôî
+					Deserialize(newPtr, *subType, subNode);
+
+					std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, newPtr);
+					if (boxed.has_value())
+						prop.setter(instance, boxed);
 					continue;
+				}
+
+				if (prop.isVector && !prop.isElementPointer)
+				{
+					const YAML::Node& arrayNode = node[prop.name];
+					if (!arrayNode || !arrayNode.IsSequence())
+						continue;
+
+					if (prop.elementTypeID == type_guid(int))
+					{
+						auto vec = node[prop.name].as<std::vector<int>>();
+						auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(float))
+					{
+						auto vec = node[prop.name].as<std::vector<float>>();
+						auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(bool))
+					{
+						auto vec = node[prop.name].as<std::vector<bool>>();
+						auto castInstance = reinterpret_cast<std::vector<bool>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(std::string))
+					{
+						auto vec = node[prop.name].as<std::vector<std::string>>();
+						auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(HashingString))
+					{
+						auto vec = node[prop.name].as<std::vector<std::string>>();
+						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->emplace_back(elem);
+						}
+					}
+					else
+					{
+						void* rawVecPtr = VectorFactory->Create(prop.typeID);
+						if (!rawVecPtr) continue;
+
+						std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, rawVecPtr);
+						if (boxed.has_value())
+							prop.setter(instance, boxed);
+
+						const Type* elementType = MetaDataRegistry->Find(prop.elementTypeID);
+						if (!elementType) continue;
+
+						VectorInvoker->Invoke(prop.typeID, rawVecPtr, arrayNode, elementType);
+						continue;
+					}
 				}
 
 				if (const Type* subType = MetaDataRegistry->Find(prop.typeName))

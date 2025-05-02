@@ -17,12 +17,12 @@ public:
 	GameObject* GetOwner() const { return m_pOwner; }
 
 	void SetDestroy() { m_destroyMark = true; }
-	bool IsDestroyMark() const { return m_destroyMark; }
+	//bool IsDestroyMark() const { return m_destroyMark; }
 
 protected:
 	GameObject*		m_pOwner{};
 	Transform		m_transform{};
     [[Property]]
 	HashedGuid		m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-	bool			m_destroyMark{ false };
+	//bool			m_destroyMark{ false };
 };

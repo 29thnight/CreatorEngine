@@ -657,8 +657,10 @@ bool TransformDifferent(const physx::PxTransform& first, physx::PxTransform& sec
 }
 
 
-void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyData)
+RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 {
+	RigidBodyGetSetData rigidBodyData;
+
 	auto body = m_rigidBodyContainer.find(id)->second;
 	
 	//dynamicBody 의 경우
@@ -690,9 +692,11 @@ void PhysicX::GetRigidBodyData(unsigned int id,RigidBodyGetSetData& rigidBodyDat
 		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
 		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
 	}
+
+	return rigidBodyData;
 }
 
-void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData, int* collisionMatrix)
+void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData)
 {
 	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
@@ -738,11 +742,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 
 		CopyMatrixDxToPx(dxMatrix, pxTransform);
 		pxBody->setGlobalPose(pxTransform);
-		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, collisionMatrix);
+		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
 
 		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)
 		{
-			dynamicBody->SetConvertScale(scale, m_physics, collisionMatrix);
+			dynamicBody->SetConvertScale(scale, m_physics, m_collisionMatrix);
 		}
 		else {
 			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));

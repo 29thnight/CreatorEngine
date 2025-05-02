@@ -27,12 +27,15 @@
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
+    <ClInclude Include="Core.OctreeManager.h" />
+    <ClInclude Include="Core.OctreeNode.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.hpp" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
+    <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
@@ -56,6 +59,9 @@
     <ClInclude Include="ReflectionMecro.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
+    <ClInclude Include="ReflectionVectorFactory.h" />
+    <ClInclude Include="ReflectionVectorInvoker.h" />
+    <ClInclude Include="ReflectionVectorMapper.h" />
     <ClInclude Include="ReflectionYml.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="Serializer.h" />

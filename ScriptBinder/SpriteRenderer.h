@@ -27,20 +27,7 @@ public:
         m_IsEnabled = able;
     }
 
-	bool IsGizmoEnabled() const
-	{
-		return m_IsGizmoEnabled;
-	}
-
-    SpriteRenderer& SetGizmoEnabled(bool able)
-    {
-		m_IsGizmoEnabled = able;
-
-		return *this;
-    }
-
 private:
     [[Property]]
     bool m_IsEnabled = false;
-	bool m_IsGizmoEnabled = false;
 };

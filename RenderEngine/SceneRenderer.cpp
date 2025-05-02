@@ -16,6 +16,7 @@
 #include "TimeSystem.h"
 #include "InputManager.h"
 #include "LightComponent.h"
+#include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -114,12 +115,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBlitPass = std::make_unique<BlitPass>();
 	m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
 
-	//WireFramePass
-	//m_pWireFramePass = std::make_unique<WireFramePass>();
-
-	//GridPass
-    //m_pGridPass = std::make_unique<GridPass>();
-
 	//PositionMapPass
 	m_pPositionMapPass = std::make_unique<PositionMapPass>();
 
@@ -178,50 +173,6 @@ void SceneRenderer::InitializeDeviceState()
 
 void SceneRenderer::InitializeImGui()
 {
-    static int lightIndex = 0;
-
-    ImGui::ContextRegister("Light", true, [&]()
-    {
-        ImGui::Text("Light Index : %d", lightIndex);
-        if (ImGui::Button("Add Light"))
-        {
-            Light light;
-            light.m_color = XMFLOAT4(1, 1, 1, 1);
-            light.m_position = XMFLOAT4(0, 0, 0, 0);
-            light.m_lightType = LightType::PointLight;
-
-            m_renderScene->m_LightController->AddLight(light);
-        }
-        if (ImGui::Button("Light index + "))
-        {
-            lightIndex++;
-            if (lightIndex >= MAX_LIGHTS) lightIndex = MAX_LIGHTS - 1;
-        }
-        if (ImGui::Button("Light index - "))
-        {
-            lightIndex--;
-            if (lightIndex < 0) lightIndex = 0;
-        }
-        if (ImGui::Button("Light On"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Enabled;
-        }
-        if (ImGui::Button("StaticShadow On"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::StaticShadows;
-        }
-        if (ImGui::Button("Light Off"))
-        {
-			m_renderScene->m_LightController->GetLight(lightIndex).m_lightStatus = LightStatus::Disabled;
-        }
-
-        ImGui::DragFloat3("Light Pos", &m_renderScene->m_LightController->GetLight(lightIndex).m_position.x, 0.1f, -10, 10);
-        ImGui::DragFloat3("Light Dir", &m_renderScene->m_LightController->GetLight(lightIndex).m_direction.x, 0.1f, -1, 1);
-        ImGui::DragFloat("Light colorX", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.x, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorY", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.y, 0.1f, 0, 1);
-        ImGui::DragFloat("Light colorZ", &m_renderScene->m_LightController->GetLight(lightIndex).m_color.z, 0.1f, 0, 1);
-    });
-
 	ImGui::ContextRegister("LightMap", true, [&]() {
 
 		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
@@ -269,8 +220,6 @@ void SceneRenderer::InitializeImGui()
 				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
 					ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
 				}
-				//ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
-				//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
 			}
 			else {
 				ImGui::Text("No LightMap");
@@ -322,55 +271,18 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
-
-	//auto gridTexture = TextureHelper::CreateRenderTexture(
-	//	DeviceState::g_ClientRect.width,
-	//	DeviceState::g_ClientRect.height,
-	//	"GridRTV",
-	//	DXGI_FORMAT_R16G16B16A16_FLOAT
-	//);
- //   m_gridTexture.swap(gridTexture);
 }
 
 void SceneRenderer::NewCreateSceneInitialize()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	m_renderScene->SetScene(scene);
-	//이제 곧 변경된다 라이트
-	//auto lightColour = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	auto lightObj1 = scene->CreateGameObject("DirectionalLight", GameObject::Type::Light);
+	auto cameraObj = scene->CreateGameObject("Main Camera", GameObjectType::Camera);
+	auto cameraComponent = cameraObj->AddComponent<CameraComponent>();
+
+	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObjectType::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
-	auto lightGizmo = lightObj1->AddComponent<SpriteRenderer>();
-	lightGizmo->m_Sprite = DataSystems->MainLightIcon;
-	lightGizmo->SetGizmoEnabled(true).SetEnabled(true);
-	lightComponent1->Awake();
-	//Light pointLight;
-	//pointLight.m_color = XMFLOAT4(1, 1, 0, 0);
-	//pointLight.m_position = XMFLOAT4(4, 3, 0, 0);
-	//pointLight.m_direction = XMFLOAT4(1, -1, 0, 0);
-	//pointLight.m_lightType = LightType::DirectionalLight;
-
-	//Light dirLight;
-	//dirLight.m_color = lightColour;
-	//dirLight.m_direction = XMFLOAT4(-1, -1, 1, 0);
-	//dirLight.m_lightType = LightType::DirectionalLight;
-
-	//Light spotLight;
-	//spotLight.m_color = XMFLOAT4(Colors::Magenta);
-	//spotLight.m_direction = XMFLOAT4(0, -1, 0, 0);
-	//spotLight.m_position = XMFLOAT4(3, 2, 0, 0);
-	//spotLight.m_lightType = LightType::SpotLight;
-	//spotLight.m_spotLightAngle = 3.142 / 4.0;
-
-	//m_renderScene->m_LightController
-	//	->AddLight(dirLight)
-	//	.AddLight(pointLight)
-	//	.AddLight(spotLight)
-	//	.SetGlobalAmbient(XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f));
-
-	scene->UpdateLight(m_renderScene->m_LightController->m_lightProperties);
-
 
 	ShadowMapRenderDesc desc;
 	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
@@ -458,7 +370,6 @@ void SceneRenderer::SceneRendering()
 
 		if (!useTestLightmap)
         {
-			
 			//[3] SSAOPass
 			{
 				DirectX11::BeginEvent(L"SSAOPass");
@@ -549,15 +460,12 @@ void SceneRenderer::SceneRendering()
 
 		//[7] SpritePass(InGameSprite)
 		{
-			if (camera != m_pEditorCamera.get())
-			{
-				DirectX11::BeginEvent(L"SpritePass");
-				Benchmark banch;
-				m_pSpritePass->SetGizmoRendering(false);
-				m_pSpritePass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
-				DirectX11::EndEvent();
-			}
+			DirectX11::BeginEvent(L"SpritePass");
+			Benchmark banch;
+			m_pSpritePass->SetGizmoRendering(false);
+			m_pSpritePass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[]  UIPass
@@ -578,13 +486,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//{
-		//	DirectX11::BeginEvent(L"GridPass");
-		//	Benchmark banch;
-		//	m_pGridPass->Execute(*m_renderScene, *camera);
-		//	RenderStatistics->UpdateRenderState("GridPass", banch.GetElapsedTime());
-		//	DirectX11::EndEvent();
-		//}
 		DirectX11::EndEvent();
 	}
 
@@ -652,99 +553,4 @@ void SceneRenderer::ReloadShaders()
 	ShaderSystem->ReloadShaders();
 }
 
-void SceneRenderer::EditorView()
-{
-	if (m_bShowLogWindow)
-	{
-		ShowLogWindow();
-	}
 
-	if (m_bShowGridSettings)
-	{
-		ShowGridSettings();
-	}
-}
-
-void SceneRenderer::ShowLogWindow()
-{
-	static int levelFilter = spdlog::level::trace;
-	bool isClear = Debug->IsClear();
-	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
-	if (ImGui::Button("Clear"))
-	{
-		Debug->Clear();
-	}
-	ImGui::SameLine();
-	ImGui::Combo("Log Filter", &levelFilter,
-		"Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
-
-	float sizeX = ImGui::GetContentRegionAvail().x;
-	float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
-
-	if (isClear)
-	{
-		Debug->toggleClear();
-		ImGui::End();
-		return;
-	}
-
-	auto entries = Debug->get_entries();
-	for (size_t i = 0; i < entries.size(); i++)
-	{
-		const auto& entry = entries[i];
-		bool is_selected = (i == selected_log_index);
-
-		if (entry.level != spdlog::level::trace && entry.level < levelFilter)
-			continue;
-
-		ImVec4 color;
-		switch (entry.level)
-		{
-		case spdlog::level::info: color = ImVec4(1, 1, 1, 1); break;
-		case spdlog::level::warn: color = ImVec4(1, 1, 0, 1); break;
-		case spdlog::level::err:  color = ImVec4(1, 0.4f, 0.4f, 1); break;
-		default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
-		}
-
-		if (is_selected)
-			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
-
-		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
-
-		int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
-
-        ImGui::PushID(i);
-		if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
-			is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
-		{
-			selected_log_index = i;
-			std::regex pattern(R"(([A-Za-z]:\\.*))");
-			std::istringstream iss(entry.message);
-			std::string line;
-
-			while (std::getline(iss, line)) 
-			{
-				std::smatch match;
-				if (std::regex_search(line, match, pattern)) 
-				{
-					std::string fileDirectory = match[1].str();
-					DataSystems->OpenFile(fileDirectory);
-				}
-			}
-		}
-		ImGui::PopStyleColor();
-
-		if (is_selected)
-			ImGui::PopStyleColor();
-        ImGui::PopID();
-	}
-
-	ImGui::End();
-}
-
-void SceneRenderer::ShowGridSettings()
-{
-	ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
-	m_pGridPass->GridSetting();
-	ImGui::End();
-}

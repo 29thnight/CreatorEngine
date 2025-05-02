@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include "LightProperty.h"
+#include "PhysicsManager.h"
 #include "Scene.generated.h"
 
 class GameObject;
@@ -19,8 +20,8 @@ public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
-	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObject::Type type = GameObject::Type::Empty, GameObject::Index parentIndex = 0);
+	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = 0);
+	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = 0);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
@@ -45,12 +46,12 @@ public:
 
     //Physics
     Core::Delegate<void, float>      FixedUpdateEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerEnterEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerStayEvent{};
-    Core::Delegate<void, ICollider*> OnTriggerExitEvent{};
-    Core::Delegate<void, ICollider*> OnCollisionEnterEvent{};
-	Core::Delegate<void, ICollider*> OnCollisionStayEvent{};
-	Core::Delegate<void, ICollider*> OnCollisionExitEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerEnterEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerStayEvent{};
+    Core::Delegate<void, const Collision&> OnTriggerExitEvent{};
+    Core::Delegate<void, const Collision&> OnCollisionEnterEvent{};
+	Core::Delegate<void, const Collision&> OnCollisionStayEvent{};
+	Core::Delegate<void, const Collision&> OnCollisionExitEvent{};
 
     //Game logic
     Core::Delegate<void, float> UpdateEvent{};
@@ -69,12 +70,12 @@ public:
 
     //Physics
     void FixedUpdate(float deltaSecond);
-    void OnTriggerEnter(ICollider* collider);
-    void OnTriggerStay(ICollider* collider);
-    void OnTriggerExit(ICollider* collider);
-    void OnCollisionEnter(ICollider* collider);
-    void OnCollisionStay(ICollider* collider);
-    void OnCollisionExit(ICollider* collider);
+    void OnTriggerEnter(const Collision& collider);
+    void OnTriggerStay(const Collision& collider);
+    void OnTriggerExit(const Collision& collider);
+    void OnCollisionEnter(const Collision& collider);
+    void OnCollisionStay(const Collision& collider);
+    void OnCollisionExit(const Collision& collider);
 
     //Game logic
     void Update(float deltaSecond);
@@ -108,52 +109,20 @@ public:
     size_t m_buildIndex{ 0 };
 
 public:
-    void UpdateLight(LightProperties& lightProperties) const
-    {
-        lightProperties.m_eyePosition = m_lightProperties.m_eyePosition;
-        lightProperties.m_globalAmbient = m_lightProperties.m_globalAmbient;
-        Memory::MemoryCopy(lightProperties.m_lights, m_lightProperties.m_lights, MAX_LIGHTS);
-    }
-
-    int AddLightCount()
-    {
-        if (m_lightCount >= MAX_LIGHTS)
-        {
-            m_lightCount = MAX_LIGHTS;
-        }
-
-        return m_lightCount++;
-    }
-
-    LightProperties& GetLightProperties()
-    {
-        return m_lightProperties;
-    }
+    uint32 UpdateLight(LightProperties& lightProperties) const;
+    std::pair<size_t, Light&> AddLight();
+	Light& GetLight(size_t index);
+    void RemoveLight(size_t index);
+	void DistroyLight();
 
 private:
     void DestroyGameObjects();
-    std::string GenerateUniqueGameObjectName(const std::string_view& name)
-    {
-        std::string uniqueName{ name.data() };
-        std::string baseName{ name.data() };
-        int count = 1;
-        while (m_gameObjectNameSet.find(uniqueName) != m_gameObjectNameSet.end())
-        {
-            uniqueName = baseName + std::string(" (") + std::to_string(count++) + std::string(")");
-        }
-        m_gameObjectNameSet.insert(uniqueName);
-        return uniqueName;
-    }
-
-	void RemoveGameObjectName(const std::string_view& name)
-	{
-		m_gameObjectNameSet.erase(name.data());
-	}
+    std::string GenerateUniqueGameObjectName(const std::string_view& name);
+	void RemoveGameObjectName(const std::string_view& name);
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-    LightProperties m_lightProperties;
+	std::vector<Light> m_lights;
     [[Property]]
 	HashingString m_sceneName;
-    int m_lightCount = 0;
 };

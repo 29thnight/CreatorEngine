@@ -86,8 +86,6 @@ private:
 	std::unique_ptr<ToneMapPass>        m_pToneMapPass{};
 	std::unique_ptr<SpritePass>         m_pSpritePass{};
 	std::unique_ptr<BlitPass>           m_pBlitPass{};
-	std::unique_ptr<WireFramePass>      m_pWireFramePass{};
-    std::unique_ptr<GridPass>           m_pGridPass{};
 	std::unique_ptr<AAPass>             m_pAAPass{};
 	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
 	std::unique_ptr<EffectManager>      m_pEffectPass{};
@@ -108,7 +106,6 @@ private:
 	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
-    //UniqueTexturePtr m_gridTexture             { TEXTURE_NULL_INITIALIZER };
 
 	//sampler
 	Sampler* m_linearSampler{};
@@ -130,18 +127,8 @@ public:
 	void SetLightmapPass()  { useTestLightmap = !useTestLightmap; }
 
 private:
-	int  selected_log_index{};
-
-private:
     bool useWireFrame       { false };
-	bool m_bIsClicked       { false };
-	bool m_bShowLogWindow   { false };
 	bool m_bShowRenderState { false };
 	bool useTestLightmap    { false };
 	bool m_bShowGridSettings{ false };
-
-public:
-	void EditorView();
-	void ShowLogWindow();
-	void ShowGridSettings();
 };

@@ -32,16 +32,17 @@ float3 GetColor(int2 pos)
 void main(uint3 ThreadID : SV_GroupThreadID, uint3 GroupID : SV_GroupID, uint3 DispatchID : SV_DispatchThreadID)
 {
 	// Luma could be stored in group local memory, for faster computation
+    int2 pos = int2(DispatchID.xy);
 
-    float3 colorN = GetColor(DispatchID.xy + int2(0, -1));
-    float3 colorW = GetColor(DispatchID.xy + int2(-1, 0));
-    float3 colorM = GetColor(DispatchID.xy);
-    float3 colorE = GetColor(DispatchID.xy + int2(1, 0));
-    float3 colorS = GetColor(DispatchID.xy + int2(0, 1));
-    float3 colorNW = GetColor(DispatchID.xy + int2(-1, -1));
-    float3 colorNE = GetColor(DispatchID.xy + int2(1, -1));
-    float3 colorSW = GetColor(DispatchID.xy + int2(-1, 1));
-    float3 colorSE = GetColor(DispatchID.xy + int2(1, 1));
+    float3 colorN = GetColor(pos + int2(0, -1));
+    float3 colorW = GetColor(pos + int2(-1, 0));
+    float3 colorM = GetColor(pos);
+    float3 colorE = GetColor(pos + int2(1, 0));
+    float3 colorS = GetColor(pos + int2(0, 1));
+    float3 colorNW = GetColor(pos + int2(-1, -1));
+    float3 colorNE = GetColor(pos + int2(1, -1));
+    float3 colorSW = GetColor(pos + int2(-1, 1));
+    float3 colorSE = GetColor(pos + int2(1, 1));
 
     float lumaN = GetLuma(colorN);
     float lumaW = GetLuma(colorW);
@@ -76,23 +77,23 @@ void main(uint3 ThreadID : SV_GroupThreadID, uint3 GroupID : SV_GroupID, uint3 D
     blurdir = clamp(blurdir, -spanMax, spanMax);
 
 	// Sample around
-    float3 interp1 = GetColor(DispatchID.xy + ceil(blurdir * float(-0.167)));
-    float3 interp2 = GetColor(DispatchID.xy + ceil(blurdir * float(0.167)));
-    float3 interp3 = GetColor(DispatchID.xy + ceil(blurdir * float(-0.5)));
-    float3 interp4 = GetColor(DispatchID.xy + ceil(blurdir * float(0.5)));
+    int2 offset1 = int2(blurdir * -0.167f + 0.5f);
+    int2 offset2 = int2(blurdir * 0.167f + 0.5f);
+    int2 offset3 = int2(blurdir * -0.5f + 0.5f);
+    int2 offset4 = int2(blurdir * 0.5f + 0.5f);
+
+    float3 interp1 = GetColor(pos + offset1);
+    float3 interp2 = GetColor(pos + offset2);
+    float3 interp3 = GetColor(pos + offset3);
+    float3 interp4 = GetColor(pos + offset4);
 
     float3 interpolant = (interp1 + interp2 + interp3 + interp4) * 0.20f;
 
     float newluma = GetLuma(interpolant);
 
-    if (newluma < minluma || luma > maxluma)
-    {
-		// Return close values with bias to original
-        Output[DispatchID.xy] = FilterResult(interp1 * 0.3f + interp2 * 0.3f + colorM * 0.4f);
-    }
-    else
-    {
-		// Return new values
-        Output[DispatchID.xy] = FilterResult((interp1 + interp2 + interp3 + interp4 + colorM) * 0.2f);
-    }
+        // Blend based on luma check
+    float edgeFactor = step(minluma, newluma) * step(newluma, maxluma);
+    float3 finalColor = lerp(interp2 * 0.3f + interp3 * 0.3f + colorM * 0.4f, interpolant, edgeFactor);
+
+    Output[pos] = FilterResult(finalColor);
 }

@@ -14,16 +14,20 @@ void SceneManager::ManagerInitialize()
 
 void SceneManager::Editor()
 {
-    if(SceneManagers->m_isGameStart && false == m_isEditorSceneLoaded)
+    if(m_isGameStart && !m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
 		m_isEditorSceneLoaded = true;
     }
-    else if (false == SceneManagers->m_isGameStart && m_isEditorSceneLoaded)
+    else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
         DeleteEditorOnlyPlayScene();
     }
     m_activeScene->Reset();
+    if (!m_isGameStart)
+    {
+		m_activeScene->Awake();
+	}
 }
 
 void SceneManager::Initialization()
@@ -173,6 +177,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
     try
     {
+        //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene);
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
@@ -206,6 +211,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 {
 	if (m_activeScene)
 	{
+        resetSelectedObjectEvent.Broadcast();
 		m_activeScene->OnDisable();
 		m_activeScene->OnDestroy();
 		m_activeScene = nullptr;
@@ -234,7 +240,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         auto obj = m_activeScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-            GameObject::Type::Empty,
+            GameObjectType::Empty,
             itNode["m_parentIndex"].as<GameObject::Index>()
         ).get();
 

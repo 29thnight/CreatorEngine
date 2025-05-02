@@ -274,7 +274,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
     DirectX11::ThrowIfFailed(device->QueryInterface(IID_PPV_ARGS(&m_infoQueue)));
     {
         // WARNING 메시지에 Breakpoint
-        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, TRUE);
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // ERROR 메시지에 Breakpoint
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);

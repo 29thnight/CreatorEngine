@@ -13,6 +13,15 @@ public:
 	void Resize() override;
 
 private:
+    Texture* GetLightIcon(int lightType, bool isMainLight) const;
+
+private:
+    Texture* MainLightIcon{};
+    Texture* PointLightIcon{};
+    Texture* SpotLightIcon{};
+    Texture* DirectionalLightIcon{};
+    Texture* CameraIcon{};
+
 	ComPtr<ID3D11Buffer> m_gizmoCameraBuffer{};
 	ComPtr<ID3D11Buffer> m_positionBuffer{};
 	ComPtr<ID3D11Buffer> m_sizeBuffer{};
