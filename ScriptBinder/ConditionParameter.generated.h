@@ -1,7 +1,7 @@
 #pragma once
 
-#define ReflectaniParameter \
-ReflectionField(AnimationParameter) \
+#define ReflectConditionParameter \
+ReflectionField(ConditionParameter) \
 { \
 	PropertyField \
 	({ \
@@ -11,5 +11,5 @@ ReflectionField(AnimationParameter) \
 		meta_property(iValue) \
 		meta_property(bValue) \
 	}); \
-	FieldEnd(AnimationParameter, PropertyOnly) \
+	FieldEnd(ConditionParameter, PropertyOnly) \
 };

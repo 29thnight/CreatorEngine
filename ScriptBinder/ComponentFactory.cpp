@@ -88,11 +88,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					auto& StatesNode = animationControllerNode["StateVec"];
 					for (auto& state : StatesNode)
 					{
-						std::shared_ptr<aniState> sharedState = std::make_shared<aniState>();
+						std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
 						Meta::Deserialize(sharedState.get(), state);
 						animationController->StateVec.push_back(sharedState);
 						animationController->States.insert(std::make_pair(sharedState->Name, animationController->StateVec.size() - 1));
-						sharedState->Owner = animationController;
+						sharedState->m_ownerController = animationController;
 						sharedState->SetBehaviour(sharedState->Name);
 						if (state["Transitions"])
 						{
@@ -102,7 +102,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 								std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 								Meta::Deserialize(sharedTransition.get(), transition);
 								sharedState->Transitions.push_back(sharedTransition);
-								sharedTransition->owner = animationController;
+								sharedTransition->m_ownerController = animationController;
 								if (transition["conditions"])
 								{
 									auto& conditionNode = transition["conditions"];
@@ -110,7 +110,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									{
 										TransCondition newcondition;
 										Meta::Deserialize(&newcondition, condition);
-										newcondition.ownerFSM = animationController;
+										newcondition.m_ownerController = animationController;
 										sharedTransition->conditions.push_back(newcondition);
 									}
 								}
@@ -124,7 +124,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 					for (auto& param : paramNode)
 					{
-						aniParameter aniParam;
+						ConditionParameter aniParam;
 						Meta::Deserialize(&aniParam, param);
 						animationController->Parameters.push_back(aniParam);
 					}
@@ -161,63 +161,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
    //         Meta::Deserialize(spriteRenderer, itNode);
 			//spriteRenderer->SetEnabled(true);
 		}
-		/*else if (componentType->typeID == GUIDCreator::GetTypeID<AnimationController>())
-		{
-			auto aniFSMcomponent = static_cast<AnimationController*>(component);
-			if (itNode["StateVec"])
-			{
-				auto& FSMNode = itNode["StateVec"];
-				for(auto& fsm : FSMNode)
-				{
-					std::shared_ptr<aniState> sharedState = std::make_shared<aniState>();
-					Meta::Deserialize(sharedState.get(), fsm);
-					aniFSMcomponent->StateVec.push_back(sharedState);
-					aniFSMcomponent->States.insert(std::make_pair(sharedState->Name, aniFSMcomponent->StateVec.size()-1));
-					sharedState->Owner = aniFSMcomponent;
-					sharedState->SetBehaviour(sharedState->Name);
-					if (fsm["Transitions"])
-					{
-						auto& transitionNode = fsm["Transitions"];
-						for (auto& transition : transitionNode)
-						{
-							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
-							Meta::Deserialize(sharedTransition.get(), transition);
-							sharedState->Transitions.push_back(sharedTransition);
-							sharedTransition->owner = aniFSMcomponent;				
-							if (transition["conditions"])
-							{
-								auto& conditionNode = transition["conditions"];
-								for (auto& condition : conditionNode)
-								{
-									TransCondition newcondition;
-									Meta::Deserialize(&newcondition, condition);
-									newcondition.ownerFSM = aniFSMcomponent;
-									sharedTransition->conditions.push_back(newcondition);
-								}
-							}
-						}
-					}
-				}
-			}
-			if (itNode["Parameters"])
-			{
-				auto& paramNode = itNode["Parameters"];
-
-				for (auto& param : paramNode)
-				{
-					aniParameter aniParam;
-					Meta::Deserialize(&aniParam, param);
-					aniFSMcomponent->Parameters.push_back(aniParam);
-				}
-			}
-			if (itNode["CurState"])
-			{
-				auto& curNode = itNode["CurState"];
-				std::string name = curNode["Name"].as<std::string>();
-				aniFSMcomponent->CurState = aniFSMcomponent->StateVec[aniFSMcomponent->States[name]].get();
-			}
-			Meta::Deserialize(aniFSMcomponent, itNode);
-		}*/
 		else
 		{
             Meta::Deserialize(component, itNode);

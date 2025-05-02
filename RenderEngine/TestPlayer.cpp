@@ -17,11 +17,11 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateState("Walk");
 	controller->CreateState("Run");
 	controller->SetCurState("Idle");
-	controller->AddParameter("Speed",player->speed,valueType::Float);
-	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, conditionType::Greater,valueType::Float);
-	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, conditionType::Less, valueType::Float);
-	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, conditionType::Greater, valueType::Float);
-	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, conditionType::Less, valueType::Float);
+	controller->AddParameter("Speed",player->speed,ValueType::Float);
+	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, ConditionType::Greater,ValueType::Float);
+	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, ConditionType::Less, ValueType::Float);
+	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, ConditionType::Greater, ValueType::Float);
+	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, ConditionType::Less, ValueType::Float);
 	
 
 }

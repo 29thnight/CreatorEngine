@@ -1,45 +1,45 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "aniParameter.generated.h"
+#include "ConditionParameter.generated.h"
 
 
-enum class conditionType
+enum class ConditionType
 {
 	Greater,
 	Less,
 	Equal,
 	NotEqual,
 };
-AUTO_REGISTER_ENUM(conditionType)
+AUTO_REGISTER_ENUM(ConditionType)
 
 
-enum class valueType
+enum class ValueType
 {
 	Float,
 	Int,
 	Bool,
 };
-AUTO_REGISTER_ENUM(valueType)
+AUTO_REGISTER_ENUM(ValueType)
 
-class aniParameter
+class ConditionParameter
 {
 public:
-   ReflectaniParameter
+   ReflectConditionParameter
 	[[Serializable]]
-	aniParameter() = default;
+	ConditionParameter() = default;
 	template<typename T>
-	aniParameter(T value, valueType _vType, std::string _name = "None")
+	ConditionParameter(T value, ValueType _vType, std::string _name = "None")
 		: vType(_vType), name(_name)
 	{
 		switch (vType)
 		{
-		case valueType::Float:
+		case ValueType::Float:
 			fValue = static_cast<float>(value);
 			break;
-		case valueType::Int:
+		case ValueType::Int:
 			iValue = static_cast<int>(value);
 			break;
-		case valueType::Bool:
+		case ValueType::Bool:
 			bValue = static_cast<bool>(value);
 			break;
 		}
@@ -50,19 +50,19 @@ public:
 	{
 		switch (vType)
 		{
-		case valueType::Float:
+		case ValueType::Float:
 			fValue = static_cast<float>(value);
 			break;
-		case valueType::Int:
+		case ValueType::Int:
 			iValue = static_cast<int>(value);
 			break;
-		case valueType::Bool:
+		case ValueType::Bool:
 			bValue = static_cast<bool>(value);
 			break;
 		}
 	}
 	[[Property]]
-	valueType vType =valueType::Float;
+	ValueType vType =ValueType::Float;
 	[[Property]]
 	std::string name = "None";
 	[[Property]]

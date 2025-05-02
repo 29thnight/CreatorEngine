@@ -7,6 +7,6 @@ public:
 	virtual void Enter() {};
 	virtual void Update(float deltaTime) {};
 	virtual void Exit() {};
-	AnimationController* Owner{};
+	AnimationController* m_ownerController{};
 	std::string name{};
 };

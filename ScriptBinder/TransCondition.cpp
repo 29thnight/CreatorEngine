@@ -3,35 +3,35 @@
 bool TransCondition::CheckTrans()
 {
 	
-	for (auto& para : ownerFSM->Parameters)
+	for (auto& para : m_ownerController->Parameters)
 	{
-		if (para.vType == valueType::Float)
+		if (para.vType == ValueType::Float)
 		{
 			switch (cType)
 			{
-			case conditionType::Greater:
+			case ConditionType::Greater:
 				return para.fValue > CompareParameter.fValue;
-			case conditionType::Less:
+			case ConditionType::Less:
 				return para.fValue < CompareParameter.fValue;
 			}
 		}
-		else if (para.vType == valueType::Int)
+		else if (para.vType == ValueType::Int)
 		{
 			switch (cType)
 			{
-			case conditionType::Greater:
+			case ConditionType::Greater:
 				return para.iValue > CompareParameter.iValue;
-			case conditionType::Less:
+			case ConditionType::Less:
 				return para.iValue < CompareParameter.iValue;
 			}
 		}
-		if (para.vType == valueType::Bool)
+		if (para.vType == ValueType::Bool)
 		{
 			switch (cType)
 			{
-			case conditionType::Equal:
+			case ConditionType::Equal:
 				return para.bValue == CompareParameter.bValue;
-			case conditionType::NotEqual:
+			case ConditionType::NotEqual:
 				return para.bValue == CompareParameter.bValue;
 			}
 		}

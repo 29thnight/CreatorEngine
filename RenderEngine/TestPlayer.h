@@ -1,7 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include "Transform.h"
-#include "aniState.h"
+#include "AnimationState.h"
 #include "AnimationController.h"
 #include "AniBehaviour.h"
 class TestPlayer : Component 
@@ -22,7 +22,7 @@ public:
 	IdleAni() { name = "Idle"; };
 	virtual void Enter() override
 	{
-		Owner->GetOwner()->nextAnimIndex = 0;
+		m_ownerController->GetOwner()->nextAnimIndex = 0;
 		//Owner->GetAnimator()->SetAnimation(0);
 	};
 	virtual void Update(float DeltaTime) override
@@ -40,7 +40,7 @@ public:
 	WalkAni() { name = "Walk"; }
 	virtual void Enter() override
 	{
-		Owner->GetOwner()->nextAnimIndex = 2;
+		m_ownerController->GetOwner()->nextAnimIndex = 2;
 		//Owner->GetAnimator()->SetAnimation(2);
 	};
 	virtual void Update(float DeltaTime) override
@@ -59,7 +59,7 @@ public:
 	RunAni()  {name = "Run";}
 	virtual void Enter() override
 	{
-		Owner->GetOwner()->nextAnimIndex = 1;
+		m_ownerController->GetOwner()->nextAnimIndex = 1;
 		//Owner->GetAnimator()->SetAnimation(1); 
 	};
 	virtual void Update(float DeltaTime)override

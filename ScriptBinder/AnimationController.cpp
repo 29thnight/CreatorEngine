@@ -1,5 +1,5 @@
 #include "AnimationController.h"
-#include "aniState.h"
+#include "AnimationState.h"
 #include "AniBehaviour.h"
 void AnimationController::SetNextState(std::string stateName)
 {

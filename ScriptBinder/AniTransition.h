@@ -2,9 +2,9 @@
 #include "Core.Minimal.h"
 #include "TransCondition.h"
 #include "AniTransition.generated.h"
+#include "ConditionParameter.h"
 
-#include "aniStruct.h"
-//using TransConditionVariant = std::variant<TransCondition<int>, TransCondition<float>, TransCondition<bool>>;
+
 class AnimationController;
 class AniTransition
 {
@@ -15,7 +15,7 @@ public:
 	AniTransition(std::string curStatename, std::string nextStatename);
 	~AniTransition();
 
-	void AddCondition(std::string ownerValueName,float Comparevalue, conditionType cType,valueType vType)
+	void AddCondition(std::string ownerValueName,float Comparevalue, ConditionType cType,ValueType vType)
 	{
 		for (const auto& cond : conditions)
 		{
@@ -26,7 +26,7 @@ public:
 		}
 		TransCondition newTrans(Comparevalue,cType,vType);
 		newTrans.valueName = ownerValueName;
-		newTrans.ownerFSM = owner;
+		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
 	void SetCurState(std::string curStatename) {curState = curStatename;}
@@ -40,7 +40,7 @@ public:
 	[[Property]]
 	std::vector<TransCondition> conditions;
 
-	AnimationController* owner{};
+	AnimationController* m_ownerController{};
 private:
 	[[Property]]
 	std::string curState;

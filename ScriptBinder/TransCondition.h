@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "TransCondition.generated.h"
-#include "aniStruct.h"
+#include "ConditionParameter.h"
 
 class AnimationController;
 class TransCondition
@@ -12,7 +12,7 @@ public:
 	TransCondition() = default;
 
 
-	TransCondition(float Comparevalue, conditionType cType, valueType vType) : cType(cType) , CompareParameter(Comparevalue, vType)
+	TransCondition(float Comparevalue, ConditionType cType, ValueType vType) : cType(cType) , CompareParameter(Comparevalue, vType)
 	{
 	
 
@@ -22,10 +22,10 @@ public:
 	[[Property]]
 	std::string valueName{};
 	[[Property]]
-	conditionType cType = conditionType::Equal;
+	ConditionType cType = ConditionType::Equal;
 	[[Property]]
-	aniParameter CompareParameter;
+	ConditionParameter CompareParameter;
 
-	AnimationController* ownerFSM{};
+	AnimationController* m_ownerController{};
 };
 

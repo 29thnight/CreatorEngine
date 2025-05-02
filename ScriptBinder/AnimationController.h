@@ -3,8 +3,8 @@
 #include "IUpdatable.h"
 #include "Animator.h"
 #include "AniTransition.h"
-#include "aniStruct.h"
-#include "aniState.h"
+#include "ConditionParameter.h"
+#include "AnimationState.h"
 #include "AnimationController.generated.h"
 
 class aniState;
@@ -21,18 +21,18 @@ public:
    AnimationController() = default;
 
 	[[Property]]
-	aniState* m_curState = nullptr;
+	AnimationState* m_curState = nullptr;
 
-	aniState* m_nextState = nullptr;
+	AnimationState* m_nextState = nullptr;
 
 	bool needBlend =false;
 	std::unordered_map<std::string, size_t> States;
 
 	[[Property]]
-	std::vector<std::shared_ptr<aniState>> StateVec;
+	std::vector<std::shared_ptr<AnimationState>> StateVec;
 
 	[[Property]]
-	std::vector<aniParameter> Parameters;
+	std::vector<ConditionParameter> Parameters;
 
 	bool BlendingAnimation(float tick);
 	//void SetAnimator(Animator* _animator) { animator = _animator; }
@@ -45,14 +45,14 @@ public:
 	virtual void Update(float tick) override;
 
 
-	aniState* CreateState(const std::string& stateName)
+	AnimationState* CreateState(const std::string& stateName)
 	{
 		auto it = States.find(stateName);
 		if (it != States.end())
 		{
 			return (StateVec[it->second].get());
 		}
-		auto state = std::make_shared<aniState>(this, stateName);
+		auto state = std::make_shared<AnimationState>(this, stateName);
 		state->SetBehaviour(stateName);
 		States.insert(std::make_pair(stateName, StateVec.size()));
 		StateVec.push_back(state);
@@ -69,20 +69,20 @@ public:
 			
 		}
 		auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
-		transition->owner = this;
+		transition->m_ownerController = this;
 		StateVec[States[curStateName]]->Transitions.push_back(transition);
 		return transition.get();
 	}
 
 	template<typename T>
-	void AddParameter(const std::string valuename, T value, valueType vType)
+	void AddParameter(const std::string valuename, T value, ValueType vType)
 	{
 		for (auto& parm : Parameters)
 		{
 			if (parm.name == valuename)
 				return;
 		}
-		Parameters.push_back(aniParameter(value, vType, valuename));
+		Parameters.push_back(ConditionParameter(value, vType, valuename));
 	}
 
 	template<typename T>

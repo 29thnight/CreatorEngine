@@ -126,7 +126,7 @@
     <ClCompile Include="Animator.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
-    <ClCompile Include="aniState.cpp">
+    <ClCompile Include="AnimationState.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
     <ClCompile Include="AniTransition.cpp">
@@ -236,7 +236,7 @@
     <ClInclude Include="Animator.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
-    <ClInclude Include="aniState.h">
+    <ClInclude Include="AnimationState.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="AniTransition.h">
@@ -266,7 +266,7 @@
     <ClInclude Include="resource.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="aniStruct.h">
+    <ClInclude Include="ConditionParameter.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="AniBehaviour.h">
