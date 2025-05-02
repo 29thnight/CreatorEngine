@@ -180,6 +180,9 @@
     <Filter Include="RenderPass\GizmoPass\cbuffers">
       <UniqueIdentifier>{75ed02cd-cac8-4239-b9be-61d8f6773f6c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset\ManagerSystem\InputManager">
+      <UniqueIdentifier>{06792b2b-fe9e-4172-8f00-aec15e30243e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -319,6 +322,12 @@
     </ClCompile>
     <ClCompile Include="GizmoLinePass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ScriptBinder\InputManager.cpp">
+      <Filter>Asset\ManagerSystem\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ScriptBinder\KeyState.cpp">
+      <Filter>Asset\ManagerSystem\InputManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -489,6 +498,12 @@
     </ClInclude>
     <ClInclude Include="ProjectionType.h">
       <Filter>Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ScriptBinder\InputManager.h">
+      <Filter>Asset\ManagerSystem\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ScriptBinder\KeyState.h">
+      <Filter>Asset\ManagerSystem\InputManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

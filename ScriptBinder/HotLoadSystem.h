@@ -1,11 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "EngineSetting.h"
 
 class ModuleBehavior;
 class GameObject;
 typedef void (*InitModuleFunc)();
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
-typedef std::vector<std::string>(*GetScriptNamesFunc)();
+typedef const char** (*GetScriptNamesFunc)(int*);
+typedef void (*SetSceneManagerFunc)(void*);
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
 {
@@ -21,8 +23,14 @@ public:
 	void TrackScriptChanges();
 	void ReloadDynamicLibrary();
 	void ReplaceScriptComponent();
+	void CompileEvent();
 
+	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
+	void UpdateSceneManager(void* sceneManager)
+	{
+		m_setSceneManagerFunc(sceneManager);
+	}
 
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
@@ -34,6 +42,11 @@ public:
 		m_scriptComponentIndexs.emplace_back(gameObject, index, name);
 	}
 
+	std::vector<std::string>& GetScriptNames()
+	{
+		return m_scriptNames;
+	}
+
 private:
 	void Compile();
 
@@ -42,7 +55,8 @@ private:
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	InitModuleFunc m_initModuleFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
-	std::wstring vcvarsall{ PathFinder::MSBuildPath() };
+	SetSceneManagerFunc m_setSceneManagerFunc{};
+	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
 
 #pragma region Script File String

@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Export.h"
 #include "CreateFactory.h"
+#include "SceneManager.h"
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -27,15 +28,28 @@ extern "C"
 		return CreateFactory::GetInstance()->CreateInstance(classNameStr);
 	}
 
-	EXPORT_API std::vector<std::string> ListModuleBehavior()
+	EXPORT_API const char** ListModuleBehavior(int* outCount)
 	{
-		std::vector<std::string> nameVector{};
-		for (auto& [name, func] : ModuleFactory->factoryMap)
+		static std::vector<std::string> nameVector;
+		static std::vector<const char*> cstrs;
+
+		nameVector.clear();
+		cstrs.clear();
+
+		for (const auto& [name, func] : ModuleFactory->factoryMap)
 		{
 			nameVector.push_back(name);
 		}
 
-		return nameVector;
+		for (auto& name : nameVector)
+		{
+			cstrs.push_back(name.c_str());
+		}
+
+		if (outCount)
+			*outCount = static_cast<int>(cstrs.size());
+
+		return cstrs.data(); // 포인터 배열 반환
 	}
 
 	EXPORT_API void InitModuleFactory()
@@ -44,5 +58,32 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("TestScriptClass", []() { return new TestScriptClass(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 	}
+
+    EXPORT_API void SetSceneManager(void* sceneManager)
+    {  
+		SceneManager* ptr = static_cast<SceneManager*>(sceneManager);
+		auto& vector = SceneManagers->GetScenes();
+		auto& exeVector = ptr->GetScenes();
+
+		vector.clear();
+		for (auto& scene : exeVector)
+		{
+			vector.push_back(scene);
+		}
+
+		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
+		SceneManagers->SetActiveScene(ptr->GetActiveScene());
+		SceneManagers->SetGameStart(ptr->IsGameStart());
+		auto& dontDestroyOnLoadObjects = SceneManagers->GetDontDestroyOnLoadObjects();
+		auto& exeDontDestroyOnLoadObjects = ptr->GetDontDestroyOnLoadObjects();
+		dontDestroyOnLoadObjects.clear();
+		for (auto& obj : exeDontDestroyOnLoadObjects)
+		{
+			dontDestroyOnLoadObjects.push_back(obj);
+		}
+		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
+		SceneManagers->SetActiveScene(ptr->GetActiveScene());
+		SceneManagers->SetGameStart(ptr->IsGameStart());
+    }
 }
 

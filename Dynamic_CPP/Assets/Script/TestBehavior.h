@@ -5,6 +5,9 @@
 class TestBehavior : public ModuleBehavior
 {
 public:
+	GENERATED_BODY(TestBehavior)
+
+public:
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override;
 	virtual void OnTriggerEnter(const Collision& collider) override;

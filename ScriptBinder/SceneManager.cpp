@@ -17,15 +17,18 @@ void SceneManager::Editor()
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
+        ScriptManager->UpdateSceneManager(SceneManager::GetInstance().get());
+        m_activeScene->Reset();
 		m_isEditorSceneLoaded = true;
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
         DeleteEditorOnlyPlayScene();
     }
-    m_activeScene->Reset();
+
     if (!m_isGameStart)
     {
+        ScriptManager->ReloadDynamicLibrary();
 		m_activeScene->Awake();
 	}
 }

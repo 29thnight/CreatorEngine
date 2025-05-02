@@ -45,6 +45,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
         {
             auto meshRenderer = static_cast<MeshRenderer*>(component);
             Model* model = nullptr;
+            Meta::Deserialize(meshRenderer, itNode);
             if (itNode["m_Material"])
             {
                 auto materialNode = itNode["m_Material"];
@@ -57,7 +58,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
                 meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
-            Meta::Deserialize(meshRenderer, itNode);
+			meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
         }
 		else if (componentType->typeID == type_guid(Animator))
@@ -72,6 +73,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 
 			Meta::Deserialize(animator, itNode);
+			animator->SetOwner(obj);
 
 			std::vector<std::string> names = animator->m_aniName;
 		}
@@ -79,12 +81,14 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			auto lightComponent = static_cast<LightComponent*>(component);
             Meta::Deserialize(lightComponent, itNode);
+			lightComponent->SetOwner(obj);
 			lightComponent->SetEnabled(true);
 		}
 		else if (componentType->typeID == type_guid(CameraComponent))
 		{
 			auto cameraComponent = static_cast<CameraComponent*>(component);
 			Meta::Deserialize(cameraComponent, itNode);
+			cameraComponent->SetOwner(obj);
 			cameraComponent->SetEnabled(true);
 		}
 		else if (componentType->typeID == type_guid(SpriteRenderer))
@@ -97,11 +101,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				FileGuid guid = spriteNode["m_fileGuid"].as<std::string>();
 			}
             Meta::Deserialize(spriteRenderer, itNode);
+			spriteRenderer->SetOwner(obj);
 			spriteRenderer->SetEnabled(true);
 		}
 		else
 		{
             Meta::Deserialize(component, itNode);
+			component->SetOwner(obj);
 		}
     }
 }

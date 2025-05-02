@@ -13,11 +13,11 @@ GizmoPass::GizmoPass()
 {
     file::path iconpath = PathFinder::IconPath();
 
-    MainLightIcon = Texture::LoadFormPath(iconpath.string() + "Main Light Gizmo.png");
-    PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLight Gizmo.png");
-    SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLight Gizmo.png");
-    DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLight Gizmo.png");
-    CameraIcon = Texture::LoadFormPath(iconpath.string() + "Camera Gizmo.png");
+    MainLightIcon = Texture::LoadFormPath(iconpath.string() + "MainLightGizmo.png");
+    PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLightGizmo.png");
+    SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLightGizmo.png");
+    DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLightGizmo.png");
+    CameraIcon = Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
 
 	m_pso = std::make_unique<PipelineStateObject>();
 

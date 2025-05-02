@@ -5,6 +5,34 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+std::string WordWrapText(const std::string& input, size_t maxLineLength)
+{
+    std::istringstream iss(input);
+    std::ostringstream oss;
+    std::string word;
+    size_t lineLength = 0;
+
+    while (iss >> word)
+    {
+        if (lineLength + word.length() > maxLineLength)
+        {
+            oss << '\n';
+            lineLength = 0;
+        }
+        else if (lineLength > 0)
+        {
+            oss << ' ';
+            ++lineLength;
+        }
+
+        oss << word;
+        lineLength += word.length();
+    }
+
+    return oss.str();
+}
+
+
 MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
     m_sceneRenderer(ptr)
 {
@@ -153,6 +181,7 @@ void MenuBarWindow::ShowLogWindow()
     {
         Debug->toggleClear();
         ImGui::End();
+        ImGui::PopFont();
         return;
     }
 
@@ -179,15 +208,15 @@ void MenuBarWindow::ShowLogWindow()
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
 
-        int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
-
+        std::string wrapped = WordWrapText(entry.message, 120);
+        int stringLine = std::count(wrapped.begin(), wrapped.end(), '\n');
         ImGui::PushID(i);
-        if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
+        if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + wrapped).c_str(),
             is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
         {
             m_selectedLogIndex = i;
             std::regex pattern(R"(([A-Za-z]:\\.*))");
-            std::istringstream iss(entry.message);
+            std::istringstream iss(wrapped);
             std::string line;
 
             while (std::getline(iss, line))

@@ -41,11 +41,10 @@ public:
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 
-	template<typename T>
-	T* AddComponent();
+	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
 
 	template<typename T>
-	T* AddScriptComponent(const std::string_view& scriptName);
+	T* AddComponent();
 
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args);

@@ -39,9 +39,6 @@
     <ClInclude Include="..\x64\Assets\Script\TestScriptClass.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
-    <ClInclude Include="..\x64\Assets\Script\TestScriptClass.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
     <ClInclude Include="Assets\Script\TestBehavior.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
@@ -55,9 +52,6 @@
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Common\SourceFile</Filter>
-    </ClCompile>
-    <ClCompile Include="..\x64\Assets\Script\TestScriptClass.cpp">
-      <Filter>Script\ScriptClass</Filter>
     </ClCompile>
     <ClCompile Include="..\x64\Assets\Script\TestScriptClass.cpp">
       <Filter>Script\ScriptClass</Filter>

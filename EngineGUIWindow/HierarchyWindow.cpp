@@ -97,7 +97,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					ImGui::EndMenu();
 				}
 
-				if (ImGui::BeginMenu("		Camera"))
+				if (ImGui::MenuItem("		Camera"))
 				{
 					auto obj = scene->CreateGameObject("Camera", GameObjectType::Camera);
 					auto comp = obj->AddComponent<CameraComponent>();

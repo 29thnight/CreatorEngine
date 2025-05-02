@@ -67,6 +67,10 @@ public:
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
 
+	FileGuid GetFileGuid(const file::path& filepath) const;
+	FileGuid GetFilenameToGuid(const std::string& filename) const;
+	file::path GetFilePath(FileGuid fileguid) const;
+
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
 	void ShowDirectoryTree(const file::path& directory);

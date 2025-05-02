@@ -1,8 +1,10 @@
 #include "HotLoadSystem.h"
 #include "LogSystem.h"
 #include "GameObject.h"
+#include "SceneManager.h"
 #include "ModuleBehavior.h"
 #include "pugixml.hpp"
+#include "ReflectionYml.h"
 
 std::string AnsiToUtf8(const std::string& ansiStr)
 {
@@ -67,19 +69,8 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
                 continue;
             }
 
-            std::string utf8Line = AnsiToUtf8(line);
-            if (line.find("error") != std::string::npos || line.find("error C") != std::string::npos)
-            {
-                Debug->LogError(utf8Line);
-            }
-            else if (line.find("warning") != std::string::npos || line.find("warning C") != std::string::npos)
-            {
-                Debug->LogWarning(utf8Line);
-            }
-            else
-            {
-                Debug->LogDebug(line);
-            }
+            //std::string utf8Line = AnsiToUtf8(line);
+			Debug->LogDebug(line);
         }
     }
 
@@ -92,10 +83,9 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 void HotLoadSystem::Initialize()
 {
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
-    std::wstring msbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
-
-    command = std::wstring(L"cmd /c \"")
-        + L"\"" + msbuildExe + L"\" "
+    
+	command = std::wstring(L"cmd /c \"")
+        + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
         + L"/m /t:Build /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
@@ -111,7 +101,17 @@ void HotLoadSystem::Initialize()
 	}
 
 	m_initModuleFunc();
-	m_scriptNames = m_scriptNamesFunc();
+	const char** scriptNames = nullptr;
+	int scriptCount = 0;
+	scriptNames = m_scriptNamesFunc(&scriptCount);
+
+	for (int i = 0; i < scriptCount; ++i)
+	{
+		std::string scriptName = scriptNames[i];
+		std::string scriptFileName = std::string(scriptName);
+		m_scriptNames.push_back(scriptName);
+	}
+
 }
 
 void HotLoadSystem::Shutdown()
@@ -142,8 +142,16 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		}
 
 		m_scriptNames.clear();
-		m_initModuleFunc();
-		m_scriptNames = m_scriptNamesFunc();
+		const char** scriptNames = nullptr;
+		int scriptCount = 0;
+		scriptNames = m_scriptNamesFunc(&scriptCount);
+
+		for (int i = 0; i < scriptCount; ++i)
+		{
+			std::string scriptName = scriptNames[i];
+			std::string scriptFileName = std::string(scriptName);
+			m_scriptNames.push_back(scriptName);
+		}
 
 		ReplaceScriptComponent();
 	}
@@ -156,11 +164,85 @@ void HotLoadSystem::ReplaceScriptComponent()
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
 			auto* newScript = CreateMonoBehavior(name.c_str());
-			//gameObject->m_components[index] = newScript;
+			ScriptManager->BindScriptEvents(newScript, name);
+			newScript->SetOwner(gameObject);
 			gameObject->m_components[index].reset(newScript);
 		}
 		m_isReloading = false;
 	}
+}
+
+void HotLoadSystem::CompileEvent()
+{
+	m_isCompileEventInvoked = true;
+}
+
+void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_view& name)
+{
+	std::string scriptBodyFileName = std::string(name) + ".cpp";
+	FileGuid guid = DataSystems->GetFilenameToGuid(scriptBodyFileName);
+	file::path scriptFullPath = DataSystems->GetFilePath(guid);
+	file::path scriptMetaPath = scriptFullPath += L".meta";
+
+	if (file::exists(scriptMetaPath))
+	{
+		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaPath.string());
+		std::vector<std::string> events;
+		if (scriptNode["eventRegisterSetting"])
+		{
+			for (const auto& node : scriptNode["eventRegisterSetting"])
+			{
+				events.push_back(node.as<std::string>());
+			}
+
+			for (const auto& event : events)
+			{
+				if (event == "Start")
+				{
+					script->Start();
+				}
+				else if (event == "FixedUpdate")
+				{
+					SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(script, &ModuleBehavior::FixedUpdate);
+				}
+				else if (event == "OnTriggerEnter")
+				{
+					SceneManagers->GetActiveScene()->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnter);
+				}
+				else if (event == "OnTriggerStay")
+				{
+					SceneManagers->GetActiveScene()->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStay);
+				}
+				else if (event == "OnTriggerExit")
+				{
+					SceneManagers->GetActiveScene()->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExit);
+				}
+				else if (event == "OnCollisionEnter")
+				{
+					SceneManagers->GetActiveScene()->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnter);
+				}
+				else if (event == "OnCollisionStay")
+				{
+					SceneManagers->GetActiveScene()->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStay);
+				}
+				else if (event == "OnCollisionExit")
+				{
+					SceneManagers->GetActiveScene()->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExit);
+				}
+				else if (event == "Update")
+				{
+					SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(script, &ModuleBehavior::Update);
+				}
+				else if (event == "LateUpdate")
+				{
+					SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(script, &ModuleBehavior::LateUpdate);
+				}
+			}
+			
+		}
+
+	}
+
 }
 
 void HotLoadSystem::CreateScriptFile(const std::string_view& name)
@@ -382,40 +464,50 @@ void HotLoadSystem::Compile()
 		hDll = nullptr;
 	}
 
-
     try
     {
         RunMsbuildWithLiveLog(command);
     }
     catch (const std::exception& e)
     {
+		m_isReloading = false;
         throw std::runtime_error("Build failed");
     }
 
 	hDll = LoadLibraryA(PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string().c_str());
 	if (!hDll)
 	{
+		m_isReloading = false;
 		throw std::runtime_error("Failed to load library");
 	}
 
 	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));
 	if (!m_scriptFactoryFunc)
 	{
+		m_isReloading = false;
 		throw std::runtime_error("Failed to get function address");
 	}
 
 	m_initModuleFunc = reinterpret_cast<InitModuleFunc>(GetProcAddress(hDll, "InitModuleFactory"));
 	if (!m_initModuleFunc)
 	{
+		m_isReloading = false;
 		throw std::runtime_error("Failed to get function address");
 	}
 
 	m_scriptNamesFunc = reinterpret_cast<GetScriptNamesFunc>(GetProcAddress(hDll, "ListModuleBehavior"));
 	if (!m_scriptNamesFunc)
 	{
+		m_isReloading = false;
 		throw std::runtime_error("Failed to get function address");
 	}
 
+	m_setSceneManagerFunc = reinterpret_cast<SetSceneManagerFunc>(GetProcAddress(hDll, "SetSceneManager"));
+	if (!m_setSceneManagerFunc)
+	{
+		m_isReloading = false;
+		throw std::runtime_error("Failed to get function address");
+	}
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
 }

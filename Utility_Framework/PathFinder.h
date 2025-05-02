@@ -15,8 +15,8 @@ namespace InternalPath
 	inline file::path UISourcePath{};
 	inline file::path MaterialSourcePath{};
 	inline file::path PrecompiledShaderPath{};
-	inline std::string VS2022Path{ "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\"" };
-    inline std::wstring MSBuildPath{ L"\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe\"" };
+	inline std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
+	inline std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
     inline file::path DynamicSolutionDir{};
 	inline file::path BaseProjectPath{};
 
@@ -138,14 +138,14 @@ public:
 		return InternalPath::IconPath;
 	}
 
-	static inline std::string VS2022Path()
+	static inline std::wstring MsbuildPreviewPath()
 	{
-		return InternalPath::VS2022Path;
+		return InternalPath::MsbuildPreviewExe;
 	}
 
-    static inline std::wstring MSBuildPath()
+    static inline std::wstring MsbuildPath()
     {
-        return InternalPath::MSBuildPath;
+        return InternalPath::MsbuildExe;
     }
 
 	static inline file::path DynamicSolutionPath(const std::string_view& path)

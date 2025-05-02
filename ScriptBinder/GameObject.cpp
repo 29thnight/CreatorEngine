@@ -1,4 +1,5 @@
 #include "GameObject.h"
+#include "ModuleBehavior.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
@@ -48,6 +49,33 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
 	return component;
 }
+
+ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptName)
+{
+    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); }) != m_components.end())
+    {
+        return nullptr;
+    }
+
+    std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(ScriptManager->CreateMonoBehavior(scriptName.data()));
+	if (!component)
+	{
+		Debug->LogError("Failed to create script component: " + std::string(scriptName));
+		return nullptr;
+	}
+	component->SetOwner(this);
+
+    auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
+    m_components.push_back(componentPtr);
+    m_componentIds[componentPtr->GetTypeID()] = m_components.size() - 1;
+
+    size_t index = m_componentIds[componentPtr->GetTypeID()];
+
+    ScriptManager->CollectScriptComponent(this, index, scriptName.data());
+
+    return component.get();
+}
+
 
 GameObject* GameObject::Find(const std::string_view& name)
 {
