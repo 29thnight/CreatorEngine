@@ -35,7 +35,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		return nullptr;//*****
+		//return nullptr;//*****
 		m_curState = StateVec[0].get();
 	}
 	if (m_curState->Transitions.empty()) return nullptr;

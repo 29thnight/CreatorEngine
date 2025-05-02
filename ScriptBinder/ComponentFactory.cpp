@@ -128,9 +128,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 						animationController->Parameters.push_back(aniParam);
 					}
 				}
-				if (animationControllerNode["CurState"])
+				if (animationControllerNode["m_curState"])
 				{
-					auto& curNode = animationControllerNode["CurState"];
+					auto& curNode = animationControllerNode["m_curState"];
 					std::string name = curNode["Name"].as<std::string>();
 					animationController->m_curState = animationController->StateVec[animationController->States[name]].get();
 				}
