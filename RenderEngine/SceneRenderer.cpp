@@ -586,9 +586,3 @@ void SceneRenderer::ReloadShaders()
 	ShaderSystem->ReloadShaders();
 }
 
-	auto entries = Debug->get_entries();
-	for (size_t i = 0; i < entries.size(); i++)
-	{
-		const auto& entry = entries[i];
-		bool is_selected = (i == selected_log_index);
-
