@@ -10,6 +10,7 @@
 #include "Scene.h"
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
+#include "SpriteRenderer.h"
 //어차피 다시 만들어야 하니까
 class LightComponent : public Component, public IRenderable, public IUpdatable, public IAwakable
 {

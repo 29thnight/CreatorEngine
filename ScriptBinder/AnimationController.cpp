@@ -1,6 +1,8 @@
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "AniBehaviour.h"
+#include "Skeleton.h"
+#include "AvatarMask.h"
 void AnimationController::SetNextState(std::string stateName)
 {
 	
@@ -33,7 +35,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-
+		return nullptr;//*****
 		m_curState = StateVec[0].get();
 	}
 	if (m_curState->Transitions.empty()) return nullptr;
@@ -92,4 +94,9 @@ void AnimationController::Update(float tick)
 
 	if (m_curState == nullptr) return;
 	m_curState->behaviour->Update(tick);
+}
+
+void AnimationController::CreateMask()
+{
+	m_owner->m_Skeleton->MarkRegionSkeleton();
 }

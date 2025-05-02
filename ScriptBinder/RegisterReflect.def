@@ -5,12 +5,13 @@
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
+#include "AvatarMask.h"
 #include "Animator.h"
 #include "Mesh.h"
-#include "Canvas.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "AniTransition.h"
+#include "Canvas.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
 #include "GameObject.h"
@@ -33,6 +34,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(AnimationController);
     AUTO_REGISTER_CLASS(AnimationState);
     AUTO_REGISTER_CLASS(Animator);
+    AUTO_REGISTER_CLASS(AvatarMask);
     AUTO_REGISTER_CLASS(Canvas);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);

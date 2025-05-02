@@ -1,6 +1,12 @@
 #include "Animator.h"
 #include "AnimationController.h"
+#include "../RenderEngine/Skeleton.h"
 
+void Animator::Update(float tick)
+{
+	if (m_animationController == nullptr) return;
+	m_animationController->Update(tick);
+}
 
 std::string Animator::GetcurAnimation()
 {
@@ -32,4 +38,6 @@ void Animator::CreateController()
 	//m_animationController = std::make_shared<AnimationController>();
 	m_animationController = new AnimationController();
 	m_animationController->m_owner = this;
+	m_animationController->CreateMask();
+	
 }

@@ -157,6 +157,7 @@
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
+    <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
@@ -180,6 +181,7 @@
     <ClInclude Include="AnimationController.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="AnimationState.h" />
+    <ClInclude Include="AvatarMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />

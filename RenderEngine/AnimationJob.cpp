@@ -137,6 +137,7 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX
     Animation& nextanimation = skeleton->m_animations[animator.nextAnimIndex];
     std::string& boneName = bone->m_name;
 
+    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg) return; //*****
     auto it = animation.m_nodeAnimations.find(boneName);
     if (it == animation.m_nodeAnimations.end())
     {
@@ -167,10 +168,16 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX
 void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)
 {
     Skeleton* skeleton = animator.m_Skeleton;
-    Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
     std::string& boneName = bone->m_name;
-    auto it = animation.m_nodeAnimations.find(boneName);
-    if (it == animation.m_nodeAnimations.end())
+    Animation* animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+    //Animation* lowAnimation = &skeleton->m_animations[0];
+    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg)
+    //{
+    //    animation = lowAnimation;
+    //    //return;
+    //}
+    auto it = animation->m_nodeAnimations.find(boneName);
+    if (it == animation->m_nodeAnimations.end())
     {
         for (Bone* child : bone->m_children)
         {
@@ -178,61 +185,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
         }
         return;
     }
-
-    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
-    {
-        //float t = 0;
-
-        //// Translation
-        //XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
-        //if (nodeAnim.m_positionKeys.size() > 1)
-        //{
-        //    int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
-        //    int nPosKeyIdx = posKeyIdx + 1;
-
-        //    NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
-        //    NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
-
-        //    t = (time - posKey.m_time) / (nPosKey.m_time - posKey.m_time);
-        //    interpPos = XMVectorLerp(posKey.m_position, nPosKey.m_position, t);
-        //}
-        //XMMATRIX translation = XMMatrixTranslationFromVector(interpPos);
-
-        //// Rotation
-        //XMVECTOR interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
-        //if (nodeAnim.m_rotationKeys.size() > 1)
-        //{
-        //    int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
-        //    int nRotKeyIdx = rotKeyIdx + 1;
-
-        //    NodeAnimation::RotationKey rotKey = nodeAnim.m_rotationKeys[rotKeyIdx];
-        //    NodeAnimation::RotationKey nRotKey = nodeAnim.m_rotationKeys[nRotKeyIdx];
-
-        //    t = (time - rotKey.m_time) / (nRotKey.m_time - rotKey.m_time);
-        //    interpQuat = XMQuaternionSlerp(rotKey.m_rotation, nRotKey.m_rotation, t);
-
-        //}
-        //XMMATRIX rotation = XMMatrixRotationQuaternion(interpQuat);
-
-        //// Scaling
-        //float interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
-
-        //if (nodeAnim.m_scaleKeys.size() > 1)
-        //{
-        //    int scalKeyIdx = CurrentKeyIndex<NodeAnimation::ScaleKey>(nodeAnim.m_scaleKeys, time);
-        //    int nScalKeyIdx = scalKeyIdx + 1;
-
-        //    NodeAnimation::ScaleKey scalKey = nodeAnim.m_scaleKeys[scalKeyIdx];
-        //    NodeAnimation::ScaleKey nScalKey = nodeAnim.m_scaleKeys[nScalKeyIdx];
-
-        //    t = (time - scalKey.m_time) / (nScalKey.m_time - scalKey.m_time);
-        //    interpScale = lerp(scalKey.m_scale.x, nScalKey.m_scale.x, t);
-        //}
-
-        //XMMATRIX scale = XMMatrixScaling(interpScale, interpScale, interpScale);
-
-        //XMMATRIX nodeTransform = scale * rotation * translation;
-    }
+    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     XMMATRIX nodeTransform = calculAni(nodeAnim, time);
     XMMATRIX globalTransform = nodeTransform * parentTransform;
 

@@ -138,6 +138,9 @@
     <ClCompile Include="TransCondition.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
+    <ClCompile Include="AvatarMask.cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
@@ -273,6 +276,9 @@
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationBehviourFatory.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
   </ItemGroup>

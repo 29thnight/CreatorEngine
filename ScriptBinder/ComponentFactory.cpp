@@ -5,7 +5,7 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
-
+#include "Model.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;

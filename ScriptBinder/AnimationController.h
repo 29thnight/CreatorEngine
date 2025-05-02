@@ -1,6 +1,5 @@
 #pragma once
 #include "Component.h"
-#include "IUpdatable.h"
 #include "Animator.h"
 #include "AniTransition.h"
 #include "ConditionParameter.h"
@@ -9,9 +8,8 @@
 
 class aniState;
 class AniTransition;
-
-
-class AnimationController : public IUpdatable
+class AvatarMask;
+class AnimationController
 {
 	/*using TransitionMap = std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>>;
 	using TransitionIter = TransitionMap::iterator;*/
@@ -42,7 +40,7 @@ public:
 
 	std::shared_ptr<AniTransition> CheckTransition();
 	void UpdateState();
-	virtual void Update(float tick) override;
+	void Update(float tick);
 
 
 	AnimationState* CreateState(const std::string& stateName)
@@ -97,6 +95,7 @@ public:
 		}
 	}
 	
+	void CreateMask();
 	Animator* m_owner{};
 private:
 	//Animator* animator;
@@ -105,5 +104,8 @@ private:
 	AniTransition* m_curTrans{};
 
 	//state layer //상체 하체 등 나누기용
+	std::vector<AnimationController> m_ControllerLayers;
+
+	//std::vector<AvatarMask> m_avatarMasks;
 };
 
