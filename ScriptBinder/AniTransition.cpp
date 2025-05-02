@@ -12,7 +12,7 @@ AniTransition::~AniTransition()
 
 bool AniTransition::CheckTransiton()
 {
-	for (auto& condition : conditions)
+	/*for (auto& condition : conditions)
 	{
 		bool result = std::visit([](auto& cond) {
 			return cond.CheckTrans();
@@ -20,10 +20,12 @@ bool AniTransition::CheckTransiton()
 
 		if (!result)
 			return false; 
+	}*/
+	for (auto& condition : conditions)
+	{
+		return condition.CheckTrans();
 	}
 
 	return true;
 }
-
-
 

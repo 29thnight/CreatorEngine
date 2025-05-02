@@ -1,9 +1,10 @@
 #pragma once
 #include "GameObject.h"
 #include "Transform.h"
-#include "aniState.h"
-#include "aniFSM.h"
-class TestPlayer
+#include "AnimationState.h"
+#include "AnimationController.h"
+#include "AniBehaviour.h"
+class TestPlayer : Component 
 {
 
 public:
@@ -12,56 +13,60 @@ public:
 	GameObject* player;
 	float speed = 0.1f;
 
-	float maxSpeed = 1.5f;
+	float maxSpeed = 15.0f;
 };
 
-class IdleAni : public aniState
+class IdleAni : public AniBehaviour
 {
 public:
-	IdleAni(aniFSM* Owner, std::string Name) : aniState(Owner,Name){}
-	virtual void Enter()
+	IdleAni() { name = "Idle"; };
+	virtual void Enter() override
 	{
-		Owner->GetAnimator()->SetAnimation(0);
+		m_ownerController->GetOwner()->nextAnimIndex = 0;
+		//Owner->GetAnimator()->SetAnimation(0);
 	};
-	virtual void Update(float DeltaTime)
-	{
-
-	};
-	virtual void Exit()
+	virtual void Update(float DeltaTime) override
 	{
 
 	};
-};
-class WalkAni : public aniState
-{
-public:
-	WalkAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
-	virtual void Enter()
-	{
-		Owner->GetAnimator()->SetAnimation(2);
-	};
-	virtual void Update(float DeltaTime)
-	{
-
-	};
-	virtual void Exit()
+	virtual void Exit() override
 	{
 
 	};
 };
-class RunAni : public aniState
+class WalkAni : public AniBehaviour
 {
 public:
-	RunAni(aniFSM* Owner, std::string Name) : aniState(Owner, Name) {}
-	virtual void Enter()
+	WalkAni() { name = "Walk"; }
+	virtual void Enter() override
 	{
-		Owner->GetAnimator()->SetAnimation(1);
+		m_ownerController->GetOwner()->nextAnimIndex = 2;
+		//Owner->GetAnimator()->SetAnimation(2);
 	};
-	virtual void Update(float DeltaTime)
+	virtual void Update(float DeltaTime) override
+	{
+
+	}; 
+	virtual void Exit() override
 	{
 
 	};
-	virtual void Exit()
+};
+
+class RunAni : public AniBehaviour
+{
+public:
+	RunAni()  {name = "Run";}
+	virtual void Enter() override
+	{
+		m_ownerController->GetOwner()->nextAnimIndex = 1;
+		//Owner->GetAnimator()->SetAnimation(1); 
+	};
+	virtual void Update(float DeltaTime)override
+	{
+
+	};
+	virtual void Exit()override
 	{
 
 	};

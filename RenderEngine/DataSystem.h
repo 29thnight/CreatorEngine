@@ -1,14 +1,17 @@
 #pragma once
 #include "../Utility_Framework/HLSLCompiler.h"
-#include "ModelLoader.h"
+//#include "ModelLoader.h"
 #include "Texture.h"
 //#include "Billboards.h"
-#include "Model.h"
 #include "ImGuiRegister.h"
 #include "AssetMetaWather.h"
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
+//#include "Model.h"
 // Main system for storing runtime data
+class ModelLoader;
+class Model;
+class Material;
 class DataSystem : public Singleton<DataSystem>
 {
 public:

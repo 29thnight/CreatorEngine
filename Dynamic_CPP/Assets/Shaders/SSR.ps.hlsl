@@ -139,8 +139,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float4 reflectedColor = Raytrace(refDir, MaxRayCount, StepSize, worldSpacePosition.rgb, IN.texCoord);
 
-    //float edgeFade = 1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f);
-    //reflectFactor *= edgeFade;
+    float edgeFade = 1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f);
+    reflectFactor *= edgeFade;
     
     //return float4(depth, depth, depth, 1);
     return color + reflectedColor * reflectFactor;

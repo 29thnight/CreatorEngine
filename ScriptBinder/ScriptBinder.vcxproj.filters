@@ -123,13 +123,13 @@
     <ClCompile Include="SoundManager.cpp">
       <Filter>Managers\SoundManager</Filter>
     </ClCompile>
-    <ClCompile Include="aniFSM.cpp">
+    <ClCompile Include="AnimationController.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
     <ClCompile Include="Animator.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
-    <ClCompile Include="aniState.cpp">
+    <ClCompile Include="AnimationState.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
     <ClCompile Include="AniTransition.cpp">
@@ -137,6 +137,12 @@
     </ClCompile>
     <ClCompile Include="PhysicsManager.cpp">
       <Filter>Managers\PhysicsManager</Filter>
+    </ClCompile>
+    <ClCompile Include="TransCondition.cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClCompile>
+    <ClCompile Include="AvatarMask.cpp">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
     <ClCompile Include="ColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
@@ -227,13 +233,13 @@
     <ClInclude Include="SpriteRenderer.h">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
-    <ClInclude Include="aniFSM.h">
+    <ClInclude Include="AnimationController.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="Animator.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
-    <ClInclude Include="aniState.h">
+    <ClInclude Include="AnimationState.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="AniTransition.h">
@@ -256,6 +262,24 @@
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
+    </ClInclude>
+    <ClInclude Include="TransCondition.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="ConditionParameter.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AniBehaviour.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationBehviourFatory.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+    </ClInclude>
+    <ClInclude Include="AvatarMask.h">
+      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>

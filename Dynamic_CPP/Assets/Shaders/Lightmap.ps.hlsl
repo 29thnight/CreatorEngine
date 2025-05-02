@@ -73,7 +73,7 @@ float4 main(VertexShaderOutput IN) : SV_TARGET
     }
     if (gUseEmmisive)
     {
-        emissive = Emissive.Sample(LinearSampler, IN.texCoord1);
+        emissive = Emissive.Sample(LinearSampler, IN.texCoord);
     }
     //float2 lightmapUV = (IN.texCoord1 - offset) / size;
     float2 lightmapUV = IN.texCoord1 * size + offset;

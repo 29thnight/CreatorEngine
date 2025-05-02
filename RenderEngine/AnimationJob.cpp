@@ -86,8 +86,19 @@ void AnimationJob::Update(float deltaTime)
 
             animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
             animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+            animator->curAniName = animator->GetcurAnimation();
             XMMATRIX rootTransform = skeleton->m_rootTransform;
-            UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
+            if (animator->m_isBlend)
+            {
+                Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
+                animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
+                UpdateBlendBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
+            }
+            else
+            {
+                UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
+            }
         });
     }
 
@@ -119,22 +130,95 @@ void AnimationJob::CleanUp()
 	m_objectSize = 0;
 }
 
-void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)
+void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& parentTransform, float time, float nextanitime)
 {
     Skeleton* skeleton = animator.m_Skeleton;
     Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
+    Animation& nextanimation = skeleton->m_animations[animator.nextAnimIndex];
     std::string& boneName = bone->m_name;
-	auto it = animation.m_nodeAnimations.find(boneName);
-	if (it == animation.m_nodeAnimations.end())
-	{
-		for (Bone* child : bone->m_children)
-		{
-			UpdateBone(child, animator, parentTransform, time);
-		}
-		return;
-	}
 
-	NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
+    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg) return; //*****
+    auto it = animation.m_nodeAnimations.find(boneName);
+    if (it == animation.m_nodeAnimations.end())
+    {
+        for (Bone* child : bone->m_children)
+        {
+            UpdateBlendBone(child, animator, parentTransform, time, nextanitime);
+        }
+        return;
+    }
+
+    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
+    NodeAnimation& nextnodeAnim = nextanimation.m_nodeAnimations[boneName];
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
+    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime);
+    XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
+    animator.blendtransform = blendTransform;
+    XMMATRIX globalTransform = blendTransform * parentTransform;
+
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    bone->m_globalTransform = globalTransform;
+
+    for (Bone* child : bone->m_children)
+    {
+        UpdateBlendBone(child, animator, globalTransform, time, nextanitime);
+    }
+}
+
+void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)
+{
+    Skeleton* skeleton = animator.m_Skeleton;
+    std::string& boneName = bone->m_name;
+    Animation* animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+    //Animation* lowAnimation = &skeleton->m_animations[0];
+    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg)
+    //{
+    //    animation = lowAnimation;
+    //    //return;
+    //}
+    auto it = animation->m_nodeAnimations.find(boneName);
+    if (it == animation->m_nodeAnimations.end())
+    {
+        for (Bone* child : bone->m_children)
+        {
+            UpdateBone(child, animator, parentTransform, time);
+        }
+        return;
+    }
+    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
+    XMMATRIX globalTransform = nodeTransform * parentTransform;
+
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    bone->m_globalTransform = globalTransform;
+
+    for (Bone* child : bone->m_children)
+    {
+        UpdateBone(child, animator, globalTransform, time);
+    }
+}
+
+XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
+{
+    XMVECTOR scale1, rot1, trans1;
+    XMMatrixDecompose(&scale1, &rot1, &trans1, curAni);
+
+    XMVECTOR scale2, rot2, trans2;
+    XMMatrixDecompose(&scale2, &rot2, &trans2, nextAni);
+
+    XMVECTOR blendedScale = XMVectorLerp(scale1, scale2, t);
+    XMVECTOR blendedTrans = XMVectorLerp(trans1, trans2, t);
+    XMVECTOR blendedRot = XMQuaternionSlerp(rot1, rot2, t);
+
+    XMMATRIX blendedNodeTransform =
+        XMMatrixScalingFromVector(blendedScale) *
+        XMMatrixRotationQuaternion(blendedRot) *
+        XMMatrixTranslationFromVector(blendedTrans);
+    return blendedNodeTransform;
+}
+
+XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
+{
     float t = 0;
 
     // Translation
@@ -184,16 +268,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     }
 
     XMMATRIX scale = XMMatrixScaling(interpScale, interpScale, interpScale);
-
     XMMATRIX nodeTransform = scale * rotation * translation;
-    XMMATRIX globalTransform = nodeTransform * parentTransform;
-
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    bone->m_globalTransform = globalTransform;
-
-    for (Bone* child : bone->m_children)
-    {
-        UpdateBone(child, animator, globalTransform, time);
-    }
+    return nodeTransform;
 }
 

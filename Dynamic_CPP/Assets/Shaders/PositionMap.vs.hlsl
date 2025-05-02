@@ -29,7 +29,7 @@ PS_INPUT main(VS_Input input)
     
     float2 texelSize = float2(1.0 / posMapWidth, 1.0 / posMapHeight);
     
-    float2 uv = input.texCoord1 - texelSize * 1.25;
+    float2 uv = input.texCoord1 + texelSize * 0.5f; // - texelSize * 1.25;
     
     //output.position = float4(input.texCoord * 2.0 - 1.0, 0, 1);
     output.position = float4((uv.x - 0.5f) * 2.0, -(uv.y - 0.5f) * 2.0, 0, 1);

@@ -150,6 +150,12 @@
     <Filter Include="RenderPass\EffectPass\NodeEditor">
       <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Skeleton\Bone">
+      <UniqueIdentifier>{dedebb22-4667-41cf-a65e-94cc10e22ea1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Skeleton\Animation">
+      <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RenderPass\ScreenSpaceReflectionPass">
       <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
     </Filter>
@@ -171,14 +177,23 @@
     <Filter Include="RenderPass\GizmoPass">
       <UniqueIdentifier>{c8c1c404-6da8-4472-9aad-a873ceb917f2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\SubSurfaceScatteringPass">
-      <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders\EditorUseShader\GizmoRender">
       <UniqueIdentifier>{9f8de7d0-f498-4164-a010-dda9fb1c7b49}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\GizmoPass\cbuffers">
       <UniqueIdentifier>{75ed02cd-cac8-4239-b9be-61d8f6773f6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\ScreenSpaceReflectionPass">
+      <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\SubSurfaceScatteringPass">
+      <UniqueIdentifier>{e0e12ab4-d511-4546-aded-0f7f5b611fa0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\VignettePass">
+      <UniqueIdentifier>{189e3444-bc39-47e3-9913-8dc29fdd9b1b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\ColorGradingPass">
+      <UniqueIdentifier>{737b3164-6b70-46e9-8b0b-6aa01ad5a01c}</UniqueIdentifier>
     </Filter>
     <Filter Include="Asset\ManagerSystem\InputManager">
       <UniqueIdentifier>{06792b2b-fe9e-4172-8f00-aec15e30243e}</UniqueIdentifier>
@@ -297,7 +312,7 @@
       <Filter>RenderPass\EffectPass</Filter>
     </ClCompile>
     <ClCompile Include="ScreenSpaceReflectionPass.cpp">
-      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+      <Filter>RenderPass\PostProcessingPass\ScreenSpaceReflectionPass</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiRenderer.cpp">
       <Filter>Renderer\ImGuiRenderer</Filter>
@@ -315,7 +330,7 @@
       <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
     <ClCompile Include="SubsurfaceScatteringPass.cpp">
-      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
+      <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
     </ClCompile>
     <ClCompile Include="TestPlayer.cpp">
       <Filter>소스 파일</Filter>
@@ -328,6 +343,12 @@
     </ClCompile>
     <ClCompile Include="..\ScriptBinder\KeyState.cpp">
       <Filter>Asset\ManagerSystem\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="VignettePass.cpp">
+      <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
+    </ClCompile>
+    <ClCompile Include="ColorGradingPass.cpp">
+      <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -464,7 +485,7 @@
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="ScreenSpaceReflectionPass.h">
-      <Filter>RenderPass\ScreenSpaceReflectionPass</Filter>
+      <Filter>RenderPass\PostProcessingPass\ScreenSpaceReflectionPass</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiRenderer.h">
       <Filter>Renderer\ImGuiRenderer</Filter>
@@ -485,7 +506,7 @@
       <Filter>RenderPass\GizmoPass</Filter>
     </ClInclude>
     <ClInclude Include="SubsurfaceScatteringPass.h">
-      <Filter>RenderPass\SubSurfaceScatteringPass</Filter>
+      <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
     </ClInclude>
     <ClInclude Include="TestPlayer.h">
       <Filter>헤더 파일</Filter>
@@ -504,6 +525,12 @@
     </ClInclude>
     <ClInclude Include="..\ScriptBinder\KeyState.h">
       <Filter>Asset\ManagerSystem\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="VignettePass.h">
+      <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
+    </ClInclude>
+    <ClInclude Include="ColorGradingPass.h">
+      <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -647,6 +674,12 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Gizmo_Line.ps.hlsl">
       <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Vignette.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ColorGrading.ps.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

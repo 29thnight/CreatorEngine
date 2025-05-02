@@ -105,6 +105,11 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			m_normalMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 			m_normalMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
+			float nullColor[4] = { 0,0,0,0 };
+
+			DirectX11::ClearRenderTargetView(m_positionMapTextures[meshName]->GetRTV(), nullColor);
+			DirectX11::ClearRenderTargetView(m_normalMapTextures[meshName]->GetRTV(), nullColor);
+
 			ID3D11RenderTargetView* rtv[2] = {
 				m_positionMapTextures[meshName]->GetRTV(),
 				m_normalMapTextures[meshName]->GetRTV()
