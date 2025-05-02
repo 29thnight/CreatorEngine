@@ -50,6 +50,8 @@ public:
     Core::Delegate<void>        sceneLoadedEvent{};
     Core::Delegate<void>        sceneUnloadedEvent{};
     Core::Delegate<void>        newSceneCreatedEvent{};
+	Core::Delegate<void>        resetSelectedObjectEvent{};
+
     bool                        m_isGameStart{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
 private:

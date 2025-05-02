@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "LightComponent.h"
 #include "ImageComponent.h"
+#include "CameraComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
@@ -66,33 +67,40 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 				if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 				{
-					scene->CreateGameObject("GameObject", GameObject::Type::Empty);
+					scene->CreateGameObject("GameObject", GameObjectType::Empty);
 				}
 
 				if (ImGui::BeginMenu("		Light"))
 				{
 					if (ImGui::MenuItem("		Directional Light"))
 					{
-						auto obj = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
+						auto obj = scene->CreateGameObject("Directional Light", GameObjectType::Light);
 						auto comp = obj->AddComponent<LightComponent>();
 						comp->m_lightType = LightType::DirectionalLight;
 						comp->m_lightStatus = LightStatus::Enabled;
 					}
 					if (ImGui::MenuItem("		Point Light")) 
 					{
-						auto obj = scene->CreateGameObject("Point Light", GameObject::Type::Light);
+						auto obj = scene->CreateGameObject("Point Light", GameObjectType::Light);
 						auto comp = obj->AddComponent<LightComponent>();
 						comp->m_lightType = LightType::PointLight;
 						comp->m_lightStatus = LightStatus::Enabled;
 					}
 					if (ImGui::MenuItem("		Spot Light"))
 					{
-						auto obj = scene->CreateGameObject("Spot Light", GameObject::Type::Light);
+						auto obj = scene->CreateGameObject("Spot Light", GameObjectType::Light);
+						obj->m_transform.SetRotation({ 0.7, 0, 0, 1 });
 						auto comp = obj->AddComponent<LightComponent>();
 						comp->m_lightType = LightType::SpotLight;
 						comp->m_lightStatus = LightStatus::Enabled;
 					}
 					ImGui::EndMenu();
+				}
+
+				if (ImGui::BeginMenu("		Camera"))
+				{
+					auto obj = scene->CreateGameObject("Camera", GameObjectType::Camera);
+					auto comp = obj->AddComponent<CameraComponent>();
 				}
 
 				ImGui::EndPopup();

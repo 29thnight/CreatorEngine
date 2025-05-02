@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
+#include "Core.Minimal.h"
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -35,8 +35,6 @@ public:
 		{
 			return;
 		}
-		//m_lightIndex = scene->AddLightCount();
-		//Light& light = scene->GetLightProperties().m_lights[m_lightIndex];
         auto pair = scene->AddLight();
 		m_lightIndex = pair.first;
         Light& light = pair.second;
@@ -52,6 +50,7 @@ public:
 		light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
 		light.m_lightType = static_cast<int>(m_lightType);
 		light.m_lightStatus = static_cast<int>(m_lightStatus);
+        light.m_range = m_range;
 		light.m_intencity = m_intencity;
     }
 
@@ -69,6 +68,7 @@ public:
         light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
         light.m_lightType = static_cast<int>(m_lightType);
         light.m_lightStatus = static_cast<int>(m_lightStatus);
+        light.m_range = m_range;
         light.m_intencity = m_intencity;
     }
 
@@ -96,14 +96,16 @@ public:
     [[Property]]
     float m_quadraticAttenuation{ 0.032f };
     [[Property]]
-    float m_spotLightAngle{ 60.f };
+    float m_spotLightAngle{ 30.f };
 
     [[Property]]
     LightType m_lightType{ DirectionalLight };
     [[Property]]
     LightStatus m_lightStatus{ Enabled };
     [[Property]]
-    float m_intencity{ 5.f };
+    float m_intencity{ 1.f };
+	[[Property]]
+	float m_range{ 10.f };
 
 private:
     bool m_IsEnabled{ false };

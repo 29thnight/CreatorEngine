@@ -21,8 +21,8 @@ public:
     {
 		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
     }
-    Object(const Object&) = delete;
-    Object(Object&&) = delete;
+    Object(const Object&) = default;
+    Object(Object&&) noexcept = default;
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
@@ -31,21 +31,10 @@ public:
     HashingString GetHashedName() const { return m_name; }
 
     void Destroy();
-    bool IsDestroyMark() const { return m_destroyMark.load(); }
-    bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad.load(); }
+    bool IsDestroyMark() const { return m_destroyMark; }
+    bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad; }
 
     void SetDontDestroyOnLoad(Object* objPtr);
-
-    //ReflectionField(Object)
-    //{
-    //    PropertyField
-    //    ({
-    //        meta_property(m_name)
-    //        meta_property(m_instanceID)
-    //    });
-
-    //    FieldEnd(Object, PropertyOnly)
-    //}
 public:
     [[Property]]
     HashingString     m_name{ "Object" };
@@ -56,6 +45,6 @@ protected:
 	HashedGuid        m_typeID{ TypeTrait::GUIDCreator::GetTypeID<Object>() };
     [[Property]]
     HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-    std::atomic<bool> m_destroyMark{ false };
-    std::atomic<bool> m_dontDestroyOnLoad{ false };
+	bool m_destroyMark{ false };
+	bool m_dontDestroyOnLoad{ false };
 };

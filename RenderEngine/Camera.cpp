@@ -49,6 +49,10 @@ Camera::~Camera()
 
 Mathf::xMatrix Camera::CalculateProjection(bool shadow)
 {
+	if (0 == m_nearPlane)
+	{
+		m_nearPlane = 0.1f;
+	}
 
 	if (shadow)
 	{
@@ -116,7 +120,7 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 {
 	DirectX::BoundingFrustum frustum;
 	frustum.CreateFromMatrix(frustum, CalculateProjection());
-	frustum.Transform(frustum, CalculateView());
+
 	return frustum;
 }
 
@@ -155,7 +159,6 @@ void Camera::HandleMovement(float deltaTime)
 	}
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
-	static XMVECTOR rotate = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
 	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
 	{
@@ -163,9 +166,6 @@ void Camera::HandleMovement(float deltaTime)
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
 		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
 
-		// Pitch 제한 적용
-		//m_pitch += deltaPitch;
-		
 		// 현재 회전 기준 축을 얻음
 		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
 
@@ -179,7 +179,6 @@ void Camera::HandleMovement(float deltaTime)
 		m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
 		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
 
-
 		// 새로운 방향 벡터 계산
 		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
 
@@ -192,18 +191,8 @@ void Camera::HandleMovement(float deltaTime)
 			m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
 			m_up = XMQuaternionNormalize(m_up);
 
-
-		//std::cout << XMVectorGetX(rightAxis) << ", " << XMVectorGetY(rightAxis) << ", " << XMVectorGetZ(rightAxis) << std::endl;
-
 		rotate = m_rotationQuat;
 	}
-
-	//if (InputManagement->IsMouseButtonDown(MouseKey::LEFT))
-	//{
-	//	m_rayDirection = RayCast(InputManagement->GetMousePos());
-	//	//std::cout << "MousePos" << InputManagement->GetMousePos().x << InputManagement->GetMousePos().y << std::endl;
-	//	//std::cout << "RayCast" << m_rayDirection.x << m_rayDirection.y << m_rayDirection.z << m_rayDirection.w << std::endl;
-	//}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
 	m_lookAt = m_eyePosition + m_forward;

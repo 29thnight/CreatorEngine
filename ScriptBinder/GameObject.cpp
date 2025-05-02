@@ -5,14 +5,14 @@
 
 GameObject::GameObject() :
 	Object("GameObject"),
-	m_gameObjectType(Type::Empty),
+	m_gameObjectType(GameObjectType::Empty),
 	m_index(0),
 	m_parentIndex(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 }
 
-GameObject::GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
     Object(name),
     m_gameObjectType(type),
     m_index(index), 
@@ -21,7 +21,7 @@ GameObject::GameObject(const std::string_view& name, GameObject::Type type, Game
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 }
 
-GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
 	Object(name, instanceID),
 	m_gameObjectType(type),
 	m_index(index),

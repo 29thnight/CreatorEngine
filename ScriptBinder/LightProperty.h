@@ -36,6 +36,7 @@ cbuffer Light
 
     int m_lightType{};
     int m_lightStatus{};
+    float m_range{ 10.f };
     float m_intencity{ 5.f };
 
     Mathf::Matrix GetLightViewMatrix() const

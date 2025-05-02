@@ -82,8 +82,17 @@ inline void EvalPointLight(SurfaceInfo surf, Light light, inout LightingInfo li)
     li.L = light.position.xyz - surf.posW.xyz;
     li.distance = length(li.L);
     li.L = normalize(li.L);
-    li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
+    //li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
 
+    if (li.distance > light.range)
+    {
+        li.attenuation = 0.0f;
+    }
+    else
+    {
+        li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
+    }
+    
     li.shadowFactor = 1;
     CalcCommonLightInfo(surf, li);
 }
@@ -93,7 +102,16 @@ inline void EvalSpotLight(SurfaceInfo surf, Light light, inout LightingInfo li)
     li.L = light.position.xyz - surf.posW.xyz;
     li.distance = length(li.L);
     li.L = normalize(li.L);
-    li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
+    //li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
+    if (li.distance > light.range)
+    {
+        li.attenuation = 0.0f;
+    }
+    else
+    {
+        li.attenuation = 1.0 / (light.constantAtt + light.linearAtt * li.distance + light.quadAtt * (li.distance * li.distance));
+    }
+    
     float minCos = cos(light.spotAngle);
     float maxCos = (minCos + 1.0f) / 2.0f; // squash between [0, 1]
     float cosAngle = dot(light.direction.xyz, -li.L);

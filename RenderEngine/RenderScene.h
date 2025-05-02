@@ -15,7 +15,6 @@ public:
 	RenderScene() = default;
 	~RenderScene();
 
-	Camera m_MainCamera;
 	LightController* m_LightController{};
 
 	void Initialize();
@@ -32,6 +31,8 @@ public:
 
 	Scene* GetScene() { return m_currentScene; }
 	GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
+
+	void ResetSelectedSceneObject();
 
 private:
 	friend class HierarchyWindow;

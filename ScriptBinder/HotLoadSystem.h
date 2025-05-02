@@ -42,8 +42,8 @@ private:
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	InitModuleFunc m_initModuleFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
-	std::string vcvarsall{ PathFinder::VS2022Path() };
-	std::string command{};
+	std::wstring vcvarsall{ PathFinder::MSBuildPath() };
+	std::wstring command{};
 
 #pragma region Script File String
 	std::string scriptIncludeString

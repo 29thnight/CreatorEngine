@@ -11,7 +11,6 @@ struct PixelShaderInput
 static const float PI = 3.14159265359;
 static const float SAMPLE_DELTA = 0.05;
 
-
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float3 irradiance = float3(0.0, 0.0, 0.0);

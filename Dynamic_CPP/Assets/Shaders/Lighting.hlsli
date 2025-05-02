@@ -27,6 +27,7 @@ struct Light
 
     int lightType;
     int status;
+    float range;
 };
 
 cbuffer LightProperties : register(b1)
@@ -66,7 +67,6 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
     
     int shadowIndex = 0;
     
-  
     float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
     float m_casCadeEnd[3] = { m_casCadeEnd1, m_casCadeEnd2, m_casCadeEnd3 };
     shadowIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :

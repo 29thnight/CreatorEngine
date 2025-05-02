@@ -3,9 +3,8 @@
 #include "Object.h"
 #include "Component.h"
 #include "Transform.h"
+#include "GameObjectType.h"
 #include "GameObject.generated.h"
-
-
 
 class Scene;
 class Bone;
@@ -26,13 +25,12 @@ public:
 		Bone,
 		TypeMax
 	};
-
    ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
 
-	GameObject(const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
-	GameObject(size_t instanceID, const std::string_view& name, GameObject::Type type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
@@ -73,7 +71,7 @@ public:
 
 	void RemoveComponent(Meta::Type& type);
 
-	GameObject::Type GetType() const { return m_gameObjectType; }
+	GameObjectType GetType() const { return m_gameObjectType; }
 
     static GameObject* Find(const std::string_view& name);
 
@@ -100,7 +98,8 @@ public:
 	std::vector<GameObject::Index> m_childrenIndices;
 
 public:
-	GameObject::Type m_gameObjectType{ GameObject::Type::Empty };
+	[[Property]]
+	GameObjectType m_gameObjectType{ GameObjectType::Empty };
 	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	
 	HashingString m_tag{};
@@ -112,7 +111,6 @@ public:
 	//debug layer
 	Bone* selectedBone{ nullptr };
 };
-
 
 #include "GameObejct.inl"
 

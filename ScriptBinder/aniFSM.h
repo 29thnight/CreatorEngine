@@ -15,7 +15,6 @@ public:
 	aniState* CurState = nullptr;
 	aniState* NextState = nullptr;
 
-
 	std::unordered_map<std::string, std::shared_ptr<aniState>> States;
 	std::unordered_map<std::string, std::vector<std::shared_ptr<AniTransition>>> Transitions;
 	

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Definition.h"
+#include "EngineSetting.h"
 #include <DbgHelp.h>
 
 #pragma comment(lib, "dbghelp.lib")
@@ -31,6 +32,7 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
         {
             fileName = fileName.substr(0, pos);
         }
+
         fileName += L".dmp";
     }
     HANDLE hFile = CreateFile(fileName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -62,5 +64,30 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
 
 
     CloseHandle(hFile);
+
+    std::wstring adsName = fileName + L":GitHash";
+    std::ofstream ads(adsName, std::ios::binary);
+    if (ads)
+    {
+        ads << EngineSettingInstance->GetGitVersionHash(); // 또는 g_EngineGitHash
+        ads.close();
+    }
 }
 
+inline std::wstring GetDumpGitHashADS(const std::wstring& dumpFilePath)
+{
+    std::wstring adsPath = dumpFilePath + L":GitHash";
+    std::ifstream ads(adsPath, std::ios::binary);
+
+    if (!ads.is_open())
+        return L"";
+
+    std::string hashData((std::istreambuf_iterator<char>(ads)), std::istreambuf_iterator<char>());
+    ads.close();
+
+    // UTF-8 to wide string 변환 (필요 시)
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, hashData.c_str(), -1, nullptr, 0);
+    std::wstring result(wlen, 0);
+    MultiByteToWideChar(CP_UTF8, 0, hashData.c_str(), -1, &result[0], wlen);
+    return result;
+}

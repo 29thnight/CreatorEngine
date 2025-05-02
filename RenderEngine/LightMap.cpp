@@ -382,7 +382,7 @@ namespace lm {
 		{
 			// light matrix
 			std::vector<CBLight> lightMats;
-			for (int i = 0; i < MAX_LIGHTS; i++) {
+			for (int i = 0; i < m_renderscene->m_LightController->m_lightCount; i++) {
 				// CB light
 				CBLight cblit = {};
 				auto& light = m_renderscene->m_LightController->GetLight(i);

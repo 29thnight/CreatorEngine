@@ -4,16 +4,101 @@
 #include "ModuleBehavior.h"
 #include "pugixml.hpp"
 
+std::string AnsiToUtf8(const std::string& ansiStr)
+{
+    // ANSI → Wide
+    int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiStr.c_str(), -1, nullptr, 0);
+    std::wstring wide(wideLen, 0);
+    MultiByteToWideChar(CP_ACP, 0, ansiStr.c_str(), -1, &wide[0], wideLen);
+
+    // Wide → UTF-8
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    std::string utf8(utf8Len, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &utf8[0], utf8Len, nullptr, nullptr);
+
+    return utf8;
+}
+
+void RunMsbuildWithLiveLog(const std::wstring& commandLine)
+{
+    HANDLE hRead, hWrite;
+    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+    if (!CreatePipe(&hRead, &hWrite, &sa, 0))
+    {
+        __debugbreak();
+    }
+
+    STARTUPINFOW si = { sizeof(STARTUPINFOW) };
+    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.hStdOutput = hWrite;
+    si.hStdError = hWrite; // 오류도 같은 파이프로
+    si.hStdInput = NULL;
+
+    PROCESS_INFORMATION pi;
+
+    std::wstring fullCommand = commandLine;
+
+    if (!CreateProcessW(NULL, &fullCommand[0], NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+    {
+        throw std::runtime_error("Build failed");
+    }
+
+    CloseHandle(hWrite); // 부모는 읽기만 하면 됨
+
+    char buffer[4096]{};
+    DWORD bytesRead;
+    std::string leftover;
+
+    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, nullptr))
+    {
+        if (bytesRead == 0) break;
+        buffer[bytesRead] = '\0';
+
+        leftover += buffer;
+
+        size_t pos;
+        while ((pos = leftover.find('\n')) != std::string::npos)
+        {
+            std::string line = leftover.substr(0, pos);
+            leftover.erase(0, pos + 1);
+
+            if (line.empty())
+            {
+                continue;
+            }
+
+            std::string utf8Line = AnsiToUtf8(line);
+            if (line.find("error") != std::string::npos || line.find("error C") != std::string::npos)
+            {
+                Debug->LogError(utf8Line);
+            }
+            else if (line.find("warning") != std::string::npos || line.find("warning C") != std::string::npos)
+            {
+                Debug->LogWarning(utf8Line);
+            }
+            else
+            {
+                Debug->LogDebug(line);
+            }
+        }
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    CloseHandle(hRead);
+}
+
 void HotLoadSystem::Initialize()
 {
-	command = std::string
-	{
-		std::string("cmd /c \"") +
-		vcvarsall +
-		" && msbuild " +
-		PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").string() +
-		" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /nologo\""
-	};
+    std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
+    std::wstring msbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
+
+    command = std::wstring(L"cmd /c \"")
+        + L"\"" + msbuildExe + L"\" "
+        + L"\"" + slnPath + L"\" "
+        + L"/m /t:Build /p:Configuration=Debug /p:Platform=x64 /nologo"
+        + L"\"";
 
 	try
 	{
@@ -297,16 +382,20 @@ void HotLoadSystem::Compile()
 		hDll = nullptr;
 	}
 
-	int result = system(command.c_str());
-	if (result != 0)
-	{
-		throw std::runtime_error("Build failed");
-	}
+
+    try
+    {
+        RunMsbuildWithLiveLog(command);
+    }
+    catch (const std::exception& e)
+    {
+        throw std::runtime_error("Build failed");
+    }
 
 	hDll = LoadLibraryA(PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string().c_str());
 	if (!hDll)
 	{
-		throw std::runtime_error("Failed to load assembly");
+		throw std::runtime_error("Failed to load library");
 	}
 
 	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));

@@ -16,6 +16,7 @@
 #include "TimeSystem.h"
 #include "InputManager.h"
 #include "LightComponent.h"
+#include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -219,8 +220,6 @@ void SceneRenderer::InitializeImGui()
 				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
 					ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
 				}
-				//ImGui::Image((ImTextureID)lightMap.edgeTexture->m_pSRV, ImVec2(512, 512));
-				//ImGui::Image((ImTextureID)lightMap.structuredBufferSRV, ImVec2(512, 512));
 			}
 			else {
 				ImGui::Text("No LightMap");
@@ -278,9 +277,11 @@ void SceneRenderer::NewCreateSceneInitialize()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	m_renderScene->SetScene(scene);
-	//이제 곧 변경된다 라이트
 
-	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObject::Type::Light);
+	auto cameraObj = scene->CreateGameObject("Main Camera", GameObjectType::Camera);
+	auto cameraComponent = cameraObj->AddComponent<CameraComponent>();
+
+	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObjectType::Light);
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
 
 	ShadowMapRenderDesc desc;
@@ -310,7 +311,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	
 	if(ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
@@ -546,99 +546,4 @@ void SceneRenderer::ReloadShaders()
 	ShaderSystem->ReloadShaders();
 }
 
-void SceneRenderer::EditorView()
-{
-	if (m_bShowLogWindow)
-	{
-		ShowLogWindow();
-	}
 
-	if (m_bShowGridSettings)
-	{
-		ShowGridSettings();
-	}
-}
-
-void SceneRenderer::ShowLogWindow()
-{
-	static int levelFilter = spdlog::level::trace;
-	bool isClear = Debug->IsClear();
-	ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
-	if (ImGui::Button("Clear"))
-	{
-		Debug->Clear();
-	}
-	ImGui::SameLine();
-	ImGui::Combo("Log Filter", &levelFilter,
-		"Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
-
-	float sizeX = ImGui::GetContentRegionAvail().x;
-	float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
-
-	if (isClear)
-	{
-		Debug->toggleClear();
-		ImGui::End();
-		return;
-	}
-
-	auto entries = Debug->get_entries();
-	for (size_t i = 0; i < entries.size(); i++)
-	{
-		const auto& entry = entries[i];
-		bool is_selected = (i == selected_log_index);
-
-		if (entry.level != spdlog::level::trace && entry.level < levelFilter)
-			continue;
-
-		ImVec4 color;
-		switch (entry.level)
-		{
-		case spdlog::level::info: color = ImVec4(1, 1, 1, 1); break;
-		case spdlog::level::warn: color = ImVec4(1, 1, 0, 1); break;
-		case spdlog::level::err:  color = ImVec4(1, 0.4f, 0.4f, 1); break;
-		default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
-		}
-
-		if (is_selected)
-			ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
-
-		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
-
-		int stringLine = std::count(entry.message.begin(), entry.message.end(), '\n');
-
-        ImGui::PushID(i);
-		if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + entry.message).c_str(),
-			is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
-		{
-			selected_log_index = i;
-			std::regex pattern(R"(([A-Za-z]:\\.*))");
-			std::istringstream iss(entry.message);
-			std::string line;
-
-			while (std::getline(iss, line)) 
-			{
-				std::smatch match;
-				if (std::regex_search(line, match, pattern)) 
-				{
-					std::string fileDirectory = match[1].str();
-					DataSystems->OpenFile(fileDirectory);
-				}
-			}
-		}
-		ImGui::PopStyleColor();
-
-		if (is_selected)
-			ImGui::PopStyleColor();
-        ImGui::PopID();
-	}
-
-	ImGui::End();
-}
-
-void SceneRenderer::ShowGridSettings()
-{
-	ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
-	m_pGridPass->GridSetting();
-	ImGui::End();
-}

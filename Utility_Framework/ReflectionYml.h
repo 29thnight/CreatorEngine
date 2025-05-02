@@ -138,35 +138,35 @@ namespace Meta
 	{
 		if (node[prop.name])
 		{
-			if (prop.typeID == GUIDCreator::GetTypeID<int>())
+			if (prop.typeID == type_guid(int))
 			{
 				prop.setter(instance, node[prop.name].as<int>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<float>())
+			else if (prop.typeID == type_guid(float))
 			{
 				prop.setter(instance, node[prop.name].as<float>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<bool>())
+			else if (prop.typeID == type_guid(bool))
 			{
 				prop.setter(instance, node[prop.name].as<bool>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<std::string>())
+			else if (prop.typeID == type_guid(std::string))
 			{
 				prop.setter(instance, node[prop.name].as<std::string>());
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<HashingString>())
+			else if (prop.typeID == type_guid(HashingString))
 			{
 				prop.setter(instance, HashingString(node[prop.name].as<std::string>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<HashedGuid>())
+			else if (prop.typeID == type_guid(HashedGuid))
 			{
 				prop.setter(instance, HashedGuid(node[prop.name].as<uint32_t>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector2>())
+			else if (prop.typeID == type_guid(Mathf::Vector2))
 			{
 				prop.setter(instance, Mathf::Vector2(node[prop.name]["x"].as<float>(), node[prop.name]["y"].as<float>()));
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector3>())
+			else if (prop.typeID == type_guid(Mathf::Vector3))
 			{
 				prop.setter(instance, Mathf::Vector3(
 						node[prop.name]["x"].as<float>(), 
@@ -175,7 +175,7 @@ namespace Meta
 					)
 				);
 			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Vector4>())
+			else if (prop.typeID == type_guid(Mathf::Vector4))
 			{
 				prop.setter(instance, Mathf::Vector4(
 					node[prop.name]["x"].as<float>(),
@@ -185,7 +185,7 @@ namespace Meta
 				)
 				);
 			}
-            else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Color4>())
+            else if (prop.typeID == type_guid(Mathf::Color4))
             {
                 prop.setter(instance, Mathf::Color4(
                     node[prop.name]["r"].as<float>(), 
@@ -195,7 +195,7 @@ namespace Meta
                 )
                 );
             }
-			else if (prop.typeID == GUIDCreator::GetTypeID<Mathf::Quaternion>())
+			else if (prop.typeID == type_guid(Mathf::Quaternion))
 			{
 				prop.setter(instance, Mathf::Quaternion(
 						node[prop.name]["x"].as<float>(), 
@@ -204,14 +204,6 @@ namespace Meta
 						node[prop.name]["w"].as<float>()
 					)
 				);
-			}
-			else if (prop.typeID == GUIDCreator::GetTypeID<std::vector<int>>())
-			{
-				if(!node[prop.name].IsNull())
-				{
-					auto vec = node[prop.name].as<std::vector<int>>();
-					prop.setter(instance, &vec);
-				}
 			}
 			else if (prop.typeID == GUIDCreator::GetTypeID<FileGuid>())
 			{
@@ -285,29 +277,29 @@ namespace Meta
 					}
 					else
 					{
-						HashingString ty_name = prop.elementTypeName.c_str();
+						HashedGuid ty_name = prop.elementTypeID;
 
-						if (ty_name == HashingString("int"))
+						if (ty_name == type_guid(int))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<int*>(element));
 						}
-						else if (ty_name == HashingString("float"))
+						else if (ty_name == type_guid(float))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<float*>(element));
 						}
-						else if (ty_name == HashingString("bool"))
+						else if (ty_name == type_guid(bool))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<bool*>(element));
 						}
-						else if (ty_name == HashingString("std::string"))
+						else if (ty_name == type_guid(std::string))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<std::string*>(element));
 						}
-						else if (ty_name == HashingString("HashingString"))
+						else if (ty_name == GUIDCreator::GetTypeID<HashingString>())
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(static_cast<HashingString*>(element)->ToString());
@@ -430,7 +422,100 @@ namespace Meta
 			{
 				if (prop.isPointer)
 				{
+					const MetaYml::Node& subNode = node[prop.name];
+					if (!subNode || !subNode.IsMap()) continue;
+
+					// 1. 타입 정보 추출
+					const Type* subType = MetaDataRegistry->Find(prop.typeName);
+					if (!subType)
+					{
+						Debug->LogError("Deserialize Pointer: Type not found");
+						continue;
+					}
+
+					// 2. 인스턴스 생성
+					void* newPtr = MetaFactoryRegistry->Create(prop.typeName);
+					if (!newPtr)
+					{
+						Debug->LogError("Deserialize Pointer: Factory create failed");
+						continue;
+					}
+
+					// 3. 역직렬화
+					Deserialize(newPtr, *subType, subNode);
+
+					std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, newPtr);
+					if (boxed.has_value())
+						prop.setter(instance, boxed);
 					continue;
+				}
+
+				if (prop.isVector && !prop.isElementPointer)
+				{
+					const YAML::Node& arrayNode = node[prop.name];
+					if (!arrayNode || !arrayNode.IsSequence())
+						continue;
+
+					if (prop.elementTypeID == type_guid(int))
+					{
+						auto vec = node[prop.name].as<std::vector<int>>();
+						auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(float))
+					{
+						auto vec = node[prop.name].as<std::vector<float>>();
+						auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(bool))
+					{
+						auto vec = node[prop.name].as<std::vector<bool>>();
+						auto castInstance = reinterpret_cast<std::vector<bool>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(std::string))
+					{
+						auto vec = node[prop.name].as<std::vector<std::string>>();
+						auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->push_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(HashingString))
+					{
+						auto vec = node[prop.name].as<std::vector<std::string>>();
+						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->emplace_back(elem);
+						}
+					}
+					else
+					{
+						void* rawVecPtr = VectorFactory->Create(prop.typeID);
+						if (!rawVecPtr) continue;
+
+						std::any boxed = TypeCast->MakeAnyFromRaw(prop.typeInfo, rawVecPtr);
+						if (boxed.has_value())
+							prop.setter(instance, boxed);
+
+						const Type* elementType = MetaDataRegistry->Find(prop.elementTypeID);
+						if (!elementType) continue;
+
+						VectorInvoker->Invoke(prop.typeID, rawVecPtr, arrayNode, elementType);
+						continue;
+					}
 				}
 
 				if (const Type* subType = MetaDataRegistry->Find(prop.typeName))

@@ -76,6 +76,9 @@
     <Filter Include="Core.Coroutine">
       <UniqueIdentifier>{762822fa-b780-4fa8-9113-9a9c4d4751ae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Octree">
+      <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -215,6 +218,24 @@
     </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.OctreeNode.h">
+      <Filter>Core.Octree</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.OctreeManager.h">
+      <Filter>Core.Octree</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionVectorFactory.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionVectorMapper.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectionVectorInvoker.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugStreamBuf.h">
+      <Filter>Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

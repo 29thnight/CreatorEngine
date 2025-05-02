@@ -131,7 +131,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		}
 		if (mat->m_pEmissive)
 		{
-			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 		//36 skinedMesh Draw -> FrameDrop : 형편없구만
 		meshRenderer->m_Mesh->Draw();
