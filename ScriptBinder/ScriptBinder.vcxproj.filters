@@ -138,16 +138,16 @@
     <ClCompile Include="PhysicsManager.cpp">
       <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
-    <ClCompile Include="ColliderComponent.cpp">
+    <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="BoxColliderComponent.cpp">
-      <Filter>Classes</Filter>
-    </ClCompile>
     <ClCompile Include="CapsuleColliderComponent.cpp">
-      <Filter>Classes</Filter>
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
     <ClCompile Include="CharacterControllerComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="TerrainCollider.cpp">
       <Filter>Classes</Filter>
     </ClCompile>
   </ItemGroup>
@@ -269,12 +269,6 @@
     <ClInclude Include="CapsuleColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="ConvexMeshColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="HeightFieldColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="CharacterControllerComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
@@ -282,6 +276,12 @@
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="RaycastComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainCollider.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshCollider.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">

@@ -6,12 +6,18 @@
 #include "../Physics/ICollider.h"
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
+#include "directxtk\SimpleMath.h"
+#include "CharacterControllerComponent.generated.h"
 
 class CharacterControllerComponent : public Component, public ICollider
 {
 public:
-	CharacterControllerComponent();
-	~CharacterControllerComponent() override;
+
+   
+   
+   ReflectCharacterControllerComponent
+	[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(CharacterControllerComponent)
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };

@@ -178,8 +178,7 @@ namespace Meta
                 }
 				ImGui::PopID();
             }
-            else if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>()
-                || hash == GUIDCreator::GetTypeID<Mathf::Quaternion>())
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Vector4>())
             {
                 auto value = std::any_cast<Mathf::Vector4>(prop.getter(instance));
 				ImGui::PushID(prop.name);
@@ -189,6 +188,17 @@ namespace Meta
                     prop.setter(instance, value);
                 }
 				ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<Mathf::Quaternion>())
+            {
+                auto value = std::any_cast<Mathf::Quaternion>(prop.getter(instance));
+                ImGui::PushID(prop.name);
+                if (ImGui::DragFloat4(prop.name, &value.x, 0.1f))
+                {
+                    MakePropChangeCommand(instance, prop, value);
+                    prop.setter(instance, value);
+                }
+                ImGui::PopID();
             }
             else if (hash == GUIDCreator::GetTypeID<Mathf::Color4>())
             {

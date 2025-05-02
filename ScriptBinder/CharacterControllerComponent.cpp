@@ -1,13 +1,5 @@
 #include "CharacterControllerComponent.h"
 
-CharacterControllerComponent::CharacterControllerComponent()
-{
-}
-
-CharacterControllerComponent::~CharacterControllerComponent()
-{
-}
-
 void CharacterControllerComponent::OnStart()
 {
 	m_transform = &(GetOwner()->m_transform);
@@ -53,14 +45,14 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 		x = 0.0f;
 	}
 
-	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3::Zero;
+	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 	input.x = x;
 	input.z = z;
 
 	//케릭터 컨트롤러
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
 
-	m_bOnMove = input != DirectX::SimpleMath::Vector3::Zero;
+	m_bOnMove = input != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 	input.Normalize();
 
 	CharactorControllerInputInfo inputInfo;
@@ -78,10 +70,10 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 		
 		input.Normalize();
 
-		if (input == DirectX::SimpleMath::Vector3::Backward) {
+		if (input == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f }) {
 			m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(input, { 0.0f,-1.0f,0.0f }));
 		}
-		else if (input != DirectX::SimpleMath::Vector3::Zero) {
+		else if (input != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
 			m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(input, { 0.0f,1.0f,0.0f }));
 		}
 	}

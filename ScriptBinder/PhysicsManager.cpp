@@ -252,8 +252,8 @@ void PhysicsManager::AddCollider(GameObject* object)
 		auto box = object->GetComponent<BoxColliderComponent>();
 		auto type = box->GetColliderType();
 		auto boxInfo = box->m_Info;
-		auto tranformOffset = box->GetOffsetTransform();
-		auto rotationOffset = box->GetOffsetRotation();
+		auto tranformOffset = box->GetPositionOffset();
+		auto rotationOffset = box->GetRotationOffset();
 
 		
 		unsigned int colliderId = ++m_lastColliderID;
