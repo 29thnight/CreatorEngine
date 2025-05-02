@@ -6,9 +6,6 @@
 #include "UIComponent.h"
 #include "ImageComponent.generated.h"
 #include <DirectXTK/SpriteBatch.h>
-class Texture;
-class UIMesh;
-class Canvas;
 
 struct alignas(16) ImageInfo
 {
@@ -20,6 +17,9 @@ struct alignas(16) ImageInfo
 
 
 //모든 2d이미지 기본?
+class Texture;
+class UIMesh;
+class Canvas;
 class ImageComponent : public UIComponent, public IUpdatable
 {
 public:

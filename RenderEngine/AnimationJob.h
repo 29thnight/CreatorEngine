@@ -18,8 +18,13 @@ private:
 	void PrepareAnimation();
     void CleanUp();
     void UpdateBones(Animator& animator);
-    void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& transform, float time);
 
+    //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
+    void UpdateBlendBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& Transform, float time ,float nextanitime);
+    void UpdateBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& Transform, float time);
+
+    XMMATRIX BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t);
+    XMMATRIX calculAni(NodeAnimation& nodeAnim, float time);
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;

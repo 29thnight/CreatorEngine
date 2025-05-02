@@ -1,28 +1,36 @@
 #include "TestPlayer.h"
 #include "InputManager.h"
 #include "Animator.h"
-#include "aniFSM.h"
+#include "AnimationController.h"
 #include "AniTransition.h"
+#include "AnimationBehviourFatory.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
-	auto fsm = player->AddComponent<aniFSM>();
-	fsm->SetAnimator(player->GetComponent<Animator>());
-	fsm->CreateState<IdleAni>("Idle");
-	fsm->CreateState<WalkAni>("Walk");
-	fsm->CreateState<RunAni>("Run");
-	fsm->SetCurState("Idle");
+	auto animation = player->GetComponent<Animator>();
+	animation->CreateController();
+	auto controller = animation->GetController();
+	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
+	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
+	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });
+	controller->CreateState("Idle");
+	controller->CreateState("Walk");
+	controller->CreateState("Run");
+	controller->SetCurState("Idle");
+	controller->AddParameter("Speed",player->speed,ValueType::Float);
+	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, ConditionType::Greater,ValueType::Float);
+	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, ConditionType::Less, ValueType::Float);
+	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, ConditionType::Greater, ValueType::Float);
+	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, ConditionType::Less, ValueType::Float);
+	
 
-	fsm->CreateTransition("Idle", "Walk")->AddCondition(&speed, 0.3f, conditionType::Greater);
-	fsm->CreateTransition("Walk", "Idle")->AddCondition(&speed, 0.3f, conditionType::Less);
-	/*AniTransition movetoRun;
-	bool canRun = true;
-	movetoRun.AddCondition(&canRun, true, conditionType::Equal);*/
 }
 
 void TestPlayer::Update(float deltaTime)
 {
-	auto ani = player->GetComponent<Animator>();
+	auto _player = GameObject::Find("aniTest");
+	auto ani = _player->GetComponent<Animator>();
+	auto controller = ani->GetController();
 	if (InputManagement->IsKeyDown('1'))
 	{
 		std::cout << "press 1" << std::endl;
@@ -39,23 +47,33 @@ void TestPlayer::Update(float deltaTime)
 		ani->SetAnimation(1);
 	}
 	float dir{};
-	if (InputManagement->IsKeyPressed(VK_RIGHT))
+	if (InputManagement->IsKeyPressed('P'))
 	{
 		dir = 1.0f;
-		speed += 0.01;
+		_player->speed += 0.01;
 	}
-	else if(InputManagement->IsKeyPressed(VK_LEFT))
+	else if(InputManagement->IsKeyPressed('O'))
 	{
 		dir = -1.0f;
-		speed += 0.01;
+		_player->speed += 0.01;
 	}
 	else
 	{
-		speed = 0;
+		if (_player->speed > 0.0f)
+		{
+			_player->speed -= 0.05f;
+			if (_player->speed < 0.0f)
+				_player->speed = 0.0f;
+		}
 	}
 
 	
-	if (speed >= maxSpeed)
-		speed = maxSpeed;
+	if (_player->speed >= maxSpeed)
+		_player->speed = maxSpeed;
+
+	controller->SetParameter("Speed", _player->speed);
+	//std::cout << _player->speed << std::endl;
+
+	
 	//player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });
 }

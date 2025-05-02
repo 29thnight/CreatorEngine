@@ -153,10 +153,12 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="aniFSM.cpp" />
+    <ClCompile Include="AnimationController.cpp" />
     <ClCompile Include="Animator.cpp" />
-    <ClCompile Include="aniState.cpp" />
+    <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
+    <ClCompile Include="ColliderComponent.cpp" />
+    <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
@@ -171,6 +173,7 @@
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
     <ClCompile Include="TextComponent.cpp" />
+    <ClCompile Include="TransCondition.cpp" />
     <ClCompile Include="UIButton.cpp" />
     <ClCompile Include="ImageComponent.cpp" />
     <ClCompile Include="Transform.cpp" />
@@ -178,9 +181,13 @@
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="aniFSM.h" />
+    <ClInclude Include="AnimationBehviourFatory.h" />
+    <ClInclude Include="AniBehaviour.h" />
+    <ClInclude Include="AnimationController.h" />
     <ClInclude Include="Animator.h" />
-    <ClInclude Include="aniState.h" />
+    <ClInclude Include="AnimationState.h" />
+    <ClInclude Include="AvatarMask.h" />
+    <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
@@ -211,6 +218,7 @@
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
@@ -219,6 +227,7 @@
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
+    <ClInclude Include="TransCondition.h" />
     <ClInclude Include="UIButton.h" />
     <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />

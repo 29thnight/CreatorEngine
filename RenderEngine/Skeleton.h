@@ -1,9 +1,20 @@
 #pragma once
 #include "Core.Minimal.h"
 
+enum class BoneRegion
+{
+	None,
+	Spine,
+	LeftArm,
+	RightArm,
+	LeftLeg,
+	RightLeg,
+};
+AUTO_REGISTER_ENUM(BoneRegion)
+
+
 class Bone;
 class Animation;
-
 class Skeleton
 {
 public:
@@ -18,7 +29,12 @@ public:
 	static constexpr uint32 MAX_BONES{ 512 };
 
 	Bone* FindBone(const std::string_view& _name);
+
+	void MarkRegionSkeleton();
+	void MarkRegion(Bone* bone, BoneRegion region);
 };
+
+std::string ToLower(std::string boneName);
 
 class Bone
 {
@@ -29,7 +45,7 @@ public:
 	Mathf::xMatrix m_globalTransform;
 	Mathf::xMatrix m_offset;
 	std::vector<Bone*> m_children;
-
+	BoneRegion m_region = BoneRegion::Spine;
     Bone() = default;
 	Bone(const std::string& _name, int _index, const Mathf::xMatrix& _offset) :
 		m_name(_name),

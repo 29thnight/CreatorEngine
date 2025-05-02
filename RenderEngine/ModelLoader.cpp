@@ -479,12 +479,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_animator->SetEnabled(true);
 			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
-
-			for (auto ani : m_model->m_Skeleton->m_animations)
-			{
-				m_animator->m_aniName.push_back(ani.m_name);
-				//m_animator->aniName = ani.m_name;
-			}
+			
+			//for (auto ani : m_model->m_Skeleton->m_animations)
+			//{
+			//	m_animator->aniName.push_back(ani.m_name);
+			//	//m_animator->aniName = ani.m_name;
+			//}
 		}
 
 		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
@@ -578,12 +578,14 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		{
 			m_animator = rootObject->AddComponent<Animator>();
 			m_animator->SetEnabled(true);
+			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
 
-			for (auto ani : m_model->m_Skeleton->m_animations)
-			{
-				m_animator->m_aniName.push_back(ani.m_name);
-			}
+			//for (auto ani : m_model->m_Skeleton->m_animations)
+			//{
+			//	m_animator->aniName.push_back(ani.m_name);
+			//	//m_animator->aniName = ani.m_name;
+			//}
 		}
 
 		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
