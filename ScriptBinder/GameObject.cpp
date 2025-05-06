@@ -76,6 +76,19 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
     return component.get();
 }
 
+std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
+{
+    HashedGuid typeID = type.typeID;
+    auto iter = m_componentIds.find(typeID);
+    if (iter != m_componentIds.end())
+    {
+        size_t index = m_componentIds[typeID];
+        return m_components[index];
+    }
+
+    return nullptr;
+}
+
 
 GameObject* GameObject::Find(const std::string_view& name)
 {

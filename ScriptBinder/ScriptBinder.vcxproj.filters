@@ -79,6 +79,18 @@
     <Filter Include="Classes\Components\CameraComponent">
       <UniqueIdentifier>{89b93491-3dc7-498f-8fa1-5063dec42141}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\CSharpScriptComponent">
+      <UniqueIdentifier>{e2c6af93-4c68-476b-bf4c-cf8e7a09dddc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\MonoManager">
+      <UniqueIdentifier>{7eb49c68-a217-46ec-bd7c-580f066b3be3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Mono">
+      <UniqueIdentifier>{f6f85cb4-3a05-4d13-886b-db21e155d7ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\MonoManager\MonoBindingFunction">
+      <UniqueIdentifier>{f67e27a4-7f8c-4409-b724-e48ff17528db}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -135,9 +147,6 @@
     <ClCompile Include="AniTransition.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
-    <ClCompile Include="PhysicsManager.cpp">
-      <Filter>Managers\PhysicsManager</Filter>
-    </ClCompile>
     <ClCompile Include="TransCondition.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
@@ -146,6 +155,12 @@
     </ClCompile>
     <ClCompile Include="ColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="MonoManager.cpp">
+      <Filter>Managers\MonoManager</Filter>
+    </ClCompile>
+    <ClCompile Include="MonoObjectBinding.cpp">
+      <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -260,9 +275,6 @@
     <ClInclude Include="IColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="PhysicsManager.h">
-      <Filter>Managers\PhysicsManager</Filter>
-    </ClInclude>
     <ClInclude Include="TransCondition.h">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClInclude>
@@ -292,6 +304,18 @@
     </ClInclude>
     <ClInclude Include="GameObjectType.h">
       <Filter>Classes\GameObject</Filter>
+    </ClInclude>
+    <ClInclude Include="MonoManager.h">
+      <Filter>Managers\MonoManager</Filter>
+    </ClInclude>
+    <ClInclude Include="MonoBehaviorRecord.h">
+      <Filter>Classes\Resources\Mono</Filter>
+    </ClInclude>
+    <ClInclude Include="CSharpScriptComponent.h">
+      <Filter>Classes\Components\CSharpScriptComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="MonoObjectBinding.h">
+      <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

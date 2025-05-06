@@ -34,6 +34,7 @@ public:
 	virtual void LateUpdate(float tick) {};
 
 public:
+    Core::DelegateHandle m_onEnableEventHandle{};
 	Core::DelegateHandle m_startEventHandle{};
 	Core::DelegateHandle m_fixedUpdateEventHandle{};
 	Core::DelegateHandle m_onTriggerEnterEventHandle{};
@@ -44,6 +45,8 @@ public:
 	Core::DelegateHandle m_onCollisionExitEventHandle{};
 	Core::DelegateHandle m_updateEventHandle{};
 	Core::DelegateHandle m_lateUpdateEventHandle{};
+    Core::DelegateHandle m_onDisableEventHandle{};
+    Core::DelegateHandle m_onDestroyEventHandle{};
 	[[Property]]
 	FileGuid m_scriptGuid{};
 };

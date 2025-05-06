@@ -42,8 +42,9 @@ public:
     void SetName(const std::string_view& name) { m_name = name.data(); }
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
-
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
+
+    std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 
 	template<typename T>
 	T* AddComponent();
