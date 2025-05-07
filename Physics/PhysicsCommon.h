@@ -7,6 +7,11 @@
 
 //type id 
 const static uint32_t m_boxTypeId = 9001;
+const static uint32_t m_sphereTypeId = 9002;
+const static uint32_t m_capsuleTypeId = 9003;
+const static uint32_t m_planeTypeId = 9004;
+const static uint32_t m_heightFieldTypeId = 9005;
+const static uint32_t m_controllerTypeId = 9006;
 
 
 

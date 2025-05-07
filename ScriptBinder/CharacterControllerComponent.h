@@ -8,6 +8,7 @@
 #include "RigidBodyComponent.h"
 #include "InputManager.h"
 #include "directxtk\SimpleMath.h"
+#include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
 class CharacterControllerComponent : public Component, public ICollider
@@ -19,8 +20,19 @@ public:
    ReflectCharacterControllerComponent
 	[[Serializable(Inheritance:Component)]]
    CharacterControllerComponent() {
-	   m_name = "CharacterControllerComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
-   } virtual ~CharacterControllerComponent() = default;
+	   m_name = "CharacterControllerComponent"; 
+	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
+
+	   m_onStartHandle = SceneManagers->GetActiveScene()->StartEvent.AddRaw(this, &CharacterControllerComponent::OnStart);
+	   m_onFixedUpdateHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnFixedUpdate);
+	   m_onLateUpdateHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnLateUpdate);
+
+
+   } virtual ~CharacterControllerComponent() {
+	   SceneManagers->GetActiveScene()->StartEvent.Remove(m_onStartHandle);
+	   SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(m_onFixedUpdateHandle);
+	   SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(m_onLateUpdateHandle);
+   };
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
@@ -35,7 +47,10 @@ public:
 	void OnLateUpdate(float fixedDeltaTime);
 
 	//==========================
-
+	Core::DelegateHandle m_onStartHandle;
+	Core::DelegateHandle m_onFixedUpdateHandle;
+	Core::DelegateHandle m_onLateUpdateHandle;
+	//==========================
 
 
 

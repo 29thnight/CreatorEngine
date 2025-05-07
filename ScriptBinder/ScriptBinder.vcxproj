@@ -168,6 +168,7 @@
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="Object.cpp" />
+    <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />

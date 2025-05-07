@@ -261,7 +261,7 @@ void PhysicX::Update(float fixedDeltaTime)
 
 		//대기중인 케릭터 컨트롤러를 생성예정 리스트에 추가
 		for (auto& controllerInfo : m_waittingCCTList) {
-			m_waittingCCTList.push_back(controllerInfo);
+			m_updateCCTList.push_back(controllerInfo);
 		}
 		m_waittingCCTList.clear();
 	}
@@ -904,7 +904,7 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
 {
 	CharacterControllerGetSetData data;
-	if (m_characterControllerContainer.find(id) == m_characterControllerContainer.end())
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
 	{
 		auto& controller = m_characterControllerContainer[id];
 		physx::PxController* pxController = controller->GetController();

@@ -171,6 +171,9 @@
     <ClCompile Include="TerrainCollider.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
+    <ClCompile Include="PhysicsManager.cpp">
+      <Filter>Managers\PhysicsManager</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ModuleBehavior.h">
