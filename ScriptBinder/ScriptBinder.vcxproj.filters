@@ -153,14 +153,23 @@
     <ClCompile Include="AvatarMask.cpp">
       <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
     </ClCompile>
-    <ClCompile Include="ColliderComponent.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClCompile>
     <ClCompile Include="MonoManager.cpp">
       <Filter>Managers\MonoManager</Filter>
     </ClCompile>
     <ClCompile Include="MonoObjectBinding.cpp">
       <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="BoxColliderComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="CapsuleColliderComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterControllerComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="TerrainCollider.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -266,13 +275,7 @@
     <ClInclude Include="BoxColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="ColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="RigidBodyComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="IColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="TransCondition.h">
@@ -316,6 +319,30 @@
     </ClInclude>
     <ClInclude Include="MonoObjectBinding.h">
       <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsManager.h">
+      <Filter>Managers\PhysicsManager</Filter>
+    </ClInclude>
+    <ClInclude Include="CapsuleColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterControllerComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshCollider.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RagdollComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="RaycastComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="SphereColliderComponent.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainCollider.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

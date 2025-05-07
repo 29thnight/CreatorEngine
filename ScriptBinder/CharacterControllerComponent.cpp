@@ -17,10 +17,10 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	}
 	
 	//todo : input 값 받아오기
-	bool foward = InputManagement->IsKeyPressed(KeyBoard::W);
-	bool backward = InputManagement->IsKeyPressed(KeyBoard::S);
-	bool left = InputManagement->IsKeyPressed(KeyBoard::A);
-	bool right = InputManagement->IsKeyPressed(KeyBoard::D);
+	bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
+	bool backward = InputManagement->IsKeyPressed(KeyBoard::DownArrow);
+	bool left = InputManagement->IsKeyPressed(KeyBoard::LeftArrow);
+	bool right = InputManagement->IsKeyPressed(KeyBoard::RightArrow);
 
 	float x = 0.0f;
 	float z = 0.0f;

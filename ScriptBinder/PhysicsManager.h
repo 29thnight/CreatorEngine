@@ -101,6 +101,8 @@ private:
 	void GetPhysicData();
 
 	unsigned int m_lastColliderID{ 0 };
+
+
 	
 	//물리엔진 객체
 	std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;

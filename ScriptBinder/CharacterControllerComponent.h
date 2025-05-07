@@ -18,7 +18,9 @@ public:
    
    ReflectCharacterControllerComponent
 	[[Serializable(Inheritance:Component)]]
-	GENERATED_BODY(CharacterControllerComponent)
+   CharacterControllerComponent() {
+	   m_name = "CharacterControllerComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
+   } virtual ~CharacterControllerComponent() = default;
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
