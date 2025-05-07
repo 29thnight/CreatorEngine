@@ -90,6 +90,38 @@ std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
 }
 
 
+void GameObject::RemoveComponent(uint32 id)
+{
+	if (id >= m_components.size())
+	{
+		return;
+	}
+
+	auto iter = m_componentIds.find(m_components[id]->GetTypeID());
+	if (iter != m_componentIds.end())
+	{
+		m_componentIds.erase(iter);
+	}
+	m_components[id]->Destroy();
+}
+
+void GameObject::RemoveComponent(const std::string_view& scriptName)
+{
+	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
+	if (iter != m_components.end())
+	{
+		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(*iter);
+		if (scriptComponent && scriptComponent->m_name == scriptName)
+		{
+			RemoveComponent(scriptComponent->GetTypeID());
+		}
+	}
+}
+
+void GameObject::RemoveComponent(Meta::Type& type)
+{
+}
+
 GameObject* GameObject::Find(const std::string_view& name)
 {
     Scene* scene = SceneManagers->GetActiveScene();

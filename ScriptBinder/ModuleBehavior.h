@@ -49,4 +49,5 @@ public:
     Core::DelegateHandle m_onDestroyEventHandle{};
 	[[Property]]
 	FileGuid m_scriptGuid{};
+	bool m_isCallStart{ false };
 };

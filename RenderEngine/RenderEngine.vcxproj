@@ -147,8 +147,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\ScriptBinder\InputManager.cpp" />
-    <ClCompile Include="..\ScriptBinder\KeyState.cpp" />
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
@@ -199,8 +197,6 @@
     <ClCompile Include="WireFramePass.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ScriptBinder\InputManager.h" />
-    <ClInclude Include="..\ScriptBinder\KeyState.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetMetaRegistry.h" />

@@ -91,6 +91,9 @@
     <Filter Include="Managers\MonoManager\MonoBindingFunction">
       <UniqueIdentifier>{f67e27a4-7f8c-4409-b724-e48ff17528db}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\InputManager">
+      <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -161,6 +164,12 @@
     </ClCompile>
     <ClCompile Include="MonoObjectBinding.cpp">
       <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="InputManager.cpp">
+      <Filter>Managers\InputManager</Filter>
+    </ClCompile>
+    <ClCompile Include="KeyState.cpp">
+      <Filter>Managers\InputManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -316,6 +325,12 @@
     </ClInclude>
     <ClInclude Include="MonoObjectBinding.h">
       <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="InputManager.h">
+      <Filter>Managers\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyState.h">
+      <Filter>Managers\InputManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -199,7 +199,14 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 			{
 				if (event == "Start")
 				{
-					script->Start();
+					SceneManagers->GetActiveScene()->StartEvent.AddLambda([=]() 
+					{
+						if (false == script->m_isCallStart)
+						{
+							script->Start();
+							script->m_isCallStart = true;
+						}
+					});
 				}
 				else if (event == "FixedUpdate")
 				{
@@ -242,6 +249,11 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 		}
 
 	}
+
+}
+
+void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name)
+{
 
 }
 

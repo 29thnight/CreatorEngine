@@ -26,6 +26,7 @@ public:
 	void CompileEvent();
 
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
+	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
 	void UpdateSceneManager(void* sceneManager)
 	{

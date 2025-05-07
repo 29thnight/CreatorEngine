@@ -13,7 +13,12 @@ class CameraComponent : public Component, public IRenderable, public IAwakable, 
 public:
    ReflectCameraComponent
 	[[Serializable(Inheritance:Component)]]
-	GENERATED_BODY(CameraComponent)
+   CameraComponent() 
+   {
+	   m_name = "CameraComponent"; 
+	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CameraComponent>();
+   } 
+   virtual ~CameraComponent() = default;
 
 	bool IsEnabled() const override
 	{
@@ -35,11 +40,6 @@ public:
 		if (m_cameraIndex != -1)
 		{
 			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
-			//else
-			//{
-			//	std::cout << "CameraComponent::Awake()else" << std::endl;
-			//	CameraManagement->ReplaceCamera(m_cameraIndex, m_pCamera);
-			//}
 		}
 		else
 		{
