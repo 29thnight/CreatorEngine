@@ -94,6 +94,9 @@
     <Filter Include="Managers\InputManager">
       <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\CPPScriptComponentBase">
+      <UniqueIdentifier>{c0240f3c-f504-4c8a-b947-eab47376032a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -173,9 +176,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ModuleBehavior.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="IObject.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -331,6 +331,12 @@
     </ClInclude>
     <ClInclude Include="KeyState.h">
       <Filter>Managers\InputManager</Filter>
+    </ClInclude>
+    <ClInclude Include="ModuleBehavior.h">
+      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
+    </ClInclude>
+    <ClInclude Include="ModuleBehaviorInfo.h">
+      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

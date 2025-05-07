@@ -22,6 +22,8 @@ public:
 	GENERATED_BODY(ModuleBehavior)
 
 public:
+	virtual void Awake() {};
+	virtual void OnEnable() {};
 	virtual void Start() {};
 	virtual void FixedUpdate(float fixedTick) {};
 	virtual void OnTriggerEnter(const Collision& collider) {};
@@ -32,6 +34,8 @@ public:
 	virtual void OnCollisionExit(const Collision& collider) {};
 	virtual void Update(float tick) {};
 	virtual void LateUpdate(float tick) {};
+	virtual void OnDisable() {};
+	virtual void OnDestroy() {};
 
 public:
     Core::DelegateHandle m_onEnableEventHandle{};
@@ -49,5 +53,7 @@ public:
     Core::DelegateHandle m_onDestroyEventHandle{};
 	[[Property]]
 	FileGuid m_scriptGuid{};
+
+public:
 	bool m_isCallStart{ false };
 };

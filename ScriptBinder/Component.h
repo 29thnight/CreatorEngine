@@ -16,8 +16,6 @@ public:
 	void SetOwner(GameObject* owner) { m_pOwner = owner; }
 	GameObject* GetOwner() const { return m_pOwner; }
 
-	void SetDestroy() { m_destroyMark = true; }
-
 protected:
 	GameObject*		m_pOwner{};
 	Transform		m_transform{};

@@ -6,6 +6,34 @@
 #include "pugixml.hpp"
 #include "ReflectionYml.h"
 
+#pragma region Script Event Binding Helper
+#define START_EVENT_BIND_HELPER(ScriptPtr) \
+	ScriptPtr->m_startEventHandle = SceneManagers->GetActiveScene()->StartEvent.AddLambda([=]() \
+	{ \
+		if (false == ScriptPtr->m_isCallStart) \
+		{ \
+			ScriptPtr->Start(); \
+			ScriptPtr->m_isCallStart = true; \
+		} \
+	})
+
+#define FIXED_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
+	SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::FixedUpdate)
+
+#define UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
+	SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::Update)
+
+#define LATE_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
+	SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::LateUpdate)
+
+#define ON_ENABLE_EVENT_BIND_HELPER(ScriptPtr) \
+	SceneManagers->GetActiveScene()->OnEnableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnEnable)
+
+#define ON_DISABLE_EVENT_BIND_HELPER(ScriptPtr) \
+	SceneManagers->GetActiveScene()->OnDisableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnDisable)
+
+#pragma endregion
+
 std::string AnsiToUtf8(const std::string& ansiStr)
 {
     // ANSI → Wide
@@ -179,14 +207,14 @@ void HotLoadSystem::CompileEvent()
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_view& name)
 {
-	std::string scriptBodyFileName = std::string(name) + ".cpp";
-	FileGuid guid = DataSystems->GetFilenameToGuid(scriptBodyFileName);
-	file::path scriptFullPath = DataSystems->GetFilePath(guid);
-	file::path scriptMetaPath = scriptFullPath += L".meta";
+	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
+	file::path scriptMetaFileName = std::string(name) + ".cpp" + ".meta";
+	FileGuid guid = DataSystems->GetFilenameToGuid(scriptMetaFileName.string());
+	file::path scriptMetaFullPath = DataSystems->GetFilePath(guid);
 
-	if (file::exists(scriptMetaPath))
+	if (file::exists(scriptMetaFullPath))
 	{
-		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaPath.string());
+		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFullPath.string());
 		std::vector<std::string> events;
 		if (scriptNode["eventRegisterSetting"])
 		{
@@ -199,55 +227,48 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 			{
 				if (event == "Start")
 				{
-					SceneManagers->GetActiveScene()->StartEvent.AddLambda([=]() 
-					{
-						if (false == script->m_isCallStart)
-						{
-							script->Start();
-							script->m_isCallStart = true;
-						}
-					});
+					START_EVENT_BIND_HELPER(script);
 				}
 				else if (event == "FixedUpdate")
 				{
-					SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(script, &ModuleBehavior::FixedUpdate);
+					FIXED_UPDATE_EVENT_BIND_HELPER(script);
 				}
-				else if (event == "OnTriggerEnter")
-				{
-					SceneManagers->GetActiveScene()->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnter);
-				}
-				else if (event == "OnTriggerStay")
-				{
-					SceneManagers->GetActiveScene()->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStay);
-				}
-				else if (event == "OnTriggerExit")
-				{
-					SceneManagers->GetActiveScene()->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExit);
-				}
-				else if (event == "OnCollisionEnter")
-				{
-					SceneManagers->GetActiveScene()->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnter);
-				}
-				else if (event == "OnCollisionStay")
-				{
-					SceneManagers->GetActiveScene()->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStay);
-				}
-				else if (event == "OnCollisionExit")
-				{
-					SceneManagers->GetActiveScene()->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExit);
-				}
+				//TODO : Physics System 완료되면 추가할 것
+				//else if (event == "OnTriggerEnter")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnter);
+				//}
+				//else if (event == "OnTriggerStay")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStay);
+				//}
+				//else if (event == "OnTriggerExit")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExit);
+				//}
+				//else if (event == "OnCollisionEnter")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnter);
+				//}
+				//else if (event == "OnCollisionStay")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStay);
+				//}
+				//else if (event == "OnCollisionExit")
+				//{
+				//	//SceneManagers->GetActiveScene()->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExit);
+				//}
 				else if (event == "Update")
 				{
-					SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(script, &ModuleBehavior::Update);
+					UPDATE_EVENT_BIND_HELPER(script);
 				}
 				else if (event == "LateUpdate")
 				{
-					SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(script, &ModuleBehavior::LateUpdate);
+					LATE_UPDATE_EVENT_BIND_HELPER(script);
 				}
 			}
 			
 		}
-
 	}
 
 }
@@ -294,23 +315,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			<< name
 			<< scriptCppEndBodyString
 			<< name
-			<< scriptCppEndFixedUpdateString
-			<< name
-			<< scriptCppEndOnTriggerEnterString
-			<< name
-			<< scriptCppEndOnTriggerStayString
-			<< name
-			<< scriptCppEndOnTriggerExitString
-			<< name
-			<< scriptCppEndOnCollisionEnterString
-			<< name
-			<< scriptCppEndOnCollisionStayString
-			<< name
-			<< scriptCppEndOnCollisionExitString
-			<< name
-			<< scriptCppEndUpdateString
-			<< name
-			<< scriptCppEndLateUpdateString;
+			<< scriptCppEndUpdateString;
 		scriptBodyFile.close();
 	}
 	else

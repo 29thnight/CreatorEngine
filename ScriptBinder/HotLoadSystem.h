@@ -76,16 +76,19 @@ private:
 		"{\n"
 		"public:\n"
 		"	"
+		"	virtual void Awake() override {}\n"
 		"	virtual void Start() override;\n"
-		"	virtual void FixedUpdate(float fixedTick) override;\n"
-		"	virtual void OnTriggerEnter(const Collision& collision) override;\n"
-		"	virtual void OnTriggerStay(const Collision& collision) override;\n"
-		"	virtual void OnTriggerExit(const Collision& collision) override;\n"
-		"	virtual void OnCollisionEnter(const Collision& collision) override;\n"
-		"	virtual void OnCollisionStay(const Collision& collision) override;\n"
-		"	virtual void OnCollisionExit(const Collision& collision) override;\n"
+		"	virtual void FixedUpdate(float fixedTick) override {}\n"
+		"	virtual void OnTriggerEnter(const Collision& collision) override {}\n"
+		"	virtual void OnTriggerStay(const Collision& collision) override {}\n"
+		"	virtual void OnTriggerExit(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionEnter(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionStay(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionExit(const Collision& collision) override {}\n"
 		"	virtual void Update(float tick) override;\n"
-		"	virtual void LateUpdate(float tick) override;\n"
+		"	virtual void LateUpdate(float tick) override {}\n"
+		"	virtual void OnDisable() override  {}\n"
+		"	virtual void OnDestroy() override  {}\n"
 	};
 
 	std::string scriptEndString
@@ -115,69 +118,6 @@ private:
 		"void "
 	};
 
-	std::string scriptCppEndFixedUpdateString
-	{
-		"::FixedUpdate(float fixedTick)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerEnterString
-	{
-		"::OnTriggerEnter(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerStayString
-	{
-		"::OnTriggerStay(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerExitString
-	{
-		"::OnTriggerExit(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionEnterString
-	{
-		"::OnCollisionEnter(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionStayString
-	{
-		"::OnCollisionStay(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionExitString
-	{
-		"::OnCollisionExit(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
 	std::string scriptCppEndUpdateString
 	{
 		"::Update(float tick)\n"
@@ -185,13 +125,6 @@ private:
 		"}\n"
 		"\n"
 		"void "
-	};
-
-	std::string scriptCppEndLateUpdateString
-	{
-		"::LateUpdate(float tick)\n"
-		"{\n"
-		"}\n"
 	};
 
 	std::string scriptFactoryIncludeString

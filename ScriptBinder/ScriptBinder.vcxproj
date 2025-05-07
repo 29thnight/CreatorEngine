@@ -212,6 +212,7 @@
     <ClInclude Include="LightMapping.h" />
     <ClInclude Include="LightProperty.h" />
     <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="ModuleBehaviorInfo.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="MonoManager.h" />
     <ClInclude Include="MonoObjectBinding.h" />
