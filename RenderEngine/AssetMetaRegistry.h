@@ -44,6 +44,13 @@ public:
         return it != m_pathToGuid.end() ? it->second : FileGuid{};
     }
 
+    FileGuid GetFilenameToGuid(const std::string& filename) const
+    {
+		auto it = std::find_if(m_pathToGuid.begin(), m_pathToGuid.end(),
+			[&filename](const auto& pair) { return pair.first.filename() == filename; });
+		return it != m_pathToGuid.end() ? it->second : FileGuid{};
+    }
+
     bool Contains(const FileGuid& guid) const
     {
         return m_guidToPath.contains(guid);

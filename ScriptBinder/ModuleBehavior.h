@@ -10,12 +10,15 @@
 
 #include "Component.h"
 #include "Scene.h"
+#include "ModuleBehavior.generated.h"
 
 struct ICollider;
 // 사용자가 새로운 컴포넌트를 추가할 때 유용한 기능을 받기 위한 컴포넌트
 class ModuleBehavior : public Component
 {
 public:
+   ReflectModuleBehavior
+	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(ModuleBehavior)
 
 public:
@@ -41,4 +44,6 @@ public:
 	Core::DelegateHandle m_onCollisionExitEventHandle{};
 	Core::DelegateHandle m_updateEventHandle{};
 	Core::DelegateHandle m_lateUpdateEventHandle{};
+	[[Property]]
+	FileGuid m_scriptGuid{};
 };

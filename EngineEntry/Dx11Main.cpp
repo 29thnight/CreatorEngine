@@ -36,19 +36,19 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
     g_progressWindow->SetStatusText(L"Script Building...");
 	ScriptManager->Initialize();
-    g_progressWindow->SetProgress(70);
+    g_progressWindow->SetProgress(65);
 
     g_progressWindow->SetStatusText(L"Initializing SoundManager...");
 	Sound->initialize((int)ChannelType::MaxChannel);
-    g_progressWindow->SetProgress(75);
+    g_progressWindow->SetProgress(70);
 
     g_progressWindow->SetStatusText(L"Loading Assets...");
 	DataSystems->Initialize();
-    g_progressWindow->SetProgress(80);
+    g_progressWindow->SetProgress(75);
     //CreateScene
     g_progressWindow->SetStatusText(L"Loading Project...");
     SceneManagers->CreateScene();
-    g_progressWindow->SetProgress(85);
+    g_progressWindow->SetProgress(80);
 
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
@@ -67,27 +67,25 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 		UIManagers->Update();
         Sound->update();
     });
-    g_progressWindow->SetProgress(86);
+    g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneManagers->SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
         m_sceneRenderer->OnWillRenderObject(deltaSecond);
         m_sceneRenderer->SceneRendering();
     });
-    g_progressWindow->SetProgress(87);
+    g_progressWindow->SetProgress(82);
 	m_OnGizmoEventHandle = SceneManagers->OnDrawGizmosEvent.AddLambda([&]()
 	{
 		m_gizmoRenderer->OnDrawGizmos();
 	});
-    g_progressWindow->SetProgress(88);
+    g_progressWindow->SetProgress(83);
     m_GUIRenderingEventHandle = SceneManagers->GUIRenderingEvent.AddLambda([&]()
     {
         OnGui();
     });
-    g_progressWindow->SetProgress(90);
+    g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();
-    g_progressWindow->SetProgress(100);
-
-    g_progressWindow->Close();
+    g_progressWindow->SetProgress(90);
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -139,7 +137,7 @@ void DirectX11::Dx11Main::Update()
 
 	if (InputManagement->IsKeyReleased(VK_F6))
 	{
-		//TODO: build key
+		ScriptManager->CompileEvent();
 	}
 
 	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))

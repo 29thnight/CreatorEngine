@@ -630,6 +630,21 @@ void DataSystem::OpenFile(const file::path& filepath)
 	}
 }
 
+FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
+{
+	return m_assetMetaRegistry->GetGuid(filepath);
+}
+
+FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const
+{
+	return m_assetMetaRegistry->GetFilenameToGuid(filename);
+}
+
+file::path DataSystem::GetFilePath(FileGuid fileguid) const
+{
+	return m_assetMetaRegistry->GetPath(fileguid);
+}
+
 void DataSystem::AddModel(const file::path& filepath, const file::path& dir)
 {
 	std::string name = file::path(filepath.filename()).replace_extension().string();

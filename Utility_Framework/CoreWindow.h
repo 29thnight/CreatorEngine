@@ -163,6 +163,7 @@ private:
         if (m_hWnd)
         {
             DragAcceptFiles(m_hWnd, TRUE);
+
             ShowWindow(m_hWnd, SW_SHOWNORMAL);
             UpdateWindow(m_hWnd);
         }

@@ -34,6 +34,14 @@ public:
     Scene* LoadScene(const std::string_view& name = "SampleScene", bool isAsync = false);
 
     void AddDontDestroyOnLoad(Object* objPtr);
+    
+	std::vector<Scene*>& GetScenes() { return m_scenes; }
+	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
+	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
+	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
+	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
+	bool IsGameStart() const { return m_isGameStart; }
+	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
 
 public:
 	//for Editor
@@ -54,6 +62,7 @@ public:
 
     bool                        m_isGameStart{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
+
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();

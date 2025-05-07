@@ -21,12 +21,6 @@
     <Filter Include="Utill\BT">
       <UniqueIdentifier>{c114c291-5ed0-48e5-8886-2d770a7c424e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Manager">
-      <UniqueIdentifier>{086e457e-5e4e-4007-9861-dc1d5f8a73d7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Manager\InputManager">
-      <UniqueIdentifier>{c6dc9f79-ddd1-48ae-bd6f-898034edd4ad}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
@@ -95,12 +89,6 @@
     <ClInclude Include="EngineEntry\Dx11Main.h">
       <Filter>Dx11Main</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\KeyState.h">
-      <Filter>Manager\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\InputManager.h">
-      <Filter>Manager\InputManager</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\ProjectSetting.h">
       <Filter>Settings</Filter>
     </ClInclude>
@@ -147,12 +135,6 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\Dx11Main.cpp">
       <Filter>Dx11Main</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\InputManager.cpp">
-      <Filter>Manager\InputManager</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\KeyState.cpp">
-      <Filter>Manager\InputManager</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
       <Filter>Window\HierarchyWindow</Filter>

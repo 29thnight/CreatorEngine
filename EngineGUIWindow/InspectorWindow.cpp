@@ -10,6 +10,7 @@
 #include "DataSystem.h"
 #include "PathFinder.h"
 #include "Transform.h"
+#include "ModuleBehavior.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
 
@@ -189,9 +190,16 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			for (auto& component : selectedSceneObject->m_components)
 			{
 				const auto& type = Meta::Find(component->ToString());
-				if (!type) continue;
+				ModuleBehavior* moduleBehavior{ dynamic_cast<ModuleBehavior*>(component.get()) };
+				std::string componentBaseName = component->ToString();
+				if (!type && !moduleBehavior) continue;
 
-				if (ImGui::CollapsingHeader(component->ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen));
+				if (nullptr != moduleBehavior)
+				{
+					componentBaseName += " (Script)";
+				}
+
+				if (ImGui::CollapsingHeader(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen));
 				{
 					if(component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>())
 					{
@@ -201,7 +209,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperMeshRenderer(meshRenderer);
 						}
 					}
-					else
+					else if (nullptr != moduleBehavior)
+					{
+						ImGuiDrawHelperModuleBehavior(moduleBehavior);
+					}
+					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
 					}
@@ -209,18 +221,70 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			}
 			
 			ImGui::Separator();
-			if (ImGui::Button("Add Component"))
+			ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
+			ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
+
+			static ImGuiTextFilter searchFilter;
+
+			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // 수평 중앙 정렬
+
+			if (ImGui::Button("Add Component", buttonSize))
 			{
 				ImGui::OpenPopup("AddComponent");
 			}
 
 			if (ImGui::BeginPopup("AddComponent"))
 			{
+				float availableWidth = ImGui::GetContentRegionAvail().x;
+				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+
 				for (const auto& [type_name, type] : ComponentFactorys->m_componentTypes)
 				{
+					if (!searchFilter.PassFilter(type_name.c_str()))
+						continue;
+
+					if (type_name.empty())
+					{
+						const_cast<std::string&>(type_name) = "None";
+					}
+
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
 						auto component = selectedSceneObject->AddComponent(*type);
+					}
+				}
+
+				if (ImGui::MenuItem("new Script"))
+				{
+					m_openScriptPopup = true;
+				}
+
+				ImGui::EndPopup();
+			}
+
+			// 다음 프레임에서 열기
+			if (m_openScriptPopup)
+			{
+				ImGui::OpenPopup("AddScript");
+				m_openScriptPopup = false;
+			}
+
+			if (ImGui::BeginPopup("AddScript"))
+			{
+				float availableWidth = ImGui::GetContentRegionAvail().x;
+				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+				for (const auto& type_name : ScriptManager->GetScriptNames())
+				{
+					if (!searchFilter.PassFilter(type_name.c_str()))
+						continue;
+					if (type_name.empty())
+					{
+						const_cast<std::string&>(type_name) = "None";
+					}
+
+					if (ImGui::MenuItem(type_name.c_str()))
+					{
+						selectedSceneObject->AddScriptComponent(type_name);
 					}
 				}
 				ImGui::EndPopup();
@@ -272,15 +336,14 @@ void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		{
 			std::string name = meshRenderer->m_Material->m_name;
 			Meta::MakeCustomChangeCommand(
-				[=]
-				{
-					meshRenderer->m_Material = DataSystems->Materials[name].get();
-				},
-				[=]
-				{
-					meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
-				}
-			);
+			[=]
+			{
+				meshRenderer->m_Material = DataSystems->Materials[name].get();
+			},
+			[=]
+			{
+				meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+			});
 
 			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
 			DataSystems->m_trasfarMaterial = nullptr;
@@ -289,5 +352,29 @@ void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	else
 	{
 		ImGui::Text("No Material");
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior)
+{
+	if (moduleBehavior)
+	{
+		ImGui::Text("Script		 ");
+		ImGui::SameLine();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+		if (ImGui::Button(moduleBehavior->GetHashedName().ToString().c_str(), ImVec2(250, 0)))
+		{
+			FileGuid guid = DataSystems->GetFilenameToGuid(moduleBehavior->GetHashedName().ToString());
+			file::path scriptFullPath = DataSystems->GetFilePath(guid);
+			if (scriptFullPath.empty())
+			{
+				Debug->LogError("Script not found: " + moduleBehavior->GetHashedName().ToString());
+				return;
+			}
+
+			DataSystems->OpenFile(scriptFullPath);
+		}
+		ImGui::PopStyleVar(2);
 	}
 }

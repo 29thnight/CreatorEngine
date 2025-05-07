@@ -31,22 +31,21 @@ public:
 
 	void Awake() override
 	{
+		//이 부분은 원하는 로직 정리해서 다시 작성
 		if (m_cameraIndex != -1)
 		{
-			if (nullptr == m_pCamera)
-			{
-				m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
-			}
-			else
-			{
-				CameraManagement->ReplaceCamera(m_cameraIndex, m_pCamera);
-			}
+			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+			//else
+			//{
+			//	std::cout << "CameraComponent::Awake()else" << std::endl;
+			//	CameraManagement->ReplaceCamera(m_cameraIndex, m_pCamera);
+			//}
 		}
 		else
 		{
 			m_pCamera = new Camera();
-			m_cameraIndex = CameraManagement->AddCamera(m_pCamera);
 			m_pCamera->RegisterContainer();
+			m_cameraIndex = m_pCamera->m_cameraIndex;
 		}		
 	}
 
@@ -71,7 +70,9 @@ public:
 
 	void OnDisable() override
 	{
-		delete m_pCamera;
+		//delete m_pCamera;
+		//m_cameraIndex = -1;
+		//m_pCamera = nullptr;
 	}
 
 	Camera* GetCamera() const

@@ -23,6 +23,7 @@
 #include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
+#include "ModuleBehavior.h"
 #include "Object.h"
 #include "RigidBodyComponent.h"
 #include "Scene.h"
@@ -52,6 +53,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MaterialInfomation);
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshRenderer);
+    AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);

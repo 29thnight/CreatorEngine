@@ -18,26 +18,6 @@ inline T* GameObject::AddComponent()
     return component.get();
 }
 
-template<typename T>
-inline T* GameObject::AddScriptComponent(const std::string_view& scriptName)
-{
-    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
-    {
-        return nullptr;
-    }
-
-    std::shared_ptr<T> component = std::shared_ptr<T>(ScriptManager->CreateMonoBehavior(scriptName.data()));
-    m_components.push_back(component);
-    component->SetOwner(this);
-    m_componentIds[component->GetTypeID()] = m_components.size();
-
-    size_t index = m_componentIds[component->GetTypeID()];
-
-    ScriptManager->CollectScriptComponent(this, index, scriptName.data());
-
-    return component.get();
-}
-
 template<typename T, typename ...Args>
 inline T* GameObject::AddComponent(Args && ...args)
 {

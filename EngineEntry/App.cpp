@@ -5,6 +5,7 @@
 #include "CoreWindow.h"
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
+#include "EngineSetting.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -17,6 +18,8 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	PathFinder::Initialize();
 	Log::Initialize();
+
+	EngineSettingInstance->Initialize();
 
 	//시작
 	CoreWindow::RegisterCreateEventHandler([](HWND hWnd, WPARAM wParam, LPARAM lParam) -> LRESULT
@@ -92,7 +95,11 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
+		g_progressWindow->SetStatusText(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
+		g_progressWindow->SetProgress(100);
+
+		g_progressWindow->Close();
 	})
 	.Then([&]
 	{
