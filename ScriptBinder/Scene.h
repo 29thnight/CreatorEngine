@@ -45,7 +45,7 @@ public:
     Core::Delegate<void> StartEvent{};
 
     //Physics
-    Core::Delegate<void, float>      FixedUpdateEvent{};
+    Core::Delegate<void, float>            FixedUpdateEvent{};
     Core::Delegate<void, const Collision&> OnTriggerEnterEvent{};
     Core::Delegate<void, const Collision&> OnTriggerStayEvent{};
     Core::Delegate<void, const Collision&> OnTriggerExitEvent{};
@@ -85,6 +85,8 @@ public:
     //Disable or Enable
     void OnDisable();
 	void OnDestroy();
+
+    void AllDestroyMark();
 
 	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
 	{

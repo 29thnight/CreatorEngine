@@ -85,11 +85,13 @@ void SceneManager::Pausing()
 void SceneManager::DisableOrEnable()
 {
     m_activeScene->OnDisable();
+    m_activeScene->OnDestroy();
 }
 
 void SceneManager::Deccommissioning()
 {
     m_activeScene->OnDisable();
+    m_activeScene->AllDestroyMark();
     m_activeScene->OnDestroy();
 }
 

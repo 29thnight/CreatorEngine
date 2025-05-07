@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Definition.h"
 #include "EngineSetting.h"
+#include "LogSystem.h"
 #include <DbgHelp.h>
 
 #pragma comment(lib, "dbghelp.lib")
@@ -72,6 +73,8 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
         ads << EngineSettingInstance->GetGitVersionHash(); // 또는 g_EngineGitHash
         ads.close();
     }
+
+    Debug->Finalize();
 }
 
 inline std::wstring GetDumpGitHashADS(const std::wstring& dumpFilePath)

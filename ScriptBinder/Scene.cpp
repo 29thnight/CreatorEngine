@@ -161,7 +161,7 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::Reset()
 {
-    //Ä¥°Ô ÀÖ³ª?
+    //ì¹ ê²Œ ìžˆë‚˜?
     ScriptManager->ReplaceScriptComponent();
 }
 
@@ -184,8 +184,8 @@ void Scene::FixedUpdate(float deltaSecond)
 {
     FixedUpdateEvent.Broadcast(deltaSecond);
 	CoroutineManagers->yield_WaitForFixedUpdate();
-	// Internal Physics Update ÀÛ¼º
-	// OnTriggerEvent.Broadcast(); ÀÛ¼º
+	// Internal Physics Update ìž‘ì„±
+	// OnTriggerEvent.Broadcast(); ìž‘ì„±
 }
 
 void Scene::OnTriggerEnter(const Collision& collider)
@@ -269,14 +269,22 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::OnDisable()
 {
     OnDisableEvent.Broadcast();
-    DistroyLight();
-    DestroyGameObjects();
 }
 
 void Scene::OnDestroy()
 {
     OnDestroyEvent.Broadcast();
+    DistroyLight();
+    DestroyGameObjects();
+}
 
+void Scene::AllDestroyMark()
+{
+    for (const auto& obj : m_SceneObjects)
+    {
+        if (obj && !obj->IsDestroyMark())
+            obj->Destroy();
+    }
 }
 
 uint32 Scene::UpdateLight(LightProperties& lightProperties) const
@@ -364,6 +372,15 @@ void Scene::DestroyGameObjects()
     {
         if (obj && deletedIndices.contains(obj->m_index))
         {
+            //for (auto& onDistroyComponent : obj->m_components)
+            //{
+            //    auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(onDistroyComponent);
+            //    if (behavior)
+            //    {
+            //        OnDisableEvent.TargetInvoke(behavior->m_onDisableEventHandle);
+            //    }
+            //}
+
             obj->m_childrenIndices.clear();
             obj.reset();
         }
