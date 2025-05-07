@@ -4,6 +4,7 @@
 #include "AnimationState.h"
 #include "AnimationController.h"
 #include "AniBehaviour.h"
+#include "Animator.h"
 class TestPlayer : Component 
 {
 
@@ -13,6 +14,7 @@ public:
 	GameObject* player;
 	float speed = 0.1f;
 
+	bool isWalking = false;
 	float maxSpeed = 15.0f;
 };
 

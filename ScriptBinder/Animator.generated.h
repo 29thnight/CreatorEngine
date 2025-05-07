@@ -13,7 +13,8 @@ ReflectionFieldInheritance(Animator, Component) \
 		meta_property(m_AnimIndex) \
 		meta_property(m_nextTimeElapsed) \
 		meta_property(m_Motion) \
-		meta_property(m_animationController) \
+		meta_property(m_animationControllers) \
+		meta_property(Parameters) \
 	}); \
 	MethodField \
 	({ \

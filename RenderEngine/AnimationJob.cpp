@@ -133,13 +133,19 @@ void AnimationJob::CleanUp()
 void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& parentTransform, float time, float nextanitime)
 {
     Skeleton* skeleton = animator.m_Skeleton;
-    Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
-    Animation& nextanimation = skeleton->m_animations[animator.nextAnimIndex];
+    Animation* animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+    Animation* nextanimation = &skeleton->m_animations[animator.nextAnimIndex];
     std::string& boneName = bone->m_name;
 
+    Animation* lowAnimation = &skeleton->m_animations[0];
+    if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg || bone->m_region == BoneRegion::Root)
+    {
+        animation = lowAnimation;
+        //return;
+    }
     //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg) return; //*****
-    auto it = animation.m_nodeAnimations.find(boneName);
-    if (it == animation.m_nodeAnimations.end())
+    auto it = animation->m_nodeAnimations.find(boneName);
+    if (it == animation->m_nodeAnimations.end())
     {
         for (Bone* child : bone->m_children)
         {
@@ -148,8 +154,8 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX
         return;
     }
 
-    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
-    NodeAnimation& nextnodeAnim = nextanimation.m_nodeAnimations[boneName];
+    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
+    NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
     XMMATRIX nodeTransform = calculAni(nodeAnim, time);
     XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime);
     XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
@@ -170,12 +176,12 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& pa
     Skeleton* skeleton = animator.m_Skeleton;
     std::string& boneName = bone->m_name;
     Animation* animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
-    //Animation* lowAnimation = &skeleton->m_animations[0];
-    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg)
-    //{
-    //    animation = lowAnimation;
-    //    //return;
-    //}
+    Animation* lowAnimation = &skeleton->m_animations[0];
+    if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg || bone->m_region ==BoneRegion::Root || bone->m_region == BoneRegion::Spine)
+    {
+        animation = lowAnimation;
+        //return;
+    }
     auto it = animation->m_nodeAnimations.find(boneName);
     if (it == animation->m_nodeAnimations.end())
     {

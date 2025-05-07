@@ -391,9 +391,6 @@
     <ClInclude Include="PSO.h">
       <Filter>Resources\PSO</Filter>
     </ClInclude>
-    <ClInclude Include="Skeleton.h">
-      <Filter>Resources\Skeleton</Filter>
-    </ClInclude>
     <ClInclude Include="Texture.h">
       <Filter>Resources\Texture</Filter>
     </ClInclude>
@@ -531,6 +528,9 @@
     </ClInclude>
     <ClInclude Include="ColorGradingPass.h">
       <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="Skeleton.h">
+      <Filter>Resources\Skeleton</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -676,9 +676,6 @@
       <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Vignette.ps.hlsl">
-      <Filter>Shaders\PostProcessShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ColorGrading.ps.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>

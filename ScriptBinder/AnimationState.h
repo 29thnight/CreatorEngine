@@ -7,7 +7,7 @@ class AniBehaviour;
 class AnimationState
 {	
 public:
-    ReflectAnimationState
+   ReflectAnimationState
 	[[Serializable]]
 	AnimationState() = default;
 	AnimationState(AnimationController* Owner, std::string Name) : m_ownerController(Owner), Name(Name) {}
@@ -24,5 +24,7 @@ public:
 	std::vector<std::shared_ptr<AniTransition>> Transitions;
 	[[Property]]
 	int index =0; 
+	[[Property]]
+	int AnimationIndex = -1;
 };
 

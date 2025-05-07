@@ -9,6 +9,7 @@ enum class ConditionType
 	Less,
 	Equal,
 	NotEqual,
+	None,
 };
 AUTO_REGISTER_ENUM(ConditionType)
 
@@ -18,6 +19,7 @@ enum class ValueType
 	Float,
 	Int,
 	Bool,
+	Trigger,
 };
 AUTO_REGISTER_ENUM(ValueType)
 
@@ -42,6 +44,9 @@ public:
 		case ValueType::Bool:
 			bValue = static_cast<bool>(value);
 			break;
+		case ValueType::Trigger:
+			tValue = static_cast<bool>(value);
+			break;
 		}
 	}
 
@@ -59,7 +64,15 @@ public:
 		case ValueType::Bool:
 			bValue = static_cast<bool>(value);
 			break;
+		case ValueType::Trigger:
+			tValue = static_cast<bool>(value);
+			break;
 		}
+	}
+
+	void ResetTrigger() 
+	{
+		tValue = false; 
 	}
 	[[Property]]
 	ValueType vType =ValueType::Float;
@@ -71,4 +84,8 @@ public:
 	int iValue{};
 	[[Property]]
 	bool bValue{};
+	
+	//Trigger   basic = false,
+	[[Property]]
+	bool tValue{false};
 };

@@ -8,29 +8,38 @@ void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
 	auto animation = player->GetComponent<Animator>();
-	animation->CreateController();
-	auto controller = animation->GetController();
+	animation->CreateController("upper");
+	animation->CreateController("lower");
+	auto controller = animation->GetController("upper");
+	auto lowercontroller = animation->GetController("lower");
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
 	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });
-	controller->CreateState("Idle");
-	controller->CreateState("Walk");
-	controller->CreateState("Run");
+	controller->CreateState("Idle",0);
+	controller->CreateState("Walk",2);
+	controller->CreateState("Run",1); 
 	controller->SetCurState("Idle");
-	controller->AddParameter("Speed",player->speed,ValueType::Float);
+	
 	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, ConditionType::Greater,ValueType::Float);
 	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, ConditionType::Less, ValueType::Float);
 	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, ConditionType::Greater, ValueType::Float);
 	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, ConditionType::Less, ValueType::Float);
 	
+	lowercontroller->CreateState("Idle", 0);
+	lowercontroller->CreateState("Walk", 2);
+	lowercontroller->CreateState("Run",  1);
+	lowercontroller->SetCurState("Idle");
+	lowercontroller->CreateTransition("Idle", "Walk")->AddCondition("Walking", isWalking, ConditionType::None, ValueType::Trigger);
 
+	animation->AddParameter("Speed", player->speed, ValueType::Float);
+	animation->AddParameter("Walking", isWalking, ValueType::Trigger);
 }
 
 void TestPlayer::Update(float deltaTime)
 {
 	auto _player = GameObject::Find("aniTest");
 	auto ani = _player->GetComponent<Animator>();
-	auto controller = ani->GetController();
+	auto controller = ani->GetController("upper");
 	if (InputManagement->IsKeyDown('1'))
 	{
 		std::cout << "press 1" << std::endl;
@@ -71,7 +80,12 @@ void TestPlayer::Update(float deltaTime)
 	if (_player->speed >= maxSpeed)
 		_player->speed = maxSpeed;
 
-	controller->SetParameter("Speed", _player->speed);
+	ani->SetParameter("Speed", _player->speed);
+
+	if (InputManagement->IsKeyDown('I'))
+	{
+		ani->SetParameter("Walking", true);
+	}
 	//std::cout << _player->speed << std::endl;
 
 	

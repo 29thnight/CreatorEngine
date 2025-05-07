@@ -1,39 +1,44 @@
 #include "TransCondition.h"
 #include "AnimationController.h"
+#include "Animator.h"
 bool TransCondition::CheckTrans()
 {
-	
-	for (auto& para : m_ownerController->Parameters)
+	auto& parameters = m_ownerController->m_owner->Parameters;
+	for (auto& parameter : parameters)
 	{
-		if (para.vType == ValueType::Float)
+		if (parameter.vType == ValueType::Float)
 		{
 			switch (cType)
 			{
 			case ConditionType::Greater:
-				return para.fValue > CompareParameter.fValue;
+				return parameter.fValue > CompareParameter.fValue;
 			case ConditionType::Less:
-				return para.fValue < CompareParameter.fValue;
+				return parameter.fValue < CompareParameter.fValue;
 			}
 		}
-		else if (para.vType == ValueType::Int)
+		else if (parameter.vType == ValueType::Int)
 		{
 			switch (cType)
 			{
 			case ConditionType::Greater:
-				return para.iValue > CompareParameter.iValue;
+				return parameter.iValue > CompareParameter.iValue;
 			case ConditionType::Less:
-				return para.iValue < CompareParameter.iValue;
+				return parameter.iValue < CompareParameter.iValue;
 			}
 		}
-		if (para.vType == ValueType::Bool)
+		else if (parameter.vType == ValueType::Bool)
 		{
 			switch (cType)
 			{
 			case ConditionType::Equal:
-				return para.bValue == CompareParameter.bValue;
+				return parameter.bValue == CompareParameter.bValue;
 			case ConditionType::NotEqual:
-				return para.bValue == CompareParameter.bValue;
+				return parameter.bValue == CompareParameter.bValue;
 			}
+		}
+		else if (parameter.vType == ValueType::Trigger)
+		{
+			return parameter.tValue == true;
 		}
 	}
 	

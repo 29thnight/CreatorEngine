@@ -1,6 +1,7 @@
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "AniBehaviour.h"
+#include "Animator.h"
 #include "Skeleton.h"
 #include "AvatarMask.h"
 void AnimationController::SetNextState(std::string stateName)
