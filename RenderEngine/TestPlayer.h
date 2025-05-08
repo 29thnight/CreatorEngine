@@ -13,8 +13,6 @@ public:
 	void Update(float deltaTime);
 	GameObject* player;
 	float speed = 0.1f;
-
-	bool isWalking = false;
 	float maxSpeed = 15.0f;
 };
 
@@ -24,8 +22,7 @@ public:
 	IdleAni() { name = "Idle"; };
 	virtual void Enter() override
 	{
-		m_ownerController->GetOwner()->nextAnimIndex = 0;
-		//Owner->GetAnimator()->SetAnimation(0);
+
 	};
 	virtual void Update(float DeltaTime) override
 	{
@@ -42,8 +39,6 @@ public:
 	WalkAni() { name = "Walk"; }
 	virtual void Enter() override
 	{
-		m_ownerController->GetOwner()->nextAnimIndex = 2;
-		//Owner->GetAnimator()->SetAnimation(2);
 	};
 	virtual void Update(float DeltaTime) override
 	{
@@ -61,8 +56,6 @@ public:
 	RunAni()  {name = "Run";}
 	virtual void Enter() override
 	{
-		m_ownerController->GetOwner()->nextAnimIndex = 1;
-		//Owner->GetAnimator()->SetAnimation(1); 
 	};
 	virtual void Update(float DeltaTime)override
 	{

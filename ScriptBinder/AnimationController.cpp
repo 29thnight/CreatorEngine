@@ -18,9 +18,14 @@ bool AnimationController::BlendingAnimation(float tick)
 	if (blendingTime >= m_curTrans->GetBlendTime()) //블렌드 타임이 끝나면 블렌드종료 -> 다음애니메이션만 계산
 	{
 		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
-		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed;
+		m_AnimationIndex = m_nextAnimationIndex;
+
+		m_timeElapsed = m_nextTimeElapsed;
+		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
+
 		m_owner->nextAnimIndex = -1;
 		m_owner->m_isBlend = false;
+		m_isBlend = false;
 		return false;
 	}
 
@@ -30,6 +35,10 @@ bool AnimationController::BlendingAnimation(float tick)
 void AnimationController::SetCurState(std::string stateName)
 {
 	m_curState = StateVec[States[stateName]].get();
+
+	
+	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
+	m_AnimationIndex = m_curState->AnimationIndex;
 }
 
 std::shared_ptr<AniTransition> AnimationController::CheckTransition()
@@ -40,6 +49,9 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		m_curState = StateVec[0].get();
 	}
 	if (m_curState->Transitions.empty()) return nullptr;
+
+
+
 	for (auto& iter : m_curState->Transitions)
 	{
 		if (true == iter->CheckTransiton())
@@ -59,17 +71,28 @@ void AnimationController::UpdateState()
 	if (nullptr != trans)
 	{
 		//새전이가있는대 이전 전이가 진행중이었음
-		if (m_owner->nextAnimIndex != -1)
+		if (m_nextAnimationIndex != -1)
 		{
-			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
-			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed;
+			
+			m_owner->m_AnimIndexChosen = m_nextAnimationIndex;
+			m_AnimationIndex = m_nextAnimationIndex;
+			
 			m_owner->nextAnimIndex = -1;
-			m_owner->m_isBlend = false;
+			m_nextAnimationIndex = -1;
 
+			m_timeElapsed = m_nextTimeElapsed;
+			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
+
+			m_owner->m_isBlend = false;
+			m_isBlend = false;
 		}
 
 
 		m_nextState = StateVec[States[trans->GetNextState()]].get();
+		
+		m_owner->nextAnimIndex = m_nextState->AnimationIndex;
+		m_nextAnimationIndex = m_nextState->AnimationIndex;
+
 		m_curState->behaviour->Exit();
 		m_nextState->behaviour->Enter();
 		m_curState = m_nextState;
@@ -77,12 +100,23 @@ void AnimationController::UpdateState()
 		m_curTrans = trans.get();
 		needBlend = true;
 		m_owner->m_isBlend = true;
-		m_owner->m_nextTimeElapsed = 0.0f;
+		m_isBlend = true;
+
+		for (auto& othercontorller : m_owner->m_animationControllers)
+		{
+			if (othercontorller->name == name) continue;
+			if(othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
+				m_nextTimeElapsed = othercontorller->m_timeElapsed;
+			else
+				m_nextTimeElapsed = 0.0f;
+		}
+		
+		//m_owner->m_nextTimeElapsed = 0.0f; //*****
+
 		m_owner->blendT = 0.0f;
 		blendingTime = 0.0f;
 	}
 
-	
 }
 void AnimationController::Update(float tick)
 {
@@ -97,7 +131,50 @@ void AnimationController::Update(float tick)
 	m_curState->behaviour->Update(tick);
 }
 
+int AnimationController::GetAnimatonIndexformState(std::string stateName)
+{
+	for (auto& state : StateVec)
+	{
+		if (state->Name == stateName)
+			return state->AnimationIndex;
+	}
+}
+
+AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex)
+{
+	auto it = States.find(stateName);
+	if (it != States.end())
+	{
+		return (StateVec[it->second].get());
+	}
+	auto state = std::make_shared<AnimationState>(this, stateName);
+	state->AnimationIndex = animationIndex;
+	state->SetBehaviour(stateName);
+	States.insert(std::make_pair(stateName, StateVec.size()));
+	StateVec.push_back(state);
+	StateVec.back()->index = StateVec.size() - 1;
+	return state.get();
+}
+
+AniTransition* AnimationController::CreateTransition(const std::string& curStateName, const std::string& nextStateName)
+{
+	for (auto& trans : StateVec[States[curStateName]]->Transitions)
+	{
+		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
+			return trans.get();
+
+	}
+	auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
+	transition->m_ownerController = this;
+	StateVec[States[curStateName]]->Transitions.push_back(transition);
+	return transition.get();
+}
+
 void AnimationController::CreateMask()
 {
 	m_owner->m_Skeleton->MarkRegionSkeleton();
+}
+
+void AnimationController::CheckMask()
+{
 }

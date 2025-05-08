@@ -35,14 +35,12 @@ public:
         m_IsEnabled = able;
     }
     void Update(float tick) override;
-    //현재애니 이름반환
-    std::string GetcurAnimation();
     void SetAnimation(int index);
     [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
     AnimationController* GetController(std::string name);
-
+    bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     [[Property]]
@@ -50,8 +48,6 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
-    [[Property]]
-    std::string curAniName;
     bool m_isBlend = false;
     float blendT = 0;
     [[Property]]

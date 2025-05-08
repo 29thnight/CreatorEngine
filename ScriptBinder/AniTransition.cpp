@@ -23,9 +23,10 @@ bool AniTransition::CheckTransiton()
 	}*/
 	for (auto& condition : conditions)
 	{
-		return condition.CheckTrans();
+		if (true == condition.CheckTrans())
+			return true;
 	}
 
-	return true;
+	return false;
 }
 

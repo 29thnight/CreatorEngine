@@ -7,32 +7,38 @@
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
-	auto animation = player->GetComponent<Animator>();
-	animation->CreateController("upper");
-	animation->CreateController("lower");
-	auto controller = animation->GetController("upper");
-	auto lowercontroller = animation->GetController("lower");
+
+
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
 	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });
+
+
+	auto animation = player->GetComponent<Animator>();
+	animation->CreateController("upper");
+	auto controller = animation->GetController("upper");
 	controller->CreateState("Idle",0);
 	controller->CreateState("Walk",2);
 	controller->CreateState("Run",1); 
 	controller->SetCurState("Idle");
-	
 	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, ConditionType::Greater,ValueType::Float);
 	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, ConditionType::Less, ValueType::Float);
 	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, ConditionType::Greater, ValueType::Float);
 	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, ConditionType::Less, ValueType::Float);
-	
+
+
+	animation->CreateController("lower");
+	auto lowercontroller = animation->GetController("lower");
 	lowercontroller->CreateState("Idle", 0);
 	lowercontroller->CreateState("Walk", 2);
 	lowercontroller->CreateState("Run",  1);
 	lowercontroller->SetCurState("Idle");
-	lowercontroller->CreateTransition("Idle", "Walk")->AddCondition("Walking", isWalking, ConditionType::None, ValueType::Trigger);
-
+	lowercontroller->CreateTransition("Idle", "Walk")->AddCondition("Walkparm", false, ConditionType::None, ValueType::Trigger);
+	lowercontroller->CreateTransition("Walk", "Idle")->AddCondition("Idleparm", false, ConditionType::None, ValueType::Trigger);
+	lowercontroller->GetAvatarMask()->UseOnlyLower();
 	animation->AddParameter("Speed", player->speed, ValueType::Float);
-	animation->AddParameter("Walking", isWalking, ValueType::Trigger);
+	animation->AddParameter("Walkparm", false, ValueType::Trigger);
+	animation->AddParameter("Idleparm", false, ValueType::Trigger);
 }
 
 void TestPlayer::Update(float deltaTime)
@@ -84,7 +90,12 @@ void TestPlayer::Update(float deltaTime)
 
 	if (InputManagement->IsKeyDown('I'))
 	{
-		ani->SetParameter("Walking", true);
+		ani->SetParameter("Walkparm", true);
+	}
+
+	if (InputManagement->IsKeyDown('U'))
+	{
+		ani->SetParameter("Idleparm", true);
 	}
 	//std::cout << _player->speed << std::endl;
 

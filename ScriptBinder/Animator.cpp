@@ -21,10 +21,7 @@ void Animator::Update(float tick)
 	}
 }
 
-std::string Animator::GetcurAnimation()
-{
-	return m_Skeleton->m_animations[m_AnimIndexChosen].m_name;
-}
+
 
 void Animator::SetAnimation(int index)
 {
@@ -65,3 +62,6 @@ AnimationController* Animator::GetController(std::string name)
 			return Controller;
 	}
 }
+
+
+

@@ -5,6 +5,7 @@ enum class BoneRegion
 {
 	Root,
 	Spine,
+	Neck,
 	LeftArm,
 	RightArm,
 	LeftLeg,

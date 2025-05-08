@@ -4,8 +4,11 @@
 bool TransCondition::CheckTrans()
 {
 	auto& parameters = m_ownerController->m_owner->Parameters;
+
+	
 	for (auto& parameter : parameters)
 	{
+		if (parameter.name != valueName) continue;
 		if (parameter.vType == ValueType::Float)
 		{
 			switch (cType)
