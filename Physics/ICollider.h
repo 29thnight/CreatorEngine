@@ -16,9 +16,9 @@ struct ICollider
 	virtual DirectX::SimpleMath::Quaternion GetRotationOffset() = 0;
 
 
-	//콜리전 활성화 여부
-	virtual void SetIsTrigger(bool isTrigger) = 0; 
-	virtual bool GetIsTrigger() = 0;
+	////콜리전 활성화 여부
+	//virtual void SetIsTrigger(bool isTrigger) = 0; 
+	//virtual bool GetIsTrigger() = 0;
 
 	//
 	virtual void OnTriggerEnter(ICollider* other) = 0;

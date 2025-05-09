@@ -98,5 +98,16 @@ void CharacterController::AddMovementInput(const DirectX::SimpleMath::Vector3& i
 
 bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, int* collisionMatrix)
 {
-	return false;
+	if (newLayerNumber == UINT_MAX)
+	{
+		return false;
+	}
+
+	m_layerNumber = newLayerNumber;
+
+	physx::PxFilterData filterData;
+	filterData.word0 = m_layerNumber;
+	filterData.word1 = collisionMatrix[m_layerNumber];
+
+	//
 }

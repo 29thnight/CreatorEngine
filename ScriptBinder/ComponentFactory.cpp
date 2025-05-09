@@ -5,6 +5,7 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
+#include "CharacterControllerComponent.h"
 #include "Model.h"
 void ComponentFactory::Initialize()
 {
@@ -162,6 +163,18 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             Meta::Deserialize(spriteRenderer, itNode);
 			spriteRenderer->SetOwner(obj);
 			spriteRenderer->SetEnabled(true);
+		}
+		else if (componentType->typeID == type_guid(RigidBodyComponent))
+		{
+			auto rigidBody = static_cast<RigidBodyComponent*>(component);
+			Meta::Deserialize(rigidBody, itNode);
+			rigidBody->SetOwner(obj);
+			}
+		else if (componentType->typeID == type_guid(CharacterControllerComponent))
+		{
+			auto characterController = static_cast<CharacterControllerComponent*>(component);
+			Meta::Deserialize(characterController, itNode);
+			characterController->SetOwner(obj);
 		}
 		else
 		{

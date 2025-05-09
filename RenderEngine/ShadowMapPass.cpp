@@ -5,6 +5,7 @@
 #include "Sampler.h"
 #include "RenderableComponents.h"
 #include "LightController.h"
+#include "directxtk\SimpleMath.h"
 
 ShadowMapPass::ShadowMapPass()
 {
@@ -246,7 +247,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;
-		if (Mathf::Vector3(LightDir) == Mathf::Vector3::Zero)
+		if (Mathf::Vector3(LightDir) == Mathf::Vector3{ 0, 0, 0 })
 		{
 			LightDir = { 0.f, 0.f, -1.f, 0.f };
 		}

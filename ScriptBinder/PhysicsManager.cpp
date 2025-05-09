@@ -5,25 +5,35 @@
 #include "Transform.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "TerrainCollider.h"
+#include "CharacterControllerComponent.h"
 
 class Scene;
 void PhysicsManager::Initialize()
 {
 	//물리엔진 초기화
 	m_bIsInitialized = Physics->Initialize();
+	
+	//델리게이트 등록
+	m_OnSceneLoadHandle = SceneManagers->sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
+	m_OnSceneUnloadHandle = SceneManagers->sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
+	m_OnChangeSceneHandle = SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
+
+
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {
-	if (m_bPlay) {
-		//물리씬에 데이터 셋
-		SetPhysicData();
+	if (!m_bIsInitialized) return;
+	
+	//물리씬에 데이터 셋
+	SetPhysicData();
 
-		//물리씬 업데이트
-		Physics->Update(fixedDeltaTime);
+	//물리씬 업데이트
+	Physics->Update(fixedDeltaTime);
 
-		//물리씬에 데이터 가져오기
-		GetPhysicData();
-	}
+	//물리씬에 데이터 가져오기
+	GetPhysicData();
+	
 }
 void PhysicsManager::Shutdown()
 {
@@ -36,7 +46,6 @@ void PhysicsManager::Shutdown()
 }
 void PhysicsManager::ChangeScene()
 {
-	
 	Physics->ChangeScene();
 }
 void PhysicsManager::OnLoadScene()
@@ -52,7 +61,7 @@ void PhysicsManager::OnLoadScene()
 		auto rigid = obj->GetComponent<RigidBodyComponent>();
 		if (!rigid)
 		{
-			return;
+			continue;
 		}
 
 		auto transform = obj->m_transform;
@@ -64,8 +73,8 @@ void PhysicsManager::OnLoadScene()
 		if (box) {
 			unsigned int colliderID = ++m_lastColliderID;
 			auto boxInfo = box->m_Info;
-			auto tranformOffset = box->GetOffsetTransform();
-			auto rotationOffset = box->GetOffsetRotation();
+			auto tranformOffset = box->GetPositionOffset();
+			auto rotationOffset = box->GetRotationOffset();
 
 			boxInfo.colliderInfo.id = colliderID;
 			boxInfo.colliderInfo.layerNumber = 0;
@@ -129,10 +138,32 @@ void PhysicsManager::OnLoadScene()
 			//todo : convex 콜라이더 생성
 		// }
 		//todo : controller Component라면
-		//auto controller = obj->GetComponent<CharacterControllerComponent>();
-		//if (controller) {
-			//todo : controller 콜라이더 생성
-		//}
+		auto controller = obj->GetComponent<CharacterControllerComponent>();
+		if (controller) {
+			auto controllerInfo = controller->GetControllerInfo();
+			auto movementInfo = controller->GetMovementInfo();
+			auto posOffset = controller->GetPositionOffset();
+			auto rotOffset = controller->GetRotationOffset();
+			auto transform = obj->m_transform;
+
+			ColliderID colliderID = ++m_lastColliderID;
+			controllerInfo.id = colliderID;
+			controllerInfo.layerNumber = 0;
+			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
+			controllerInfo.position = position+controller->GetPositionOffset();
+
+			Physics->CreateCCT(controllerInfo, movementInfo);
+
+			m_colliderContainer.insert({ colliderID, {
+				m_controllerTypeId,
+				controller,
+				controller->GetOwner(),
+				controller,
+				false
+				} });
+			
+			controller->SetControllerInfo(controllerInfo);
+		}
 		//관절 정보가 있는 ragdoll이라면
 		//auto ragdoll = obj->GetComponent<RagdollComponent>();
 		//if (ragdoll) {
@@ -176,15 +207,15 @@ void PhysicsManager::ProcessCallback()
 			continue;
 		}
 
-		auto lhsObj = lhs->second.collider;
-		auto rhsObj = rhs->second.collider;
+		auto lhsObj = lhs->second.gameObject;
+		auto rhsObj = rhs->second.gameObject;
 
-		//Collision collision{ lhsObj,rhsObj,data.contactPoints };
+		Collision collision{ lhsObj,rhsObj,data.contactPoints };
 
 		switch (type)
 		{
 		case ECollisionEventType::ENTER_OVERLAP:
-			//SceneManagers->GetActiveScene()->OnCollisionEnter(rhsObj);
+			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
 			break;
@@ -237,6 +268,30 @@ void PhysicsManager::DrawDebugInfo()
 	
 }
 
+void PhysicsManager::AddTerrainCollider(GameObject* object)
+{
+	if (!object->HasComponent<TerrainCollider>()) {
+		return;
+	}
+
+	TerrainCollider* collider = object->GetComponent<TerrainCollider>();
+	Transform& transform = object->m_transform;
+	// auto terrain = object->GetComponent<Terrain>();
+
+	HeightFieldColliderInfo heightFieldInfo;
+
+	ColliderID colliderID = ++m_lastColliderID;
+
+	collider->SetColliderID(colliderID);
+	heightFieldInfo.colliderInfo.id = colliderID;
+	heightFieldInfo.colliderInfo.layerNumber = static_cast<unsigned int>(object->GetType());
+	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
+	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+
+	
+
+}
+
 void PhysicsManager::AddCollider(GameObject* object)
 {
 	if (!object->HasComponent<RigidBodyComponent>()) {
@@ -252,8 +307,8 @@ void PhysicsManager::AddCollider(GameObject* object)
 		auto box = object->GetComponent<BoxColliderComponent>();
 		auto type = box->GetColliderType();
 		auto boxInfo = box->m_Info;
-		auto tranformOffset = box->GetOffsetTransform();
-		auto rotationOffset = box->GetOffsetRotation();
+		auto tranformOffset = box->GetPositionOffset();
+		auto rotationOffset = box->GetRotationOffset();
 
 		
 		unsigned int colliderId = ++m_lastColliderID;
@@ -328,6 +383,11 @@ void PhysicsManager::RemoveCollider(GameObject* object)
 
 }
 
+void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
+{
+	m_callbacks.push_back({ data,type });
+}
+
 void PhysicsManager::SetPhysicData()
 {
 	for (auto& [id, colliderInfo] : m_colliderContainer) {
@@ -342,7 +402,40 @@ void PhysicsManager::SetPhysicData()
 		auto offset = colliderInfo.collider->GetPositionOffset();
 
 		//todo : CCT,Controller,ragdoll,capsule,차후 deformeSuface
-		
+		if (colliderInfo.id == m_controllerTypeId)
+		{
+			//케릭터 컨트롤러
+			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
+			CharacterControllerGetSetData data;
+			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
+			data.position = position+controller->GetPositionOffset();
+			data.rotation = transform.GetWorldQuaternion();
+			data.Scale = transform.GetWorldScale();
+
+			auto controllerInfo = controller->GetControllerInfo();
+			auto prevlayer = controllerInfo.layerNumber;
+			auto currentLayer = static_cast<unsigned int>(colliderInfo.gameObject->GetType());
+			
+			if (prevlayer != currentLayer) {
+				data.LayerNumber = currentLayer;
+				controller->SetControllerInfo(controllerInfo);
+			}
+
+			Physics->SetCCTData(id, data);
+
+			CharacterMovementGetSetData movementData;
+
+			auto movementInfo = controller->GetMovementInfo();
+			movementData.acceleration = movementInfo.acceleration;
+			movementData.maxSpeed = movementInfo.maxSpeed;
+			movementData.velocity = rigidbody->GetLinearVelocity();
+			movementData.isFall = controller->IsFalling();
+			movementData.restrictDirection = controller->GetMoveRestrict();
+
+			Physics->SetMovementData(id, movementData);
+
+		}
+		else
 		{
 			//기본도형
 			RigidBodyGetSetData data;
@@ -390,7 +483,7 @@ void PhysicsManager::GetPhysicData()
 		}
 
 		auto rigidbody = ColliderInfo.gameObject->GetComponent<RigidBodyComponent>();
-		auto transform = ColliderInfo.gameObject->m_transform;
+		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
 		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) {
@@ -398,7 +491,18 @@ void PhysicsManager::GetPhysicData()
 		}
 
 		//todo : CCT,Controller,ragdoll,capsule,차후 deformeSuface
+		if (ColliderInfo.id == m_controllerTypeId) {
+			//케릭터 컨트롤러
+			auto controller = ColliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
+			auto controll = Physics->GetCCTData(id);
+			auto movement = Physics->GetMovementData(id);
+			auto position = controll.position - controller->GetPositionOffset();
 
+			controller->SetFalling(movement.isFall);
+			rigidbody->SetLinearVelocity(movement.velocity);
+			transform.SetPosition(position);
+		}
+		else
 		{
 			//기본 도형
 			auto data = Physics->GetRigidBodyData(id);
