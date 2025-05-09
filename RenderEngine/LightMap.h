@@ -112,7 +112,7 @@ namespace lm {
 		int padding = 4;
 		float bias = 0.0057f;
 		int rectSize = 40;
-		int leafCount = 1024;
+		int leafCount = 4;
 
 		int sampleCount = 4;
 		int indirectCount = 2;
@@ -157,6 +157,7 @@ namespace lm {
 
 		ID3D11Buffer* structuredLightBuffer = nullptr;
 		ID3D11ShaderResourceView* structuredLightBufferSRV = nullptr;
+		ID3D11ShaderResourceView* textureArraySRV = nullptr;
 
 		Coroutine<> GenerateLightmapCoroutine(
 			RenderScene* scene,

@@ -118,6 +118,11 @@ DirectX11::Sizef Camera::GetScreenSize() const
 
 DirectX::BoundingFrustum Camera::GetFrustum()
 {
+	if (m_farPlane == 0.f)
+	{
+		m_farPlane = 0.5f;
+	}
+
 	DirectX::BoundingFrustum frustum;
 	frustum.CreateFromMatrix(frustum, CalculateProjection());
 
@@ -160,7 +165,7 @@ void Camera::HandleMovement(float deltaTime)
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
-	if (InputManagement->IsMouseButtonDown(MouseKey::MIDDLE))
+	if (InputManagement->IsMouseButtonDown(MouseKey::RIGHT))
 	{
 		// 마우스 이동량 가져오기
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;

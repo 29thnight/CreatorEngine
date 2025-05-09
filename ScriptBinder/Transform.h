@@ -36,17 +36,6 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
-	//ReflectionField(Transform)
-	//{
-	//	PropertyField
-	//	({
-	//		meta_property(position)
-	//		meta_property(rotation)
-	//		meta_property(scale)
-	//	});
-	//	FieldEnd(Transform, PropertyOnly)
-	//}
-
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;

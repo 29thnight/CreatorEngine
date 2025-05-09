@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
+#include "AnimationController.h"
 #include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };
 
@@ -11,19 +12,19 @@ class AnimationController;
 class Animator : public Component, public IRenderable, public IUpdatable
 {
 public:
-   ReflectAnimator
-    [[Serializable(Inheritance:Component)]]
-   Animator() 
-   {
-       m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
-   } 
-   virtual ~Animator()
-   {
-       if (m_animationController)
-       {
-           delete m_animationController;
-       }
-   }
+    ReflectAnimator
+        [[Serializable(Inheritance:Component)]]
+    Animator()
+    {
+        m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
+    }
+    virtual ~Animator()
+    {
+        for (auto Controller : m_animationControllers)
+        {
+            delete Controller;
+        }
+    }
     bool IsEnabled() const override
     {
         return m_IsEnabled;
@@ -34,14 +35,12 @@ public:
         m_IsEnabled = able;
     }
     void Update(float tick) override;
-    //현재애니 이름반환
-    std::string GetcurAnimation();
     void SetAnimation(int index);
     [[Method]]
     void UpdateAnimation();
-    void CreateController();
-    AnimationController* GetController() { return m_animationController; }
-
+    void CreateController(std::string name);
+    AnimationController* GetController(std::string name);
+    bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     [[Property]]
@@ -49,8 +48,6 @@ public:
     [[Property]]
     uint32_t m_AnimIndexChosen{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
-    [[Property]]
-    std::string curAniName;
     bool m_isBlend = false;
     float blendT = 0;
     [[Property]]
@@ -63,8 +60,35 @@ public:
     [[Property]]
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
+ 
     [[Property]]
-    AnimationController* m_animationController{};
+    std::vector<AnimationController*> m_animationControllers{};
+    [[Property]]
+    std::vector<ConditionParameter> Parameters;
+
+    template<typename T>
+    void AddParameter(const std::string valuename, T value, ValueType vType)
+    {
+        for (auto& parm : Parameters)
+        {
+            if (parm.name == valuename)
+                return;
+        }
+        Parameters.push_back(ConditionParameter(value, vType, valuename));
+    }
+
+    template<typename T>
+    void SetParameter(const std::string valuename, T Value)
+    {
+        for (auto& param : Parameters)
+        {
+            if (param.name == valuename)
+            {
+                param.UpdateParameter(Value);
+            }
+        }
+    }
+  
 private:
     bool m_IsEnabled = false;
     

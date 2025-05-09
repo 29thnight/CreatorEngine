@@ -65,6 +65,10 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 	}
 	component->SetOwner(this);
 
+	std::string scriptFile = std::string(scriptName) + ".cpp";
+
+	component->m_scriptGuid = DataSystems->GetFilenameToGuid(scriptFile);
+
     auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
     m_components.push_back(componentPtr);
     m_componentIds[componentPtr->GetTypeID()] = m_components.size() - 1;
@@ -114,6 +118,8 @@ void GameObject::RemoveComponent(const std::string_view& scriptName)
 		if (scriptComponent && scriptComponent->m_name == scriptName)
 		{
 			RemoveComponent(scriptComponent->GetTypeID());
+			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
+			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->GetTypeID()], scriptComponent->m_name.ToString());
 		}
 	}
 }

@@ -83,9 +83,19 @@ public:
 	DirectX::BoundingFrustum GetFrustum() const
 	{
 		DirectX::BoundingFrustum frustum = m_pCamera->GetFrustum();
-		frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
+		//frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
+		frustum.Origin = Mathf::Vector3(m_pOwner->m_transform.position);
+		frustum.Orientation = m_pOwner->m_transform.rotation;
 
 		return frustum;
+	}
+
+	DirectX::BoundingBox GetEditorBoundingBox() const
+	{
+		DirectX::BoundingBox box;
+		box.Center = Mathf::Vector3(m_pOwner->m_transform.position);
+		box.Extents = m_editorBoundingBox.Extents;
+		return box;
 	}
 
 private:
@@ -93,5 +103,6 @@ private:
 	Camera* m_pCamera{ nullptr };
 	[[Property]]
 	int m_cameraIndex{ -1 };
+	BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
 	bool m_IsEnabled{ false };
 };

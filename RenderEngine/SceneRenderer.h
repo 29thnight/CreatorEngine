@@ -19,6 +19,7 @@
 #include "SubsurfaceScatteringPass.h"
 #include "VignettePass.h"
 #include "ColorGradingPass.h"
+#include "VolumetricFogPass.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -66,6 +67,7 @@ private:
 	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
+	void ApplyNewCubeMap(const std::string_view& filename);
 	void UnbindRenderTargets();
 	void ReloadShaders();
 
@@ -98,6 +100,7 @@ private:
 	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
 	std::unique_ptr<VignettePass> m_pVignettePass{};
 	std::unique_ptr<ColorGradingPass> m_pColorGradingPass{};
+	std::unique_ptr<VolumetricFogPass> m_pVolumetricFogPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers

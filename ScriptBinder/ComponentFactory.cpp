@@ -33,6 +33,13 @@ void ComponentFactory::Initialize()
 
 void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
 {
+	if (itNode["ModuleBehavior"])
+	{
+		std::string scriptName = itNode["m_name"].as<std::string>();
+		auto scriptComponent = obj->AddScriptComponent(scriptName);
+		return;
+	}
+
     const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
     if (nullptr == componentType)
     {
@@ -74,66 +81,70 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
 			}
 
-			if(itNode["m_animationController"])
+			if (itNode["Parameters"])
 			{
-				auto& animationControllerNode = itNode["m_animationController"];
+				auto& paramNode = itNode["Parameters"];
 
-				AnimationController* animationController = new AnimationController();
-				Meta::Deserialize(animationController, animationControllerNode);
-				animationController->m_owner = animator;
-				animator->m_animationController = animationController;
-				if (animationControllerNode["StateVec"])
+				for (auto& param : paramNode)
 				{
-					
-					auto& StatesNode = animationControllerNode["StateVec"];
-					for (auto& state : StatesNode)
+					ConditionParameter aniParam;
+					Meta::Deserialize(&aniParam, param);
+					animator->Parameters.push_back(aniParam);
+				}
+			}
+			if(itNode["m_animationControllers"])
+			{
+				auto& animationControllerNode = itNode["m_animationControllers"];
+
+				for (auto& layer : animationControllerNode)
+				{
+
+					AnimationController* animationController = new AnimationController();
+					Meta::Deserialize(animationController, layer);
+					animationController->m_owner = animator;
+					//animator->m_animationController = animationController;
+					if (layer["StateVec"])
 					{
-						std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
-						Meta::Deserialize(sharedState.get(), state);
-						animationController->StateVec.push_back(sharedState);
-						animationController->States.insert(std::make_pair(sharedState->Name, animationController->StateVec.size() - 1));
-						sharedState->m_ownerController = animationController;
-						sharedState->SetBehaviour(sharedState->Name);
-						if (state["Transitions"])
+						auto& StatesNode = layer["StateVec"];
+						for (auto& state : StatesNode)
 						{
-							auto& transitionNode = state["Transitions"];
-							for (auto& transition : transitionNode)
+							std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
+							Meta::Deserialize(sharedState.get(), state);
+							animationController->StateVec.push_back(sharedState);
+							animationController->States.insert(std::make_pair(sharedState->Name, animationController->StateVec.size() - 1));
+							sharedState->m_ownerController = animationController;
+							sharedState->SetBehaviour(sharedState->Name);
+							if (state["Transitions"])
 							{
-								std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
-								Meta::Deserialize(sharedTransition.get(), transition);
-								sharedState->Transitions.push_back(sharedTransition);
-								sharedTransition->m_ownerController = animationController;
-								if (transition["conditions"])
+								auto& transitionNode = state["Transitions"];
+								for (auto& transition : transitionNode)
 								{
-									auto& conditionNode = transition["conditions"];
-									for (auto& condition : conditionNode)
+									std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
+									Meta::Deserialize(sharedTransition.get(), transition);
+									sharedState->Transitions.push_back(sharedTransition);
+									sharedTransition->m_ownerController = animationController;
+									if (transition["conditions"])
 									{
-										TransCondition newcondition;
-										Meta::Deserialize(&newcondition, condition);
-										newcondition.m_ownerController = animationController;
-										sharedTransition->conditions.push_back(newcondition);
+										auto& conditionNode = transition["conditions"];
+										for (auto& condition : conditionNode)
+										{
+											TransCondition newcondition;
+											Meta::Deserialize(&newcondition, condition);
+											newcondition.m_ownerController = animationController;
+											sharedTransition->conditions.push_back(newcondition);
+										}
 									}
 								}
 							}
 						}
 					}
-				}
-				if (animationControllerNode["Parameters"])
-				{
-					auto& paramNode = animationControllerNode["Parameters"];
-
-					for (auto& param : paramNode)
+					if (layer["m_curState"])
 					{
-						ConditionParameter aniParam;
-						Meta::Deserialize(&aniParam, param);
-						animationController->Parameters.push_back(aniParam);
+						auto& curNode = layer["m_curState"];
+						std::string name = curNode["Name"].as<std::string>();
+						animationController->m_curState = animationController->StateVec[animationController->States[name]].get();
 					}
-				}
-				if (animationControllerNode["m_curState"])
-				{
-					auto& curNode = animationControllerNode["m_curState"];
-					std::string name = curNode["Name"].as<std::string>();
-					animationController->m_curState = animationController->StateVec[animationController->States[name]].get();
+					animator->m_animationControllers.push_back(animationController);
 				}
 			}
 		}

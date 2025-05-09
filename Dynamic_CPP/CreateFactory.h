@@ -3,7 +3,6 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
-#include "TestScriptClass.h"
 #include "TestBehavior.h"
 
 class CreateFactory : public Singleton<CreateFactory>
@@ -28,7 +27,7 @@ public:
 		}
 		return nullptr; // or throw an exception
 	}
-	std::unordered_map<std::string, std::function<ModuleBehavior* ()>> factoryMap;
+	std::unordered_map<std::string, std::function<ModuleBehavior*()>> factoryMap;
 };
 
 static inline auto& ModuleFactory = CreateFactory::GetInstance();

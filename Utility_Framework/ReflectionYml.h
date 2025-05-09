@@ -3,6 +3,7 @@
 #include "ReflectionRegister.h"
 #include "IObject.h"
 #include "DataSystem.h"
+#include "ModuleBehavior.h"
 #include <yaml-cpp/yaml.h>
 
 namespace Meta
@@ -128,22 +129,6 @@ namespace Meta
 			FileGuid fileGuid = std::any_cast<FileGuid>(value);
 			node[prop.name] = fileGuid.ToString();
 		}
-	/*	else if (typeID == GUIDCreator::GetTypeID<TransCondition<int>>())
-		{
-
-		}
-		else if (typeID == GUIDCreator::GetTypeID<TransCondition<int>>())
-		{
-
-		}
-		else if (typeID == GUIDCreator::GetTypeID<TransCondition<int>>())
-		{
-		*****
-		}*/
-		//else if (typeID == GUIDCreator::GetTypeID<TransConditionVariant>())
-		//{
-
-		//}
 		else
 		{
 			node[prop.name] = "[not suport type]"; // 기타 미지원 타입

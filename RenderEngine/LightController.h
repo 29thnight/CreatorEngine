@@ -10,6 +10,7 @@ class GBufferPass;
 class SceneRenderer;
 class RenderScene;
 class RenderPassWindow;
+class VolumetricFogPass;
 class LightController
 {
 public:
@@ -41,6 +42,7 @@ private:
 	friend class SceneRenderer;
 	friend class RenderPassWindow;
 	friend class RenderScene;
+	friend class VolumetricFogPass;
 
 	ID3D11Buffer* m_pLightBuffer{ nullptr };
     ID3D11Buffer* m_pLightCountBuffer{ nullptr };

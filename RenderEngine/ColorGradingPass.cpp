@@ -1,8 +1,10 @@
 #include "ColorGradingPass.h"
 #include "ShaderSystem.h"
+#include "TimeSystem.h"
 
 struct alignas(16) CBData {
 	float lerpValue;
+	float time;
 };
 
 ColorGradingPass::ColorGradingPass()
@@ -63,9 +65,11 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
+	timer += DirectX11::TimeSystem::TimeSysInstance->GetElapsedSeconds();
 	camera.UpdateBuffer();
 	CBData cbData;
 	cbData.lerpValue = lerp;
+	cbData.time = timer * 0.2f;
 
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
@@ -85,6 +89,8 @@ void ColorGradingPass::ControlPanel()
 {
 	ImGui::Checkbox("ColorGrading", &isOn);
 	ImGui::SliderFloat("Lerp", &lerp, 0.0f, 1.0f);
+	if(ImGui::Button("Timer Zero"))
+		timer = 0.0f;
 }
 
 void ColorGradingPass::Resize()

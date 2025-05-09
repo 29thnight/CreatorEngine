@@ -5,7 +5,7 @@
 #include "RenderableComponents.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
-
+#include "AnimationController.h"
 using namespace DirectX;
 
 inline float lerp(float a, float b, float f)
@@ -81,24 +81,59 @@ void AnimationJob::Update(float deltaTime)
     {
         m_UpdateThreadPool.Enqueue([&]
         {
+            
             Skeleton* skeleton = animator->m_Skeleton;
-            Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
 
-            animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
-            animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-            animator->curAniName = animator->GetcurAnimation();
-            XMMATRIX rootTransform = skeleton->m_rootTransform;
-            if (animator->m_isBlend)
+            //컨트롤러별로 상,하체 등등이 분리되있다면
+            if (animator->UsesMultipleControllers() == true)
             {
-                Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
-                animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
-                animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
-                UpdateBlendBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
+               
+                for (auto& animationcontroller : animator->m_animationControllers)
+                {
+                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
+                    animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration);
+                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+                    if (animationcontroller->m_isBlend)
+                    {
+                        Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
+                        animationcontroller->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
+                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
+                    }
+                    else
+                    {
+                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);  
+                    }
+                }
+                XMMATRIX rootTransform = skeleton->m_rootTransform;
+
+                UpdateBoneLayer(skeleton->m_rootBone, *animator , rootTransform);
+               
             }
             else
             {
-                UpdateBone(skeleton->m_rootBone, *animator, rootTransform, (*animator).m_TimeElapsed);
+                Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
+                animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+                animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+                AnimationController* animationcontroller = nullptr;
+                if(!animator->m_animationControllers.empty())
+                    animationcontroller = animator->m_animationControllers[0];
+                XMMATRIX rootTransform = skeleton->m_rootTransform;
+                if (animator->m_isBlend)
+                {
+                    Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
+                    animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                    animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
+                    UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
+                }
+                else
+                {
+                    UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
+                }
             }
+            
+            
         });
     }
 
@@ -130,72 +165,120 @@ void AnimationJob::CleanUp()
 	m_objectSize = 0;
 }
 
-void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, const DirectX::XMMATRIX& parentTransform, float time, float nextanitime)
+void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller,const DirectX::XMMATRIX& parentTransform, float time, float nextanitime)
 {
     Skeleton* skeleton = animator.m_Skeleton;
-    Animation& animation = skeleton->m_animations[animator.m_AnimIndexChosen];
-    Animation& nextanimation = skeleton->m_animations[animator.nextAnimIndex];
+    Animation* animation;
+    Animation* nextanimation;
+    if (controller)
+    {
+        animation = &skeleton->m_animations[controller->GetAnimationIndex()];
+        nextanimation = &skeleton->m_animations[controller->GetNextAnimationIndex()];
+    }
+    else
+    {
+        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+        nextanimation = &skeleton->m_animations[animator.nextAnimIndex];
+    }
+
     std::string& boneName = bone->m_name;
 
-    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg) return; //*****
-    auto it = animation.m_nodeAnimations.find(boneName);
-    if (it == animation.m_nodeAnimations.end())
+
+    auto it = animation->m_nodeAnimations.find(boneName);
+    if (it == animation->m_nodeAnimations.end())
     {
         for (Bone* child : bone->m_children)
         {
-            UpdateBlendBone(child, animator, parentTransform, time, nextanitime);
+            UpdateBlendBone(child, animator, controller,parentTransform, time, nextanitime);
         }
         return;
     }
 
-    NodeAnimation& nodeAnim = animation.m_nodeAnimations[boneName];
-    NodeAnimation& nextnodeAnim = nextanimation.m_nodeAnimations[boneName];
+    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
+    NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
     XMMATRIX nodeTransform = calculAni(nodeAnim, time);
     XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime);
     XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
     animator.blendtransform = blendTransform;
     XMMATRIX globalTransform = blendTransform * parentTransform;
 
+    
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     bone->m_globalTransform = globalTransform;
-
+    if (controller)
+    {
+        controller->m_LocalTransforms[bone->m_index] = blendTransform;
+        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    }
     for (Bone* child : bone->m_children)
     {
-        UpdateBlendBone(child, animator, globalTransform, time, nextanitime);
+        UpdateBlendBone(child, animator, controller,globalTransform, time, nextanitime);
     }
 }
 
-void AnimationJob::UpdateBone(Bone* bone, Animator& animator, const XMMATRIX& parentTransform, float time)
+void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationController* controller,const XMMATRIX& parentTransform, float time)
 {
     Skeleton* skeleton = animator.m_Skeleton;
     std::string& boneName = bone->m_name;
-    Animation* animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
-    //Animation* lowAnimation = &skeleton->m_animations[0];
-    //if (bone->m_region == BoneRegion::LeftLeg || bone->m_region == BoneRegion::RightLeg)
-    //{
-    //    animation = lowAnimation;
-    //    //return;
-    //}
+    Animation* animation;
+    if (controller)
+    {
+        animation = &skeleton->m_animations[controller->GetAnimationIndex()];
+        auto mask = controller->GetAvatarMask();
+    }
+    else
+    {
+        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+    }
     auto it = animation->m_nodeAnimations.find(boneName);
     if (it == animation->m_nodeAnimations.end())
     {
         for (Bone* child : bone->m_children)
         {
-            UpdateBone(child, animator, parentTransform, time);
+            UpdateBone(child, animator, controller,parentTransform, time);
         }
         return;
     }
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     XMMATRIX nodeTransform = calculAni(nodeAnim, time);
     XMMATRIX globalTransform = nodeTransform * parentTransform;
-
-    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    
     bone->m_globalTransform = globalTransform;
-
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    
+    if (controller)
+    {
+        controller->m_LocalTransforms[bone->m_index] = nodeTransform;
+        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    }
     for (Bone* child : bone->m_children)
     {
-        UpdateBone(child, animator, globalTransform, time);
+        UpdateBone(child, animator, controller,globalTransform, time);
     }
+}
+
+
+void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX::XMMATRIX& parentTransform)
+{
+    Skeleton* skeleton = animator.m_Skeleton;
+    std::string& boneName = bone->m_name;
+    bool isCalculAnimate = true;
+    XMMATRIX globalTransform{};
+   
+    for (auto& controller : animator.m_animationControllers)
+    {
+        auto mask = controller->GetAvatarMask();
+        if (mask->IsBoneEnabled(bone->m_region) == true)
+        {
+            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+        }
+    }
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    for (Bone* child : bone->m_children)
+    {
+        UpdateBoneLayer(child, animator,globalTransform);
+    }
+    
 }
 
 XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)

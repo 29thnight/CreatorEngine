@@ -116,6 +116,12 @@ void ImGuiRenderer::BeginRender()
 
 	ImGui::NewFrame();
 
+	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
+	if (file::exists(iniPath))
+	{
+		return;
+	}
+
     static bool firstLoop = true;
     if (firstLoop) 
 	{

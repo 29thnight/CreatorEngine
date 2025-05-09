@@ -24,6 +24,7 @@ public:
 		CppScript,
 		CSharpScript,
 		Sound,
+		HDR,
 	};
 	//일단 이대로 진행
 	enum class AssetType
@@ -40,7 +41,8 @@ public:
 		{ FileType::Shader, "Shader" },
 		{ FileType::CppScript, "CppScript" },
 		{ FileType::CSharpScript, "CSharpScript" },
-		{ FileType::Sound, "Sound" }
+		{ FileType::Sound, "Sound" },
+		{ FileType::HDR, "HDR" }
 	};
 
 private:
@@ -69,10 +71,13 @@ public:
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
+	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
 
 	FileGuid GetFileGuid(const file::path& filepath) const;
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
+	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
+
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
@@ -126,6 +131,8 @@ private:
 	efsw::FileWatcher* m_watcher{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
 	std::shared_ptr<AssetMetaWatcher> m_assetMetaWatcher{};
+
+	static std::atomic_bool m_isExecuteSolution;
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();

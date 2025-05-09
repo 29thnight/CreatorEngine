@@ -138,8 +138,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//Vignette
 	m_pVignettePass = std::make_unique<VignettePass>();
 
+	//ColorGrading
 	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
 	m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
+
+	//VolumetricFog
+	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
+	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
 
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
@@ -308,12 +313,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-	/*DataSystems->LoadModel("aniTest.fbx");
-	model[0] = DataSystems->LoadCashedModel("aniTest.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *SceneManagers->GetActiveScene());
-	player.GetPlayer(testt);*/
-
-
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
@@ -331,15 +330,12 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	//player.Update(deltaTime);
 	if(ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
 	}
 
 	m_renderScene->Update(deltaTime);
-	m_pEditorCamera->HandleMovement(deltaTime);
-
 	PrepareRender();
 }
 
@@ -437,6 +433,15 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+		//VolumetricFogPass
+		{
+			DirectX11::BeginEvent(L"VolumetricFogPass");
+			Benchmark banch;
+			m_pVolumetricFogPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("VolumetricFogPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
         //[*] PostProcessPass
         {
 			DirectX11::BeginEvent(L"PostProcessPass");
@@ -464,7 +469,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-
 		//Vignette
 		{
 			DirectX11::BeginEvent(L"VignettePass");
@@ -483,6 +487,7 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+
 		{
 			//DirectX11::BeginEvent(L"EffectPass");
 			//Benchmark banch;
@@ -491,7 +496,7 @@ void SceneRenderer::SceneRendering()
 			//DirectX11::EndEvent();
 		}
 
-		//[7] SpritePass(InGameSprite)
+		//[7] SpritePass
 		{
 			DirectX11::BeginEvent(L"SpritePass");
 			Benchmark banch;
@@ -572,6 +577,16 @@ void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
 	ID3D11RenderTargetView* rtv = texture.GetRTV();
 
 	DirectX11::OMSetRenderTargets(1, &rtv, dsv);
+}
+
+void SceneRenderer::ApplyNewCubeMap(const std::string_view& filename)
+{
+	m_pSkyBoxPass->GenerateCubeMap(filename, *m_renderScene);
+	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
+
+	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
 void SceneRenderer::UnbindRenderTargets()

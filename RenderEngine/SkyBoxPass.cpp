@@ -214,6 +214,25 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
     GenerateEnvironmentMap(scene);
 }
 
+void SkyBoxPass::GenerateCubeMap(const std::string_view& fileName, RenderScene& scene)
+{
+	m_skyBoxTexture.reset();
+
+	m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+	m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
+		m_cubeMapSize,
+		"CubeMap",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+	));
+
+	m_skyBoxCubeMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
+	m_skyBoxCubeMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_cubeMapGenerationRequired = true;
+
+	GenerateCubeMap(scene);
+}
+
 Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 {
 	auto deviceContext = DeviceState::g_pDeviceContext;
