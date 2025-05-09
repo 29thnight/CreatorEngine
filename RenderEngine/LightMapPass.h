@@ -13,5 +13,7 @@ private:
 	ComPtr<ID3D11Buffer> m_materialBuffer;
 	ComPtr<ID3D11Buffer> m_boneBuffer;
 	ComPtr<ID3D11Buffer> m_cbuffer;
+
+	std::vector<Texture*>* m_plightmaps{};
 };
 

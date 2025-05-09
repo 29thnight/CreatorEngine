@@ -19,6 +19,7 @@
 #include "SubsurfaceScatteringPass.h"
 #include "VignettePass.h"
 #include "ColorGradingPass.h"
+#include "VolumetricFogPass.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -98,6 +99,7 @@ private:
 	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
 	std::unique_ptr<VignettePass> m_pVignettePass{};
 	std::unique_ptr<ColorGradingPass> m_pColorGradingPass{};
+	std::unique_ptr<VolumetricFogPass> m_pVolumetricFogPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 	//buffers

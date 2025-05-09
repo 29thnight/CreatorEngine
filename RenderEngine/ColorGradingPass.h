@@ -19,6 +19,7 @@ private:
 	Texture* m_pCopiedTexture{};
 	ComPtr<ID3D11Buffer> m_Buffer{};
 	float lerp = 0.f;
+	float timer = 0.f;
 	bool isOn{ true };
 };
 

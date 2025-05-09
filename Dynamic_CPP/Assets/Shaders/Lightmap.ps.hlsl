@@ -39,7 +39,8 @@ Texture2D OcclusionRoughnessMetal : register(t2);
 Texture2D AO : register(t3);
 Texture2D Emissive : register(t4);
 
-Texture2DArray<float4> lightmap : register(t14);
+//Texture2DArray<float4> lightmap : register(t14);
+Texture2D<float4> lightmap : register(t14);
 
 static const float GAMMA = 2.2;
 static const float INV_GAMMA = 1.0 / GAMMA;
@@ -77,7 +78,7 @@ float4 main(VertexShaderOutput IN) : SV_TARGET
     }
     //float2 lightmapUV = (IN.texCoord1 - offset) / size;
     float2 lightmapUV = IN.texCoord1 * size + offset;
-    float4 lightmapColor = lightmap.SampleLevel(LinearSampler, float3(lightmapUV, lightmapIndex), 0.0);
+    float4 lightmapColor = lightmap.SampleLevel(LinearSampler, lightmapUV, 0.0);
     
     // kD = 1 - F0, F0 is based on metallic
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo.rgb, metallic);
