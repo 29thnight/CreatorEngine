@@ -41,11 +41,9 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-	std::cout << m_pOwner->m_name.ToString() << std::endl;
+	std::cout << "TestBehavior::Update" << std::endl;
 
 	GameObject::Find("IcoSphere")->m_transform.AddPosition(Mathf::Vector3(0.0f, 0.0f, 1.0f) * tick);
-
-	std::cout << "TestBehavior Update" << std::endl;
 }
 
 void TestBehavior::LateUpdate(float tick)

@@ -81,6 +81,14 @@ public:
 		}
 	}
 
+    DirectX::BoundingBox GetEditorBoundingBox() const
+	{
+		DirectX::BoundingBox box;
+		box.Center = Mathf::Vector3(m_pOwner->m_transform.position);
+		box.Extents = m_editorBoundingBox.Extents;
+		return box;
+	}
+
     [[Property]]
     int m_lightIndex{ 0 };
 
@@ -108,5 +116,7 @@ public:
 	float m_range{ 10.f };
 
 private:
+    BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
+
     bool m_IsEnabled{ false };
 };

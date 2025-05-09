@@ -2,7 +2,7 @@
 
 void DebugClass::Initialize()
 {
-    logSink = std::make_shared<LogSink>(2000);
+    logSink = std::make_shared<LogSink>(500);
 	fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("Log\\Editor.log", true);
 
 	std::vector<spdlog::sink_ptr> sinks{ logSink, fileSink };

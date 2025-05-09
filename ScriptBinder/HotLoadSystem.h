@@ -20,7 +20,7 @@ private:
 public:
 	void Initialize();
 	void Shutdown();
-	void TrackScriptChanges();
+	bool IsScriptUpToDate();
 	void ReloadDynamicLibrary();
 	void ReplaceScriptComponent();
 	void CompileEvent();
@@ -43,9 +43,32 @@ public:
 		m_scriptComponentIndexs.emplace_back(gameObject, index, name);
 	}
 
+	void UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+	{
+		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
+		{
+			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
+		});
+	}
+
 	std::vector<std::string>& GetScriptNames()
 	{
 		return m_scriptNames;
+	}
+
+	bool IsCompileEventInvoked() const
+	{
+		return m_isCompileEventInvoked;
+	}
+
+	void SetCompileEventInvoked(bool value)
+	{
+		m_isCompileEventInvoked = value;
+	}
+
+	void SetReload(bool value)
+	{
+		m_isReloading = value;
 	}
 
 private:
@@ -70,12 +93,17 @@ private:
 		"class "
 	};
 
-	std::string scriptBodyString
+	std::string scriptInheritString
 	{
 		" : public ModuleBehavior\n"
 		"{\n"
 		"public:\n"
-		"	"
+		"	MODULE_BEHAVIOR_BODY("
+	};
+
+	std::string scriptBodyString
+	{
+		")\n"
 		"	virtual void Awake() override {}\n"
 		"	virtual void Start() override;\n"
 		"	virtual void FixedUpdate(float fixedTick) override {}\n"

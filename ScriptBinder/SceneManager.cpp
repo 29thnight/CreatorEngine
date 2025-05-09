@@ -113,8 +113,11 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
 
 Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
-	std::ofstream sceneFileOut("TestScene.yml");
+    file::path saveSceneFileName = name.data();
+	std::ofstream sceneFileOut(saveSceneFileName);
     MetaYml::Node sceneNode{};
+
+    m_activeScene->m_SceneObjects[0]->m_name = saveSceneFileName.stem().string();
 
     try
     {
@@ -131,13 +134,19 @@ Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 
 Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 {
+	std::string loadSceneName = name.data();
+
 	try
 	{
-        MetaYml::Node sceneNode = MetaYml::LoadFile("TestScene.yml");
+        MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         if (m_activeScene)
         {
 			Scene* swapScene = m_activeScene;
 			m_activeScene = nullptr;
+
+			std::erase_if(m_scenes, 
+                [&](const auto& scene) { return scene == swapScene; });
+
 			delete swapScene;
         }
 		m_activeScene = Scene::LoadScene(name);
@@ -217,19 +226,17 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	if (m_activeScene)
 	{
         resetSelectedObjectEvent.Broadcast();
+		m_activeScene->AllDestroyMark();
 		m_activeScene->OnDisable();
 		m_activeScene->OnDestroy();
 		m_activeScene = nullptr;
 	}
-	for (auto& scene : m_scenes)
-	{
-		if (scene && scene->m_sceneName == "PlayScene")
-		{
-			delete scene;
-			scene = nullptr;
-		}
-	}
-	std::erase_if(m_scenes, [](const auto& scene) { return scene == nullptr; });
+
+	Scene* swapScene = m_scenes[m_activeSceneIndex];
+    std::erase_if(m_scenes,
+        [&](const auto& scene) { return scene == swapScene; });
+	delete swapScene;
+	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
 	m_isEditorSceneLoaded = false;

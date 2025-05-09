@@ -162,6 +162,7 @@ void Scene::DestroyGameObject(GameObject::Index index)
 void Scene::Reset()
 {
     //칠게 있나?
+    ScriptManager->SetReload(true);
     ScriptManager->ReplaceScriptComponent();
 }
 
@@ -325,7 +326,7 @@ void Scene::RemoveLight(size_t index)
 {
 	if (index < m_lights.size())
 	{
-		m_lights[index].m_lightType = LightType::InVaild;
+		m_lights[index].m_lightType = LightType_InVaild;
 		m_lights[index].m_lightStatus = LightStatus::Disabled;
 		m_lights[index].m_intencity = 0.f;
 		m_lights[index].m_color = { 0,0,0,0 };
@@ -336,7 +337,7 @@ void Scene::DistroyLight()
 {
     std::erase_if(m_lights, [](const Light& light) 
 	{
-		return light.m_lightType == LightType::InVaild;
+		return light.m_lightType == LightType_InVaild;
 	});
 }
 
@@ -372,14 +373,14 @@ void Scene::DestroyGameObjects()
     {
         if (obj && deletedIndices.contains(obj->m_index))
         {
-            //for (auto& onDistroyComponent : obj->m_components)
-            //{
-            //    auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(onDistroyComponent);
-            //    if (behavior)
-            //    {
-            //        OnDisableEvent.TargetInvoke(behavior->m_onDisableEventHandle);
-            //    }
-            //}
+            for (auto& onDistroyComponent : obj->m_components)
+            {
+                auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(onDistroyComponent);
+                if (behavior)
+                {
+                    ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->GetTypeID()], behavior->m_name.ToString());
+                }
+            }
 
             obj->m_childrenIndices.clear();
             obj.reset();

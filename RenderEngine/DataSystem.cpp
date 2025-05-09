@@ -1,4 +1,5 @@
 #include "DataSystem.h"
+#include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>
@@ -12,6 +13,7 @@
 #include "fa.h"
 
 ImGuiTextFilter DataSystem::filter;
+std::atomic_bool DataSystem::m_isExecuteSolution = false;
 
 bool HasImageFile(const file::path& directory)
 {
@@ -45,11 +47,11 @@ void DataSystem::Initialize()
 	ShaderIcon = Texture::LoadFormPath(iconpath.string() + "Shader.png");
 	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Code.png");
 
-	MainLightIcon = Texture::LoadFormPath(iconpath.string() + "Main Light Gizmo.png");
-	PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLight Gizmo.png");
-	SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLight Gizmo.png");
-	DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLight Gizmo.png");
-	CameraIcon = Texture::LoadFormPath(iconpath.string() + "Camera Gizmo.png");
+	MainLightIcon = Texture::LoadFormPath(iconpath.string() + "MainLightGizmo.png");
+	PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLightGizmo.png");
+	SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLightGizmo.png");
+	DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLightGizmo.png");
+	CameraIcon = Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
 
 	smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
@@ -59,6 +61,7 @@ void DataSystem::Initialize()
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
 	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
 	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
+	m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
 	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
 	m_watcher->watch();
 }
@@ -433,17 +436,10 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 		}
 	}
 
-
-
 	SFonts.emplace(name, std::make_shared<SpriteFont>(DeviceState::g_pDevice, destination.c_str()));
 	
-	
-
-
 	return SFonts[name].get();
 }
-
-
 
 void DataSystem::OpenContentsBrowser()
 {
@@ -630,6 +626,68 @@ void DataSystem::OpenFile(const file::path& filepath)
 	}
 }
 
+void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath)
+{
+	if (m_isExecuteSolution)
+	{
+		return;
+	}
+
+	std::wstring cmdLine = L"\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe\" \"" +
+		slnPath.wstring() + L"\" /Command \"File.OpenFile " + filepath.wstring() + L"\"";
+
+	STARTUPINFOW si = { sizeof(si) };
+	PROCESS_INFORMATION pi = {};
+	std::wstring mutableCmd = cmdLine;
+
+	if (CreateProcessW(
+		nullptr,
+		mutableCmd.data(),
+		nullptr, nullptr,
+		FALSE,
+		0,
+		nullptr, nullptr,
+		&si,
+		&pi))
+	{
+		m_isExecuteSolution = true;
+		std::thread([hProcess = pi.hProcess, this]() 
+		{
+			while (true)
+			{
+				DWORD result = WaitForSingleObject(hProcess, 1);
+
+				if (result == WAIT_OBJECT_0)
+				{
+					break;
+				}
+				else if (result == WAIT_FAILED)
+				{
+					break;
+				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(2));
+			}
+
+			// Visual Studio 종료 감지 완료
+			if (!ScriptManager->IsCompileEventInvoked())
+			{
+				ScriptManager->SetCompileEventInvoked(true);
+			}
+			m_assetMetaRegistry->Clear();
+			m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
+			m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
+			m_isExecuteSolution = false;
+			CloseHandle(hProcess);
+		}).detach();
+
+		CloseHandle(pi.hThread); // 스레드는 곧바로 닫아도 됨
+	}
+	else
+	{
+		MessageBoxW(nullptr, L"Visual Studio Execute Failed", L"Error", MB_ICONERROR);
+	}
+}
+
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 {
 	return m_assetMetaRegistry->GetGuid(filepath);
@@ -638,6 +696,11 @@ FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
 FileGuid DataSystem::GetFilenameToGuid(const std::string& filename) const
 {
 	return m_assetMetaRegistry->GetFilenameToGuid(filename);
+}
+
+FileGuid DataSystem::GetStemToGuid(const std::string& stem) const
+{
+	return m_assetMetaRegistry->GetStemToGuid(stem);
 }
 
 file::path DataSystem::GetFilePath(FileGuid fileguid) const

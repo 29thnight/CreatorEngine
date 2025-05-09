@@ -5,6 +5,11 @@
 #include "ModuleBehavior.h"
 #include "pugixml.hpp"
 #include "ReflectionYml.h"
+#include "ProgressWindow.h"
+
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 #pragma region Script Event Binding Helper
 #define START_EVENT_BIND_HELPER(ScriptPtr) \
@@ -18,19 +23,19 @@
 	})
 
 #define FIXED_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::FixedUpdate)
+	ScriptPtr->m_fixedUpdateEventHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::FixedUpdate)
 
 #define UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::Update)
+	ScriptPtr->m_updateEventHandle = SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::Update)
 
 #define LATE_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::LateUpdate)
+	ScriptPtr->m_lateUpdateEventHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::LateUpdate)
 
 #define ON_ENABLE_EVENT_BIND_HELPER(ScriptPtr) \
-	SceneManagers->GetActiveScene()->OnEnableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnEnable)
+	ScriptPtr->m_onEnableEventHandle = SceneManagers->GetActiveScene()->OnEnableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnEnable)
 
 #define ON_DISABLE_EVENT_BIND_HELPER(ScriptPtr) \
-	SceneManagers->GetActiveScene()->OnDisableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnDisable)
+	ScriptPtr->m_onDisableEventHandle = SceneManagers->GetActiveScene()->OnDisableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnDisable)
 
 #pragma endregion
 
@@ -61,7 +66,7 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
     STARTUPINFOW si = { sizeof(STARTUPINFOW) };
     si.dwFlags |= STARTF_USESTDHANDLES;
     si.hStdOutput = hWrite;
-    si.hStdError = hWrite; // 오류도 같은 파이프로
+    si.hStdError = hWrite;
     si.hStdInput = NULL;
 
     PROCESS_INFORMATION pi;
@@ -73,7 +78,7 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
         throw std::runtime_error("Build failed");
     }
 
-    CloseHandle(hWrite); // 부모는 읽기만 하면 됨
+    CloseHandle(hWrite);
 
     char buffer[4096]{};
     DWORD bytesRead;
@@ -97,9 +102,19 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
                 continue;
             }
 
-            //std::string utf8Line = AnsiToUtf8(line);
-			Debug->LogDebug(line);
-        }
+			if (line.find("error") != std::string::npos || line.find("error C") != std::string::npos)
+			{
+				Debug->LogError(line);
+			}
+			else if (line.find("오류") != std::string::npos || line.find("경고") != std::string::npos)
+			{
+				Debug->LogDebug(line);
+			}
+			//else
+			//{
+			//	Debug->LogDebug(line);
+			//}
+		}
     }
 
     WaitForSingleObject(pi.hProcess, INFINITE);
@@ -115,7 +130,7 @@ void HotLoadSystem::Initialize()
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
-        + L"/m /t:Build /p:Configuration=Debug /p:Platform=x64 /nologo"
+        + L"/m /t:Clean;Build /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
 
 	try
@@ -151,14 +166,41 @@ void HotLoadSystem::Shutdown()
 	}
 }
 
-void HotLoadSystem::TrackScriptChanges()
+bool HotLoadSystem::IsScriptUpToDate()
 {
+	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
+	file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
+
+	if (!file::exists(dllPath))
+		return false;
+
+	auto dllTimeStamp = file::last_write_time(dllPath);
+
+	for (const auto& scriptName : m_scriptNames)
+	{
+		file::path scriptPath = PathFinder::Relative("Script\\" + scriptName + ".cpp");
+
+		if (file::exists(scriptPath))
+		{
+			auto scriptTimeStamp = file::last_write_time(scriptPath);
+
+			if (scriptTimeStamp > dllTimeStamp)
+			{
+				return false; // 빌드 필요함 (스크립트가 더 최신임)
+			}
+		}
+	}
+
+	return true; // 모든 스크립트가 DLL보다 오래됨 (업투데이트됨)
 }
 
 void HotLoadSystem::ReloadDynamicLibrary()
 {
 	if(true == m_isCompileEventInvoked)
 	{
+		g_progressWindow->Launch();
+		g_progressWindow->SetStatusText(L"Compile Script Library...");
+		g_progressWindow->SetProgress(100);
 		try
 		{
 			Compile();
@@ -169,6 +211,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			return;
 		}
 
+		m_initModuleFunc();
 		m_scriptNames.clear();
 		const char** scriptNames = nullptr;
 		int scriptCount = 0;
@@ -182,6 +225,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		}
 
 		ReplaceScriptComponent();
+		g_progressWindow->Close();
 	}
 }
 
@@ -192,9 +236,21 @@ void HotLoadSystem::ReplaceScriptComponent()
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
 			auto* newScript = CreateMonoBehavior(name.c_str());
-			ScriptManager->BindScriptEvents(newScript, name);
+			if (nullptr == newScript)
+			{
+				Debug->LogError("Failed to create script: " + std::string(name));
+				continue;
+			}
+
+			if(SceneManagers->m_isGameStart)
+			{
+				ScriptManager->BindScriptEvents(newScript, name);
+			}
 			newScript->SetOwner(gameObject);
-			gameObject->m_components[index].reset(newScript);
+			auto sharedScript = std::shared_ptr<Component>(newScript);
+			gameObject->m_components[index].reset();
+			gameObject->m_components[index].swap(sharedScript);
+			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
 		m_isReloading = false;
 	}
@@ -208,14 +264,19 @@ void HotLoadSystem::CompileEvent()
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_view& name)
 {
 	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
-	file::path scriptMetaFileName = std::string(name) + ".cpp" + ".meta";
-	FileGuid guid = DataSystems->GetFilenameToGuid(scriptMetaFileName.string());
-	file::path scriptMetaFullPath = DataSystems->GetFilePath(guid);
+	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
+	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
 
-	if (file::exists(scriptMetaFullPath))
+	if (file::exists(scriptMetaFileName))
 	{
-		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFullPath.string());
+		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFileName.string());
 		std::vector<std::string> events;
+		if (!scriptNode["eventRegisterSetting"])
+		{
+
+		}
+
+
 		if (scriptNode["eventRegisterSetting"])
 		{
 			for (const auto& node : scriptNode["eventRegisterSetting"])
@@ -270,12 +331,29 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 			
 		}
 	}
-
 }
 
 void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name)
 {
+	if (0 != script->m_startEventHandle.GetID())
+	{
+		SceneManagers->GetActiveScene()->StartEvent.Remove(script->m_startEventHandle);
+	}
 
+	if (0 != script->m_fixedUpdateEventHandle.GetID())
+	{
+		SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(script->m_fixedUpdateEventHandle);
+	}
+
+	if (0 != script->m_updateEventHandle.GetID())
+	{
+		SceneManagers->GetActiveScene()->UpdateEvent.Remove(script->m_updateEventHandle);
+	}
+
+	if (0 != script->m_lateUpdateEventHandle.GetID())
+	{
+		SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(script->m_lateUpdateEventHandle);
+	}
 }
 
 void HotLoadSystem::CreateScriptFile(const std::string_view& name)
@@ -295,6 +373,8 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		scriptFile 
 			<< scriptIncludeString 
 			<< name 
+			<< scriptInheritString
+			<< name
 			<< scriptBodyString
 			<< scriptEndString;
 
@@ -483,11 +563,12 @@ void HotLoadSystem::Compile()
 
     try
     {
-        RunMsbuildWithLiveLog(command);
+		if (!IsScriptUpToDate()) RunMsbuildWithLiveLog(command);
     }
     catch (const std::exception& e)
     {
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Build failed...");
         throw std::runtime_error("Build failed");
     }
 
@@ -495,13 +576,16 @@ void HotLoadSystem::Compile()
 	if (!hDll)
 	{
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to load library...");
 		throw std::runtime_error("Failed to load library");
 	}
 
 	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));
 	if (!m_scriptFactoryFunc)
+
 	{
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
 
@@ -509,6 +593,7 @@ void HotLoadSystem::Compile()
 	if (!m_initModuleFunc)
 	{
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
 
@@ -516,6 +601,7 @@ void HotLoadSystem::Compile()
 	if (!m_scriptNamesFunc)
 	{
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
 
@@ -523,8 +609,10 @@ void HotLoadSystem::Compile()
 	if (!m_setSceneManagerFunc)
 	{
 		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
+
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
 }

@@ -75,7 +75,55 @@ public:
         }
     }
 
-private:
+    void ScanAndCleanupInvalidMeta(const std::filesystem::path& root)
+    {
+        namespace fs = std::filesystem;
+
+        for (auto& entry : fs::recursive_directory_iterator(root))
+        {
+            if (!entry.is_regular_file())
+                continue;
+
+            const fs::path& path = entry.path();
+
+            if (path.extension() == ".meta")
+            {
+                std::string filename = path.filename().string();
+
+                if (filename.ends_with(".meta.meta") ||
+                    filename.find("~") != std::string::npos ||
+                    filename.find("~$") == 0 ||
+                    path.stem().extension() == ".TMP")
+                {
+                    try
+                    {
+                        fs::remove(path);
+                        std::cout << "[Removed Invalid Meta] " << path << std::endl;
+                    }
+                    catch (const std::exception& e)
+                    {
+                        std::cerr << "Error removing invalid .meta file: " << e.what() << std::endl;
+                    }
+                    continue;
+                }
+
+                fs::path originalPath = RemoveMetaExtension(path);
+                if (!fs::exists(originalPath))
+                {
+                    try
+                    {
+                        fs::remove(path);
+                        std::cout << "[Removed Orphaned Meta] " << path << std::endl;
+                    }
+                    catch (const std::exception& e)
+                    {
+                        std::cerr << "Error removing orphaned .meta file: " << e.what() << std::endl;
+                    }
+                }
+            }
+        }
+    }
+
     std::vector<std::string> ExtractFunctionNames(const std::filesystem::path& file)
     {
         std::vector<std::string> functions;
@@ -101,6 +149,8 @@ private:
         return functions;
     }
 
+private:
+
     FileGuid LoadGuidFromMeta(const std::filesystem::path& metaPath)
     {
         YAML::Node node = YAML::LoadFile(metaPath.string());
@@ -119,7 +169,16 @@ private:
 
     bool IsTargetFile(const std::filesystem::path& path)
     {
+		std::string filename = path.filename().string();
         std::string extension = path.extension().string();
+
+        if (filename.find("~") != std::string::npos ||
+            filename.find("~$") == 0 ||
+            extension == ".TMP" || extension == ".tmp")
+        {
+            return false;
+        }
+        
         return  extension == ".fbx" || extension == ".gltf" || extension == ".obj" || 
                 extension == ".png" || extension == ".dds" || extension == ".hdr" ||
                 extension == ".hlsl" || extension == ".cpp" || extension == ".glb" ||
@@ -138,10 +197,8 @@ private:
         {
             if (fs::exists(oldMeta)) 
             {
-
-                    fs::rename(oldMeta, newMeta);
-                    std::cout << "[Meta Moved] " << oldMeta << " -> " << newMeta << std::endl;
-
+                fs::rename(oldMeta, newMeta);
+                std::cout << "[Meta Moved] " << oldMeta << " -> " << newMeta << std::endl;
             }
             else if (!fs::exists(newMeta)) 
             {
@@ -187,6 +244,8 @@ private:
         if (!IsTargetFile(filePath))
             return;
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
         std::filesystem::path metaPath = filePath.string() + ".meta";
         if (!std::filesystem::exists(metaPath))
         {
@@ -206,6 +265,9 @@ private:
     {
         std::filesystem::path metaPath = targetFile.string() + ".meta";
 
+        if (std::filesystem::exists(metaPath))
+            return;
+
         using namespace TypeTrait;
         YAML::Node root;
         root["guid"] = GUIDCreator::MakeFileGUID().ToString();
@@ -221,6 +283,8 @@ private:
 
         std::ofstream fout(metaPath);
         fout << root;
+
+        fout.flush();
     }
 
 private:
