@@ -37,7 +37,6 @@ struct TerrainLayer {
 class Terrain :public Component{
 
 public:
-
    ReflectTerrain
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(Terrain)
