@@ -331,13 +331,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     TargetTexture[DTid.xy] = finalColor;
     TargetEnvironmentTexture[DTid.xy] = float4(ambient, 1);
-    //TargetEnvironmentTexture[DTid.xy] = float4(ambient, 1);
-    //for (int y = -1; y <= 1; y++)
-    //{
-        //for (int x = -1; x <= 1; x++)
-        //{
-        //}
-    //}
 }
 
 /*

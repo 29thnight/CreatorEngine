@@ -133,6 +133,7 @@ namespace lm {
 
 	void LightMap::CalculateRectangles()
 	{
+		// Shelf First-Fit Bin Packing
 		// 사각형 배치. 자리가 부족하면 다음 라이트맵으로 넘어감.
 		int useSpace = 0;
 		Rect nextPoint = { 0, 0, 0, 0 };
@@ -208,440 +209,26 @@ namespace lm {
 	void LightMap::DrawRectangles(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
 	{
 
-		// triangle buffer
-		{
-			D3D11_BUFFER_DESC bufferDesc = {};
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.ByteWidth = sizeof(Triangle) * m_trianglesInScene.size();
-			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			bufferDesc.StructureByteStride = sizeof(Triangle);
-
-			D3D11_SUBRESOURCE_DATA initData = {};
-			initData.pSysMem = m_trianglesInScene.data();
-
-			triangleBuffer = nullptr;
-			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &triangleBuffer);
-
-			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-			srvDesc.Buffer.FirstElement = 0;
-			srvDesc.Buffer.NumElements = (UINT)m_trianglesInScene.size();
-
-			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(triangleBuffer, &srvDesc, &TriangleBufferSRV);
-			if (!SUCCEEDED(hr))
-				Debug->LogError("Failed to create Shader Resource View for triangle buffer.");
-			else {
-				Debug->Log("Triangle buffer created successfully.");
-			}
-		}
-		// indice buffer
-		{
-			D3D11_BUFFER_DESC bufferDesc = {};
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.ByteWidth = sizeof(int) * m_triIndices.size();
-			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			bufferDesc.StructureByteStride = sizeof(int);
-
-			D3D11_SUBRESOURCE_DATA initData = {};
-			initData.pSysMem = m_triIndices.data();
-
-			indiceBuffer = nullptr;
-			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &indiceBuffer);
-
-			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-			srvDesc.Buffer.FirstElement = 0;
-			srvDesc.Buffer.NumElements = (UINT)m_triIndices.size();
-
-			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(indiceBuffer, &srvDesc, &TriangleIndiceBufferSRV);
-			if (!SUCCEEDED(hr))
-				Debug->LogError("Failed to create Shader Resource View for Indice buffer.");
-			else {
-				Debug->Log("Indice buffer created successfully.");
-			}
-		}
-		// BVH buffer
-		{
-			D3D11_BUFFER_DESC bufferDesc = {};
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.ByteWidth = sizeof(BVHNode) * bvhNodes.size();
-			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			bufferDesc.StructureByteStride = sizeof(BVHNode);
-
-			D3D11_SUBRESOURCE_DATA initData = {};
-			initData.pSysMem = bvhNodes.data();
-
-			bvhBuffer = nullptr;
-			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &bvhBuffer);
-
-			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-			srvDesc.Buffer.FirstElement = 0;
-			srvDesc.Buffer.NumElements = (UINT)bvhNodes.size();
-
-			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(bvhBuffer, &srvDesc, &BVHBufferSRV);
-			if (!SUCCEEDED(hr))
-				Debug->LogError("Failed to create Shader Resource View for BVH buffer.");
-			else {
-				Debug->Log("BVH buffer created successfully.");
-			}
-		}
-
-		DirectX11::CSSetShaderResources(10, 1, &TriangleBufferSRV);
-		DirectX11::CSSetShaderResources(11, 1, &TriangleIndiceBufferSRV);
-		DirectX11::CSSetShaderResources(12, 1, &BVHBufferSRV);
-
-
-
-		int lightmapIndex = -1;
-
-		for (auto& lightmap : lightmaps)
-			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(lightmap->m_pUAV, Colors::Transparent);
-		for (auto& env : environmentMaps)
-			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(env->m_pUAV, Colors::Transparent);
-
-		DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
-		DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
-		DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 1
-
-		//DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
-		//DirectX11::CSSetUnorderedAccessViews(7, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
-
-		CBSetting cbset = {};
-		cbset.lightsize = MAX_LIGHTS;
-		cbset.bias = bias;
-		cbset.globalAmbient = m_renderscene->m_LightController->GetProperties().m_globalAmbient;
-		cbset.useEnvMap = true;
-		//cbset.useAo = true;
-		DirectX11::UpdateBuffer(m_settingBuf.Get(), &cbset);
-		DirectX11::CSSetConstantBuffer(0, 1, m_settingBuf.GetAddressOf());	// setting 0
-
-		{
-			// light matrix
-			std::vector<CBLight> lightMats;
-			for (int i = 0; i < m_renderscene->m_LightController->m_lightCount; i++) {
-				// CB light
-				CBLight cblit = {};
-				auto& light = m_renderscene->m_LightController->GetLight(i);
-				cblit.position = light.m_position;
-				cblit.direction = light.m_direction;
-				cblit.color = light.m_color;
-				cblit.constantAtt = light.m_constantAttenuation;
-				cblit.linearAtt = light.m_linearAttenuation;
-				cblit.quadAtt = light.m_quadraticAttenuation;
-				cblit.spotAngle = light.m_spotLightAngle;
-				cblit.lightType = light.m_lightType;
-				cblit.status = light.m_lightStatus;
-
-				lightMats.emplace_back(cblit);
-			}
-			D3D11_BUFFER_DESC bufferDesc = {};
-			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			bufferDesc.ByteWidth = sizeof(CBLight) * (UINT)lightMats.size();
-			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			bufferDesc.StructureByteStride = sizeof(CBLight);
-			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-
-			// 초기 데이터 설정
-			D3D11_SUBRESOURCE_DATA initData = {};
-			initData.pSysMem = lightMats.data();
-
-			// 버퍼 생성
-			structuredLightBuffer = nullptr;
-			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &structuredLightBuffer);
-
-			// (3) Shader Resource View 생성
-			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-			srvDesc.Buffer.ElementWidth = sizeof(CBLight);
-			srvDesc.Buffer.NumElements = (UINT)lightMats.size();
-
-			DeviceState::g_pDevice->CreateShaderResourceView(structuredLightBuffer, &srvDesc, &structuredLightBufferSRV);
-
-			// (4) Compute Shader에 바인딩
-			DirectX11::CSSetShaderResources(2, 1, &structuredLightBufferSRV);
-		}
-
-		DirectX11::CSSetShaderResources(4, 1, &envMap->m_pSRV);
-		//DirectX11::CSSetShaderResources(0, 1, &m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
-
-		for (int i = 0; i < rects.size(); i++)
-		{
-			MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[i].data);
-			if (lightmapIndex != renderer->m_LightMapping.lightmapIndex) {
-				lightmapIndex = renderer->m_LightMapping.lightmapIndex;
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
-				DirectX11::CSSetUnorderedAccessViews(1, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
-			}
-
-			// CB 업데이트
-			CBData cbData = {};
-			int cSize = canvasSize;
-			cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
-			cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
-			cbData.useAo = renderer->m_Material->m_AOMap != nullptr;
-			DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
-			DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
-
-			// CB Transform
-			CBTransform cbtr = {};
-			cbtr.worldMat = rects[i].worldMat;
-			DirectX11::UpdateBuffer(m_transformBuf.Get(), &cbtr);
-			DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
-
-			if (renderer->m_Mesh == nullptr) continue;
-			auto meshName = renderer->m_Mesh->GetName();
-			DirectX11::CSSetShaderResources(1, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
-			DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
-			if(renderer->m_Material->m_AOMap)
-				DirectX11::CSSetShaderResources(5, 1, &renderer->m_Material->m_AOMap->m_pSRV);
-
-			// 컴퓨트 셰이더 실행
-			UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
-			UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
-			DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
-		}
-
-		ID3D11UnorderedAccessView* nullUAV[2] = { nullptr, nullptr };
-		DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+		
 	}
 
 	void LightMap::DilateLightMap()
 	{
-		for (auto& lightmap : lightmaps) {
-			for (int i = 0; i < dilateCount; i++) {
-				// 엣지 설정.
-				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
-				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
-				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-
-				// 엣지로 덮어쓰기.
-				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
-				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-			}
-		}
 	}
 
 	void LightMap::DirectBlur()
 	{
-		for (auto& lightmap : lightmaps) {
-			ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-
-			for (int i = 0; i < directMSAACount; i++) {
-				// msaa
-				DirectX11::CSSetShaderResources(0, 1, nullSRV);
-				DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
-				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
-				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-
-
-				// msaa 덮어쓰기.
-				DirectX11::CSSetShaderResources(0, 1, nullSRV);
-				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
-				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-			}
-		}
 	}
 
 	void LightMap::DrawIndirectLight(const std::unique_ptr<PositionMapPass>& m_pPositionMapPass)
 	{
 		
-		for(int i = 0; i < indirectCount; i++){
-			// triangleCount, sampleCount Update
-			indirectBuf ind = {};
-			ind.Resolution = { canvasSize, canvasSize };
-			ind.triangleCount = m_trianglesInScene.size();
-			ind.g_SampleCount = sampleCount;
-			DirectX11::UpdateBuffer(m_indirect1.Get(), &ind);
-			DirectX11::CSSetConstantBuffer(0, 1, m_indirect1.GetAddressOf());
-			DirectX11::CSSetShader(m_indirectLightShader->GetShader(), nullptr, 0);
-			// 라이트맵 배열
-			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = canvasSize;
-			desc.Height = canvasSize;
-			desc.MipLevels = 1;
-			desc.ArraySize = lightmaps.size();
-			desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-			desc.SampleDesc.Count = 1;
-			desc.Usage = D3D11_USAGE_DEFAULT;
-			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-			ID3D11Texture2D* textureArray = nullptr;
-			DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &textureArray);
-
-			for (UINT i = 0; i < lightmaps.size(); ++i)
-			{
-				DeviceState::g_pDeviceContext->CopySubresourceRegion(
-					textureArray,                      // 대상 Texture2DArray
-					D3D11CalcSubresource(0, i, 1),     // (MipLevel, ArraySlice, MipLevels)
-					0, 0, 0,
-					lightmaps[i]->m_pTexture,                // 각각의 개별 텍스처
-					0,
-					nullptr
-				);
-			}
-
-			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Format = desc.Format;
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-			srvDesc.Texture2DArray.MipLevels = 1;
-			srvDesc.Texture2DArray.ArraySize = lightmaps.size();
-			srvDesc.Texture2DArray.FirstArraySlice = 0;
-
-			ID3D11ShaderResourceView* textureArraySRV = nullptr;
-			DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
-
-			DirectX11::CSSetShaderResources(1, 1, &textureArraySRV);
-
-
-
-			int ligtmapIndex = -1;
-			for (int i = 0; i < rects.size(); i++)
-			{
-				MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[i].data);
-				if (ligtmapIndex != renderer->m_LightMapping.lightmapIndex) {
-					ligtmapIndex = renderer->m_LightMapping.lightmapIndex;
-					DirectX11::CSSetUnorderedAccessViews(0, 1, &indirectMaps[ligtmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
-				}
-
-				// CB 업데이트
-				CBData cbData = {};
-				int cSize = canvasSize;
-				cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
-				cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
-				cbData.useAo = renderer->m_Material->m_AOMap != nullptr;
-				DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
-				DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
-
-				// CB Transform
-				CBTransform cbtr = {};
-				cbtr.worldMat = rects[i].worldMat;
-				DirectX11::UpdateBuffer(m_transformBuf.Get(), &cbtr);
-				DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
-
-				if (renderer->m_Mesh == nullptr) continue;
-				auto meshName = renderer->m_Mesh->GetName();
-				DirectX11::CSSetShaderResources(2, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
-				DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
-
-				// 컴퓨트 셰이더 실행
-				UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
-				UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
-				DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
-			}
-
-			for (auto& lightmap : indirectMaps) {
-				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-
-				for (int i = 0; i < indirectCount; i++) {
-					// msaa
-					DirectX11::CSSetShaderResources(0, 1, nullSRV);
-					DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
-					DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
-					DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
-					DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
-					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-
-
-					// msaa 덮어쓰기.
-					DirectX11::CSSetShaderResources(0, 1, nullSRV);
-					DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
-					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
-					DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
-					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-				}
-			}
-
-			DirectX11::CSSetShader(m_AddTextureColor->GetShader(), nullptr, 0);
-			for (int i = 0; i < lightmaps.size(); i++) {
-				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-
-				// AddTextureColor
-				DirectX11::CSSetShaderResources(0, 1, nullSRV);
-				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
-				DirectX11::CSSetShaderResources(0, 1, &indirectMaps[i]->m_pSRV); // 라이트맵 텍스처
-				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-				//
-				//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
-			}
-
-			textureArraySRV->Release();
-			textureArray->Release();
-		}
+		
 
 
 		
 
 
-		// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
-		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = canvasSize;
-		desc.Height = canvasSize;
-		desc.MipLevels = 1;
-		desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DYNAMIC;  // CPU에서 업데이트 가능
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &imgTexture);
-
-		// Shader Resource View (SRV) 생성 (ImGui에서 사용하기 위해 필요)
-		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = desc.Format;
-		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-
-		DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
-
-		for (int i = 0; i < lightmaps.size(); i++) {
-			DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[i]->m_pTexture);
-
-			// 텍스쳐 저장
-			DirectX::ScratchImage image;
-			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-			std::wstring filename = L"direct" + std::to_wstring(i) + L".hdr";
-			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
-			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
-		}
-		for (int i = 0; i < indirectMaps.size(); i++) {
-			DeviceState::g_pDeviceContext->CopyResource(imgTexture, indirectMaps[i]->m_pTexture);
-
-			// 텍스쳐 저장
-			DirectX::ScratchImage image;
-			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-			std::wstring filename = L"Indirect" + std::to_wstring(i) + L".hdr";
-			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
-			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
-		}
-		for (int i = 0; i < environmentMaps.size(); i++) {
-			DeviceState::g_pDeviceContext->CopyResource(imgTexture, environmentMaps[i]->m_pTexture);
-
-			// 텍스쳐 저장
-			DirectX::ScratchImage image;
-			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
-			std::wstring filename = L"Env" + std::to_wstring(i) + L".hdr";
-			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
-			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
-		}
-		imgTexture->Release();
-		imgTexture = nullptr;
 	}
 
 	void LightMap::CreateLightMap()
@@ -793,34 +380,499 @@ namespace lm {
 		int bvh = BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size() - 1);
 		co_yield ReturnNull();
 
-		DrawRectangles(m_pPositionMapPass);
+		//DrawRectangles(m_pPositionMapPass);
+		// triangle buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(Triangle) * m_trianglesInScene.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(Triangle);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = m_trianglesInScene.data();
+
+			triangleBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &triangleBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)m_trianglesInScene.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(triangleBuffer, &srvDesc, &TriangleBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for triangle buffer.");
+			else {
+				Debug->Log("Triangle buffer created successfully.");
+			}
+		}
+		// indice buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(int) * m_triIndices.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(int);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = m_triIndices.data();
+
+			indiceBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &indiceBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)m_triIndices.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(indiceBuffer, &srvDesc, &TriangleIndiceBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for Indice buffer.");
+			else {
+				Debug->Log("Indice buffer created successfully.");
+			}
+		}
+		// BVH buffer
+		{
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.ByteWidth = sizeof(BVHNode) * bvhNodes.size();
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			bufferDesc.StructureByteStride = sizeof(BVHNode);
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = bvhNodes.data();
+
+			bvhBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &bvhBuffer);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = (UINT)bvhNodes.size();
+
+			auto hr = DeviceState::g_pDevice->CreateShaderResourceView(bvhBuffer, &srvDesc, &BVHBufferSRV);
+			if (!SUCCEEDED(hr))
+				Debug->LogError("Failed to create Shader Resource View for BVH buffer.");
+			else {
+				Debug->Log("BVH buffer created successfully.");
+			}
+		}
+
+		DirectX11::CSSetShaderResources(10, 1, &TriangleBufferSRV);
+		DirectX11::CSSetShaderResources(11, 1, &TriangleIndiceBufferSRV);
+		DirectX11::CSSetShaderResources(12, 1, &BVHBufferSRV);
+
+
+
+		int lightmapIndex = -1;
+
+		for (auto& lightmap : lightmaps)
+			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(lightmap->m_pUAV, Colors::Transparent);
+		for (auto& env : environmentMaps)
+			DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(env->m_pUAV, Colors::Transparent);
+
+
+		//DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // target texture 0
+		//DirectX11::CSSetUnorderedAccessViews(7, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
+
+		CBSetting cbset = {};
+		cbset.lightsize = MAX_LIGHTS;
+		cbset.bias = bias;
+		cbset.globalAmbient = m_renderscene->m_LightController->GetProperties().m_globalAmbient;
+		cbset.useEnvMap = true;
+		//cbset.useAo = true;
+		DirectX11::UpdateBuffer(m_settingBuf.Get(), &cbset);
+
+		{
+			// light matrix
+			std::vector<CBLight> lightMats;
+			for (int i = 0; i < m_renderscene->m_LightController->m_lightCount; i++) {
+				// CB light
+				CBLight cblit = {};
+				auto& light = m_renderscene->m_LightController->GetLight(i);
+				cblit.position = light.m_position;
+				cblit.direction = light.m_direction;
+				cblit.color = light.m_color;
+				cblit.constantAtt = light.m_constantAttenuation;
+				cblit.linearAtt = light.m_linearAttenuation;
+				cblit.quadAtt = light.m_quadraticAttenuation;
+				cblit.spotAngle = light.m_spotLightAngle;
+				cblit.lightType = light.m_lightType;
+				cblit.status = light.m_lightStatus;
+
+				lightMats.emplace_back(cblit);
+			}
+			D3D11_BUFFER_DESC bufferDesc = {};
+			bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			bufferDesc.ByteWidth = sizeof(CBLight) * (UINT)lightMats.size();
+			bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufferDesc.StructureByteStride = sizeof(CBLight);
+			bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			// 초기 데이터 설정
+			D3D11_SUBRESOURCE_DATA initData = {};
+			initData.pSysMem = lightMats.data();
+
+			// 버퍼 생성
+			structuredLightBuffer = nullptr;
+			DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &structuredLightBuffer);
+
+			// (3) Shader Resource View 생성
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			srvDesc.Buffer.ElementWidth = sizeof(CBLight);
+			srvDesc.Buffer.NumElements = (UINT)lightMats.size();
+
+			DeviceState::g_pDevice->CreateShaderResourceView(structuredLightBuffer, &srvDesc, &structuredLightBufferSRV);
+
+			// (4) Compute Shader에 바인딩
+		}
+
+		//DirectX11::CSSetShaderResources(0, 1, &m_pLightmapShadowPass->m_shadowmapTextures[0]->m_pSRV);
+
+		ID3D11UnorderedAccessView* nullUAV[2] = { nullptr, nullptr };
+		for (int i = 0; i < rects.size(); i++)
+		{
+			DeviceState::g_pDeviceContext->CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+			DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
+			DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 1
+			DirectX11::CSSetConstantBuffer(0, 1, m_settingBuf.GetAddressOf());	// setting 0
+			DirectX11::CSSetShaderResources(2, 1, &structuredLightBufferSRV);
+			DirectX11::CSSetShaderResources(4, 1, &envMap->m_pSRV);
+
+			MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[i].data);
+			if (lightmapIndex != renderer->m_LightMapping.lightmapIndex) {
+				lightmapIndex = renderer->m_LightMapping.lightmapIndex;
+			}
+			DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[lightmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
+			DirectX11::CSSetUnorderedAccessViews(1, 1, &environmentMaps[lightmapIndex]->m_pUAV, nullptr); // target texture 1
+
+			// CB 업데이트
+			CBData cbData = {};
+			int cSize = canvasSize;
+			cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
+			cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
+			cbData.useAo = renderer->m_Material->m_AOMap != nullptr;
+			DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
+			DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
+
+			// CB Transform
+			CBTransform cbtr = {};
+			cbtr.worldMat = rects[i].worldMat;
+			DirectX11::UpdateBuffer(m_transformBuf.Get(), &cbtr);
+			DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
+
+			if (renderer->m_Mesh == nullptr) continue;
+			auto meshName = renderer->m_Mesh->GetName();
+			DirectX11::CSSetShaderResources(1, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
+			DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
+			if (renderer->m_Material->m_AOMap)
+				DirectX11::CSSetShaderResources(5, 1, &renderer->m_Material->m_AOMap->m_pSRV);
+
+			// 컴퓨트 셰이더 실행
+			UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
+			UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
+			DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
+			co_yield ReturnNull();
+
+			DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+			m_pLightMapPass->Initialize(lightmaps);
+			co_yield ReturnNull();
+		}
+
+		DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 		Debug->Log("DrawRectangles");
 		co_yield ReturnNull();// ReturnNull();
 
-		DilateLightMap();
+		//DilateLightMap();
+		for (auto& lightmap : lightmaps) {
+			for (int i = 0; i < dilateCount; i++) {
+				// 엣지 설정.
+				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
+				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
+				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+				// 엣지로 덮어쓰기.
+				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+			}
+		}
 		co_yield ReturnNull();
 
-		DirectBlur();
+		//DirectBlur();
+		for (auto& lightmap : lightmaps) {
+			ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+
+			for (int i = 0; i < directMSAACount; i++) {
+				// msaa
+				DirectX11::CSSetShaderResources(0, 1, nullSRV);
+				DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
+				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
+				DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+
+				// msaa 덮어쓰기.
+				DirectX11::CSSetShaderResources(0, 1, nullSRV);
+				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+			}
+		}
 		co_yield ReturnNull();
 
-		DrawIndirectLight(m_pPositionMapPass);
+		//DrawIndirectLight(m_pPositionMapPass);
+		for (int i = 0; i < indirectCount; i++) {
+			// triangleCount, sampleCount Update
+			indirectBuf ind = {};
+			ind.Resolution = { canvasSize, canvasSize };
+			ind.triangleCount = m_trianglesInScene.size();
+			ind.g_SampleCount = sampleCount;
+			DirectX11::UpdateBuffer(m_indirect1.Get(), &ind);
+			// 라이트맵 배열
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = canvasSize;
+			desc.Height = canvasSize;
+			desc.MipLevels = 1;
+			desc.ArraySize = lightmaps.size();
+			desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			desc.SampleDesc.Count = 1;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+			ID3D11Texture2D* textureArray = nullptr;
+			DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &textureArray);
+
+			for (UINT i = 0; i < lightmaps.size(); ++i)
+			{
+				DeviceState::g_pDeviceContext->CopySubresourceRegion(
+					textureArray,                      // 대상 Texture2DArray
+					D3D11CalcSubresource(0, i, 1),     // (MipLevel, ArraySlice, MipLevels)
+					0, 0, 0,
+					lightmaps[i]->m_pTexture,                // 각각의 개별 텍스처
+					0,
+					nullptr
+				);
+			}
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = desc.Format;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+			srvDesc.Texture2DArray.MipLevels = 1;
+			srvDesc.Texture2DArray.ArraySize = lightmaps.size();
+			srvDesc.Texture2DArray.FirstArraySlice = 0;
+
+			textureArraySRV = nullptr;
+			DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
+
+
+
+
+			int ligtmapIndex = -1;
+			for (int i = 0; i < rects.size(); i++)
+			{
+				MeshRenderer* renderer = static_cast<MeshRenderer*>(rects[i].data);
+				if (ligtmapIndex != renderer->m_LightMapping.lightmapIndex) {
+					ligtmapIndex = renderer->m_LightMapping.lightmapIndex;
+				}
+				DirectX11::CSSetShader(m_indirectLightShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetConstantBuffer(0, 1, m_indirect1.GetAddressOf());
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &indirectMaps[ligtmapIndex]->m_pUAV, nullptr); // 타겟 텍스처
+				DirectX11::CSSetShaderResources(1, 1, &textureArraySRV);
+
+				// CB 업데이트
+				CBData cbData = {};
+				int cSize = canvasSize;
+				cbData.Offset = { rects[i].x, rects[i].y }; // 타겟 텍스처에서 시작 위치 (0~1)
+				cbData.Size = { rects[i].w, rects[i].h };   // 복사할 크기 (0~1)
+				cbData.useAo = renderer->m_Material->m_AOMap != nullptr;
+				DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
+				DirectX11::CSSetConstantBuffer(1, 1, m_Buffer.GetAddressOf());
+
+				// CB Transform
+				CBTransform cbtr = {};
+				cbtr.worldMat = rects[i].worldMat;
+				DirectX11::UpdateBuffer(m_transformBuf.Get(), &cbtr);
+				DirectX11::CSSetConstantBuffer(2, 1, m_transformBuf.GetAddressOf());
+
+				if (renderer->m_Mesh == nullptr) continue;
+				auto meshName = renderer->m_Mesh->GetName();
+				DirectX11::CSSetShaderResources(2, 1, &m_pPositionMapPass->m_positionMapTextures[meshName]->m_pSRV);
+				DirectX11::CSSetShaderResources(3, 1, &m_pPositionMapPass->m_normalMapTextures[meshName]->m_pSRV);
+
+				// 컴퓨트 셰이더 실행
+				UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
+				UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
+				DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+			}
+
+			for (auto& lightmap : indirectMaps) {
+				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+
+				for (int i = 0; i < indirectCount; i++) {
+					// msaa
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
+					DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+					DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
+					DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+					co_yield ReturnNull();
+
+					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+					m_pLightMapPass->Initialize(lightmaps);
+					co_yield ReturnNull();
+
+
+					// msaa 덮어쓰기.
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+					DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+					co_yield ReturnNull();
+
+					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+					m_pLightMapPass->Initialize(lightmaps);
+					co_yield ReturnNull();
+				}
+			}
+
+			DirectX11::CSSetShader(m_AddTextureColor->GetShader(), nullptr, 0);
+			for (int i = 0; i < lightmaps.size(); i++) {
+				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+
+				// AddTextureColor
+				DirectX11::CSSetShaderResources(0, 1, nullSRV);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
+				DirectX11::CSSetShaderResources(0, 1, &indirectMaps[i]->m_pSRV); // 라이트맵 텍스처
+				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+				co_yield ReturnNull();
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+				m_pLightMapPass->Initialize(lightmaps);
+				co_yield ReturnNull();
+				//
+				//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
+			}
+
+			textureArraySRV->Release();
+			textureArray->Release();
+		}
 		Debug->Log("Complete Bake Lightmap");
 		co_yield ReturnNull();
 
-		DirectX11::CSSetShader(m_AddTextureColor->GetShader(), nullptr, 0);
 		for (int i = 0; i < lightmaps.size(); i++) {
 			ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 		
+			DirectX11::CSSetShader(m_AddTextureColor->GetShader(), nullptr, 0);
 			// AddTextureColor
 			DirectX11::CSSetShaderResources(0, 1, nullSRV);
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
 			DirectX11::CSSetShaderResources(0, 1, &environmentMaps[i]->m_pSRV); // 라이트맵 텍스처
 			DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+			co_yield ReturnNull();
+
+			DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+			m_pLightMapPass->Initialize(lightmaps);
+			co_yield ReturnNull();
 			//
 			//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
 		}
 		co_yield ReturnNull();
 
+		// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = canvasSize;
+		desc.Height = canvasSize;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DYNAMIC;  // CPU에서 업데이트 가능
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &imgTexture);
+
+		// Shader Resource View (SRV) 생성 (ImGui에서 사용하기 위해 필요)
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = desc.Format;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+
+		DeviceState::g_pDevice->CreateShaderResourceView(imgTexture, &srvDesc, &imgSRV);
+
+		for (int i = 0; i < lightmaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, lightmaps[i]->m_pTexture);
+
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"direct" + std::to_wstring(i) + L".hdr";
+			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
+			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
+		}
+		for (int i = 0; i < indirectMaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, indirectMaps[i]->m_pTexture);
+
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Indirect" + std::to_wstring(i) + L".hdr";
+			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
+			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
+		}
+		for (int i = 0; i < environmentMaps.size(); i++) {
+			DeviceState::g_pDeviceContext->CopyResource(imgTexture, environmentMaps[i]->m_pTexture);
+
+			// 텍스쳐 저장
+			DirectX::ScratchImage image;
+			HRESULT hr = DirectX::CaptureTexture(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, imgTexture, image);
+			std::wstring filename = L"Env" + std::to_wstring(i) + L".hdr";
+			//DirectX::SaveToWICFile(*image.GetImage(0, 0, 0), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename.data());
+			DirectX::SaveToHDRFile(*image.GetImage(0, 0, 0), filename.data());
+		}
+		imgTexture->Release();
+		imgTexture = nullptr;
 
 		m_pLightMapPass->Initialize(lightmaps);
 
@@ -834,15 +886,6 @@ namespace lm {
 	)
 	{
 		StartCoroutine(GenerateLightmapCoroutine(scene, m_pPositionMapPass, m_pLightMapPass));
-		//SetScene(scene);
-
-		//Prepare();
-		////TestPrepare();
-		//PrepareRectangles();
-		//CalculateRectangles();
-		//int indices = DrawRectangles(m_pPositionMapPass);
-
-		//DrawIndirectLight(m_pPositionMapPass, indices);
 	}
 }
 

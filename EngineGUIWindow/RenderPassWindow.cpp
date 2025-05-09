@@ -53,6 +53,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pColorGradingPass->ControlPanel();
 		}
 
+		if (ImGui::CollapsingHeader("VolumetricFogPass"))
+		{
+			m_sceneRenderer->m_pVolumetricFogPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("SpritePass"))
 		{
 			if(ImGui::CollapsingHeader("SceneRenderer"))
