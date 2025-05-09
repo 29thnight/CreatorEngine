@@ -308,10 +308,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 	desc.m_textureWidth = 2048;
 	desc.m_textureHeight = 2048;
 
-	DataSystems->LoadModel("aniTest.fbx");
+	/*DataSystems->LoadModel("aniTest.fbx");
 	model[0] = DataSystems->LoadCashedModel("aniTest.fbx");
 	testt = Model::LoadModelToSceneObj(model[0], *SceneManagers->GetActiveScene());
-	player.GetPlayer(testt);
+	player.GetPlayer(testt);*/
 
 
 	m_renderScene->m_LightController->Initialize();
@@ -331,7 +331,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	player.Update(deltaTime);
+	//player.Update(deltaTime);
 	if(ShaderSystem->IsReloading())
 	{
 		ReloadShaders();

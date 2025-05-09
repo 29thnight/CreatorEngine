@@ -44,6 +44,7 @@ public:
 	int m_index{};
 	int m_parentIndex{};
 	Mathf::xMatrix m_globalTransform;
+	Mathf::xMatrix m_localTransform;
 	Mathf::xMatrix m_offset;
 	std::vector<Bone*> m_children;
 	BoneRegion m_region = BoneRegion::Root;

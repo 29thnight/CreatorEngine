@@ -49,6 +49,8 @@ public:
 	float m_isBlend;
 
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
+
+	DirectX::XMMATRIX m_LocalTransforms[512]{};
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;

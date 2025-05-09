@@ -33,8 +33,8 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	lowercontroller->CreateState("Walk", 2);
 	lowercontroller->CreateState("Run",  1);
 	lowercontroller->SetCurState("Idle");
-	lowercontroller->CreateTransition("Idle", "Walk")->AddCondition("Walkparm", false, ConditionType::None, ValueType::Trigger);
-	lowercontroller->CreateTransition("Walk", "Idle")->AddCondition("Idleparm", false, ConditionType::None, ValueType::Trigger);
+	lowercontroller->CreateTransition("Idle", "Run")->AddCondition("Walkparm", false, ConditionType::None, ValueType::Trigger);
+	lowercontroller->CreateTransition("Run", "Idle")->AddCondition("Idleparm", false, ConditionType::None, ValueType::Trigger);
 	lowercontroller->GetAvatarMask()->UseOnlyLower();
 	animation->AddParameter("Speed", player->speed, ValueType::Float);
 	animation->AddParameter("Walkparm", false, ValueType::Trigger);

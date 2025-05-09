@@ -22,7 +22,7 @@ private:
     //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
     void UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time ,float nextanitime);
     void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time);
-
+    void UpdateBoneLayer(Bone* bone, Animator& animator,  const DirectX::XMMATRIX& Transform);
     XMMATRIX BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t);
     XMMATRIX calculAni(NodeAnimation& nodeAnim, float time);
 	Core::DelegateHandle m_sceneLoadedHandle;

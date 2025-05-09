@@ -103,9 +103,12 @@ void AnimationJob::Update(float deltaTime)
                     }
                     else
                     {
-                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
+                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);  
                     }
                 }
+                XMMATRIX rootTransform = skeleton->m_rootTransform;
+
+                UpdateBoneLayer(skeleton->m_rootBone, *animator , rootTransform);
                
             }
             else
@@ -171,8 +174,6 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     {
         animation = &skeleton->m_animations[controller->GetAnimationIndex()];
         nextanimation = &skeleton->m_animations[controller->GetNextAnimationIndex()];
-        auto mask = controller->GetAvatarMask();
-        if (mask->IsBoneEnabled(bone->m_region) == false) return;
     }
     else
     {
@@ -204,7 +205,11 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     bone->m_globalTransform = globalTransform;
-
+    if (controller)
+    {
+        controller->m_LocalTransforms[bone->m_index] = blendTransform;
+        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    }
     for (Bone* child : bone->m_children)
     {
         UpdateBlendBone(child, animator, controller,globalTransform, time, nextanitime);
@@ -216,13 +221,10 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     Skeleton* skeleton = animator.m_Skeleton;
     std::string& boneName = bone->m_name;
     Animation* animation;
-    bool isCalculAnimate = true;
     if (controller)
     {
         animation = &skeleton->m_animations[controller->GetAnimationIndex()];
         auto mask = controller->GetAvatarMask();
-        isCalculAnimate = mask->IsBoneEnabled(bone->m_region);
- 
     }
     else
     {
@@ -237,36 +239,46 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
         }
         return;
     }
-    
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     XMMATRIX nodeTransform = calculAni(nodeAnim, time);
     XMMATRIX globalTransform = nodeTransform * parentTransform;
-    bone->m_globalTransform = globalTransform;
-        if (controller)
-        {
-            controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-
-            if (bone->m_region != BoneRegion::Spine)
-            {
-                if (controller == animator.m_animationControllers.back())
-                {
-                    for (auto& control : animator.m_animationControllers)
-                    {
-                        if (control == controller) continue;
-                        auto blend = BlendAni(controller->m_FinalTransforms[bone->m_index], control->m_FinalTransforms[bone->m_index], 0.5);
-                    }
-                }
-            }
-        }
-    if (isCalculAnimate)
-    {
-       animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    }
     
+    bone->m_globalTransform = globalTransform;
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    
+    if (controller)
+    {
+        controller->m_LocalTransforms[bone->m_index] = nodeTransform;
+        controller->m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    }
     for (Bone* child : bone->m_children)
     {
         UpdateBone(child, animator, controller,globalTransform, time);
     }
+}
+
+
+void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX::XMMATRIX& parentTransform)
+{
+    Skeleton* skeleton = animator.m_Skeleton;
+    std::string& boneName = bone->m_name;
+    bool isCalculAnimate = true;
+    XMMATRIX globalTransform{};
+   
+    for (auto& controller : animator.m_animationControllers)
+    {
+        auto mask = controller->GetAvatarMask();
+        if (mask->IsBoneEnabled(bone->m_region) == true)
+        {
+            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+        }
+    }
+    animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+    for (Bone* child : bone->m_children)
+    {
+        UpdateBoneLayer(child, animator,globalTransform);
+    }
+    
 }
 
 XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)

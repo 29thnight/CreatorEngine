@@ -61,9 +61,6 @@
     <Filter Include="Classes\Components\RenderableComponent">
       <UniqueIdentifier>{73674677-6778-4028-8951-143f6440393b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\RenderableComponent\AniMation">
-      <UniqueIdentifier>{c4ebd2f5-0acb-4d51-9e35-55964ddb90a2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\RenderableComponent\UI">
       <UniqueIdentifier>{df554586-f3d5-4847-8a1e-de01fa0426d3}</UniqueIdentifier>
     </Filter>
@@ -78,6 +75,12 @@
     </Filter>
     <Filter Include="Classes\Components\CameraComponent">
       <UniqueIdentifier>{89b93491-3dc7-498f-8fa1-5063dec42141}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Animation">
+      <UniqueIdentifier>{c4ebd2f5-0acb-4d51-9e35-55964ddb90a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\InputActionManager">
+      <UniqueIdentifier>{c83882e2-80b3-4d8d-95cd-8da2418fea94}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -124,28 +127,31 @@
       <Filter>Managers\SoundManager</Filter>
     </ClCompile>
     <ClCompile Include="AnimationController.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="Animator.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="AnimationState.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="AniTransition.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
-    </ClCompile>
-    <ClCompile Include="PhysicsManager.cpp">
-      <Filter>Managers\PhysicsManager</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="TransCondition.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="AvatarMask.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="ColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="InputActionManager.cpp">
+      <Filter>Managers\InputActionManager</Filter>
+    </ClCompile>
+    <ClCompile Include="InputAction.cpp">
+      <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -234,16 +240,16 @@
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
     <ClInclude Include="AnimationController.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Animator.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationState.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AniTransition.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="IAwakable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
@@ -260,26 +266,23 @@
     <ClInclude Include="IColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="PhysicsManager.h">
-      <Filter>Managers\PhysicsManager</Filter>
-    </ClInclude>
     <ClInclude Include="TransCondition.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="ConditionParameter.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AniBehaviour.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationBehviourFatory.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AvatarMask.h">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
@@ -292,6 +295,12 @@
     </ClInclude>
     <ClInclude Include="GameObjectType.h">
       <Filter>Classes\GameObject</Filter>
+    </ClInclude>
+    <ClInclude Include="InputActionManager.h">
+      <Filter>Managers\InputActionManager</Filter>
+    </ClInclude>
+    <ClInclude Include="InputAction.h">
+      <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
