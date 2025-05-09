@@ -161,6 +161,7 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::Reset()
 {
+	
     //칠게 있나?
     ScriptManager->SetReload(true);
     ScriptManager->ReplaceScriptComponent();
@@ -168,6 +169,7 @@ void Scene::Reset()
 
 void Scene::Awake()
 {
+    
     AwakeEvent.Broadcast();
 }
 
@@ -184,9 +186,11 @@ void Scene::Start()
 void Scene::FixedUpdate(float deltaSecond)
 {
     FixedUpdateEvent.Broadcast(deltaSecond);
-	CoroutineManagers->yield_WaitForFixedUpdate();
+	InternalPhysicsUpdateEvent.Broadcast(deltaSecond);
 	// Internal Physics Update 작성
+	PhysicsManagers->Update(deltaSecond);
 	// OnTriggerEvent.Broadcast(); 작성
+	CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
 void Scene::OnTriggerEnter(const Collision& collider)

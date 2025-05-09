@@ -98,7 +98,7 @@ void Core::App::Run()
 		g_progressWindow->SetStatusText(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
 		g_progressWindow->SetProgress(100);
-
+		
 		g_progressWindow->Close();
 	})
 	.Then([&]

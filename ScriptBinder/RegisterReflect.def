@@ -14,6 +14,7 @@
 #include "AvatarMask.h"
 #include "CameraComponent.h"
 #include "Canvas.h"
+#include "CharacterControllerComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
 #include "GameObject.h"
@@ -26,6 +27,7 @@
 #include "Object.h"
 #include "RigidBodyComponent.h"
 #include "Scene.h"
+#include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
 #include "UIButton.h"
@@ -41,6 +43,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Camera);
     AUTO_REGISTER_CLASS(CameraComponent);
     AUTO_REGISTER_CLASS(Canvas);
+    AUTO_REGISTER_CLASS(CharacterControllerComponent);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
     AUTO_REGISTER_CLASS(GameObject);
@@ -56,6 +59,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SpriteRenderer);
+    AUTO_REGISTER_CLASS(Terrain);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);

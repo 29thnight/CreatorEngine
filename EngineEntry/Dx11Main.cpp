@@ -86,6 +86,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
+	PhysicsManagers->Initialize();
 }
 
 DirectX11::Dx11Main::~Dx11Main()

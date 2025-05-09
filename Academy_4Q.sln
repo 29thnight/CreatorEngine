@@ -15,6 +15,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Physics", "Physics\Physics.vcxproj", "{2584186C-912C-4E2F-A8A3-F79A22591BCA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ScriptBinder", "ScriptBinder\ScriptBinder.vcxproj", "{4D36AF4E-3AA3-4FB5-B462-F66AE13EF959}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2584186C-912C-4E2F-A8A3-F79A22591BCA} = {2584186C-912C-4E2F-A8A3-F79A22591BCA}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImGuiHelper", "ImGuiHelper\ImGuiHelper.vcxproj", "{81FF579E-DEF8-47FC-B8C6-1AD59E98494C}"
 EndProject

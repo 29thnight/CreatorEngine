@@ -2,9 +2,18 @@
 #include "IRenderPass.h"
 #include "../ScriptBinder/ImageComponent.h"
 #include "../ScriptBinder/TextComponent.h"
-#include <DirectXTK/SpriteBatch.h>
+
+namespace DirectX
+{
+	namespace DX11
+	{
+		class SpriteBatch;
+	}
+}
+
 class GameObject;
 class Camera;
+
 class UIPass : public IRenderPass
 {
 public:

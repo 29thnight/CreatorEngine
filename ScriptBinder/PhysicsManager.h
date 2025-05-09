@@ -1,4 +1,5 @@
 #pragma once
+#include "Core.Minimal.h"
 #include "../physics/Physx.h"
 #include "../physics/ICollider.h"
 #include "GameObject.h"
@@ -17,8 +18,9 @@ struct Collision
 class ICollider;
 class Component;
 class GameObject;
-class PhysicsManager
+class PhysicsManager : public Singleton<PhysicsManager>
 {
+	friend class Singleton;
 	//todo : 
 	// - 물리엔진 초기화 및 업데이트
 	// - 물리엔진 종료
@@ -84,6 +86,10 @@ private:
 	//씬로드 완료 여부
 	bool m_bIsLoaded{ false };
 
+	//================
+	//terrain
+	void AddTerrainCollider(GameObject* object);
+
 	//
 	void AddCollider(GameObject* object);
 	void RemoveCollider(GameObject* object);
@@ -93,6 +99,9 @@ private:
 	void CalculateOffset(DirectX::SimpleMath::Vector3 offset, GameObject* object);
 
 
+	Core::DelegateHandle m_OnSceneLoadHandle;
+	Core::DelegateHandle m_OnSceneUnloadHandle;
+	Core::DelegateHandle m_OnChangeSceneHandle;
 
 	//pre update  GameObject data -> pxScene data
 	void SetPhysicData();
@@ -101,6 +110,8 @@ private:
 	void GetPhysicData();
 
 	unsigned int m_lastColliderID{ 0 };
+
+
 	
 	//물리엔진 객체
 	std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
@@ -108,4 +119,6 @@ private:
 	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
+
+static auto& PhysicsManagers = PhysicsManager::GetInstance();
 

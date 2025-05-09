@@ -42,6 +42,9 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	//Kinematic 객체는 물리 엔진이 힘이나 충돌에 의해 자동으로 이동시키지 않습니다. 대신 사용자가 직접 위치나 회전을 업데이트합니다. 이러한 객체는 시네마틱 애니메이션이나 특정 제어가 필요한 경우에 유용
 	//Dynamic 객체는 물리 엔진이 힘, 중력, 충돌 등에 의해 자동으로 이동시키는 객체입니다. 이 객체는 물리적 상호작용을 통해 자연스럽게 움직입니다. 예를 들어, 떨어지는 물체나 충돌하는 물체가 이에 해당합니다.
 
+	//todo: ccd 연산량 확인 --> 아마 변경 없을듯
+
+
 	//직접 제어 명시 및 충돌 연산 플래그 설정
 	if (isKinematic) {
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);

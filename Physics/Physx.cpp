@@ -165,6 +165,18 @@ bool PhysicX::Initialize()
 
 	m_characterControllerManager = PxCreateControllerManager(*m_scene);
 
+
+	//======================================================================
+	//debug용 plane 생성 --> triangle mesh로 대체 예정
+	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
+	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *m_defaultMaterial);
+	plane->attachShape(*planeShape);
+	m_scene->addActor(*plane);
+	planeShape->release();
+
+	//======================================================================
+
+
 	return true;
 }
 //void PhysicX::HasConvexMeshResource(const unsigned int& hash)
@@ -261,7 +273,7 @@ void PhysicX::Update(float fixedDeltaTime)
 
 		//대기중인 케릭터 컨트롤러를 생성예정 리스트에 추가
 		for (auto& controllerInfo : m_waittingCCTList) {
-			m_waittingCCTList.push_back(controllerInfo);
+			m_updateCCTList.push_back(controllerInfo);
 		}
 		m_waittingCCTList.clear();
 	}
@@ -904,7 +916,7 @@ void PhysicX::AddInputMove(const CharactorControllerInputInfo& info)
 CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
 {
 	CharacterControllerGetSetData data;
-	if (m_characterControllerContainer.find(id) == m_characterControllerContainer.end())
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
 	{
 		auto& controller = m_characterControllerContainer[id];
 		physx::PxController* pxController = controller->GetController();
@@ -934,7 +946,7 @@ CharacterControllerGetSetData PhysicX::GetCCTData(const unsigned int& id)
 CharacterMovementGetSetData PhysicX::GetMovementData(const unsigned int& id)
 {
 	CharacterMovementGetSetData data;
-	if (m_characterControllerContainer.find(id) == m_characterControllerContainer.end())
+	if (m_characterControllerContainer.find(id) != m_characterControllerContainer.end())
 	{
 		auto& controller = m_characterControllerContainer[id];
 		CharacterMovement* movement = controller->GetCharacterMovement();

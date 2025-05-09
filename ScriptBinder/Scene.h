@@ -46,6 +46,7 @@ public:
 
     //Physics
     Core::Delegate<void, float>            FixedUpdateEvent{};
+	Core::Delegate<void, float>            InternalPhysicsUpdateEvent{};
     Core::Delegate<void, const Collision&> OnTriggerEnterEvent{};
     Core::Delegate<void, const Collision&> OnTriggerStayEvent{};
     Core::Delegate<void, const Collision&> OnTriggerExitEvent{};
