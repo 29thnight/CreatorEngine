@@ -137,15 +137,15 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					if (compare != rotation)
 					{
 						Meta::MakeCustomChangeCommand([=]
-							{
-								selectedSceneObject->m_transform.rotation = prevRotation;
-								selectedSceneObject->m_transform.m_dirty = true;
-							},
-							[=]
-							{
-								selectedSceneObject->m_transform.rotation = rotation;
-								selectedSceneObject->m_transform.m_dirty = true;
-							});
+						{
+							selectedSceneObject->m_transform.rotation = prevRotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						},
+						[=]
+						{
+							selectedSceneObject->m_transform.rotation = rotation;
+							selectedSceneObject->m_transform.m_dirty = true;
+						});
 					}
 					editingRotation = false;
 				}
@@ -233,6 +233,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::OpenPopup("AddComponent");
 			}
 
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("AddComponent"))
 			{
 				float availableWidth = ImGui::GetContentRegionAvail().x;
@@ -269,6 +270,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				m_openScriptPopup = false;
 			}
 
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("AddScript"))
 			{
 				float availableWidth = ImGui::GetContentRegionAvail().x;
@@ -365,15 +367,18 @@ void InspectorWindow::ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavi
 		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 		if (ImGui::Button(moduleBehavior->GetHashedName().ToString().c_str(), ImVec2(250, 0)))
 		{
-			FileGuid guid = DataSystems->GetFilenameToGuid(moduleBehavior->GetHashedName().ToString());
+			FileGuid guid = DataSystems->GetStemToGuid(moduleBehavior->GetHashedName().ToString());
 			file::path scriptFullPath = DataSystems->GetFilePath(guid);
 			if (scriptFullPath.empty())
 			{
 				Debug->LogError("Script not found: " + moduleBehavior->GetHashedName().ToString());
+				ImGui::PopStyleVar(2);
 				return;
 			}
 
-			DataSystems->OpenFile(scriptFullPath);
+			file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
+
+			DataSystems->OpenSolutionAndFile(slnPath, scriptFullPath);
 		}
 		ImGui::PopStyleVar(2);
 	}

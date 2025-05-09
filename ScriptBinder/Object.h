@@ -34,7 +34,11 @@ public:
     bool IsDestroyMark() const { return m_destroyMark; }
     bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad; }
 
-    void SetDontDestroyOnLoad(Object* objPtr);
+	static void Destroy(Object* objPtr);
+    static void SetDontDestroyOnLoad(Object* objPtr);
+    static Object* Instantiate(const Object* original, const std::string_view& newName);
+
+
 public:
     [[Property]]
     HashingString     m_name{ "Object" };
@@ -42,9 +46,9 @@ public:
 protected:
     friend class SceneManager;
     friend class RenderScene;
-	HashedGuid        m_typeID{ TypeTrait::GUIDCreator::GetTypeID<Object>() };
+	HashedGuid        m_typeID{ type_guid(Object) };
     [[Property]]
-    HashedGuid        m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
+    HashedGuid        m_instanceID{ make_guid() };
 	bool m_destroyMark{ false };
 	bool m_dontDestroyOnLoad{ false };
 };

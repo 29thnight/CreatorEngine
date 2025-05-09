@@ -51,6 +51,13 @@ public:
 		return it != m_pathToGuid.end() ? it->second : FileGuid{};
     }
 
+	FileGuid GetStemToGuid(const std::string& stem) const
+	{
+		auto it = std::find_if(m_pathToGuid.begin(), m_pathToGuid.end(),
+			[&stem](const auto& pair) { return pair.first.stem() == stem; });
+		return it != m_pathToGuid.end() ? it->second : FileGuid{};
+	}
+
     bool Contains(const FileGuid& guid) const
     {
         return m_guidToPath.contains(guid);
@@ -60,6 +67,12 @@ public:
     {
         return m_pathToGuid.contains(path);
     }
+
+	void Clear()
+	{
+		m_guidToPath.clear();
+		m_pathToGuid.clear();
+	}
 
 private:
     std::unordered_map<FileGuid, file::path> m_guidToPath;

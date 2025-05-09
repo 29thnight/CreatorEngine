@@ -37,6 +37,8 @@ public:
 private:
 	friend class HierarchyWindow;
 	friend class InspectorWindow;
+	friend class SceneViewWindow;
+
 	void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
 	
 	Scene* m_currentScene{};

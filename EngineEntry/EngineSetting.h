@@ -22,10 +22,8 @@ public:
 		char* vcInstallDir = nullptr;
 		size_t len = 0;
 
-		// Use _dupenv_s to safely retrieve the environment variable
 		if (_dupenv_s(&vcInstallDir, &len, "VSINSTALLDIR") != 0 || vcInstallDir == nullptr)
 		{
-			// Handle the error: Visual Studio is not installed
 			return false;
 		}
 

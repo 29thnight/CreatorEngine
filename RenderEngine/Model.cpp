@@ -55,6 +55,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 				| aiProcess_TransformUVCoords
 				| aiProcess_OptimizeMeshes
 				| aiProcess_ImproveCacheLocality
+				| aiProcess_GenBoundingBoxes
 			);
 
 			if (nullptr == assimpScene)
@@ -65,6 +66,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 			if (anim::empty == assimpScene->mNumAnimations)
 			{
 				importer.ApplyPostProcessing(aiProcess_PreTransformVertices);
+				importer.ApplyPostProcessing(aiProcess_GenBoundingBoxes);
 			}
 
 			ModelLoader loader = ModelLoader(assimpScene, path_.string());
@@ -161,16 +163,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	{
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
-
-	Meta::MakeCustomChangeCommand([=] 
-	{
-	
-	}, 
-	[=] 
-	{
-	
-	});
-
 
 	return model;
 }

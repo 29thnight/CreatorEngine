@@ -20,12 +20,13 @@ private:
 public:
 	void Initialize();
 	void Shutdown();
-	void TrackScriptChanges();
+	bool IsScriptUpToDate();
 	void ReloadDynamicLibrary();
 	void ReplaceScriptComponent();
 	void CompileEvent();
 
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
+	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
 	void UpdateSceneManager(void* sceneManager)
 	{
@@ -42,9 +43,32 @@ public:
 		m_scriptComponentIndexs.emplace_back(gameObject, index, name);
 	}
 
+	void UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
+	{
+		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
+		{
+			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
+		});
+	}
+
 	std::vector<std::string>& GetScriptNames()
 	{
 		return m_scriptNames;
+	}
+
+	bool IsCompileEventInvoked() const
+	{
+		return m_isCompileEventInvoked;
+	}
+
+	void SetCompileEventInvoked(bool value)
+	{
+		m_isCompileEventInvoked = value;
+	}
+
+	void SetReload(bool value)
+	{
+		m_isReloading = value;
 	}
 
 private:
@@ -69,22 +93,30 @@ private:
 		"class "
 	};
 
-	std::string scriptBodyString
+	std::string scriptInheritString
 	{
 		" : public ModuleBehavior\n"
 		"{\n"
 		"public:\n"
-		"	"
+		"	MODULE_BEHAVIOR_BODY("
+	};
+
+	std::string scriptBodyString
+	{
+		")\n"
+		"	virtual void Awake() override {}\n"
 		"	virtual void Start() override;\n"
-		"	virtual void FixedUpdate(float fixedTick) override;\n"
-		"	virtual void OnTriggerEnter(const Collision& collision) override;\n"
-		"	virtual void OnTriggerStay(const Collision& collision) override;\n"
-		"	virtual void OnTriggerExit(const Collision& collision) override;\n"
-		"	virtual void OnCollisionEnter(const Collision& collision) override;\n"
-		"	virtual void OnCollisionStay(const Collision& collision) override;\n"
-		"	virtual void OnCollisionExit(const Collision& collision) override;\n"
+		"	virtual void FixedUpdate(float fixedTick) override {}\n"
+		"	virtual void OnTriggerEnter(const Collision& collision) override {}\n"
+		"	virtual void OnTriggerStay(const Collision& collision) override {}\n"
+		"	virtual void OnTriggerExit(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionEnter(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionStay(const Collision& collision) override {}\n"
+		"	virtual void OnCollisionExit(const Collision& collision) override {}\n"
 		"	virtual void Update(float tick) override;\n"
-		"	virtual void LateUpdate(float tick) override;\n"
+		"	virtual void LateUpdate(float tick) override {}\n"
+		"	virtual void OnDisable() override  {}\n"
+		"	virtual void OnDestroy() override  {}\n"
 	};
 
 	std::string scriptEndString
@@ -114,69 +146,6 @@ private:
 		"void "
 	};
 
-	std::string scriptCppEndFixedUpdateString
-	{
-		"::FixedUpdate(float fixedTick)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerEnterString
-	{
-		"::OnTriggerEnter(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerStayString
-	{
-		"::OnTriggerStay(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnTriggerExitString
-	{
-		"::OnTriggerExit(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionEnterString
-	{
-		"::OnCollisionEnter(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionStayString
-	{
-		"::OnCollisionStay(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndOnCollisionExitString
-	{
-		"::OnCollisionExit(const Collision& collision)\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
 	std::string scriptCppEndUpdateString
 	{
 		"::Update(float tick)\n"
@@ -184,13 +153,6 @@ private:
 		"}\n"
 		"\n"
 		"void "
-	};
-
-	std::string scriptCppEndLateUpdateString
-	{
-		"::LateUpdate(float tick)\n"
-		"{\n"
-		"}\n"
 	};
 
 	std::string scriptFactoryIncludeString

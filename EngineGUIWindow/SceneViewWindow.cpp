@@ -5,6 +5,8 @@
 #include "fa.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "CameraComponent.h"
+#include "LightComponent.h"
 #include "GameObject.h"
 #include "DataSystem.h"
 #include "RenderState.h"
@@ -77,6 +79,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static bool boundSizing = false;
 	static bool boundSizingSnap = false;
 	static bool selectMode = false;
+	static GameObject* selected = nullptr;
 	static enum class SelectGuizmoMode selectGizmoMode = SelectGuizmoMode::Translate;
 	static const char* buttons[] = {
 		ICON_FA_EYE,
@@ -103,6 +106,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
 	float viewManipulateTop = 0;
+	float windowTopLeftX = 0;
+	float windowTopLeftY = 0;
+	ImVec2 imageMin{};
+	ImVec2 imageMax{};
+	float windowWidth = 0;
+	float windowHeight = 0;
+
 	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 	if (useWindow)
 	{
@@ -114,25 +124,23 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 		ImGuizmo::SetDrawlist();
 
-		float windowWidth = (float)ImGui::GetWindowWidth();
-		float windowHeight = (float)ImGui::GetWindowHeight();
-		ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+		windowWidth = (float)ImGui::GetWindowWidth();
+		windowHeight = (float)ImGui::GetWindowHeight();
+		windowTopLeftX = ImGui::GetWindowPos().x;
+		windowTopLeftY = ImGui::GetWindowPos().y;
+		float titleBarHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2;
+		ImGuizmo::SetRect(windowTopLeftX, windowTopLeftY + titleBarHeight, windowWidth, windowHeight);
 		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
 		viewManipulateTop = ImGui::GetWindowPos().y;
 		ImGuiWindow* window = ImGui::GetCurrentWindow();
 		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
 
-		float x = windowWidth;//window->InnerRect.Max.x - window->InnerRect.Min.x;
-		float y = windowHeight;//window->InnerRect.Max.y - window->InnerRect.Min.y;
-
-		/*m_sceneRenderer->m_pEditorCamera->m_viewWidth = windowWidth;
-		m_sceneRenderer->m_pEditorCamera->m_viewHeight = windowHeight;
-		auto view = m_sceneRenderer->m_pEditorCamera->CalculateView();
-		XMFLOAT4X4 floatMatrix;
-		XMStoreFloat4x4(&floatMatrix, view);
-		cameraView = &floatMatrix.m[0][0];*/
+		float x = windowWidth;
+		float y = windowHeight;
 
 		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
+		imageMin = ImGui::GetItemRectMin();
+		imageMax = ImGui::GetItemRectMax();
 
 		ImVec2 imagePos = ImGui::GetItemRectMin();
 		ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
@@ -177,19 +185,15 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
 		for (int i = 0; i < buttonCount; i++)
 		{
-			// 선택된 버튼은 활성화 색상, 나머지는 비활성화 색상으로 설정합니다.
 			if (i == (int)selectGizmoMode)
 			{
-				// 활성화된 버튼 색상 (예: 녹색 계열)
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
 			}
 			else
 			{
-				// 비활성화된 버튼 색상 (예: 회색 계열)
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
 			}
 
-			// 버튼 렌더링: 버튼을 클릭하면 선택된 인덱스를 업데이트합니다.
 			if (ImGui::Button(buttons[i]))
 			{
 				selectGizmoMode = (SelectGuizmoMode)i;
@@ -199,7 +203,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			currentPos = ImGui::GetCursorScreenPos();
 			ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
 
-			// PushStyleColor 호출마다 PopStyleColor를 호출해 원래 상태로 복원합니다.
 			ImGui::PopStyleColor();
 		}
 		ImGui::PopStyleVar(1);
@@ -343,9 +346,219 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		cam->m_forward = rotDir;
 	}
 
+	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+	{
+		cam->HandleMovement(Time->GetElapsedSeconds());
+	}
+
+	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+
+	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+	{
+		float closest = FLT_MAX;
+		ImVec2 mousePos = ImGui::GetMousePos();
+		ImVec2 imagePos = imageMin; // 이미지 좌상단 위치
+		ImVec2 imageSize = imageMax;
+
+		Ray ray = CreateRayFromCamera(cam, mousePos, imagePos, imageSize);
+
+		auto sceneObjects = SceneManagers->GetActiveScene()->m_SceneObjects;
+		auto hits = PickObjectsFromRay(ray, sceneObjects);
+
+		auto test = PickObjectFromRay(ray, sceneObjects);
+
+		if (test)
+		{
+			std::cout << "Hit Object: " << test->m_name.ToString() << std::endl;
+		}
+
+		if (!hits.empty())
+		{
+			// 이전과 동일한 히트 목록이면 인덱스 증가
+			if (hits.size() == m_hitResults.size())
+			{
+				bool allSame = true;
+				for (size_t i = 0; i < hits.size(); ++i)
+				{
+					if (hits[i].object != m_hitResults[i].object)
+					{
+						allSame = false;
+						break;
+					}
+				}
+
+				if (allSame)
+					m_currentHitIndex = (m_currentHitIndex + 1) % hits.size();
+				else
+					m_currentHitIndex = 0;
+			}
+			else
+			{
+				m_currentHitIndex = 0;
+			}
+
+			m_hitResults = hits;
+
+			GameObject* selected = m_hitResults[m_currentHitIndex].object;
+			sceneSelectedObj = selected;
+		}
+		else
+		{
+			m_hitResults.clear();
+			m_currentHitIndex = 0;
+		}
+	}
+
 	if (useWindow)
 	{
 		ImGui::End();
 		ImGui::PopStyleColor(2);
 	}
+}
+
+Mathf::Vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth)
+{
+	float normX = (mouseScreenPos.x - imagePos.x) / imageSize.x;
+	float normY = (mouseScreenPos.y - imagePos.y) / imageSize.y;
+
+	float ndcX = normX * 2.0f - 1.0f;
+	float ndcY = (1.0f - normY) * 2.0f - 1.0f;
+
+	XMVECTOR clipPos = XMVectorSet(ndcX, ndcY, depth, 1.0f);
+
+	XMMATRIX proj = cam->CalculateProjection();
+	XMMATRIX view = cam->CalculateView();
+	XMMATRIX invViewProj = XMMatrixInverse(nullptr, XMMatrixMultiply(view, proj));
+
+	XMVECTOR worldPos = XMVector4Transform(clipPos, invViewProj);
+	worldPos = XMVectorScale(worldPos, 1.0f / XMVectorGetW(worldPos));
+
+	XMFLOAT3 result;
+	XMStoreFloat3(&result, worldPos);
+	return result;
+}
+
+Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, const ImVec2& imagePos, const ImVec2& imageSize)
+{
+	float normX = (mousePos.x - imagePos.x) / imageSize.x;
+	float normY = (mousePos.y - imagePos.y) / imageSize.y;
+
+	float ndcX = normX * 2.0f - 1.0f;
+	float ndcY = (1.0f - normY) * 2.0f - 1.0f;
+
+	XMVECTOR nearPoint = XMVectorSet(ndcX, ndcY, 0.0f, 1.0f);
+	XMVECTOR farPoint = XMVectorSet(ndcX, ndcY, 1.0f, 1.0f);
+
+	XMMATRIX view = cam->CalculateView();
+	XMMATRIX proj = cam->CalculateProjection();
+	XMMATRIX invViewProj = XMMatrixInverse(nullptr, view * proj);
+
+	nearPoint = XMVector4Transform(nearPoint, invViewProj);
+	farPoint = XMVector4Transform(farPoint, invViewProj);
+
+	nearPoint = XMVectorScale(nearPoint, 1.0f / XMVectorGetW(nearPoint));
+	farPoint = XMVectorScale(farPoint, 1.0f / XMVectorGetW(farPoint));
+
+	XMVECTOR dir = XMVector3Normalize(XMVectorSubtract(farPoint, nearPoint));
+
+	Ray ray;
+	XMStoreFloat3(&ray.origin, nearPoint);
+	XMStoreFloat3(&ray.direction, dir);
+	return ray;
+}
+
+GameObject* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects)
+{
+	GameObject* selected = nullptr;
+	float closestDistance = FLT_MAX;
+
+	for (auto& obj : sceneObjects)
+	{
+		auto* meshComp = obj->GetComponent<MeshRenderer>();
+		if (!meshComp || !meshComp->m_Mesh)
+			continue;
+
+		const Mesh* mesh = meshComp->m_Mesh;
+
+		BoundingBox worldAABB;
+		worldAABB.Extents = mesh->GetBoundingBox().Extents;
+		mesh->GetBoundingBox().Transform(
+			worldAABB,
+			obj->m_transform.GetWorldMatrix()
+		);
+
+		float hitDistance;
+		if (worldAABB.Intersects(
+			XMLoadFloat3(&ray.origin),
+			XMLoadFloat3(&ray.direction),
+			hitDistance))
+		{
+			if (hitDistance < closestDistance)
+			{
+				closestDistance = hitDistance;
+				selected = obj.get();
+			}
+		}
+
+	}
+
+	return selected;
+}
+
+std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects)
+{
+	std::vector<RayHitResult> hits;
+
+	for (auto& obj : sceneObjects)
+	{
+		auto* meshComp = obj->GetComponent<MeshRenderer>();
+		auto* cameraComp = obj->GetComponent<CameraComponent>();
+		auto* lightComp = obj->GetComponent<LightComponent>();
+		if (meshComp && meshComp->m_Mesh)
+		{
+			const Mesh* mesh = meshComp->m_Mesh;
+
+			BoundingBox worldAABB;
+			mesh->GetBoundingBox().Transform(
+				worldAABB,
+				obj->m_transform.GetWorldMatrix()
+			);
+
+			float hitDistance;
+			if (worldAABB.Intersects(XMLoadFloat3(&ray.origin), XMLoadFloat3(&ray.direction), hitDistance))
+			{
+				hits.push_back({ obj.get(), hitDistance });
+			}
+		}
+		else if (cameraComp)
+		{
+			BoundingBox worldAABB;
+			worldAABB = cameraComp->GetEditorBoundingBox();
+
+			float hitDistance;
+			if (worldAABB.Intersects(XMLoadFloat3(&ray.origin), XMLoadFloat3(&ray.direction), hitDistance))
+			{
+				hits.push_back({ obj.get(), hitDistance });
+			}
+		}
+		else if (lightComp)
+		{
+			BoundingBox worldAABB;
+			worldAABB = lightComp->GetEditorBoundingBox();
+
+			float hitDistance;
+			if (worldAABB.Intersects(XMLoadFloat3(&ray.origin), XMLoadFloat3(&ray.direction), hitDistance))
+			{
+				hits.push_back({ obj.get(), hitDistance });
+			}
+		}
+	}
+
+	// 거리순 정렬 (가까운 오브젝트가 먼저)
+	std::sort(hits.begin(), hits.end(), [](const RayHitResult& a, const RayHitResult& b) 
+	{
+		return a.distance < b.distance;
+	});
+
+	return hits;
 }

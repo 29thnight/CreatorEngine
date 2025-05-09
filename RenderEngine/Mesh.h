@@ -73,6 +73,10 @@ public:
 
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }
+
+	BoundingBox GetBoundingBox() const { return m_boundingBox; }
+	BoundingSphere GetBoundingSphere() const { return m_boundingSphere; }
+
 private:
 	friend class ModelLoader;
 

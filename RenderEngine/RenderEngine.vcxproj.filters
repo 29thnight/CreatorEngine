@@ -195,9 +195,6 @@
     <Filter Include="RenderPass\PostProcessingPass\ColorGradingPass">
       <UniqueIdentifier>{737b3164-6b70-46e9-8b0b-6aa01ad5a01c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ManagerSystem\InputManager">
-      <UniqueIdentifier>{06792b2b-fe9e-4172-8f00-aec15e30243e}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -337,12 +334,6 @@
     </ClCompile>
     <ClCompile Include="GizmoLinePass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
-    </ClCompile>
-    <ClCompile Include="..\ScriptBinder\InputManager.cpp">
-      <Filter>Asset\ManagerSystem\InputManager</Filter>
-    </ClCompile>
-    <ClCompile Include="..\ScriptBinder\KeyState.cpp">
-      <Filter>Asset\ManagerSystem\InputManager</Filter>
     </ClCompile>
     <ClCompile Include="VignettePass.cpp">
       <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
@@ -516,12 +507,6 @@
     </ClInclude>
     <ClInclude Include="ProjectionType.h">
       <Filter>Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ScriptBinder\InputManager.h">
-      <Filter>Asset\ManagerSystem\InputManager</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ScriptBinder\KeyState.h">
-      <Filter>Asset\ManagerSystem\InputManager</Filter>
     </ClInclude>
     <ClInclude Include="VignettePass.h">
       <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>

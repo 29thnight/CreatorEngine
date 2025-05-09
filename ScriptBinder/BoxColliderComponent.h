@@ -10,7 +10,6 @@ public:
 	[[Property]] 
 	bool m_IsTrigger = false;
 
-
 	EColliderType GetColliderType() const
 	{
 		return m_IsTrigger ? EColliderType::TRIGGER : EColliderType::COLLISION;

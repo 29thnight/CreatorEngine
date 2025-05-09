@@ -65,5 +65,13 @@
         m_typeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
     virtual ~T() = default; \
+
+#define MODULE_BEHAVIOR_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); \
+    }\
+    virtual ~T() = default; \
     
 #pragma endregion

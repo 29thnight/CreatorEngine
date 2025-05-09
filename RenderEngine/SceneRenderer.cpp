@@ -338,7 +338,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	}
 
 	m_renderScene->Update(deltaTime);
-	m_pEditorCamera->HandleMovement(deltaTime);
+	//m_pEditorCamera->HandleMovement(deltaTime);
 
 	PrepareRender();
 }

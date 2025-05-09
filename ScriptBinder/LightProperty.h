@@ -9,8 +9,9 @@ enum LightType
     DirectionalLight,
     PointLight,
     SpotLight,
-	InVaild
 };
+
+constexpr int LightType_InVaild = -1;
 
 AUTO_REGISTER_ENUM(LightType)
 

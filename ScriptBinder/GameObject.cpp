@@ -65,6 +65,10 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 	}
 	component->SetOwner(this);
 
+	std::string scriptFile = std::string(scriptName) + ".cpp";
+
+	component->m_scriptGuid = DataSystems->GetFilenameToGuid(scriptFile);
+
     auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
     m_components.push_back(componentPtr);
     m_componentIds[componentPtr->GetTypeID()] = m_components.size() - 1;
@@ -76,6 +80,53 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
     return component.get();
 }
 
+std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
+{
+    HashedGuid typeID = type.typeID;
+    auto iter = m_componentIds.find(typeID);
+    if (iter != m_componentIds.end())
+    {
+        size_t index = m_componentIds[typeID];
+        return m_components[index];
+    }
+
+    return nullptr;
+}
+
+
+void GameObject::RemoveComponent(uint32 id)
+{
+	if (id >= m_components.size())
+	{
+		return;
+	}
+
+	auto iter = m_componentIds.find(m_components[id]->GetTypeID());
+	if (iter != m_componentIds.end())
+	{
+		m_componentIds.erase(iter);
+	}
+	m_components[id]->Destroy();
+}
+
+void GameObject::RemoveComponent(const std::string_view& scriptName)
+{
+	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
+	if (iter != m_components.end())
+	{
+		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(*iter);
+		if (scriptComponent && scriptComponent->m_name == scriptName)
+		{
+			RemoveComponent(scriptComponent->GetTypeID());
+			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
+			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->GetTypeID()], scriptComponent->m_name.ToString());
+		}
+	}
+}
+
+void GameObject::RemoveComponent(Meta::Type& type)
+{
+}
 
 GameObject* GameObject::Find(const std::string_view& name)
 {

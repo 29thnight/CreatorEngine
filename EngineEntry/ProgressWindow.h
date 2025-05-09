@@ -25,6 +25,14 @@ public:
         m_imagePath = imagePath;
         InitCommonControls();
         m_hThread = CreateThread(nullptr, 0, ThreadProc, this, 0, nullptr);
+
+		if (m_hThread == nullptr)
+		{
+			MessageBoxW(nullptr, L"Failed to create thread", L"Error", MB_ICONERROR);
+			return;
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     void SetProgress(int value)
@@ -41,8 +49,16 @@ public:
 
     void Close()
     {
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
         if (m_hWnd)
             PostMessage(m_hWnd, WM_CLOSE, 0, 0);
+
+		if (m_hWnd && IsWindow(m_hWnd))
+		{
+			DestroyWindow(m_hWnd);
+			m_hWnd = nullptr;
+		}
 
         if (m_hThread)
         {

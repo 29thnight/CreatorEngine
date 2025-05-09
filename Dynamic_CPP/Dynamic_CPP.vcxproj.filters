@@ -36,13 +36,7 @@
     <ClInclude Include="CreateFactory.h">
       <Filter>Script\CreateFactory</Filter>
     </ClInclude>
-    <ClInclude Include="..\x64\Assets\Script\TestScriptClass.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
     <ClInclude Include="Assets\Script\TestBehavior.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Script\TestScriptClass.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
   </ItemGroup>
@@ -53,13 +47,7 @@
     <ClCompile Include="pch.cpp">
       <Filter>Common\SourceFile</Filter>
     </ClCompile>
-    <ClCompile Include="..\x64\Assets\Script\TestScriptClass.cpp">
-      <Filter>Script\ScriptClass</Filter>
-    </ClCompile>
     <ClCompile Include="Assets\Script\TestBehavior.cpp">
-      <Filter>Script\ScriptClass</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Script\TestScriptClass.cpp">
       <Filter>Script\ScriptClass</Filter>
     </ClCompile>
   </ItemGroup>

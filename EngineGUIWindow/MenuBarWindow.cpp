@@ -4,6 +4,115 @@
 #include "DataSystem.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include <commdlg.h>
+
+#pragma comment(lib, "comdlg32.lib")
+
+std::wstring ShowOpenFileDialog(LPCWCHAR filterString, LPCWCHAR title = L"Open File", const std::wstring& initialDirectory = L"")
+{
+    wchar_t filename[MAX_PATH] = L"";
+    wchar_t defaultExt[MAX_PATH] = L"";
+
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFilter = filterString;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    ofn.lpstrTitle = title;
+
+	if (!initialDirectory.empty())
+	{
+		ofn.lpstrInitialDir = initialDirectory.c_str();
+	}
+
+    if (GetOpenFileNameW(&ofn))
+    {
+        // 사용자가 확장자를 입력하지 않은 경우, 선택된 필터의 확장자를 추가
+        if (wcsrchr(filename, L'.') == nullptr)
+        {
+            // 선택된 필터의 확장자 가져오기
+            LPCWCHAR filter = filterString;
+            int filterIndex = ofn.nFilterIndex - 1; // nFilterIndex는 1부터 시작
+            while (filterIndex > 0 && *filter != L'\0')
+            {
+                filter += wcslen(filter) + 1; // 다음 필터로 이동
+                filter += wcslen(filter) + 1; // 확장자 부분으로 이동
+                --filterIndex;
+            }
+
+            if (*filter != L'\0')
+            {
+                // 확장자 부분에서 첫 번째 확장자 추출
+                LPCWCHAR extStart = wcsrchr(filter, L'*');
+                if (extStart && *(extStart + 1) == L'.')
+                {
+                    wcscpy_s(defaultExt, extStart + 1);
+                    wcscat_s(filename, L".");
+                    wcscat_s(filename, defaultExt);
+                }
+            }
+        }
+
+        return filename;
+    }
+
+    return L""; // 취소 또는 실패
+}
+
+std::wstring ShowSaveFileDialog(LPCWCHAR filterString, LPCWCHAR title = L"Save File", const std::wstring& initialDirectory = L"")
+{
+    wchar_t filename[MAX_PATH] = L"";
+    wchar_t defaultExt[MAX_PATH] = L"";
+
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFilter = filterString;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    ofn.lpstrTitle = title;
+
+	if (!initialDirectory.empty())
+	{
+		ofn.lpstrInitialDir = initialDirectory.c_str();
+	}
+
+    if (GetSaveFileNameW(&ofn))
+    {
+        // 사용자가 확장자를 입력하지 않은 경우, 선택된 필터의 확장자를 추가
+        if (wcsrchr(filename, L'.') == nullptr)
+        {
+            // 선택된 필터의 확장자 가져오기
+            LPCWCHAR filter = filterString;
+            int filterIndex = ofn.nFilterIndex - 1; // nFilterIndex는 1부터 시작
+            while (filterIndex > 0 && *filter != L'\0')
+            {
+                filter += wcslen(filter) + 1; // 다음 필터로 이동
+                filter += wcslen(filter) + 1; // 확장자 부분으로 이동
+                --filterIndex;
+            }
+
+            if (*filter != L'\0')
+            {
+                // 확장자 부분에서 첫 번째 확장자 추출
+                LPCWCHAR extStart = wcsrchr(filter, L'*');
+                if (extStart && *(extStart + 1) == L'.')
+                {
+                    wcscpy_s(defaultExt, extStart + 1);
+                    wcscat_s(filename, L".");
+                    wcscat_s(filename, defaultExt);
+                }
+            }
+        }
+
+        return filename;
+    }
+
+    return L""; // 취소 또는 실패
+}
 
 std::string WordWrapText(const std::string& input, size_t maxLineLength)
 {
@@ -31,7 +140,6 @@ std::string WordWrapText(const std::string& input, size_t maxLineLength)
 
     return oss.str();
 }
-
 
 MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
     m_sceneRenderer(ptr)
@@ -61,12 +169,39 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Save Current Scene"))
                 {
                     //Test
-                    SceneManagers->SaveScene();
+                    file::path fileName = ShowSaveFileDialog(
+						L"Scene Files (*.creator)\0*.creator\0",
+						L"Save Scene",
+                        PathFinder::Relative("Scenes\\").wstring()
+					);
+					if (!fileName.empty())
+					{
+                        SceneManagers->SaveScene(fileName.string());
+					}
+                    else
+                    {
+						Debug->LogError("Failed to save scene.");
+                    }
                 }
                 if (ImGui::MenuItem("Load Scene"))
                 {
 					SceneManagers->resetSelectedObjectEvent.Broadcast();
-                    SceneManagers->LoadScene();
+                    //SceneManagers->LoadScene();
+
+					file::path fileName = ShowOpenFileDialog(
+						L"Scene Files (*.creator)\0*.creator\0",
+						L"Load Scene",
+						PathFinder::Relative("Scenes\\").wstring()
+					);
+                    if (!fileName.empty())
+                    {
+                        SceneManagers->LoadScene(fileName.string());
+                    }
+                    else
+                    {
+                        Debug->LogError("Failed to load scene.");
+                    }
+
                 }
                 if (ImGui::MenuItem("Exit"))
                 {
@@ -162,79 +297,107 @@ void MenuBarWindow::RenderMenuBar()
 void MenuBarWindow::ShowLogWindow()
 {
     static int levelFilter = spdlog::level::trace;
+    static bool autoScroll = true;
     bool isClear = Debug->IsClear();
+
     ImGui::PushFont(m_koreanFont);
-
     ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
-    if (ImGui::Button("Clear"))
+    ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+    // == 상단 고정 헤더 영역 ==
+    ImGui::BeginChild("LogHeader", ImVec2(0, 0),
+        ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY,
+        ImGuiWindowFlags_NoScrollbar);
     {
-        Debug->Clear();
-    }
-    ImGui::SameLine();
-    ImGui::Combo("Log Filter", &levelFilter,
-        "Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
-
-    float sizeX = ImGui::GetContentRegionAvail().x;
-    float sizeY = ImGui::CalcTextSize(Debug->GetBackLogMessage().c_str()).y;
-
-    if (isClear)
-    {
-        Debug->toggleClear();
-        ImGui::End();
-        ImGui::PopFont();
-        return;
-    }
-
-    auto entries = Debug->get_entries();
-    for (size_t i = 0; i < entries.size(); i++)
-    {
-        const auto& entry = entries[i];
-        bool is_selected = (i == m_selectedLogIndex);
-
-        if (entry.level != spdlog::level::trace && entry.level < levelFilter)
-            continue;
-
-        ImVec4 color;
-        switch (entry.level)
+        if (ImGui::Button("Clear"))
         {
-        case spdlog::level::info: color = ImVec4(1, 1, 1, 1); break;
-        case spdlog::level::warn: color = ImVec4(1, 1, 0, 1); break;
-        case spdlog::level::err:  color = ImVec4(1, 0.4f, 0.4f, 1); break;
-        default: color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+            Debug->Clear();
+        }
+        ImGui::SameLine();
+        ImGui::Combo("Log Filter", &levelFilter,
+            "Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
+        ImGui::SameLine();
+        ImGui::Checkbox("Auto Scroll", &autoScroll);
+    }
+    ImGui::EndChild();
+
+    ImGui::Separator();
+
+    // == 스크롤 가능한 로그 영역 ==
+    ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    {
+        if (isClear)
+        {
+            Debug->toggleClear();
+            ImGui::EndChild();
+            ImGui::End();
+            ImGui::PopFont();
+            return;
         }
 
-        if (is_selected)
-            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
+        auto entries = Debug->get_entries();
+        float sizeX = ImGui::GetContentRegionAvail().x;
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
+        // 현재 스크롤 상태 감지
+        bool shouldScroll = autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10.0f;
 
-        std::string wrapped = WordWrapText(entry.message, 120);
-        int stringLine = std::count(wrapped.begin(), wrapped.end(), '\n');
-        ImGui::PushID(i);
-        if (ImGui::Selectable(std::string(ICON_FA_CIRCLE_INFO + std::string(" ") + wrapped).c_str(),
-            is_selected, ImGuiSelectableFlags_AllowDoubleClick, { sizeX , float(15 * stringLine) }))
+        for (size_t i = 0; i < entries.size(); ++i)
         {
-            m_selectedLogIndex = i;
-            std::regex pattern(R"(([A-Za-z]:\\.*))");
-            std::istringstream iss(wrapped);
-            std::string line;
+            const auto& entry = entries[i];
+            if (entry.level != spdlog::level::trace && entry.level < levelFilter)
+                continue;
 
-            while (std::getline(iss, line))
+            bool is_selected = (i == m_selectedLogIndex);
+
+            ImVec4 color;
+            switch (entry.level)
             {
-                std::smatch match;
-                if (std::regex_search(line, match, pattern) && entry.level != spdlog::level::debug)
+            case spdlog::level::info:  color = ImVec4(1, 1, 1, 1); break;
+            case spdlog::level::warn:  color = ImVec4(1, 1, 0, 1); break;
+            case spdlog::level::err:   color = ImVec4(1, 0.4f, 0.4f, 1); break;
+            case spdlog::level::critical: color = ImVec4(1, 0, 0, 1); break;
+            default:                   color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+            }
+
+            if (is_selected)
+                ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
+
+            std::string wrapped = WordWrapText(entry.message, 120);
+            int stringLine = std::count(wrapped.begin(), wrapped.end(), '\n');
+
+            ImGui::PushID(i);
+            if (ImGui::Selectable((ICON_FA_CIRCLE_INFO + std::string(" ") + wrapped).c_str(),
+                is_selected, ImGuiSelectableFlags_AllowDoubleClick,
+                ImVec2(sizeX, float(15 * stringLine))))
+            {
+                m_selectedLogIndex = i;
+
+                std::regex pattern(R"(([A-Za-z]:\\.*))");
+                std::istringstream iss(wrapped);
+                std::string line;
+
+                while (std::getline(iss, line))
                 {
-                    std::string fileDirectory = match[1].str();
-                    DataSystems->OpenFile(fileDirectory);
+                    std::smatch match;
+                    if (std::regex_search(line, match, pattern) && entry.level != spdlog::level::debug)
+                    {
+                        std::string fileDirectory = match[1].str();
+                        DataSystems->OpenFile(fileDirectory);
+                    }
                 }
             }
-        }
-        ImGui::PopStyleColor();
-
-        if (is_selected)
+            ImGui::PopID();
             ImGui::PopStyleColor();
-        ImGui::PopID();
+            if (is_selected)
+                ImGui::PopStyleColor();
+        }
+
+        if (shouldScroll)
+            ImGui::SetScrollHereY(1.0f);
     }
+    ImGui::EndChild();
 
     ImGui::End();
     ImGui::PopFont();

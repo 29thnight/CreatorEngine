@@ -32,6 +32,13 @@ void ComponentFactory::Initialize()
 
 void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
 {
+	if (itNode["ModuleBehavior"])
+	{
+		std::string scriptName = itNode["m_name"].as<std::string>();
+		auto scriptComponent = obj->AddScriptComponent(scriptName);
+		return;
+	}
+
     const Meta::Type* componentType = Meta::ExtractTypeFromYAML(itNode);
     if (nullptr == componentType)
     {

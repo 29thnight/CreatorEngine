@@ -11,7 +11,6 @@ GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_pWireFramePass = std::make_unique<WireFramePass>();
 	m_pGizmoPass = std::make_unique<GizmoPass>();
 	m_pGizmoLinePass = std::make_unique<GizmoLinePass>();
-
 }
 
 GizmoRenderer::~GizmoRenderer()

@@ -16,13 +16,9 @@ public:
 	void SetOwner(GameObject* owner) { m_pOwner = owner; }
 	GameObject* GetOwner() const { return m_pOwner; }
 
-	void SetDestroy() { m_destroyMark = true; }
-	//bool IsDestroyMark() const { return m_destroyMark; }
-
 protected:
 	GameObject*		m_pOwner{};
 	Transform		m_transform{};
     [[Property]]
 	HashedGuid		m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-	//bool			m_destroyMark{ false };
 };

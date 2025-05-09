@@ -5,7 +5,7 @@
 class TestBehavior : public ModuleBehavior
 {
 public:
-	GENERATED_BODY(TestBehavior)
+	MODULE_BEHAVIOR_BODY(TestBehavior)
 
 public:
 	virtual void Start() override;

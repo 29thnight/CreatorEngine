@@ -13,7 +13,7 @@ inline T* GameObject::AddComponent()
     std::shared_ptr<T> component = std::make_shared<T>();
     m_components.push_back(component);
     component->SetOwner(this);
-    m_componentIds[component->GetTypeID()] = m_components.size();
+    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
 
     return component.get();
 }
@@ -30,7 +30,7 @@ inline T* GameObject::AddComponent(Args && ...args)
     std::shared_ptr<T> component = std::make_shared<T>(std::forward<Args>(args)...);
     m_components.push_back(component);
     component->SetOwner(this);
-    m_componentIds[component->GetTypeID()] = m_components.size();
+    m_componentIds[component->GetTypeID()] = m_components.size() - 1;
 
     return component.get();
 }
@@ -49,7 +49,8 @@ inline T* GameObject::GetComponent()
 {
     for (auto& component : m_components)
     {
-        if (std::shared_ptr<T> castedComponent = std::dynamic_pointer_cast<T>(component))
+        std::shared_ptr<T> castedComponent = std::dynamic_pointer_cast<T>(component);
+        if (nullptr != castedComponent.get())
             return castedComponent.get();
     }
     return nullptr;
