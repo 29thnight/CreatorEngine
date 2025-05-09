@@ -53,7 +53,7 @@ LightMapPass::LightMapPass()
 
 	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
 
-	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	m_pso->m_samplers.push_back(linearSampler);
@@ -67,43 +67,45 @@ LightMapPass::LightMapPass()
 
 void LightMapPass::Initialize(std::vector<Texture*>& lightmaps)
 {
-	int size = lightmaps.size();
-	D3D11_TEXTURE2D_DESC temp;
-	lightmaps[0]->m_pTexture->GetDesc(&temp);
+	m_plightmaps = &lightmaps;
 
-	D3D11_TEXTURE2D_DESC texArrayDesc = {};
-	texArrayDesc.Width = temp.Width;
-	texArrayDesc.Height = temp.Width;
-	texArrayDesc.MipLevels = 1;
-	texArrayDesc.ArraySize = size; // N개의 텍스처
-	texArrayDesc.Format = temp.Format;
-	texArrayDesc.SampleDesc.Count = 1;
-	texArrayDesc.Usage = D3D11_USAGE_DEFAULT;
-	texArrayDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	texArrayDesc.CPUAccessFlags = 0;
+	//int size = lightmaps.size();
+	//D3D11_TEXTURE2D_DESC temp;
+	//lightmaps[0]->m_pTexture->GetDesc(&temp);
 
-	ID3D11Texture2D* textureArray = nullptr;
-	auto hr = DeviceState::g_pDevice->CreateTexture2D(&texArrayDesc, nullptr, &textureArray);
+	//D3D11_TEXTURE2D_DESC texArrayDesc = {};
+	//texArrayDesc.Width = temp.Width;
+	//texArrayDesc.Height = temp.Width;
+	//texArrayDesc.MipLevels = 1;
+	//texArrayDesc.ArraySize = size; // N개의 텍스처
+	//texArrayDesc.Format = temp.Format;
+	//texArrayDesc.SampleDesc.Count = 1;
+	//texArrayDesc.Usage = D3D11_USAGE_DEFAULT;
+	//texArrayDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	//texArrayDesc.CPUAccessFlags = 0;
 
-	for (UINT i = 0; i < size; i++) {
-		DeviceState::g_pDeviceContext->CopySubresourceRegion(
-			textureArray, D3D11CalcSubresource(0, i, 1), 0, 0, 0, // Dest
-			lightmaps[i]->m_pTexture, 0, nullptr // Source
-		);
-	}
+	//ID3D11Texture2D* textureArray = nullptr;
+	//auto hr = DeviceState::g_pDevice->CreateTexture2D(&texArrayDesc, nullptr, &textureArray);
 
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-	srvDesc.Texture2DArray.MostDetailedMip = 0;
-	srvDesc.Texture2DArray.MipLevels = 1;
-	srvDesc.Texture2DArray.FirstArraySlice = 0;
-	srvDesc.Texture2DArray.ArraySize = size;
+	//for (UINT i = 0; i < size; i++) {
+	//	DeviceState::g_pDeviceContext->CopySubresourceRegion(
+	//		textureArray, D3D11CalcSubresource(0, i, 1), 0, 0, 0, // Dest
+	//		lightmaps[i]->m_pTexture, 0, nullptr // Source
+	//	);
+	//}
 
-	ID3D11ShaderResourceView* textureArraySRV = nullptr;
-	hr = DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
+	//D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	//srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	//srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+	//srvDesc.Texture2DArray.MostDetailedMip = 0;
+	//srvDesc.Texture2DArray.MipLevels = 1;
+	//srvDesc.Texture2DArray.FirstArraySlice = 0;
+	//srvDesc.Texture2DArray.ArraySize = size;
 
-	DirectX11::PSSetShaderResources(14, 1, &textureArraySRV);
+	//ID3D11ShaderResourceView* textureArraySRV = nullptr;
+	//hr = DeviceState::g_pDevice->CreateShaderResourceView(textureArray, &srvDesc, &textureArraySRV);
+
+	//DirectX11::PSSetShaderResources(14, 1, &textureArraySRV);
 }
 
 void LightMapPass::Execute(RenderScene& scene, Camera& camera)
@@ -147,6 +149,12 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 		Material* mat = meshRenderer->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 		DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
+		
+		if (meshRenderer->m_LightMapping.lightmapIndex >= 0 && m_plightmaps != nullptr && (*m_plightmaps).size() > meshRenderer->m_LightMapping.lightmapIndex) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
+		{
+			DirectX11::PSSetShaderResources(14, 1, &(*m_plightmaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
+		}
+		
 		if (mat->m_pBaseColor)
 		{
 			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);

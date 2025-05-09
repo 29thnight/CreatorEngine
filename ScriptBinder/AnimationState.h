@@ -7,7 +7,7 @@ class AniBehaviour;
 class AnimationState
 {	
 public:
-    ReflectAnimationState
+   ReflectAnimationState
 	[[Serializable]]
 	AnimationState() = default;
 	AnimationState(AnimationController* Owner, std::string Name) : m_ownerController(Owner), Name(Name) {}
@@ -24,5 +24,10 @@ public:
 	std::vector<std::shared_ptr<AniTransition>> Transitions;
 	[[Property]]
 	int index =0; 
+	[[Property]]
+	int AnimationIndex = -1;
+
+	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용
+	float m_animationTimeElapsed = 0;
 };
 

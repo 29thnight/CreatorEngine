@@ -3,8 +3,9 @@
 
 enum class BoneRegion
 {
-	None,
+	Root,
 	Spine,
+	Neck,
 	LeftArm,
 	RightArm,
 	LeftLeg,
@@ -43,9 +44,10 @@ public:
 	int m_index{};
 	int m_parentIndex{};
 	Mathf::xMatrix m_globalTransform;
+	Mathf::xMatrix m_localTransform;
 	Mathf::xMatrix m_offset;
 	std::vector<Bone*> m_children;
-	BoneRegion m_region = BoneRegion::Spine;
+	BoneRegion m_region = BoneRegion::Root;
     Bone() = default;
 	Bone(const std::string& _name, int _index, const Mathf::xMatrix& _offset) :
 		m_name(_name),

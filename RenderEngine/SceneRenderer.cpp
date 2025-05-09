@@ -138,8 +138,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//Vignette
 	m_pVignettePass = std::make_unique<VignettePass>();
 
+	//ColorGrading
 	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
 	m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
+
+	//VolumetricFog
+	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
+	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
 
 	m_pUIPass = std::make_unique<UIPass>();
 	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
@@ -428,6 +433,15 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+		//VolumetricFogPass
+		{
+			DirectX11::BeginEvent(L"VolumetricFogPass");
+			Benchmark banch;
+			m_pVolumetricFogPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("VolumetricFogPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
         //[*] PostProcessPass
         {
 			DirectX11::BeginEvent(L"PostProcessPass");
@@ -472,6 +486,7 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("ColorGradingPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
 
 		{
 			//DirectX11::BeginEvent(L"EffectPass");

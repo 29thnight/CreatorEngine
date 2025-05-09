@@ -167,6 +167,8 @@
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="MonoObjectBinding.cpp" />
+    <ClCompile Include="InputAction.cpp" />
+    <ClCompile Include="InputActionManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
@@ -202,6 +204,8 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
+    <ClInclude Include="InputAction.h" />
+    <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />

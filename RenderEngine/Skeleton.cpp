@@ -22,6 +22,10 @@ void Skeleton::MarkRegionSkeleton()
 		{
 			MarkRegion(bone, BoneRegion::Spine);
 		}
+		else if (bonename.find("neck") != std::string::npos)
+		{
+			MarkRegion(bone, BoneRegion::Neck);
+		}
 		else if (bonename.find("shoulder") != std::string::npos)
 		{
 			if (bonename.find("left") != std::string::npos)

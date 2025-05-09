@@ -4,14 +4,24 @@
 
 void Animator::Update(float tick)
 {
-	if (m_animationController == nullptr) return;
-	m_animationController->Update(tick);
+	
+	if (m_animationControllers.empty()) return;
+
+	for (auto& animationController : m_animationControllers)
+	{
+		animationController->Update(tick);
+	}
+
+	for (auto& param : Parameters)
+	{
+		if (param.vType == ValueType::Trigger)
+		{
+			param.ResetTrigger();
+		}
+	}
 }
 
-std::string Animator::GetcurAnimation()
-{
-	return m_Skeleton->m_animations[m_AnimIndexChosen].m_name;
-}
+
 
 void Animator::SetAnimation(int index)
 {
@@ -33,11 +43,25 @@ void Animator::UpdateAnimation()
 	
 }
 
-void Animator::CreateController()
+void Animator::CreateController(std::string name)
 {
-	//m_animationController = std::make_shared<AnimationController>();
-	m_animationController = new AnimationController();
-	m_animationController->m_owner = this;
-	m_animationController->CreateMask();
 	
+	
+	AnimationController* animationController = new AnimationController();
+	animationController->m_owner = this;
+	animationController->name = name;
+	animationController->CreateMask();
+	m_animationControllers.push_back(animationController);
 }
+
+AnimationController* Animator::GetController(std::string name)
+{
+	for (auto& Controller : m_animationControllers)
+	{
+		if (Controller->name == name)
+			return Controller;
+	}
+}
+
+
+

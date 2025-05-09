@@ -15,15 +15,10 @@ public:
 	AniTransition(std::string curStatename, std::string nextStatename);
 	~AniTransition();
 
-	void AddCondition(std::string ownerValueName,float Comparevalue, ConditionType cType,ValueType vType)
+	template<typename T>
+	void AddCondition(std::string ownerValueName,T Comparevalue, ConditionType cType,ValueType vType)
 	{
-		for (const auto& cond : conditions)
-		{
-			if (cond.CompareParameter.fValue == Comparevalue && cond.valueName == ownerValueName && cond.cType == cType)
-			{
-				return; // 이미 있으면 아무것도 안 하고 return 나중에 지우기 ******
-			}
-		}
+
 		TransCondition newTrans(Comparevalue,cType,vType);
 		newTrans.valueName = ownerValueName;
 		newTrans.m_ownerController = m_ownerController;

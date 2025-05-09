@@ -11,8 +11,8 @@ public:
 	[[Serializable]]
 	TransCondition() = default;
 
-
-	TransCondition(float Comparevalue, ConditionType cType, ValueType vType) : cType(cType) , CompareParameter(Comparevalue, vType)
+	template<typename T>
+	TransCondition(T Comparevalue, ConditionType cType, ValueType vType) : cType(cType) , CompareParameter(Comparevalue, vType)
 	{
 	
 
