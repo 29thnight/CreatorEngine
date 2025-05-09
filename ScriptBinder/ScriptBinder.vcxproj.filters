@@ -157,8 +157,6 @@
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="AniTransition.cpp">
-      <Filter>Classes\Components\RenderableComponent\AniMation</Filter>
-    </ClCompile>
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
     <ClCompile Include="TransCondition.cpp">
