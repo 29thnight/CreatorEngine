@@ -91,6 +91,9 @@
     <Filter Include="Managers\MonoManager\MonoBindingFunction">
       <UniqueIdentifier>{f67e27a4-7f8c-4409-b724-e48ff17528db}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\Terrain">
+      <UniqueIdentifier>{cdb0c853-085c-4431-9734-95df997eda57}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -346,6 +349,9 @@
     </ClInclude>
     <ClInclude Include="TerrainCollider.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="Terrain.h">
+      <Filter>Classes\Components\Terrain</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

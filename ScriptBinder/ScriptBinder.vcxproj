@@ -230,6 +230,7 @@
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="Terrain.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="TransCondition.h" />

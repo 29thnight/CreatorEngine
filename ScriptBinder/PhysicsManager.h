@@ -86,6 +86,10 @@ private:
 	//씬로드 완료 여부
 	bool m_bIsLoaded{ false };
 
+	//================
+	//terrain
+	void AddTerrainCollider(GameObject* object);
+
 	//
 	void AddCollider(GameObject* object);
 	void RemoveCollider(GameObject* object);

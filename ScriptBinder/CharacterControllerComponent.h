@@ -195,9 +195,9 @@ private:
 	bool m_bOnMove{ false }; //이동중인지 체크
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
 
-	float m_fBaseSpeed{ 0.0f }; //기본 속도
-	float m_fBaseAcceleration{ 0.0f }; //기본 가속도
-	float m_fFinalMultiplierSpeed{ 0.0f }; //최종 속도
+	float m_fBaseSpeed{ 0.025f }; //기본 속도
+	float m_fBaseAcceleration{ 1.0f }; //기본 가속도
+	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
 
 
 	//이동 제한

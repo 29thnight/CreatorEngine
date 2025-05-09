@@ -53,6 +53,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
 
 	m_bOnMove = input != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
+
 	input.Normalize();
 
 	CharactorControllerInputInfo inputInfo;

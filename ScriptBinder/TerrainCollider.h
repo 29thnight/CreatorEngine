@@ -18,9 +18,13 @@ public:
 	}
 
 
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override;
+	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override {
+		m_posOffset = pos;
+	}
 
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override;
+	DirectX::SimpleMath::Vector3 GetPositionOffset() override {
+		return m_posOffset;
+	}
 
 
 private:
@@ -31,9 +35,13 @@ private:
 
 	// ICollider을(를) 통해 상속됨
 	//terrain collider는 rotation이 필요없음 
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
+	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override {
+		m_rotOffset = rotation;
+	}
 
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override;
+	DirectX::SimpleMath::Quaternion GetRotationOffset() override {
+		return m_rotOffset;
+	}
 
 
 	//terrain collider는 trigger가 필요없음 차후 충돌지점에 이팩트 추가시 필요할지도

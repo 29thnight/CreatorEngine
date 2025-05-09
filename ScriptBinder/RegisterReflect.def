@@ -27,6 +27,7 @@
 #include "Object.h"
 #include "RigidBodyComponent.h"
 #include "Scene.h"
+#include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
 #include "UIButton.h"
@@ -58,6 +59,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SpriteRenderer);
+    AUTO_REGISTER_CLASS(Terrain);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);

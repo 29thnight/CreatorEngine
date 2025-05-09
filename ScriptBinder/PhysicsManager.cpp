@@ -5,6 +5,7 @@
 #include "Transform.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
 
 class Scene;
@@ -267,6 +268,30 @@ void PhysicsManager::DrawDebugInfo()
 	
 }
 
+void PhysicsManager::AddTerrainCollider(GameObject* object)
+{
+	if (!object->HasComponent<TerrainCollider>()) {
+		return;
+	}
+
+	TerrainCollider* collider = object->GetComponent<TerrainCollider>();
+	Transform& transform = object->m_transform;
+	// auto terrain = object->GetComponent<Terrain>();
+
+	HeightFieldColliderInfo heightFieldInfo;
+
+	ColliderID colliderID = ++m_lastColliderID;
+
+	collider->SetColliderID(colliderID);
+	heightFieldInfo.colliderInfo.id = colliderID;
+	heightFieldInfo.colliderInfo.layerNumber = static_cast<unsigned int>(object->GetType());
+	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
+	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
+
+	
+
+}
+
 void PhysicsManager::AddCollider(GameObject* object)
 {
 	if (!object->HasComponent<RigidBodyComponent>()) {
@@ -398,6 +423,17 @@ void PhysicsManager::SetPhysicData()
 
 			Physics->SetCCTData(id, data);
 
+			CharacterMovementGetSetData movementData;
+
+			auto movementInfo = controller->GetMovementInfo();
+			movementData.acceleration = movementInfo.acceleration;
+			movementData.maxSpeed = movementInfo.maxSpeed;
+			movementData.velocity = rigidbody->GetLinearVelocity();
+			movementData.isFall = controller->IsFalling();
+			movementData.restrictDirection = controller->GetMoveRestrict();
+
+			Physics->SetMovementData(id, movementData);
+
 		}
 		else
 		{
@@ -447,7 +483,7 @@ void PhysicsManager::GetPhysicData()
 		}
 
 		auto rigidbody = ColliderInfo.gameObject->GetComponent<RigidBodyComponent>();
-		auto transform = ColliderInfo.gameObject->m_transform;
+		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
 		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) {
