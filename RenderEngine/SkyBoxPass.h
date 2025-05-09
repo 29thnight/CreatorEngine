@@ -13,7 +13,8 @@ public:
 	void SetRenderTarget(Texture* renderTarget);
 	void SetBackBuffer(ID3D11RenderTargetView* backBuffer);
     void GenerateCubeMap(RenderScene& scene);
-    Texture* GenerateEnvironmentMap(RenderScene& scene);
+	void GenerateCubeMap(const std::string_view& fileName, RenderScene& scene);
+	Texture* GenerateEnvironmentMap(RenderScene& scene);
     Texture* GeneratePrefilteredMap(RenderScene& scene);
     Texture* GenerateBRDFLUT(RenderScene& scene);
 

@@ -32,6 +32,24 @@ enum class SelectGuizmoMode
 	Scale
 };
 
+bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const Mathf::Vector3& planePoint, float& outDistance)
+{
+	float denom{};
+    denom = planeNormal.Dot(ray.direction);
+	// 노멀과 평행하면 교차 없음
+	if (fabs(denom) < 1e-6f)
+		return false;
+
+	Mathf::Vector3 diff = planePoint - ray.origin;
+	float t = diff.Dot(planeNormal) / denom;
+
+	if (t < 0)
+		return false;
+
+	outDistance = t;
+	return true;
+}
+
 SceneViewWindow::SceneViewWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
 {
 }
@@ -353,6 +371,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
 
+
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 	{
 		float closest = FLT_MAX;
@@ -364,13 +383,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		auto sceneObjects = SceneManagers->GetActiveScene()->m_SceneObjects;
 		auto hits = PickObjectsFromRay(ray, sceneObjects);
-
-		auto test = PickObjectFromRay(ray, sceneObjects);
-
-		if (test)
-		{
-			std::cout << "Hit Object: " << test->m_name.ToString() << std::endl;
-		}
 
 		if (!hits.empty())
 		{
@@ -407,6 +419,56 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			m_hitResults.clear();
 			m_currentHitIndex = 0;
 		}
+	}
+
+	ImRect dropRect = ImRect(imageMin, imageMax);
+	static file::path previewModelPath;
+	static GameObject* dragPreviewObject = nullptr;
+	static ImGuiPayload* dragPayload = nullptr;
+	Scene* scene = SceneManagers->GetActiveScene();
+
+	if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
+	{
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery);
+		if (!dragPayload || dragPayload != payload)
+		{
+			dragPayload = const_cast<ImGuiPayload*>(payload);
+			if (previewModelPath.empty() && !dragPreviewObject)
+			{
+				const char* droppedFilePath = static_cast<const char*>(payload->Data);
+				file::path filename = file::path(droppedFilePath).filename();
+				previewModelPath = PathFinder::Relative("Models\\") / filename;
+
+				dragPreviewObject = Model::LoadModelToSceneObj(
+					DataSystems->LoadCashedModel(previewModelPath.string().c_str()),
+					*scene);
+			}
+		}
+		else
+		{
+			ImVec2 mousePos = ImGui::GetMousePos();
+			Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
+
+			float distance;
+			if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
+			{
+				Mathf::Vector3 worldPos = ray.origin + Mathf::Vector3(ray.direction) * distance;
+
+				if (payload->IsPreview() && dragPreviewObject)
+				{
+					dragPreviewObject->m_transform.SetPosition(worldPos);
+				}
+			}
+
+			if (!dragPayload->IsPreview() && dragPreviewObject)
+			{
+				dragPreviewObject = nullptr;
+				dragPayload = nullptr;
+				previewModelPath.clear();
+			}
+		}
+
+		ImGui::EndDragDropTarget();
 	}
 
 	if (useWindow)

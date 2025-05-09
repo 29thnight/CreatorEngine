@@ -29,6 +29,7 @@ private:
     void ShowGridSettings();
 
 private:
+	SceneRenderer* m_pRenderer{ nullptr };
 	std::unique_ptr<GizmoPass>      m_pGizmoPass{};
 	std::unique_ptr<WireFramePass>  m_pWireFramePass{};
 	std::unique_ptr<GridPass>       m_pGridPass{};

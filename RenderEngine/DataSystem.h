@@ -24,6 +24,7 @@ public:
 		CppScript,
 		CSharpScript,
 		Sound,
+		HDR,
 	};
 	//일단 이대로 진행
 	enum class AssetType
@@ -40,7 +41,8 @@ public:
 		{ FileType::Shader, "Shader" },
 		{ FileType::CppScript, "CppScript" },
 		{ FileType::CSharpScript, "CSharpScript" },
-		{ FileType::Sound, "Sound" }
+		{ FileType::Sound, "Sound" },
+		{ FileType::HDR, "HDR" }
 	};
 
 private:

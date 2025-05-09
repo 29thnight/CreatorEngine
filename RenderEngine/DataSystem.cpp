@@ -511,9 +511,14 @@ void DataSystem::ShowCurrentDirectoryFiles()
 					fileType = FileType::Model;
 					iconTexture = (ImTextureID)ModelIcon->m_pSRV;
 				}
-				else if (extension == ".png" || extension == ".dds" || extension == ".hdr")
+				else if (extension == ".png" || extension == ".dds")
 				{
 					fileType = FileType::Texture;
+					iconTexture = (ImTextureID)TextureIcon->m_pSRV;
+				}
+				else if (extension == ".hdr")
+				{
+					fileType = FileType::HDR;
 					iconTexture = (ImTextureID)TextureIcon->m_pSRV;
 				}
 				else if (extension == ".hlsl")
@@ -573,6 +578,7 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		color = IM_COL32(255, 165, 0, 255);
 		break;
 	case FileType::Texture:
+	case FileType::HDR:
 		color = IM_COL32(0, 255, 0, 255);
 		break;
 	case FileType::Shader:

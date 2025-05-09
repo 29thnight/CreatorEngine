@@ -70,7 +70,7 @@ private:
 	ComputeShader* m_pAutoExposureHistogramCS{};
 	ComputeShader* m_pAutoExposureEvalCS{};
 
-	ToneMapType m_toneMapType{ ToneMapType::ACES };
+	ToneMapType m_toneMapType{ ToneMapType::Reinhard };
 
 	ID3D11Buffer* m_pHistogramBuffer{};
 	ID3D11Buffer* m_pLuminanceAverageBuffer{};

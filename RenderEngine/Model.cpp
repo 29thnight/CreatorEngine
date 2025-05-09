@@ -157,7 +157,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
-	Benchmark banch;
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{
@@ -178,8 +177,6 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 	ModelLoader loader = ModelLoader(model, &Scene);
 	file::path path_ = model->path;
 
-	Benchmark banch;
-	
 	auto rootObj =loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{

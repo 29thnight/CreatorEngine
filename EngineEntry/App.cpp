@@ -203,7 +203,9 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
                if (!dumpGitHash.empty())
                {
                    Debug->LogDebug("Git Hash in dump: " + dumpGitHash.string());
-                   DataSystems->OpenFile(filePath);
+				   std::string command = "https://github.com/29thnight/LastProject/commit/" + dumpGitHash.string();
+				   ShellExecuteA(nullptr, "open", command.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+				   DataSystems->OpenFile(filePath);
                }
                else
                {

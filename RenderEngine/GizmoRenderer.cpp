@@ -4,6 +4,7 @@
 #include "RenderState.h"
 
 GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
+	m_pRenderer(pRenderer),
 	m_renderScene(pRenderer->m_renderScene),
 	m_pEditorCamera(pRenderer->m_pEditorCamera.get())
 {
@@ -19,7 +20,7 @@ GizmoRenderer::~GizmoRenderer()
 
 void GizmoRenderer::EditorView()
 {
-    if (m_bShowGridSettings)
+    if (m_pRenderer->m_bShowGridSettings)
     {
         ShowGridSettings();
     }
