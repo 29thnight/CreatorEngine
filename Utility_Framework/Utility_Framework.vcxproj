@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -27,7 +27,6 @@
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
-    <ClInclude Include="Core.OctreeManager.h" />
     <ClInclude Include="Core.OctreeNode.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
@@ -74,6 +73,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Core.Coroutine.cpp" />
+    <ClCompile Include="Core.OctreeNode.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />

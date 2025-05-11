@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
+#include "GameObject.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
 #include "../RenderEngine/Mesh.h"
@@ -24,6 +25,8 @@ public:
     {
         m_IsEnabled = able;
     }
+
+    BoundingBox GetBoundingBox() const;
 
 public:
     [[Property]]

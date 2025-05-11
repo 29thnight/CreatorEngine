@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -150,6 +150,7 @@
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
+    <ClCompile Include="CullingManager.cpp" />
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectModules.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
@@ -203,6 +204,7 @@
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="ColorGradingPass.h" />
+    <ClInclude Include="CullingManager.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectModules.h" />
     <ClInclude Include="GizmoCbuffer.h" />
