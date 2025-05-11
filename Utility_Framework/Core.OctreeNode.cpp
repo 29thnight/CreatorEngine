@@ -56,10 +56,10 @@ void OctreeNode::Insert(MeshRenderer* object, int maxDepth, int maxObjectsPerNod
             Subdivide(maxDepth, maxObjectsPerNode);
 
             // 재분배
-            for (MeshRenderer* m : objects)
+            for (MeshRenderer* renderer : objects)
             {
                 for (OctreeNode* child : children)
-                    if (child) child->Insert(m, maxDepth, maxObjectsPerNode);
+                    if (child) child->Insert(renderer, maxDepth, maxObjectsPerNode);
             }
 
             objects.clear();
