@@ -59,7 +59,7 @@ ShadowMapPass::ShadowMapPass()
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
 {
 	Texture* shadowMapTexture = Texture::CreateArray(width, height, "Shadow Map",
-		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, 3);
+		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, cascadeCount);
 
 
 	for (int i = 0; i < cascadeCount; i++)
@@ -96,7 +96,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.05, 0.3 });
+
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	camera.CalculateProjection();
@@ -106,7 +107,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 	ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
 	auto projMatrix = camera.CalculateProjection();
 	Mathf::Vector4 transformedCascade;
-
 
 	shadowMapConstant.m_casCadeEnd1 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[1], 1.f }, camera.CalculateProjection()).z;
 	shadowMapConstant.m_casCadeEnd2 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[2], 1.f }, camera.CalculateProjection()).z;
@@ -134,7 +134,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		scene.UseModel();
 		for (auto& obj : scene.GetScene()->m_SceneObjects)
 		{
-
 			if (obj->ToString() == "Cube" || obj->ToString() == "Plane")
 				continue;
 			MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
@@ -259,7 +258,6 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
 		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.f, cascadeExtents.z);
-
 
 		shadowinfo[i].m_eyePosition = shadowPos;
 		shadowinfo[i].m_lookAt = centerPos;

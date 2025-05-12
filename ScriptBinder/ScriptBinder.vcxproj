@@ -204,6 +204,7 @@
     <ClInclude Include="CSharpScriptComponent.h" />
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAwakable.h" />
+    <ClInclude Include="ICullingObject.h" />
     <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />

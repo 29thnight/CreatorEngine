@@ -161,7 +161,6 @@ private:
 	std::vector<std::vector<float>> m_layerHeightMap;
 
 	//지형의 높이맵을 담고 있는 텍스쳐 -> 예는 어떻게 할까?
-
 	float m_textureWidth;
 	float m_textureHeight;
 };

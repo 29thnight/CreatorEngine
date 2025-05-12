@@ -103,6 +103,9 @@
     <Filter Include="Managers\InputActionManager">
       <UniqueIdentifier>{c83882e2-80b3-4d8d-95cd-8da2418fea94}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\GameObject\Prefab">
+      <UniqueIdentifier>{6e9ab838-161a-44e1-9869-a39e015ffcc4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -388,6 +391,9 @@
     </ClInclude>
     <ClInclude Include="InputAction.h">
       <Filter>Managers\InputActionManager</Filter>
+    </ClInclude>
+    <ClInclude Include="ICullingObject.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
