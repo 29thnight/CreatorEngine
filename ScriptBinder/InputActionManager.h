@@ -1,9 +1,19 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "ActionMap.h"
 class InputActionManager : public Singleton<InputActionManager>
 {
-	
-public:
 	friend class Singleton;
+public:
+	InputActionManager() = default;
+	~InputActionManager() = default;
+	void Update(float tick);
+	ActionMap* AddActionMap(std::string name);
+
+	ActionMap* FindActionMap(std::string name);
+	
+private:
+	std::vector<ActionMap*> m_actionMaps;
 };
 
+static auto& InputActionManagers = InputActionManager::GetInstance();

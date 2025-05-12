@@ -14,6 +14,7 @@
 #include "EngineSetting.h"
 
 #include "UIManager.h"
+#include "InputActionManager.h"
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -53,6 +54,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
+        InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
         if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
         {

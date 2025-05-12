@@ -15,8 +15,8 @@ enum class InputType
 enum class KeyState
 {
 	Idle,  //기본
-	Pressed, //한번 누른거
-	Hold,   //누르는중
+	Down, //한번 누른거
+	Pressed,   //누르는중
 	Released, //눌렀다가 뗏을때
 };
 

@@ -5,12 +5,15 @@
 #include "AnimationController.h"
 #include "AniBehaviour.h"
 #include "Animator.h"
-class TestPlayer : Component 
+class TestPlayer
 {
 
 public:
 	void GetPlayer(GameObject* _player);
 	void Update(float deltaTime);
+
+
+	void Jump();
 	GameObject* player;
 	float speed = 0.1f;
 	float maxSpeed = 15.0f;

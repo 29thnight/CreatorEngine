@@ -165,7 +165,7 @@ void Camera::HandleMovement(float deltaTime)
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
-	if (InputManagement->IsMouseButtonDown(MouseKey::RIGHT))
+	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT))
 	{
 		// 마우스 이동량 가져오기
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;

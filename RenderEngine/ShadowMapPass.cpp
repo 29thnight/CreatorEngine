@@ -135,12 +135,13 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		for (auto& obj : scene.GetScene()->m_SceneObjects)
 		{
 
-			if (obj->ToString() == "Cube" || obj->ToString() == "Plane")
+			if (obj->ToString() == "Cube" || obj->ToString() == "Plane") //*****
 				continue;
 			MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
 			if (nullptr == meshRenderer) continue;
 			if (!meshRenderer->IsEnabled()) continue;
 
+			//if(m_shadowCamera.GetFrustum().Intersects()))  //*****
 			scene.UpdateModel(obj->m_transform.GetWorldMatrix());
 
 			meshRenderer->m_Mesh->Draw();
@@ -263,7 +264,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 
 		shadowinfo[i].m_eyePosition = shadowPos;
 		shadowinfo[i].m_lookAt = centerPos;
-		shadowinfo[i].m_nearPlane = 0;
+		shadowinfo[i].m_nearPlane = 0; //*****
 		shadowinfo[i].m_farPlane = cascadeExtents.z;
 		shadowinfo[i].m_viewWidth = maxExtents.x;
 		shadowinfo[i].m_viewHeight = maxExtents.y;

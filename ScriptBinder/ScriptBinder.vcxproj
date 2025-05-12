@@ -169,7 +169,7 @@
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="MonoObjectBinding.cpp" />
-    <ClCompile Include="InputAction.cpp" />
+    <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
@@ -208,7 +208,7 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
-    <ClInclude Include="InputAction.h" />
+    <ClInclude Include="ActionMap.h" />
     <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
