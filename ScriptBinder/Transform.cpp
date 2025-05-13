@@ -35,7 +35,7 @@ Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 {
 	m_dirty = true;
-	rotation = DirectX::XMQuaternionMultiply(rotation, quaternion);
+	rotation = DirectX::XMQuaternionMultiply(quaternion, rotation);
 
 	return *this;
 }
