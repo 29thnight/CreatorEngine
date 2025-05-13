@@ -17,6 +17,7 @@
 #include "InputManager.h"
 #include "LightComponent.h"
 #include "CameraComponent.h"
+#include "CullingManager.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
@@ -163,7 +164,14 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
+	m_threadPool = new ThreadPool(4);
+
     m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+}
+
+SceneRenderer::~SceneRenderer()
+{
+	delete m_threadPool;
 }
 
 void SceneRenderer::InitializeDeviceState()
@@ -347,7 +355,7 @@ void SceneRenderer::SceneRendering()
 	{
 		if (nullptr == camera) continue;
 		std::wstring name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
-		DirectX11::BeginEvent(name.c_str());
+		DirectX11::BeginEvent(name);
 		//[1] ShadowMapPass
 		{
 			DirectX11::BeginEvent(L"ShadowMapPass");
@@ -525,33 +533,42 @@ void SceneRenderer::SceneRendering()
 		}
 
 		DirectX11::EndEvent();
-	}
 
-	m_pGBufferPass->ClearDeferredQueue();
-	m_pForwardPass->ClearForwardQueue();
+		camera->ClearRenderQueue();
+	}
 }
 
 void SceneRenderer::PrepareRender()
 {
+	Benchmark banch;
 	auto m_currentScene = SceneManagers->GetActiveScene();
+	std::vector<MeshRenderer*> meshes;
 	for (auto& obj : m_currentScene->m_SceneObjects)
 	{
-		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
-		if (nullptr == meshRenderer) continue;
-		if (false == meshRenderer->IsEnabled()) continue;
-
-		Material* mat = meshRenderer->m_Material;
-
-		if (nullptr == mat) continue;
-
-		switch (mat->m_renderingMode)
+		if (MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>(); nullptr != meshRenderer)
 		{
-		case MaterialRenderingMode::Opaque:
-			m_pGBufferPass->PushDeferredQueue(obj.get());
-			break;
-		case MaterialRenderingMode::Transparent:
-			m_pForwardPass->PushForwardQueue(obj.get());
-			break;
+			if (false == meshRenderer->IsEnabled()) continue;
+			if (!meshRenderer->IsNeedUpdateCulling()) continue;
+
+			meshes.push_back(meshRenderer);
+		}
+	}
+
+	for (auto& mesh : meshes)
+	{
+		CullingManagers->UpdateMesh(mesh);
+	}
+
+	for (auto& camera : CameraManagement->m_cameras)
+	{
+		if (nullptr == camera) continue;
+
+		std::vector<MeshRenderer*> culledMeshes;
+		CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+
+		for (auto& culledMesh : culledMeshes)
+		{
+			camera->PushRenderQueue(culledMesh);
 		}
 	}
 }

@@ -4,6 +4,7 @@
 
 class Scene;
 class Object;
+class MeshRenderer;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -42,6 +43,8 @@ public:
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
+
+    std::vector<MeshRenderer*> GetAllMeshRenderers() const;
 
 public:
 	//for Editor

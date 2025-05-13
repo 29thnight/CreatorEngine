@@ -205,7 +205,6 @@
     <ClInclude Include="CSharpScriptComponent.h" />
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAwakable.h" />
-    <ClInclude Include="ICullingObject.h" />
     <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
@@ -229,6 +228,7 @@
     <ClInclude Include="MonoObjectBinding.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PhysicsManager.h" />
+    <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RaycastComponent.h" />
     <ClInclude Include="RegisterReflect.def" />

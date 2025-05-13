@@ -35,7 +35,7 @@ Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 {
 	m_dirty = true;
-	DirectX::XMQuaternionMultiply(rotation, quaternion);
+	rotation = DirectX::XMQuaternionMultiply(rotation, quaternion);
 
 	return *this;
 }
@@ -101,4 +101,9 @@ Mathf::xVector Transform::GetWorldScale() const
 Mathf::xVector Transform::GetWorldQuaternion() const
 {
 	return m_worldQuaternion;
+}
+
+bool Transform::IsDirty() const
+{
+	return m_dirty;
 }

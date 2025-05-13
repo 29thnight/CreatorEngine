@@ -13,7 +13,13 @@ inline OctreeNode::OctreeNode(const DirectX::BoundingBox& box, int depth) :
 OctreeNode::~OctreeNode()
 {
     for (OctreeNode* child : children)
-        delete child;
+    {
+		if (child)
+		{
+			child->~OctreeNode();
+			free(child);
+		}
+    }
 }
 
 void OctreeNode::Subdivide(int maxDepth, int maxObjectsPerNode)
@@ -38,7 +44,10 @@ void OctreeNode::Subdivide(int maxDepth, int maxObjectsPerNode)
         childBox.Center = XMFLOAT3(c.x + dx, c.y + dy, c.z + dz);
         childBox.Extents = childExtents;
 
-        children[i] = new OctreeNode(childBox, depth + 1);
+		void* voidPtr = malloc(sizeof(OctreeNode));
+		OctreeNode* child = new (voidPtr) OctreeNode(childBox, depth + 1);
+
+		children[i] = child;
     }
 }
 
@@ -50,19 +59,36 @@ void OctreeNode::Insert(MeshRenderer* object, int maxDepth, int maxObjectsPerNod
     if (isLeaf)
     {
         objects.push_back(object);
+		object->CullGroupInsert(this);
 
         if (objects.size() > maxObjectsPerNode && depth < maxDepth)
         {
             Subdivide(maxDepth, maxObjectsPerNode);
 
-            // 재분배
-            for (MeshRenderer* renderer : objects)
+            std::vector<MeshRenderer*> previousObjects = std::move(objects);
+            objects.clear();
+
+            for (MeshRenderer* renderer : previousObjects)
             {
+                renderer->CullGroupClear();
+                bool inserted = false;
+
                 for (OctreeNode* child : children)
-                    if (child) child->Insert(renderer, maxDepth, maxObjectsPerNode);
+                {
+                    if (child && child->boundingBox.Intersects(renderer->GetBoundingBox()))
+                    {
+                        child->Insert(renderer, maxDepth, maxObjectsPerNode);
+                        inserted = true;
+                    }
+                }
+
+                if (!inserted)
+                {
+                    objects.push_back(renderer);
+                    renderer->CullGroupInsert(this);
+                }
             }
 
-            objects.clear();
         }
     }
     else
@@ -80,6 +106,8 @@ bool OctreeNode::Contains(const DirectX::BoundingBox& box) const
 
 bool OctreeNode::Remove(MeshRenderer* object)
 {
+    bool removed = false;
+
     if (!boundingBox.Intersects(object->GetBoundingBox()))
         return false;
 
@@ -89,16 +117,29 @@ bool OctreeNode::Remove(MeshRenderer* object)
         if (it != objects.end())
         {
             objects.erase(it);
-            return true;
+            removed = true;
         }
-        return false;
     }
 
     for (OctreeNode* child : children)
     {
-        if (child && child->Remove(object))
-            return true;
+        if (child)
+            removed |= child->Remove(object);
     }
 
-    return false;
+    return removed;
+}
+
+int OctreeNode::GetMaxDepth() const
+{
+	if (isLeaf)
+		return depth;
+
+	int maxChildDepth = depth;
+	for (const OctreeNode* child : children)
+	{
+		if (child)
+			maxChildDepth = std::max(maxChildDepth, child->GetMaxDepth());
+	}
+	return maxChildDepth;
 }

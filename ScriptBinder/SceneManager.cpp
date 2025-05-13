@@ -185,6 +185,19 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     }
 }
 
+std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
+{
+	std::vector<MeshRenderer*> meshRenderers;
+	for (const auto& renderer : m_activeScene->m_SceneObjects)
+	{
+		if (auto ptr = renderer->GetComponent<MeshRenderer>(); nullptr != ptr)
+		{
+			meshRenderers.push_back(ptr);
+		}
+	}
+	return meshRenderers;
+}
+
 void SceneManager::CreateEditorOnlyPlayScene()
 {
     MetaYml::Node sceneNode{};

@@ -201,6 +201,9 @@
     <ClCompile Include="InputAction.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
+    <ClCompile Include="MeshRenderer.cpp">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -392,8 +395,8 @@
     <ClInclude Include="InputAction.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
-    <ClInclude Include="ICullingObject.h">
-      <Filter>Interfaces</Filter>
+    <ClInclude Include="PrefabUtility.h">
+      <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

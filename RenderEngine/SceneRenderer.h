@@ -55,6 +55,7 @@ private:
 	friend class GizmoRenderer;
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
+	~SceneRenderer();
 
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
@@ -128,6 +129,7 @@ private:
 	lm::LightMap lightMap;
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
+	ThreadPool* m_threadPool = nullptr;
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

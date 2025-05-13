@@ -12,6 +12,7 @@
 #include "ShaderSystem.h"
 #include "SceneManager.h"
 #include "EngineSetting.h"
+#include "CullingManager.h"
 
 #include "UIManager.h"
 
@@ -19,6 +20,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 {
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
 	m_deviceResources->RegisterDeviceNotify(this);
+
+    XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
+    XMFLOAT3 extents = { 2000.0f, 2000.0f, 2000.0f };
+    BoundingBox fixedBounds(center, extents);
+	CullingManagers->Initialize(fixedBounds, 3, 30);
+
     g_progressWindow->SetProgress(50);
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);

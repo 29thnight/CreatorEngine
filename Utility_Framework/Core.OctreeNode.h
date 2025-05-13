@@ -3,8 +3,7 @@
 #include <array>
 #include <vector>
 
-class MeshRenderer; // 렌더 가능한 객체 포워드 선언
-
+class MeshRenderer;
 class OctreeNode
 {
 public:
@@ -24,4 +23,6 @@ public:
 
     bool Contains(const DirectX::BoundingBox& box) const;
     bool Remove(MeshRenderer* object);
+
+	int GetMaxDepth() const;
 };
