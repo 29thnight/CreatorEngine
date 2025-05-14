@@ -43,9 +43,7 @@ void TestBehavior::Update(float tick)
 {
 	std::cout << "TestBehavior::Update" << std::endl;
 
-	Mathf::Quaternion rotation = Mathf::Quaternion::CreateFromAxisAngle({1,0,0}, tick / 3.14);
-
-	GetOwner()->m_transform.SetRotation(rotation);
+	GetOwner()->m_transform.AddPosition(Mathf::Vector3(0.0f, 0.0f, 1.0f) * tick);
 
 
 }

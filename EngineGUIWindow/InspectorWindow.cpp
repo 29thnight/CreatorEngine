@@ -13,6 +13,7 @@
 #include "ModuleBehavior.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
+#include "CustomCollapsingHeader.h"
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -74,7 +75,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				i *= Mathf::Rad2Deg;
 			}
 
-			if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+			bool menuClicked = false;
+			if (ImGui::DrawCollapsingHeaderWithButton("Transform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
 			{
 				ImGui::Text("Position ");
 				ImGui::SameLine();
@@ -187,8 +189,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 			}
 
+
 			for (auto& component : selectedSceneObject->m_components)
 			{
+				if(nullptr == component)
+					continue;
+
 				const auto& type = Meta::Find(component->ToString());
 				ModuleBehavior* moduleBehavior{ dynamic_cast<ModuleBehavior*>(component.get()) };
 				std::string componentBaseName = component->ToString();
@@ -199,7 +205,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					componentBaseName += " (Script)";
 				}
 
-				if (ImGui::CollapsingHeader(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen));
+				if (ImGui::CollapsingHeader(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					if(component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>())
 					{
@@ -255,9 +261,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					}
 				}
 
-				if (ImGui::MenuItem("new Script"))
+				if (ImGui::MenuItem("Scripts"))
 				{
 					m_openScriptPopup = true;
+				}
+
+				if (ImGui::MenuItem("new Script"))
+				{
+					m_openNewScriptPopup = true;
 				}
 
 				ImGui::EndPopup();
@@ -266,12 +277,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			// 다음 프레임에서 열기
 			if (m_openScriptPopup)
 			{
-				ImGui::OpenPopup("AddScript");
+				ImGui::OpenPopup("Scripts");
 				m_openScriptPopup = false;
 			}
 
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
-			if (ImGui::BeginPopup("AddScript"))
+			if (ImGui::BeginPopup("Scripts"))
 			{
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -289,6 +300,66 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						selectedSceneObject->AddScriptComponent(type_name);
 					}
 				}
+				ImGui::EndPopup();
+			}
+
+			// 다음 프레임에서 열기
+			if (m_openNewScriptPopup)
+			{
+				ImGui::OpenPopup("NewScript");
+				m_openNewScriptPopup = false;
+			}
+
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
+			if (ImGui::BeginPopup("NewScript"))
+			{
+				float availableWidth = ImGui::GetContentRegionAvail().x;
+				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+				static char scriptName[64] = "NewBehaviourScript";
+				ImGui::InputText("Name", scriptName, sizeof(scriptName));
+				std::string scriptNameStr(scriptName);
+				auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
+				bool isDisabled = false;
+				if (file::exists(scriptBodyFilePath))
+				{
+					ImGui::Text("Script already exists.");
+					isDisabled = true;
+				}
+				else if (scriptNameStr.empty())
+				{
+					ImGui::Text("Script name cannot be empty.");
+					isDisabled = true;
+				}
+				else if (scriptNameStr.find_first_of("0123456789") == 0)
+				{
+					ImGui::Text("Script name cannot start with a number.");
+					isDisabled = true;
+				}
+				else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
+				{
+					ImGui::Text("Script name contains invalid characters.");
+					isDisabled = true;
+				}
+
+				ImGui::BeginDisabled(isDisabled);
+				if (ImGui::Button("Create and Add"))
+				{
+
+					if (!scriptNameStr.empty())
+					{
+						ScriptManager->CreateScriptFile(scriptNameStr);
+						ScriptManager->SetCompileEventInvoked(true);
+						ScriptManager->ReloadDynamicLibrary();
+						selectedSceneObject->AddScriptComponent(scriptNameStr);
+						scriptNameStr.clear();
+					}
+					else
+					{
+						Debug->LogError("Script name cannot be empty.");
+					}
+				}
+				ImGui::EndDisabled();
+
 				ImGui::EndPopup();
 			}
 		}

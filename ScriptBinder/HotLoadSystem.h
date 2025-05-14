@@ -4,10 +4,13 @@
 
 class ModuleBehavior;
 class GameObject;
+
+#pragma region DLLFunctionPtr
 typedef void (*InitModuleFunc)();
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
 typedef void (*SetSceneManagerFunc)(void*);
+#pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
 {
@@ -28,6 +31,8 @@ public:
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
+
+#pragma region Script Build Helper
 	void UpdateSceneManager(void* sceneManager)
 	{
 		m_setSceneManagerFunc(sceneManager);
@@ -70,6 +75,7 @@ public:
 	{
 		m_isReloading = value;
 	}
+#pragma endregion
 
 private:
 	void Compile();
@@ -152,7 +158,6 @@ private:
 		"{\n"
 		"}\n"
 		"\n"
-		"void "
 	};
 
 	std::string scriptFactoryIncludeString

@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
+#include "TagManager.h"
 
 GameObject::GameObject() :
 	Object("GameObject"),
@@ -11,6 +12,7 @@ GameObject::GameObject() :
 	m_parentIndex(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetParentID(0);
 }
 
 GameObject::GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -20,6 +22,7 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
     m_parentIndex(parentIndex)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetParentID(parentIndex);
 }
 
 GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -29,6 +32,24 @@ GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObje
 	m_parentIndex(parentIndex)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetParentID(parentIndex);
+}
+
+void GameObject::SetTag(const std::string_view& tag)
+{
+	if (tag.empty() || tag == "Untagged")
+	{
+		return; // Avoid adding empty tags
+	}
+
+	if (TagManager::GetInstance()->HasTag(tag.data()))
+	{
+		m_tag = tag.data();
+	}
+	else
+	{
+		m_tag = "Untagged";
+	}
 }
 
 std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
@@ -71,9 +92,9 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 
     auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
     m_components.push_back(componentPtr);
-    m_componentIds[componentPtr->GetTypeID()] = m_components.size() - 1;
+    m_componentIds[component->m_scriptTypeID] = m_components.size() - 1;
 
-    size_t index = m_componentIds[componentPtr->GetTypeID()];
+    size_t index = m_componentIds[component->m_scriptTypeID];
 
     ScriptManager->CollectScriptComponent(this, index, scriptName.data());
 
@@ -94,7 +115,7 @@ std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
 }
 
 
-void GameObject::RemoveComponent(uint32 id)
+void GameObject::RemoveComponentIndex(uint32 id)
 {
 	if (id >= m_components.size())
 	{
@@ -109,7 +130,18 @@ void GameObject::RemoveComponent(uint32 id)
 	m_components[id]->Destroy();
 }
 
-void GameObject::RemoveComponent(const std::string_view& scriptName)
+void GameObject::RemoveComponentTypeID(uint32 typeID)
+{
+	auto iter = m_componentIds.find(typeID);
+	if (iter != m_componentIds.end())
+	{
+		size_t index = iter->second;
+		m_components[index]->Destroy();
+		m_componentIds.erase(iter);
+	}
+}
+
+void GameObject::RemoveScriptComponent(const std::string_view& scriptName)
 {
 	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
 	if (iter != m_components.end())
@@ -117,7 +149,7 @@ void GameObject::RemoveComponent(const std::string_view& scriptName)
 		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(*iter);
 		if (scriptComponent && scriptComponent->m_name == scriptName)
 		{
-			RemoveComponent(scriptComponent->GetTypeID());
+			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
 			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
 			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->GetTypeID()], scriptComponent->m_name.ToString());
 		}
@@ -136,6 +168,16 @@ GameObject* GameObject::Find(const std::string_view& name)
         return scene->GetGameObject(name).get();
     }
     return nullptr;
+}
+
+GameObject* GameObject::FindIndex(GameObject::Index index)
+{
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (scene)
+	{
+		return scene->GetGameObject(index).get();
+	}
+	return nullptr;
 }
 
 

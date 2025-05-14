@@ -5,6 +5,7 @@
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "RegisterReflect.def"
+#include "CullingManager.h"
 
 void SceneManager::ManagerInitialize()
 {

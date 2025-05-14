@@ -1,5 +1,6 @@
 #include "SceneViewWindow.h"
 #include "SceneRenderer.h"
+#include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -50,7 +51,9 @@ bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const
 	return true;
 }
 
-SceneViewWindow::SceneViewWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
+SceneViewWindow::SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) : 
+	m_sceneRenderer(ptr),
+	m_gizmoRenderer(gizmo_ptr)
 {
 }
 
@@ -175,7 +178,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 		if (ImGui::Button(ICON_FA_BARS " Grid"))
 		{
-			m_sceneRenderer->m_bShowGridSettings = true;
+			m_gizmoRenderer->m_bShowGridSettings = true;
 		}
 
 		ImGui::SameLine();

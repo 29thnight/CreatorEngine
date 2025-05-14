@@ -53,7 +53,7 @@ public:
     Core::DelegateHandle m_onDestroyEventHandle{};
 	[[Property]]
 	FileGuid m_scriptGuid{};
-
+	HashedGuid m_scriptTypeID{ type_guid(ModuleBehavior) };
 public:
 	bool m_isCallStart{ false };
 };

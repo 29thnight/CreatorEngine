@@ -161,6 +161,7 @@
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
+    <ClCompile Include="Component.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
@@ -217,7 +218,6 @@
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />
     <ClInclude Include="IRenderable.h" />
-    <ClInclude Include="JobManager.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightMapping.h" />
@@ -244,6 +244,7 @@
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />

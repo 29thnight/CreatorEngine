@@ -33,7 +33,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 #ifdef EDITOR
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
 	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get());
+	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
 	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
 	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());

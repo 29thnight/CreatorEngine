@@ -19,6 +19,9 @@
     <Filter Include="소스 파일\fonts">
       <UniqueIdentifier>{771775e3-a902-490d-9f1f-f108f8f79c8b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\CollapsingHeader">
+      <UniqueIdentifier>{351c0fd0-8ac4-45e2-a515-5a47000c00fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGuiContext.h">
@@ -41,6 +44,9 @@
     </ClInclude>
     <ClInclude Include="IconsFontAwesome6.h">
       <Filter>소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomCollapsingHeader.h">
+      <Filter>소스 파일\CollapsingHeader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
