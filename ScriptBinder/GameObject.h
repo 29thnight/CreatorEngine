@@ -15,7 +15,7 @@ class GameObject : public Object
 {
 public:
 	[[property]]
-	float speed = 0; //*****
+	float speed = 0; //***** 이거 언제까지 유지해야함?
 	using Index = int;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	enum class Type
@@ -27,10 +27,9 @@ public:
 		Bone,
 		TypeMax
 	};
-   ReflectGameObject
+    ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
-
 	GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
@@ -91,6 +90,8 @@ public:
 		return index == INVALID_INDEX;
 	}
 
+	void SetEnabled(bool able) override final;
+
     [[Property]]
 	Transform m_transform{};
     [[Property]]
@@ -113,9 +114,6 @@ public:
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
-
-	//debug layer
-	Bone* selectedBone{ nullptr };
 };
 
 #include "GameObejct.inl"

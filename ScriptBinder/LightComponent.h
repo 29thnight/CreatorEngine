@@ -4,7 +4,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IAwakable.h"
-#include "IOnDisable.h"
+#include "IOnDistroy.h"
 #include "IUpdatable.h"
 #include "SceneManager.h"
 #include "GameObject.h"
@@ -12,7 +12,7 @@
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
 
-class LightComponent : public Component, public IUpdatable, public IAwakable, public IOnDisable
+class LightComponent : public Component, public IUpdatable, public IAwakable, public IOnDistroy
 {
 public:
    ReflectLightComponent
@@ -63,7 +63,7 @@ public:
         light.m_intencity = m_intencity;
     }
 
-	void OnDisable() override
+	void OnDistroy() override
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (scene != nullptr && m_pOwner->IsDestroyMark())

@@ -27,6 +27,9 @@ namespace Meta
     {
         for (const auto& prop : type.properties)
         {
+			if (prop.name == "m_isEnabled")
+				continue;
+
             const HashedGuid hash = prop.typeID;
             if (hash == GUIDCreator::GetTypeID<int>())
             {

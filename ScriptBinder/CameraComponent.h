@@ -3,12 +3,12 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IAwakable.h"
-#include "IOnDisable.h"
+#include "IOnDistroy.h"
 #include "IUpdatable.h"
 #include "Camera.h"
 #include "CameraComponent.generated.h"
 
-class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDisable
+class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDistroy
 {
 public:
    ReflectCameraComponent
@@ -54,7 +54,7 @@ public:
 		}
 	}
 
-	void OnDisable() override
+	void OnDistroy() override
 	{
 		//delete m_pCamera;
 		//m_cameraIndex = -1;

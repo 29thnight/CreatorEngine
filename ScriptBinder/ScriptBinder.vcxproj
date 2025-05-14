@@ -216,6 +216,8 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />
+    <ClInclude Include="IOnDistroy.h" />
+    <ClInclude Include="IOnEnable.h" />
     <ClInclude Include="IProjectSetting.h" />
     <ClInclude Include="IRenderable.h" />
     <ClInclude Include="KeyState.h" />

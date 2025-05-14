@@ -15,10 +15,19 @@ interface IAwakable
 
 		m_awakeEventHandle = subscribedScene->AwakeEvent.AddLambda([this]
 		{
-			if (false == isAwakeCalled)
+			auto ptr = dynamic_cast<Component*>(this);
+			auto sceneObject = ptr->GetOwner();
+			if (ptr && sceneObject)
 			{
-				Awake();
-				isAwakeCalled = true;
+				if (!ptr->IsEnabled() && sceneObject->IsDestroyMark())
+				{
+					return;
+				}
+				else if (!isAwakeCalled)
+				{
+					Awake();
+					isAwakeCalled = true;
+				}
 			}
 		});
 	}

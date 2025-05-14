@@ -3,14 +3,6 @@
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
 
-Scene::~Scene()
-{
-    for (auto& gameObject : m_SceneObjects)
-    {
-        gameObject.reset();
-    }
-}
-
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
     std::string uniqueName = GenerateUniqueGameObjectName(sceneObject->GetHashedName().ToString());
@@ -161,15 +153,12 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::Reset()
 {
-	
-    //칠게 있나?
     ScriptManager->SetReload(true);
     ScriptManager->ReplaceScriptComponent();
 }
 
 void Scene::Awake()
 {
-    
     AwakeEvent.Broadcast();
 }
 

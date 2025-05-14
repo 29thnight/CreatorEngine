@@ -180,4 +180,21 @@ GameObject* GameObject::FindIndex(GameObject::Index index)
 	return nullptr;
 }
 
+void GameObject::SetEnabled(bool able)
+{
+	if (m_isEnabled == able)
+	{
+		return;
+	}
+	m_isEnabled = able;
+
+	for (auto& component : m_components)
+	{
+		if (component)
+		{
+			component->SetEnabled(able);
+		}
+	}
+}
+
 

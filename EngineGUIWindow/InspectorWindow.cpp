@@ -49,18 +49,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		if (scene && selectedSceneObject)
 		{
 			std::string name = selectedSceneObject->m_name.ToString();
-			if (ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled))
-			{
-				Meta::MakeCustomChangeCommand([=]
-				{
-					selectedSceneObject->m_isEnabled = !selectedSceneObject->m_isEnabled;
-				},
-				[=]
-				{
-					selectedSceneObject->m_isEnabled = !selectedSceneObject->m_isEnabled;
-				});
-			}
-
+			ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled);
 			ImGui::SameLine();
 
 			if (ImGui::InputText("name",
@@ -221,7 +210,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					componentBaseName += " (Script)";
 				}
 
-				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen))
+				bool* isEnabled = &component->m_isEnabled;
+				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, isEnabled))
 				{
 					if(isOpen)
 					{

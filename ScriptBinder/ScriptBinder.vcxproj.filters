@@ -332,7 +332,7 @@
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="IOnDisable.h">
+    <ClInclude Include="IOnDistroy.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
@@ -412,6 +412,12 @@
     </ClInclude>
     <ClInclude Include="IProjectSetting.h">
       <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="IOnEnable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="IOnDisable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
