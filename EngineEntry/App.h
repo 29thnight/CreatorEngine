@@ -33,7 +33,6 @@ namespace Core
         HWND m_hWnd{ nullptr };
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
 		std::unique_ptr<DirectX11::Dx11Main> m_main;
-		std::unique_ptr<ProjectSetting> m_projectSetting;
 		bool m_windowClosed{ false };
 		bool m_windowVisible{ true };
 	};

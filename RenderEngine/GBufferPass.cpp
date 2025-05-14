@@ -9,6 +9,8 @@
 #include "LightProperty.h"
 #include "Benchmark.hpp"
 
+XMMATRIX InitialMatrix[MAX_BONES]{};
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -48,6 +50,11 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
+	for (uint32 i = 0; i < MAX_BONES; i++)
+	{
+		InitialMatrix[i] = XMMatrixIdentity();
+	}
 }
 
 GBufferPass::~GBufferPass()
@@ -112,6 +119,10 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
 				currentAnimator = animator;
 			}
+		}
+		else
+		{
+			DirectX11::UpdateBuffer(m_boneBuffer.Get(), InitialMatrix);
 		}
 
 		Material* mat = meshRenderer->m_Material;

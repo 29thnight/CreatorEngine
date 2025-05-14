@@ -120,6 +120,7 @@ public:
 
 private:
     void DestroyGameObjects();
+	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
 

@@ -80,6 +80,7 @@ private:
 	ID3D11ShaderResourceView*   m_depthStencilSRV{};
 
     Core::DelegateHandle m_newSceneCreatedEventHandle{};
+	Core::DelegateHandle m_activeSceneChangedEventHandle{};
 
 	//pass
 	std::unique_ptr<ShadowMapPass>      m_pShadowMapPass{};

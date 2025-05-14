@@ -10,16 +10,13 @@
 
 class Animator;
 class OctreeNode;
-class MeshRenderer : public Component, public IRenderable
+class MeshRenderer : public Component
 {
 public:
    ReflectMeshRenderer
     [[Serializable(Inheritance:Component)]]
    MeshRenderer();
    virtual ~MeshRenderer();
-
-   bool IsEnabled() const override;
-   void SetEnabled(bool able) override;
 
    bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
    void SetNeedUpdateCulling(bool able) { m_isNeedUptateCulling = able; }
@@ -39,8 +36,6 @@ public:
     LightMapping m_LightMapping;
 
 private:
-    [[Property]]
-    bool m_IsEnabled{ false };
 	bool m_isNeedUptateCulling{ false };
 	std::unordered_set<OctreeNode*> m_OctreeNodes;
 };

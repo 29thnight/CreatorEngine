@@ -8,7 +8,7 @@
 #include "Camera.h"
 #include "CameraComponent.generated.h"
 
-class CameraComponent : public Component, public IRenderable, public IAwakable, public IUpdatable, public IOnDisable
+class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDisable
 {
 public:
    ReflectCameraComponent
@@ -19,20 +19,6 @@ public:
 	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CameraComponent>();
    } 
    virtual ~CameraComponent() = default;
-
-	bool IsEnabled() const override
-	{
-		return m_IsEnabled;
-	}
-
-	void SetEnabled(bool able) override
-	{
-		m_IsEnabled = able;
-		if (m_pCamera)
-		{
-			m_pCamera->m_isActive = m_IsEnabled;
-		}
-	}
 
 	void Awake() override
 	{

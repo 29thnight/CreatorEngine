@@ -325,7 +325,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 			nullptr, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 	
-		XMMATRIX parentMat = SceneManagers->GetActiveScene()->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
@@ -373,9 +373,35 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 
 	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+	static bool useGizmo = false;
+	static float gizmoTimer = 0.f;
 
+	if (ImGuizmo::IsUsing())
+	{
+		useGizmo = true;
+		if (useWindow)
+		{
+			ImGui::End();
+			ImGui::PopStyleColor(2);
+		}
+		return;
+	}
 
-	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+	if (useGizmo)
+	{
+		gizmoTimer += Time->GetElapsedSeconds();
+		if (gizmoTimer > 0.5f)
+		{
+			useGizmo = false;
+			gizmoTimer = 0.f;
+		}
+	}
+	else
+	{
+		gizmoTimer = 0.f;
+	}
+
+	if (!useGizmo && ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 	{
 		float closest = FLT_MAX;
 		ImVec2 mousePos = ImGui::GetMousePos();
@@ -423,7 +449,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			m_currentHitIndex = 0;
 		}
 	}
-
 
 	ImRect dropRect = ImRect(imageMin, imageMax);
 	static file::path previewModelPath;

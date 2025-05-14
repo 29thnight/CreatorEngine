@@ -9,11 +9,11 @@ constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
 class AnimationController;
-class Animator : public Component, public IRenderable, public IUpdatable
+class Animator : public Component, public IUpdatable
 {
 public:
     ReflectAnimator
-        [[Serializable(Inheritance:Component)]]
+    [[Serializable(Inheritance:Component)]]
     Animator()
     {
         m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
@@ -25,15 +25,7 @@ public:
             delete Controller;
         }
     }
-    bool IsEnabled() const override
-    {
-        return m_IsEnabled;
-    }
 
-    void SetEnabled(bool able) override
-    {
-        m_IsEnabled = able;
-    }
     void Update(float tick) override;
     void SetAnimation(int index);
     [[Method]]

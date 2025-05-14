@@ -11,7 +11,7 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
-class GameObject : public Object/*, public Transform*/
+class GameObject : public Object
 {
 public:
 	[[property]]

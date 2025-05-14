@@ -1,6 +1,5 @@
 #include "Transform.h"
 #include "GameObject.h"
-#include "SceneManager.h"
 
 Transform& Transform::SetScale(Mathf::Vector3 scale)
 {
@@ -83,11 +82,11 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 {
 	m_worldMatrix = matrix;
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
-	Mathf::xVector determinant{};
-	m_inverseMatrix = XMMatrixInverse(nullptr, m_worldMatrix);
-
-	Mathf::Matrix inverseParentMatrix = GameObject::FindIndex(m_parentID)->m_transform.GetInverseMatrix();
-	m_localMatrix = inverseParentMatrix * m_worldMatrix;
+	
+	XMMATRIX parentMat = GameObject::FindIndex(m_parentID)->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+	m_localMatrix = newLocalMatrix;
 
 	SetLocalMatrix(m_localMatrix);
 }

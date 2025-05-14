@@ -12,21 +12,12 @@
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
 
-class LightComponent : public Component, public IRenderable, public IUpdatable, public IAwakable, public IOnDisable
+class LightComponent : public Component, public IUpdatable, public IAwakable, public IOnDisable
 {
 public:
    ReflectLightComponent
     [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(LightComponent)
-
-    bool IsEnabled() const override
-    {
-        return m_IsEnabled;
-    }
-    void SetEnabled(bool able) override
-    {
-        m_IsEnabled = able;
-    }
 
     void Awake() override
     {
@@ -117,6 +108,4 @@ public:
 
 private:
     BoundingBox m_editorBoundingBox{ { 0, 0, 0 }, { 1, 1, 1 } };
-
-    bool m_IsEnabled{ false };
 };

@@ -16,16 +16,6 @@ MeshRenderer::~MeshRenderer()
 	CullingManagers->Remove(this);
 }
 
-bool MeshRenderer::IsEnabled() const
-{
-    return m_IsEnabled;
-}
-
-void MeshRenderer::SetEnabled(bool able)
-{
-    m_IsEnabled = able;
-}
-
 BoundingBox MeshRenderer::GetBoundingBox() const
 {
     if (m_Mesh)

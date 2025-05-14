@@ -23,22 +23,13 @@ enum class Direction
 	Right
 };
 
-class UIComponent : public Component, public IRenderable
+class UIComponent : public Component
 {
 public:
    ReflectUIComponent
     [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(UIComponent)
 
-	bool IsEnabled() const override
-	{
-		return m_IsEnabled;
-	}
-
-	void SetEnabled(bool able) override
-	{
-		m_IsEnabled = able;
-	}
 	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
 	Canvas* GetOwnerCanvas() { return ownerCanvas; }
 	void SetOrder(int index) { _layerorder = index; }
@@ -51,9 +42,6 @@ public:
 	Mathf::Vector2 scale{ 1,1};
 	UItype type = UItype::None;
 
-protected:
-    [[Property]]
-	bool m_IsEnabled = true;
 private:
 	std::unordered_map<Direction, GameObject*> navigation;
 	Canvas* ownerCanvas = nullptr;

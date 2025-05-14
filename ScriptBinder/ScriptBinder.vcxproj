@@ -178,6 +178,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
+    <ClCompile Include="TagManager.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
     <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="TransCondition.cpp" />
@@ -215,6 +216,7 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />
+    <ClInclude Include="IProjectSetting.h" />
     <ClInclude Include="IRenderable.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="LightComponent.h" />
@@ -254,6 +256,7 @@
     <ClInclude Include="UIManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Component.inl" />
     <None Include="GameObejct.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

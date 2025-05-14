@@ -49,6 +49,20 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		if (scene && selectedSceneObject)
 		{
 			std::string name = selectedSceneObject->m_name.ToString();
+			if (ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled))
+			{
+				Meta::MakeCustomChangeCommand([=]
+				{
+					selectedSceneObject->m_isEnabled = !selectedSceneObject->m_isEnabled;
+				},
+				[=]
+				{
+					selectedSceneObject->m_isEnabled = !selectedSceneObject->m_isEnabled;
+				});
+			}
+
+			ImGui::SameLine();
+
 			if (ImGui::InputText("name",
 				&name[0],
 				name.capacity() + 1,
@@ -189,6 +203,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 			}
 
+			static bool isOpen = false;
+			static Component* selectedComponent = nullptr;
 
 			for (auto& component : selectedSceneObject->m_components)
 			{
@@ -205,8 +221,13 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					componentBaseName += " (Script)";
 				}
 
-				if (ImGui::CollapsingHeader(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen))
 				{
+					if(isOpen)
+					{
+						selectedComponent = component.get();
+					}
+
 					if(component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>())
 					{
 						MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
@@ -310,6 +331,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				m_openNewScriptPopup = false;
 			}
 
+			if (isOpen)
+			{
+				ImGui::OpenPopup("ComponentMenu");
+				isOpen = false;
+			}
+
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
 			{
@@ -362,6 +389,22 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 				ImGui::EndPopup();
 			}
+
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
+			if (ImGui::BeginPopup("ComponentMenu"))
+			{
+				if (ImGui::MenuItem("		Remove Component"))
+				{
+					selectedSceneObject->RemoveComponent(selectedComponent);
+					ImGui::CloseCurrentPopup();
+					selectedComponent = nullptr;
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::PopStyleVar();
+			ImGui::PopStyleColor(2);
 		}
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }

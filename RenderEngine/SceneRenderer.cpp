@@ -167,6 +167,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_threadPool = new ThreadPool(4);
 
     m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_activeSceneChangedEventHandle = SceneManagers->activeSceneChangedEvent.AddLambda([&] 
+	{
+		m_renderScene->Update(0.f);
+	});
 }
 
 SceneRenderer::~SceneRenderer()
@@ -309,7 +313,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 	auto cameraComponent = cameraObj->AddComponent<CameraComponent>();
 
 	auto lightObj1 = scene->CreateGameObject("Directional Light", GameObjectType::Light);
+	lightObj1->SetTag("MainCamera");
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
+	lightComponent1->m_lightStatus = LightStatus::StaticShadows;
 
 	ShadowMapRenderDesc desc;
 	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);

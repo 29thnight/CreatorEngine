@@ -14,7 +14,7 @@ namespace ImGui
         return ImVec2(lhs.x * scalar, lhs.y * scalar);
     }
 
-    bool DrawCollapsingHeaderWithButton(const char* label, ImGuiTreeNodeFlags flags, const char* buttonLabel, bool* outButtonClicked)
+    inline bool DrawCollapsingHeaderWithButton(const char* label, ImGuiTreeNodeFlags flags, const char* buttonLabel, bool* outButtonClicked)
     {
         ImGuiWindow* window = ImGui::GetCurrentWindow();
         if (window->SkipItems)

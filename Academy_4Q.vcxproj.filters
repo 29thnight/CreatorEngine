@@ -48,11 +48,26 @@
     <Filter Include="Window\HierarchyWindow">
       <UniqueIdentifier>{4431d1fe-ea29-4cc3-9d62-dbf6cb957ff8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\AssetBundleWindow">
-      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window\ProgressWindow">
       <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\ProjectSettingWindow">
+      <UniqueIdentifier>{39d0c6ea-3529-4a2c-b0bf-edd8f131f5fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\NodeEditorWindow%28작성예정%29">
+      <UniqueIdentifier>{d7d3d37d-4f45-4181-9e2f-64059b8fc331}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\NodeEditorWindow%28작성예정%29\BluePrint">
+      <UniqueIdentifier>{a3693c80-6976-44ff-ab63-9f0d5d91b87e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\AssetBundleWindow%28작성예정%29">
+      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Settings\EngineSetting">
+      <UniqueIdentifier>{b298e48b-fdbc-428f-ac7f-495645492ba9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Settings\ProjectSetting">
+      <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -89,15 +104,6 @@
     <ClInclude Include="EngineEntry\Dx11Main.h">
       <Filter>Dx11Main</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\ProjectSetting.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EngineSetting.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EngineVersion.h">
-      <Filter>Settings</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\Resource.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -109,6 +115,18 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectSettingWindow.h">
+      <Filter>Window\ProjectSettingWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EngineSetting.h">
+      <Filter>Settings\EngineSetting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\ProjectSetting.h">
+      <Filter>Settings\ProjectSetting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EngineVersion.h">
+      <Filter>Settings\EngineSetting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -141,6 +159,9 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
       <Filter>Window\InspectorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="ProjectSetting.cpp">
+      <Filter>Settings\ProjectSetting</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

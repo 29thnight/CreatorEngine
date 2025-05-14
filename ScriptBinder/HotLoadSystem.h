@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "GameObject.h"
 #include "EngineSetting.h"
 
 class ModuleBehavior;
