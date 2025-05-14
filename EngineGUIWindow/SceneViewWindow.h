@@ -3,6 +3,7 @@
 #include "ImGuiRegister.h"
 
 class SceneRenderer;
+class GizmoRenderer;
 class GameObject;
 class Camera;
 struct Ray { XMFLOAT3 origin, direction; };
@@ -15,7 +16,7 @@ struct RayHitResult
 class SceneViewWindow
 {
 public:
-	SceneViewWindow(SceneRenderer* ptr);
+	SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr);
 	~SceneViewWindow() = default;
 
 	void RenderSceneViewWindow();
@@ -27,7 +28,10 @@ private:
 	GameObject* PickObjectFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects);
 	
 	std::vector<RayHitResult> PickObjectsFromRay(const Ray& ray, const std::vector<std::shared_ptr<GameObject>>& sceneObjects);
+	
+private:
 	SceneRenderer* m_sceneRenderer{ nullptr };
+	GizmoRenderer* m_gizmoRenderer{ nullptr };
 
 	std::vector<RayHitResult> m_hitResults;
 	size_t m_currentHitIndex = 0;

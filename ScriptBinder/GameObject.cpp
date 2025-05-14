@@ -71,9 +71,9 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 
     auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
     m_components.push_back(componentPtr);
-    m_componentIds[componentPtr->GetTypeID()] = m_components.size() - 1;
+    m_componentIds[component->m_scriptTypeID] = m_components.size() - 1;
 
-    size_t index = m_componentIds[componentPtr->GetTypeID()];
+    size_t index = m_componentIds[component->m_scriptTypeID];
 
     ScriptManager->CollectScriptComponent(this, index, scriptName.data());
 

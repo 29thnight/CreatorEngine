@@ -71,6 +71,7 @@
     { \
         m_name = #T; \
         m_typeID = TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
     virtual ~T() = default; \
     

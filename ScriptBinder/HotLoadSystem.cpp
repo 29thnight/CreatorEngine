@@ -498,7 +498,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
-		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
 		pugi::xml_node filterNodeSource = newSource.append_child("Filter");
 		filterNodeSource.text().set("Script\\ScriptClass");
 
@@ -525,12 +525,12 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
 		pugi::xml_node headerGroup = itemGroups[1];
 		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
-		newHeader.append_attribute("Include") = "\\Assets\\Script\\" + scriptHeaderFileName;
+		newHeader.append_attribute("Include") = "Assets\\Script\\" + scriptHeaderFileName;
 
 		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
-		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
 
 		pugi::xml_node additionalOptionsDebug = newSource.append_child("AdditionalOptions");
 		additionalOptionsDebug.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Debug|x64'";

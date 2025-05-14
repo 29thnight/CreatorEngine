@@ -195,11 +195,11 @@
     <Filter Include="RenderPass\PostProcessingPass\ColorGradingPass">
       <UniqueIdentifier>{737b3164-6b70-46e9-8b0b-6aa01ad5a01c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ManagerSystem\InputManager">
-      <UniqueIdentifier>{06792b2b-fe9e-4172-8f00-aec15e30243e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\PostProcessingPass\VolumetricFogPass">
       <UniqueIdentifier>{58f16791-412c-4cde-8140-c46c487171c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ManagerSystem\AssetBundle">
+      <UniqueIdentifier>{2b0dcc16-18b4-487b-957c-42ced7d3cc45}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

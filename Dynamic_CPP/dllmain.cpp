@@ -22,6 +22,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
 extern "C"
 {
+#pragma region Exported Functions
 	EXPORT_API ModuleBehavior* CreateModuleBehavior(const char* className)
 	{
 		std::string classNameStr(className);
@@ -52,14 +53,8 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void InitModuleFactory()
+	EXPORT_API void SetSceneManager(void* sceneManager)
 	{
-		// Register the factory function for TestBehavior Automation
-		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
-	}
-
-    EXPORT_API void SetSceneManager(void* sceneManager)
-    {  
 		SceneManager* ptr = static_cast<SceneManager*>(sceneManager);
 		auto& vector = SceneManagers->GetScenes();
 		auto& exeVector = ptr->GetScenes();
@@ -83,6 +78,13 @@ extern "C"
 		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
 		SceneManagers->SetActiveScene(ptr->GetActiveScene());
 		SceneManagers->SetGameStart(ptr->IsGameStart());
-    }
+	}
+#pragma	endregion
+
+	EXPORT_API void InitModuleFactory()
+	{
+		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
+	}
 }
 

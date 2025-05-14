@@ -106,6 +106,12 @@
     <Filter Include="Classes\GameObject\Prefab">
       <UniqueIdentifier>{6e9ab838-161a-44e1-9869-a39e015ffcc4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\TagManager">
+      <UniqueIdentifier>{7326de3f-16cd-476a-9169-7a99837ccb03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\Pool">
+      <UniqueIdentifier>{c6f9af70-6c32-4634-b5fa-8fa78515e055}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -204,6 +210,9 @@
     <ClCompile Include="MeshRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClCompile>
+    <ClCompile Include="Component.cpp">
+      <Filter>Classes\Components\ComponentBase</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -215,17 +224,11 @@
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>
-    <ClInclude Include="JobManager.h">
-      <Filter>Managers</Filter>
-    </ClInclude>
     <ClInclude Include="HotLoadSystem.h">
       <Filter>Classes\HotLoadSystem</Filter>
     </ClInclude>
     <ClInclude Include="LightProperty.h">
       <Filter>Classes\Resources\Light</Filter>
-    </ClInclude>
-    <ClInclude Include="GameObjectPool.h">
-      <Filter>Managers</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Classes\Components\ComponentBase</Filter>
@@ -397,6 +400,12 @@
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="TagManager.h">
+      <Filter>Managers\TagManager</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObjectPool.h">
+      <Filter>Managers\Pool</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
