@@ -24,6 +24,8 @@ public:
 		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
+
+	void AddDefaultCondition();
 	void SetCurState(std::string curStatename) {curState = curStatename;}
 	void SetNextState(std::string nextStatename) { nextState = nextStatename; }
 	std::string GetCurState()const { return curState; }

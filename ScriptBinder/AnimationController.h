@@ -26,6 +26,12 @@ public:
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
 
+
+
+	
+	//어디에서든지 전이가능한 state모음
+	[[Property]]
+	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;
 	bool BlendingAnimation(float tick);
 	Animator* GetOwner() { return m_owner; };
 	void SetCurState(std::string stateName);
@@ -36,7 +42,7 @@ public:
 	int GetAnimatonIndexformState(std::string stateName);
 	int GetAnimationIndex() { return m_AnimationIndex; }
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
-	AnimationState* CreateState(const std::string& stateName, int animationIndex);
+	AnimationState* CreateState(const std::string& stateName, int animationIndex, bool isLoop = true, bool isAny = false);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
 	
 	AvatarMask* GetAvatarMask() { return &m_avatarMask; }

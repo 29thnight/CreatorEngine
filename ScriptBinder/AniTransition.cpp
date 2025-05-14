@@ -1,4 +1,5 @@
 #include "AniTransition.h"
+#include "AniTransition.h"
 
 
 AniTransition::AniTransition(std::string curStatename, std::string nextStatename)
@@ -8,6 +9,11 @@ AniTransition::AniTransition(std::string curStatename, std::string nextStatename
 }
 AniTransition::~AniTransition()
 {
+}
+
+void AniTransition::AddDefaultCondition()
+{
+
 }
 
 bool AniTransition::CheckTransiton()

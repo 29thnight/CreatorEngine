@@ -14,6 +14,13 @@ enum class InputValueType
 	Float,
 	Vector2,
 };
+
+struct InputValue
+{
+	float fValue;
+	Mathf::Vector2 v2Value;
+};
+
 struct InputAction
 {
 	std::string actionName;
@@ -23,9 +30,14 @@ struct InputAction
 
 	ActionType actionType; //value , button
 	InputValueType valueType = InputValueType::None;   // float ,vector2
-	size_t key;            
+
+
+	std::vector<size_t> key;
+
 	size_t playerIndex = 0;
 
+
+	InputValue value;
 	std::string objName;
 	std::string funName;
 	void InvokeAction()
@@ -33,9 +45,9 @@ struct InputAction
 
 	}
 
-	std::function<void()> action;
-	std::function<void(std::any)> actionValue;
-	
+	std::function<void()> buttonAction;
+	std::function<void(std::any)> valueAction;
+
 };
 
 
@@ -46,34 +58,80 @@ public:
 	ActionMap();
 	~ActionMap();
 
-
-	template <typename T>
-	void AddAction(std::string name,size_t _playerindex, ActionType _actionType, InputValueType _valueType, InputType _inputType, T _key, KeyState _state, std::function<void()> _action)
+	void AddButtonAction(std::string name, size_t _playerindex,InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action)
 	{
 		InputAction inputAction;
 		inputAction.actionName = name;
 		inputAction.playerIndex = _playerindex;
-		inputAction.actionType = _actionType;
-		inputAction.valueType = _valueType;
+
+		inputAction.actionType = ActionType::Button;
 		inputAction.inputType = _inputType;
-		inputAction.key = _key;
+
+		inputAction.key.push_back(_key);
 		inputAction.keystate = _state;
-		inputAction.action = _action;
+		inputAction.buttonAction = _action;
 		m_actions.push_back(inputAction);
 	}
-	template <typename T>
-	void AddAction(std::string name, size_t _playerindex, ActionType _actionType,InputType _inputType, T _key, KeyState _state, std::function<void()> _action)
+
+	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(Mathf::Vector2)> _action)
 	{
 		InputAction inputAction;
 		inputAction.actionName = name;
 		inputAction.playerIndex = _playerindex;
-
-		inputAction.actionType = _actionType;
+		inputAction.actionType = ActionType::Value;
 		inputAction.inputType = _inputType;
-		inputAction.key = static_cast<size_t>(_key);
-		inputAction.keystate = _state;
-		inputAction.action = _action;
+		inputAction.valueType = _inputValueType;
+		if (_inputValueType == InputValueType::Float)
+		{
+			inputAction.key.resize(2);
+		}
+		else if (_inputValueType == InputValueType::Vector2)
+		{
+			inputAction.key.resize(4);
+		}
+		
+		for (int index = 0; index < _keys.size(); index++)
+		{
+			inputAction.key[index] = _keys[index];
+		}
+		inputAction.keystate = KeyState::Pressed;
+		inputAction.valueAction = [action = std::move(_action)](std::any value) {
+			if (value.type() == typeid(Mathf::Vector2)) {
+				action(std::any_cast<Mathf::Vector2>(value)); 
+			}
+			};
 		m_actions.push_back(inputAction);
+
+	}
+	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(float)> _action)
+	{
+		InputAction inputAction;
+		inputAction.actionName = name;
+		inputAction.playerIndex = _playerindex;
+		inputAction.actionType = ActionType::Value;
+		inputAction.inputType = _inputType;
+		inputAction.valueType = _inputValueType;
+		if (_inputValueType == InputValueType::Float)
+		{
+			inputAction.key.resize(2);
+		}
+		else if (_inputValueType == InputValueType::Vector2)
+		{
+			inputAction.key.resize(4);
+		}
+
+		for (int index = 0; index < _keys.size(); index++)
+		{
+			inputAction.key[index] = _keys[index];
+		}
+		inputAction.keystate = KeyState::Pressed;
+		inputAction.valueAction = [action = std::move(_action)](std::any value) {
+			if (value.type() == typeid(float)) {
+				action(std::any_cast<float>(value));
+			}
+			};
+		m_actions.push_back(inputAction);
+
 	}
 	void CheckAction();
 	std::string m_name;

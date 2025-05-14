@@ -90,6 +90,7 @@ class Animation
 public:
 	std::string m_name{};
 	std::map<std::string, NodeAnimation> m_nodeAnimations;
-	double m_duration{};
+	float m_duration{};
 	double m_ticksPerSecond{};
+	bool m_isLoop = false;
 };

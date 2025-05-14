@@ -13,7 +13,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
 	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });
-
+	AnimationFactorys->ReisterFactory("Punch", []() {return new RunAni(); });
 
 	auto animation = player->GetComponent<Animator>();
 	animation->CreateController("upper");
@@ -21,35 +21,41 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateState("Idle",0);
 	controller->CreateState("Walk",2);
 	controller->CreateState("Run",1); 
+	controller->CreateState("Punch",3,true);
 	controller->SetCurState("Idle");
-	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 0.3f, ConditionType::Greater,ValueType::Float);
-	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 0.3f, ConditionType::Less, ValueType::Float);
-	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 10.3f, ConditionType::Greater, ValueType::Float);
-	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 10.3f, ConditionType::Less, ValueType::Float);
+	controller->CreateTransition("Idle", "Punch")->AddCondition("OnPunch", false, ConditionType::None, ValueType::Trigger);
 	animation->CreateController("lower");
 	auto lowercontroller = animation->GetController("lower");
 	lowercontroller->CreateState("Idle", 0);
 	lowercontroller->CreateState("Walk", 2);
 	lowercontroller->CreateState("Run",  1);
+	lowercontroller->CreateState("Punch", 3);
 	lowercontroller->SetCurState("Idle");
-	lowercontroller->CreateTransition("Idle", "Run")->AddCondition("Walkparm", false, ConditionType::None, ValueType::Trigger);
-	lowercontroller->CreateTransition("Run", "Idle")->AddCondition("Idleparm", false, ConditionType::None, ValueType::Trigger);
+	lowercontroller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 5.3f, ConditionType::Greater, ValueType::Float);
+	lowercontroller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 5.3f, ConditionType::Less, ValueType::Float);
+	lowercontroller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
+	lowercontroller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	lowercontroller->GetAvatarMask()->UseOnlyLower();
 	animation->AddParameter("Speed", player->speed, ValueType::Float);
 	animation->AddParameter("Walkparm", false, ValueType::Trigger);
 	animation->AddParameter("Idleparm", false, ValueType::Trigger);
+	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 
 	auto playerMap = InputActionManagers->AddActionMap("Player");
-	playerMap->AddAction("Attack",0, ActionType::Button, InputType::KeyBoard, 'A', KeyState::Down, []() { std::cout << "Test A Click"<< std::endl;});
-	playerMap->AddAction("Bttack",0, ActionType::Button, InputType::KeyBoard, 'B', KeyState::Pressed, []() { std::cout << "Test B Pressed" << std::endl;});
-	playerMap->AddAction("Cttack",0, ActionType::Button, InputType::KeyBoard, KeyBoard::Space, KeyState::Released, [this]() {Jump();});
-	playerMap->AddAction("Attack",0, ActionType::Button, InputType::GamePad, ControllerButton::A, KeyState::Down, []() { std::cout << "Test  Pad A Click" << std::endl;});
-	playerMap->AddAction("Attack",0, ActionType::Button, InputType::GamePad, ControllerButton::B, KeyState::Down, []() { std::cout << "Test  Pad B Click" << std::endl;});
+	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
+	playerMap->AddButtonAction("Jump",0, InputType::KeyBoard, KeyBoard::Space, KeyState::Released, [this]() {Jump();});
+
+	playerMap->AddButtonAction("Attack",0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, []() { std::cout << "Test  Pad A Click" << std::endl;});
+	playerMap->AddButtonAction("Attack",0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, []() { std::cout << "Test  Pad B Click" << std::endl;});
+
+
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow },
+		[this](Mathf::Vector2 dir) {Move(dir);});
 }
 
 void TestPlayer::Update(float deltaTime)
 {
-	auto _player = GameObject::Find("aniTest");
+	auto _player = GameObject::Find("Punch");
 	auto ani = _player->GetComponent<Animator>();
 	auto controller = ani->GetController("upper");
 	if (InputManagement->IsKeyDown('1'))
@@ -67,16 +73,9 @@ void TestPlayer::Update(float deltaTime)
 		std::cout << "press 3" << std::endl;
 		ani->SetAnimation(1);
 	}
-	float dir{};
-	if (InputManagement->IsKeyPressed('P'))
+	else if(InputManagement->IsKeyPressed('P'))
 	{
-		dir = 1.0f;
-		_player->speed += 0.01;
-	}
-	else if(InputManagement->IsKeyPressed('O'))
-	{
-		dir = -1.0f;
-		_player->speed += 0.01;
+		_player->speed += 0.05;
 	}
 	else
 	{
@@ -104,20 +103,24 @@ void TestPlayer::Update(float deltaTime)
 		ani->SetParameter("Idleparm", true);
 	}
 
+	_player->m_transform.AddPosition({ _player->speed * deltaTime* dir.x,0, _player->speed * deltaTime * dir.y });
+}
 
-	if (InputManagement->IsControllerButtonDown(0, ControllerButton::A))
-	{
-		std::cout << "A" << std::endl;
-	}
-	//std::cout << _player->speed << std::endl;
+void TestPlayer::Punch()
+{
+	auto _player = GameObject::Find("Punch");
+	auto ani = _player->GetComponent<Animator>();
+	ani->SetParameter("OnPunch" ,true);
+}
 
-	
-	//player->m_transform.AddPosition({ speed * deltaTime* dir,0,0 });
+void TestPlayer::Move(Mathf::Vector2 _dir)
+{
+	dir = _dir;
 }
 
 void TestPlayer::Jump()
 {
-	auto _player = GameObject::Find("aniTest");
+	auto _player = GameObject::Find("Punch");
 	_player->m_transform.AddPosition({0,1,0 });
 
 }

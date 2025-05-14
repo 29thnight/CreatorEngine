@@ -316,8 +316,8 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-	DataSystems->LoadModel("aniTest.fbx");
-	model[0] = DataSystems->LoadCashedModel("aniTest.fbx");
+	DataSystems->LoadModel("Punch.fbx");
+	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
 	player.GetPlayer(testt);
 

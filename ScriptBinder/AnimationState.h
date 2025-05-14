@@ -26,7 +26,10 @@ public:
 	int index =0; 
 	[[Property]]
 	int AnimationIndex = -1;
-
+	[[Property]]
+	bool m_isAny = false;
+	[[Property]]
+	bool m_isLoop = true;
 	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용
 	float m_animationTimeElapsed = 0;
 };

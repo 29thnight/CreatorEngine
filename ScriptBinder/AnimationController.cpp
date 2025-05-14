@@ -48,15 +48,28 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		//return nullptr;//*****
 		m_curState = StateVec[0].get();
 	}
-	if (m_curState->Transitions.empty()) return nullptr;
 
-
-
-	for (auto& iter : m_curState->Transitions)
+	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
 	{
-		if (true == iter->CheckTransiton())
+		for (auto& state : m_anyStateVec)
 		{
-			return iter;
+			for (auto& trans : state->Transitions)
+			{
+				if (true == trans->CheckTransiton())
+				{
+					return trans;
+				}
+			}
+		}
+	}
+
+
+	if (m_curState->Transitions.empty()) return nullptr;
+	for (auto& trans : m_curState->Transitions)
+	{
+		if (true == trans->CheckTransiton())
+		{
+			return trans;
 		}
 	}
 	return nullptr;
@@ -140,19 +153,24 @@ int AnimationController::GetAnimatonIndexformState(std::string stateName)
 	}
 }
 
-AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex)
+AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isLoop, bool isAny)
 {
 	auto it = States.find(stateName);
 	if (it != States.end())
 	{
 		return (StateVec[it->second].get());
 	}
+
 	auto state = std::make_shared<AnimationState>(this, stateName);
+	if (isAny == true)
+		state->m_isAny = true;
 	state->AnimationIndex = animationIndex;
+	state->m_isLoop = isLoop; 
 	state->SetBehaviour(stateName);
 	States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
+
 	return state.get();
 }
 
@@ -169,6 +187,7 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 	StateVec[States[curStateName]]->Transitions.push_back(transition);
 	return transition.get();
 }
+
 
 void AnimationController::CreateMask()
 {

@@ -13,10 +13,13 @@ public:
 	void Update(float deltaTime);
 
 
+	Mathf::Vector2 dir;
+	void Punch();
+	void Move(Mathf::Vector2 dir);
 	void Jump();
 	GameObject* player;
 	float speed = 0.1f;
-	float maxSpeed = 15.0f;
+	float maxSpeed = 60.0f;
 };
 
 class IdleAni : public AniBehaviour

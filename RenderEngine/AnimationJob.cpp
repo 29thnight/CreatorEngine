@@ -19,7 +19,7 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
     float duration = time;
     for (UINT i = 0; i < keys.size() - 1; ++i)
     {
-        if (duration < keys[i + 1].m_time)
+        if (duration <= keys[i + 1].m_time)
         {
             return i;
         }
@@ -92,7 +92,9 @@ void AnimationJob::Update(float deltaTime)
                 {
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
-                    animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration);
+                    //animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
+                    if (animationcontroller->m_timeElapsed >= animation.m_duration)
+                        animationcontroller->m_timeElapsed = animation.m_duration;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
@@ -303,7 +305,6 @@ XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
 XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
 {
     float t = 0;
-
     // Translation
     XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
     if (nodeAnim.m_positionKeys.size() > 1)
