@@ -252,10 +252,11 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
-	m_isEditorSceneLoaded = false;
+	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
 	sceneUnloadedEvent.Broadcast();
-	m_activeScene = m_scenes[m_EditorSceneIndex];
+
+	m_isEditorSceneLoaded = false;
 }
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)

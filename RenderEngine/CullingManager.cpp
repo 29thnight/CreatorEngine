@@ -65,7 +65,7 @@ void CullingManager::Initialize(const BoundingBox& worldBounds, int maxDepth, in
 
 	m_threadPool = new ThreadPool;
 
-    SceneManagers->sceneLoadedEvent.AddLambda([&]()
+    SceneManagers->activeSceneChangedEvent.AddLambda([&]()
     {
 		std::vector<MeshRenderer*> sceneMeshes = SceneManagers->GetAllMeshRenderers();
 		BoundingBox newWorldBounds = CalculateSceneWorldBounds(sceneMeshes);

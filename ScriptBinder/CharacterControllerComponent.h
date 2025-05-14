@@ -15,9 +15,7 @@ class CharacterControllerComponent : public Component, public ICollider
 {
 public:
 
-
-
-	ReflectCharacterControllerComponent
+   ReflectCharacterControllerComponent
 		[[Serializable(Inheritance:Component)]]
 	CharacterControllerComponent() {
 		m_name = "CharacterControllerComponent";

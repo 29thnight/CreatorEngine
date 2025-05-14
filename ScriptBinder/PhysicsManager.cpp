@@ -65,7 +65,7 @@ void PhysicsManager::OnLoadScene()
 			continue;
 		}
 
-		auto transform = obj->m_transform;
+		auto& transform = obj->m_transform;
 		auto bodyType = rigid->GetBodyType();
 
 		auto box = obj->GetComponent<BoxColliderComponent>();
@@ -119,7 +119,13 @@ void PhysicsManager::OnLoadScene()
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
 				Physics->CreateDynamicBody(boxInfo, EColliderType::COLLISION, isKinematic);
 				//콜라이더 정보 저장
-				//m_colliderContainer.insert({ colliderID, boxInfo });
+				m_colliderContainer.insert({ colliderID, {
+				m_boxTypeId,
+				box,
+				box->GetOwner(),
+				box,
+				false
+				} });
 			}
 
 		}
@@ -282,7 +288,7 @@ void PhysicsManager::AddTerrainCollider(GameObject* object)
 
 	TerrainCollider* collider = object->GetComponent<TerrainCollider>();
 	Transform& transform = object->m_transform;
-	auto terrain = object->GetComponent<Terrain>();
+	auto terrain = object->GetComponent<TerrainComponent>();
 
 	HeightFieldColliderInfo heightFieldInfo;
 
@@ -416,7 +422,7 @@ void PhysicsManager::SetPhysicData()
 			continue;
 		}
 
-		auto transform = colliderInfo.gameObject->m_transform;
+		auto& transform = colliderInfo.gameObject->m_transform;
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 

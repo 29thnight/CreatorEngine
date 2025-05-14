@@ -398,6 +398,15 @@
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
+    <ClInclude Include="ArticulationData.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="ArticulationLoader.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkData.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

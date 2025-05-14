@@ -23,6 +23,7 @@
 #include "GameObject.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
+#include "RagdollComponent.h"
 #include "MeshCollider.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
@@ -64,12 +65,13 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
-    AUTO_REGISTER_CLASS(Terrain);
     AUTO_REGISTER_CLASS(TerrainCollider);
+    AUTO_REGISTER_CLASS(TerrainComponent);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);

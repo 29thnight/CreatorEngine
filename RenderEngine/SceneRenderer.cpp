@@ -167,6 +167,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_threadPool = new ThreadPool(4);
 
     m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_activeSceneChangedEventHandle = SceneManagers->activeSceneChangedEvent.AddLambda([&] 
+	{
+		m_renderScene->Update(0.0f);
+	});
 }
 
 SceneRenderer::~SceneRenderer()
