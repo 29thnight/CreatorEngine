@@ -2,16 +2,23 @@
 #include "Component.h"  
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"
+#include "BoxColliderComponent.generated.h"
 
 class BoxColliderComponent : public Component, public ICollider  
 {  
 public:  
-    BoxColliderComponent();
-    ~BoxColliderComponent()  override;
+
+   ReflectBoxColliderComponent
+	[[Serializable(Inheritance:Component)]]
+    BoxColliderComponent() {
+        m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
+		m_type = EColliderType::COLLISION;
+        m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
+    } virtual ~BoxColliderComponent() = default;
 
    [[Property]]  
    BoxColliderInfo m_Info;  
-   [[Property]]  
+   [[Property]]
    DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };  
    [[Property]]  
    DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };  

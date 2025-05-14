@@ -15,30 +15,38 @@ class CharacterControllerComponent : public Component, public ICollider
 {
 public:
 
-   
-   
-   ReflectCharacterControllerComponent
-	[[Serializable(Inheritance:Component)]]
-   CharacterControllerComponent() {
-	   m_name = "CharacterControllerComponent"; 
-	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
-
-	   m_onStartHandle = SceneManagers->GetActiveScene()->StartEvent.AddRaw(this, &CharacterControllerComponent::OnStart);
-	   m_onFixedUpdateHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnFixedUpdate);
-	   m_onLateUpdateHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnLateUpdate);
 
 
-   } virtual ~CharacterControllerComponent() {
-	   SceneManagers->GetActiveScene()->StartEvent.Remove(m_onStartHandle);
-	   SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(m_onFixedUpdateHandle);
-	   SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(m_onLateUpdateHandle);
-   };
+	ReflectCharacterControllerComponent
+		[[Serializable(Inheritance:Component)]]
+	CharacterControllerComponent() {
+		m_name = "CharacterControllerComponent";
+		m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
+
+		m_onStartHandle = SceneManagers->GetActiveScene()->StartEvent.AddRaw(this, &CharacterControllerComponent::OnStart);
+		m_onFixedUpdateHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnFixedUpdate);
+		m_onLateUpdateHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnLateUpdate);
+
+
+	} virtual ~CharacterControllerComponent() {
+		SceneManagers->GetActiveScene()->StartEvent.Remove(m_onStartHandle);
+		SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(m_onFixedUpdateHandle);
+		SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(m_onLateUpdateHandle);
+	};
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
+	
+	
+	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
+	
+	void Move(const DirectX::SimpleMath::Vector2& moveInput)
+	{
+		m_moveInput = moveInput;
+	}
 
 	//==========================
 	//씬 내부에서 실행	되는 함수들

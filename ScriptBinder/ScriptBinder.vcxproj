@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -191,6 +191,8 @@
     <ClInclude Include="AnimationController.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="AnimationState.h" />
+    <ClInclude Include="ArticulationData.h" />
+    <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
@@ -219,6 +221,7 @@
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightMapping.h" />
     <ClInclude Include="LightProperty.h" />
+    <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="ModuleBehaviorInfo.h" />

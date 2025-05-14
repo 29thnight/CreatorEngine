@@ -2,13 +2,18 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
+#include "TerrainCollider.generated.h"
 
 class TerrainCollider : public Component, public ICollider
 {
 public:
-	TerrainCollider();
-	~TerrainCollider();
 
+   ReflectTerrainCollider
+	[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(TerrainCollider)
+
+	[[Property]]
+	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	
 	void SetColliderID(unsigned int id) {
 		m_colliderID = id;
@@ -30,7 +35,7 @@ public:
 private:
 	unsigned int m_colliderID;
 
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 	// ICollider을(를) 통해 상속됨

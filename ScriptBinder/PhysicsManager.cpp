@@ -5,6 +5,7 @@
 #include "Transform.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
+#include "Terrain.h"
 #include "TerrainCollider.h"
 #include "CharacterControllerComponent.h"
 
@@ -218,14 +219,19 @@ void PhysicsManager::ProcessCallback()
 			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
+			SceneManagers->GetActiveScene()->OnCollisionStay(collision);
 			break;
 		case ECollisionEventType::END_OVERLAP:
+			SceneManagers->GetActiveScene()->OnCollisionExit(collision);
 			break;
 		case ECollisionEventType::ENTER_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerEnter(collision);
 			break;
 		case ECollisionEventType::ON_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerStay(collision);
 			break;
 		case ECollisionEventType::END_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerExit(collision);
 			break;
 		default:
 			break;
@@ -276,7 +282,7 @@ void PhysicsManager::AddTerrainCollider(GameObject* object)
 
 	TerrainCollider* collider = object->GetComponent<TerrainCollider>();
 	Transform& transform = object->m_transform;
-	// auto terrain = object->GetComponent<Terrain>();
+	auto terrain = object->GetComponent<Terrain>();
 
 	HeightFieldColliderInfo heightFieldInfo;
 
@@ -288,6 +294,19 @@ void PhysicsManager::AddTerrainCollider(GameObject* object)
 	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 
+	heightFieldInfo.numCols = terrain->GetWidth();
+	heightFieldInfo.numRows = terrain->GetHeight();
+	heightFieldInfo.heightMep = terrain->GetHeightMap();
+	
+	Physics->CreateStaticBody(heightFieldInfo, EColliderType::COLLISION);
+	
+	m_colliderContainer.insert({ colliderID, {
+		m_heightFieldTypeId,
+		collider,
+		collider->GetOwner(),
+		collider,
+		false
+	} });
 	
 
 }

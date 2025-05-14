@@ -198,6 +198,9 @@
     <ClCompile Include="InputAction.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
+    <ClCompile Include="MeshCollider.cpp">
+      <Filter>Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">

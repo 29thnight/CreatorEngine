@@ -135,6 +135,18 @@ public:
 	
 	}
 
+
+	//============================================================
+	//HeigtMap을 기반으로 Collider 생성에 필요한 정보들을 반환
+	int GetWidth() const { return m_width; }
+	int GetHeight() const { return m_height; }
+
+	float* GetHeightMap() { return m_heightMap.data(); }
+
+	
+
+
+
 private:
 	//터레인을 구분하는 아이디
 	unsigned int m_terrainID{ 0 };
