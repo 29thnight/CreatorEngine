@@ -1,28 +1,28 @@
 #pragma once
-#include "DirectXCollision.h"
+#include <DirectXCollision.h>
+#include <array>
 #include <vector>
-#include <memory>
 
-class Mesh;
-
+class MeshRenderer;
 class OctreeNode
 {
 public:
-    static constexpr int MaxMeshesPerNode = 10;
-    static constexpr float MinNodeSize = 1.0f;
+    DirectX::BoundingBox boundingBox;
+    std::vector<MeshRenderer*> objects;
 
-    OctreeNode(const DirectX::BoundingBox& bounds);
+    std::array<OctreeNode*, 8> children{};
 
-    void InsertMesh(Mesh* mesh);
-    void FrustumCull(const DirectX::BoundingFrustum& frustum, std::vector<Mesh*>& visibleMeshes) const;
+    int depth = 0;
+    bool isLeaf = true;
 
-private:
-    void Subdivide();
-    int GetChildIndexForMesh(const DirectX::BoundingBox& meshBounds) const;
+    OctreeNode(const DirectX::BoundingBox& box, int depth = 0);
+    ~OctreeNode();
 
-private:
-    DirectX::BoundingBox m_bounds;
-    std::vector<Mesh*> m_meshes;
-    std::unique_ptr<OctreeNode> m_children[8];
-    bool m_isLeaf = true;
+    void Subdivide(int maxDepth, int maxObjectsPerNode);
+    void Insert(MeshRenderer* object, int maxDepth, int maxObjectsPerNode);
+
+    bool Contains(const DirectX::BoundingBox& box) const;
+    bool Remove(MeshRenderer* object);
+
+	int GetMaxDepth() const;
 };

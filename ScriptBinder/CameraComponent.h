@@ -84,8 +84,8 @@ public:
 	{
 		DirectX::BoundingFrustum frustum = m_pCamera->GetFrustum();
 		//frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
-		frustum.Origin = Mathf::Vector3(m_pOwner->m_transform.position);
-		frustum.Orientation = m_pOwner->m_transform.rotation;
+		//frustum.Origin = Mathf::Vector3(m_pOwner->m_transform.position);
+		//frustum.Orientation = m_pOwner->m_transform.rotation;
 
 		return frustum;
 	}

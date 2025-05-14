@@ -257,6 +257,9 @@
     <ClCompile Include="Core.Coroutine.cpp">
       <Filter>Core.Coroutine</Filter>
     </ClCompile>
+    <ClCompile Include="Core.OctreeNode.cpp">
+      <Filter>Core.Octree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="MemoryPool.inl">

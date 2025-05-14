@@ -95,7 +95,7 @@ public:
     Mathf::Vector4 m_position{};
     Mathf::Vector4 m_direction{ -1, -1, 1, 0 };
     [[Property]]
-    Mathf::Color4  m_color{ 1, 0, 0, 1 };
+    Mathf::Color4  m_color{ 1, 1, 1, 1 };
 
     [[Property]]
     float m_constantAttenuation{ 1.f };

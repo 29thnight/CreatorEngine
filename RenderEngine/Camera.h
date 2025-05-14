@@ -4,6 +4,7 @@
 #include "Texture.h"
 #include "Camera.generated.h"
 
+class MeshRenderer;
 class Camera
 {
 public:
@@ -26,6 +27,9 @@ public:
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
 	void ClearRenderTarget();
+
+	void PushRenderQueue(MeshRenderer* meshRenderer);
+	void ClearRenderQueue();
 
 	[[Property]]
 	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
@@ -68,6 +72,9 @@ public:
 	ComPtr<ID3D11Buffer> m_ProjBuffer;
     UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
     UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
+
+	std::vector<MeshRenderer*> m_defferdQueue;
+	std::vector<MeshRenderer*> m_forwardQueue;
 };
 
 class SceneRenderer;

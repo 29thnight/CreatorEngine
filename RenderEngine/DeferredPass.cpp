@@ -83,6 +83,15 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 
     auto& lightManager = scene.m_LightController;
 
+	for (auto& light : lightManager->m_lightProperties.m_lights)
+	{
+		if (light.m_lightType == LightType::DirectionalLight)
+		{
+            light.m_lightStatus = LightStatus::StaticShadows;
+			break;
+		}
+	}
+
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
     if (lightManager->hasLightWithShadows)

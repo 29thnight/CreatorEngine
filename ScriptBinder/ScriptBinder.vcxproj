@@ -167,6 +167,7 @@
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="InputAction.cpp" />
@@ -230,6 +231,7 @@
     <ClInclude Include="MonoObjectBinding.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PhysicsManager.h" />
+    <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RaycastComponent.h" />
     <ClInclude Include="RegisterReflect.def" />

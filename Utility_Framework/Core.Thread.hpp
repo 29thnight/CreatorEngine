@@ -217,6 +217,11 @@ public:
 		}
 	}
 
+	DWORD GetThreadCount() const
+	{
+		return m_numThreads;
+	}
+
 private:
 	void Execute()
 	{

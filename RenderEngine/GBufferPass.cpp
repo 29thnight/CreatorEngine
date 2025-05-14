@@ -93,13 +93,17 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 	Animator* currentAnimator = nullptr;
 
-	for (auto& sceneObject : m_deferredQueue)
-	{		
-		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
+	for (auto& meshRenderer : camera.m_defferdQueue)
+	{	
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
 
+		GameObject* sceneObject = meshRenderer->GetOwner();
+		if (sceneObject->IsDestroyMark()) continue;
+		if (sceneObject->m_parentIndex == -1) continue;
+
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+
 		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
 		if (nullptr != animator && animator->IsEnabled())
 		{
@@ -133,7 +137,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		{
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
-		//36 skinedMesh Draw -> FrameDrop : 형편없구만
+
 		meshRenderer->m_Mesh->Draw();
 	}
 

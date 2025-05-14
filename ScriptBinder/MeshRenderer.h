@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
+#include "GameObject.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
 #include "../RenderEngine/Mesh.h"
@@ -8,22 +9,26 @@
 #include "MeshRenderer.generated.h"
 
 class Animator;
+class OctreeNode;
 class MeshRenderer : public Component, public IRenderable
 {
 public:
    ReflectMeshRenderer
     [[Serializable(Inheritance:Component)]]
-   GENERATED_BODY(MeshRenderer);
+   MeshRenderer();
+   virtual ~MeshRenderer();
 
-    bool IsEnabled() const override
-    {
-        return m_IsEnabled;
-    }
+   bool IsEnabled() const override;
+   void SetEnabled(bool able) override;
 
-    void SetEnabled(bool able) override
-    {
-        m_IsEnabled = able;
-    }
+   bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
+   void SetNeedUpdateCulling(bool able) { m_isNeedUptateCulling = able; }
+
+    BoundingBox GetBoundingBox() const;
+
+	void CullGroupInsert(OctreeNode* node);
+    void CullGroupClear();
+	std::unordered_set<OctreeNode*>& GetCullGroup() { return m_OctreeNodes; }
 
 public:
     [[Property]]
@@ -36,4 +41,6 @@ public:
 private:
     [[Property]]
     bool m_IsEnabled{ false };
+	bool m_isNeedUptateCulling{ false };
+	std::unordered_set<OctreeNode*> m_OctreeNodes;
 };

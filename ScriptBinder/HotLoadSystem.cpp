@@ -248,7 +248,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 			}
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
-			gameObject->m_components[index].reset();
+			//gameObject->m_components[index].reset();
 			gameObject->m_components[index].swap(sharedScript);
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
@@ -271,12 +271,6 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 	{
 		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFileName.string());
 		std::vector<std::string> events;
-		if (!scriptNode["eventRegisterSetting"])
-		{
-
-		}
-
-
 		if (scriptNode["eventRegisterSetting"])
 		{
 			for (const auto& node : scriptNode["eventRegisterSetting"])
@@ -557,6 +551,15 @@ void HotLoadSystem::Compile()
 {
 	if (hDll)
 	{
+		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+		{
+			auto* script = static_cast<ModuleBehavior*>(gameObject->m_components[index].get());
+			if (script)
+			{
+				UnbindScriptEvents(script, name);
+			}
+			gameObject->m_components[index].reset();
+		}
 		FreeLibrary(hDll);
 		hDll = nullptr;
 	}

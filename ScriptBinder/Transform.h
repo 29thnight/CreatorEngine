@@ -36,6 +36,8 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
+	bool IsDirty() const;
+
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;

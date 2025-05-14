@@ -421,6 +421,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 	}
 
+
 	ImRect dropRect = ImRect(imageMin, imageMax);
 	static file::path previewModelPath;
 	static GameObject* dragPreviewObject = nullptr;
@@ -433,14 +434,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (!dragPayload || dragPayload != payload)
 		{
 			dragPayload = const_cast<ImGuiPayload*>(payload);
-			if (previewModelPath.empty() && !dragPreviewObject)
+			if (previewModelPath.empty() && !dragPreviewObject && dragPayload)
 			{
-				const char* droppedFilePath = static_cast<const char*>(payload->Data);
+				const char* droppedFilePath = static_cast<const char*>(dragPayload->Data);
 				file::path filename = file::path(droppedFilePath).filename();
 				previewModelPath = PathFinder::Relative("Models\\") / filename;
 
 				dragPreviewObject = Model::LoadModelToSceneObj(
-					DataSystems->LoadCashedModel(previewModelPath.string().c_str()),
+					DataSystems->LoadCashedModel(previewModelPath.string()),
 					*scene);
 			}
 		}
@@ -466,6 +467,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				dragPayload = nullptr;
 				previewModelPath.clear();
 			}
+		}
+
+		if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
+		{
+			const char* droppedFilePath = (const char*)HDRPayload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
 		}
 
 		ImGui::EndDragDropTarget();
