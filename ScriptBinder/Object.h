@@ -32,7 +32,11 @@ public:
 
     void Destroy();
     bool IsDestroyMark() const { return m_destroyMark; }
+	void SetDestroyMark() { m_destroyMark = true; }
     bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad; }
+
+	bool IsEnabled() const { return m_isEnabled; }
+	void SetEnabled(bool able) { m_isEnabled = able; }
 
 	static void Destroy(Object* objPtr);
     static void SetDontDestroyOnLoad(Object* objPtr);
@@ -42,6 +46,8 @@ public:
 public:
     [[Property]]
     HashingString     m_name{ "Object" };
+    [[Property]]
+	bool m_isEnabled{ true };
 
 protected:
     friend class SceneManager;

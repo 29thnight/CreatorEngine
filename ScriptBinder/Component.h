@@ -16,15 +16,9 @@ public:
 	void SetOwner(GameObject* owner) { m_pOwner = owner; }
 	GameObject* GetOwner() const { return m_pOwner; }
 
-	//template<typename T>
-	//T* GetComponent()
-	//{
-	//	if (m_pOwner)
-	//	{
-	//		return m_pOwner->GetComponent<T>();
-	//	}
-	//	return nullptr;
-	//}
+	//TODO : 테스트 필요(사유는 inl에 요약)
+	template<typename T>
+	T* GetComponent();
 
 	Component* GetComponent(HashedGuid typeof);
 
@@ -34,3 +28,5 @@ protected:
     [[Property]]
 	HashedGuid		m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 };
+
+#include "Component.inl"

@@ -11,7 +11,7 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
-class GameObject : public Object
+class GameObject : public Object/*, public Transform*/
 {
 public:
 	[[property]]
@@ -40,6 +40,7 @@ public:
 
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
+	void SetTag(const std::string_view& tag);
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
@@ -67,15 +68,18 @@ public:
 	template<typename T>
 	void RemoveComponent(T* component);
 
-	void RemoveComponent(uint32 id);
+	void RemoveComponentIndex(uint32 id);
 
-	void RemoveComponent(const std::string_view& scriptName);
+	void RemoveComponentTypeID(uint32 typeID);
+
+	void RemoveScriptComponent(const std::string_view& scriptName);
 
 	void RemoveComponent(Meta::Type& type);
 
 	GameObjectType GetType() const { return m_gameObjectType; }
 
     static GameObject* Find(const std::string_view& name);
+	static GameObject* FindIndex(GameObject::Index index);
 
 	static inline bool IsValidIndex(Index index)
 	{
@@ -103,8 +107,8 @@ public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
 	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-	
-	HashingString m_tag{};
+	[[Property]]
+	HashingString m_tag{ "Untagged" };
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]
