@@ -92,11 +92,15 @@ void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatri
 	if(GameObjectType::Bone == obj->GetType())
 	{
 		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
-		if (bone)
+		if (animator)
 		{
-			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+			const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+			if (bone)
+			{
+				obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+			}
 		}
+
 	}
 	else
 	{

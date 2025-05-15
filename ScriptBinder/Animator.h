@@ -43,7 +43,6 @@ public:
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
-    [[Property]]
     float m_TimeElapsed{};
     [[Property]]
     uint32_t m_AnimIndexChosen{};
@@ -51,16 +50,13 @@ public:
     bool m_isBlend = false;
     float blendT = 0;
     [[Property]]
-    bool m_isLoof{ false };
-    [[Property]]
     int m_AnimIndex{};
     int nextAnimIndex = -1;
-    [[Property]]
     float m_nextTimeElapsed{};
     [[Property]]
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
- 
+
     [[Property]]
     std::vector<AnimationController*> m_animationControllers{};
     [[Property]]

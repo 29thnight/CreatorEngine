@@ -21,7 +21,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateState("Idle",0);
 	controller->CreateState("Walk",2);
 	controller->CreateState("Run",1); 
-	controller->CreateState("Punch",3,true);
+	controller->CreateState("Punch",3);
 	controller->SetCurState("Idle");
 	controller->CreateTransition("Idle", "Punch")->AddCondition("OnPunch", false, ConditionType::None, ValueType::Trigger);
 	animation->CreateController("lower");

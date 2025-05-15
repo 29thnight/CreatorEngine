@@ -2,17 +2,20 @@
 
 #pragma once
 
+#include "CameraComponent.h"
+#include "Animation.h"
 #include "AnimationState.h"
+#include "Terrain.h"
+#include "Skeleton.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
-#include "Animator.h"
 #include "Mesh.h"
 #include "AnimationController.h"
+#include "Animator.h"
 #include "AniTransition.h"
 #include "AvatarMask.h"
-#include "CameraComponent.h"
 #include "Canvas.h"
 #include "CharacterControllerComponent.h"
 #include "ImageComponent.h"
@@ -27,7 +30,6 @@
 #include "Object.h"
 #include "RigidBodyComponent.h"
 #include "Scene.h"
-#include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
 #include "UIButton.h"
@@ -36,6 +38,7 @@
 REFLECTION_REGISTER()
 {
     AUTO_REGISTER_CLASS(AniTransition);
+    AUTO_REGISTER_CLASS(Animation);
     AUTO_REGISTER_CLASS(AnimationController);
     AUTO_REGISTER_CLASS(AnimationState);
     AUTO_REGISTER_CLASS(Animator);
@@ -58,6 +61,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Object);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
+    AUTO_REGISTER_CLASS(Skeleton);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(Terrain);
     AUTO_REGISTER_CLASS(TextComponent);

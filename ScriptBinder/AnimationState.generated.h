@@ -10,7 +10,6 @@ ReflectionField(AnimationState) \
 		meta_property(index) \
 		meta_property(AnimationIndex) \
 		meta_property(m_isAny) \
-		meta_property(m_isLoop) \
 	}); \
 	FieldEnd(AnimationState, PropertyOnly) \
 };

@@ -13,7 +13,6 @@
 #include "ModuleBehavior.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
-
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -213,6 +212,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					{
 						ImGuiDrawHelperModuleBehavior(moduleBehavior);
 					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<Animator>())
+					{
+						Animator* animator = dynamic_cast<Animator*> (component.get());
+						if (nullptr != animator)
+						{
+							ImGuiDrawHelperAnimator(animator);
+						}
+					}
 					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
@@ -381,5 +388,51 @@ void InspectorWindow::ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavi
 			DataSystems->OpenSolutionAndFile(slnPath, scriptFullPath);
 		}
 		ImGui::PopStyleVar(2);
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
+{
+	if (animator)
+	{
+		const auto& aniType = Meta::Find(animator->GetTypeID());
+		Meta::DrawProperties(animator, *aniType);
+		Meta::DrawMethods(animator, *aniType);
+		if (ImGui::CollapsingHeader("animations"))
+		{
+			for (auto& animation : animator->m_Skeleton->m_animations)
+			{
+				ImGui::PushID(animation.m_name.c_str());
+				const auto& mat_info_type = Meta::Find("Animation");
+				Meta::DrawProperties(&animation, *mat_info_type);
+				
+				ImGui::PopID();
+			}
+		}
+
+		if (!animator->m_animationControllers.empty())
+		{
+			if (ImGui::CollapsingHeader("Controllers"))
+			{
+				for (auto& controller : animator->m_animationControllers)
+				{
+					ImGui::PushID(controller->name.c_str());
+					const auto& mat_controller_type = Meta::Find("AnimationController");
+					Meta::DrawProperties(controller, *mat_controller_type);
+					/*const auto& mat_mask_type = Meta::Find("AvatarMask");
+					Meta::DrawProperties(&controller->m_avatarMask, *mat_mask_type);
+					const auto& mat_state_type = Meta::Find("AnimationState");
+					Meta::DrawProperties(&(*controller->m_curState), *mat_state_type);*/
+					ImGui::PopID();
+				}
+
+
+
+			}
+
+		}
+
+
+
 	}
 }

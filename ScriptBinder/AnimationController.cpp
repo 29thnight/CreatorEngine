@@ -35,7 +35,7 @@ bool AnimationController::BlendingAnimation(float tick)
 void AnimationController::SetCurState(std::string stateName)
 {
 	m_curState = StateVec[States[stateName]].get();
-
+	m_curStateName = m_curState->Name;
 	
 	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
 	m_AnimationIndex = m_curState->AnimationIndex;
@@ -47,6 +47,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	{
 		//return nullptr;//*****
 		m_curState = StateVec[0].get();
+		m_curStateName = m_curState->Name;
 	}
 
 	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
@@ -109,6 +110,7 @@ void AnimationController::UpdateState()
 		m_curState->behaviour->Exit();
 		m_nextState->behaviour->Enter();
 		m_curState = m_nextState;
+		m_curStateName = m_curState->Name;
 		m_nextState = nullptr;
 		m_curTrans = trans.get();
 		needBlend = true;
@@ -153,7 +155,7 @@ int AnimationController::GetAnimatonIndexformState(std::string stateName)
 	}
 }
 
-AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isLoop, bool isAny)
+AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isAny)
 {
 	auto it = States.find(stateName);
 	if (it != States.end())
@@ -165,7 +167,6 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	if (isAny == true)
 		state->m_isAny = true;
 	state->AnimationIndex = animationIndex;
-	state->m_isLoop = isLoop; 
 	state->SetBehaviour(stateName);
 	States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);

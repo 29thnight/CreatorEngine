@@ -433,15 +433,18 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (!dragPayload || dragPayload != payload)
 		{
 			dragPayload = const_cast<ImGuiPayload*>(payload);
-			if (previewModelPath.empty() && !dragPreviewObject)
+			if (nullptr != payload)
 			{
-				const char* droppedFilePath = static_cast<const char*>(payload->Data);
-				file::path filename = file::path(droppedFilePath).filename();
-				previewModelPath = PathFinder::Relative("Models\\") / filename;
+				if (previewModelPath.empty() && !dragPreviewObject)
+				{
+					const char* droppedFilePath = static_cast<const char*>(payload->Data);
+					file::path filename = file::path(droppedFilePath).filename();
+					previewModelPath = PathFinder::Relative("Models\\") / filename;
 
-				dragPreviewObject = Model::LoadModelToSceneObj(
-					DataSystems->LoadCashedModel(previewModelPath.string().c_str()),
-					*scene);
+					dragPreviewObject = Model::LoadModelToSceneObj(
+						DataSystems->LoadCashedModel(previewModelPath.string().c_str()),
+						*scene);
+				}
 			}
 		}
 		else

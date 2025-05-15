@@ -350,6 +350,9 @@
     <ClCompile Include="VolumetricFogPass.cpp">
       <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
     </ClCompile>
+    <ClCompile Include="Animation.cpp">
+      <Filter>Resources\Skeleton\Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -528,6 +531,9 @@
     </ClInclude>
     <ClInclude Include="VolumetricFogPass.h">
       <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation.h">
+      <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

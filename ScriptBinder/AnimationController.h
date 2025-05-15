@@ -19,6 +19,8 @@ public:
     [[Property]]
     std::string name;
 	[[Property]]
+	std::string m_curStateName = "None";
+	[[Property]]
 	AnimationState* m_curState = nullptr;
 	AnimationState* m_nextState = nullptr;
 	bool needBlend =false;
@@ -42,7 +44,7 @@ public:
 	int GetAnimatonIndexformState(std::string stateName);
 	int GetAnimationIndex() { return m_AnimationIndex; }
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
-	AnimationState* CreateState(const std::string& stateName, int animationIndex, bool isLoop = true, bool isAny = false);
+	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
 	
 	AvatarMask* GetAvatarMask() { return &m_avatarMask; }
@@ -57,13 +59,14 @@ public:
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};
+	[[Property]]
+	AvatarMask m_avatarMask{};
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;
 	int m_nextAnimationIndex = -1;
 	//지금일어나는중인 전이 - 블렌드시간 탈출시간등
 	AniTransition* m_curTrans{};
-	[[Property]]
-	AvatarMask m_avatarMask{};
+	
 };
 

@@ -3,5 +3,10 @@
 #define ReflectSkeleton \
 ReflectionField(Skeleton) \
 { \
-	FieldEnd(Skeleton, None) \
+	PropertyField \
+	({ \
+		meta_property(m_animations) \
+		meta_property(m_rootTransform) \
+	}); \
+	FieldEnd(Skeleton, PropertyOnly) \
 };

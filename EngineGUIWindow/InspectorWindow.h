@@ -5,6 +5,7 @@ class SceneRenderer;
 class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
+class Animator;
 class InspectorWindow
 {
 public:
@@ -16,4 +17,5 @@ private:
 	bool m_openScriptPopup{ false };
 	void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
+	void ImGuiDrawHelperAnimator(Animator* animator);
 };
