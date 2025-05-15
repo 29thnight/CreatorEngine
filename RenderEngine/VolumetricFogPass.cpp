@@ -78,8 +78,6 @@ VolumetricFogPass::VolumetricFogPass()
 	//m_pso->m_samplers.push_back(linearSampler);
 	m_Buffer = DirectX11::CreateBuffer(sizeof(MainCB), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
-
-
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
@@ -289,6 +287,6 @@ void VolumetricFogPass::ControlPanel()
 	ImGui::SliderFloat("Custom far plane", &mCustomFarPlane, 10.0f, 10000.0f);
 }
 
-void VolumetricFogPass::Resize()
+void VolumetricFogPass::Resize(uint32_t width, uint32_t height)
 {
 }

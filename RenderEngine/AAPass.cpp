@@ -84,7 +84,3 @@ void AAPass::ControlPanel()
 		ImGui::SliderFloat("SpanMax", &m_FXAAParameters.SpanMax, 0.0f, 100.0f);
 	}
 }
-
-void AAPass::Resize()
-{
-}

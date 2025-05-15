@@ -11,7 +11,18 @@ enum RTV_Type
 	RTV_TypeMax
 };
 
-class IRenderPass abstract
+struct IViewEvent
+{
+	virtual ~IViewEvent() = default;
+
+	virtual void ResizeRelease() = 0;
+	virtual void Resize(uint32_t width, uint32_t height) = 0;
+
+	Core::DelegateHandle m_onReleaseHandle{};
+	Core::DelegateHandle m_onResizeHandle{};
+};
+
+class IRenderPass abstract : public IViewEvent
 {
 public:
 	IRenderPass() = default;
@@ -21,7 +32,8 @@ public:
 	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
 	virtual void ControlPanel() {};
 	void ReloadShaders() { m_pso->ReloadShaders(); };
-	virtual void Resize() {};
+	virtual void ResizeRelease() {};
+	virtual void Resize(uint32_t width, uint32_t height) {};
 
 
 protected:

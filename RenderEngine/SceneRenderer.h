@@ -60,6 +60,7 @@ public:
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
 	void SceneRendering();
+	void ReApplyCurrCubeMap();
 
 private:
 	void InitializeDeviceState();
@@ -81,6 +82,7 @@ private:
 
     Core::DelegateHandle m_newSceneCreatedEventHandle{};
 	Core::DelegateHandle m_activeSceneChangedEventHandle{};
+	Core::DelegateHandle m_resizeEventHandle{};
 
 	//pass
 	std::unique_ptr<ShadowMapPass>      m_pShadowMapPass{};

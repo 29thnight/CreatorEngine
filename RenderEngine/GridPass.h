@@ -40,7 +40,7 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
     void GridSetting();
-    virtual void Resize() override;
+    virtual void Resize(uint32_t width, uint32_t height) override;
 
     ID3D11ShaderResourceView* GetGridSRV() const { return m_gridTexture->m_pSRV; }
 

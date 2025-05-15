@@ -67,7 +67,6 @@ void DirectX11::DeviceResources::SetDpi(float dpi)
     {
         m_dpi = dpi;
         m_effectiveDpi = dpi;
-        m_d2dContext->SetDpi(m_dpi, m_dpi);
         CreateWindowSizeDependentResources();
     }
 }
@@ -277,7 +276,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // ERROR 메시지에 Breakpoint
-        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, FALSE);
 
         // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
@@ -330,6 +329,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
     //m_d2dTargetBitmap = nullptr;
     m_d3dDepthStencilView = nullptr;
     m_d3dContext->Flush1(D3D11_CONTEXT_TYPE_ALL, nullptr);
+    m_d3dContext->ClearState();
 
     UpdateRenderTargetSize();
 
@@ -443,7 +443,9 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         //백버퍼 텍스쳐 받아오기
         ID3D11Resource* pResource = nullptr;
 		m_d3dRenderTargetView->GetResource(&pResource);
-		pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer);
+		DirectX11::ThrowIfFailed(
+            pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
+        );
 
         // 필요한 경우 3D 렌더링에 사용할 깊이 스텐실 뷰를 만듭니다.
         CD3D11_TEXTURE2D_DESC1 depthStencilDesc(
@@ -532,10 +534,6 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 
         m_d3dContext->RSSetViewports(1, &m_screenViewport);
-
-        DirectX11::ThrowIfFailed(
-            m_swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer))
-        );
     }
 }
 

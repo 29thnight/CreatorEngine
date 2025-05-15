@@ -22,6 +22,9 @@ public:
 	DirectX11::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum();
 
+	void ResizeRelease();
+	void ResizeResources();
+
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
@@ -144,6 +147,22 @@ public:
 		}
 		return nullptr;
 	}
+
+	size_t GetCameraCount()
+	{
+		size_t count = 0;
+		for (auto& camera : m_cameras)
+		{
+			if (nullptr != camera)
+			{
+				count++;
+			}
+		}
+		return count;
+	}
+
+	Core::Delegate<void> m_releaseResourcesEvent{};
+	Core::Delegate<void> m_recreateResourcesEvent{};
 
 private:
 	friend class SceneRenderer;

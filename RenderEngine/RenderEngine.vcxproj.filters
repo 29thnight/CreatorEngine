@@ -156,9 +156,6 @@
     <Filter Include="Resources\Skeleton\Animation">
       <UniqueIdentifier>{39737bb8-d7cc-407c-9f2e-a52ba10a78ca}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\ScreenSpaceReflectionPass">
-      <UniqueIdentifier>{293c831d-e84d-4f3f-9e4c-b930a76457ef}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Renderer\ImGuiRenderer">
       <UniqueIdentifier>{a7936112-fd34-4f36-b1ee-2bb11a3de982}</UniqueIdentifier>
     </Filter>

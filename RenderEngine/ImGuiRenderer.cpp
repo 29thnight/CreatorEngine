@@ -5,6 +5,82 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY);
+
+void AdjustImGuiDockNodesOnResize(float ratioX, float ratioY)
+{
+	ImGuiContext* ctx = ImGui::GetCurrentContext();
+	if (!ctx) return;
+
+	ImGuiDockContext* dockCtx = &ctx->DockContext;
+
+	for (int i = 0; i < dockCtx->Nodes.Data.Size; i++)
+	{
+		ImGuiDockNode* node = (ImGuiDockNode*)dockCtx->Nodes.Data[i].val_p;
+		if (!node || !node->IsRootNode()) continue;
+
+		// 루트 노드는 Viewport에 자동 맞춰짐 (중앙 DockSpace)
+		// 자식 노드들을 비례 조정
+		ResizeDockNodeRecursive(node, ratioX, ratioY);
+	}
+}
+
+void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY)
+{
+	if (!node) return;
+
+	// 중앙 노드는 Viewport에 맞춰지므로 무시
+	if (!node->IsCentralNode())
+	{
+		ImVec2 oldPos = node->Pos;
+		ImVec2 oldSize = node->Size;
+
+		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
+		ImVec2 newSize = ImVec2(oldSize.x * ratioX, oldSize.y * ratioY);
+
+		if (newSize.x == 0 || newSize.y == 0)
+		{
+			return;
+		}
+
+		ImGui::DockBuilderSetNodePos(node->ID, newPos);
+		ImGui::DockBuilderSetNodeSize(node->ID, newSize);
+	}
+
+	// 자식 노드 재귀 호출
+	ResizeDockNodeRecursive(node->ChildNodes[0], ratioX, ratioY);
+	ResizeDockNodeRecursive(node->ChildNodes[1], ratioX, ratioY);
+}
+
+void AdjustAllImGuiWindowsOnResize(ImVec2 oldSize, ImVec2 newSize)
+{
+	ImGuiContext* ctx = ImGui::GetCurrentContext();
+	if (!ctx)
+		return;
+
+	float ratioX = newSize.x / oldSize.x;
+	float ratioY = newSize.y / oldSize.y;
+
+	for (int i = 0; i < ctx->Windows.Size; ++i)
+	{
+		ImGuiWindow* window = ctx->Windows[i];
+		if (!window)
+			continue;
+
+		// Docked 창은 DockBuilder에서 위치 설정
+		if (window->DockIsActive && window->DockNode)
+		{
+			continue;
+		}
+
+		ImVec2 oldPos = window->Pos;
+		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
+		ImGui::SetWindowPos(window->Name, newPos, ImGuiCond_Always);
+	}
+
+	AdjustImGuiDockNodesOnResize(ratioX, ratioY);
+}
+
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
 {
@@ -104,10 +180,26 @@ ImGuiRenderer::~ImGuiRenderer()
 
 void ImGuiRenderer::BeginRender()
 {
+    static bool firstLoop = true;
+	static bool forceResize = false;
+
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
+	
+	RECT rect;
+	HWND hWnd = m_deviceResources->GetWindow()->GetHandle();
+	GetClientRect(hWnd, &rect);
+	ImGuiIO& io = ImGui::GetIO();
+	ImVec2 newSize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
+	if (io.DisplaySize != newSize)
+	{
+		AdjustAllImGuiWindowsOnResize(io.DisplaySize, newSize);
+		//forceResize = true;
+		io.DisplaySize = newSize;
+		io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+	}
+	
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -117,13 +209,12 @@ void ImGuiRenderer::BeginRender()
 	ImGui::NewFrame();
 
 	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
-	if (file::exists(iniPath))
+	if (!forceResize && file::exists(iniPath))
 	{
 		return;
 	}
 
-    static bool firstLoop = true;
-    if (firstLoop) 
+    if (firstLoop || forceResize)
 	{
         ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
         ImGuiID id = ImGui::GetID("MainWindowGroup");
@@ -150,6 +241,7 @@ void ImGuiRenderer::BeginRender()
     }
 
     if (firstLoop) firstLoop = false;
+	if (forceResize) forceResize = false;
 }
 
 void ImGuiRenderer::Render()

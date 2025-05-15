@@ -65,7 +65,3 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
 }
-
-void BlitPass::Resize()
-{
-}

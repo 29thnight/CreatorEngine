@@ -135,6 +135,41 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 	return frustum;
 }
 
+void Camera::ResizeRelease()
+{
+	if (m_renderTarget)
+	{
+		m_renderTarget.reset();
+	}
+
+	if (m_depthStencil)
+	{
+		m_depthStencil.reset();
+	}
+}
+
+void Camera::ResizeResources()
+{
+	m_aspectRatio = DeviceState::g_aspectRatio;
+
+	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+	auto renderTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		cameraRTVName,
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+	m_renderTarget.swap(renderTexture);
+
+	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
+	auto depthStencil = TextureHelper::CreateDepthTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		depthName
+	);
+	m_depthStencil.swap(depthStencil);
+}
+
 void Camera::RegisterContainer()
 {
 	m_cameraIndex = CameraManagement->AddCamera(this);

@@ -80,7 +80,3 @@ void VignettePass::ControlPanel()
 	ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
 	ImGui::SliderFloat("Softness", &softness, 0.0f, 1.0f);
 }
-
-void VignettePass::Resize()
-{
-}

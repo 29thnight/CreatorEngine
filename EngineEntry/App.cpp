@@ -1,4 +1,5 @@
 #include "App.h"
+#include "Camera.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
@@ -78,6 +79,7 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 void Core::App::RegisterHandler(CoreWindow& coreWindow)
 {
     coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
+	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
     coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
     coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
     coreWindow.RegisterHandler(WM_DROPFILES, this, &App::HandleDropFileEvent);

@@ -154,7 +154,3 @@ void DeferredPass::ControlPanel()
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
 }
-
-void DeferredPass::Resize()
-{
-}

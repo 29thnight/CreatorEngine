@@ -76,6 +76,7 @@ SkyBoxPass::~SkyBoxPass()
 
 void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
 {
+	m_fileName = fileName;
 	m_size = size;
 
     std::vector<uint32> skyboxIndices =
@@ -216,6 +217,7 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
 
 void SkyBoxPass::GenerateCubeMap(const std::string_view& fileName, RenderScene& scene)
 {
+	m_fileName = fileName;
 	m_skyBoxTexture.reset();
 
 	m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
@@ -408,6 +410,19 @@ void SkyBoxPass::ControlPanel()
 	ImGui::SliderFloat("scale", &m_scale, 1.f, 1000.f);
 }
 
-void SkyBoxPass::Resize()
+void SkyBoxPass::Resize(uint32_t width, uint32_t height)
 {
+	m_skyBoxTexture.reset();
+
+	m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(m_fileName));
+	m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
+		m_cubeMapSize,
+		"CubeMap",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+	));
+
+	m_skyBoxCubeMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
+	m_skyBoxCubeMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_cubeMapGenerationRequired = true;
 }

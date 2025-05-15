@@ -12,7 +12,6 @@ public:
 	void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	virtual void Resize() override;
 private:
 	Texture* m_DiffuseTexture{};
 	Texture* m_MetalRoughTexture{};

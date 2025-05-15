@@ -15,7 +15,7 @@
 class LightComponent : public Component, public IUpdatable, public IAwakable, public IOnDistroy
 {
 public:
-   ReflectLightComponent
+    ReflectLightComponent
     [[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(LightComponent)
 

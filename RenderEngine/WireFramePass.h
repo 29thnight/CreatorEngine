@@ -15,7 +15,7 @@ public:
 	// IRenderPass을(를) 통해 상속됨
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
 
 private:
 	CameraBuffer m_CameraBuffer;

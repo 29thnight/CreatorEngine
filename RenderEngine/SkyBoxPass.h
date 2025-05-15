@@ -24,7 +24,9 @@ public:
 
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
+
+	file::path CurrentSkyBoxTextureName() const { return m_fileName; }
 
 private:
     //skybox 쉐이더는 해당 pass의 기본 pso에 고정시키기
@@ -44,6 +46,7 @@ private:
 
 	Mathf::xMatrix m_scaleMatrix{};
 	Texture* m_RenderTarget{};
+	file::path m_fileName{};
 	bool m_cubeMapGenerationRequired{ true };
 	float m_size{ 25.f };
 	float m_scale{ 40.f };

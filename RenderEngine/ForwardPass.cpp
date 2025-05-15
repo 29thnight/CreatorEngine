@@ -118,18 +118,3 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 void ForwardPass::ControlPanel()
 {
 }
-
-void ForwardPass::Resize()
-{
-}
-
-void ForwardPass::PushForwardQueue(GameObject* sceneObject)
-{
-	if (nullptr == sceneObject) return;
-	m_forwardQueue.push_back(sceneObject);
-}
-
-void ForwardPass::ClearForwardQueue()
-{
-	m_forwardQueue.clear();
-}

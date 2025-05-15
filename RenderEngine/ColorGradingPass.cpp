@@ -92,7 +92,3 @@ void ColorGradingPass::ControlPanel()
 	if(ImGui::Button("Timer Zero"))
 		timer = 0.0f;
 }
-
-void ColorGradingPass::Resize()
-{
-}

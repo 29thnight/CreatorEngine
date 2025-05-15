@@ -89,7 +89,7 @@ void SceneManager::DisableOrEnable()
     m_activeScene->OnDestroy();
 }
 
-void SceneManager::Deccommissioning()
+void SceneManager::Decommissioning()
 {
     m_activeScene->OnDisable();
     m_activeScene->AllDestroyMark();

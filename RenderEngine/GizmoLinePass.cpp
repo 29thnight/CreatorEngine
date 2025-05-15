@@ -130,7 +130,7 @@ void GizmoLinePass::ControlPanel()
 {
 }
 
-void GizmoLinePass::Resize()
+void GizmoLinePass::Resize(uint32_t width, uint32_t height)
 {
 }
 

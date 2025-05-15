@@ -13,7 +13,7 @@ public:
 	void ClearTextures();
 
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
 
 	std::unordered_map<std::string, Texture*> m_positionMapTextures;
 	std::unordered_map<std::string, Texture*> m_normalMapTextures;

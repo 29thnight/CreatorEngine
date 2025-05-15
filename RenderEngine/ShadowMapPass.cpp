@@ -160,7 +160,7 @@ void ShadowMapPass::ControlPanel()
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
 
-void ShadowMapPass::Resize()
+void ShadowMapPass::Resize(uint32_t width, uint32_t height)
 {
 
 }

@@ -57,8 +57,6 @@ void AnimationJob::Update(float deltaTime)
 		counter++;
     }
 
-	std::cout << "Animator Count : " << counter << std::endl;
-
     for(auto& animator : m_currAnimator)
     {
         m_UpdateThreadPool.Enqueue([&]
