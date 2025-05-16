@@ -5,6 +5,7 @@
 #include "AnimationState.h"
 #include "AnimationController.generated.h"
 #include "AvatarMask.h"
+#include "imgui-node-editor/imgui_node_editor.h"
 class aniState;
 class AniTransition;
 class AvatarMask;
@@ -28,7 +29,7 @@ public:
 
 	std::set<std::string> StateNameSet;
 
-	
+	ax::NodeEditor::EditorContext* conEdit;
 	//어디에서든지 전이가능한 state모음
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;

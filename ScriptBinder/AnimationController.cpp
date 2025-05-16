@@ -214,8 +214,10 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 			return trans.get();
 
 	}
+	
 	auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
 	transition->m_ownerController = this;
+	transition->m_name = curStateName + " to " + nextStateName;
 	FindState(curStateName)->Transitions.push_back(transition);
 	return transition.get();
 }

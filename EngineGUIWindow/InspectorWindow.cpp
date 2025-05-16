@@ -419,7 +419,6 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 			{
 				showControllersWindow = !showControllersWindow;
 			}
-			
 			if(showControllersWindow)
 			{
 				ImGui::Begin("Animation Controllers", &showControllersWindow);
@@ -431,31 +430,92 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::Text("Controllers");
 					ImGui::Separator();
 
-					
-					for(int index = 0; index < animator->m_animationControllers.size(); ++index)
+					auto& controllers = animator->m_animationControllers;
+					for(int index = 0; index < controllers.size(); ++index)
 					{
-						auto& controller = animator->m_animationControllers[index];
+						auto& controller = controllers[index];
 						bool isSelected = (selectedControllerIndex == index);
-						if (ImGui::Selectable(controller->name.c_str(), isSelected))
+						ImGui::PushID(index);
+						
+						float selectableWidth = ImGui::GetContentRegionAvail().x - 33.0f; // 버튼 폭만큼 빼기
+					
+						if (ImGui::Selectable(controller->name.c_str(), isSelected, 0, ImVec2(selectableWidth, 0)))
 						{
 							selectedControllerIndex = index;
 						}
+						ImGui::SameLine();
+						if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+						{
+							ImGui::OpenPopup("ControllerDetailPopup");
+						}
+						
+						if (ImGui::BeginPopup("ControllerDetailPopup"))
+						{
+							ImGui::Text("Detail: %s", "ControllerDetailPopup");
+							ImGui::Separator();
+
+							const auto& mat_controller_type = Meta::Find("AnimationController");
+							Meta::DrawProperties(controller, *mat_controller_type);
+							Meta::DrawMethods(controller, *mat_controller_type);
+
+							ImGui::EndPopup();
+						}
+						ImGui::PopID();
 					}
 					ImGui::EndChild();
 
 					ImGui::SameLine();
-					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); // 남은 너비 전부 차지
+					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); 
 					ImGui::Text("Controller Info");
 					ImGui::Separator();
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
 						auto& controller = animator->m_animationControllers[selectedControllerIndex];
-						const auto& mat_controller_type = Meta::Find("AnimationController");
-						Meta::DrawProperties(controller, *mat_controller_type);
-						Meta::DrawMethods(controller, *mat_controller_type);
-
+						std::string fileName = controller->name + ".node_editor.json";
 						if (!controller->StateVec.empty())
 						{
+							namespace ed = ax::NodeEditor;
+							if (!controller->conEdit)
+							{
+								ed::Config config;
+								config.SettingsFile = fileName.c_str();
+								controller->conEdit = ed::CreateEditor(&config);
+							}
+
+							ed::SetCurrentEditor(controller->conEdit);
+							ed::Begin("State Machine Editor");
+							for (auto& state : controller->StateVec)
+							{
+								
+								ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(state->m_name));
+								ed::BeginNode(nodeID);
+								ImGui::Text(state->m_name.c_str());
+								ed::PinId inputPinID = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 0);
+								ed::PinId outputPinID = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
+								ed::BeginPin(inputPinID, ed::PinKind::Input);
+								ImGui::Dummy(ImVec2(1, 1));
+								ed::EndPin();
+
+								ed::BeginPin(outputPinID, ed::PinKind::Output);
+								ImGui::Dummy(ImVec2(1, 1));
+								ed::EndPin();
+
+								ed::EndNode();
+
+								for(auto& trans : state->Transitions)
+								{
+									ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetCurState()));
+									ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetNextState()));
+									
+									ed::PinId startPin = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
+									ed::PinId endPin = ed::PinId((static_cast<uint64_t>(nextnodeID) << 1) | 0);
+									ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(trans->m_name));
+									ed::Link(linkId, startPin,endPin);
+								}
+							}
+
+							ed::End();
+							ed::SetCurrentEditor(nullptr);
 							if (ImGui::CollapsingHeader("States"))
 							{
 								const auto& mat_animationState_type = Meta::Find("AnimationState");
@@ -476,49 +536,9 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					}
 
 					ImGui::EndChild();
-					//for (auto& controller : animator->m_animationControllers)
-					//{
-					//	ImGui::PushID((controller->name + std::to_string(i)).c_str());
-
-					//	if (ImGui::CollapsingHeader(controller->name.c_str()))
-					//	{
-
-					//		const auto& mat_controller_type = Meta::Find("AnimationController");
-					//		//const auto& mat_name_type = Meta::Find("std::string");
-					//		Meta::DrawProperties(controller, *mat_controller_type);
-					//		Meta::DrawMethods(controller, *mat_controller_type);
-
-						//	if (!controller->StateVec.empty())
-						//	{
-						//		if (ImGui::CollapsingHeader("States"))
-						//		{
-						//			const auto& mat_animationState_type = Meta::Find("AnimationState");
-						//			for (auto& shardAnimationState : controller->StateVec)
-						//			{
-
-						//				AnimationState* AnimationState = shardAnimationState.get();
-						//				ImGui::PushID(AnimationState->m_name.c_str());
-						//				if (ImGui::CollapsingHeader(AnimationState->m_name.c_str()))
-						//				{
-						//					Meta::DrawProperties(AnimationState, *mat_animationState_type);
-						//					//Meta::DrawMethods(AnimationState, *mat_controller_type);
-						//				}
-						//				ImGui::PopID();
-						//			}
-
-						//		}
-						//	}
-						//}
-					//	i++;
-					//	ImGui::PopID();
-					//}
 				}
 				ImGui::End(); // 창 닫기
-			}
-
-			
-			namespace ed = ax::NodeEditor;
-			ed::EditorContext* context = nullptr;
+			}			
 		}
 	}
 }

@@ -38,6 +38,8 @@ public:
 	std::vector<TransCondition> conditions;
 
 	AnimationController* m_ownerController{};
+	[[Property]]
+	std::string m_name = "NoName";
 private:
 	[[Property]]
 	std::string curState;
