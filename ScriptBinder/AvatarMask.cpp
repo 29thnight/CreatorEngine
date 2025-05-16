@@ -2,19 +2,25 @@
 #include "Skeleton.h"
 bool AvatarMask::IsBoneEnabled(BoneRegion region)
 {
-    if (isUpper)
-    {
-        return  region == BoneRegion::Neck ||
-            region == BoneRegion::LeftArm ||
-            region == BoneRegion::RightArm;
-    }
+    if (useAll)
+        return true;
 
-    if (isLower)
+    switch (region)
     {
-        return  region == BoneRegion::Root ||
-            region == BoneRegion::Spine ||
-            region == BoneRegion::LeftLeg ||
-            region == BoneRegion::RightLeg;
+    case BoneRegion::Root:
+        return useLower;
+    case BoneRegion::Spine:
+        return useLower;
+    case BoneRegion::LeftArm:
+        return useUpper;
+    case BoneRegion::RightArm:
+        return useUpper;
+    case BoneRegion::Neck:
+        return useUpper;
+    case BoneRegion::LeftLeg:
+        return useLower;
+    case BoneRegion::RightLeg:
+        return useLower;
     }
 
     return false;

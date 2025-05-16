@@ -10,12 +10,12 @@ public:
    ReflectAnimationState
 	[[Serializable]]
 	AnimationState() = default;
-	AnimationState(AnimationController* Owner, std::string Name) : m_ownerController(Owner), Name(Name) {}
+	AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name) {}
 
 
 	void SetBehaviour(std::string name);
 	[[Property]]
-	std::string Name{};
+	std::string m_name{};
 
 	std::string behaviourName{};
 	AniBehaviour* behaviour{};

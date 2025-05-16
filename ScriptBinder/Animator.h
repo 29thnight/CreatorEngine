@@ -39,6 +39,8 @@ public:
     [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
+    [[Method]]
+    void CreateController_UI();
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]

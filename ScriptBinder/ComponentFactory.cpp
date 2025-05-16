@@ -94,6 +94,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			}
 			if(itNode["m_animationControllers"])
 			{
+				
 				auto& animationControllerNode = itNode["m_animationControllers"];
 
 				for (auto& layer : animationControllerNode)
@@ -111,9 +112,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
 							Meta::Deserialize(sharedState.get(), state);
 							animationController->StateVec.push_back(sharedState);
-							animationController->States.insert(std::make_pair(sharedState->Name, animationController->StateVec.size() - 1));
+							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
 							sharedState->m_ownerController = animationController;
-							sharedState->SetBehaviour(sharedState->Name);
+							sharedState->SetBehaviour(sharedState->m_name);
 							if (state["Transitions"])
 							{
 								auto& transitionNode = state["Transitions"];
@@ -141,8 +142,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					if (layer["m_curState"])
 					{
 						auto& curNode = layer["m_curState"];
-						std::string name = curNode["Name"].as<std::string>();
-						animationController->m_curState = animationController->StateVec[animationController->States[name]].get();
+						std::string name = curNode["m_name"].as<std::string>();
+						animationController->m_curState = animationController->FindState(name);
 					}
 					animator->m_animationControllers.push_back(animationController);
 				}

@@ -15,7 +15,7 @@
 #include "ReflectionImGuiHelper.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-
+#include "imgui-node-editor/imgui_node_editor.h"
 constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
 constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
@@ -395,6 +395,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 {
 	if (animator)
 	{
+		static bool showControllersWindow = false;
 		const auto& aniType = Meta::Find(animator->GetTypeID());
 		Meta::DrawProperties(animator, *aniType);
 		Meta::DrawMethods(animator, *aniType);
@@ -405,34 +406,119 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				ImGui::PushID(animation.m_name.c_str());
 				const auto& mat_info_type = Meta::Find("Animation");
 				Meta::DrawProperties(&animation, *mat_info_type);
-				
+
 				ImGui::PopID();
 			}
 		}
 
 		if (!animator->m_animationControllers.empty())
 		{
-			if (ImGui::CollapsingHeader("Controllers"))
+			ImGui::Text("Controllers ");
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_BOX))
 			{
-				for (auto& controller : animator->m_animationControllers)
+				showControllersWindow = !showControllersWindow;
+			}
+			
+			if(showControllersWindow)
+			{
+				ImGui::Begin("Animation Controllers", &showControllersWindow);
+				//if (ImGui::CollapsingHeader("Controllers"))
 				{
-					ImGui::PushID(controller->name.c_str());
-					const auto& mat_controller_type = Meta::Find("AnimationController");
-					Meta::DrawProperties(controller, *mat_controller_type);
-					/*const auto& mat_mask_type = Meta::Find("AvatarMask");
-					Meta::DrawProperties(&controller->m_avatarMask, *mat_mask_type);
-					const auto& mat_state_type = Meta::Find("AnimationState");
-					Meta::DrawProperties(&(*controller->m_curState), *mat_state_type);*/
-					ImGui::PopID();
+					int i = 0;
+					static int selectedControllerIndex = 0;
+					ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
+					ImGui::Text("Controllers");
+					ImGui::Separator();
+
+					
+					for(int index = 0; index < animator->m_animationControllers.size(); ++index)
+					{
+						auto& controller = animator->m_animationControllers[index];
+						bool isSelected = (selectedControllerIndex == index);
+						if (ImGui::Selectable(controller->name.c_str(), isSelected))
+						{
+							selectedControllerIndex = index;
+						}
+					}
+					ImGui::EndChild();
+
+					ImGui::SameLine();
+					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); // 남은 너비 전부 차지
+					ImGui::Text("Controller Info");
+					ImGui::Separator();
+					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
+					{
+						auto& controller = animator->m_animationControllers[selectedControllerIndex];
+						const auto& mat_controller_type = Meta::Find("AnimationController");
+						Meta::DrawProperties(controller, *mat_controller_type);
+						Meta::DrawMethods(controller, *mat_controller_type);
+
+						if (!controller->StateVec.empty())
+						{
+							if (ImGui::CollapsingHeader("States"))
+							{
+								const auto& mat_animationState_type = Meta::Find("AnimationState");
+								for (auto& shardAnimationState : controller->StateVec)
+								{
+									AnimationState* AnimationState = shardAnimationState.get();
+									ImGui::PushID(AnimationState->m_name.c_str());
+									if (ImGui::CollapsingHeader(AnimationState->m_name.c_str()))
+									{
+										Meta::DrawProperties(AnimationState, *mat_animationState_type);
+										//Meta::DrawMethods(AnimationState, *mat_controller_type);
+									}
+									ImGui::PopID();
+								}
+
+							}
+						}
+					}
+
+					ImGui::EndChild();
+					//for (auto& controller : animator->m_animationControllers)
+					//{
+					//	ImGui::PushID((controller->name + std::to_string(i)).c_str());
+
+					//	if (ImGui::CollapsingHeader(controller->name.c_str()))
+					//	{
+
+					//		const auto& mat_controller_type = Meta::Find("AnimationController");
+					//		//const auto& mat_name_type = Meta::Find("std::string");
+					//		Meta::DrawProperties(controller, *mat_controller_type);
+					//		Meta::DrawMethods(controller, *mat_controller_type);
+
+						//	if (!controller->StateVec.empty())
+						//	{
+						//		if (ImGui::CollapsingHeader("States"))
+						//		{
+						//			const auto& mat_animationState_type = Meta::Find("AnimationState");
+						//			for (auto& shardAnimationState : controller->StateVec)
+						//			{
+
+						//				AnimationState* AnimationState = shardAnimationState.get();
+						//				ImGui::PushID(AnimationState->m_name.c_str());
+						//				if (ImGui::CollapsingHeader(AnimationState->m_name.c_str()))
+						//				{
+						//					Meta::DrawProperties(AnimationState, *mat_animationState_type);
+						//					//Meta::DrawMethods(AnimationState, *mat_controller_type);
+						//				}
+						//				ImGui::PopID();
+						//			}
+
+						//		}
+						//	}
+						//}
+					//	i++;
+					//	ImGui::PopID();
+					//}
 				}
-
-
-
+				ImGui::End(); // 창 닫기
 			}
 
+			
+			namespace ed = ax::NodeEditor;
+			ed::EditorContext* context = nullptr;
 		}
-
-
-
 	}
 }

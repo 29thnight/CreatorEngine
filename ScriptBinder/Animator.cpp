@@ -54,6 +54,14 @@ void Animator::CreateController(std::string name)
 	m_animationControllers.push_back(animationController);
 }
 
+void Animator::CreateController_UI()
+{
+	AnimationController* animationController = new AnimationController();
+	animationController->m_owner = this;
+	animationController->CreateMask();
+	m_animationControllers.push_back(animationController);
+}
+
 AnimationController* Animator::GetController(std::string name)
 {
 	for (auto& Controller : m_animationControllers)

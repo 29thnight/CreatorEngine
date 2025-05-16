@@ -7,7 +7,7 @@
 void AnimationController::SetNextState(std::string stateName)
 {
 	
-	m_nextState = StateVec[States[stateName]].get();
+	m_nextState = FindState(stateName);
 }
 
 bool AnimationController::BlendingAnimation(float tick)
@@ -34,8 +34,7 @@ bool AnimationController::BlendingAnimation(float tick)
 
 void AnimationController::SetCurState(std::string stateName)
 {
-	m_curState = StateVec[States[stateName]].get();
-	m_curStateName = m_curState->Name;
+	m_curState = FindState(stateName);
 	
 	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
 	m_AnimationIndex = m_curState->AnimationIndex;
@@ -45,9 +44,8 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		//return nullptr;//*****
-		m_curState = StateVec[0].get();
-		m_curStateName = m_curState->Name;
+		return nullptr;//*****
+		//m_curState = StateVec[0].get();
 	}
 
 	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
@@ -102,15 +100,16 @@ void AnimationController::UpdateState()
 		}
 
 
-		m_nextState = StateVec[States[trans->GetNextState()]].get();
-		
+		m_nextState = FindState(trans->GetNextState());
+
 		m_owner->nextAnimIndex = m_nextState->AnimationIndex;
 		m_nextAnimationIndex = m_nextState->AnimationIndex;
 
+		if (m_curState->behaviour != nullptr)
 		m_curState->behaviour->Exit();
+		if (m_nextState->behaviour != nullptr)
 		m_nextState->behaviour->Enter();
 		m_curState = m_nextState;
-		m_curStateName = m_curState->Name;
 		m_nextState = nullptr;
 		m_curTrans = trans.get();
 		needBlend = true;
@@ -143,24 +142,26 @@ void AnimationController::Update(float tick)
 	}
 
 	if (m_curState == nullptr) return;
-	m_curState->behaviour->Update(tick);
+
+	if(m_curState->behaviour != nullptr)
+		m_curState->behaviour->Update(tick);
 }
 
 int AnimationController::GetAnimatonIndexformState(std::string stateName)
 {
 	for (auto& state : StateVec)
 	{
-		if (state->Name == stateName)
+		if (state->m_name == stateName)
 			return state->AnimationIndex;
 	}
 }
 
 AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isAny)
 {
-	auto it = States.find(stateName);
-	if (it != States.end())
+	auto it = FindState(stateName);
+	if (it != nullptr)
 	{
-		return (StateVec[it->second].get());
+		return it;
 	}
 
 	auto state = std::make_shared<AnimationState>(this, stateName);
@@ -171,13 +172,43 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
-
+	StateNameSet.insert(stateName);
 	return state.get();
+}
+
+void AnimationController::CreateState_UI()
+{
+	std::string uniqueName = "NewState"; 
+	std::string baseName = "NewState";
+	int count = 0;
+	while(StateNameSet.find(uniqueName) !=  StateNameSet.end())
+	{
+		uniqueName = baseName + " " + std::to_string(count++);
+	}
+
+	auto state = std::make_shared<AnimationState>(this, uniqueName);
+	StateNameSet.insert(uniqueName);
+	StateVec.push_back(state);
+	StateVec.back()->index = StateVec.size() - 1;
+}
+
+AnimationState* AnimationController::FindState(std::string stateName)
+{
+	for (auto& state : StateVec)
+	{
+		if (state->m_name == stateName)
+		{
+			return state.get();
+		}
+	}
+
+	return nullptr;
 }
 
 AniTransition* AnimationController::CreateTransition(const std::string& curStateName, const std::string& nextStateName)
 {
-	for (auto& trans : StateVec[States[curStateName]]->Transitions)
+	
+	for (auto& trans : FindState(curStateName)->Transitions)
 	{
 		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
 			return trans.get();
@@ -185,7 +216,7 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 	}
 	auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
 	transition->m_ownerController = this;
-	StateVec[States[curStateName]]->Transitions.push_back(transition);
+	FindState(curStateName)->Transitions.push_back(transition);
 	return transition.get();
 }
 

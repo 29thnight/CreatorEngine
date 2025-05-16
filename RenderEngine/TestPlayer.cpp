@@ -36,7 +36,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	lowercontroller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
 	lowercontroller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	lowercontroller->GetAvatarMask()->UseOnlyLower();
-	animation->AddParameter("Speed", player->speed, ValueType::Float);
+	animation->AddParameter("Speed",speed, ValueType::Float);
 	animation->AddParameter("Walkparm", false, ValueType::Trigger);
 	animation->AddParameter("Idleparm", false, ValueType::Trigger);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
@@ -75,23 +75,23 @@ void TestPlayer::Update(float deltaTime)
 	}
 	else if(InputManagement->IsKeyPressed('P'))
 	{
-		_player->speed += 0.05;
+		speed += 0.05;
 	}
 	else
 	{
-		if (_player->speed > 0.0f)
+		if (speed > 0.0f)
 		{
-			_player->speed -= 0.05f;
-			if (_player->speed < 0.0f)
-				_player->speed = 0.0f;
+			speed -= 0.05f;
+			if (speed < 0.0f)
+				speed = 0.0f;
 		}
 	}
 
 	
-	if (_player->speed >= maxSpeed)
-		_player->speed = maxSpeed;
+	if (speed >= maxSpeed)
+		speed = maxSpeed;
 
-	ani->SetParameter("Speed", _player->speed);
+	ani->SetParameter("Speed", speed);
 
 	if (InputManagement->IsKeyDown('I'))
 	{
@@ -103,7 +103,7 @@ void TestPlayer::Update(float deltaTime)
 		ani->SetParameter("Idleparm", true);
 	}
 
-	_player->m_transform.AddPosition({ _player->speed * deltaTime* dir.x,0, _player->speed * deltaTime * dir.y });
+	_player->m_transform.AddPosition({ speed * deltaTime* dir.x,0, speed * deltaTime * dir.y });
 }
 
 void TestPlayer::Punch()

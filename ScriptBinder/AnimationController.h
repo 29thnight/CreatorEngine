@@ -17,9 +17,7 @@ public:
     AnimationController() = default;
 
     [[Property]]
-    std::string name;
-	[[Property]]
-	std::string m_curStateName = "None";
+    std::string name = "None";
 	[[Property]]
 	AnimationState* m_curState = nullptr;
 	AnimationState* m_nextState = nullptr;
@@ -28,7 +26,7 @@ public:
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
 
-
+	std::set<std::string> StateNameSet;
 
 	
 	//어디에서든지 전이가능한 state모음
@@ -45,12 +43,15 @@ public:
 	int GetAnimationIndex() { return m_AnimationIndex; }
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
+	[[Method]]
+	void CreateState_UI();
+
+	AnimationState* FindState(std::string stateName);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
 	
 	AvatarMask* GetAvatarMask() { return &m_avatarMask; }
 	void CreateMask();
 	void CheckMask();
-	
 	Animator* m_owner{};
 	float m_timeElapsed;
 	float m_nextTimeElapsed;

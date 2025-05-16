@@ -50,7 +50,7 @@ private:
 	[[Property]]
 	float exitTime =0.f;
 
-	//std::vector<TransConditionVariant> conditions;
+	
 	
 };
 

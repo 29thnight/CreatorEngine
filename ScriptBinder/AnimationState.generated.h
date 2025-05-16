@@ -5,7 +5,7 @@ ReflectionField(AnimationState) \
 { \
 	PropertyField \
 	({ \
-		meta_property(Name) \
+		meta_property(m_name) \
 		meta_property(Transitions) \
 		meta_property(index) \
 		meta_property(AnimationIndex) \
