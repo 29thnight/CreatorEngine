@@ -77,6 +77,12 @@ public:
 	BoundingBox GetBoundingBox() const { return m_boundingBox; }
 	BoundingSphere GetBoundingSphere() const { return m_boundingSphere; }
 
+	std::vector<Vertex> GetVertices() const{ return m_vertices; }
+	std::vector<uint32> GetIndices() const { return m_indices; }
+	ComPtr<ID3D11Buffer> GetVertexBuffer() { return m_vertexBuffer; }
+	ComPtr<ID3D11Buffer> GetIndexBuffer()  { return m_indexBuffer; }
+	uint32 GetStride()  { return m_stride; }
+
 private:
 	friend class ModelLoader;
 

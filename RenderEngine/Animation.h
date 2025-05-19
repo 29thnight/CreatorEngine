@@ -40,5 +40,5 @@ public:
 	float m_duration{};
 	double m_ticksPerSecond{};
 	[[Property]]
-	bool m_isLoop = false;
+	bool m_isLoop = true;
 };
