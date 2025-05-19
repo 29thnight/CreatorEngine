@@ -39,8 +39,8 @@ public:
 	{
 		if (m_pCamera)
 		{
-			m_pCamera->m_eyePosition = m_pOwner->m_transform.position;
-			XMVECTOR rotationQuat = m_pOwner->m_transform.rotation;
+			m_pCamera->m_eyePosition = m_pOwner->m_transform.GetWorldPosition();
+			XMVECTOR rotationQuat = m_pOwner->m_transform.GetWorldQuaternion();
 			rotationQuat = XMQuaternionNormalize(rotationQuat);
 
 			static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
