@@ -383,6 +383,19 @@ void SceneRenderer::SceneRendering()
 	for(auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
+
+		if (camera != m_pEditorCamera.get())
+		{
+			if(EngineSettingInstance->IsGameView())
+			{
+				camera->m_applyRenderPipelinePass.m_BlitPass = true;
+			}
+			else
+			{
+				camera->m_applyRenderPipelinePass.m_BlitPass = false;
+			}
+		}
+
 		std::wstring name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
 		DirectX11::BeginEvent(name);
 		//[1] ShadowMapPass
@@ -413,6 +426,7 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
 		if (useTestLightmap)
 		{
 			DirectX11::BeginEvent(L"LightMapPass");

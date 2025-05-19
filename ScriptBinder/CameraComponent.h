@@ -16,7 +16,7 @@ public:
    CameraComponent() 
    {
 	   m_name = "CameraComponent"; 
-	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CameraComponent>();
+	   m_typeID = type_guid(CameraComponent);
    } 
    virtual ~CameraComponent() = default;
 
@@ -56,9 +56,9 @@ public:
 
 	void OnDistroy() override
 	{
-		//delete m_pCamera;
-		//m_cameraIndex = -1;
-		//m_pCamera = nullptr;
+		delete m_pCamera;
+		m_cameraIndex = -1;
+		m_pCamera = nullptr;
 	}
 
 	Camera* GetCamera() const
@@ -69,9 +69,6 @@ public:
 	DirectX::BoundingFrustum GetFrustum() const
 	{
 		DirectX::BoundingFrustum frustum = m_pCamera->GetFrustum();
-		//frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
-		//frustum.Origin = Mathf::Vector3(m_pOwner->m_transform.position);
-		//frustum.Orientation = m_pOwner->m_transform.rotation;
 
 		return frustum;
 	}

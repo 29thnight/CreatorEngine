@@ -122,3 +122,34 @@ public:
 private:
     flag m_flag{};
 };
+
+template<typename T>
+class Property
+{
+public:
+    using Getter = std::function<T()>;
+    using Setter = std::function<void(const T&)>;
+
+    Property() = default;
+
+    Property(Getter getter, Setter setter)
+        : m_getter(std::move(getter)), m_setter(std::move(setter)) {
+    }
+
+    // Getter
+    operator T() const
+    {
+        return m_getter();
+    }
+
+    // Setter
+    Property& operator=(const T& value)
+    {
+        m_setter(value);
+        return *this;
+    }
+
+private:
+    Getter m_getter;
+    Setter m_setter;
+};

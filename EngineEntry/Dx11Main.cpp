@@ -216,7 +216,7 @@ void DirectX11::Dx11Main::InfoWindow()
 
 void DirectX11::Dx11Main::OnGui()
 {
-    if (!m_isGameView)
+    if (!EngineSettingInstance->IsGameView())
     {
         m_imguiRenderer->BeginRender();
 		m_menuBarWindow->RenderMenuBar();

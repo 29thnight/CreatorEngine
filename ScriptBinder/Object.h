@@ -21,8 +21,6 @@ public:
     {
 		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
     }
-    Object(const Object&) = default;
-    Object(Object&&) noexcept = default;
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }

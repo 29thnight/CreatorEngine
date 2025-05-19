@@ -1,13 +1,21 @@
 #include "Component.h"
 #include "GameObject.h"
 
-Component* Component::GetComponent(HashedGuid typeof)
+void Component::SetOwner(GameObject* owner)
 {
+	m_pOwner = owner; 
+	m_pTransform = &m_pOwner->m_transform;
+}
+
+Component& Component::GetComponent(HashedGuid typeof)
+{
+	if (!m_pOwner) throw std::null_exception("not set owner");
+
 	auto it = m_pOwner->m_componentIds.find(typeof);
 	if (it != m_pOwner->m_componentIds.end())
 	{
-		return m_pOwner->m_components[it->second].get();
+		return *m_pOwner->m_components[it->second].get();
 	}
 
-	return nullptr;
+	throw std::null_exception("Component not found");
 }

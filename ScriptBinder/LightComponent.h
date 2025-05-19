@@ -29,29 +29,32 @@ public:
         auto pair = scene->AddLight();
 		m_lightIndex = pair.first;
         Light& light = pair.second;
-
-		light.m_position = m_pOwner->m_transform.position;
-		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
-        light.m_direction.Normalize();
-        m_direction = light.m_direction;
-		light.m_color = m_color * m_intencity;
-		light.m_constantAttenuation = m_constantAttenuation;
-		light.m_linearAttenuation = m_linearAttenuation;
-		light.m_quadraticAttenuation = m_quadraticAttenuation;
-		light.m_spotLightAngle = XMConvertToRadians(m_spotLightAngle);
-		light.m_lightType = static_cast<int>(m_lightType);
-		light.m_lightStatus = static_cast<int>(m_lightStatus);
-        light.m_range = m_range;
-		light.m_intencity = m_intencity;
+		scene->CollectLightComponent(this);
+        ApplyLightData(light);
     }
 
     void Update(float deltaSeconds) override
     {
         Light& light = SceneManagers->GetActiveScene()->GetLight(m_lightIndex);
+		ApplyLightData(light);
+    }
+
+	void OnDistroy() override
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (scene != nullptr && m_pOwner->IsDestroyMark())
+		{
+            scene->RemoveLight(m_lightIndex);
+            scene->UnCollectLightComponent(this);
+		}
+	}
+
+    void ApplyLightData(Light& light)
+    {
         light.m_position = m_pOwner->m_transform.position;
-		light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
-		light.m_direction.Normalize();
-		m_direction = light.m_direction;
+        light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
+        light.m_direction.Normalize();
+        m_direction = light.m_direction;
         light.m_color = m_color * m_intencity;
         light.m_constantAttenuation = m_constantAttenuation;
         light.m_linearAttenuation = m_linearAttenuation;
@@ -62,15 +65,6 @@ public:
         light.m_range = m_range;
         light.m_intencity = m_intencity;
     }
-
-	void OnDistroy() override
-	{
-		Scene* scene = SceneManagers->GetActiveScene();
-		if (scene != nullptr && m_pOwner->IsDestroyMark())
-		{
-            scene->RemoveLight(m_lightIndex);
-		}
-	}
 
     DirectX::BoundingBox GetEditorBoundingBox() const
 	{

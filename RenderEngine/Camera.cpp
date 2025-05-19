@@ -12,6 +12,8 @@ Camera::Camera()
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
 
+	m_cameraIndex = CameraManagement->GetCameraCount();
+
 	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
 
     auto renderTexture = TextureHelper::CreateRenderTexture(  
