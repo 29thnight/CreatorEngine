@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -161,12 +161,14 @@
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
+    <ClCompile Include="Component.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="MonoManager.cpp" />
     <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="ActionMap.cpp" />
@@ -176,6 +178,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
+    <ClCompile Include="TagManager.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
     <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="TransCondition.cpp" />
@@ -213,8 +216,10 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />
+    <ClInclude Include="IOnDistroy.h" />
+    <ClInclude Include="IOnEnable.h" />
+    <ClInclude Include="IProjectSetting.h" />
     <ClInclude Include="IRenderable.h" />
-    <ClInclude Include="JobManager.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightMapping.h" />
@@ -227,6 +232,7 @@
     <ClInclude Include="MonoObjectBinding.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PhysicsManager.h" />
+    <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RaycastComponent.h" />
     <ClInclude Include="RegisterReflect.def" />
@@ -239,6 +245,7 @@
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
@@ -251,6 +258,7 @@
     <ClInclude Include="UIManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Component.inl" />
     <None Include="GameObejct.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

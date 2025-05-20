@@ -24,6 +24,7 @@ public:
 
 	RenderScene* m_renderScene{};
 	Camera* m_pEditorCamera{};
+    bool m_bShowGridSettings{ true };
 
 private:
     void ShowGridSettings();
@@ -36,5 +37,4 @@ private:
 	std::unique_ptr<GizmoLinePass>  m_pGizmoLinePass{};
 
 	bool m_buseWireFrame{ false };
-    bool m_bShowGridSettings{ true };
 };

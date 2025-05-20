@@ -4,6 +4,7 @@
 
 class Scene;
 class Object;
+class MeshRenderer;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -24,7 +25,7 @@ public:
     void EndOfFrame();
     void Pausing();
     void DisableOrEnable();
-    void Deccommissioning();
+    void Decommissioning();
 
     Scene* GetActiveScene() { return m_activeScene; }
     Scene* GetScene(size_t index) { return m_scenes[index]; }
@@ -42,6 +43,10 @@ public:
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
+
+	bool IsEditorSceneLoaded() const { return m_isEditorSceneLoaded; }
+
+    std::vector<MeshRenderer*> GetAllMeshRenderers() const;
 
 public:
 	//for Editor
@@ -78,3 +83,16 @@ private:
 };
 
 static auto& SceneManagers = SceneManager::GetInstance();
+#pragma region SceneManagerEvents
+static auto& PlayModeEvent = SceneManagers->PlayModeEvent;
+static auto& InputEvent = SceneManagers->InputEvent;
+static auto& SceneRenderingEvent = SceneManagers->SceneRenderingEvent;
+static auto& OnDrawGizmosEvent = SceneManagers->OnDrawGizmosEvent;
+static auto& GUIRenderingEvent = SceneManagers->GUIRenderingEvent;
+static auto& InternalAnimationUpdateEvent = SceneManagers->InternalAnimationUpdateEvent;
+static auto& activeSceneChangedEvent = SceneManagers->activeSceneChangedEvent;
+static auto& sceneLoadedEvent = SceneManagers->sceneLoadedEvent;
+static auto& sceneUnloadedEvent = SceneManagers->sceneUnloadedEvent;
+static auto& newSceneCreatedEvent = SceneManagers->newSceneCreatedEvent;
+static auto& resetSelectedObjectEvent = SceneManagers->resetSelectedObjectEvent;
+#pragma endregion

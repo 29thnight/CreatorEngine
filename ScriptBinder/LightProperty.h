@@ -75,7 +75,7 @@ cbuffer LightCount
 
 cbuffer ShadowMapConstant
 {
-   float m_shadowMapWidth{};
+    float m_shadowMapWidth{};
     float m_shadowMapHeight{};
     Mathf::xMatrix m_lightViewProjection[3]{};
     float m_casCadeEnd1{};

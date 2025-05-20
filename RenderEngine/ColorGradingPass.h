@@ -12,7 +12,6 @@ public:
 	void Initialize(const std::string_view& fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	virtual void Resize() override;
 
 	UniqueTexturePtr m_pColorGradingTexture{};
 private:

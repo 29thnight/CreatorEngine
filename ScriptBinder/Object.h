@@ -21,8 +21,6 @@ public:
     {
 		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
     }
-    Object(const Object&) = default;
-    Object(Object&&) noexcept = default;
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
@@ -30,9 +28,12 @@ public:
     std::string ToString() const override final { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
 
-    void Destroy();
+    virtual void Destroy();
     bool IsDestroyMark() const { return m_destroyMark; }
     bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad; }
+
+    bool IsEnabled() const { return m_isEnabled; }
+	virtual void SetEnabled(bool able) { m_isEnabled = able; }
 
 	static void Destroy(Object* objPtr);
     static void SetDontDestroyOnLoad(Object* objPtr);
@@ -41,7 +42,9 @@ public:
 
 public:
     [[Property]]
-    HashingString     m_name{ "Object" };
+    HashingString m_name{ "Object" };
+    [[Property]]
+	bool m_isEnabled{ true };
 
 protected:
     friend class SceneManager;

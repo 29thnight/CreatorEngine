@@ -10,8 +10,8 @@
 #include "Component.h"
 #include "Terrain.generated.h"
 
-
-struct TerrainBrush {
+struct TerrainBrush 
+{
 	//터레인을 수정할수 있는 브러쉬
 	//brush 모드 / 상승 / 하강 / 평탄화 / 페인팅
 	enum class Mode { Raise, Lower, Flatten, PaintLayer } m_mode;
@@ -25,17 +25,16 @@ struct TerrainBrush {
 	void SetBrushMode(Mode mode) { m_mode = mode; }
 };
 
-struct TerrainLayer {
+struct TerrainLayer 
+{
 	uint32_t m_layerID{ 0 };
-	ID3D10ShaderResourceView* diffuseTexture{ nullptr };
-	ID3D10ShaderResourceView* normalTexture{ nullptr };
+	ID3D11ShaderResourceView* diffuseTexture{ nullptr };
+	ID3D11ShaderResourceView* normalTexture{ nullptr };
 	float fileFactor{ 1.0f };
 };
 
-
-
-class Terrain :public Component{
-
+class Terrain : public Component
+{
 public:
    ReflectTerrain
 	[[Serializable(Inheritance:Component)]]
@@ -47,12 +46,14 @@ public:
 	int m_height{ 1000 };
 	
 	//초기화
-	void Initialize() {
+	void Initialize() 
+	{
 		m_heightMap.assign(m_width * m_height, 0.0f); //0.0f로 초기화
 		m_vNormalMap.assign(m_width * m_height, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f }); //normal vector 초기화
 	}
 
-	void ApplyBrush(const TerrainBrush& brush) {
+	void ApplyBrush(const TerrainBrush& brush) 
+	{
 		//브러쉬를 적용하는 함수
 		
 		//브러쉬 적용 범위
@@ -62,14 +63,18 @@ public:
 		int maxY = std::min(m_height - 1, static_cast<int>(brush.m_center.y + brush.m_radius));
 
 		//범위 순회
-		for (int i = minY; i <= maxY; ++i) {
-			for (int j = minX; j <= maxX; ++j) {
+		for (int i = minY; i <= maxY; ++i) 
+		{
+			for (int j = minX; j <= maxX; ++j) 
+			{
 				//브러쉬의 중심과 현재 좌표의 거리로 원형으로 적용
 				float distance = sqrtf(powf(brush.m_center.x - j, 2) + powf(brush.m_center.y - i, 2));
-				if (distance <= brush.m_radius) {
+				if (distance <= brush.m_radius) 
+				{
 					//브러쉬의 세기와 거리 비율에 따라 높이 변경
 					float heightChange = brush.m_strength * (1.0f - (distance / brush.m_radius));
-					switch (brush.m_mode) {
+					switch (brush.m_mode) 
+					{
 					case TerrainBrush::Mode::Raise:
 						m_heightMap[i * m_width + j] += heightChange;
 						break;
@@ -89,14 +94,15 @@ public:
 		}
 		//노말맵 재계산
 		ReClalculateNormalMap();
-
 	}
 
-
 	//변경된 높이맵을 기반으로 노말맵을 다시 계산
-	void ReClalculateNormalMap() {
-		for (int i = 0; i < m_height; ++i) {
-			for (int j = 0; j < m_width; ++j) {
+	void ReClalculateNormalMap() 
+	{
+		for (int i = 0; i < m_height; ++i) 
+		{
+			for (int j = 0; j < m_width; ++j) 
+			{
 				//노말맵 계산
 				//상하좌우 높이차를 계산하여 노말 벡터를 구함
 				float heightL = (j > 0) ? m_heightMap[i * m_width + (j - 1)] : m_heightMap[i * m_width + j];
@@ -110,7 +116,8 @@ public:
 				normal.z = heightD - heightU;
 				//정규화
 				float length = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-				if (length > 0.0f) {
+				if (length > 0.0f) 
+				{
 					normal.x /= length;
 					normal.y /= length;
 					normal.z /= length;
@@ -122,23 +129,26 @@ public:
 	}
 
 	//높이맵을 기반으로 레이어를 페인팅
-	void PaintLayer(uint32_t layerId,int x,int y,float strength) {
+	void PaintLayer(uint32_t layerId,int x,int y,float strength) 
+	{
 		//todo : 레이어 페인팅
-		for (size_t i = 0; i < m_layers.size(); ++i) {
-			if (m_layers[i].m_layerID == layerId) {
+		for (size_t i = 0; i < m_layers.size(); ++i) 
+		{
+			if (m_layers[i].m_layerID == layerId) 
+			{
 				//레이어 페인팅
 				int mapIdx = y * m_width + x;
 				m_layerHeightMap[i][mapIdx] = std::clamp(m_layerHeightMap[i][mapIdx] + strength, 0.0f, 1.0f);
 				break;
 			}
 		}
-	
 	}
 
 private:
 	//터레인을 구분하는 아이디
 	unsigned int m_terrainID{ 0 };
-	
+	//바이너리로 저장된 지형 정보 파일에 대한 GUID
+	FileGuid m_trrainAssetGuid{};
 	//헤이트 맵
 	std::vector<float> m_heightMap;
 	//계산된 노말맵
@@ -151,7 +161,6 @@ private:
 	std::vector<std::vector<float>> m_layerHeightMap;
 
 	//지형의 높이맵을 담고 있는 텍스쳐 -> 예는 어떻게 할까?
-
 	float m_textureWidth;
 	float m_textureHeight;
 };

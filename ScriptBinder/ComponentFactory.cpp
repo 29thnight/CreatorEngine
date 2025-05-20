@@ -92,6 +92,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					animator->Parameters.push_back(aniParam);
 				}
 			}
+
 			if(itNode["m_animationControllers"])
 			{
 				

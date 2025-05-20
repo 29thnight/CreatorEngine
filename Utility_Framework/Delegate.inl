@@ -48,6 +48,7 @@ namespace Core
 	void Delegate<Ret, Args...>::Remove(const DelegateHandle& handle)
 	{
 		SpinLock lock(atomic_flag_);
+		if (callbacks_.size() == 0) return;
 		callbacks_.erase(std::remove_if(callbacks_.begin(), callbacks_.end(),
 			[&handle](const CallbackInfo& info) { return info.handle == handle; }), callbacks_.end());
 	}

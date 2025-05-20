@@ -5,6 +5,7 @@
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "RegisterReflect.def"
+#include "CullingManager.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -88,7 +89,7 @@ void SceneManager::DisableOrEnable()
     m_activeScene->OnDestroy();
 }
 
-void SceneManager::Deccommissioning()
+void SceneManager::Decommissioning()
 {
     m_activeScene->OnDisable();
     m_activeScene->AllDestroyMark();
@@ -141,6 +142,9 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         if (m_activeScene)
         {
+            m_activeScene->AllDestroyMark();
+            m_activeScene->OnDisable();
+            m_activeScene->OnDestroy();
 			Scene* swapScene = m_activeScene;
 			m_activeScene = nullptr;
 
@@ -183,6 +187,19 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
     {
         m_dontDestroyOnLoadObjects.push_back(objPtr);
     }
+}
+
+std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
+{
+	std::vector<MeshRenderer*> meshRenderers;
+	for (const auto& renderer : m_activeScene->m_SceneObjects)
+	{
+		if (auto ptr = renderer->GetComponent<MeshRenderer>(); nullptr != ptr)
+		{
+			meshRenderers.push_back(ptr);
+		}
+	}
+	return meshRenderers;
 }
 
 void SceneManager::CreateEditorOnlyPlayScene()
@@ -239,10 +256,11 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
-	m_isEditorSceneLoaded = false;
+	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
 	sceneUnloadedEvent.Broadcast();
-	m_activeScene = m_scenes[m_EditorSceneIndex];
+
+	m_isEditorSceneLoaded = false;
 }
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)

@@ -15,6 +15,7 @@ public:
 private:
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	bool m_openScriptPopup{ false };
+	bool m_openNewScriptPopup{ false };
 	void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);

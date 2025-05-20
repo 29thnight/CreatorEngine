@@ -1,4 +1,5 @@
 #include "Transform.h"
+#include "GameObject.h"
 
 Transform& Transform::SetScale(Mathf::Vector3 scale)
 {
@@ -35,7 +36,7 @@ Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 {
 	m_dirty = true;
-	DirectX::XMQuaternionMultiply(rotation, quaternion);
+	rotation = DirectX::XMQuaternionMultiply(quaternion, rotation);
 
 	return *this;
 }
@@ -81,11 +82,13 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 {
 	m_worldMatrix = matrix;
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
-	Mathf::xVector determinant{};
-	if (XMVectorGetX(determinant) != 0.0f)
-	{
-		m_inverseMatrix = XMMatrixInverse(&determinant, m_worldMatrix);
-	}
+	
+	XMMATRIX parentMat = GameObject::FindIndex(m_parentID)->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
+	m_localMatrix = newLocalMatrix;
+
+	SetLocalMatrix(m_localMatrix);
 }
 
 Mathf::xVector Transform::GetWorldPosition() const
@@ -101,4 +104,14 @@ Mathf::xVector Transform::GetWorldScale() const
 Mathf::xVector Transform::GetWorldQuaternion() const
 {
 	return m_worldQuaternion;
+}
+
+bool Transform::IsDirty() const
+{
+	return m_dirty;
+}
+
+void Transform::SetParentID(uint32 id)
+{
+	m_parentID = id;
 }

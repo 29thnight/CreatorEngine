@@ -19,9 +19,10 @@ public:
 	~SSAOPass();
 
 	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal);
+	void ReloadDSV(ID3D11ShaderResourceView* depth);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
 
 private:
     UniqueTexturePtr m_NoiseTexture{ TEXTURE_NULL_INITIALIZER };

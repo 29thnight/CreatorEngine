@@ -1,5 +1,6 @@
 #include "SceneViewWindow.h"
 #include "SceneRenderer.h"
+#include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -50,7 +51,9 @@ bool RayIntersectsPlane(const Ray& ray, const Mathf::Vector3& planeNormal, const
 	return true;
 }
 
-SceneViewWindow::SceneViewWindow(SceneRenderer* ptr) : m_sceneRenderer(ptr)
+SceneViewWindow::SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) : 
+	m_sceneRenderer(ptr),
+	m_gizmoRenderer(gizmo_ptr)
 {
 }
 
@@ -175,7 +178,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 		if (ImGui::Button(ICON_FA_BARS " Grid"))
 		{
-			m_sceneRenderer->m_bShowGridSettings = true;
+			m_gizmoRenderer->m_bShowGridSettings = true;
 		}
 
 		ImGui::SameLine();
@@ -322,7 +325,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 			nullptr, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
 	
-		XMMATRIX parentMat = SceneManagers->GetActiveScene()->GetGameObject(obj->m_parentIndex)->m_transform.GetWorldMatrix();
+		XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
@@ -370,9 +373,35 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 
 	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+	static bool useGizmo = false;
+	static float gizmoTimer = 0.f;
 
+	if (ImGuizmo::IsUsing())
+	{
+		useGizmo = true;
+		if (useWindow)
+		{
+			ImGui::End();
+			ImGui::PopStyleColor(2);
+		}
+		return;
+	}
 
-	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+	if (useGizmo)
+	{
+		gizmoTimer += Time->GetElapsedSeconds();
+		if (gizmoTimer > 0.5f)
+		{
+			useGizmo = false;
+			gizmoTimer = 0.f;
+		}
+	}
+	else
+	{
+		gizmoTimer = 0.f;
+	}
+
+	if (!useGizmo && ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 	{
 		float closest = FLT_MAX;
 		ImVec2 mousePos = ImGui::GetMousePos();
@@ -433,18 +462,15 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		if (!dragPayload || dragPayload != payload)
 		{
 			dragPayload = const_cast<ImGuiPayload*>(payload);
-			if (nullptr != payload)
+			if (previewModelPath.empty() && !dragPreviewObject && dragPayload)
 			{
-				if (previewModelPath.empty() && !dragPreviewObject)
-				{
-					const char* droppedFilePath = static_cast<const char*>(payload->Data);
-					file::path filename = file::path(droppedFilePath).filename();
-					previewModelPath = PathFinder::Relative("Models\\") / filename;
+				const char* droppedFilePath = static_cast<const char*>(dragPayload->Data);
+				file::path filename = file::path(droppedFilePath).filename();
+				previewModelPath = PathFinder::Relative("Models\\") / filename;
 
-					dragPreviewObject = Model::LoadModelToSceneObj(
-						DataSystems->LoadCashedModel(previewModelPath.string().c_str()),
-						*scene);
-				}
+				dragPreviewObject = Model::LoadModelToSceneObj(
+					DataSystems->LoadCashedModel(previewModelPath.string()),
+					*scene);
 			}
 		}
 		else
@@ -469,6 +495,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				dragPayload = nullptr;
 				previewModelPath.clear();
 			}
+		}
+
+		if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
+		{
+			const char* droppedFilePath = (const char*)HDRPayload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
 		}
 
 		ImGui::EndDragDropTarget();

@@ -25,10 +25,9 @@ public:
 		Bone,
 		TypeMax
 	};
-   ReflectGameObject
+    ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
-
 	GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
@@ -38,6 +37,9 @@ public:
 
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
+	void SetTag(const std::string_view& tag);
+
+	virtual void Destroy() override final;
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
@@ -65,15 +67,18 @@ public:
 	template<typename T>
 	void RemoveComponent(T* component);
 
-	void RemoveComponent(uint32 id);
+	void RemoveComponentIndex(uint32 id);
 
-	void RemoveComponent(const std::string_view& scriptName);
+	void RemoveComponentTypeID(uint32 typeID);
+
+	void RemoveScriptComponent(const std::string_view& scriptName);
 
 	void RemoveComponent(Meta::Type& type);
 
 	GameObjectType GetType() const { return m_gameObjectType; }
 
     static GameObject* Find(const std::string_view& name);
+	static GameObject* FindIndex(GameObject::Index index);
 
 	static inline bool IsValidIndex(Index index)
 	{
@@ -84,6 +89,8 @@ public:
 	{
 		return index == INVALID_INDEX;
 	}
+
+	void SetEnabled(bool able) override final;
 
     [[Property]]
 	Transform m_transform{};
@@ -101,15 +108,12 @@ public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
 	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
-	
-	HashingString m_tag{};
+	[[Property]]
+	HashingString m_tag{ "Untagged" };
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
-
-	//debug layer
-	Bone* selectedBone{ nullptr };
 };
 
 #include "GameObejct.inl"

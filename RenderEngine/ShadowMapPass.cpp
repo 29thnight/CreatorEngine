@@ -59,7 +59,7 @@ ShadowMapPass::ShadowMapPass()
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
 {
 	Texture* shadowMapTexture = Texture::CreateArray(width, height, "Shadow Map",
-		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, 3);
+		DXGI_FORMAT_R32_TYPELESS, D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, cascadeCount);
 
 
 	for (int i = 0; i < cascadeCount; i++)
@@ -96,7 +96,9 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	camera.CalculateProjection();
@@ -107,11 +109,9 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 	auto projMatrix = camera.CalculateProjection();
 	Mathf::Vector4 transformedCascade;
 
-
 	shadowMapConstant.m_casCadeEnd1 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[1], 1.f }, camera.CalculateProjection()).z;
 	shadowMapConstant.m_casCadeEnd2 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[2], 1.f }, camera.CalculateProjection()).z;
 	shadowMapConstant.m_casCadeEnd3 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[3], 1.f }, camera.CalculateProjection()).z;
-
 
 	for (int i = 0; i < cascadeCount; i++)
 	{
@@ -162,7 +162,7 @@ void ShadowMapPass::ControlPanel()
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
 
-void ShadowMapPass::Resize()
+void ShadowMapPass::Resize(uint32_t width, uint32_t height)
 {
 
 }
@@ -187,6 +187,36 @@ std::vector<float> devideCascadeEnd(Camera& camera, std::vector<float> ratios)
 	return cascadeEnds;
 }
 
+std::vector<float> devideCascadeEnd(Camera& camera, int cascadeCount, float lambda = 0.95f)
+{
+	std::vector<float> cascadeEnds;
+	cascadeEnds.reserve(cascadeCount + 1);
+
+	float nearZ = camera.m_nearPlane;
+	float farZ = camera.m_farPlane;
+
+	// 0번째는 near plane
+	cascadeEnds.push_back(nearZ);
+
+	for (int i = 1; i <= cascadeCount; ++i)
+	{
+		float p = static_cast<float>(i) / cascadeCount;
+
+		// Linear split
+		float linearSplit = nearZ + (farZ - nearZ) * p;
+
+		// Logarithmic split
+		float logSplit = nearZ * std::pow(farZ / nearZ, p);
+
+		// Lambda 혼합 분할
+		float split = lambda * logSplit + (1.0f - lambda) * linearSplit;
+
+		cascadeEnds.push_back(split);
+	}
+
+	return cascadeEnds;
+}
+
 std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir)
 {
 	auto Fullfrustum = camera.GetFrustum();
@@ -196,15 +226,14 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 	float nearZ = camera.m_nearPlane;
 	float farZ = camera.m_farPlane;
 
-
 	DirectX::BoundingFrustum frustum(camera.CalculateProjection());
 	float frustumDistnace = (frustum.Far - frustum.Near);
 
 	Mathf::Matrix cameraview = camera.CalculateView();
 	Mathf::Matrix viewInverse = camera.CalculateInverseView();
 	Mathf::Vector3 forwardVec;
-	cameraview.Forward(forwardVec);
-	Mathf::Vector3 adjustTranslate = forwardVec * frustumDistnace;
+	forwardVec = cameraview.Forward();
+	Mathf::Vector3 adjustTranslate = forwardVec/* * frustumDistnace*/;
 
 	std::array<std::array<	Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
 
@@ -260,7 +289,6 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
 		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.f, cascadeExtents.z);
-
 
 		shadowinfo[i].m_eyePosition = shadowPos;
 		shadowinfo[i].m_lookAt = centerPos;

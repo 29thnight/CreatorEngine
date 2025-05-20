@@ -53,7 +53,7 @@ public:
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
 
 
 private:

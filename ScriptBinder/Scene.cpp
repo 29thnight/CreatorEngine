@@ -2,14 +2,7 @@
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
-
-Scene::~Scene()
-{
-    for (auto& gameObject : m_SceneObjects)
-    {
-        gameObject.reset();
-    }
-}
+#include "LightComponent.h"
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
@@ -161,15 +154,12 @@ void Scene::DestroyGameObject(GameObject::Index index)
 
 void Scene::Reset()
 {
-	
-    //칠게 있나?
     ScriptManager->SetReload(true);
     ScriptManager->ReplaceScriptComponent();
 }
 
 void Scene::Awake()
 {
-    
     AwakeEvent.Broadcast();
 }
 
@@ -280,6 +270,7 @@ void Scene::OnDestroy()
 {
     OnDestroyEvent.Broadcast();
     DistroyLight();
+    DestroyComponents();
     DestroyGameObjects();
 }
 
@@ -289,6 +280,22 @@ void Scene::AllDestroyMark()
     {
         if (obj && !obj->IsDestroyMark())
             obj->Destroy();
+    }
+}
+
+void Scene::CollectLightComponent(LightComponent* ptr)
+{
+	if (ptr)
+	{
+		m_lightComponents.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectLightComponent(LightComponent* ptr)
+{
+    if (ptr)
+    {
+		std::erase_if(m_lightComponents, [ptr](const auto& light) { return light == ptr; });
     }
 }
 
@@ -339,10 +346,40 @@ void Scene::RemoveLight(size_t index)
 
 void Scene::DistroyLight()
 {
-    std::erase_if(m_lights, [](const Light& light) 
+    std::unordered_map<size_t, size_t> indexRemap;
+    std::vector<Light> newLights;
+    bool isFirstDirectional = false;
+
+	newLights.reserve(m_lights.size());
+
+    for (size_t i = 0; i < m_lights.size(); ++i)
+    {
+        if (m_lights[i].m_lightType != LightType_InVaild)
+        {
+            indexRemap[i] = newLights.size();
+            newLights.push_back(m_lights[i]);
+        }
+    }
+
+    m_lights = std::move(newLights);
+
+	for (auto& comp : m_lightComponents)
 	{
-		return light.m_lightType == LightType_InVaild;
-	});
+		if (!comp) continue;
+
+		int&  lightIndex = comp->m_lightIndex;
+		auto& lightType  = comp->m_lightType;
+        if (auto it = indexRemap.find(lightIndex); it != indexRemap.end())
+        {
+            lightIndex = static_cast<int>(it->second);
+        }
+
+        if (!isFirstDirectional && lightType == LightType::DirectionalLight)
+        {
+            isFirstDirectional  = true;
+            comp->m_lightStatus = LightStatus::StaticShadows;
+        }
+	}
 }
 
 void Scene::DestroyGameObjects()
@@ -357,7 +394,7 @@ void Scene::DestroyGameObjects()
 	if (deletedIndices.empty())
 		return;
 
-    for (const auto& obj : m_SceneObjects)
+    for (auto& obj : m_SceneObjects)
     {
         if (obj && deletedIndices.contains(obj->m_index))
         {
@@ -370,26 +407,12 @@ void Scene::DestroyGameObjects()
                     m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
                 }
             }
-        }
-    }
-
-    for (auto& obj : m_SceneObjects)
-    {
-        if (obj && deletedIndices.contains(obj->m_index))
-        {
-            for (auto& onDistroyComponent : obj->m_components)
-            {
-                auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(onDistroyComponent);
-                if (behavior)
-                {
-                    ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->GetTypeID()], behavior->m_name.ToString());
-                }
-            }
 
             obj->m_childrenIndices.clear();
             obj.reset();
         }
     }
+
     std::erase_if(m_SceneObjects, [](const auto& obj) { return obj == nullptr; });
 
     std::unordered_map<uint32_t, uint32_t> indexMap;
@@ -424,6 +447,34 @@ void Scene::DestroyGameObjects()
 
         obj->m_index = indexMap[oldIndex];
     }
+}
+
+void Scene::DestroyComponents()
+{
+	for (auto& obj : m_SceneObjects)
+	{
+		if (obj)
+		{
+			for (auto& component : obj->m_components)
+			{
+				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
+				if (behavior)
+				{
+					ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->m_scriptTypeID], behavior->m_name.ToString());
+				}
+
+				if (component && component->IsDestroyMark() && !component->IsDontDestroyOnLoad())
+				{
+					component.reset();
+				}
+			}
+
+			std::erase_if(obj->m_components, [](const auto& component)
+			{
+				return component == nullptr;
+			});
+		}
+	}
 }
 
 std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)

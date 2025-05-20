@@ -118,7 +118,3 @@ void ScreenSpaceReflectionPass::ControlPanel()
 	ImGui::SliderInt("Max Ray Count", &maxRayCount, 1, 100);
 	ImGui::Text("Time: %f", Time);
 }
-
-void ScreenSpaceReflectionPass::Resize()
-{
-}

@@ -29,7 +29,7 @@
 #include "LightMap.h"
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
-#include "EffectManager.h"
+#include "Effect/EffectManager.h"
 
 #include "TestPlayer.h"
 const static float pi = XM_PIDIV2 - 0.01f;
@@ -55,10 +55,12 @@ private:
 	friend class GizmoRenderer;
 public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
+	~SceneRenderer();
 
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
 	void SceneRendering();
+	void ReApplyCurrCubeMap();
 
 private:
 	void InitializeDeviceState();
@@ -79,6 +81,8 @@ private:
 	ID3D11ShaderResourceView*   m_depthStencilSRV{};
 
     Core::DelegateHandle m_newSceneCreatedEventHandle{};
+	Core::DelegateHandle m_activeSceneChangedEventHandle{};
+	Core::DelegateHandle m_resizeEventHandle{};
 
 	//pass
 	std::unique_ptr<ShadowMapPass>      m_pShadowMapPass{};
@@ -128,6 +132,7 @@ private:
 	lm::LightMap lightMap;
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
+	ThreadPool* m_threadPool = nullptr;
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

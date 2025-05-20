@@ -5,7 +5,7 @@
 #include "IUpdatable.h"
 #include "Canvas.generated.h"
 
-class Canvas : public Component, public IRenderable, public IUpdatable
+class Canvas : public Component, public IUpdatable
 {
 public:
    ReflectCanvas
@@ -13,21 +13,9 @@ public:
 	Canvas();
 	~Canvas() = default;
 
-	bool IsEnabled() const override
-	{
-		return m_IsEnabled;
-	}
-
-	void SetEnabled(bool able) override
-	{
-		m_IsEnabled = able;
-	}
-
 	void AddUIObject(GameObject* obj);
 	virtual void Update(float tick) override;
 
-    [[Property]]
-	bool m_IsEnabled = true;
 	int PreCanvasOrder = 0;
     [[Property]]
 	int CanvasOrder = 0;

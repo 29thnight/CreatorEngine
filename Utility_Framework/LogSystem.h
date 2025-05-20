@@ -4,6 +4,7 @@
 #include "ClassProperty.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
 class DebugClass : public Singleton<DebugClass>

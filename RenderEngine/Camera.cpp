@@ -2,6 +2,8 @@
 #include "InputManager.h"
 #include "DeviceState.h"
 #include "ImGuiRegister.h"
+#include "MeshRenderer.h"
+#include "Material.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -9,6 +11,8 @@ const static float pi2 = XM_PI * 2.f;
 Camera::Camera()
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
+
+	m_cameraIndex = CameraManagement->GetCameraCount();
 
 	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
 
@@ -124,9 +128,48 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 	}
 
 	DirectX::BoundingFrustum frustum;
-	frustum.CreateFromMatrix(frustum, CalculateProjection());
+	BoundingFrustum::CreateFromMatrix(frustum, CalculateProjection());
+
+	DirectX::XMMATRIX viewMatrix = CalculateView();
+	DirectX::XMMATRIX invView = XMMatrixInverse(nullptr, viewMatrix);
+	frustum.Transform(frustum, invView);
 
 	return frustum;
+}
+
+void Camera::ResizeRelease()
+{
+	if (m_renderTarget)
+	{
+		m_renderTarget.reset();
+	}
+
+	if (m_depthStencil)
+	{
+		m_depthStencil.reset();
+	}
+}
+
+void Camera::ResizeResources()
+{
+	m_aspectRatio = DeviceState::g_aspectRatio;
+
+	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+	auto renderTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		cameraRTVName,
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+	m_renderTarget.swap(renderTexture);
+
+	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
+	auto depthStencil = TextureHelper::CreateDepthTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		depthName
+	);
+	m_depthStencil.swap(depthStencil);
 }
 
 void Camera::RegisterContainer()
@@ -230,4 +273,27 @@ void Camera::ClearRenderTarget()
 {
 	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
 	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+}
+
+void Camera::PushRenderQueue(MeshRenderer* meshRenderer)
+{
+	if (nullptr == meshRenderer) return;
+	if (false == meshRenderer->IsEnabled()) return;
+	Material* mat = meshRenderer->m_Material;
+	if (nullptr == mat) return;
+	switch (mat->m_renderingMode)
+	{
+	case MaterialRenderingMode::Opaque:
+		m_defferdQueue.push_back(meshRenderer);
+		break;
+	case MaterialRenderingMode::Transparent:
+		m_forwardQueue.push_back(meshRenderer);
+		break;
+	}
+}
+
+void Camera::ClearRenderQueue()
+{
+	m_defferdQueue.clear();
+	m_forwardQueue.clear();
 }

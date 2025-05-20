@@ -34,7 +34,6 @@ namespace DirectX11
         void InfoWindow();
         void OnGui();
 		void DisableOrEnable();
-		void SceneFinalize();
 
 		// IDeviceNotify
 		virtual void OnDeviceLost() override;
@@ -60,8 +59,6 @@ namespace DirectX11
 		Core::DelegateHandle m_OnGizmoEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
 		
-		
-
 		std::thread m_renderThread;
 
 		//std::unique_ptr<Scene> m_scene;

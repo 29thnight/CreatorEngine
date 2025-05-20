@@ -1,6 +1,8 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "SceneManager.h"
+#include "Component.h"
+#include "GameObject.h"
 #include "Scene.h"
 
 interface IUpdatable
@@ -12,9 +14,22 @@ interface IUpdatable
         {
             return;
         }
+
         m_updateEventHandle = subscribedScene->UpdateEvent.AddLambda([this](float deltaSecond)
         {
-            Update(deltaSecond);
+            auto ptr = dynamic_cast<Component*>(this);
+			auto sceneObject = ptr->GetOwner();
+			if (nullptr != ptr && sceneObject)
+			{
+                if (!ptr->IsEnabled() && sceneObject->IsDestroyMark())
+                {
+                    return;
+                }
+                else
+                {
+                    Update(deltaSecond);
+                }
+			}
         });
     }
     virtual ~IUpdatable()

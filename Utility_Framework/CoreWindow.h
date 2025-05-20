@@ -42,9 +42,9 @@ public:
     void RegisterHandler(UINT message, Instance* instance, LRESULT(Instance::* handler)(HWND, WPARAM, LPARAM))
     {
         m_handlers[message] = [=](HWND hWnd, WPARAM wParam, LPARAM lParam)
-            {
-                return (instance->*handler)(hWnd, wParam, lParam);
-            };
+        {
+            return (instance->*handler)(hWnd, wParam, lParam);
+        };
     }
 
     template <typename Initializer>

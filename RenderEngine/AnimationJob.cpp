@@ -46,48 +46,26 @@ void AnimationJob::Update(float deltaTime)
     Scene* scene = SceneManagers->GetActiveScene();
     uint32 currSize = scene->m_SceneObjects.size();
 
-    if (currSize < m_objectSize)
+    m_currAnimator.clear();
+	int counter = 0;
+    for (auto& sceneObj : scene->m_SceneObjects)
     {
-        m_currAnimator.clear();
-        m_objectSize = 0;
-    }
+        Animator* animator = sceneObj->GetComponent<Animator>();
+        if (nullptr == animator || !animator->IsEnabled()) continue;
 
-    if(m_objectSize != currSize)
-    {
-        if(0 == m_objectSize)
-        {
-            for (auto& sceneObj : scene->m_SceneObjects)
-            {
-                Animator* animator = sceneObj->GetComponent<Animator>();
-                if (nullptr == animator || !animator->IsEnabled()) continue;
-
-                m_currAnimator.push_back(animator);
-            }
-        }
-        else
-        {
-            for (uint32 i = m_objectSize - 1; i < currSize; ++i)
-            {
-                Animator* animator = scene->m_SceneObjects[i]->GetComponent<Animator>();
-                if (nullptr == animator || !animator->IsEnabled()) continue;
-
-                m_currAnimator.push_back(animator);
-            }
-        }
-        m_objectSize = currSize;
+        m_currAnimator.push_back(animator);
+		counter++;
     }
 
     for(auto& animator : m_currAnimator)
     {
         m_UpdateThreadPool.Enqueue([&]
         {
-            
             Skeleton* skeleton = animator->m_Skeleton;
 
             //컨트롤러별로 상,하체 등등이 분리되있다면
             if (animator->UsesMultipleControllers() == true)
             {
-               
                 for (auto& animationcontroller : animator->m_animationControllers)
                 {
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
@@ -144,8 +122,6 @@ void AnimationJob::Update(float deltaTime)
                     UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
                 }
             }
-            
-            
         });
     }
 
@@ -168,7 +144,6 @@ void AnimationJob::PrepareAnimation()
 
         m_currAnimator.push_back(animator);
     }
-	m_objectSize = currSize;
 }
 
 void AnimationJob::CleanUp()

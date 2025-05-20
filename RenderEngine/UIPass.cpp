@@ -148,7 +148,7 @@ void UIPass::ControlPanel()
 {
 }
 
-void UIPass::Resize()
+void UIPass::Resize(uint32_t width, uint32_t height)
 {
 }
 

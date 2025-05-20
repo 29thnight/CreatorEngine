@@ -10,6 +10,8 @@
 #include "Benchmark.hpp"
 #include "MeshRenderer.h"
 
+XMMATRIX InitialMatrix[MAX_BONES]{};
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -49,6 +51,11 @@ GBufferPass::GBufferPass()
 
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
+	for (uint32 i = 0; i < MAX_BONES; i++)
+	{
+		InitialMatrix[i] = XMMatrixIdentity();
+	}
 }
 
 GBufferPass::~GBufferPass()
@@ -61,14 +68,6 @@ void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetView
 	for (uint32 i = 0; i < size; i++)
 	{
 		m_renderTargetViews[i] = renderTargetViews[i];
-	}
-}
-
-void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
-{
-	for (uint32 i = 0; i < size; i++)
-	{
-		m_editorRTV[i] = renderTargetViews[i];
 	}
 }
 
@@ -158,7 +157,12 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
 
+		GameObject* sceneObject = meshRenderer->GetOwner();
+		if (sceneObject->IsDestroyMark()) continue;
+		if (sceneObject->m_parentIndex == -1) continue;
+
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+
 		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
 		if (nullptr != animator && animator->IsEnabled())
 		{
@@ -167,6 +171,10 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
 				currentAnimator = animator;
 			}
+		}
+		else
+		{
+			DirectX11::UpdateBuffer(m_boneBuffer.Get(), InitialMatrix);
 		}
 
 		Material* mat = meshRenderer->m_Material;
@@ -192,7 +200,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		{
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
-		//36 skinedMesh Draw -> FrameDrop : 형편없구만
+
 		meshRenderer->m_Mesh->Draw();
 	}
 
@@ -207,17 +215,6 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
 }
 
-void GBufferPass::PushDeferredQueue(GameObject* sceneObject)
-{
-	if (nullptr == sceneObject) return;
-	m_deferredQueue.push_back(sceneObject);
-}
-
-void GBufferPass::ClearDeferredQueue()
-{
-	m_deferredQueue.clear();
-}
-
-void GBufferPass::Resize()
+void GBufferPass::Resize(uint32_t width, uint32_t height)
 {
 }

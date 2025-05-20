@@ -1,11 +1,20 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 
+enum class TextureType
+{
+	Unknown,
+	Texture2D,
+	TextureCube,
+	TextureArray,
+	ImageTexture,
+};
+
 class Texture
 {
 public:
 	Texture() = default;
-	Texture(ID3D11Texture2D* texture, const std::string_view& name);
+	Texture(ID3D11Texture2D* texture, const std::string_view& name, TextureType type, CD3D11_TEXTURE2D_DESC desc);
 	Texture(const Texture&) = delete;
 	Texture(Texture&& texture) noexcept;
 	~Texture();
@@ -46,23 +55,43 @@ public:
 		_In_opt_ uint32 mipLevels = 1
 	);
 
+	void ResizeSRV();
+
 	void CreateRTV(_In_ DXGI_FORMAT textureFormat);
+
+	void ResizeRTV(uint32 index);
 
 	void CreateCubeRTVs(
 		_In_ DXGI_FORMAT textureFormat,
 		_In_opt_ uint32 mipLevels = 1
 	);
 
+	void ResizeCubeRTVs();
+
 	void CreateDSV(_In_ DXGI_FORMAT textureFormat);
 
+	void ResizeDSV();
+
 	void CreateUAV(_In_ DXGI_FORMAT textureFormat);
+
+	void ResizeUAV();
 
 	ID3D11RenderTargetView* GetRTV(uint32 index = 0);
 
 	ID3D11Texture2D* m_pTexture{};
+	TextureType m_textureType = TextureType::Unknown;
 	ID3D11ShaderResourceView* m_pSRV{};
+	CD3D11_SHADER_RESOURCE_VIEW_DESC m_srvDesc{};
+
 	ID3D11DepthStencilView* m_pDSV{};
+	CD3D11_DEPTH_STENCIL_VIEW_DESC m_dsvDesc{};
+
 	ID3D11UnorderedAccessView* m_pUAV{};
+	CD3D11_UNORDERED_ACCESS_VIEW_DESC m_uavDesc{};
+
+	bool m_hasSRV{ false };
+	bool m_hasDSV{ false };
+	bool m_hasUAV{ false };
 
 	std::string m_name;
 
@@ -78,11 +107,43 @@ public:
 		m_isTextureAlpha = isAlpha;
 	}
 
+	void ResizeViews(_In_ uint32 width, _In_ uint32 height);
+
+	void Resize2DViews(_In_ uint32 width, _In_ uint32 height);
+	void ResizeCubeViews(_In_ uint32 size);
+	void ResizeArrayViews(_In_ uint32 width, _In_ uint32 height);
+
+	void ResizeRelease();
+
 private:
 	float2 size{};
+
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
+	std::vector<CD3D11_RENDER_TARGET_VIEW_DESC> m_rtvDescs;
+	DXGI_FORMAT m_format{ DXGI_FORMAT_UNKNOWN };
+	CD3D11_TEXTURE2D_DESC m_desc{};
+	bool m_hasRTV{ false };
+	uint32 m_rtvCount = 0;
 	bool m_isTextureAlpha{ false };
+
+	Core::DelegateHandle m_onReleaseHandle{};
+	Core::DelegateHandle m_onResizeHandle{};
 };
+
+class TextureManager : public Singleton<TextureManager>
+{
+private:
+	friend class Singleton;
+	TextureManager() = default;
+	~TextureManager() = default;
+
+public:
+	Core::Delegate<void> OnTextureReleaseEvent{};
+	Core::Delegate<void, uint32, uint32> OnTextureResizeEvent{};
+};
+
+static auto& OnResizeReleaseEvent = TextureManager::GetInstance()->OnTextureReleaseEvent;
+static auto& OnResizeEvent = TextureManager::GetInstance()->OnTextureResizeEvent;
 
 namespace TextureHelper
 {

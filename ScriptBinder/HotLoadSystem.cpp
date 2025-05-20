@@ -127,11 +127,19 @@ void HotLoadSystem::Initialize()
 {
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
     
+#if defined(_DEBUG)
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
         + L"/m /t:Clean;Build /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
+#else
+	command = std::wstring(L"cmd /c \"")
+		+ L"\"" + msbuildPath + L"\" "
+		+ L"\"" + slnPath + L"\" "
+		+ L"/m /t:Clean;Build /p:Configuration=Release /p:Platform=x64 /nologo"
+		+ L"\"";
+#endif
 
 	try
 	{
@@ -248,7 +256,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 			}
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
-			gameObject->m_components[index].reset();
+			//gameObject->m_components[index].reset();
 			gameObject->m_components[index].swap(sharedScript);
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
@@ -271,12 +279,6 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 	{
 		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFileName.string());
 		std::vector<std::string> events;
-		if (!scriptNode["eventRegisterSetting"])
-		{
-
-		}
-
-
 		if (scriptNode["eventRegisterSetting"])
 		{
 			for (const auto& node : scriptNode["eventRegisterSetting"])
@@ -504,7 +506,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
-		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
 		pugi::xml_node filterNodeSource = newSource.append_child("Filter");
 		filterNodeSource.text().set("Script\\ScriptClass");
 
@@ -531,12 +533,12 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
 		pugi::xml_node headerGroup = itemGroups[1];
 		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
-		newHeader.append_attribute("Include") = "\\Assets\\Script\\" + scriptHeaderFileName;
+		newHeader.append_attribute("Include") = "Assets\\Script\\" + scriptHeaderFileName;
 
 		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
 		pugi::xml_node cppGroup = itemGroups[2];
 		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
-		newSource.append_attribute("Include") = "\\Assets\\Script\\" + scriptBodyFileName;
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
 
 		pugi::xml_node additionalOptionsDebug = newSource.append_child("AdditionalOptions");
 		additionalOptionsDebug.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Debug|x64'";
@@ -557,6 +559,15 @@ void HotLoadSystem::Compile()
 {
 	if (hDll)
 	{
+		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+		{
+			auto* script = static_cast<ModuleBehavior*>(gameObject->m_components[index].get());
+			if (script)
+			{
+				UnbindScriptEvents(script, name);
+			}
+			gameObject->m_components[index].reset();
+		}
 		FreeLibrary(hDll);
 		hDll = nullptr;
 	}

@@ -43,7 +43,9 @@ void TestBehavior::Update(float tick)
 {
 	std::cout << "TestBehavior::Update" << std::endl;
 
-	GameObject::Find("IcoSphere")->m_transform.AddPosition(Mathf::Vector3(0.0f, 0.0f, 1.0f) * tick);
+	GetOwner()->m_transform.AddPosition(Mathf::Vector3(0.0f, 0.0f, 1.0f) * tick);
+
+
 }
 
 void TestBehavior::LateUpdate(float tick)

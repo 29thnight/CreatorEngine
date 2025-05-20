@@ -36,9 +36,16 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
+	bool IsDirty() const;
+
+	void SetParentID(uint32 id);
+
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;
+
+	uint32 m_parentID{ 0 };
+
 	[[Property]]
 	bool32 m_dirty{ true };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };

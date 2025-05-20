@@ -105,7 +105,7 @@ namespace lm {
 		// IRenderPass을(를) 통해 상속됨
 		void Initialize();
 		void Execute(RenderScene& scene, Camera& camera) override;
-		virtual void Resize() override;
+		virtual void Resize(uint32_t width, uint32_t height) override;
 
 	public:
 		int canvasSize = 1024;

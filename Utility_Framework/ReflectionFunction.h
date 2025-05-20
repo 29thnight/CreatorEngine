@@ -8,6 +8,7 @@
 #include "Core.Mathf.h"
 #include "LogSystem.h"
 #include "HashingString.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <magic_enum/magic_enum.hpp>
 

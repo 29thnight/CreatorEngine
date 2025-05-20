@@ -179,6 +179,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineGUIWindow\RenderPassWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
+    <ClInclude Include="ProjectSettingWindow.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
@@ -191,6 +192,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
+    <ClCompile Include="ProjectSetting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">

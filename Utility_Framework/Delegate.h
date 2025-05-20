@@ -29,6 +29,26 @@ namespace Core
 		{ std::invoke(t, args...) } -> std::convertible_to<Ret>;
 	};
 
+	template <typename T, typename Ret, typename... Args>
+	struct RawCallback {
+		T* instance;
+		Ret(T::* member)(Args...);
+		int priority = 0;
+	};
+
+	template <typename T, typename Ret, typename... Args>
+	struct SharedCallback {
+		std::shared_ptr<T> instance;
+		Ret(T::* member)(Args...);
+		int priority = 0;
+	};
+
+	template <typename Callable>
+	struct LambdaCallback {
+		Callable lambda;
+		int priority = 0;
+	};
+
 	template <typename Ret, typename... Args>
 	class Delegate
 	{
@@ -47,6 +67,18 @@ namespace Core
 		void TargetInvoke(DelegateHandle& DelegateHandle, Args... args);
 		template <typename R = Ret>
 		std::vector<std::future<R>> AsyncBroadcast(Args... args);
+
+		Delegate& operator()(const Args&... args)
+		{
+			Broadcast(args...);
+			return *this;
+		}
+
+		Delegate& operator-=(const DelegateHandle& handle)
+		{
+			Remove(handle);
+			return *this;
+		}
 
 	private:
 		struct CallbackInfo

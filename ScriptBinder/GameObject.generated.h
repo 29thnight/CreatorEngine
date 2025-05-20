@@ -11,6 +11,7 @@ ReflectionFieldInheritance(GameObject, Object) \
 		meta_property(m_rootIndex) \
 		meta_property(m_childrenIndices) \
 		meta_property(m_gameObjectType) \
+		meta_property(m_tag) \
 		meta_property(m_components) \
 	}); \
 	FieldEnd(GameObject, PropertyOnlyInheritance) \

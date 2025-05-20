@@ -20,7 +20,7 @@ GizmoRenderer::~GizmoRenderer()
 
 void GizmoRenderer::EditorView()
 {
-    if (m_pRenderer->m_bShowGridSettings)
+    if (m_bShowGridSettings)
     {
         ShowGridSettings();
     }

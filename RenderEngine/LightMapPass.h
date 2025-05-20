@@ -8,7 +8,7 @@ public:
 
 	void Initialize(std::vector<Texture*>& lightmaps);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	virtual void Resize() override;
+	virtual void Resize(uint32_t width, uint32_t height) override;
 private:
 	ComPtr<ID3D11Buffer> m_materialBuffer;
 	ComPtr<ID3D11Buffer> m_boneBuffer;

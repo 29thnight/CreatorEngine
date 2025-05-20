@@ -1,4 +1,5 @@
 #pragma once
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -48,10 +49,17 @@ public:
 
 		if (ImGui::Begin(m_name.data(), m_isPopup ? &m_opened : 0, m_flags))
 		{
+			ImGuiWindow* window = ImGui::GetCurrentWindow();
+			if (window->SkipItems)
+			{
+				ImGui::End();
+				return;
+			}
+
 			if (m_isPopup)
 			{
-				ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
-				ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+				ImGui::BringWindowToFocusFront(window);
+				ImGui::BringWindowToDisplayFront(window);
 			}
 
 			for (auto& context : m_contexts)

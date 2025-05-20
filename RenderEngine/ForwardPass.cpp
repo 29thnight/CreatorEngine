@@ -58,11 +58,13 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 
 	Animator* currentAnimator = nullptr;
 
-	for (auto& sceneObject : m_forwardQueue)
+	for (auto& meshRenderer : camera.m_forwardQueue)
 	{
-		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
+
+		GameObject* sceneObject = meshRenderer->GetOwner();
+		if (sceneObject->IsDestroyMark()) continue;
 
 		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
 		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
@@ -115,19 +117,4 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 
 void ForwardPass::ControlPanel()
 {
-}
-
-void ForwardPass::Resize()
-{
-}
-
-void ForwardPass::PushForwardQueue(GameObject* sceneObject)
-{
-	if (nullptr == sceneObject) return;
-	m_forwardQueue.push_back(sceneObject);
-}
-
-void ForwardPass::ClearForwardQueue()
-{
-	m_forwardQueue.clear();
 }

@@ -6,7 +6,7 @@
 #include "../RenderEngine/Texture.h"
 #include "SpriteRenderer.generated.h"
 
-class SpriteRenderer : public Component, public IRenderable
+class SpriteRenderer : public Component
 {
 public:
     [[Property]]
@@ -16,18 +16,4 @@ public:
    ReflectSpriteRenderer
     [[Serializable(Inheritance:Component)]]
     GENERATED_BODY(SpriteRenderer)
-
-    bool IsEnabled() const override
-    {
-        return m_IsEnabled;
-    }
-
-    void SetEnabled(bool able) override
-    {
-        m_IsEnabled = able;
-    }
-
-private:
-    [[Property]]
-    bool m_IsEnabled = false;
 };

@@ -12,6 +12,7 @@
 #include "ShaderSystem.h"
 #include "SceneManager.h"
 #include "EngineSetting.h"
+#include "CullingManager.h"
 
 #include "UIManager.h"
 #include "InputActionManager.h"
@@ -20,6 +21,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 {
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
 	m_deviceResources->RegisterDeviceNotify(this);
+
+    XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
+    XMFLOAT3 extents = { 2000.0f, 2000.0f, 2000.0f };
+    BoundingBox fixedBounds(center, extents);
+	CullingManagers->Initialize(fixedBounds, 3, 30);
+
     g_progressWindow->SetProgress(50);
 	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
@@ -27,7 +34,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 #ifdef EDITOR
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
 	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get());
+	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
 	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
 	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
@@ -51,7 +58,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     SceneManagers->CreateScene();
     g_progressWindow->SetProgress(80);
 
-    m_InputEvenetHandle = SceneManagers->InputEvent.AddLambda([&](float deltaSecond)
+    m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
         InputActionManagers->Update(deltaSecond);
@@ -70,18 +77,18 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         Sound->update();
     });
     g_progressWindow->SetProgress(81);
-    m_SceneRenderingEventHandle = SceneManagers->SceneRenderingEvent.AddLambda([&](float deltaSecond)
+    m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
         m_sceneRenderer->OnWillRenderObject(deltaSecond);
         m_sceneRenderer->SceneRendering();
     });
     g_progressWindow->SetProgress(82);
-	m_OnGizmoEventHandle = SceneManagers->OnDrawGizmosEvent.AddLambda([&]()
+	m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
 	{
 		m_gizmoRenderer->OnDrawGizmos();
 	});
     g_progressWindow->SetProgress(83);
-    m_GUIRenderingEventHandle = SceneManagers->GUIRenderingEvent.AddLambda([&]()
+    m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
     {
         OnGui();
     });
@@ -94,7 +101,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 DirectX11::Dx11Main::~Dx11Main()
 {
 	m_deviceResources->RegisterDeviceNotify(nullptr);
-    SceneManagers->Deccommissioning();
+    SceneManagers->Decommissioning();
 }
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
@@ -105,7 +112,23 @@ void DirectX11::Dx11Main::SceneInitialize()
 void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 {
 	//렌더러의 창 크기에 따라 리소스를 다시 만드는 코드를 여기에 추가합니다.
-	m_deviceResources->ResizeResources();
+    m_deviceResources->ReleaseSwapChain();
+    OnResizeReleaseEvent();
+
+    RECT rect;
+    HWND hwnd = m_deviceResources->GetWindow()->GetHandle();
+
+    GetClientRect(hwnd, &rect);
+    DirectX11::Sizef size;
+    size.width = rect.right - rect.left;
+    size.height = rect.bottom - rect.top;
+
+    // Create the render target view and depth stencil view.
+    m_deviceResources->SetLogicalSize(size);
+
+    OnResizeEvent(size.width, size.height);
+
+    m_sceneRenderer->ReApplyCurrCubeMap();
 }
 
 void DirectX11::Dx11Main::Update()
@@ -179,22 +202,23 @@ void DirectX11::Dx11Main::InfoWindow()
 {
     std::wostringstream woss;
     woss.precision(6);
-    woss << L"Creator Editor - "
+    woss << L"Creator Editor - Windows"
         << L"Width: "
-        << m_deviceResources->GetOutputSize().width
+        << DeviceState::g_Viewport.Width
         << L" Height: "
-        << m_deviceResources->GetOutputSize().height
+        << DeviceState::g_Viewport.Height
         << L" FPS: "
         << m_timeSystem.GetFramesPerSecond()
         << L" FrameCount: "
-        << m_timeSystem.GetFrameCount();
+        << m_timeSystem.GetFrameCount()
+        << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
 }
 
 void DirectX11::Dx11Main::OnGui()
 {
-    if (!m_isGameView)
+    if (!EngineSettingInstance->IsGameView())
     {
         m_imguiRenderer->BeginRender();
 		m_menuBarWindow->RenderMenuBar();

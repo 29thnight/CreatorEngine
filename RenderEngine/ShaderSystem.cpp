@@ -1,6 +1,7 @@
 #include "ShaderSystem.h"
 #include "HLSLCompiler.h"
 #include "Benchmark.hpp"
+#include "ProgressWindow.h"
 
 ShaderResourceSystem::~ShaderResourceSystem()
 {
@@ -62,11 +63,13 @@ void ShaderResourceSystem::LoadShaders()
 void ShaderResourceSystem::ReloadShaders()
 {
 	//RemoveShaders();
+	g_progressWindow->Launch();
+	g_progressWindow->SetTitle(L"Reloading shaders...");
+	g_progressWindow->SetStatusText(L"Reloading shaders...");
+	g_progressWindow->SetProgress(0.0f);
 	HLSLCompiler::CleanUpCache();
 	HLSLIncludeReloadShaders();
 	CSOCleanup();
-
-	Debug->Log("[Shaders Reload Starting]");
 
 	try
 	{
@@ -87,6 +90,8 @@ void ShaderResourceSystem::ReloadShaders()
 		for (const auto& hlslPath : hlslFiles)
 		{
 			file::path cso = precompiledpath / (hlslPath.stem().string() + ".cso");
+			std::wstring text = L"Reloading shader : " + hlslPath.stem().wstring() + L"...";
+			g_progressWindow->SetStatusText(text);
 
 			if (file::exists(cso))
 			{
@@ -109,11 +114,7 @@ void ShaderResourceSystem::ReloadShaders()
 
 			++current;
 			float percent = (static_cast<float>(current) / total) * 100.0f;
-			Debug->Log("Reloading shaders... " + 
-				std::to_string(current) + "/" + 
-				std::to_string(total) + " (" + 
-				std::to_string(percent) + "%)"
-			);
+			g_progressWindow->SetProgress(percent);
 		}
 
 	}
@@ -131,6 +132,9 @@ void ShaderResourceSystem::ReloadShaders()
 	m_isReloading = false;
 
 	Debug->Log("[Shaders Reload Completed]");
+	g_progressWindow->SetStatusText(L"Reloading shaders completed");
+	g_progressWindow->SetProgress(100.0f);
+	g_progressWindow->Close();
 }
 
 void ShaderResourceSystem::HLSLIncludeReloadShaders()

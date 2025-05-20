@@ -4,6 +4,7 @@
 #include "Texture.h"
 #include "Camera.generated.h"
 
+class MeshRenderer;
 class Camera
 {
 public:
@@ -21,11 +22,17 @@ public:
 	DirectX11::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum();
 
+	void ResizeRelease();
+	void ResizeResources();
+
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
 	void ClearRenderTarget();
+
+	void PushRenderQueue(MeshRenderer* meshRenderer);
+	void ClearRenderQueue();
 
 	[[Property]]
 	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
@@ -68,6 +75,9 @@ public:
 	ComPtr<ID3D11Buffer> m_ProjBuffer;
     UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
     UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
+
+	std::vector<MeshRenderer*> m_defferdQueue;
+	std::vector<MeshRenderer*> m_forwardQueue;
 };
 
 class SceneRenderer;
@@ -137,6 +147,22 @@ public:
 		}
 		return nullptr;
 	}
+
+	size_t GetCameraCount()
+	{
+		size_t count = 0;
+		for (auto& camera : m_cameras)
+		{
+			if (nullptr != camera)
+			{
+				count++;
+			}
+		}
+		return count;
+	}
+
+	Core::Delegate<void> m_releaseResourcesEvent{};
+	Core::Delegate<void> m_recreateResourcesEvent{};
 
 private:
 	friend class SceneRenderer;

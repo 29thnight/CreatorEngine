@@ -92,18 +92,26 @@ void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatri
 	if(GameObjectType::Bone == obj->GetType())
 	{
 		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		if (animator)
+		if (!animator || !animator->IsEnabled())
 		{
-			const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
-			if (bone)
-			{
-				obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
-			}
+			return;
 		}
-
+		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		if (bone)
+		{
+			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+		}
 	}
 	else
 	{
+		if (obj->m_transform.IsDirty())
+		{
+			auto renderer = obj->GetComponent<MeshRenderer>();
+			if (renderer)
+			{
+				renderer->SetNeedUpdateCulling(true);
+			}
+		}
 		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 		obj->m_transform.SetAndDecomposeMatrix(model);
 	}
