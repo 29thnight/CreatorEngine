@@ -9,7 +9,7 @@ public:
 	MeshColliderComponent();
 	~MeshColliderComponent() override;
 	[[Property]]
-	ConvexMeshColliderInfo m_Info;
+	ConvexMeshColliderInfo m_Info; 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]

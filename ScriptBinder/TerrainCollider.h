@@ -2,13 +2,17 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
+#include "TerrainColliderComponent.generated.h"
 
-class TerrainCollider : public Component, public ICollider
+class TerrainColliderComponent : public Component, public ICollider
 {
 public:
-	TerrainCollider();
-	~TerrainCollider();
+   ReflectTerrainColliderComponent
+	[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(TerrainColliderComponent)
 
+	[[Property]]
+	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	
 	void SetColliderID(unsigned int id) {
 		m_colliderID = id;

@@ -74,6 +74,14 @@ Model* Model::LoadModel(const std::string_view& filePath)
 			model = loader.LoadModel();
 			model->path = path_;
 
+			/*file::path metaPath = path_.string() + ".meta";
+			if (file::exists(metaPath))
+			{
+				auto node = MetaYml::LoadFile(metaPath.string());
+				if(node[""])
+			}*/
+
+
 			return model;
 		}
 	}

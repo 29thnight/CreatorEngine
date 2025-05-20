@@ -8,7 +8,10 @@
 
 #pragma once
 #include "Component.h"
-#include "Terrain.generated.h"
+#include "Mesh.h"
+#include "ResourceAllocator.h"
+#include "TerrainCollider.h"
+#include "TerrainComponent.generated.h"
 
 struct TerrainBrush 
 {
@@ -38,7 +41,10 @@ class Terrain : public Component
 public:
    ReflectTerrain
 	[[Serializable(Inheritance:Component)]]
-	GENERATED_BODY(Terrain)
+   TerrainComponent() {
+	   m_name = "TerrainComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>();
+	   Initialize();
+   } virtual ~TerrainComponent() = default;
 
 	[[Property]]
 	int m_width{ 1000 };

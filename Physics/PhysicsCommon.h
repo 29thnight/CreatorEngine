@@ -12,6 +12,7 @@ const static uint32_t m_capsuleTypeId = 9003;
 const static uint32_t m_planeTypeId = 9004;
 const static uint32_t m_heightFieldTypeId = 9005;
 const static uint32_t m_controllerTypeId = 9006;
+const static uint32_t m_convexTypeId = 9007;
 
 
 

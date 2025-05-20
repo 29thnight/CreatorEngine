@@ -12,6 +12,8 @@
 #include "AnimationController.h"
 #include "AniTransition.h"
 #include "AvatarMask.h"
+#include "BoxColliderComponent.h"
+#include "TerrainCollider.h"
 #include "CameraComponent.h"
 #include "Canvas.h"
 #include "CharacterControllerComponent.h"
@@ -59,7 +61,8 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
     AUTO_REGISTER_CLASS(SpriteRenderer);
-    AUTO_REGISTER_CLASS(Terrain);
+    AUTO_REGISTER_CLASS(TerrainColliderComponent);
+    AUTO_REGISTER_CLASS(TerrainComponent);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);

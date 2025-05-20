@@ -19,6 +19,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	if (GetColliderType() == EColliderType::COLLISION)
 	{
 		shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
+		shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 	}
 	else {
 		shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
@@ -53,13 +54,15 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	else {
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, true);
+
+		m_rigidDynamic->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, false);
 	}
 
 	if (!m_rigidDynamic->attachShape(*shape)) {
 		Debug->LogError("DynamicRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
-
+	
 	//rigidBody 확장 수집한 쉐이프의 부피에 따라 질량과 관성 모멘트를 업데이트
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_rigidDynamic, 1.0f);
 

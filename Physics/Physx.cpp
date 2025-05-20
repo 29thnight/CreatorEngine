@@ -168,11 +168,20 @@ bool PhysicX::Initialize()
 
 	//======================================================================
 	//debug용 plane 생성 --> triangle mesh로 대체 예정
-	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
+	
+	/*physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
 	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *m_defaultMaterial);
+	planeShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
+	planeShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+	physx::PxFilterData filterData;
+	filterData.word0 = 0;
+	filterData.word1 = 0xFFFFFFFF;
+	planeShape->setSimulationFilterData(filterData);
 	plane->attachShape(*planeShape);
+	plane->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
+	plane->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 	m_scene->addActor(*plane);
-	planeShape->release();
+	planeShape->release();*/
 
 	//======================================================================
 
@@ -502,7 +511,7 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED), *material);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 	staticBody->SetOffsetRotation(DirectX::SimpleMath::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
@@ -595,7 +604,8 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	//filterData
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
-	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	 //filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 
 	//collisionData
@@ -623,7 +633,8 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//필터데이터
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
-	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	//filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 
 	//collisionData

@@ -8,6 +8,10 @@
 #include "ReflectionYml.h"
 #include "SceneManager.h"
 
+//
+#include "RigidBodyComponent.h"
+#include "MeshCollider.h"
+
 ModelLoader::ModelLoader()
 {
 }
@@ -486,12 +490,17 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			Mesh* mesh = m_model->m_Meshes[meshId];
 			Material* material = m_model->m_Materials[mesh->m_materialIndex];
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
-
+			//
+			RigidBodyComponent* rigidbody = rootObject->AddComponent<RigidBodyComponent>();
+			MeshColliderComponent* convexMesh = rootObject->AddComponent<MeshColliderComponent>();
+			
 			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
+			
+
 			return;
 		}
 	}
@@ -504,6 +513,16 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[mesh->m_materialIndex];
 		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+
+		//
+		RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+		MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+		convexMesh->SetDensity(0);
+		convexMesh->SetDynamicFriction(0);
+		convexMesh->SetStaticFriction(0);
+		convexMesh->SetRestitution(0);
+
+
 
 		meshRenderer->SetEnabled(true);
 		meshRenderer->m_Mesh = mesh;
