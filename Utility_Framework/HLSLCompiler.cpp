@@ -22,7 +22,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     compileFlag |= D3DCOMPILE_DEBUG;
 #endif
 #if defined(NDEBUG)
-    compileFlag |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+    //compileFlag |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #endif
     compileFlag |= D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
 

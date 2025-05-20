@@ -4,22 +4,25 @@
 #include "GameObject.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
+#include "IOnDistroy.h"
 #include "../RenderEngine/Mesh.h"
 #include "../RenderEngine/Material.h"
 #include "MeshRenderer.generated.h"
 
 class Animator;
 class OctreeNode;
-class MeshRenderer : public Component
+class MeshRenderer : public Component, public IOnDistroy
 {
 public:
    ReflectMeshRenderer
     [[Serializable(Inheritance:Component)]]
    MeshRenderer();
-   virtual ~MeshRenderer();
+   virtual ~MeshRenderer() override;
 
    bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
    void SetNeedUpdateCulling(bool able) { m_isNeedUptateCulling = able; }
+
+   virtual void OnDistroy() override;
 
     BoundingBox GetBoundingBox() const;
 

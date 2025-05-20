@@ -44,6 +44,8 @@ public:
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
 
+	bool IsEditorSceneLoaded() const { return m_isEditorSceneLoaded; }
+
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
 
 public:

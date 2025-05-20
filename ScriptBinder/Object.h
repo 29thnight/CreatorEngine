@@ -28,9 +28,8 @@ public:
     std::string ToString() const override final { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
 
-    void Destroy();
+    virtual void Destroy();
     bool IsDestroyMark() const { return m_destroyMark; }
-	void SetDestroyMark() { m_destroyMark = true; }
     bool IsDontDestroyOnLoad() const { return m_dontDestroyOnLoad; }
 
     bool IsEnabled() const { return m_isEnabled; }

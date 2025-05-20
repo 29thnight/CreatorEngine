@@ -23,6 +23,7 @@ public:
 
     bool Contains(const DirectX::BoundingBox& box) const;
     bool Remove(MeshRenderer* object);
+    bool RemoveRecursive(MeshRenderer* target);
 
 	int GetMaxDepth() const;
 };

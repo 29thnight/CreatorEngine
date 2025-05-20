@@ -111,6 +111,8 @@ public:
     std::atomic_bool m_isEnable{ false };
     [[Property]]
     size_t m_buildIndex{ 0 };
+    [[Property]]
+	HashingString m_sceneName;
 
 
 public:
@@ -132,6 +134,4 @@ private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
 	std::vector<LightComponent*> m_lightComponents;
 	std::vector<Light> m_lights;
-    [[Property]]
-	HashingString m_sceneName;
 };

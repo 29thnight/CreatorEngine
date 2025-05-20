@@ -52,6 +52,29 @@ void GameObject::SetTag(const std::string_view& tag)
 	}
 }
 
+void GameObject::Destroy()
+{
+	if (m_destroyMark)
+	{
+		return;
+	}
+	m_destroyMark = true;
+
+	for (auto& component : m_components)
+	{
+		component->Destroy();
+	}
+
+	for (auto& childIndex : m_childrenIndices)
+	{
+		GameObject* child = FindIndex(childIndex);
+		if (child)
+		{
+			child->Destroy();
+		}
+	}
+}
+
 std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 {
     if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == type.typeID; }) != m_components.end())

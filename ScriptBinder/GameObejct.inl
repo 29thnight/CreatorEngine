@@ -84,7 +84,7 @@ inline std::vector<T*> GameObject::GetComponents()
 template<typename T>
 inline void GameObject::RemoveComponent(T* component)
 {
-    component->SetDestroyMark();
+    component->Destroy();
 	auto it = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> comp) { return comp.get() == component; });
 
 	if (it != m_components.end())

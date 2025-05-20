@@ -41,6 +41,8 @@ public:
     void SetName(const std::string_view& name) { m_name = name.data(); }
 	void SetTag(const std::string_view& tag);
 
+	virtual void Destroy() override final;
+
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
 

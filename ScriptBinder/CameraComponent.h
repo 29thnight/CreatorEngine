@@ -62,9 +62,13 @@ public:
 
 	void OnDistroy() override
 	{
-		delete m_pCamera;
-		m_cameraIndex = -1;
-		m_pCamera = nullptr;
+		Scene* scene = SceneManagers->GetActiveScene();
+		if("PlayScene" != scene->m_sceneName.ToString())
+		{
+			delete m_pCamera;
+			m_cameraIndex = -1;
+			m_pCamera = nullptr;
+		}
 	}
 
 	Camera* GetCamera() const

@@ -267,6 +267,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         &context				// 디바이스 직접 컨텍스트를 반환합니다.
     );
 
+#if defined(_DEBUG)
 	// 디버그 레이어를 사용하여 디바이스를 만들면 디버그 레이어에 대한 포인터를 가져옵니다.
     DirectX11::ThrowIfFailed(device->QueryInterface(IID_PPV_ARGS(&m_debugDevice)));
 
@@ -283,6 +284,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
 
         m_infoQueue->Release();
     }
+#endif
 
     if (FAILED(hr))
     {

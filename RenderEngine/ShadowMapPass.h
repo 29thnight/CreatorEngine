@@ -24,6 +24,7 @@ struct ShadowInfo
 
 //cascade마다 값 나눠주기
 std::vector<float>      devideCascadeEnd(Camera& camera, std::vector<float> ratios);
+std::vector<float>		devideCascadeEnd(Camera& camera, int cascadeCount, float lambda);
 std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir);
 
 class ShadowMapPass final : public IRenderPass
