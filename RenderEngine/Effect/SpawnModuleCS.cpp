@@ -1,4 +1,4 @@
-#include "ShaderSystem.h"
+#include "../ShaderSystem.h"
 #include "SpawnModuleCS.h"
 
 void SpawnModuleCS::Initialize()

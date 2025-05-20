@@ -1,7 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "PSO.h"
-#include "DeviceState.h"
+#include "../PSO.h"
+#include "../DeviceState.h"
 #include "GameObject.h"
 
 enum class BillBoardType

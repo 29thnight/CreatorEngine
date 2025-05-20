@@ -1,5 +1,5 @@
 #include "BillboardModuleGPU.h"
-#include "ShaderSystem.h"
+#include "../ShaderSystem.h"
 
 void BillboardModuleGPU::Initialize()
 {

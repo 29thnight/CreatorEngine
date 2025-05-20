@@ -1,8 +1,8 @@
 #include "SparkleEffect.h"
 #include "ImGuiRegister.h"
-#include "Camera.h"
+#include "../Camera.h"
 #include "RenderModules.h"
-#include "DataSystem.h"
+#include "../DataSystem.h"
 
 SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) : ParticleSystem(maxParticles), m_delta(0.0f)
 {

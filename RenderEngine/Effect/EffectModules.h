@@ -1,7 +1,7 @@
 #pragma once
-#include "Texture.h"
+#include "../Texture.h"
 #include "RenderModules.h"
-#include "IRenderPass.h"
+#include "../IRenderPass.h"
 #include "SpawnModuleCS.h"
 
 
