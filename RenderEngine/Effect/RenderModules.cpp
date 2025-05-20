@@ -1,6 +1,6 @@
 ﻿#include "RenderModules.h"
-#include "ShaderSystem.h"
-#include "Renderer.h"
+#include "../ShaderSystem.h"
+#include "../Renderer.h"
 
 void RenderModules::CleanupRenderState()
 {

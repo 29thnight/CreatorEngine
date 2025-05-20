@@ -1,5 +1,5 @@
 #pragma once
-#include "IRenderPass.h"
+#include "../IRenderPass.h"
 #include "ParticleSystem.h"
 
 enum class Effect
