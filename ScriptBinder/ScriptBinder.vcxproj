@@ -194,6 +194,8 @@
     <ClInclude Include="AnimationController.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="AnimationState.h" />
+    <ClInclude Include="ArticulationData.h" />
+    <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
@@ -224,6 +226,7 @@
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightMapping.h" />
     <ClInclude Include="LightProperty.h" />
+    <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="ModuleBehaviorInfo.h" />

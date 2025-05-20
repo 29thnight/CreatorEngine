@@ -1,7 +1,7 @@
 #include "HeightFieldResource.h"
 #include <vector>
 
-HeightFieldResource::HeightFieldResource(physx::PxPhysics* physics, const int* height, const unsigned int& numCols, const unsigned int& numRows) : ResourceBase(EResourceType::HEIGHT_FIELD)
+HeightFieldResource::HeightFieldResource(physx::PxPhysics* physics, const float* height, const unsigned int& numCols, const unsigned int& numRows) : ResourceBase(EResourceType::HEIGHT_FIELD)
 {
 	//height field 데이터 생성
 	std::vector<physx::PxHeightFieldSample> samples(numRows * numCols);

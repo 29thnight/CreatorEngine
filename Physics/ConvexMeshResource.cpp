@@ -15,6 +15,7 @@ ConvexMeshResource::ConvexMeshResource(physx::PxPhysics* physics, DirectX::Simpl
 	physx::PxCookingParams params(scale);
 	params.meshPreprocessParams |= physx::PxMeshPreprocessingFlag::eDISABLE_CLEAN_MESH;
 	params.meshPreprocessParams |= physx::PxMeshPreprocessingFlag::eDISABLE_ACTIVE_EDGES_PRECOMPUTE;
+	
 
 	physx::PxDefaultMemoryOutputStream writeBuffer;
 	physx::PxConvexMeshCookingResult::Enum result;

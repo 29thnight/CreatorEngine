@@ -6,7 +6,7 @@
 class HeightFieldResource : public ResourceBase
 {
 public:
-	HeightFieldResource(physx::PxPhysics* physics,const int* height,const unsigned int& numCols,const unsigned int& numRows);
+	HeightFieldResource(physx::PxPhysics* physics,const float* height,const unsigned int& numCols,const unsigned int& numRows);
 	virtual ~HeightFieldResource();
 
 	inline physx::PxHeightField* GetHeightField() const { return m_heightField; }

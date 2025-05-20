@@ -2,36 +2,57 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
+#include "CapsuleColliderComponent.generated.h"
 
 class CapsuleColliderComponent : public Component, public ICollider
 {
 public:
-	CapsuleColliderComponent();
-	~CapsuleColliderComponent() override;
+   ReflectCapsuleColliderComponent
+	[[Serializable(Inheritance:Component)]]
+	CapsuleColliderComponent() {
+		m_name = "CapsuleColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<CapsuleColliderComponent>();
+		m_type = EColliderType::COLLISION;
+		m_Info.radius = 1.0f;
+		m_Info.height = 1.0f;
+	} virtual ~CapsuleColliderComponent() = default;
+	
+	
 
 	[[Property]]
-	CapsuleColliderInfo m_Info;
+	float m_radius{ 1.0f };
+	[[Property]]
+	float m_height{ 1.0f };
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 	//info
-	float GetRadius() const
+	float GetRadius()
 	{
+		if (m_radius != 0.0f)
+		{
+			m_Info.radius = m_radius;
+		}
 		return m_Info.radius;
 	}
 	void SetRadius(float radius)
 	{
 		m_Info.radius = radius;
+		m_radius = m_Info.radius;
 	}
-	float GetHeight() const
+	float GetHeight()
 	{
+		if (m_height != 0.0f)
+		{
+			m_Info.height = m_height;
+		}
 		return m_Info.height;
 	}
 	void SetHeight(float height)
 	{
 		m_Info.height = height;
+		m_height = m_Info.height;
 	}
 
 
@@ -43,13 +64,23 @@ public:
 	{
 		m_type = type;
 	}
-	CapsuleColliderInfo GetCapsuleInfo() const
+	CapsuleColliderInfo GetCapsuleInfo()
 	{
+		if (m_radius != 0.0f)
+		{
+			m_Info.radius = m_radius;
+		}
+		if (m_height != 0.0f)
+		{
+			m_Info.height = m_height;
+		}
 		return m_Info;
 	}
 	void SetCapsuleInfoMation(const CapsuleColliderInfo& info)
 	{
 		m_Info = info;
+		m_radius = m_Info.radius;
+		m_height = m_Info.height;
 	}
 
 	float GetStaticFriction() const
@@ -112,4 +143,5 @@ public:
 private:
 	EColliderType m_type;
 	int m_collsionCount{ 0 };
+	CapsuleColliderInfo m_Info;
 };

@@ -1,22 +1,16 @@
-//Terrain Component
-//지형정보를 담고 있는 컴포넌트
-//렌더하는 건 모르겠고 일단 정보만 담아 보자
-//정보를 가지고 있는 정보 기반으로 렌더하고 물리엔진에 넘겨주고
-//각각의 시스템/매니저에서 처리하도록 하자
-//그렇다면 Terrain은 무엇을 가지고 있어야 할까?
-//지형의 높이맵과 텍스쳐 정보
-
 #pragma once
 #include "Component.h"
-#include "Terrain.generated.h"
+#include "Mesh.h"
+#include "ResourceAllocator.h"
+#include "TerrainCollider.h"
+#include "TerrainComponent.generated.h"
 
-struct TerrainBrush 
+
+struct TerrainBrush
 {
-	//터레인을 수정할수 있는 브러쉬
-	//brush 모드 / 상승 / 하강 / 평탄화 / 페인팅
 	enum class Mode { Raise, Lower, Flatten, PaintLayer } m_mode;
 
-	DirectX::XMFLOAT2 m_center; //브러쉬의 중심 좌표-->마우스에 대하여 화면 좌표계에서 받아와야함
+	DirectX::XMFLOAT2 m_center; 
 	float m_radius; //브러쉬의 반지름
 	float m_strength; //브러쉬의 세기(변화량)
 	float m_flatTargetHeight; //평탄화할 높이
@@ -25,7 +19,7 @@ struct TerrainBrush
 	void SetBrushMode(Mode mode) { m_mode = mode; }
 };
 
-struct TerrainLayer 
+struct TerrainLayer
 {
 	uint32_t m_layerID{ 0 };
 	ID3D11ShaderResourceView* diffuseTexture{ nullptr };
@@ -33,12 +27,15 @@ struct TerrainLayer
 	float fileFactor{ 1.0f };
 };
 
-class Terrain : public Component
+class TerrainComponent : public Component
 {
 public:
-   ReflectTerrain
+   ReflectTerrainComponent
 	[[Serializable(Inheritance:Component)]]
-	GENERATED_BODY(Terrain)
+   TerrainComponent() {
+	   m_name = "TerrainComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>();
+	   Initialize();
+   } virtual ~TerrainComponent() = default;
 
 	[[Property]]
 	int m_width{ 1000 };
@@ -50,9 +47,50 @@ public:
 	{
 		m_heightMap.assign(m_width * m_height, 0.0f); //0.0f로 초기화
 		m_vNormalMap.assign(m_width * m_height, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f }); //normal vector 초기화
+
+		//std::vector<Vertex> vertices;
+
+		//vertices.reserve(m_width * m_height);
+		//for (int i = 0; i < m_height; ++i)
+		//{
+		//	for (int j = 0; j < m_width; ++j)
+		//	{
+		//		//정점 생성
+		//		Vertex vertex;
+		//		vertex.position = DirectX::XMFLOAT3(static_cast<float>(j), m_heightMap[i * m_width + j], static_cast<float>(i));
+		//		vertex.normal = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f); //초기 노말 벡터
+		//		vertex.uv0 = DirectX::XMFLOAT2(static_cast<float>(j) / (m_width - 1), static_cast<float>(i) / (m_height - 1));
+		//		vertices.push_back(vertex);
+		//	}
+		//}
+		//
+		//std::vector<uint32_t> indices;
+		//indices.reserve((m_width - 1) * (m_height - 1) * 6);
+		//for (int i = 0; i < m_height - 1; ++i)
+		//{
+		//	for (int j = 0; j < m_width - 1; ++j)
+		//	{
+		//		//정점 인덱스 생성
+		//		int topLeft = i * m_width + j;
+		//		int topRight = topLeft + 1;
+		//		int bottomLeft = (i + 1) * m_width + j;
+		//		int bottomRight = bottomLeft + 1;
+		//		//삼각형 인덱스 생성
+		//		indices.push_back(topLeft);
+		//		indices.push_back(bottomLeft);
+		//		indices.push_back(topRight);
+		//		indices.push_back(topRight);
+		//		indices.push_back(bottomLeft);
+		//		indices.push_back(bottomRight);
+		//	}
+		//}
+
+		//std::string name = "TerrainMesh"+ std::to_string(m_terrainID);
+
+		//m_pMash = AllocateResource<Mesh>(name, vertices, indices);
 	}
 
-	void ApplyBrush(const TerrainBrush& brush) 
+	void ApplyBrush(const TerrainBrush& brush)
 	{
 		//브러쉬를 적용하는 함수
 		
@@ -144,6 +182,18 @@ public:
 		}
 	}
 
+
+	//============================================================
+	//HeigtMap을 기반으로 Collider 생성에 필요한 정보들을 반환
+	int GetWidth() const { return m_width; }
+	int GetHeight() const { return m_height; }
+
+	float* GetHeightMap() { return m_heightMap.data(); }
+
+	
+
+
+
 private:
 	//터레인을 구분하는 아이디
 	unsigned int m_terrainID{ 0 };
@@ -163,6 +213,8 @@ private:
 	//지형의 높이맵을 담고 있는 텍스쳐 -> 예는 어떻게 할까?
 	float m_textureWidth;
 	float m_textureHeight;
+
+	Mesh* m_pMash{ nullptr };
 };
 
 //테스트로
