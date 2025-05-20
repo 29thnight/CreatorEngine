@@ -1,15 +1,10 @@
 #pragma once
-#include "EffectModules.h"
+#include "ParticleSystem.h"
 #include "ShaderSystem.h"
 #include "Effects.h"
+#include "BillboardModuleGPU.h"
 
-struct SparkleParameters : public EffectParameters
-{
-    Mathf::Vector2 size;
-    Mathf::Vector2 range;
-};
-
-class SparkleEffect : public EffectModules
+class SparkleEffect : public ParticleSystem
 {
 public:
     SparkleEffect(const Mathf::Vector3& position, int maxParticles = 100);
@@ -24,18 +19,13 @@ public:
 
     void SpawnSparklesBurst(int count);
 
-    void UpdateConstantBuffer();
-
     void UpdateInstanceData();
-
-    void SetParameters(SparkleParameters* params);
-
 private:
-    BillboardModule* m_billboardModule;
+    BillboardModuleGPU* m_billboardModule;
 
     float m_delta;
-    SparkleParameters* m_sparkleParams;
-    std::shared_ptr<Texture> m_sparkleTexture;
+    Texture* m_sparkleTexture;
     ComPtr<ID3D11Buffer> m_constantBuffer;
-    SpawnModule* m_spawnModule;
+    float m_rate = 0;
+    UINT m_max = 0;
 };
