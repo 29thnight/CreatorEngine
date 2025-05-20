@@ -100,6 +100,6 @@ void WireFramePass::ControlPanel()
 {
 }
 
-void WireFramePass::Resize()
+void WireFramePass::Resize(uint32_t width, uint32_t height)
 {
 }

@@ -249,6 +249,6 @@ void ToneMapPass::ControlPanel()
     }
 }
 
-void ToneMapPass::Resize()
+void ToneMapPass::Resize(uint32_t width, uint32_t height)
 {
 }

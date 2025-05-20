@@ -35,6 +35,12 @@ public:
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
+	void SetTitle(const std::wstring& title)
+	{
+		if (m_hWnd)
+			SetWindowTextW(m_hWnd, title.c_str());
+	}
+
     void SetProgress(int value)
     {
         if (m_hProgress)
@@ -114,7 +120,7 @@ private:
         int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
         int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
 
-        m_hWnd = CreateWindowEx(WS_EX_TOPMOST, L"ProgressWindowClass", L"Initializing...",
+        m_hWnd = CreateWindowEx(WS_EX_TOPMOST, L"ProgressWindowClass", m_title.c_str(),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
             x, y, width, height, nullptr, nullptr, GetModuleHandle(nullptr), this);
 
@@ -243,6 +249,7 @@ private:
     HBITMAP m_hBitmap = nullptr;
     HFONT m_hFont = nullptr;
     HANDLE m_hThread = nullptr;
+	std::wstring m_title = L"Initializing...";
 };
 
 inline static auto& g_progressWindow = ProgressWindow::GetInstance();

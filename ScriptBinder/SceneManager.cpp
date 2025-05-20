@@ -89,7 +89,7 @@ void SceneManager::DisableOrEnable()
     m_activeScene->OnDestroy();
 }
 
-void SceneManager::Deccommissioning()
+void SceneManager::Decommissioning()
 {
     m_activeScene->OnDisable();
     m_activeScene->AllDestroyMark();
@@ -142,6 +142,9 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         if (m_activeScene)
         {
+            m_activeScene->AllDestroyMark();
+            m_activeScene->OnDisable();
+            m_activeScene->OnDestroy();
 			Scene* swapScene = m_activeScene;
 			m_activeScene = nullptr;
 

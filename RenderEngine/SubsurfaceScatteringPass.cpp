@@ -104,7 +104,3 @@ void SubsurfaceScatteringPass::ControlPanel()
 	ImGui::SliderFloat("Strength", &strength, 0.f, 1.f);
 	ImGui::SliderFloat("Width", &width, 0.f, 1.f);
 }
-
-void SubsurfaceScatteringPass::Resize()
-{
-}

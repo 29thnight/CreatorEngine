@@ -228,6 +228,6 @@ void PostProcessingPass::GaussianBlurComputeKernel()
 	}
 }
 
-void PostProcessingPass::Resize()
+void PostProcessingPass::Resize(uint32_t width, uint32_t height)
 {
 }

@@ -3,6 +3,7 @@
 
 #include "Sampler.hlsli"
 
+#define MAX_CASCADE 4
 #define MAX_LIGHTS 4
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1

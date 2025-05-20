@@ -1,5 +1,7 @@
 #pragma once
 #include "Core.Definition.h"
+#include "Delegate.h"
+
 using namespace Microsoft::WRL;
 
 class CoreWindow;
@@ -42,6 +44,7 @@ namespace DirectX11
 		ID3D11Device3* GetD3DDevice() const { return m_d3dDevice.Get(); }
 		ID3D11DeviceContext3* GetD3DDeviceContext() const { return m_d3dContext.Get(); }
 		IDXGISwapChain3* GetSwapChain() const { return m_swapChain.Get(); }
+		void ReleaseSwapChain() { m_swapChain.Reset(); m_swapChain = nullptr; }
 		D3D_FEATURE_LEVEL GetDeviceFeatureLevel() const { return m_d3dFeatureLevel; }
 		ID3D11RenderTargetView1* GetBackBufferRenderTargetView() const { return m_d3dRenderTargetView.Get(); }
 		ID3D11Texture2D1* GetBackBuffer() const { return m_backBuffer.Get(); }
@@ -53,13 +56,6 @@ namespace DirectX11
 		ID3D11BlendState* GetBlendState() const { return m_blendState.Get(); }
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
 		ID3DUserDefinedAnnotation* GetAnnotation() const { return m_annotation.Get(); }
-
-		ID2D1Factory3* GetD2DFactory() const { return m_d2dFactory.Get(); }
-		ID2D1Device2* GetD2DDevice() const { return m_d2dDevice.Get(); }
-		ID2D1DeviceContext2* GetD2DDeviceContext() const { return m_d2dContext.Get(); }
-		ID2D1RenderTarget* GetD2DTarget() const { return m_d2dTarget.Get(); }
-		IDWriteFactory3* GetDWriteFactory() const { return m_dwriteFactory.Get(); }
-		IWICImagingFactory2* GetWicImagingFactory() const { return m_wicFactory; }
 
 		void ReportLiveDeviceObjects();
 
@@ -88,15 +84,6 @@ namespace DirectX11
 		ComPtr<ID3D11DepthStencilState> m_depthStencilState;
 		ComPtr<ID3D11BlendState> m_blendState;
 		D3D11_VIEWPORT m_screenViewport;
-
-		ComPtr<ID2D1Factory3> m_d2dFactory;
-		ComPtr<ID2D1Device2> m_d2dDevice;
-		ComPtr<ID2D1DeviceContext2> m_d2dContext;
-		ComPtr<ID2D1RenderTarget> m_d2dTarget;
-		ComPtr<IDXGISurface2> dxgiBackBuffer;
-
-		ComPtr<IDWriteFactory3> m_dwriteFactory;
-		IWICImagingFactory2* m_wicFactory;
 
 		CoreWindow* m_window;
 

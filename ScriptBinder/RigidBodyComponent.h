@@ -29,7 +29,6 @@ public:
 	Mathf::Vector3 GetAngularVelocity() const { return m_angularVelocity; }
 	void SetAngularVelocity(const Mathf::Vector3& angularVelocity) { m_angularVelocity = angularVelocity; }
 
-
 	void SetLockLinearX(bool isLock) { m_isLockLinearX = isLock; }
 	void SetLockLinearY(bool isLock) { m_isLockLinearY = isLock; }
 	void SetLockLinearZ(bool isLock) { m_isLockLinearZ = isLock; }

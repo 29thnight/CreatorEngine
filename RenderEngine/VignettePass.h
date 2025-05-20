@@ -11,7 +11,6 @@ public:
 
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	virtual void Resize() override;
 private:
 	Texture* m_CopiedTexture{};
 	ComPtr<ID3D11Buffer> m_Buffer{};

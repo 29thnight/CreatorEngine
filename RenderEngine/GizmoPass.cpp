@@ -153,7 +153,7 @@ void GizmoPass::ControlPanel()
 {
 }
 
-void GizmoPass::Resize()
+void GizmoPass::Resize(uint32_t width, uint32_t height)
 {
 }
 

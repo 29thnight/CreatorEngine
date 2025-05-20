@@ -83,14 +83,14 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 
     auto& lightManager = scene.m_LightController;
 
-	for (auto& light : lightManager->m_lightProperties.m_lights)
-	{
-		if (light.m_lightType == LightType::DirectionalLight)
-		{
-            light.m_lightStatus = LightStatus::StaticShadows;
-			break;
-		}
-	}
+	//for (auto& light : lightManager->m_lightProperties.m_lights)
+	//{
+	//	if (light.m_lightType == LightType::DirectionalLight)
+	//	{
+ //           light.m_lightStatus = LightStatus::StaticShadows;
+	//		break;
+	//	}
+	//}
 
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
@@ -153,8 +153,4 @@ void DeferredPass::ControlPanel()
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
-}
-
-void DeferredPass::Resize()
-{
 }

@@ -222,9 +222,6 @@
     <ClInclude Include="Core.OctreeNode.h">
       <Filter>Core.Octree</Filter>
     </ClInclude>
-    <ClInclude Include="Core.OctreeManager.h">
-      <Filter>Core.Octree</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionVectorFactory.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

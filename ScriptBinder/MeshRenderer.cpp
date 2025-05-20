@@ -13,7 +13,11 @@ MeshRenderer::MeshRenderer()
 
 MeshRenderer::~MeshRenderer()
 {
-	CullingManagers->Remove(this);
+}
+
+void MeshRenderer::OnDistroy()
+{
+    CullingManagers->Remove(this);
 }
 
 BoundingBox MeshRenderer::GetBoundingBox() const

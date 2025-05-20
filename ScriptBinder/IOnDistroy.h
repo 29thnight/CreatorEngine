@@ -14,7 +14,7 @@ interface IOnDistroy
         {
             return;
         }
-        m_onDistroyEventHandle = subscribedScene->OnDisableEvent.AddLambda([this]
+        m_onDistroyEventHandle = subscribedScene->OnDestroyEvent.AddLambda([this]
         {
             auto ptr = dynamic_cast<Component*>(this);
             auto sceneObject = ptr->GetOwner();
@@ -34,7 +34,7 @@ interface IOnDistroy
     }
     virtual ~IOnDistroy()
     {
-        subscribedScene->OnDisableEvent.Remove(m_onDistroyEventHandle);
+        subscribedScene->OnDestroyEvent.Remove(m_onDistroyEventHandle);
     }
 
     virtual void OnDistroy() = 0;

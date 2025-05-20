@@ -10,7 +10,7 @@ public:
 
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	void Resize() override;
+	void Resize(uint32_t width, uint32_t height) override;
 
 private:
     Texture* GetLightIcon(int lightType, bool isMainLight) const;

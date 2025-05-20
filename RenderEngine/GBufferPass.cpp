@@ -70,14 +70,6 @@ void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetView
 	}
 }
 
-void GBufferPass::SetEditorRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)
-{
-	for (uint32 i = 0; i < size; i++)
-	{
-		m_editorRTV[i] = renderTargetViews[i];
-	}
-}
-
 void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
@@ -163,17 +155,6 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
 }
 
-void GBufferPass::PushDeferredQueue(GameObject* sceneObject)
-{
-	if (nullptr == sceneObject) return;
-	m_deferredQueue.push_back(sceneObject);
-}
-
-void GBufferPass::ClearDeferredQueue()
-{
-	m_deferredQueue.clear();
-}
-
-void GBufferPass::Resize()
+void GBufferPass::Resize(uint32_t width, uint32_t height)
 {
 }

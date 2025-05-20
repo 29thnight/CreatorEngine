@@ -78,8 +78,6 @@ VolumetricFogPass::VolumetricFogPass()
 	//m_pso->m_samplers.push_back(linearSampler);
 	m_Buffer = DirectX11::CreateBuffer(sizeof(MainCB), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
-
-
 	m_pso = std::make_unique<PipelineStateObject>();
 
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
@@ -197,7 +195,8 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
 	Mathf::Color4 lightColor = scene.m_LightController->GetLight(0).m_color;
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	MainCB data{};
@@ -289,6 +288,6 @@ void VolumetricFogPass::ControlPanel()
 	ImGui::SliderFloat("Custom far plane", &mCustomFarPlane, 10.0f, 10000.0f);
 }
 
-void VolumetricFogPass::Resize()
+void VolumetricFogPass::Resize(uint32_t width, uint32_t height)
 {
 }

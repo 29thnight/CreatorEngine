@@ -130,6 +130,25 @@ bool OctreeNode::Remove(MeshRenderer* object)
     return removed;
 }
 
+bool OctreeNode::RemoveRecursive(MeshRenderer* target)
+{
+    bool removed = false;
+
+    auto& vec = objects;
+    size_t before = vec.size();
+    std::erase_if(vec, [&](MeshRenderer* obj) { return obj == target; });
+    if (vec.size() < before)
+        removed = true;
+
+    for (OctreeNode* child : children)
+    {
+        if (child)
+            removed |= child->RemoveRecursive(target);
+    }
+
+    return removed;
+}
+
 int OctreeNode::GetMaxDepth() const
 {
 	if (isLeaf)

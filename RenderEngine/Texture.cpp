@@ -31,8 +31,7 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::
 		)
 	);
 
-	//return new Texture(texture, name);
-    return AllocateResource<Texture>(texture, name);
+	return AllocateResource<Texture>(texture, name, TextureType::Texture2D, textureDesc);
 }
 
 Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ uint32 mipLevels, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
@@ -59,8 +58,7 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name
 		)
 	);
 
-	//return new Texture(texture, name);
-    return AllocateResource<Texture>(texture, name);
+    return AllocateResource<Texture>(texture, name, TextureType::TextureCube, textureDesc);
 }
 
 
@@ -85,8 +83,7 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_vie
 		)
 	);
 
-	//return new Texture(texture, name);
-    return AllocateResource<Texture>(texture, name);
+    return AllocateResource<Texture>(texture, name, TextureType::TextureArray, textureDesc);
 }
 
 Texture* Texture::LoadFormPath(_In_ const file::path& path)
@@ -157,12 +154,8 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 			)
 		);
 	}
-	
-    std::cout << "Texture :" << banch3.GetElapsedTime() << std::endl;
-    Benchmark banch4;
-	//Texture* texture = new Texture;
+
     Texture* texture = AllocateResource<Texture>();
-    std::cout << "new Texture :" << banch4.GetElapsedTime() << std::endl;
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceView(
@@ -174,18 +167,22 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 		)
 	);
 
+	texture->m_textureType = TextureType::ImageTexture;
 	texture->size = { float(metadata.width),float(metadata.height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
 
 	return texture;
 }
 
-//member functions
-Texture::Texture(ID3D11Texture2D* texture, const std::string_view& name) :
+Texture::Texture(ID3D11Texture2D* texture, const std::string_view& name, TextureType type, CD3D11_TEXTURE2D_DESC desc) :
 	m_pTexture(texture),
-	m_name(name)
+	m_name(name),
+	m_textureType(type),
+	m_desc(desc)
 {
 	DirectX::SetName(m_pTexture, name);
+	m_onReleaseHandle = OnResizeReleaseEvent.AddRaw(this, &Texture::ResizeRelease);
+	m_onResizeHandle = OnResizeEvent.AddRaw(this, &Texture::ResizeViews);
 }
 
 Texture::Texture(Texture&& texture) noexcept
@@ -195,11 +192,28 @@ Texture::Texture(Texture&& texture) noexcept
 	m_pDSV = texture.m_pDSV;
 	m_pRTVs = std::move(texture.m_pRTVs);
 	m_name = std::move(texture.m_name);
+	m_textureType = texture.m_textureType;
+	m_desc = texture.m_desc;
+	if (texture.m_onReleaseHandle.IsValid())
+	{
+		OnResizeReleaseEvent -= texture.m_onReleaseHandle;
+	}
+
+	if (texture.m_onResizeHandle.IsValid())
+	{
+		OnResizeEvent -= texture.m_onResizeHandle;
+	}
+	m_onReleaseHandle = OnResizeReleaseEvent.AddRaw(this, &Texture::ResizeRelease);
+	m_onResizeHandle = OnResizeEvent.AddRaw(this, &Texture::ResizeViews);
 
 	texture.m_pTexture = nullptr;
 	texture.m_pSRV = nullptr;
 	texture.m_pDSV = nullptr;
 	texture.m_pRTVs.clear();
+	texture.m_textureType = TextureType::Unknown;
+	texture.m_desc = CD3D11_TEXTURE2D_DESC();
+	texture.m_onReleaseHandle = Core::DelegateHandle();
+	texture.m_onResizeHandle = Core::DelegateHandle();
 }
 
 Texture::~Texture()
@@ -213,6 +227,16 @@ Texture::~Texture()
 		Memory::SafeDelete(rtv);
 	}
 	m_pRTVs.clear();
+
+	if (m_onReleaseHandle.IsValid())
+	{
+		OnResizeReleaseEvent -= m_onReleaseHandle;
+	}
+
+	if (m_onResizeHandle.IsValid())
+	{
+		OnResizeEvent -= m_onResizeHandle;
+	}
 }
 
 void Texture::CreateSRV(_In_ DXGI_FORMAT textureFormat, _In_opt_ D3D11_SRV_DIMENSION viewDimension, _In_opt_ uint32 mipLevels)
@@ -224,10 +248,23 @@ void Texture::CreateSRV(_In_ DXGI_FORMAT textureFormat, _In_opt_ D3D11_SRV_DIMEN
 		0, 
 		mipLevels
 	};
+	m_srvDesc = srvDesc;
 
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateShaderResourceView(
 			m_pTexture, &srvDesc, &m_pSRV
+		)
+	);
+
+	DirectX::SetName(m_pSRV, m_name + "SRV");
+	m_hasSRV = true;
+}
+
+void Texture::ResizeSRV()
+{
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateShaderResourceView(
+			m_pTexture, &m_srvDesc, &m_pSRV
 		)
 	);
 
@@ -241,6 +278,24 @@ void Texture::CreateRTV(_In_ DXGI_FORMAT textureFormat)
 		D3D11_RTV_DIMENSION_TEXTURE2D,
 		textureFormat,
 	};
+
+	m_rtvDescs.push_back(rtvDesc);
+
+	ID3D11RenderTargetView* rtv;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateRenderTargetView(
+			m_pTexture, &rtvDesc, &rtv
+		)
+	);
+	DirectX::SetName(rtv, m_name + "RTV");
+	m_pRTVs.push_back(rtv);
+	m_hasRTV = true;
+	m_rtvCount = static_cast<uint32>(m_pRTVs.size());
+}
+
+void Texture::ResizeRTV(uint32 index)
+{
+	CD3D11_RENDER_TARGET_VIEW_DESC rtvDesc = m_rtvDescs[index];
 
 	ID3D11RenderTargetView* rtv;
 	DirectX11::ThrowIfFailed(
@@ -267,6 +322,8 @@ void Texture::CreateCubeRTVs(_In_ DXGI_FORMAT textureFormat, _In_opt_ uint32 mip
 				1,
 			};
 
+			m_rtvDescs.push_back(rtvDesc);
+
 			ID3D11RenderTargetView* rtv;
 			DirectX11::ThrowIfFailed(
 				DeviceState::g_pDevice->CreateRenderTargetView(
@@ -278,6 +335,16 @@ void Texture::CreateCubeRTVs(_In_ DXGI_FORMAT textureFormat, _In_opt_ uint32 mip
 			m_pRTVs.push_back(rtv);
 		}
 	}
+	m_hasRTV = true;
+	m_rtvCount = static_cast<uint32>(m_pRTVs.size());
+}
+
+void Texture::ResizeCubeRTVs()
+{
+	for (uint32 i = 0; i < m_rtvCount; ++i)
+	{
+		ResizeRTV(i);
+	}
 }
 
 void Texture::CreateDSV(_In_ DXGI_FORMAT textureFormat)
@@ -288,12 +355,26 @@ void Texture::CreateDSV(_In_ DXGI_FORMAT textureFormat)
 		textureFormat
 	};
 
+	m_dsvDesc = dsvDesc;
+
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateDepthStencilView(
 			m_pTexture, &dsvDesc, &m_pDSV
 		)
 	);
 
+	DirectX::SetName(m_pDSV, m_name + "DSV");
+
+	m_hasDSV = true;
+}
+
+void Texture::ResizeDSV()
+{
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateDepthStencilView(
+			m_pTexture, &m_dsvDesc, &m_pDSV
+		)
+	);
 	DirectX::SetName(m_pDSV, m_name + "DSV");
 }
 
@@ -305,12 +386,26 @@ void Texture::CreateUAV(DXGI_FORMAT textureFormat)
 		textureFormat
 	};
 
+	m_uavDesc = uavDesc;
+
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateUnorderedAccessView(
 			m_pTexture, &uavDesc, &m_pUAV
 		)
 	);
 
+	DirectX::SetName(m_pUAV, m_name + "UAV");
+
+	m_hasUAV = true;
+}
+
+void Texture::ResizeUAV()
+{
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateUnorderedAccessView(
+			m_pTexture, &m_uavDesc, &m_pUAV
+		)
+	);
 	DirectX::SetName(m_pUAV, m_name + "UAV");
 }
 
@@ -322,6 +417,100 @@ ID3D11RenderTargetView* Texture::GetRTV(uint32 index)
 float2 Texture::GetImageSize() const
 {
 	return size;
+}
+
+void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
+{
+	if (m_textureType == TextureType::ImageTexture)
+	{
+		return;
+	}
+
+	switch (m_textureType)
+	{
+	case TextureType::Texture2D:
+		Resize2DViews(width, height);
+		break;
+	case TextureType::TextureCube:
+		ResizeCubeViews(width); // Å¥ºê´Â width = height
+		break;
+	case TextureType::TextureArray:
+		ResizeArrayViews(width, height);
+		break;
+	default:
+		break;
+	}
+
+}
+
+void Texture::Resize2DViews(_In_ uint32 width, _In_ uint32 height)
+{
+	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX::SetName(m_pTexture, m_name);
+
+	size = { (float)width, (float)height };
+
+	if (m_hasSRV) ResizeSRV();
+	if (m_hasRTV)
+	{
+		for (uint32 i = 0; i < m_rtvCount; ++i)
+		{
+			ResizeRTV(i);
+		}
+	}
+	if (m_hasDSV) ResizeDSV();
+	if (m_hasUAV) ResizeUAV();
+}
+
+void Texture::ResizeCubeViews(_In_ uint32 size)
+{
+	const uint32 mipLevels = 1;
+
+	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX::SetName(m_pTexture, m_name);
+
+	if (m_hasSRV) ResizeSRV();
+	if (m_hasRTV) ResizeCubeRTVs();
+	if (m_hasDSV) ResizeDSV();
+	if (m_hasUAV) ResizeUAV();
+}
+
+void Texture::ResizeArrayViews(_In_ uint32 width, _In_ uint32 height)
+{
+	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
+	DirectX::SetName(m_pTexture, m_name);
+
+	size = { (float)width, (float)height };
+
+	if (m_hasSRV) ResizeSRV();
+	if (m_hasRTV)
+	{
+		for (uint32 i = 0; i < m_rtvCount; ++i)
+		{
+			ResizeRTV(i);
+		}
+	}
+	if (m_hasDSV) ResizeDSV();
+	if (m_hasUAV) ResizeUAV();
+}
+
+void Texture::ResizeRelease()
+{
+	if (m_textureType == TextureType::ImageTexture)
+	{
+		return;
+	}
+
+	Memory::SafeDelete(m_pTexture);
+	Memory::SafeDelete(m_pSRV);
+	Memory::SafeDelete(m_pDSV);
+	Memory::SafeDelete(m_pUAV);
+
+	for (auto& rtv : m_pRTVs) 
+	{
+		Memory::SafeDelete(rtv);
+	}
+	m_pRTVs.clear();
 }
 
 

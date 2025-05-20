@@ -93,6 +93,11 @@ void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth
     m_NoiseTexture = MakeUniqueTexturePtr(tex);
 }
 
+void SSAOPass::ReloadDSV(ID3D11ShaderResourceView* depth)
+{
+    m_DepthSRV = depth;
+}
+
 void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
@@ -130,6 +135,6 @@ void SSAOPass::ControlPanel()
 {
 }
 
-void SSAOPass::Resize()
+void SSAOPass::Resize(uint32_t width, uint32_t height)
 {
 }

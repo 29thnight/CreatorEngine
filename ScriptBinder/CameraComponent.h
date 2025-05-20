@@ -16,7 +16,7 @@ public:
    CameraComponent() 
    {
 	   m_name = "CameraComponent"; 
-	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<CameraComponent>();
+	   m_typeID = type_guid(CameraComponent);
    } 
    virtual ~CameraComponent() = default;
 
@@ -26,6 +26,12 @@ public:
 		if (m_cameraIndex != -1)
 		{
 			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
+			if (m_pCamera == nullptr)
+			{
+				m_pCamera = new Camera();
+				m_pCamera->RegisterContainer();
+				m_cameraIndex = m_pCamera->m_cameraIndex;
+			}
 		}
 		else
 		{
@@ -39,8 +45,8 @@ public:
 	{
 		if (m_pCamera)
 		{
-			m_pCamera->m_eyePosition = m_pOwner->m_transform.position;
-			XMVECTOR rotationQuat = m_pOwner->m_transform.rotation;
+			m_pCamera->m_eyePosition = m_pOwner->m_transform.GetWorldPosition();
+			XMVECTOR rotationQuat = m_pOwner->m_transform.GetWorldQuaternion();
 			rotationQuat = XMQuaternionNormalize(rotationQuat);
 
 			static const XMVECTOR FORWARD = XMVectorSet(0, 0, 1, 0);
@@ -56,9 +62,13 @@ public:
 
 	void OnDistroy() override
 	{
-		//delete m_pCamera;
-		//m_cameraIndex = -1;
-		//m_pCamera = nullptr;
+		Scene* scene = SceneManagers->GetActiveScene();
+		if("PlayScene" != scene->m_sceneName.ToString())
+		{
+			delete m_pCamera;
+			m_cameraIndex = -1;
+			m_pCamera = nullptr;
+		}
 	}
 
 	Camera* GetCamera() const
@@ -69,9 +79,6 @@ public:
 	DirectX::BoundingFrustum GetFrustum() const
 	{
 		DirectX::BoundingFrustum frustum = m_pCamera->GetFrustum();
-		//frustum.Transform(frustum, m_pOwner->m_transform.GetWorldMatrix());
-		//frustum.Origin = Mathf::Vector3(m_pOwner->m_transform.position);
-		//frustum.Orientation = m_pOwner->m_transform.rotation;
 
 		return frustum;
 	}

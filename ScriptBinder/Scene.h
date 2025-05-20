@@ -7,6 +7,7 @@
 class GameObject;
 class RenderScene;
 class SceneManager;
+class LightComponent;
 struct ICollider;
 class Scene
 {
@@ -110,8 +111,13 @@ public:
     std::atomic_bool m_isEnable{ false };
     [[Property]]
     size_t m_buildIndex{ 0 };
+    [[Property]]
+	HashingString m_sceneName;
+
 
 public:
+	void CollectLightComponent(LightComponent* ptr);
+	void UnCollectLightComponent(LightComponent* ptr);
     uint32 UpdateLight(LightProperties& lightProperties) const;
     std::pair<size_t, Light&> AddLight();
 	Light& GetLight(size_t index);
@@ -126,7 +132,6 @@ private:
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
+	std::vector<LightComponent*> m_lightComponents;
 	std::vector<Light> m_lights;
-    [[Property]]
-	HashingString m_sceneName;
 };

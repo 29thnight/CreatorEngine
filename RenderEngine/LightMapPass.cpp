@@ -181,6 +181,6 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 }
 
 
-void LightMapPass::Resize()
+void LightMapPass::Resize(uint32_t width, uint32_t height)
 {
 }

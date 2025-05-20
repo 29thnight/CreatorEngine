@@ -13,6 +13,9 @@ public:
 	void Finalize();
 	void Load();
 	void Save();
+
+public:
+	std::wstring m_projectName;
 };
 
 static auto& ProjectSettingInstance = ProjectSetting::GetInstance();

@@ -166,8 +166,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_threadPool = new ThreadPool(4);
 
-    m_newSceneCreatedEventHandle = SceneManagers->newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
-	m_activeSceneChangedEventHandle = SceneManagers->activeSceneChangedEvent.AddLambda([&] 
+    m_newSceneCreatedEventHandle = newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
 	});
@@ -176,6 +176,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 SceneRenderer::~SceneRenderer()
 {
 	delete m_threadPool;
+
+	OnResizeEvent -= m_resizeEventHandle;
 }
 
 void SceneRenderer::InitializeDeviceState()
@@ -192,6 +194,27 @@ void SceneRenderer::InitializeDeviceState()
     DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
     DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
 	DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+
+	m_resizeEventHandle = OnResizeEvent.AddLambda([&](uint32_t width, uint32_t height)
+	{
+		DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
+		DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
+		DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
+		DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
+		DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
+		DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
+		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
+		//DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
+		DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
+		DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
+		DeviceState::g_ClientRect = m_deviceResources->GetLogicalSize();
+		DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
+		DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+
+		m_pSSAOPass->ReloadDSV(m_deviceResources->GetDepthStencilViewSRV());
+
+		m_pBlitPass->Initialize(m_deviceResources->GetBackBufferRenderTargetView());
+	});
 }
 
 void SceneRenderer::InitializeImGui()
@@ -350,6 +373,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	}
 
 	m_renderScene->Update(deltaTime);
+	//m_pEffectPass->Update(deltaTime);
 	PrepareRender();
 }
 
@@ -360,6 +384,19 @@ void SceneRenderer::SceneRendering()
 	for(auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
+
+		if (camera != m_pEditorCamera.get())
+		{
+			if(EngineSettingInstance->IsGameView())
+			{
+				camera->m_applyRenderPipelinePass.m_BlitPass = true;
+			}
+			else
+			{
+				camera->m_applyRenderPipelinePass.m_BlitPass = false;
+			}
+		}
+
 		std::wstring name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
 		DirectX11::BeginEvent(name);
 		//[1] ShadowMapPass
@@ -379,10 +416,18 @@ void SceneRenderer::SceneRendering()
 		{
 			DirectX11::BeginEvent(L"GBufferPass");
 			Benchmark banch;
+			ID3D11RenderTargetView* views[]{
+				m_diffuseTexture->GetRTV(),
+				m_metalRoughTexture->GetRTV(),
+				m_normalTexture->GetRTV(),
+				m_emissiveTexture->GetRTV()
+			};
+			m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 			m_pGBufferPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
 		if (useTestLightmap)
 		{
 			DirectX11::BeginEvent(L"LightMapPass");
@@ -501,7 +546,6 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-
 		{
 			//DirectX11::BeginEvent(L"EffectPass");
 			//Benchmark banch;
@@ -542,6 +586,11 @@ void SceneRenderer::SceneRendering()
 
 		camera->ClearRenderQueue();
 	}
+}
+
+void SceneRenderer::ReApplyCurrCubeMap()
+{
+	ApplyNewCubeMap(m_pSkyBoxPass->CurrentSkyBoxTextureName().string());
 }
 
 void SceneRenderer::PrepareRender()

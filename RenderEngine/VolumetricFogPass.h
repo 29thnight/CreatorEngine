@@ -40,7 +40,7 @@ public:
 	void Initialize(const std::string_view& fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-	virtual void Resize() override;
+	virtual void Resize(uint32_t width, uint32_t height) override;
 private:
 
 

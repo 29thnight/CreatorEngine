@@ -309,7 +309,7 @@ namespace lm {
 	}
 
 
-	void LightMap::Resize()
+	void lm::LightMap::Resize(uint32_t width, uint32_t height)
 	{
 	}
 

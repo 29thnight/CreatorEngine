@@ -45,6 +45,7 @@ namespace file = std::filesystem;
 #include <vector>
 #include <cstdint>
 #include <ranges>
+constexpr inline auto& foreach = std::ranges::for_each;
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"

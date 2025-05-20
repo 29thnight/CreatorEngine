@@ -162,6 +162,6 @@ void GridPass::GridSetting()
     ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
 }
 
-void GridPass::Resize()
+void GridPass::Resize(uint32_t width, uint32_t height)
 {
 }

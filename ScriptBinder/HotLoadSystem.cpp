@@ -127,11 +127,19 @@ void HotLoadSystem::Initialize()
 {
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
     
+#if defined(_DEBUG)
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
         + L"/m /t:Clean;Build /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
+#else
+	command = std::wstring(L"cmd /c \"")
+		+ L"\"" + msbuildPath + L"\" "
+		+ L"\"" + slnPath + L"\" "
+		+ L"/m /t:Clean;Build /p:Configuration=Release /p:Platform=x64 /nologo"
+		+ L"\"";
+#endif
 
 	try
 	{

@@ -136,27 +136,24 @@ void CullingManager::CullMeshesMultithread(const DirectX::BoundingFrustum& frust
 
 	for (DWORD i = 0; i < m_threadPool->GetThreadCount(); ++i)
 	{
+        uint32_t index = jobIndex.fetch_add(1);
+        if (index >= rootChildren.size())
+            break;
+
+        OctreeNode* child = rootChildren[index];
+        if (!child)
+            continue;
+
 		m_threadPool->Enqueue([&, i]()
 		{
-            while (true)
-            {
-                uint32_t index = jobIndex.fetch_add(1);
-                if (index >= rootChildren.size())
-                    break;
-
-                OctreeNode* child = rootChildren[index];
-                if (!child)
-                    continue;
-
-                CullRecursive(frustum, child, results[i]);
-            }
+            CullRecursive(frustum, child, results[i]);
 		});
 	}
 
     // 루트 노드 자체 검사
-    ContainmentType rootContainment = frustum.Contains(m_root->boundingBox);
-    if (rootContainment != DISJOINT)
-        CullRecursive(frustum, m_root, outVisibleMeshes);
+    //ContainmentType rootContainment = frustum.Contains(m_root->boundingBox);
+    //if (rootContainment != DISJOINT)
+    //    CullRecursive(frustum, m_root, outVisibleMeshes);
 
     m_threadPool->NotifyAllAndWait();
 
