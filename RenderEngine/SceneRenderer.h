@@ -29,7 +29,7 @@
 #include "LightMap.h"
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
-#include "EffectManager.h"
+#include "Effect/EffectManager.h"
 
 #include "TestPlayer.h"
 const static float pi = XM_PIDIV2 - 0.01f;

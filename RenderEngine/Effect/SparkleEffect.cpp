@@ -9,7 +9,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
     m_position = position;
 
     // 실제 텍스처 사진
-    m_sparkleTexture = DataSystems->LoadEffectTexture("star.png");
+    m_sparkleTexture = DataSystems->LoadTexture("123.png");
     {
         ImGui::ContextRegister("Sparkle Effect", true, [&]()
             {

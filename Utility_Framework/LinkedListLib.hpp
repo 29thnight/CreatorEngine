@@ -84,6 +84,7 @@ public:
 			_pTail->_pNext = pNewLinkProperty;
 			_pTail = pNewLinkProperty;
 		}
+		_size++;
 	}
 
 	void Unlink(LinkProperty<_Type>* pDeleteLinkProperty)
@@ -110,6 +111,7 @@ public:
 		}
 
 		pDeleteLinkProperty->InternalSeparate();
+		_size--;
 	}
 
 	void erase(Iterator& begin, Iterator& end)
@@ -136,11 +138,15 @@ public:
 		}
 		_pHead = nullptr;
 		_pTail = nullptr;
+		_size = 0;
 	}
+
+	size_t size() const { return _size; }
 
 private:
 	LinkProperty<_Type>* _pHead{};
 	LinkProperty<_Type>* _pTail{};
+	size_t _size{ 0 };
 };
 
 #endif // !_LINKEDLIST_HPP
