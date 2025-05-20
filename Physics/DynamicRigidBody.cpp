@@ -37,6 +37,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	CopyMatrixDxToPx(transform, transformPx);
 
 	m_rigidDynamic = physics->createRigidDynamic(transformPx);
+
 	m_rigidDynamic->userData = data;
 
 	//kinematic 按眉客 悼利 按眉狼 瞒捞
@@ -54,7 +55,6 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	else {
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, true);
-
 		m_rigidDynamic->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, false);
 	}
 

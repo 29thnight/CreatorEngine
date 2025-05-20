@@ -2,6 +2,7 @@
 #include "Component.h"  
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"
+#include "BoxColliderComponent.generated.h"
 
 class BoxColliderComponent : public Component, public ICollider  
 {  

@@ -2,12 +2,21 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
+#include "CapsuleColliderComponent.generated.h"
 
 class CapsuleColliderComponent : public Component, public ICollider
 {
 public:
-	CapsuleColliderComponent();
-	~CapsuleColliderComponent() override;
+   ReflectCapsuleColliderComponent
+	[[Serializable(Inheritance:Component)]]
+	CapsuleColliderComponent() {
+		m_name = "CapsuleColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<CapsuleColliderComponent>();
+		m_type = EColliderType::COLLISION;
+		m_Info.radius = 1.0f;
+		m_Info.height = 1.0f;
+	} virtual ~CapsuleColliderComponent() = default;
+	
+	
 
 	[[Property]]
 	float m_radius{ 1.0f };

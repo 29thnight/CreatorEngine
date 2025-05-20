@@ -16,7 +16,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 		return;
 	}
 	
-	//todo : input 값 받아오기
+	////todo : input 값 받아오기
 	bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
 	bool backward = InputManagement->IsKeyPressed(KeyBoard::DownArrow);
 	bool left = InputManagement->IsKeyPressed(KeyBoard::LeftArrow);
@@ -46,6 +46,8 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	}
 
 	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
+	/*input.x = m_moveInput.x;
+	input.z = m_moveInput.y;*/
 	input.x = x;
 	input.z = z;
 

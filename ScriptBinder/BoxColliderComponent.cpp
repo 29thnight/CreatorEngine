@@ -1,14 +1,5 @@
 #include "BoxColliderComponent.h"
 
-BoxColliderComponent::BoxColliderComponent() : m_Info{}, m_type(EColliderType::COLLISION)
-{
-	m_Info.boxExtent={ 1.0f, 1.0f, 1.0f };
-}
-
-BoxColliderComponent::~BoxColliderComponent()
-{
-}
-
 void BoxColliderComponent::SetPositionOffset(DirectX::SimpleMath::Vector3 pos)
 {
 	m_posOffset = pos;

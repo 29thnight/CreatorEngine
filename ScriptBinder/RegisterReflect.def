@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AnimationState.h"
+#include "TerrainCollider.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
 #include "Component.h"
@@ -17,11 +18,14 @@
 #include "CameraComponent.h"
 #include "Canvas.h"
 #include "CharacterControllerComponent.h"
+#include "CapsuleColliderComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
 #include "GameObject.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
+#include "RagdollComponent.h"
+#include "MeshCollider.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
@@ -29,6 +33,7 @@
 #include "Object.h"
 #include "RigidBodyComponent.h"
 #include "Scene.h"
+#include "SphereColliderComponent.h"
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
@@ -42,9 +47,11 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(AnimationState);
     AUTO_REGISTER_CLASS(Animator);
     AUTO_REGISTER_CLASS(AvatarMask);
+    AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Camera);
     AUTO_REGISTER_CLASS(CameraComponent);
     AUTO_REGISTER_CLASS(Canvas);
+    AUTO_REGISTER_CLASS(CapsuleColliderComponent);
     AUTO_REGISTER_CLASS(CharacterControllerComponent);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
@@ -55,11 +62,14 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Material);
     AUTO_REGISTER_CLASS(MaterialInfomation);
     AUTO_REGISTER_CLASS(Mesh);
+    AUTO_REGISTER_CLASS(MeshColliderComponent);
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
+    AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);

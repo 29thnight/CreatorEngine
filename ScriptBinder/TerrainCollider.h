@@ -34,7 +34,7 @@ public:
 private:
 	unsigned int m_colliderID;
 
-	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
 	// ICollider을(를) 통해 상속됨

@@ -76,7 +76,7 @@ void PhysicsManager::OnLoadScene()
 			continue;
 		}
 
-		auto transform = obj->m_transform;
+		auto& transform = obj->m_transform;
 		auto bodyType = rigid->GetBodyType();
 
 		auto box = obj->GetComponent<BoxColliderComponent>();
@@ -405,14 +405,19 @@ void PhysicsManager::ProcessCallback()
 			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
+			SceneManagers->GetActiveScene()->OnCollisionStay(collision);
 			break;
 		case ECollisionEventType::END_OVERLAP:
+			SceneManagers->GetActiveScene()->OnCollisionExit(collision);
 			break;
 		case ECollisionEventType::ENTER_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerEnter(collision);
 			break;
 		case ECollisionEventType::ON_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerStay(collision);
 			break;
 		case ECollisionEventType::END_COLLISION:
+			SceneManagers->GetActiveScene()->OnTriggerExit(collision);
 			break;
 		default:
 			break;
@@ -463,7 +468,7 @@ void PhysicsManager::AddTerrainCollider(GameObject* object)
 
 	TerrainColliderComponent* collider = object->GetComponent<TerrainColliderComponent>();
 	Transform& transform = object->m_transform;
-	// auto terrain = object->GetComponent<Terrain>();
+	auto terrain = object->GetComponent<TerrainComponent>();
 
 	HeightFieldColliderInfo heightFieldInfo;
 
@@ -601,7 +606,7 @@ void PhysicsManager::SetPhysicData()
 			continue;
 		}
 
-		auto transform = colliderInfo.gameObject->m_transform;
+		auto& transform = colliderInfo.gameObject->m_transform;
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 

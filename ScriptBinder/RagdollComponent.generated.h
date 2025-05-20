@@ -3,5 +3,9 @@
 #define ReflectRagdollComponent \
 ReflectionFieldInheritance(RagdollComponent, Component) \
 { \
-	FieldEnd(RagdollComponent, NoneInheritance) \
+	PropertyField \
+	({ \
+		meta_property(m_bIsRagdoll) \
+	}); \
+	FieldEnd(RagdollComponent, PropertyOnlyInheritance) \
 };

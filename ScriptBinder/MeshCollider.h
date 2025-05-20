@@ -2,12 +2,14 @@
 #include "Component.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
+#include "MeshColliderComponent.generated.h"
 
 class MeshColliderComponent : public Component, public ICollider
 {
 public:
-	MeshColliderComponent();
-	~MeshColliderComponent() override;
+   ReflectMeshColliderComponent
+	[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(MeshColliderComponent)
 	[[Property]]
 	ConvexMeshColliderInfo m_Info; 
 	[[Property]]
@@ -90,17 +92,40 @@ public:
 
 	//=========================================================
 	// ICollider을(를) 통해 상속됨
-	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override;
-	DirectX::SimpleMath::Vector3 GetPositionOffset() override;
-	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
-	DirectX::SimpleMath::Quaternion GetRotationOffset() override;
-	void OnTriggerEnter(ICollider* other) override;
-	void OnTriggerStay(ICollider* other) override;
-		
-	void OnTriggerExit(ICollider* other) override;
-	void OnCollisionEnter(ICollider* other) override;
-	void OnCollisionStay(ICollider* other) override;
-	void OnCollisionExit(ICollider* other) override;
+	void SetPositionOffset(DirectX::SimpleMath::Vector3 pos) override {
+		m_posOffset = pos;
+	}
+	DirectX::SimpleMath::Vector3 GetPositionOffset() override {
+		return m_posOffset;
+	}
+	void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override {
+		m_rotOffset = rotation;
+	}
+	DirectX::SimpleMath::Quaternion GetRotationOffset() override {
+		return m_rotOffset;
+	}
+
+	void OnTriggerEnter(ICollider* other) override {
+		++m_collsionCount;
+	}
+	void OnTriggerStay(ICollider* other) override {
+	}
+	void OnTriggerExit(ICollider* other) override {
+		if (m_collsionCount != 0) {
+			--m_collsionCount;
+		}
+	}
+	void OnCollisionEnter(ICollider* other) override {
+		++m_collsionCount;
+	}
+	void OnCollisionStay(ICollider* other) override {
+
+	}
+	void OnCollisionExit(ICollider* other) override {
+		if (m_collsionCount != 0) {
+			--m_collsionCount;
+		}
+	}
 private:
 	EColliderType m_type;
 	unsigned int m_collsionCount = 0;

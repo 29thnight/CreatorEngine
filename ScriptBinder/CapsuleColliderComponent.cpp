@@ -1,15 +1,5 @@
 #include "CapsuleColliderComponent.h"
 
-CapsuleColliderComponent::CapsuleColliderComponent()
-	: m_Info{}, m_type(EColliderType::COLLISION)
-{
-	m_Info.radius = 1.0f;
-	m_Info.height = 1.0f;
-}
-
-CapsuleColliderComponent::~CapsuleColliderComponent()
-{
-}
 
 void CapsuleColliderComponent::OnTriggerEnter(ICollider* other)
 {
