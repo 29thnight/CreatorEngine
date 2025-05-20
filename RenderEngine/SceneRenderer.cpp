@@ -373,6 +373,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 	}
 
 	m_renderScene->Update(deltaTime);
+	//m_pEffectPass->Update(deltaTime);
 	PrepareRender();
 }
 
