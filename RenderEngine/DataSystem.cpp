@@ -558,7 +558,20 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	ImU32 color{};
 	if (ImGui::ImageButton(fileName.c_str(), iconTexture, tileSize))
 	{
+		selectedMetaFilePath = directory.string();
+		selectedMetaFilePath += ".meta";
 
+		selectedFileName = fileName;
+
+		try
+		{
+			selectedFileMetaNode = YAML::LoadFile(selectedMetaFilePath);
+		}
+		catch (const std::exception& e)
+		{
+			Debug->LogError(e.what());
+			selectedFileMetaNode = std::nullopt;
+		}
 	}
 
 	if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))

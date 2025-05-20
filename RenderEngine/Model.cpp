@@ -44,19 +44,51 @@ Model* Model::LoadModel(const std::string_view& filePath)
 		}
 		else
 		{
+			flag settings = aiProcess_LimitBoneWeights
+				| aiProcessPreset_TargetRealtime_Fast
+				| aiProcess_ConvertToLeftHanded
+				| aiProcess_TransformUVCoords
+				| aiProcess_GenBoundingBoxes;
+
+			bool isCreateMeshCollider{ false };
+
+			file::path metaPath = path_.string() + ".meta";
+			if (file::exists(metaPath))
+			{
+				auto node = MetaYml::LoadFile(metaPath.string());
+				if (node["ModelImporter"])
+				{
+					const MetaYml::Node& modelImporterNode = node["ModelImporter"];
+					if (modelImporterNode)
+					{
+						if (modelImporterNode["OptimizeMeshes"] && modelImporterNode["OptimizeMeshes"].as<bool>())
+						{
+							settings |= aiProcess_OptimizeMeshes;
+						}
+
+						if (modelImporterNode["ImproveCacheLocality"] && modelImporterNode["ImproveCacheLocality"].as<bool>())
+						{
+							settings |= aiProcess_ImproveCacheLocality;
+						}
+
+						if (modelImporterNode["CreateMeshCollider"])
+						{
+							isCreateMeshCollider = modelImporterNode["CreateMeshCollider"].as<bool>();
+						}
+					}
+				}
+				else
+				{
+					settings |= aiProcess_OptimizeMeshes;
+					settings |= aiProcess_ImproveCacheLocality;
+				}
+			}
+
 			Assimp::Importer importer;
 			importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 			importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
-			const aiScene* assimpScene = importer.ReadFile(filePath.data(),
-				aiProcess_LimitBoneWeights
-				| aiProcessPreset_TargetRealtime_Fast
-				| aiProcess_ConvertToLeftHanded
-				| aiProcess_TransformUVCoords
-				| aiProcess_OptimizeMeshes
-				| aiProcess_ImproveCacheLocality
-				| aiProcess_GenBoundingBoxes
-			);
+			const aiScene* assimpScene = importer.ReadFile(filePath.data(), settings);
 
 			if (nullptr == assimpScene)
 			{
@@ -71,16 +103,8 @@ Model* Model::LoadModel(const std::string_view& filePath)
 
 			ModelLoader loader = ModelLoader(assimpScene, path_.string());
 
-			model = loader.LoadModel();
+			model = loader.LoadModel(isCreateMeshCollider);
 			model->path = path_;
-
-			/*file::path metaPath = path_.string() + ".meta";
-			if (file::exists(metaPath))
-			{
-				auto node = MetaYml::LoadFile(metaPath.string());
-				if(node[""])
-			}*/
-
 
 			return model;
 		}

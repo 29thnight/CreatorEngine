@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <set>
 #include <memory>
+#include <wincrypt.h>
 #include "combaseapi.h"
 
 inline GUID GenerateGUID()
@@ -12,6 +13,58 @@ inline GUID GenerateGUID()
 	GUID guid;
 	HRESULT hr = CoCreateGuid(&guid);
 	return guid;
+}
+
+inline GUID GenerateDeterministicGUIDFromName(const std::string& name)
+{
+	GUID outGuid{};
+	HCRYPTPROV hProv = NULL;
+	HCRYPTHASH hHash = NULL;
+
+	// Acquire a cryptographic provider context
+	if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+	{
+		throw std::runtime_error("Create Filed GUID using string");
+	}
+
+	// Create a hash object
+	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
+	{
+		CryptReleaseContext(hProv, 0);
+		throw std::runtime_error("Create Filed GUID using string");
+	}
+
+	// Hash the input string
+	if (!CryptHashData(hHash, reinterpret_cast<const BYTE*>(name.c_str()), name.length(), 0))
+	{
+		CryptDestroyHash(hHash);
+		CryptReleaseContext(hProv, 0);
+		throw std::runtime_error("Create Filed GUID using string");
+	}
+
+	BYTE hash[16]; // MD5 = 128-bit
+	DWORD hashLen = sizeof(hash);
+	if (!CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0))
+	{
+		CryptDestroyHash(hHash);
+		CryptReleaseContext(hProv, 0);
+		throw std::runtime_error("Create Filed GUID using string");
+	}
+
+	CryptDestroyHash(hHash);
+	CryptReleaseContext(hProv, 0);
+
+	// Map the hash to GUID format
+	outGuid.Data1 = *(DWORD*)&hash[0];
+	outGuid.Data2 = *(WORD*)&hash[4];
+	outGuid.Data3 = *(WORD*)&hash[6];
+	memcpy(outGuid.Data4, &hash[8], 8);
+
+	// Optional: Set version bits to indicate this is "name-based" (version 5 style)
+	outGuid.Data3 = (outGuid.Data3 & 0x0FFF) | (5 << 12);     // Set version to 5
+	outGuid.Data4[0] = (outGuid.Data4[0] & 0x3F) | 0x80;       // Set variant to RFC4122
+
+	return outGuid;
 }
 
 inline size_t ConvertGUIDToHash(const GUID& guid)
@@ -253,6 +306,18 @@ namespace TypeTrait
 		static inline FileGuid MakeFileGUID()
 		{
 			FileGuid guid(GenerateGUID());
+			while (g_fileGuids.find(guid) != g_fileGuids.end())
+			{
+				guid = GenerateGUID();
+			}
+			g_fileGuids.insert(guid);
+
+			return guid;
+		}
+
+		static inline FileGuid MakeFileGUID(const std::string& filePath)
+		{
+			FileGuid guid(GenerateDeterministicGUIDFromName(filePath));
 			while (g_fileGuids.find(guid) != g_fileGuids.end())
 			{
 				guid = GenerateGUID();

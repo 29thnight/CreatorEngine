@@ -274,7 +274,7 @@ private:
         }
 
         if (!root["guid"])
-            root["guid"] = GUIDCreator::MakeFileGUID().ToString();
+            root["guid"] = GUIDCreator::MakeFileGUID(targetFile.string()).ToString();
 
         root["importSettings"]["extension"] = targetFile.extension().string();
         root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();
@@ -287,6 +287,15 @@ private:
             for (const auto& f : functions)
                 root["eventRegisterSetting"].push_back(f);
         }
+        else if (targetFile.extension() == ".fbx"
+			|| targetFile.extension() == ".gltf"
+			|| targetFile.extension() == ".obj"
+			|| targetFile.extension() == ".glb")
+        {
+			root["ModelImporter"]["OptimizeMeshes"] = true;
+			root["ModelImporter"]["ImproveCacheLocality"] = true;
+			root["ModelImporter"]["CreateMeshCollider"] = false;
+		}
 
         std::ofstream fout(metaPath);
         fout << root;
