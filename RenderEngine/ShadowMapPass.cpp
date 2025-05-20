@@ -96,8 +96,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
@@ -132,15 +132,14 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& obj : scene.GetScene()->m_SceneObjects)
+		for (auto& meshRenderer : camera.m_defferdQueue)
 		{
-			if (obj->ToString() == "Cube" || obj->ToString() == "Plane")
-				continue;
-			MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
-			if (nullptr == meshRenderer) continue;
 			if (!meshRenderer->IsEnabled()) continue;
 
-			scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+			GameObject* sceneObject = meshRenderer->GetOwner();
+			if (sceneObject->IsDestroyMark()) continue;
+			if (sceneObject->m_parentIndex == -1) continue;
+			scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
 
 			meshRenderer->m_Mesh->Draw();
 		}
@@ -230,8 +229,9 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 	Mathf::Matrix cameraview = camera.CalculateView();
 	Mathf::Matrix viewInverse = camera.CalculateInverseView();
 	Mathf::Vector3 forwardVec;
-	forwardVec = cameraview.Forward();
-	Mathf::Vector3 adjustTranslate = forwardVec/* * frustumDistnace*/;
+	cameraview.Forward(forwardVec);
+	//forwardVec = cameraview.Forward();
+	Mathf::Vector3 adjustTranslate = forwardVec * frustumDistnace;
 
 	std::array<std::array<	Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
 

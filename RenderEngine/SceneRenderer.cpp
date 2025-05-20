@@ -597,20 +597,14 @@ void SceneRenderer::PrepareRender()
 {
 	Benchmark banch;
 	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*> meshes;
-	for (auto& obj : m_currentScene->m_SceneObjects)
-	{
-		if (MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>(); nullptr != meshRenderer)
-		{
-			if (false == meshRenderer->IsEnabled()) continue;
-			if (!meshRenderer->IsNeedUpdateCulling()) continue;
+	std::vector<MeshRenderer*>& staticMeshes = m_currentScene->GetMeshRenderers();
+	std::vector<MeshRenderer*>& skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
-			meshes.push_back(meshRenderer);
-		}
-	}
-
-	for (auto& mesh : meshes)
+	for (auto& mesh : staticMeshes)
 	{
+		if (false == mesh->IsEnabled() || 
+			false == mesh->IsNeedUpdateCulling()) continue;
+
 		CullingManagers->UpdateMesh(mesh);
 	}
 
@@ -618,14 +612,32 @@ void SceneRenderer::PrepareRender()
 	{
 		if (nullptr == camera) continue;
 
-		std::vector<MeshRenderer*> culledMeshes;
-		CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
-
-		for (auto& culledMesh : culledMeshes)
+		m_threadPool->Enqueue([&camera, &skinnedMeshes]
 		{
-			camera->PushRenderQueue(culledMesh);
-		}
+			std::vector<MeshRenderer*> culledMeshes;
+			CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+
+			for (auto& culledMesh : culledMeshes)
+			{
+				if (false == culledMesh->IsEnabled()) continue;
+
+				camera->PushRenderQueue(culledMesh);
+			}
+
+			for (auto& skinnedMesh : skinnedMeshes)
+			{
+				if (false == skinnedMesh->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if(frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				{
+					camera->PushRenderQueue(skinnedMesh);
+				}
+			}
+		});
 	}
+
+	m_threadPool->NotifyAllAndWait();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

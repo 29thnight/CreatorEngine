@@ -8,6 +8,7 @@ class GameObject;
 class RenderScene;
 class SceneManager;
 class LightComponent;
+class MeshRenderer;
 struct ICollider;
 class Scene
 {
@@ -124,6 +125,12 @@ public:
     void RemoveLight(size_t index);
 	void DistroyLight();
 
+public:
+	void CollectMeshRenderer(MeshRenderer* ptr);
+	void UnCollectMeshRenderer(MeshRenderer* ptr);
+	std::vector<MeshRenderer*>& GetMeshRenderers() { return m_meshRenderers; }
+	std::vector<MeshRenderer*>& GetSkinnedMeshRenderers() { return m_skinnedMeshRenderers; }
+
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
@@ -132,6 +139,8 @@ private:
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-	std::vector<LightComponent*> m_lightComponents;
-	std::vector<Light> m_lights;
+	std::vector<LightComponent*>    m_lightComponents;
+	std::vector<MeshRenderer*>      m_meshRenderers;
+	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
+	std::vector<Light>              m_lights;
 };
