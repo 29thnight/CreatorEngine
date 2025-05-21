@@ -10,6 +10,7 @@ public:
     DirectX::BoundingBox boundingBox;
     std::vector<MeshRenderer*> objects;
 
+	OctreeNode* parent = nullptr;
     std::array<OctreeNode*, 8> children{};
 
     int depth = 0;

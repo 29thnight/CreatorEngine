@@ -23,7 +23,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	m_deviceResources->RegisterDeviceNotify(this);
 
     XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
-    XMFLOAT3 extents = { 2000.0f, 2000.0f, 2000.0f };
+    XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
     BoundingBox fixedBounds(center, extents);
 	CullingManagers->Initialize(fixedBounds, 3, 30);
 

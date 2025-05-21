@@ -2,31 +2,45 @@
 #include "Component.h"  
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"
+#include "BoxColliderComponent.generated.h"
 
 class BoxColliderComponent : public Component, public ICollider  
 {  
 public:  
-    BoxColliderComponent();
-    ~BoxColliderComponent()  override;
+
+   ReflectBoxColliderComponent
+	[[Serializable(Inheritance:Component)]]
+    BoxColliderComponent() {
+        m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
+		m_type = EColliderType::COLLISION;
+        m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
+		m_boxExtent = m_Info.boxExtent;
+    } virtual ~BoxColliderComponent() = default;
+
 
    [[Property]]  
-   BoxColliderInfo m_Info;  
-   [[Property]]  
+   DirectX::SimpleMath::Vector3 m_boxExtent{ 1.0f, 1.0f, 1.0f };
+   [[Property]]
    DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };  
    [[Property]]  
    DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };  
    
 
 
-   //info
-   DirectX::SimpleMath::Vector3 GetExtents() const
-   {
-	   return m_Info.boxExtent;
+   DirectX::SimpleMath::Vector3 GetExtents()
+   {  
+      if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)  
+      {  
+          m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
+	  }
+	  
+      return m_Info.boxExtent;  
    }
 
    void SetExtents(const DirectX::SimpleMath::Vector3& extents)  
    {  
        m_Info.boxExtent = extents;  
+       m_boxExtent = m_Info.boxExtent;
    }  
 
 
@@ -40,14 +54,20 @@ public:
 	   m_type = type;
    }
 
-   BoxColliderInfo GetBoxInfo() const
+   BoxColliderInfo GetBoxInfo()
    {
+	   if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
+	   {
+		   m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
+	   }
+
 	   return m_Info;
    }
 
    void SetBoxInfoMation(const BoxColliderInfo& info)  
    {  
        m_Info = info;  
+	   m_boxExtent = m_Info.boxExtent;
    }  
 
    float GetStaticFriction() const
@@ -105,8 +125,6 @@ public:
     bool GetIsTrigger() override;*/
 
 private:  
-    
-
 
     void OnTriggerEnter(ICollider* other) override;
 
@@ -122,4 +140,5 @@ private:
 
     EColliderType m_type;
 	unsigned int m_collsionCount = 0;
+    BoxColliderInfo m_Info;
 };

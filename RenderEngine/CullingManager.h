@@ -3,6 +3,7 @@
 #include "Core.Thread.hpp"
 #include <vector>
 #include <DirectXCollision.h>
+#include <set>
 
 class MeshRenderer;
 class OctreeNode;
@@ -32,6 +33,9 @@ private:
     int m_maxDepth = 5;
     int m_maxMeshesPerNode = 10;
 
+    std::set<MeshRenderer*> m_uniqueMeshes;
+
+	void CullRoot(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& out) const;
     void CullRecursive(const DirectX::BoundingFrustum& frustum, OctreeNode* node, std::vector<MeshRenderer*>& out) const;
 };
 

@@ -20,6 +20,7 @@ OctreeNode::~OctreeNode()
 			free(child);
 		}
     }
+	parent = nullptr;
 }
 
 void OctreeNode::Subdivide(int maxDepth, int maxObjectsPerNode)
@@ -48,6 +49,7 @@ void OctreeNode::Subdivide(int maxDepth, int maxObjectsPerNode)
 		OctreeNode* child = new (voidPtr) OctreeNode(childBox, depth + 1);
 
 		children[i] = child;
+		child->parent = this;
     }
 }
 
@@ -80,15 +82,14 @@ void OctreeNode::Insert(MeshRenderer* object, int maxDepth, int maxObjectsPerNod
                         child->Insert(renderer, maxDepth, maxObjectsPerNode);
                         inserted = true;
                     }
-                }
 
-                if (!inserted)
-                {
-                    objects.push_back(renderer);
-                    renderer->CullGroupInsert(this);
+                    if (!inserted)
+                    {
+                        objects.push_back(renderer);
+                        renderer->CullGroupInsert(this);
+                    }
                 }
             }
-
         }
     }
     else
@@ -113,12 +114,17 @@ bool OctreeNode::Remove(MeshRenderer* object)
 
     if (isLeaf)
     {
-        auto it = std::find(objects.begin(), objects.end(), object);
-        if (it != objects.end())
-        {
-            objects.erase(it);
-            removed = true;
-        }
+		auto& vec = objects;
+		size_t before = vec.size();
+		std::erase_if(vec, [&](MeshRenderer* obj) { return obj == object; });
+		if (vec.size() < before)
+			removed = true;
+    }
+
+    if (parent)
+    {
+		auto& vec = parent->objects;
+		std::erase_if(vec, [&](MeshRenderer* obj) { return obj == object; });
     }
 
     for (OctreeNode* child : children)
@@ -139,6 +145,12 @@ bool OctreeNode::RemoveRecursive(MeshRenderer* target)
     std::erase_if(vec, [&](MeshRenderer* obj) { return obj == target; });
     if (vec.size() < before)
         removed = true;
+
+    if (parent)
+    {
+		auto& vec = parent->objects;
+		std::erase_if(vec, [&](MeshRenderer* obj) { return obj == target; });
+    }
 
     for (OctreeNode* child : children)
     {

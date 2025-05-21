@@ -48,7 +48,7 @@ private:
 	void LoadMesh(std::fstream& infile);
 	void LoadMaterial(std::fstream& infile);
 
-	Model* LoadModel();
+	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
 	void GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
 

@@ -12,6 +12,7 @@ const static uint32_t m_capsuleTypeId = 9003;
 const static uint32_t m_planeTypeId = 9004;
 const static uint32_t m_heightFieldTypeId = 9005;
 const static uint32_t m_controllerTypeId = 9006;
+const static uint32_t m_convexTypeId = 9007;
 
 
 
@@ -224,7 +225,7 @@ struct HeightFieldColliderInfo
 {
 	ColliderInfo colliderInfo;	//콜라이더 정보
 	//unsigned int heightFieldHash = 0;	//HeightField 해쉬값
-	int* heightMep = nullptr;	//모델 높이 맵 정보
+	float* heightMep = nullptr;	//모델 높이 맵 정보
 	unsigned int numCols = 0;	//높이 맵 가로 겟수
 	unsigned int numRows = 0;	//높이 맵 세로 겟수
 	float rowScale = 1.0f;	//높이 맵 세로 유닛 길이

@@ -37,6 +37,7 @@ public:
     Skeleton*   m_Skeleton{};
 	bool m_hasBones{ false };
     int m_numTotalMeshes{};
+	bool m_isMakeMeshCollider{ false };
 
 private:
 	friend class SceneRenderer;

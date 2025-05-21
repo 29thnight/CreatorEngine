@@ -3,21 +3,43 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "CullingManager.h"
+#include "SceneManager.h"
+#include "Scene.h"
 
 MeshRenderer::MeshRenderer()
 {
     m_name = "MeshRenderer"; 
     m_typeID = TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>();
-	CullingManagers->Insert(this);
 }
 
 MeshRenderer::~MeshRenderer()
 {
 }
 
+void MeshRenderer::Awake()
+{
+    auto scene = SceneManagers->GetActiveScene();
+    if (scene)
+    {
+        scene->CollectMeshRenderer(this);
+    }
+
+    if(!m_isSkinnedMesh)
+    {
+        CullingManagers->Insert(this);
+
+		m_isNeedUptateCulling = true;
+    }
+}
+
 void MeshRenderer::OnDistroy()
 {
     CullingManagers->Remove(this);
+	auto scene = SceneManagers->GetActiveScene();
+	if (scene)
+	{
+		scene->UnCollectMeshRenderer(this);
+	}
 }
 
 BoundingBox MeshRenderer::GetBoundingBox() const

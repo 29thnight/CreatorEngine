@@ -42,14 +42,14 @@ void GameObject::SetTag(const std::string_view& tag)
 		return; // Avoid adding empty tags
 	}
 
-	if (TagManager::GetInstance()->HasTag(tag.data()))
-	{
-		m_tag = tag.data();
-	}
-	else
-	{
-		m_tag = "Untagged";
-	}
+	//if (TagManager::GetInstance()->HasTag(tag.data()))
+	//{
+	//	m_tag = tag.data();
+	//}
+	//else
+	//{
+	//	m_tag = "Untagged";
+	//}
 }
 
 void GameObject::Destroy()

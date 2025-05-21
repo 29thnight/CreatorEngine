@@ -18,6 +18,7 @@ void PhysicsEventCallback::onSleep(PxActor** actors, PxU32 count)
 
 void PhysicsEventCallback::onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs)
 {
+	std::cout << "onContact" << std::endl;
 	//발생한 충동 이벤트 전체 이벤트 순회
 	for (PxU32 i = 0; i < nbPairs; i++) {
 
@@ -41,6 +42,7 @@ void PhysicsEventCallback::onContact(const PxContactPairHeader& pairHeader, cons
 
 void PhysicsEventCallback::onTrigger(PxTriggerPair* pairs, PxU32 count)
 {
+	std::cout << "onTrigger" << std::endl;
 	for (PxU32 i = 0; i < count; i++)
 	{
 		//Start OverLap 
@@ -221,6 +223,7 @@ void PhysicsEventCallback::SettingTriggerData(const physx::PxTriggerPair* pairs,
 void PhysicsEventCallback::CountTrigger(unsigned int triggerId,unsigned int otherId,const ECollisionEventType& eventType)
 {
 	//다중 충돌을 위한 트리거 맵 세트
+	
 	//충돌이 시작된 경우
 	if (eventType == ECollisionEventType::ENTER_OVERLAP) {
 		auto iter = m_triggerMap.find(triggerId);

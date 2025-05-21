@@ -2,6 +2,14 @@ RWTexture2D<float4> TargetTexture : register(u0); // 타겟 텍스처 (UAV)
 Texture2D<float4> InputTexture : register(t0);
 // sobel filter algorithm
 
+float2 Arrow[4] =
+{
+    { 1, 0 },
+    { 0, 1 },
+    { -1, 0 },
+    { 0, -1 }
+};
+
 // Sobel 필터 (엣지 검출)
 float SobelEdgeDetection(Texture2D<float4> tex, int2 uv)
 {
@@ -45,6 +53,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
     //TargetTexture[uv] = color;
     
     
+    //for (int i = 0; i < 4; i++)
+    //{
+    //    
+    //}
+    if (color.a > 0)
+    {
+        TargetTexture[uv] = color;
+        return;
+    }
+    
+    //TargetTexture[uv] = color;
     //TargetTexture[uv] = InputTexture.Load(float3(uv, 0)) / 9.0;
     for (int y = -1; y <= 1; y++)
     {
@@ -53,11 +72,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
             if (x == 0 && y == 0)
                 continue;
             float4 neighborColor = InputTexture[uv + int2(x, y)];
-            if (neighborColor.a > 0)
+            if (neighborColor.a == 1)
             {
                 color = neighborColor;
-                TargetTexture[uv] = color;
+                break;
             }
         }
     }
+    TargetTexture[uv] = color;
 }

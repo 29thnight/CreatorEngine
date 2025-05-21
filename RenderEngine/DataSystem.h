@@ -96,6 +96,10 @@ public:
 
 	Material* m_trasfarMaterial{};
 
+	std::string selectedFileName{};
+	std::string selectedMetaFilePath{};
+	std::optional<YAML::Node> selectedFileMetaNode{};
+
 	//--------- Icon for ImGui
 	Texture* TextureIcon{};
 	Texture* ModelIcon{};

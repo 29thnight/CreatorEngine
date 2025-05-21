@@ -5,13 +5,14 @@
 #include "IRenderable.h"
 #include "LightMapping.h"
 #include "IOnDistroy.h"
+#include "IAwakable.h"
 #include "../RenderEngine/Mesh.h"
 #include "../RenderEngine/Material.h"
 #include "MeshRenderer.generated.h"
 
 class Animator;
 class OctreeNode;
-class MeshRenderer : public Component, public IOnDistroy
+class MeshRenderer : public Component, public IOnDistroy, public IAwakable
 {
 public:
    ReflectMeshRenderer
@@ -22,7 +23,11 @@ public:
    bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
    void SetNeedUpdateCulling(bool able) { m_isNeedUptateCulling = able; }
 
+   virtual void Awake() override;
    virtual void OnDistroy() override;
+
+   void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
+   bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
     BoundingBox GetBoundingBox() const;
 
@@ -37,6 +42,8 @@ public:
     Mesh* m_Mesh{ nullptr };
     [[Property]]
     LightMapping m_LightMapping;
+    [[Property]]
+	bool m_isSkinnedMesh{ false };
 
 private:
 	bool m_isNeedUptateCulling{ false };
