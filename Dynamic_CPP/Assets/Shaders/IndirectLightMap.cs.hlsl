@@ -2,7 +2,7 @@
 // 라이트맵처럼 라이트맵 텍스쳐의 한 픽셀을 선택하여
 // 그 픽셀의 pos, normal을 가져와서 ray를 삼각형에 쏘고
 // 맞은 삼각형이 있으면 샘플링해서 metalic, roughness로 계산된 광원을 가져온다.
-
+//#define Indirect_Max_Sampling_Count 64
 
 // === 구조체 ===
 struct Triangle
@@ -36,22 +36,23 @@ struct Ray
 };
 
 // === 버퍼 ===
-Texture2DArray<float4> lightMap : register(t1);
-Texture2D<float4> this_PositionMap : register(t2);
-Texture2D<float4> this_NormalMap : register(t3);
+Texture2DArray<float4> lightMap : register(t0);
+Texture2D<float4> this_PositionMap : register(t1);
+Texture2D<float4> this_NormalMap : register(t2);
 
 
 StructuredBuffer<Triangle> triangles : register(t10);
 StructuredBuffer<int> TriIndices : register(t11); // BVH에서 삼각형 인덱스
 StructuredBuffer<BVHNode> BVHNodes : register(t12);
 RWTexture2D<float4> g_IndirectLightMap : register(u0);
+RWTexture2D<float4> g_DirectionalMap : register(u1);
 
 // === 상수 버퍼 ===
 cbuffer CB_Lightmap : register(b0)
 {
     int2 Resolution;
     int triangleCount;    // indice
-    int g_SampleCount;    // ray 샘플링 수
+    int sampleCount;
 }
 cbuffer CB : register(b1)
 {
@@ -62,23 +63,27 @@ cbuffer CB : register(b1)
 cbuffer transform : register(b2)
 {
     matrix worldMat;
-};
+}
+cbuffer CB_Hammersley_Sample : register(b3)
+{
+    float2 xi;
+}
 
 // === 유틸리티 ===
-float RadicalInverse_VdC(uint bits)
-{
-    bits = (bits << 16) | (bits >> 16);
-    bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
-    bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
-    bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
-    bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
-    return float(bits) * 2.3283064365386963e-10;
-}
+//float RadicalInverse_VdC(uint bits)
+//{
+//    bits = (bits << 16) | (bits >> 16);
+//    bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
+//    bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
+//    bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
+//    bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
+//    return float(bits) * 2.3283064365386963e-10;
+//}
 
-float2 HammersleySample(uint i, uint N)
-{
-    return float2(float(i) / float(N), RadicalInverse_VdC(i));
-}
+//float2 HammersleySample(uint i, uint N)
+//{
+//    return float2(float(i) / float(N), RadicalInverse_VdC(i));
+//}
 
 float3 SampleHemisphere(float2 xi)
 {
@@ -96,16 +101,17 @@ float3x3 BuildTBN(float3 n)
     return float3x3(t, b, n);
 }
 
+//Moller-Trumbore
 inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out float t, out float3 bary)
 {
-    float3 origin = orig + dir * 0.01; // 자신을 때리는 경우 방지.
+    float3 origin = orig + dir * 0.001; // 자신을 때리는 경우 방지.
     
     float3 v0 = tri.v0, v1 = tri.v1, v2 = tri.v2;
     float3 edge1 = v1 - v0;
     float3 edge2 = v2 - v0;
     float3 pvec = cross(dir, edge2);
     float det = dot(edge1, pvec);
-    if (det < 1e-4)
+    if (abs(det) < 1e-6)
         return false;
 
     float invDet = 1.0 / det;
@@ -167,11 +173,33 @@ bool IntersectAABB(Ray ray, float3 bmin, float3 bmax)
     float3 tmax = max(t1, t2);
     float tEnter = max(max(tmin.x, tmin.y), tmin.z);
     float tExit = min(min(tmax.x, tmax.y), tmax.z);
-    return tEnter <= tExit && tExit > 0;
+    return tEnter <= tExit && tExit > 0 && tEnter < tExit;
+}
+
+bool IntersectAABBWithT(float3 rayOrigin, float3 rayDir, float3 minB, float3 maxB, out float tNear)
+{
+    float3 invDir = 1.0 / rayDir;
+    float3 t0 = (minB - rayOrigin) * invDir;
+    float3 t1 = (maxB - rayOrigin) * invDir;
+
+    float3 tmin = min(t0, t1);
+    float3 tmax = max(t0, t1);
+
+    float tEnter = max(max(tmin.x, tmin.y), tmin.z);
+    float tExit = min(min(tmax.x, tmax.y), tmax.z);
+
+    tNear = tEnter;
+    return tExit >= tEnter && tExit > 0;
+}
+
+// sRGB/Rec.709 표준 : 명도 계산 함수
+float luminance(float3 color)
+{
+    return dot(color, float3(0.2126, 0.7152, 0.0722));
 }
 
 // === 메인 커널 ===
-[numthreads(16, 16, 1)]
+[numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     float2 targetPos = float2(DTid.xy);
@@ -183,46 +211,35 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     
     // localUV는 현재 타일(이 메쉬)의 정규화된 UV (0~1)
-    float2 localUV = (targetPos - Offset) / Size;
-    //if (dispatchThreadID.x >= Resolution.x || dispatchThreadID.y >= Resolution.y)
-    //    return;
+    float2 localUV = (targetPos + 0.5f - Offset) / Size;
 
-    //float2 uv = (dispatchThreadID.xy + 0.5) / Resolution;
-    //float3 pos = Sampling(this_PositionMap, LinearSampler, localUV, float2(2048, 2048)).xyz;
     float4 pos = this_PositionMap.SampleLevel(PointSampler, localUV, 0);
-    float4 normal = normalize(this_NormalMap.SampleLevel(LinearSampler, localUV, 0));
+    float4 normal = normalize(this_NormalMap.SampleLevel(PointSampler, localUV, 0));
     
     float4 worldPos = mul(worldMat, pos);
     float3 worldNor = mul(worldMat, float4(normal.xyz, 0)).xyz;
 
-    if(worldPos.w == 0.0)
-        return;
+    //if (pos.a != 1)
+    //    return;
     
     float3x3 TBN = BuildTBN(normalize(worldNor));
     float3 indirect = float3(0, 0, 0);
-    
-    //float2 xi;
-    //float3 localDir;
-    //float3 worldDir;
 
-    //float minT;// = 1e20;
-    //float3 color;// = float3(0, 0, 0);
-                //g_IndirectLightMap[DTid.xy] = float4(0, 1, 0, 1);
-        
-    //float hitT;// = 0;
-    //float3 bary;// = { 0, 0, 0 };
     
-    for (int i = 0; i < 512; ++i){
-        float2 xi = HammersleySample(i, 512);
+    //for (int i = 0; i < Indirect_Max_Sampling_Count; ++i)
+    //{
+        //float2 xi = HammersleySample(i, Indirect_Max_Sampling_Count);
+    
         float3 localDir = SampleHemisphere(xi);
         float3 worldDir = mul(localDir, TBN);
 
-        float minT = 1e20;
+        float minT = 1e19;
         float3 finalColor = float3(0, 0, 0);
+        float3 flnalDirectional = float3(0, 0, 0);
         float3 hitBary = float3(0, 0, 0);
         int hitTriIndex = -1;
 
-    // ====== BVH Traversal ======
+        // ====== BVH Traversal ======
         int stack[64];
         int stackPtr = 0;
         stack[stackPtr++] = 0; // root node index
@@ -239,7 +256,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             
             if (node.isLeaf)
             {
-                for (int j = node.start; j < node.end; ++j)
+                for (int j = node.start; j <= node.end; ++j)
                 {
                     int triIndex = TriIndices[j]; // 인덱스를 통해 삼각형 참조
                     Triangle tri = triangles[triIndex];
@@ -253,18 +270,29 @@ void main(uint3 DTid : SV_DispatchThreadID)
                             minT = t;
                             hitBary = bary;
                             hitTriIndex = triIndex;
+                            //break;
                         }
                     }
                 }
             }
             else
             {
-                stack[stackPtr++] = node.left;
-                stack[stackPtr++] = node.right;
+                float tLeft = 1e20, tRight = 1e20;
+                bool hitLeft = IntersectAABBWithT(ray.origin, ray.dir, BVHNodes[node.left].boundsMin, BVHNodes[node.left].boundsMax, tLeft);
+                bool hitRight = IntersectAABBWithT(ray.origin, ray.dir, BVHNodes[node.right].boundsMin, BVHNodes[node.right].boundsMax, tRight);
+                
+                if (minT >= tLeft)
+                {
+                    stack[stackPtr++] = node.left;
+                }
+                if (minT >= tRight)
+                {
+                    stack[stackPtr++] = node.right;
+                }
             }
         }
 
-    // ====== Hit 처리 ======
+        // ====== Hit 처리 ======
         if (hitTriIndex >= 0)
         {
             Triangle hitTri = triangles[hitTriIndex];
@@ -279,6 +307,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             hitBary.z * hitTri.n2;
             //hitNormal = normalize(hitNormal);
             
+            // ray가 광원이 되는 삼각형의 노멀에 가까울 때 가장세고, 받는 삼각형의 노멀에 가까울 때 가장 많이 받음.
             float diffuseFactor = max(dot(worldNor, worldDir), 0.0f) * max(dot(hitNormal, -worldDir), 0.0f);
 
             finalColor = lightMap.SampleLevel(PointSampler, float3(interpUV, hitTri.lightmapIndex), 0.0).rgb;
@@ -287,11 +316,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float distance = minT; // 이미 계산된 ray hit 거리
         float attenuation = 1.0 / (distance * distance + 1.0);
         indirect += finalColor * attenuation;
-    }
+    flnalDirectional = luminance(finalColor * attenuation) * -worldDir;
+    //}
 
     //GroupMemoryBarrierWithGroupSync();
-    indirect /= 512.0;
-    g_IndirectLightMap[DTid.xy] = float4(indirect, 1);
+    //indirect /= sampleCount;//Indirect_Max_Sampling_Count;
+    g_IndirectLightMap[DTid.xy] += float4(indirect, 1);
+    g_DirectionalMap[DTid.xy] += float4(flnalDirectional, 0);
 }
 
 /*

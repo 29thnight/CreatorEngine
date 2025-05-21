@@ -99,8 +99,10 @@ void SubsurfaceScatteringPass::Execute(RenderScene& scene, Camera& camera)
 
 void SubsurfaceScatteringPass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Checkbox("Enable Subsurface Scattering", &isOn);
 	ImGui::SliderFloat2("Direction", &direction.x, -1.f, 1.f);
 	ImGui::SliderFloat("Strength", &strength, 0.f, 1.f);
 	ImGui::SliderFloat("Width", &width, 0.f, 1.f);
+	ImGui::PopID();
 }

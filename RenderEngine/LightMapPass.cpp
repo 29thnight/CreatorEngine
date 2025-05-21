@@ -11,6 +11,7 @@
 struct alignas(16) CB {
 	XMFLOAT2 offset{ 0,0 };
 	XMFLOAT2 size{ 0,0 };
+	XMFLOAT3 cameraPos{ 0,0,0 };
 	int lightmapIndex = -1;
 };
 
@@ -53,7 +54,7 @@ LightMapPass::LightMapPass()
 
 	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
 
-	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	m_pso->m_samplers.push_back(linearSampler);
@@ -65,10 +66,10 @@ LightMapPass::LightMapPass()
 	DirectX::SetName(m_materialBuffer.Get(), "materialData");
 }
 
-void LightMapPass::Initialize(std::vector<Texture*>& lightmaps)
+void LightMapPass::Initialize(std::vector<Texture*>& lightmaps, std::vector<Texture*>& directionalmaps)
 {
 	m_plightmaps = &lightmaps;
-
+	m_pDirectionalMaps = &directionalmaps;
 	//int size = lightmaps.size();
 	//D3D11_TEXTURE2D_DESC temp;
 	//lightmaps[0]->m_pTexture->GetDesc(&temp);
@@ -131,6 +132,7 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 		CB buf{};
 		buf.offset = meshRenderer->m_LightMapping.lightmapOffset;
 		buf.size = meshRenderer->m_LightMapping.lightmapTiling;
+		buf.cameraPos = XMFLOAT3(camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2]);
 		buf.lightmapIndex = meshRenderer->m_LightMapping.lightmapIndex;
 		DirectX11::UpdateBuffer(m_cbuffer.Get(), &buf);
 		DirectX11::PSSetConstantBuffer(1, 1, m_cbuffer.GetAddressOf());
@@ -150,9 +152,12 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 		DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 		
-		if (meshRenderer->m_LightMapping.lightmapIndex >= 0 && m_plightmaps != nullptr && (*m_plightmaps).size() > meshRenderer->m_LightMapping.lightmapIndex) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
+		if (meshRenderer->m_LightMapping.lightmapIndex >= 0) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
 		{
-			DirectX11::PSSetShaderResources(14, 1, &(*m_plightmaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
+			if(m_plightmaps != nullptr && (*m_plightmaps).size() > meshRenderer->m_LightMapping.lightmapIndex)
+				DirectX11::PSSetShaderResources(14, 1, &(*m_plightmaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
+			if(m_pDirectionalMaps != nullptr && (*m_pDirectionalMaps).size() > meshRenderer->m_LightMapping.lightmapIndex)
+				DirectX11::PSSetShaderResources(15, 1, &(*m_pDirectionalMaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
 		}
 		
 		if (mat->m_pBaseColor)
@@ -173,7 +178,7 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 		}
 		if (mat->m_pEmissive)
 		{
-			DirectX11::PSSetShaderResources(4, 1, &mat->m_pEmissive->m_pSRV);
+			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
 		meshRenderer->m_Mesh->Draw();

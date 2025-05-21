@@ -1,8 +1,8 @@
 #pragma once
 #include "IRenderPass.h"
+#include "Texture.h"
 #include <unordered_map>
 
-class Texture;
 class PositionMapPass final : public IRenderPass
 {
 public:
@@ -19,6 +19,14 @@ public:
 	std::unordered_map<std::string, Texture*> m_normalMapTextures;
 	ComPtr<ID3D11Buffer> m_Buffer{};
 public:
-	int posNormMapSize = 2048;
+	void CreateTempTexture();
+
+	int posNormMapSize = 400;
+	int posNormDilateCount = 2;
+	bool isDilateOn{ true };
+
+	ComputeShader* m_edgeComputeShader{};
+	ComputeShader* m_edgeCoverComputeShader{};
+	Texture* tempTexture{};
 };
 

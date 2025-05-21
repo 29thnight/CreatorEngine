@@ -87,8 +87,10 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 
 void ColorGradingPass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Checkbox("ColorGrading", &isOn);
 	ImGui::SliderFloat("Lerp", &lerp, 0.0f, 1.0f);
 	if(ImGui::Button("Timer Zero"))
 		timer = 0.0f;
+	ImGui::PopID();
 }

@@ -80,6 +80,7 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 
 	//안에서 배열은 3으로 고정중 필요하면 수정
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
+	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
 	m_shadowCamera.m_isOrthographic = true;
 }
@@ -158,7 +159,7 @@ void ShadowMapPass::ControlPanel()
 {
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
+	//ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
 	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
@@ -275,7 +276,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 			radius = std::max<float>(radius, distance);
 		}
 
-		radius = std::ceil(radius * 16.f) / 16.f;
+		radius = std::ceil(radius * 32.f) / 32.f;
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;

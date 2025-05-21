@@ -153,7 +153,8 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 
 			delete swapScene;
         }
-		m_activeScene = Scene::LoadScene(name);
+		file::path sceneName = name.data();
+		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {

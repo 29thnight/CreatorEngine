@@ -111,10 +111,12 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 
 void ScreenSpaceReflectionPass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Text("Screen Space Reflection");
 	ImGui::Checkbox("Enable SSR", &isOn);
 	ImGui::SliderFloat("Step Size", &stepSize, 0.0f, 1.0f);
 	ImGui::SliderFloat("Max Thickness", &MaxThickness, 0.0f, 0.02f, "%.5f");
 	ImGui::SliderInt("Max Ray Count", &maxRayCount, 1, 100);
 	ImGui::Text("Time: %f", Time);
+	ImGui::PopID();
 }

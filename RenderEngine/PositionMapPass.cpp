@@ -60,6 +60,11 @@ PositionMapPass::PositionMapPass()
 	m_pso->m_samplers.push_back(pointSampler);
 
 	m_Buffer = DirectX11::CreateBuffer(sizeof(PositionMapBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+
+	m_edgeComputeShader = &ShaderSystem->ComputeShaders["NeighborSampling"];
+	m_edgeCoverComputeShader = &ShaderSystem->ComputeShaders["LightmapEdgeCover"];
+
+	CreateTempTexture();
 }
 
 void PositionMapPass::Initialize(uint32 width, uint32 height)
@@ -68,8 +73,12 @@ void PositionMapPass::Initialize(uint32 width, uint32 height)
 
 void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 {
-
 	ClearTextures();
+
+	if (tempTexture == nullptr) {
+		CreateTempTexture();
+	}
+
 	m_pso->Apply();
 
 	PositionMapBuffer posBuf = { posNormMapSize, posNormMapSize };
@@ -96,14 +105,18 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 			if (m_positionMapTextures[meshName] != nullptr) continue;
 			// ¸ðµ¨ÀÇ positionMap »ý¼º
 			m_positionMapTextures[meshName] = Texture::Create(posNormMapSize, posNormMapSize, "Position Map",
-				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+			m_positionMapTextures[meshName]->m_textureType = TextureType::ImageTexture;
 			m_positionMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 			m_positionMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+			m_positionMapTextures[meshName]->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
 			m_normalMapTextures[meshName] = Texture::Create(posNormMapSize, posNormMapSize, "Normal Map",
-				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+				DXGI_FORMAT_R32G32B32A32_FLOAT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+			m_normalMapTextures[meshName]->m_textureType = TextureType::ImageTexture;
 			m_normalMapTextures[meshName]->CreateRTV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 			m_normalMapTextures[meshName]->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+			m_normalMapTextures[meshName]->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 
 			float nullColor[4] = { 0,0,0,0 };
 
@@ -131,6 +144,54 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 		}
 	}
 
+	if (isDilateOn == false) return;
+
+	ID3D11UnorderedAccessView* nullUAV[2] = { nullptr, nullptr };
+	
+	for (int i = 0; i < posNormDilateCount; i++) {
+		for (auto& [name, texture] : m_positionMapTextures)
+		{
+			if (texture != nullptr)
+			{
+				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
+				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr);
+				DirectX11::CSSetShaderResources(0, 1, &texture->m_pSRV);
+				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+
+				// ¿§Áö·Î µ¤¾î¾²±â.
+				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &texture->m_pUAV, nullptr);
+				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
+				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+			}
+		}
+		for (auto& [name, texture] : m_normalMapTextures)
+		{
+			if (texture != nullptr)
+			{
+				DirectX11::CSSetShader(m_edgeComputeShader->GetShader(), nullptr, 0);
+				DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr);
+				DirectX11::CSSetShaderResources(0, 1, &texture->m_pSRV);
+				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+
+				// ¿§Áö·Î µ¤¾î¾²±â.
+				DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+				DirectX11::CSSetUnorderedAccessViews(0, 1, &texture->m_pUAV, nullptr);
+				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
+				DirectX11::Dispatch(posNormMapSize / 16.f, posNormMapSize / 16.f, 1);
+
+				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+			}
+		}
+	}
 
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
 }
@@ -147,15 +208,31 @@ void PositionMapPass::ClearTextures()
 		DeallocateResource(texture.second);
 	}
 	m_normalMapTextures.clear();
+	
+	DeallocateResource(tempTexture);
+	tempTexture = nullptr;
 }
 
 void PositionMapPass::ControlPanel()
 {
-
 }
 
 void PositionMapPass::Resize(uint32_t width, uint32_t height)
 {
+}
+
+void PositionMapPass::CreateTempTexture()
+{
+	tempTexture = Texture::Create(
+		posNormMapSize,
+		posNormMapSize,
+		"tempTexture",
+		DXGI_FORMAT_R32G32B32A32_FLOAT,
+		D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE
+	);
+	tempTexture->m_textureType = TextureType::ImageTexture;
+	tempTexture->CreateUAV(DXGI_FORMAT_R32G32B32A32_FLOAT);
+	tempTexture->CreateSRV(DXGI_FORMAT_R32G32B32A32_FLOAT);
 }
 
 /*

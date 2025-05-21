@@ -10,6 +10,7 @@ class SceneManager;
 class LightComponent;
 class MeshRenderer;
 struct ICollider;
+class Texture;
 class Scene
 {
 public:
@@ -145,4 +146,9 @@ private:
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
 	std::vector<Light>              m_lights;
+
+public:
+	HashingString GetSceneName() const { return m_sceneName; }
+    std::vector<Texture*> m_lightmapTextures{};
+    std::vector<Texture*> m_directionalmapTextures{};
 };

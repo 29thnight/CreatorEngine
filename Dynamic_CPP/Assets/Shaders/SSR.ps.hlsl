@@ -69,6 +69,12 @@ float noise(float2 seed)
 {
     return frac(sin(dot(seed.xy, float2(12.9898, 78.233))) * 43758.5453);
 }
+float Hash12(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 19.19);
+    return frac((p3.x + p3.y) * p3.z);
+}
 float4 Raytrace(float3 reflectionWorld, const int maxCount, float stepSize, float3 pos, float2 uv)
 {
     float4 color = float4(0.0, 0.0f, 0.0f, 0.0f);
@@ -78,7 +84,8 @@ float4 Raytrace(float3 reflectionWorld, const int maxCount, float stepSize, floa
     [loop]
     for (int i = 1; i <= maxCount; i++)
     {
-        float3 ray = (i + noise(uv + Time)) * step;
+        float3 ray = (i + noise(uv/* + Time*/)) * step;
+        //float3 ray = (i + Hash12(uv * float2(1920, 1080))) * step; // No noise
         float3 rayPos = pos + ray;
         float4 vpPos = mul(ViewProjMatrix, float4(rayPos, 1.0f));
         //color = vpPos;
@@ -139,7 +146,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float4 reflectedColor = Raytrace(refDir, MaxRayCount, StepSize, worldSpacePosition.rgb, IN.texCoord);
 
-    float edgeFade = 1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f);
+    float edgeFade = saturate(1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f));
     reflectFactor *= edgeFade;
     
     //return float4(depth, depth, depth, 1);
