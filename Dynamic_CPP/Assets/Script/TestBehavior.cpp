@@ -43,8 +43,9 @@ void TestBehavior::Update(float tick)
 {
 	std::cout << "TestBehavior::Update" << std::endl;
 
-	GetOwner()->m_transform.AddPosition(Mathf::Vector3(0.0f, 0.0f, 1.0f) * tick);
+	Transform& transfrom = GetComponent<Transform>();
 
+	transfrom.AddPosition(Mathf::Vector3(0.0f, 2.0f, 0.0f) * tick);
 
 }
 

@@ -132,7 +132,11 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& meshRenderer : camera.m_defferdQueue)
+
+		auto activeScene = SceneManagers->GetActiveScene();
+
+
+		for (auto& meshRenderer : activeScene->GetMeshRenderers())
 		{
 			if (!meshRenderer->IsEnabled()) continue;
 

@@ -128,8 +128,9 @@ public:
 public:
 	void CollectMeshRenderer(MeshRenderer* ptr);
 	void UnCollectMeshRenderer(MeshRenderer* ptr);
-	std::vector<MeshRenderer*>& GetMeshRenderers() { return m_meshRenderers; }
+	std::vector<MeshRenderer*>& GetMeshRenderers() { return m_allMeshRenderers; }
 	std::vector<MeshRenderer*>& GetSkinnedMeshRenderers() { return m_skinnedMeshRenderers; }
+	std::vector<MeshRenderer*>& GetStaticMeshRenderers() { return m_staticMeshRenderers; }
 
 private:
     void DestroyGameObjects();
@@ -140,7 +141,8 @@ private:
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
 	std::vector<LightComponent*>    m_lightComponents;
-	std::vector<MeshRenderer*>      m_meshRenderers;
+	std::vector<MeshRenderer*>      m_allMeshRenderers;
+	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
 	std::vector<Light>              m_lights;
 };

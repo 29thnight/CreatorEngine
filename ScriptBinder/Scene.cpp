@@ -387,13 +387,14 @@ void Scene::CollectMeshRenderer(MeshRenderer* ptr)
 {
 	if (ptr)
 	{
+		m_allMeshRenderers.push_back(ptr);
 		if (ptr->IsSkinnedMesh())
 		{
 			m_skinnedMeshRenderers.push_back(ptr);
 		}
 		else
 		{
-			m_meshRenderers.push_back(ptr);
+			m_staticMeshRenderers.push_back(ptr);
 		}
 	}
 }
@@ -408,8 +409,9 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 		}
 		else
 		{
-			std::erase_if(m_meshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
+			std::erase_if(m_staticMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
         }
+		std::erase_if(m_allMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
 	}
 }
 

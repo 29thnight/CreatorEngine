@@ -597,7 +597,7 @@ void SceneRenderer::PrepareRender()
 {
 	Benchmark banch;
 	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*>& staticMeshes = m_currentScene->GetMeshRenderers();
+	std::vector<MeshRenderer*>& staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*>& skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
 	for (auto& mesh : staticMeshes)
@@ -612,16 +612,27 @@ void SceneRenderer::PrepareRender()
 	{
 		if (nullptr == camera) continue;
 
-		m_threadPool->Enqueue([&camera, &skinnedMeshes]
+		//std::vector<MeshRenderer*> culledMeshes;
+		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+
+		//for (auto& culledMesh : culledMeshes)
+		//{
+		//	if (false == culledMesh->IsEnabled()) continue;
+
+		//	camera->PushRenderQueue(culledMesh);
+		//}
+
+		m_threadPool->Enqueue([&camera, &skinnedMeshes, &staticMeshes]
 		{
-			std::vector<MeshRenderer*> culledMeshes;
-			CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
-
-			for (auto& culledMesh : culledMeshes)
+			for (auto& mesh : staticMeshes)
 			{
-				if (false == culledMesh->IsEnabled()) continue;
+				if (false == mesh->IsEnabled()) continue;
+				auto frustum = camera->GetFrustum();
 
-				camera->PushRenderQueue(culledMesh);
+				if (frustum.Intersects(mesh->GetBoundingBox()))
+				{
+					camera->PushRenderQueue(mesh);
+				}
 			}
 
 			for (auto& skinnedMesh : skinnedMeshes)
@@ -629,7 +640,7 @@ void SceneRenderer::PrepareRender()
 				if (false == skinnedMesh->IsEnabled()) continue;
 
 				auto frustum = camera->GetFrustum();
-				if(frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					camera->PushRenderQueue(skinnedMesh);
 				}
