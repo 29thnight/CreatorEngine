@@ -195,8 +195,8 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
 	Mathf::Color4 lightColor = scene.m_LightController->GetLight(0).m_color;
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.3 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	MainCB data{};

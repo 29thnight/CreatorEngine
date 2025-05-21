@@ -95,7 +95,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 
 	
-	std::map<std::string, std::vector<GameObject*>> instanceObjects;
+	/*std::map<std::string, std::vector<GameObject*>> instanceObjects;
 
 	for (auto sceneObject : m_deferredQueue)
 	{
@@ -149,11 +149,11 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 		DirectX11::IASetIndexBuffer(mesh->GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
 		DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		DirectX11::DrawIndexedInstanced(mesh->GetIndices().size(), sceneObjects.size(),0,0,0);
-	}
-
-	for (auto& sceneObject : m_deferredQueue)
+	}*/
+	
+	for (auto& meshRenderer : camera.m_defferdQueue)
 	{		
-		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
+		
 		if (nullptr == meshRenderer) continue;
 		if (!meshRenderer->IsEnabled()) continue;
 

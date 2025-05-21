@@ -87,76 +87,126 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
-	if (!m_abled)
+	scene.m_LightController->m_shadowMapConstant.useCasCade = m_useCasCade;
+	if (m_useCasCade)
 	{
+		if (!m_abled)
+		{
+			for (int i = 0; i < cascadeCount; i++)
+			{
+				DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+			}
+			return;
+		}
+		Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
+		std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+		//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+
+		std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
+
+		camera.CalculateProjection();
+		scene.m_LightController->m_shadowMapConstant.devideShadow = shadowMapConstant2.devideShadow;
+		scene.m_LightController->m_shadowMapConstant._epsilon = shadowMapConstant2._epsilon;
+
+		ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
+		shadowMapConstant.m_casCadeEnd1 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[1], 1.f }, camera.CalculateProjection()).z;
+		shadowMapConstant.m_casCadeEnd2 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[2], 1.f }, camera.CalculateProjection()).z;
+		shadowMapConstant.m_casCadeEnd3 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[3], 1.f }, camera.CalculateProjection()).z;
+
 		for (int i = 0; i < cascadeCount; i++)
 		{
 			DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+			DirectX11::OMSetRenderTargets(0, nullptr, m_shadowMapDSVarr[i]);
+			auto desc = scene.m_LightController->m_shadowMapRenderDesc;
+			m_shadowCamera.m_eyePosition = cascadeinfo[i].m_eyePosition;
+			m_shadowCamera.m_lookAt = cascadeinfo[i].m_lookAt;
+			m_shadowCamera.m_viewHeight = cascadeinfo[i].m_viewHeight;
+			m_shadowCamera.m_viewWidth = cascadeinfo[i].m_viewWidth;
+			m_shadowCamera.m_nearPlane = cascadeinfo[i].m_nearPlane;
+			m_shadowCamera.m_farPlane = cascadeinfo[i].m_farPlane;
+			DeviceState::g_pDeviceContext->RSSetViewports(1, &shadowViewport);
+			DirectX11::PSSetShader(NULL, NULL, 0);
+
+			shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
+			shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
+			shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
+			m_shadowCamera.UpdateBuffer(true);
+			scene.UseModel();
+			for (auto& meshRenderer : camera.m_defferdQueue)
+			{
+
+				GameObject* sceneObject = meshRenderer->GetOwner();
+				if (sceneObject->IsDestroyMark()) continue;
+				if (sceneObject->m_parentIndex == -1) continue;
+				scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
+				meshRenderer->m_Mesh->Draw();
+			}
+			DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
+			DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
+			DirectX11::UnbindRenderTargets();
 		}
-		return;
+		scene.m_LightController->m_shadowMapConstant = shadowMapConstant;
 	}
-	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
-
-	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
-
-	camera.CalculateProjection();
-	scene.m_LightController->m_shadowMapConstant.devideShadow = shadowMapConstant2.devideShadow;
-	scene.m_LightController->m_shadowMapConstant._epsilon = shadowMapConstant2._epsilon;
-
-	ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
-	auto projMatrix = camera.CalculateProjection();
-	Mathf::Vector4 transformedCascade;
-
-	shadowMapConstant.m_casCadeEnd1 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[1], 1.f }, camera.CalculateProjection()).z;
-	shadowMapConstant.m_casCadeEnd2 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[2], 1.f }, camera.CalculateProjection()).z;
-	shadowMapConstant.m_casCadeEnd3 = Mathf::Vector4::Transform({ 0, 0, cascadeEnd[3], 1.f }, camera.CalculateProjection()).z;
-
-	for (int i = 0; i < cascadeCount; i++)
+	else
 	{
-		DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
-		DirectX11::OMSetRenderTargets(0, nullptr, m_shadowMapDSVarr[i]);
+		if (!m_abled)
+		{
+			DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+			return;
+		}
+
+	
+		Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction; //&&&&&
+		std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+		//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+
+		std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
+		camera.CalculateProjection();
+		scene.m_LightController->m_shadowMapConstant.devideShadow = shadowMapConstant2.devideShadow;
+		scene.m_LightController->m_shadowMapConstant._epsilon = shadowMapConstant2._epsilon;
+
+		ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
+
+
+		DirectX11::ClearDepthStencilView(m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		DirectX11::OMSetRenderTargets(0, nullptr, m_shadowMapDSVarr[0]);
 		auto desc = scene.m_LightController->m_shadowMapRenderDesc;
-		m_shadowCamera.m_eyePosition = cascadeinfo[i].m_eyePosition;
-		m_shadowCamera.m_lookAt = cascadeinfo[i].m_lookAt;
-		m_shadowCamera.m_viewHeight = cascadeinfo[i].m_viewHeight;
-		m_shadowCamera.m_viewWidth = cascadeinfo[i].m_viewWidth;
-		m_shadowCamera.m_nearPlane = cascadeinfo[i].m_nearPlane;
-		m_shadowCamera.m_farPlane = cascadeinfo[i].m_farPlane;
+		m_shadowCamera.m_eyePosition = cascadeinfo[2].m_eyePosition;
+		m_shadowCamera.m_lookAt = cascadeinfo[2].m_lookAt;
+		m_shadowCamera.m_viewHeight = cascadeinfo[2].m_viewHeight;
+		m_shadowCamera.m_viewWidth = cascadeinfo[2].m_viewWidth;
+		m_shadowCamera.m_nearPlane = cascadeinfo[2].m_nearPlane;
+		m_shadowCamera.m_farPlane = cascadeinfo[2].m_farPlane;
 		DeviceState::g_pDeviceContext->RSSetViewports(1, &shadowViewport);
 		DirectX11::PSSetShader(NULL, NULL, 0);
 
 		shadowMapConstant.m_shadowMapWidth = desc.m_textureWidth;
 		shadowMapConstant.m_shadowMapHeight = desc.m_textureHeight;
-		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
+		shadowMapConstant.m_lightViewProjection[0] = cascadeinfo[2].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& obj : scene.GetScene()->m_SceneObjects)
+		for (auto& meshRenderer : camera.m_defferdQueue)
 		{
 
-			if (obj->ToString() == "Cube" || obj->ToString() == "Plane") //*****
-				continue;
-			MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
-			if (nullptr == meshRenderer) continue;
-			if (!meshRenderer->IsEnabled()) continue;
-
-			//if(m_shadowCamera.GetFrustum().Intersects()))  //*****
-			scene.UpdateModel(obj->m_transform.GetWorldMatrix());
-
+			GameObject* sceneObject = meshRenderer->GetOwner();
+			if (sceneObject->IsDestroyMark()) continue;
+			if (sceneObject->m_parentIndex == -1) continue;
+			scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
 			meshRenderer->m_Mesh->Draw();
 		}
 		DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 		DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
 		DirectX11::UnbindRenderTargets();
-	}
+	
 	scene.m_LightController->m_shadowMapConstant = shadowMapConstant;
+	}
 }
 
 void ShadowMapPass::ControlPanel()
 {
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
+	ImGui::Checkbox("UseCasCade", &m_useCasCade);
 	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
 	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
@@ -234,7 +284,8 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 	Mathf::Vector3 forwardVec;
 	forwardVec = cameraview.Forward();
 	Mathf::Vector3 adjustTranslate = forwardVec/* * frustumDistnace*/;
-
+	//cameraview.Forward(forwardVec);
+	//Mathf::Vector3 adjustTranslate = forwardVec * frustumDistnace;
 	std::array<std::array<	Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
 
 	for (size_t i = 0; i < sliceFrustums.size(); ++i)

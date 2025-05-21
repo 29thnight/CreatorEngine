@@ -55,6 +55,7 @@ cbuffer ShadowMapConstants : register(b2) // supports one
     float m_casCadeEnd3;
     float _epsilon;
     int devideShadow; //max = 9
+    uint useCasCade;
     
 }
 
@@ -69,13 +70,26 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
     int shadowIndex = 0;
     
     float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
-    float m_casCadeEnd[3] = { m_casCadeEnd1, m_casCadeEnd2, m_casCadeEnd3 };
-    shadowIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :
+    float m_casCadeEnd[3];
+    int nextShadowIndex;
+    if (useCasCade)
+    {
+        m_casCadeEnd[0] = m_casCadeEnd1;
+        m_casCadeEnd[1] = m_casCadeEnd2;
+        m_casCadeEnd[2] = m_casCadeEnd3;
+        shadowIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :
               (viewPos.z <= m_casCadeEnd2) ? 1 :
-              (viewPos.z <= m_casCadeEnd3) ? 2 : 0;
+              (viewPos.z <= m_casCadeEnd3) ? 2 : 2;
   
-    int nextShadowIndex = min(shadowIndex + 1, 2);
+        nextShadowIndex = min(shadowIndex + 1, 2);
     
+    }
+    else
+    {
+        shadowIndex = 0;
+        nextShadowIndex = 0;
+
+    }
     float2 texelSize = float2(1, 1) / float2(mapWidth, mapHeight);
     float epsilon = _epsilon;
     //그림자 경게선 퍼센트 
@@ -113,37 +127,41 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
     shadow /= devideShadow;
     float finalShadow = shadow;
     
-    if (viewPos.z > endZ - cascadeEdge && shadowIndex < 2)
+    if(useCasCade)
     {
+    
+        if (viewPos.z > endZ - cascadeEdge && shadowIndex < 2)
+        {
         
-        float4 nextlightSpacePosition = mul(lightViewProjection[nextShadowIndex], worldPosition);
-        float3 nextprojCoords = nextlightSpacePosition.xyz / nextlightSpacePosition.w;
-        float nextcurrentDepth = nextprojCoords.z;
+            float4 nextlightSpacePosition = mul(lightViewProjection[nextShadowIndex], worldPosition);
+            float3 nextprojCoords = nextlightSpacePosition.xyz / nextlightSpacePosition.w;
+            float nextcurrentDepth = nextprojCoords.z;
 
-        if (nextcurrentDepth > 1)
-            return 0;
+            if (nextcurrentDepth > 1)
+                return 0;
     
 
-        nextprojCoords.y = -nextprojCoords.y;
-        nextprojCoords.xy = (nextprojCoords.xy * 0.5) + 0.5f;
-        float nextshadow = 0;
-        float blendFactor = saturate((viewPos.z - (endZ - cascadeEdge)) / cascadeEdge);
-        if (nextprojCoords.x >= 0.0 && nextprojCoords.x <= 1.0 && nextprojCoords.y >= 0.0 && nextprojCoords.y <= 1.0)
-        {
-            for (int x = -1; x < 2; ++x)
+            nextprojCoords.y = -nextprojCoords.y;
+            nextprojCoords.xy = (nextprojCoords.xy * 0.5) + 0.5f;
+            float nextshadow = 0;
+            float blendFactor = saturate((viewPos.z - (endZ - cascadeEdge)) / cascadeEdge);
+            if (nextprojCoords.x >= 0.0 && nextprojCoords.x <= 1.0 && nextprojCoords.y >= 0.0 && nextprojCoords.y <= 1.0)
             {
-        //[unroll]
-                for (int y = -1; y < 2; ++y)
+                for (int x = -1; x < 2; ++x)
                 {
-                    float2 uv = float2(nextprojCoords.xy + float2(x, y) * texelSize);
-                    float closestDepth = ShadowMapArr.Sample(PointSampler, float3(uv, nextShadowIndex)).r;
-                    nextshadow += (closestDepth < nextcurrentDepth - epsilon);
+        //[unroll]
+                    for (int y = -1; y < 2; ++y)
+                    {
+                        float2 uv = float2(nextprojCoords.xy + float2(x, y) * texelSize);
+                        float closestDepth = ShadowMapArr.Sample(PointSampler, float3(uv, nextShadowIndex)).r;
+                        nextshadow += (closestDepth < nextcurrentDepth - epsilon);
+                    }
                 }
             }
-        }
-        nextshadow /= devideShadow;
-        finalShadow = lerp(shadow, nextshadow, blendFactor);
+            nextshadow /= devideShadow;
+            finalShadow = lerp(shadow, nextshadow, blendFactor);
         
+        }
     }
     
  
