@@ -6,7 +6,8 @@
 #include "RenderableComponents.h"
 #include "LightController.h"
 #include "directxtk\SimpleMath.h"
-
+std::vector<float> g_cascadeCut =  { 0.15,0.5 };
+bool g_useCascade = true;
 ShadowMapPass::ShadowMapPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -88,8 +89,8 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 {
 	m_pso->Apply();
-	scene.m_LightController->m_shadowMapConstant.useCasCade = m_useCasCade;
-	if (m_useCasCade)
+	scene.m_LightController->m_shadowMapConstant.useCasCade = g_useCascade;
+	if (g_useCascade)
 	{
 		if (!m_abled)
 		{
@@ -100,7 +101,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			return;
 		}
 		Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-		std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+		scene.m_LightController->GetLight(0).GetLightViewMatrix();
+		std::vector<float> cascadeEnd = devideCascadeEnd(camera, g_cascadeCut);
 		//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 
 		std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
@@ -158,7 +160,7 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 	
 		Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction; //&&&&&
-		std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+		std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.5 });
 		//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 
 		std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
@@ -207,10 +209,9 @@ void ShadowMapPass::ControlPanel()
 {
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Checkbox("UseCasCade", &m_useCasCade);
+	ImGui::Checkbox("UseCasCade", &g_useCascade);
 	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
 	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
-	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
 
 void ShadowMapPass::Resize(uint32_t width, uint32_t height)
@@ -340,11 +341,11 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * minExtents.z;
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
-		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.f, cascadeExtents.z);
+		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, cascadeExtents.z);
 
 		shadowinfo[i].m_eyePosition = shadowPos;
 		shadowinfo[i].m_lookAt = centerPos;
-		shadowinfo[i].m_nearPlane = 0; //*****
+		shadowinfo[i].m_nearPlane = 0.1f; //*****
 		shadowinfo[i].m_farPlane = cascadeExtents.z;
 		shadowinfo[i].m_viewWidth = maxExtents.x;
 		shadowinfo[i].m_viewHeight = maxExtents.y;

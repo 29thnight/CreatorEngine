@@ -2,10 +2,10 @@
 
 #pragma once
 
+#include "TerrainCollider.h"
 #include "CameraComponent.h"
 #include "Animation.h"
 #include "AnimationState.h"
-#include "Terrain.h"
 #include "Skeleton.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
@@ -17,8 +17,6 @@
 #include "AniTransition.h"
 #include "AvatarMask.h"
 #include "BoxColliderComponent.h"
-#include "TerrainCollider.h"
-#include "CameraComponent.h"
 #include "Canvas.h"
 #include "CharacterControllerComponent.h"
 #include "CapsuleColliderComponent.h"
@@ -73,8 +71,8 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);
-    AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(Skeleton);
+    AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);

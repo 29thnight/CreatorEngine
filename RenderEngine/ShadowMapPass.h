@@ -26,7 +26,8 @@ struct ShadowInfo
 std::vector<float>      devideCascadeEnd(Camera& camera, std::vector<float> ratios);
 std::vector<float>		devideCascadeEnd(Camera& camera, int cascadeCount, float lambda);
 std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> cascadeEnd, Mathf::Vector4 LightDir);
-
+extern std::vector<float> g_cascadeCut;
+extern bool g_useCascade;
 class ShadowMapPass final : public IRenderPass
 {
 public:
@@ -39,7 +40,7 @@ public:
 	virtual void Resize(uint32_t width, uint32_t height) override;
 
 
-	bool m_useCasCade = true;
+	
 	Camera m_shadowCamera{};
 
 	UniqueTexturePtr m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
@@ -51,7 +52,6 @@ public:
 
 	//그림자 적용할 빛마다 3개 현재는 빛 1개에만 적용가능
 	ID3D11DepthStencilView* m_shadowMapDSVarr[cascadeCount]{};
-
 	ShadowMapConstant shadowMapConstant2;
 };
 

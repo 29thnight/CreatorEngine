@@ -10,6 +10,7 @@ struct alignas(16) MainCB
 {
 	XMMATRIX InvViewProj;
 	XMMATRIX PrevViewProj;
+
 	XMMATRIX ShadowMatrix;
 	XMFLOAT4 SunDirection;
 	XMFLOAT4 SunColor;
@@ -196,14 +197,19 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
 	Mathf::Color4 lightColor = scene.m_LightController->GetLight(0).m_color;
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, g_cascadeCut);
 	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	MainCB data{};
 	data.InvViewProj = XMMatrixTranspose(XMMatrixInverse(nullptr, camera.CalculateView() * camera.CalculateProjection()));
 	data.PrevViewProj = mPrevViewProj;
-	data.ShadowMatrix = cascadeinfo[0].m_lightViewProjection /** XMLoadFloat4x4(&MatrixHelper::GetProjectionShadowMatrix())*/;
+
+	data.ShadowMatrix = cascadeinfo[2].m_lightViewProjection; /** XMLoadFloat4x4(&MatrixHelper::GetProjectionShadowMatrix())*/;
+	if (g_useCascade == false) //sehwan &&&&&
+	{
+		data.ShadowMatrix = cascadeinfo[2].m_lightViewProjection;
+	}
 	data.SunDirection = -lightdir;
 	data.SunColor = lightColor;
 	data.CameraPosition = XMFLOAT4{ camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2], 1.0f };
