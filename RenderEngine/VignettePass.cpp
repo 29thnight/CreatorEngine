@@ -76,7 +76,9 @@ void VignettePass::Execute(RenderScene& scene, Camera& camera)
 
 void VignettePass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Checkbox("Vignette", &isOn);
 	ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
 	ImGui::SliderFloat("Softness", &softness, 0.0f, 1.0f);
+	ImGui::PopID();
 }

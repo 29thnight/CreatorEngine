@@ -31,7 +31,8 @@ struct Light
 
     int lightType;
     int status;
-    int2 pad;
+    float range;
+    float intencity;
 };
 
 struct Vertex
@@ -52,7 +53,7 @@ struct Triangle
     float2 uv0, uv1, uv2;
     float2 lightmapUV0, lightmapUV1, lightmapUV2;
     int lightmapIndex;
-    int3 pad;
+    float3 pad;
 };
 
 struct BVHNode
@@ -78,13 +79,14 @@ struct Ray
 RWTexture2D<float4> TargetTexture : register(u0); // 타겟 텍스처 (UAV)
 //RWTexture2D<float4> TargetEnvironmentTexture : register(u7); // 타겟 텍스처 (UAV)
 RWTexture2D<float4> TargetEnvironmentTexture : register(u1);
+RWTexture2D<float4> TargetDirectionalMap : register(u2); // 타겟 텍스처 (UAV)
 
-Texture2DArray<float> shadowMapTextures : register(t0); // 소스 텍스처 (SRV)
+
 Texture2D<float4> positionMapTexture : register(t1); // 소스 텍스처 (SRV)
 StructuredBuffer<Light> g_Lights : register(t2);
-Texture2D<float4> normalMapTexture : register(t3); // 노멀맵까지 적용된 텍스쳐로 받기.
+Texture2D<float4> normalMapTexture : register(t3); // 노멀맵까지 적용된 텍스쳐로 받기보단 따로 받아서 계산해서 사용하기.
 
-TextureCube EnvMap : register(t4);
+TextureCube EnvMap : register(t4);  // 리플렉션 프로브처럼 lightmap pass에서 추가 계산하여 사용하는 것이 좋아보임.
 Texture2D AoMap : register(t5);
 
 StructuredBuffer<Triangle> triangles : register(t10);
@@ -152,7 +154,7 @@ inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out floa
     float3 edge2 = v2 - v0;
     float3 pvec = cross(dir, edge2);    // 평행한 직선은 외적이 0이 되므로 오류 발생 가능성 있음.
     float det = dot(edge1, pvec);       // 크기가 0인 벡터와의 내적은 0임. 아래에서 처리하므로 문제없음.
-    if (abs(det) < 1e-6)                // 앞 뒷면 모두 계산하기 위함.
+    if (det > -1e-6)                    // 빛이 오는 방향에서 막는 삼각형 검출.
         return false;
 
     float invDet = 1.0 / det;
@@ -184,7 +186,23 @@ bool IntersectAABB(Ray ray, float3 bmin, float3 bmax)
     return tEnter <= tExit && tExit > 0 && tEnter < tExit;
    
 }
-bool TraceShadow(float3 origin, float3 dir, float maxDist)
+
+bool IntersectAABBWithT(float3 rayOrigin, float3 rayDir, float3 minB, float3 maxB, out float tNear)
+{
+    float3 invDir = 1.0 / rayDir;
+    float3 t0 = (minB - rayOrigin) * invDir;
+    float3 t1 = (maxB - rayOrigin) * invDir;
+
+    float3 tmin = min(t0, t1);
+    float3 tmax = max(t0, t1);
+
+    float tEnter = max(max(tmin.x, tmin.y), tmin.z);
+    float tExit = min(min(tmax.x, tmax.y), tmax.z);
+
+    tNear = tEnter;
+    return tExit >= tEnter && tExit > 0;
+}
+bool TraceShadow(float3 origin, float3 dir, float maxDist, out float3 color)
 {
     uint stack[64];
     int stackPtr = 0;
@@ -209,17 +227,44 @@ bool TraceShadow(float3 origin, float3 dir, float maxDist)
                 int triIndex = TriIndices[i];
                 Triangle tri = triangles[triIndex];
                 if (RayTriangleIntersect(origin, dir, tri, hitT, bary) && hitT < maxDist)
+                {
+                    color = tri.pad;
                     return true;
+                }
             }
         }
         else
         {
-            stack[stackPtr++] = node.left;
-            stack[stackPtr++] = node.right;
+            //stack[stackPtr++] = node.left;
+            //stack[stackPtr++] = node.right;
+            
+            float tLeft = 0, tRight = 0;
+            bool hitLeft = IntersectAABBWithT(ray.origin, ray.dir, BVHNodes[node.left].boundsMin, BVHNodes[node.left].boundsMax, tLeft);
+            bool hitRight = IntersectAABBWithT(ray.origin, ray.dir, BVHNodes[node.right].boundsMin, BVHNodes[node.right].boundsMax, tRight);
+
+            if (hitLeft && hitRight)
+            {
+                stack[stackPtr++] = (tLeft < tRight) ? node.right : node.left;
+                stack[stackPtr++] = (tLeft < tRight) ? node.left : node.right;
+            }
+            else if (hitLeft)
+            {
+                stack[stackPtr++] = node.left;
+            }
+            else if (hitRight)
+            {
+                stack[stackPtr++] = node.right;
+            }
         }
     }
 
     return false;
+}
+
+// sRGB/Rec.709 표준 : 명도 계산 함수
+float luminance(float3 color)
+{
+    return dot(color, float3(0.2126, 0.7152, 0.0722));
 }
 
 [numthreads(16, 16, 1)]
@@ -237,11 +282,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
 
     // 타겟 텍스처 좌표를 0~1로 정규화 // targetpos 0~lightmapSize, offset
-    float2 localUV = (targetPos - Offset) / Size; 
+    float2 localUV = (targetPos + 0.5f - Offset) / Size; 
     
     // 주변값을 샘플링하게 되면 급격한 위치변화 때문에 그림자가 번지듯이 나옴
     //float4 localpos = Sampling(positionMapTexture, LinearSampler, localUV, float2(2048, 2048));
-    float4 localNormal = normalMapTexture.SampleLevel(LinearSampler, localUV, 0);
+    float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
+    localNormal.a = 0;
     
     
     float4 localpos = positionMapTexture.SampleLevel(PointSampler, localUV, 0);
@@ -261,8 +307,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
     //float4 localNormal = normalMapTexture.SampleLevel(PointSampler, localUV, 0);
     
     float3 worldPos = (mul(worldMat, localpos)).xyz; // 라이트맵 PositionMap에서 가져온 월드 좌표
-    float3 normal = (normalize(mul(worldMat, localNormal))).xyz; // 라이트맵 NormalMap 또는 기하 정보에서 유도
+    float3 normal = normalize(mul(worldMat, localNormal).xyz); // 라이트맵 NormalMap 또는 기하 정보에서 유도
     float4 finalColor = float4(0, 0, 0, 0);
+    float3 dominantDir = float3(0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; ++i)
     {
         Light light = g_Lights[i];
@@ -283,12 +330,21 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             toLight = light.position.xyz - worldPos;
             distance = length(toLight);
+            
             toLight = normalize(toLight);
             NdotL = max(dot(normal, toLight), 0.0);
-
+            
+            if (distance > light.range)
+                continue;
+            
             // Distance attenuation (Point, Spot)
             float att = light.constantAtt + light.linearAtt * distance + light.quadAtt * (distance * distance);
             attenuation = 1.0 / max(att, 0.001);
+            
+            
+            //// 부드러운 거리감쇠를 생각했으나 너무 선형적임. 1 - (d^2 / r^2)으로? 위에 이미 있었네.
+            //float rangeAtt = saturate(1.0 - (distance * distance / (light.range * light.range)));
+            //attenuation *= rangeAtt;
         }
 
         // Spot light extra check
@@ -306,13 +362,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
             if (attenuation <= 0)
                 continue;
         }
-
+        float3 debugColor = float3(0, 0, 0);
         // Shadow check (BVH traversal)
-        bool blocked = TraceShadow(worldPos + normal * bias, toLight, distance);
+        bool blocked = TraceShadow(worldPos + normal * bias, toLight, distance, debugColor);
         finalColor.a = 1;
         if (!blocked)
         {
-            finalColor.rgb += NdotL * attenuation * light.color.rgb;
+            finalColor.rgb += NdotL * attenuation * light.color.rgb * light.intencity;
+            dominantDir += normalize(light.direction.xyz) * luminance(light.color.rgb) * light.intencity;
         }
     }
     SurfaceInfo surf;
@@ -331,6 +388,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     TargetTexture[DTid.xy] = finalColor;
     TargetEnvironmentTexture[DTid.xy] = float4(ambient, 1);
+    TargetDirectionalMap[DTid.xy] = float4(dominantDir, 1);
+
 }
 
 /*

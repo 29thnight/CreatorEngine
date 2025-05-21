@@ -23,7 +23,7 @@ namespace lm {
 		XMFLOAT2 uv0, uv1, uv2;
 		XMFLOAT2 lightmapUV0, lightmapUV1, lightmapUV2;
 		int lightmapIndex = -1;
-		int3 pad = { 0,0,0 };
+		float3 tempColor = { 0,0,0 };
 	};
 
 	struct AABB {
@@ -96,6 +96,7 @@ namespace lm {
 		std::vector<Texture*> lightmaps;
 		std::vector<Texture*> indirectMaps;
 		std::vector<Texture*> environmentMaps;
+		std::vector<Texture*> directionalMaps;
 		Texture* tempTexture = nullptr;
 		Texture* envMap = nullptr;
 
@@ -111,18 +112,20 @@ namespace lm {
 		int canvasSize = 1024;
 		int padding = 4;
 		float bias = 0.0057f;
-		int rectSize = 40;
+		int rectSize = 400;
 		int leafCount = 4;
 
-		int sampleCount = 4;
+		int indirectSampleCount = 512;
 		int indirectCount = 2;
 
 		// 외각선에 픽셀 추가.
-		int dilateCount = 1;
+		int dilateCount = 0; // 이제 사용 안해도될듯 포지면맵 단계에서 미리 픽셀 늘려두면 됨.
 		// 라이트맵 블러처리.
-		int directMSAACount = 1;
+		int directMSAACount = 2;
 		// 간접광 블러처리.
-		int indirectMSAACount = 1;
+		int indirectMSAACount = 2;
+
+		bool useEnvironmentMap = true;
 
 		std::vector<BVHNode> bvhNodes;
 	private:
@@ -133,6 +136,7 @@ namespace lm {
 		ComPtr<ID3D11Buffer> m_lightBuf{};
 		ComPtr<ID3D11Buffer> m_settingBuf{};
 		ComPtr<ID3D11Buffer> m_indirect1{};
+		ComPtr<ID3D11Buffer> m_CBHammersley{};
 
 		ComputeShader* m_computeShader{};
 		ComputeShader* m_edgeComputeShader{};
@@ -140,6 +144,7 @@ namespace lm {
 		ComputeShader* m_MSAAcomputeShader{};
 		ComputeShader* m_indirectLightShader{};
 		ComputeShader* m_AddTextureColor{};
+		ComputeShader* m_NormalizeTextureColor{};
 
 		RenderScene* m_renderscene = nullptr;
 		Sampler* sample = nullptr;
@@ -164,6 +169,25 @@ namespace lm {
 			const std::unique_ptr<PositionMapPass>& m_pPositionMapPass,
 			const std::unique_ptr<LightMapPass>& m_pLightMapPass
 		);
+
+	private:
+		void UnBindLightmapPS();
+
+		float RadicalInverse_VdC(UINT bits)
+		{
+			bits = (bits << 16) | (bits >> 16);
+			bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
+			bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
+			bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
+			bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
+			return float(bits) * 2.3283064365386963e-10;
+		}
+
+		float2 HammersleySample(UINT i, UINT N)
+		{
+			return float2(float(i) / float(N), RadicalInverse_VdC(i));
+		}
+
 
 		inline int BuildBVH(std::vector<Triangle>& tris, std::vector<int>& triIndices, int start, int end, int depth = 0)
 		{
@@ -195,12 +219,27 @@ namespace lm {
 
 			// 축 선택 (X, Y, Z 순환)
 			int axis = depth % 3;
+			int debugstart = start;
+			int debugend = end;
 			std::sort(triIndices.begin() + start, triIndices.begin() + end, [&](int a, int b) {
-				Mathf::Vector3 ca = (tris[triIndices[a]].v0 + tris[triIndices[a]].v1 + tris[triIndices[a]].v2) / 3.0f;
-				Mathf::Vector3 cb = (tris[triIndices[b]].v0 + tris[triIndices[b]].v1 + tris[triIndices[b]].v2) / 3.0f;
-				if (axis == 0) return ca.x < cb.x;
-				else if (axis == 1) return ca.y < cb.y;
-				else return ca.z < cb.z;
+				//assert(a >= 0 && a <= end && b >= 0 && b <= end);
+				int debugstart = start;
+				int debugend = end;
+				Triangle& t1 = tris[a];//tris[triIndices[a]];
+				Triangle& t2 = tris[b];//tris[triIndices[b]];
+				Mathf::Vector3 ca = (t1.v0 + t1.v1 + t1.v2) / 3.0f;
+				Mathf::Vector3 cb = (t2.v0 + t2.v1 + t2.v2) / 3.0f;
+				if (axis == 0) { 
+					t2.tempColor = { 1,0,0 };
+					return ca.x < cb.x; }
+				else if (axis == 1) { 
+					t2.tempColor = { 0,1,0 };
+					return ca.y < cb.y; 
+				}
+				else { 
+					t2.tempColor = { 0,0,1 };
+					return ca.z < cb.z; 
+				}
 				});
 
 			int mid = (start + end) / 2;

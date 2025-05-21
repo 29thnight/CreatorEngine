@@ -111,6 +111,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 
     cameraView cameraview{};
     cameraview.cameraView = camera.CalculateView();
+    DirectX11::UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
     DirectX11::PSSetConstantBuffer(10, 1, m_shadowcamBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
 
