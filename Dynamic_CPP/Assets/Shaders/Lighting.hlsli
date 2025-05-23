@@ -67,11 +67,12 @@ cbuffer CameraView : register(b10)
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
 {
     
-    int shadowIndex = 0;
+    
     
     float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
     float m_casCadeEnd[3];
     int nextShadowIndex;
+    int shadowIndex = 0;
     if (useCasCade)
     {
         m_casCadeEnd[0] = m_casCadeEnd1;
@@ -82,7 +83,26 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
               (viewPos.z <= m_casCadeEnd3) ? 2 : 2;
   
         nextShadowIndex = min(shadowIndex + 1, 2);
-    
+        //if ((viewPos.x) <= m_casCadeEnd1 &&
+        //     (viewPos.y) <= m_casCadeEnd1 &&
+        //     (viewPos.z) <= m_casCadeEnd1)
+        //{
+        //    shadowIndex = 0;
+        //}
+        //else if ((viewPos.x) <= m_casCadeEnd2 &&
+        // (viewPos.y) <= m_casCadeEnd2 &&
+        // (viewPos.z) <= m_casCadeEnd2)
+        //{
+        //    shadowIndex = 1;
+        //}
+        //else if ((viewPos.x) <= m_casCadeEnd3 &&
+        // (viewPos.y) <= m_casCadeEnd3 &&
+        // (viewPos.z) <= m_casCadeEnd3)
+        //{
+        //    shadowIndex = 2;
+        //}
+
+        //nextShadowIndex = min(shadowIndex + 1, 2);
     }
     else
     {
@@ -90,6 +110,7 @@ float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
         nextShadowIndex = 0;
 
     }
+    //shadowIndex = 2;
     float2 texelSize = float2(1, 1) / float2(mapWidth, mapHeight);
     float epsilon = _epsilon;
     //그림자 경게선 퍼센트 
