@@ -4,6 +4,18 @@
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
+#include "Animator.h"
+#include "Skeleton.h"
+
+Scene::Scene()
+{
+    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
+}
+
+Scene::~Scene()
+{
+    SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
+}
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
@@ -246,6 +258,11 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
+	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
+	{
+		UpdateModelRecursive(objIndex, XMMatrixIdentity());
+	}
+
     UpdateEvent.Broadcast(deltaSecond);
 }
 
@@ -282,6 +299,11 @@ void Scene::AllDestroyMark()
         if (obj && !obj->IsDestroyMark())
             obj->Destroy();
     }
+}
+
+void Scene::ResetSelectedSceneObject()
+{
+    m_selectedSceneObject = nullptr;
 }
 
 void Scene::CollectLightComponent(LightComponent* ptr)
@@ -526,5 +548,47 @@ std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
 void Scene::RemoveGameObjectName(const std::string_view& name)
 {
 	m_gameObjectNameSet.erase(name.data());
+}
+
+void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
+{
+	const auto& obj = GetGameObject(objIndex);
+
+	if (!obj || obj->IsDestroyMark())
+	{
+		return;
+	}
+
+	if (GameObjectType::Bone == obj->GetType())
+	{
+		const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
+		if (!animator || !animator->IsEnabled())
+		{
+			return;
+		}
+		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		if (bone)
+		{
+			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+		}
+	}
+	else
+	{
+		if (obj->m_transform.IsDirty())
+		{
+			auto renderer = obj->GetComponent<MeshRenderer>();
+			if (renderer)
+			{
+				renderer->SetNeedUpdateCulling(true);
+			}
+		}
+		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
+		obj->m_transform.SetAndDecomposeMatrix(model);
+	}
+
+	for (auto& childIndex : obj->m_childrenIndices)
+	{
+		UpdateModelRecursive(childIndex, model);
+	}
 }
 

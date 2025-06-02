@@ -169,7 +169,6 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_NoScrollbar);
 	ImGui::GetContext("SelectMatarial").Close();
 
-
 	ImGui::ContextRegister(ICON_FA_FOLDER_OPEN " Content Browser", true, [&]()
 	{
 		static file::path DataDirectory = PathFinder::Relative();
@@ -204,6 +203,8 @@ void DataSystem::RenderForEditer()
 		ImGui::EndChild();
 
 	}, ImGuiWindowFlags_None);
+
+	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Close();
 }
 
 void DataSystem::MonitorFiles()

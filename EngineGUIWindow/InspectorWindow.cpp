@@ -177,7 +177,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		{
 			scene = SceneManagers->GetActiveScene();
 			renderScene = m_sceneRenderer->m_renderScene;
-			selectedSceneObject = renderScene->m_selectedSceneObject;
+			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)
 			{

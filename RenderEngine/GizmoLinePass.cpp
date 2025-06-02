@@ -70,7 +70,9 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
 
-	auto selectedObject = scene.GetSelectSceneObject();
+    auto activeScene = SceneManagers->GetActiveScene();
+
+	auto selectedObject = activeScene->GetSelectSceneObject();
 	if (nullptr == selectedObject) return;
 
     ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();

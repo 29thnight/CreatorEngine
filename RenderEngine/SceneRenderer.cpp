@@ -250,74 +250,7 @@ void SceneRenderer::InitializeDeviceState()
 
 void SceneRenderer::InitializeImGui()
 {
-	ImGui::ContextRegister("LightMap", true, [&]() {
-
-		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
-		ImGui::Text("LightMap");
-		if (ImGui::CollapsingHeader("Settings")) {
-			ImGui::Checkbox("LightmapPass On/Off", &useTestLightmap);
-
-			ImGui::Text("Position and NormalMap Settings");
-			ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
-			if (ImGui::Button("Clear position normal maps")) {
-				m_pPositionMapPass->ClearTextures();
-			}
-			ImGui::Checkbox("IsPositionMapDilateOn", &m_pPositionMapPass->isDilateOn);
-			ImGui::DragInt("PosNorm Dilate Count", &m_pPositionMapPass->posNormDilateCount, 1, 0, 16);
-			ImGui::Text("LightMap Bake Settings");
-			ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
-			ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
-			ImGui::DragInt("Padding", &lightMap.padding);
-			ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
-			ImGui::DragInt("LeafCount", &lightMap.leafCount, 1, 0, 1024);
-			ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
-			ImGui::DragInt("Indirect Sample Count", &lightMap.indirectSampleCount, 1, 0, 512);
-			ImGui::DragInt("Dilate Count", &lightMap.dilateCount, 1, 0, 16);
-			ImGui::DragInt("Direct MSAA Count", &lightMap.directMSAACount, 1, 0, 16);
-			ImGui::DragInt("Indirect MSAA Count", &lightMap.indirectMSAACount, 1, 0, 16);
-			ImGui::Checkbox("Use Environment Map", &lightMap.useEnvironmentMap);
-		}
-
-		if (ImGui::Button("Generate LightMap"))
-		{
-			Camera c{};
-			// 메쉬별로 positionMap 생성
-			m_pPositionMapPass->Execute(*m_renderScene, c);
-			// lightMap 생성
-			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
-
-			//m_pLightMapPass->Initialize(lightMap.lightmaps);
-		}
-
-		if (ImGui::CollapsingHeader("Baked Maps")) {
-			if (lightMap.imgSRV)
-			{
-				ImGui::Text("LightMaps");
-				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-					if (ImGui::ImageButton("##LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("indirectMaps");
-				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
-					if (ImGui::ImageButton("##IndirectMap", (ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("environmentMaps");
-				for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
-					if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-			}
-			else {
-				ImGui::Text("No LightMap");
-			}
-		}
-
-		ImGui::EndChild();
-	});
+	
 }
 
 void SceneRenderer::InitializeTextures()

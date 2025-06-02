@@ -57,7 +57,7 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
-
+	//TODO : Change deferredContext Render
 	for (auto& meshRenderer : camera.m_forwardQueue)
 	{
 		if (nullptr == meshRenderer) continue;

@@ -165,6 +165,21 @@ LRESULT Core::App::HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
+	if (wParam == SIZE_MINIMIZED)
+	{
+		EngineSettingInstance->SetMinimized(true);
+		return 0; // 최소화된 경우 무시
+	}
+
+	if (EngineSettingInstance->IsMinimized())
+	{
+		if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
+		{
+			EngineSettingInstance->SetMinimized(false);
+			return 0; // 복원된 경우 무시
+		}
+	}
+
 	m_main->CreateWindowSizeDependentResources();
 
 	return 0;

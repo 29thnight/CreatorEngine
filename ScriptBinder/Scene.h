@@ -16,8 +16,8 @@ class Scene
 public:
    ReflectScene
     [[Serializable]]
-	Scene() = default;
-	~Scene() = default;
+	Scene();
+	~Scene();
 
     [[Property]]
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
@@ -115,7 +115,9 @@ public:
     size_t m_buildIndex{ 0 };
     [[Property]]
 	HashingString m_sceneName;
-
+public:
+    GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
+    void ResetSelectedSceneObject();
 
 public:
 	void CollectLightComponent(LightComponent* ptr);
@@ -138,6 +140,7 @@ private:
 	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
+    void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
@@ -151,4 +154,6 @@ public:
 	HashingString GetSceneName() const { return m_sceneName; }
     std::vector<Texture*> m_lightmapTextures{};
     std::vector<Texture*> m_directionalmapTextures{};
+    Core::DelegateHandle resetObjHandle{};
+    GameObject* m_selectedSceneObject = nullptr;
 };

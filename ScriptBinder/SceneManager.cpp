@@ -114,7 +114,10 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
 
 Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
-    file::path saveSceneFileName = name.data();
+	std::string fileStem = name.data();
+	std::string fileExtension = ".creator";
+    file::path saveSceneFileName = fileStem + fileExtension;
+
 	std::ofstream sceneFileOut(saveSceneFileName);
     MetaYml::Node sceneNode{};
 
@@ -131,6 +134,8 @@ Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 	}
 
 	sceneFileOut << sceneNode;
+
+    sceneFileOut.close();
 }
 
 Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)

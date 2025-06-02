@@ -59,7 +59,8 @@ SceneViewWindow::SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) :
 
 void SceneViewWindow::RenderSceneViewWindow()
 {
-	auto obj = m_sceneRenderer->m_renderScene->GetSelectSceneObject();
+	auto scene = SceneManagers->GetActiveScene();
+	auto obj = scene->GetSelectSceneObject();
 	if (obj)
 	{
 		auto mat = obj->m_transform.GetWorldMatrix();
@@ -372,7 +373,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		cam->HandleMovement(Time->GetElapsedSeconds());
 	}
 
-	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+	auto scene = SceneManagers->GetActiveScene();
+	auto& sceneSelectedObj = scene->m_selectedSceneObject;
 	static bool useGizmo = false;
 	static float gizmoTimer = 0.f;
 
@@ -454,7 +456,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static file::path previewModelPath;
 	static GameObject* dragPreviewObject = nullptr;
 	static ImGuiPayload* dragPayload = nullptr;
-	Scene* scene = SceneManagers->GetActiveScene();
 
 	if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
 	{

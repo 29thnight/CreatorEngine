@@ -24,6 +24,8 @@
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.Definition.h" />
+    <ClInclude Include="Core.FenceFlag.h" />
+    <ClInclude Include="Core.FenceFlagGroup.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />

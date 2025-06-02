@@ -14,18 +14,12 @@
 
 RenderScene::~RenderScene()
 {
-	//TODO : ComPtr이라 자동 해제 -> default로 변경할 것
-    ImGui::ContextUnregister("GameObject Hierarchy");
-    ImGui::ContextUnregister("GameObject Inspector");
-
 	Memory::SafeDelete(m_LightController);
 }
 
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
-
-	SceneManagers->resetSelectedObjectEvent.AddRaw(this, &RenderScene::ResetSelectedSceneObject);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -39,11 +33,6 @@ void RenderScene::Update(float deltaSecond)
 	if (m_currentScene == nullptr) return;
 
     m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
-
-	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
-	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
-	}
 }
 
 void RenderScene::ShadowStage(Camera& camera)
@@ -71,53 +60,4 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
 {
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
-}
-
-void RenderScene::ResetSelectedSceneObject()
-{
-	m_selectedSceneObject = nullptr;
-}
-
-void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
-{
-	if(!m_currentScene) return;
-
-	const auto& obj = m_currentScene->GetGameObject(objIndex);
-
-	if (!obj || obj->IsDestroyMark())
-	{
-		return;
-	}
-
-	if(GameObjectType::Bone == obj->GetType())
-	{
-		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		if (!animator || !animator->IsEnabled())
-		{
-			return;
-		}
-		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
-		if (bone)
-		{
-			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
-		}
-	}
-	else
-	{
-		if (obj->m_transform.IsDirty())
-		{
-			auto renderer = obj->GetComponent<MeshRenderer>();
-			if (renderer)
-			{
-				renderer->SetNeedUpdateCulling(true);
-			}
-		}
-		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-		obj->m_transform.SetAndDecomposeMatrix(model);
-	}
-
-	for (auto& childIndex : obj->m_childrenIndices)
-	{
-		UpdateModelRecursive(childIndex, model);
-	}
 }

@@ -47,6 +47,11 @@ public:
 
 		ImGuiIO& io = ImGui::GetIO();
 
+		if (m_name.empty())
+		{
+			return;
+		}
+
 		if (ImGui::Begin(m_name.data(), m_isPopup ? &m_opened : 0, m_flags))
 		{
 			ImGuiWindow* window = ImGui::GetCurrentWindow();

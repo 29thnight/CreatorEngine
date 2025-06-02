@@ -15,6 +15,12 @@
 #include "CullingManager.h"
 
 #include "UIManager.h"
+#include "SpinLock.h"
+#include "Core.FenceFlag.h"
+
+std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
+std::atomic<bool> isGameToRender = false;
+FenceFlag fenceGameToRender;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -94,12 +100,24 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
+
+	isGameToRender = true;
+
+   /* m_renderThread = std::thread([&] 
+	{
+		while (isGameToRender)
+		{
+			RenderWorkerThread();
+		}
+	});
+    m_renderThread.detach();*/
 }
 
 DirectX11::Dx11Main::~Dx11Main()
 {
 	m_deviceResources->RegisterDeviceNotify(nullptr);
     SceneManagers->Decommissioning();
+	isGameToRender = false;
 }
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
@@ -132,6 +150,8 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
+	//SpinLock lock(gameToRenderLock);
+
     m_timeSystem.Tick([&]
     {
         InfoWindow();
@@ -179,12 +199,20 @@ void DirectX11::Dx11Main::Update()
 		Physics->ConnectPVD();
 	}
 #endif // !EDITOR
+
+    //fenceGameToRender.Wait();
+    //fenceGameToRender.Reset();
 }
 
 bool DirectX11::Dx11Main::Render()
 {
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (m_timeSystem.GetFrameCount() == 0) return false;
+	if (m_timeSystem.GetFrameCount() == 0)
+    { 
+        fenceGameToRender.Signal();
+        return false;
+    }
+
 	{
         SceneManagers->SceneRendering(m_timeSystem.GetElapsedSeconds());
 #if defined(EDITOR)
@@ -193,6 +221,7 @@ bool DirectX11::Dx11Main::Render()
 #endif // !EDITOR
 	}
 
+    fenceGameToRender.Signal();
 	return true;
 }
 
@@ -231,6 +260,14 @@ void DirectX11::Dx11Main::OnGui()
 void DirectX11::Dx11Main::DisableOrEnable()
 {
 	SceneManagers->DisableOrEnable();
+}
+
+void DirectX11::Dx11Main::RenderWorkerThread()
+{
+	if (Render())
+	{
+		m_deviceResources->Present();
+	}
 }
 
 // 릴리스가 필요한 디바이스 리소스를 렌더러에 알립니다.

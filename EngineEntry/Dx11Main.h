@@ -35,6 +35,8 @@ namespace DirectX11
         void OnGui();
 		void DisableOrEnable();
 
+		void RenderWorkerThread();
+
 		// IDeviceNotify
 		virtual void OnDeviceLost() override;
 		virtual void OnDeviceRestored() override;
