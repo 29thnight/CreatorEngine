@@ -15,6 +15,30 @@ struct Collision
 	const std::vector<DirectX::SimpleMath::Vector3>& contactPoints;
 };
 
+
+//raycast event 관련 함수등록 관련 메인부에 문의 할것
+struct RayEvent {
+	struct ResultData {
+		bool hasBlock;
+		GameObject* blockObject;
+		DirectX::SimpleMath::Vector3 blockPoint;
+
+		unsigned int hitCount = -1;
+		std::vector<GameObject*> hitObjects;
+		std::vector<unsigned int> hitObjectLayer;
+		std::vector<DirectX::SimpleMath::Vector3> hitPoints;
+	};
+
+	DirectX::SimpleMath::Vector3 origin = DirectX::SimpleMath::Vector3::Zero;
+	DirectX::SimpleMath::Vector3 direction = DirectX::SimpleMath::Vector3::Zero;
+	float distance = 0.0f;
+	unsigned int layerMask = 0;
+
+	ResultData* resultData = nullptr;
+	bool isStatic = false;
+	bool bUseDebugDraw = false;
+};
+
 class ICollider;
 class Component;
 class GameObject;
@@ -46,6 +70,7 @@ class PhysicsManager : public Singleton<PhysicsManager>
 	};
 
 public:
+
 	PhysicsManager() = default;
 	~PhysicsManager() = default;
 
@@ -72,6 +97,10 @@ public:
 	//디버그 정보 드로우 //[[maybe_unused]] todo : DebugSystem 통합
 	[[maybe_unused]] 
 	void DrawDebugInfo();
+
+
+	void RayCast(RayEvent& rayEvent);
+	
 
 private:
 	// 초기화 여부
