@@ -5,7 +5,7 @@
 template<typename T>
 inline T& Component::GetComponent()
 {
-	if (!m_pOwner) return throw std::null_exception("not set owner");
+	if (!m_pOwner) throw std::null_exception("not set owner");
 
 	if constexpr (std::is_same_v<T, Transform>)
 	{

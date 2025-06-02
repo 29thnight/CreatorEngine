@@ -80,6 +80,7 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 
 	//안에서 배열은 3으로 고정중 필요하면 수정
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
+	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
 	m_shadowCamera.m_isOrthographic = true;
 }
@@ -96,8 +97,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15, 0.3 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
@@ -132,15 +133,18 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& obj : scene.GetScene()->m_SceneObjects)
+
+		auto activeScene = SceneManagers->GetActiveScene();
+
+
+		for (auto& meshRenderer : activeScene->GetMeshRenderers())
 		{
-			if (obj->ToString() == "Cube" || obj->ToString() == "Plane")
-				continue;
-			MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
-			if (nullptr == meshRenderer) continue;
 			if (!meshRenderer->IsEnabled()) continue;
 
-			scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+			GameObject* sceneObject = meshRenderer->GetOwner();
+			if (sceneObject->IsDestroyMark()) continue;
+			if (sceneObject->m_parentIndex == -1) continue;
+			scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
 
 			meshRenderer->m_Mesh->Draw();
 		}
@@ -155,7 +159,7 @@ void ShadowMapPass::ControlPanel()
 {
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
+	//ImGui::Image((ImTextureID)m_shadowMapTexture->m_pSRV, ImVec2(128, 128));
 	ImGui::SliderFloat("epsilon", &shadowMapConstant2._epsilon, 0.0001f, 0.03f);
 	ImGui::SliderInt("devideShadow", &shadowMapConstant2.devideShadow, 1, 9);
 }
@@ -230,8 +234,9 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 	Mathf::Matrix cameraview = camera.CalculateView();
 	Mathf::Matrix viewInverse = camera.CalculateInverseView();
 	Mathf::Vector3 forwardVec;
-	forwardVec = cameraview.Forward();
-	Mathf::Vector3 adjustTranslate = forwardVec/* * frustumDistnace*/;
+	cameraview.Forward(forwardVec);
+	//forwardVec = cameraview.Forward();
+	Mathf::Vector3 adjustTranslate = forwardVec * frustumDistnace;
 
 	std::array<std::array<	Mathf::Vector3, 8>, cascadeCount> sliceFrustums;
 
@@ -271,7 +276,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 			radius = std::max<float>(radius, distance);
 		}
 
-		radius = std::ceil(radius * 16.f) / 16.f;
+		radius = std::ceil(radius * 32.f) / 32.f;
 
 		Mathf::Vector3 maxExtents = { radius, radius, radius };
 		Mathf::Vector3 minExtents = -maxExtents;

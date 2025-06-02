@@ -259,7 +259,7 @@ void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector
     Vector3 right = XMVector3Normalize(XMVector3Cross(dir, up));
     Vector3 forward = XMVector3Normalize(XMVector3Cross(right, dir));
 
-    float radius = height * tanf(outerConeAngle * 0.5f);
+    float radius = height * tanf(XMConvertToRadians(outerConeAngle) * 0.5f);
 
     for (int i = 0; i < segmentCount; ++i)
     {

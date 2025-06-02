@@ -3,7 +3,6 @@
 #pragma once
 
 #include "AnimationState.h"
-#include "TerrainCollider.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
 #include "Component.h"

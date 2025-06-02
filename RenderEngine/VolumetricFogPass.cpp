@@ -181,6 +181,7 @@ void VolumetricFogPass::Initialize(const std::string_view& fileName)
 
 void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 {
+	if (!isOn) return;
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	ID3D11ShaderResourceView* nullSRVall[3] = { nullptr, nullptr, nullptr };
 	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
@@ -195,8 +196,8 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
 	Mathf::Color4 lightColor = scene.m_LightController->GetLight(0).m_color;
 	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
+	std::vector<float> cascadeEnd = devideCascadeEnd(camera, { 0.15,0.5 });
+	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
 
 	MainCB data{};
@@ -277,7 +278,9 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 void VolumetricFogPass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Text("VolumetricFogMain");
+	ImGui::Checkbox("VolumetricFog", &isOn);
 	ImGui::SliderFloat("Anisotropy", &mAnisotropy, 0.0f, 1.0f);
 	ImGui::SliderFloat("Density", &mDensity, 0.1f, 10.0f);
 	ImGui::SliderFloat("Strength", &mStrength, 0.0f, 50.0f);
@@ -286,6 +289,7 @@ void VolumetricFogPass::ControlPanel()
 	ImGui::SliderFloat("Blending with previous frame", &mPreviousFrameBlendFactor, 0.0f, 1.0f);
 	ImGui::SliderFloat("Custom near plane", &mCustomNearPlane, 0.01f, 10.0f);
 	ImGui::SliderFloat("Custom far plane", &mCustomFarPlane, 10.0f, 10000.0f);
+	ImGui::PopID();
 }
 
 void VolumetricFogPass::Resize(uint32_t width, uint32_t height)

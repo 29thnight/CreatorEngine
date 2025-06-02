@@ -46,6 +46,4 @@ private:
 	GameObject* m_selectedSceneObject = nullptr;
 	ID3D11Buffer* m_ModelBuffer;
 	bool m_isPlaying = false;
-
-	std::thread animationJobThread{};
 };

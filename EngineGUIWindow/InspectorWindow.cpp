@@ -18,6 +18,140 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+static const std::unordered_set<std::string> ignoredKeys = {
+	"guid",
+	"importSettings"
+};
+
+void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
+{
+	if (node.IsNull()) return;
+
+	if (node.IsMap())
+	{
+		for (auto it = node.begin(); it != node.end(); ++it)
+		{
+			std::string key = it->first.as<std::string>();
+			if (ignoredKeys.count(key)) continue;
+
+			YAML::Node& value = it->second;
+
+			if (value.IsMap() || value.IsSequence())
+			{
+				if (ImGui::TreeNode(key.c_str()))
+				{
+					DrawYamlNodeEditor(value, key);
+					ImGui::TreePop();
+				}
+			}
+			else
+			{
+				// 자동 분기 처리
+				if (value.IsScalar())
+				{
+					std::string val = value.as<std::string>();
+					std::istringstream iss(val);
+					float f;
+					int i;
+					bool b;
+
+					std::string uniqueID = key + "##" + label;
+
+					// bool
+					if (val == "true" || val == "false")
+					{
+						b = (val == "true");
+						if (ImGui::Checkbox(uniqueID.c_str(), &b))
+							value = b ? "true" : "false";
+					}
+					// int
+					else if ((iss >> i) && iss.eof())
+					{
+						if (ImGui::InputInt(uniqueID.c_str(), &i))
+							value = std::to_string(i);
+					}
+					// float
+					else
+					{
+						std::istringstream iss2(val);
+						if ((iss2 >> f) && iss2.eof())
+						{
+							if (ImGui::InputFloat(uniqueID.c_str(), &f))
+								value = std::to_string(f);
+						}
+						else
+						{
+							// fallback to string
+							char buffer[256];
+							strcpy_s(buffer, val.c_str());
+							if (ImGui::InputText(uniqueID.c_str(), buffer, sizeof(buffer)))
+								value = std::string(buffer);
+						}
+					}
+				}
+			}
+		}
+	}
+	else if (node.IsSequence())
+	{
+		for (std::size_t i = 0; i < node.size(); ++i)
+		{
+			YAML::Node element = node[i];
+			std::string indexLabel = label + "[" + std::to_string(i) + "]";
+
+			if (element.IsMap() || element.IsSequence())
+			{
+				if (ImGui::TreeNode(indexLabel.c_str()))
+				{
+					DrawYamlNodeEditor(element, indexLabel);
+					ImGui::TreePop();
+				}
+			}
+			else
+			{
+				std::string val = element.as<std::string>();
+				std::istringstream iss(val);
+				float f;
+				int i;
+				bool b;
+
+				std::string uniqueID = indexLabel;
+
+				// bool
+				if (val == "true" || val == "false")
+				{
+					b = (val == "true");
+					if (ImGui::Checkbox(uniqueID.c_str(), &b))
+						element = b ? "true" : "false";
+				}
+				// int
+				else if ((iss >> i) && iss.eof())
+				{
+					if (ImGui::InputInt(uniqueID.c_str(), &i))
+						element = std::to_string(i);
+				}
+				// float
+				else
+				{
+					std::istringstream iss2(val);
+					if ((iss2 >> f) && iss2.eof())
+					{
+						if (ImGui::InputFloat(uniqueID.c_str(), &f))
+							element = std::to_string(f);
+					}
+					else
+					{
+						char buffer[256];
+						strcpy_s(buffer, val.c_str());
+						if (ImGui::InputText(uniqueID.c_str(), buffer, sizeof(buffer)))
+							element = std::string(buffer);
+					}
+				}
+			}
+		}
+	}
+}
+
 constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
 constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
@@ -28,9 +162,16 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
+		static GameObject* prevSelectedSceneObject = nullptr;
+		static bool wasMetaSelectedLastFrame = false;
+
 		Scene* scene = nullptr;
 		RenderScene* renderScene = nullptr;
 		GameObject* selectedSceneObject = nullptr;
+		std::optional<MetaYml::Node>& selectedNode{ DataSystems->selectedFileMetaNode };
+		bool isSelectedNode = selectedNode.has_value();
+		file::path selectedFileName{ DataSystems->selectedFileName };
+		file::path selectedMetaFilePath{ DataSystems->selectedMetaFilePath };
 
 		if (m_sceneRenderer)
 		{
@@ -44,6 +185,26 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::End();
 				return;
 			}
+		}
+
+		bool sceneObjectJustSelected = (selectedSceneObject != nullptr && selectedSceneObject != prevSelectedSceneObject);
+
+		bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
+
+		// 3. 우선순위 결정
+		if (sceneObjectJustSelected)
+		{
+			// 게임 오브젝트 선택 시 YAML 선택 해제
+			selectedNode = std::nullopt;
+			isSelectedNode = false;
+			wasMetaSelectedLastFrame = false;
+		}
+		else if (metaNodeJustSelected)
+		{
+			// 메타 파일 선택 시 게임 오브젝트 해제
+			selectedSceneObject = nullptr;
+			prevSelectedSceneObject = nullptr;
+			wasMetaSelectedLastFrame = true;
 		}
 
 		if (scene && selectedSceneObject)
@@ -396,6 +557,50 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::PopStyleVar();
 			ImGui::PopStyleColor(2);
 		}
+		else if (isSelectedNode)
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+			ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+			
+			std::string stem = selectedFileName.stem().string();
+
+			stem += " Import Settings";
+
+			if (ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				DrawYamlNodeEditor(*selectedNode);
+
+				ImGui::Spacing();
+				if (ImGui::Button("Save"))
+				{
+					try
+					{
+						YAML::Emitter emitter;
+						emitter << *selectedNode;
+
+						std::ofstream fout(selectedMetaFilePath);
+						if (fout.is_open())
+						{
+							fout << emitter.c_str();
+							fout.close();
+						}
+						else
+						{
+							Debug->LogError("Failed to open file for writing: " + selectedMetaFilePath.string());
+						}
+					}
+					catch (const std::exception& e)
+					{
+						Debug->LogError("Failed to save YAML: " + std::string(e.what()));
+					}
+				}
+			}
+			ImGui::PopStyleVar(2);
+		}
+
+		prevSelectedSceneObject = selectedSceneObject;
+		wasMetaSelectedLastFrame = isSelectedNode;
+
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
 }
 

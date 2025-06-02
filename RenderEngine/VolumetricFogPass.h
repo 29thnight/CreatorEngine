@@ -42,7 +42,7 @@ public:
 	void ControlPanel() override;
 	virtual void Resize(uint32_t width, uint32_t height) override;
 private:
-
+	bool isOn{ true };
 
 	float mAnisotropy = 0.05f;
 	float mDensity = 0.350f;

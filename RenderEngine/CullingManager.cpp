@@ -33,17 +33,17 @@ BoundingBox CalculateSceneWorldBounds(const std::vector<MeshRenderer*>& sceneMes
     if (!initialized)
     {
         // 메쉬가 하나도 없으면 고정 박스 사용
-        return BoundingBox({ 0.0f, 0.0f, 0.0f }, { 2000.0f, 2000.0f, 2000.0f });
+        return BoundingBox({ 0.0f, 0.0f, 0.0f }, { 2000.f, 2000.f, 2000.f });
     }
 
-    const float minExtentThreshold = 2000.0f;
+    const float minExtentThreshold = 2000.f;
 
     // 각 축의 extents가 최소 기준보다 작은 경우, 고정 박스 사용
     if (bounds.Extents.x < minExtentThreshold * 0.5f ||
         bounds.Extents.y < minExtentThreshold * 0.5f ||
         bounds.Extents.z < minExtentThreshold * 0.5f)
     {
-        return BoundingBox({ 0.0f, 0.0f, 0.0f }, { 2000.0f, 2000.0f, 2000.0f });
+        return BoundingBox({ 0.0f, 0.0f, 0.0f }, { 2000.f, 2000.f, 2000.f });
     }
 
     return bounds;
@@ -120,8 +120,20 @@ void CullingManager::SmartCullMeshes(const DirectX::BoundingFrustum& frustum, st
 
 void CullingManager::CullMeshes(const BoundingFrustum& frustum, std::vector<MeshRenderer*>& outVisibleMeshes) const
 {
+	std::vector<MeshRenderer*> visibleMeshes;
+
     if (m_root)
-        CullRecursive(frustum, m_root, outVisibleMeshes);
+        CullRecursive(frustum, m_root, visibleMeshes);
+
+	// 중복 제거
+	std::set<MeshRenderer*> uniqueMeshes(visibleMeshes.begin(), visibleMeshes.end());
+	for (const auto& result : uniqueMeshes)
+	{
+		if (result)
+		{
+			outVisibleMeshes.push_back(result);
+		}
+	}
 }
 
 void CullingManager::CullMeshesMultithread(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& outVisibleMeshes) const
@@ -151,15 +163,49 @@ void CullingManager::CullMeshesMultithread(const DirectX::BoundingFrustum& frust
 	}
 
     // 루트 노드 자체 검사
-    //ContainmentType rootContainment = frustum.Contains(m_root->boundingBox);
-    //if (rootContainment != DISJOINT)
-    //    CullRecursive(frustum, m_root, outVisibleMeshes);
+    ContainmentType rootContainment = frustum.Contains(m_root->boundingBox);
+    if (rootContainment != DISJOINT)
+    {
+        CullRoot(frustum, outVisibleMeshes);
+    }
 
     m_threadPool->NotifyAllAndWait();
 
-	for (const auto& result : results)
+	std::set<MeshRenderer*> uniqueMeshes;
+    for (const auto& result : results)
+    {
+		uniqueMeshes.insert(result.begin(), result.end());
+    }
+
+    for (const auto& result : uniqueMeshes)
+    {
+        if (result)
+        {
+            outVisibleMeshes.push_back(result);
+        }
+    }
+}
+
+void CullingManager::CullRoot(const DirectX::BoundingFrustum& frustum, std::vector<MeshRenderer*>& out) const
+{
+    ContainmentType result = frustum.Contains(m_root->boundingBox);
+
+	if (result == DISJOINT)
+		return;
+
+	if (result == CONTAINS)
 	{
-		outVisibleMeshes.insert(outVisibleMeshes.end(), result.begin(), result.end());
+		out.insert(out.end(), m_root->objects.begin(), m_root->objects.end());
+	}
+	else
+	{
+		for (MeshRenderer* renderer : m_root->objects)
+		{
+			if (frustum.Intersects(renderer->GetBoundingBox()) && !renderer->m_isSkinnedMesh)
+            {
+                out.push_back(renderer);
+            }
+		}
 	}
 }
 
@@ -189,7 +235,7 @@ void CullingManager::CullRecursive(const BoundingFrustum& frustum, OctreeNode* n
         {
             for (MeshRenderer* renderer : node->objects)
             {
-                if (frustum.Intersects(renderer->GetBoundingBox()))
+                if (frustum.Intersects(renderer->GetBoundingBox()) && !renderer->m_isSkinnedMesh)
                     out.push_back(renderer);
             }
         }
@@ -227,6 +273,18 @@ void CullingManager::UpdateMesh(MeshRenderer* mesh)
 
 bool CullingManager::Remove(MeshRenderer* mesh)
 {
+    //if (!m_root)
+    //    return false;
+
+    //bool removed = false;
+    //for (OctreeNode* node : mesh->GetCullGroup())
+    //{
+    //    node->Remove(mesh);
+    //}
+
+    //mesh->CullGroupClear();
+    //return removed;
+
     if (!m_root)
         return false;
 
@@ -237,7 +295,7 @@ bool CullingManager::Remove(MeshRenderer* mesh)
     }
 
     mesh->CullGroupClear();
-	return true;
+    return true;
 }
 
 void CullingManager::RemoveAll()

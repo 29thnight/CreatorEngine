@@ -3,6 +3,7 @@
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
+#include "MeshRenderer.h"
 
 std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObject>& sceneObject)
 {
@@ -379,6 +380,38 @@ void Scene::DistroyLight()
             isFirstDirectional  = true;
             comp->m_lightStatus = LightStatus::StaticShadows;
         }
+	}
+}
+
+void Scene::CollectMeshRenderer(MeshRenderer* ptr)
+{
+	if (ptr)
+	{
+		m_allMeshRenderers.push_back(ptr);
+		if (ptr->IsSkinnedMesh())
+		{
+			m_skinnedMeshRenderers.push_back(ptr);
+		}
+		else
+		{
+			m_staticMeshRenderers.push_back(ptr);
+		}
+	}
+}
+
+void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
+{
+	if (ptr)
+	{
+        if (ptr->IsSkinnedMesh())
+        {
+			std::erase_if(m_skinnedMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
+		}
+		else
+		{
+			std::erase_if(m_staticMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
+        }
+		std::erase_if(m_allMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
 	}
 }
 

@@ -654,13 +654,7 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Fullscreen.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IntegrateBRDF.ps.hlsl">
-      <Filter>Shaders\PipelineShader</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IrradianceMap.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\PixelShader.ps.hlsl">
@@ -782,6 +776,24 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LifeModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\IrradianceMap.ps.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NormalizeTexture.cs.hlsl">
+      <Filter>Shaders\LightMap</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
