@@ -27,10 +27,12 @@
     <ClInclude Include="ImGuiMath.h" />
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />
+    <ClInclude Include="NodeEditor.h" />
     <ClInclude Include="widgets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp" />
+    <ClCompile Include="NodeEditor.cpp" />
     <ClCompile Include="widgets.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -10,6 +10,7 @@ class aniState;
 class AniTransition;
 class AvatarMask;
 class Animator;
+class NodeEditor;
 class AnimationController
 {
 public:
@@ -29,7 +30,8 @@ public:
 
 	std::set<std::string> StateNameSet;
 
-	ax::NodeEditor::EditorContext* conEdit;
+	NodeEditor* m_nodeEditor;
+	//ax::NodeEditor::EditorContext* conEdit;
 	//어디에서든지 전이가능한 state모음
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;

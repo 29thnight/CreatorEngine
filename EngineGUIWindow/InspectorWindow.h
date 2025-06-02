@@ -1,11 +1,14 @@
 #pragma once
 #include "ImGuiRegister.h"
+#include <imgui.h>
+#include <imgui_internal.h>
 
 class SceneRenderer;
 class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
+
 class InspectorWindow
 {
 public:
@@ -19,4 +22,6 @@ private:
 	void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);
+
+	void DrawMyLink(std::string linkName, std::string from, std::string to);
 };

@@ -1,7 +1,7 @@
 #include "Animator.h"
 #include "AnimationController.h"
 #include "../RenderEngine/Skeleton.h"
-
+#include "NodeEditor.h"
 void Animator::Update(float tick)
 {
 	
@@ -51,6 +51,7 @@ void Animator::CreateController(std::string name)
 	animationController->m_owner = this;
 	animationController->name = name;
 	animationController->CreateMask();
+	animationController->m_nodeEditor = new NodeEditor();
 	m_animationControllers.push_back(animationController);
 }
 

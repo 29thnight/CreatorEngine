@@ -14,10 +14,11 @@
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
 #include "CustomCollapsingHeader.h"
-
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+#include "NodeEditor.h"
+namespace ed = ax::NodeEditor;
 static const std::unordered_set<std::string> ignoredKeys = {
 	"guid",
 	"importSettings"
@@ -785,19 +786,13 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						std::string fileName = controller->name + ".node_editor.json";
 						if (!controller->StateVec.empty())
 						{
-							namespace ed = ax::NodeEditor;
-							if (!controller->conEdit)
-							{
-								ed::Config config;
-								config.SettingsFile = fileName.c_str();
-								controller->conEdit = ed::CreateEditor(&config);
-							}
-
-							ed::SetCurrentEditor(controller->conEdit);
-							ed::Begin("State Machine Editor");
+							controller->m_nodeEditor->MakeEdit(fileName);
 							for (auto& state : controller->StateVec)
 							{
-								
+								controller->m_nodeEditor->DrawNode(state->m_name);
+
+								/*ed::Style& style = ed::GetStyle();
+								style.LinkStrength = 0.0f; 
 								ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(state->m_name));
 								ed::BeginNode(nodeID);
 								ImGui::Text(state->m_name.c_str());
@@ -811,22 +806,32 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								ImGui::Dummy(ImVec2(1, 1));
 								ed::EndPin();
 
-								ed::EndNode();
+								ed::EndNode();*/
 
-								for(auto& trans : state->Transitions)
-								{
-									ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetCurState()));
-									ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetNextState()));
-									
-									ed::PinId startPin = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
-									ed::PinId endPin = ed::PinId((static_cast<uint64_t>(nextnodeID) << 1) | 0);
-									ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(trans->m_name));
-									ed::Link(linkId, startPin,endPin);
-								}
+								
 							}
 
-							ed::End();
-							ed::SetCurrentEditor(nullptr);
+
+							for (auto& state : controller->StateVec)
+							{
+								for (auto& trans : state->Transitions)
+								{
+									//ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetCurState()));
+									//ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetNextState()));
+
+									//ed::PinId startPin = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
+									//ed::PinId endPin = ed::PinId((static_cast<uint64_t>(nextnodeID) << 1) | 0);
+									//ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(trans->m_name));
+									////ed::Link(linkId, startPin, endPin);
+									//auto id = static_cast<uint64_t>(linkId);
+									//DrawMyLink(trans->m_name, trans->GetCurState(), trans->GetNextState());
+									//ImGui::SetCursorScreenPos();
+									controller->m_nodeEditor->DrawLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+								}
+							}
+							/*ed::End();
+							ed::SetCurrentEditor(nullptr);*/
+							controller->m_nodeEditor->EndEdit();
 							if (ImGui::CollapsingHeader("States"))
 							{
 								const auto& mat_animationState_type = Meta::Find("AnimationState");
@@ -853,3 +858,43 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 		}
 	}
 }
+
+void InspectorWindow::DrawMyLink(std::string linkName, std::string from, std::string to)
+{
+	ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(linkName));
+	ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(from));
+	ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(to));
+	ed::LinkId reverselinkId = static_cast<ed::LinkId>(std::hash<std::string>{}(std::string(to + " to " + from)));
+	ImVec2 p1 = ed::GetNodePosition(nodeID);
+	ImVec2 p2 = ed::GetNodePosition(nextnodeID);
+
+	// 오프셋을 줘서 겹침 방지
+	//float offset = ((linkId % 3) - 1) * 20.0f;
+	
+	// 중간 꺾이는 지점
+	//ImVec2 mid1 = ImVec2(p1.x + offset, p1.y);
+	//ImVec2 mid2 = ImVec2(p1.x + offset, p2.y);
+
+
+	ImVec2 dir = p2 - p1;          // 상대 방향
+	float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+	ImVec2 normDir = ImVec2(dir.x / length, dir.y / length); // 정규화
+
+
+	// 현재 윈도우에서 DrawList 얻기
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+
+
+	ImU32 color = IM_COL32(255, 255, 255, 255);
+	float thickness = 2.0f;
+
+
+
+	// 3단 꺾인 직선 그리기
+	drawList->AddLine(p1, p2, color, thickness);
+	/*drawList->AddLine(p1, mid1, color, thickness);
+	drawList->AddLine(mid1, mid2, color, thickness);
+	drawList->AddLine(mid2, p2, color, thickness);*/
+}
+
