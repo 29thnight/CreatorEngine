@@ -6,6 +6,7 @@
 #include "RenderableComponents.h"
 #include "LightController.h"
 #include "directxtk\SimpleMath.h"
+#include "RenderCommand.h"
 std::vector<float> g_cascadeCut =  { 0.15,0.5 };
 bool g_useCascade = true;
 ShadowMapPass::ShadowMapPass()
@@ -135,14 +136,15 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			shadowMapConstant.m_lightViewProjection[i] = cascadeinfo[i].m_lightViewProjection;
 			m_shadowCamera.UpdateBuffer(true);
 			scene.UseModel();
-			for (auto& meshRenderer : camera.m_defferdQueue)
+			for (auto& RenderCommand : camera.m_defferdQueue)
 			{
 
-				GameObject* sceneObject = meshRenderer->GetOwner();
-				if (sceneObject->IsDestroyMark()) continue;
-				if (sceneObject->m_parentIndex == -1) continue;
-				scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-				meshRenderer->m_Mesh->Draw();
+				//GameObject* sceneObject = meshRenderer->GetOwner();
+				//if (sceneObject->IsDestroyMark()) continue;
+				//if (sceneObject->m_parentIndex == -1) continue;
+				scene.UpdateModel(RenderCommand.m_worldMatrix);
+				//meshRenderer->m_Mesh->Draw();
+				RenderCommand.m_Mesh->Draw();
 			}
 			DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 			DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
@@ -188,14 +190,15 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		shadowMapConstant.m_lightViewProjection[0] = cascadeinfo[2].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& meshRenderer : camera.m_defferdQueue)
+		for (auto& RenderCommand : camera.m_defferdQueue)
 		{
 
-			GameObject* sceneObject = meshRenderer->GetOwner();
-			if (sceneObject->IsDestroyMark()) continue;
-			if (sceneObject->m_parentIndex == -1) continue;
-			scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-			meshRenderer->m_Mesh->Draw();
+			//GameObject* sceneObject = meshRenderer->GetOwner();
+			//if (sceneObject->IsDestroyMark()) continue;
+			//if (sceneObject->m_parentIndex == -1) continue;
+			scene.UpdateModel(RenderCommand.m_worldMatrix);
+			//meshRenderer->m_Mesh->Draw();
+			RenderCommand.m_Mesh->Draw();
 		}
 		DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 		DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
