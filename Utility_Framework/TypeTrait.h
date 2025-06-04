@@ -98,6 +98,7 @@ constexpr bool is_vector_v<std::vector<T>> = true;
 struct HashedGuid
 {
 	size_t m_ID_Data{ 0 };
+	static constexpr size_t INVAILD_ID{ 0 };
 
 	HashedGuid() = default;
 	HashedGuid(size_t id) : m_ID_Data(id) {}

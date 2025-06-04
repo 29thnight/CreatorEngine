@@ -39,6 +39,7 @@ AnimationJob::~AnimationJob()
 {
 	SceneManagers->sceneLoadedEvent.Remove(m_sceneLoadedHandle);
 	SceneManagers->InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
+    SceneManagers->sceneUnloadedEvent.Remove(m_sceneUnloadedHandle);
 }
 
 void AnimationJob::Update(float deltaTime)

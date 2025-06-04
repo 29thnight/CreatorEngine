@@ -5,6 +5,7 @@
 #include "Camera.generated.h"
 
 class MeshRenderer;
+class RenderCommand;
 class Camera
 {
 public:
@@ -32,6 +33,7 @@ public:
 	void ClearRenderTarget();
 
 	void PushRenderQueue(MeshRenderer* meshRenderer);
+	void SortRenderQueue();
 	void ClearRenderQueue();
 
 	[[Property]]
@@ -76,8 +78,10 @@ public:
     UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
     UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
 
-	std::vector<MeshRenderer*> m_defferdQueue;
-	std::vector<MeshRenderer*> m_forwardQueue;
+	std::vector<RenderCommand> m_defferdQueue;
+	std::vector<RenderCommand> m_forwardQueue;
+
+	std::mutex m_cameraMutex;
 };
 
 class SceneRenderer;

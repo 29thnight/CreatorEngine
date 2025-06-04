@@ -48,11 +48,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"AmbientOcclusion",
-		DXGI_FORMAT_R16_UNORM,
+		//DXGI_FORMAT_R16_UNORM,
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
 	);
-	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
-	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
+	ao->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	ao->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_ambientOcclusionTexture = MakeUniqueTexturePtr(ao);
 
 	//Buffer 생성
@@ -83,7 +84,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     m_pSSAOPass->Initialize(
         ao,
         m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture.get()
+        m_normalTexture.get(),
+		m_diffuseTexture.get()
     );
 
     //deferredPass
@@ -182,7 +184,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 				Texture* texture = Texture::LoadFormPath(fileName);
 				if (texture == nullptr) break;
-				scene->m_lightmapTextures.push_back(texture);
+				scene->m_directionalmapTextures.push_back(texture);
 			}
 
 			m_pLightMapPass->Initialize(scene->m_lightmapTextures, scene->m_directionalmapTextures);
@@ -250,74 +252,7 @@ void SceneRenderer::InitializeDeviceState()
 
 void SceneRenderer::InitializeImGui()
 {
-	ImGui::ContextRegister("LightMap", true, [&]() {
-
-		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
-		ImGui::Text("LightMap");
-		if (ImGui::CollapsingHeader("Settings")) {
-			ImGui::Checkbox("LightmapPass On/Off", &useTestLightmap);
-
-			ImGui::Text("Position and NormalMap Settings");
-			ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
-			if (ImGui::Button("Clear position normal maps")) {
-				m_pPositionMapPass->ClearTextures();
-			}
-			ImGui::Checkbox("IsPositionMapDilateOn", &m_pPositionMapPass->isDilateOn);
-			ImGui::DragInt("PosNorm Dilate Count", &m_pPositionMapPass->posNormDilateCount, 1, 0, 16);
-			ImGui::Text("LightMap Bake Settings");
-			ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
-			ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
-			ImGui::DragInt("Padding", &lightMap.padding);
-			ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
-			ImGui::DragInt("LeafCount", &lightMap.leafCount, 1, 0, 1024);
-			ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
-			ImGui::DragInt("Indirect Sample Count", &lightMap.indirectSampleCount, 1, 0, 512);
-			ImGui::DragInt("Dilate Count", &lightMap.dilateCount, 1, 0, 16);
-			ImGui::DragInt("Direct MSAA Count", &lightMap.directMSAACount, 1, 0, 16);
-			ImGui::DragInt("Indirect MSAA Count", &lightMap.indirectMSAACount, 1, 0, 16);
-			ImGui::Checkbox("Use Environment Map", &lightMap.useEnvironmentMap);
-		}
-
-		if (ImGui::Button("Generate LightMap"))
-		{
-			Camera c{};
-			// 메쉬별로 positionMap 생성
-			m_pPositionMapPass->Execute(*m_renderScene, c);
-			// lightMap 생성
-			lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
-
-			//m_pLightMapPass->Initialize(lightMap.lightmaps);
-		}
-
-		if (ImGui::CollapsingHeader("Baked Maps")) {
-			if (lightMap.imgSRV)
-			{
-				ImGui::Text("LightMaps");
-				for (int i = 0; i < lightMap.lightmaps.size(); i++) {
-					if (ImGui::ImageButton("##LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("indirectMaps");
-				for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
-					if (ImGui::ImageButton("##IndirectMap", (ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("environmentMaps");
-				for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
-					if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-			}
-			else {
-				ImGui::Text("No LightMap");
-			}
-		}
-
-		ImGui::EndChild();
-	});
+	
 }
 
 void SceneRenderer::InitializeTextures()
@@ -480,16 +415,17 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+		//[3] SSAOPass
+		{
+			DirectX11::BeginEvent(L"SSAOPass");
+			Benchmark banch;
+			m_pSSAOPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
 		if (!useTestLightmap)
         {
-			//[3] SSAOPass
-			{
-				DirectX11::BeginEvent(L"SSAOPass");
-				Benchmark banch;
-				m_pSSAOPass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
-				DirectX11::EndEvent();
-			}
 			//[4] DeferredPass
 			{
 				DirectX11::BeginEvent(L"DeferredPass");
@@ -639,20 +575,28 @@ void SceneRenderer::ReApplyCurrCubeMap()
 
 void SceneRenderer::PrepareRender()
 {
-	Benchmark banch;
-	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*>& staticMeshes = m_currentScene->GetStaticMeshRenderers();
-	std::vector<MeshRenderer*>& skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
-	for (auto& mesh : staticMeshes)
+	if (GameSceneStart || GameSceneEnd)
 	{
-		if (false == mesh->IsEnabled() || 
-			false == mesh->IsNeedUpdateCulling()) continue;
-
-		CullingManagers->UpdateMesh(mesh);
+		return;
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	Benchmark banch;
+	auto m_currentScene = SceneManagers->GetActiveScene();
+	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
+	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+
+	//for (auto& mesh : staticMeshes)
+	//{
+	//	if (false == mesh->IsEnabled() || 
+	//		false == mesh->IsNeedUpdateCulling()) continue;
+
+	//	CullingManagers->UpdateMesh(mesh);
+	//}
+
+	for (auto camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
@@ -666,30 +610,35 @@ void SceneRenderer::PrepareRender()
 		//	camera->PushRenderQueue(culledMesh);
 		//}
 
-		m_threadPool->Enqueue([&camera, &skinnedMeshes, &staticMeshes]
+		for (auto mesh : staticMeshes)
 		{
-			for (auto& mesh : staticMeshes)
+			if (false == mesh->IsEnabled()) continue;
+
+			m_threadPool->Enqueue([camera, mesh]
 			{
-				if (false == mesh->IsEnabled()) continue;
 				auto frustum = camera->GetFrustum();
 
 				if (frustum.Intersects(mesh->GetBoundingBox()))
 				{
 					camera->PushRenderQueue(mesh);
 				}
-			}
+			});
+		}
 
-			for (auto& skinnedMesh : skinnedMeshes)
+		for (auto skinnedMesh : skinnedMeshes)
+		{
+			if (false == skinnedMesh->IsEnabled()) continue;
+
+			m_threadPool->Enqueue([camera, skinnedMesh]
 			{
-				if (false == skinnedMesh->IsEnabled()) continue;
-
 				auto frustum = camera->GetFrustum();
+
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					camera->PushRenderQueue(skinnedMesh);
 				}
-			}
-		});
+			});
+		}
 	}
 
 	m_threadPool->NotifyAllAndWait();

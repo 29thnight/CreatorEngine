@@ -61,6 +61,9 @@ void AdjustAllImGuiWindowsOnResize(ImVec2 oldSize, ImVec2 newSize)
 	float ratioX = newSize.x / oldSize.x;
 	float ratioY = newSize.y / oldSize.y;
 
+	ratioX = std::abs(ratioX);
+	ratioY = std::abs(ratioY);
+
 	for (int i = 0; i < ctx->Windows.Size; ++i)
 	{
 		ImGuiWindow* window = ctx->Windows[i];
@@ -88,28 +91,17 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 15.0f, nullptr, io.Fonts->GetGlyphRangesKorean());
-	
+
 	static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 	ImFontConfig icons_config;
 	ImFontConfig font_config;
 	icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
 	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
 	io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
-
-	//If you want change between icons size you will need to create a new font
-	//io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 12.0f, &icons_config, icons_ranges);
-	//io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 20.0f, &icons_config, icons_ranges);
-
-	//To use brands icons you need do the same steps but using the brands header
-	//If a quotation mark is displayed instead of the icon, probably the Icon header and Font Awesome version are not the same
-
 	io.Fonts->Build();
     // Setup Dear ImGui style
-    //ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
 	ImGuiStyle* style = &ImGui::GetStyle();
-
+#pragma region "ImGuiStyle"
 	style->WindowPadding = ImVec2(5, 5);
 	style->WindowRounding = 5.0f;
 	style->WindowBorderSize = 0.01f;
@@ -163,14 +155,15 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.25f, 0.00f, 0.00f, 1.00f);
 	style->Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.25f, 1.00f, 0.00f, 0.43f);
 	//style->Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(1.00f, 0.98f, 0.95f, 0.73f);
-
+#pragma endregion
     // Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(m_deviceResources->GetWindow()->GetHandle());
-	//ImGui_ImplWin32_EnableDpiAwareness();
-	//ImGui::GetMainViewport()->Pos = ImVec2(0.0f, 0.0f);
     ID3D11Device* device = m_deviceResources->GetD3DDevice();
     ID3D11DeviceContext* deviceContext = m_deviceResources->GetD3DDeviceContext();
     ImGui_ImplDX11_Init(device, deviceContext);
+
+	//RegisterDisplaySizeHandler();
+	//ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 }
 
 ImGuiRenderer::~ImGuiRenderer()
@@ -182,15 +175,31 @@ void ImGuiRenderer::BeginRender()
 {
     static bool firstLoop = true;
 	static bool forceResize = false;
+	ImGuiIO& io = ImGui::GetIO();
+
+	//if(firstLoop)
+	//{
+	//	auto lastWindowSize = EngineSettingInstance->GetWindowSize();
+	//	auto windowSize2D = Mathf::Vector2(io.DisplaySize.x, io.DisplaySize.y);
+	//	if (windowSize2D != lastWindowSize)
+	//	{
+	//		forceResize = true;
+	//	}
+	//}
 
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
 	
 	RECT rect;
 	HWND hWnd = m_deviceResources->GetWindow()->GetHandle();
 	GetClientRect(hWnd, &rect);
-	ImGuiIO& io = ImGui::GetIO();
+
 	ImVec2 newSize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
-	if (io.DisplaySize != newSize)
+	
+	EngineSettingInstance->SetWindowSize({ newSize.x, newSize.y });
+
+	if (io.DisplaySize		!= newSize 
+		&& newSize			!= ImVec2(0, 0)
+		&& io.DisplaySize	!= ImVec2(0, 0))
 	{
 		AdjustAllImGuiWindowsOnResize(io.DisplaySize, newSize);
 		//forceResize = true;
@@ -202,7 +211,6 @@ void ImGuiRenderer::BeginRender()
 	ImGui_ImplWin32_NewFrame();
 	io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-	//io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 

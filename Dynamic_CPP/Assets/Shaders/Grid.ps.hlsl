@@ -68,7 +68,7 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     // 최종 색상 (프리멀티플라이드 알파 블렌딩)
     float3 color = (checkerColor.rgb /** alphaChec*/) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);
 
-    if (alpha < 0.1)
-        discard;
+    //if (alpha < 0.1)
+    //    discard;
     return float4(color, alpha);
 }

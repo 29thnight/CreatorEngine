@@ -4,6 +4,7 @@
 #include "ImGuiRegister.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "RenderCommand.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -281,15 +282,24 @@ void Camera::PushRenderQueue(MeshRenderer* meshRenderer)
 	if (false == meshRenderer->IsEnabled()) return;
 	Material* mat = meshRenderer->m_Material;
 	if (nullptr == mat) return;
-	switch (mat->m_renderingMode)
+
 	{
-	case MaterialRenderingMode::Opaque:
-		m_defferdQueue.push_back(meshRenderer);
-		break;
-	case MaterialRenderingMode::Transparent:
-		m_forwardQueue.push_back(meshRenderer);
-		break;
+		std::unique_lock lock(m_cameraMutex);
+
+		switch (mat->m_renderingMode)
+		{
+		case MaterialRenderingMode::Opaque:
+			m_defferdQueue.emplace_back(meshRenderer);
+			break;
+		case MaterialRenderingMode::Transparent:
+			m_forwardQueue.emplace_back(meshRenderer);
+			break;
+		}
 	}
+}
+
+void Camera::SortRenderQueue()
+{
 }
 
 void Camera::ClearRenderQueue()

@@ -21,8 +21,6 @@ void Animator::Update(float tick)
 	}
 }
 
-
-
 void Animator::SetAnimation(int index)
 {
 	m_AnimIndex = index;

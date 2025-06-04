@@ -14,7 +14,6 @@ enum class BoneRegion
 };
 AUTO_REGISTER_ENUM(BoneRegion)
 
-
 class Bone;
 class Animation;
 class Skeleton

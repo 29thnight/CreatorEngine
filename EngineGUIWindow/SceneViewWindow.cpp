@@ -59,7 +59,8 @@ SceneViewWindow::SceneViewWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) :
 
 void SceneViewWindow::RenderSceneViewWindow()
 {
-	auto obj = m_sceneRenderer->m_renderScene->GetSelectSceneObject();
+	auto scene = SceneManagers->GetActiveScene();
+	auto obj = scene->GetSelectSceneObject();
 	if (obj)
 	{
 		auto mat = obj->m_transform.GetWorldMatrix();
@@ -297,6 +298,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
 			ImGui::Text("UIPass: %.5f ms", RenderStatistics->GetRenderState("UIPass"));
 			ImGui::Text("BlitPass: %.5f ms", RenderStatistics->GetRenderState("BlitPass"));
+
+			ImGui::Text("SSR: %.5f ms", RenderStatistics->GetRenderState("ScreenSpaceReflectionPass"));
+			ImGui::Text("SSS: %.5f ms", RenderStatistics->GetRenderState("SubsurfaceScatteringPass"));
+			ImGui::Text("Vignette: %.5f ms", RenderStatistics->GetRenderState("VignettePass"));
+			ImGui::Text("ColorGrading: %.5f ms", RenderStatistics->GetRenderState("ColorGradingPass"));
+			ImGui::Text("VolumetricFog: %.5f ms", RenderStatistics->GetRenderState("VolumetricFogPass"));
 			ImGui::EndPopup();
 		}
 		ImGui::PopFont();
@@ -372,7 +379,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		cam->HandleMovement(Time->GetElapsedSeconds());
 	}
 
-	auto& sceneSelectedObj = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+	auto scene = SceneManagers->GetActiveScene();
+	auto& sceneSelectedObj = scene->m_selectedSceneObject;
 	static bool useGizmo = false;
 	static float gizmoTimer = 0.f;
 
@@ -454,7 +462,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	static file::path previewModelPath;
 	static GameObject* dragPreviewObject = nullptr;
 	static ImGuiPayload* dragPayload = nullptr;
-	Scene* scene = SceneManagers->GetActiveScene();
 
 	if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
 	{

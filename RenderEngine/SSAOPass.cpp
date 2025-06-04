@@ -43,11 +43,12 @@ SSAOPass::~SSAOPass()
 {
 }
 
-void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal)
+void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal, Texture* diffuse)
 {
 	m_DepthSRV = depth;
 	m_NormalTexture = normal;
 	m_RenderTarget = renderTarget;
+    m_DiffuseTexture = diffuse;
 
 	
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 - 1.0
@@ -114,25 +115,31 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
     m_SSAOBuffer.m_InverseViewProjection = XMMatrixInverse(nullptr, m_SSAOBuffer.m_ViewProjection);
     m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
-    m_SSAOBuffer.m_Radius = 0.1f;
+    m_SSAOBuffer.m_Radius = radius;
+    m_SSAOBuffer.m_Thickness = thickness;
     m_SSAOBuffer.m_windowSize = { (float)DeviceState::g_ClientRect.width, (float)DeviceState::g_ClientRect.height };
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_SSAOBuffer);
 
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
 
-    ID3D11ShaderResourceView* srvs[3] = { camera.m_depthStencil->m_pSRV, m_NormalTexture->m_pSRV, m_NoiseTexture->m_pSRV };
-    DirectX11::PSSetShaderResources(0, 3, srvs);
+    ID3D11ShaderResourceView* srvs[4] = { camera.m_depthStencil->m_pSRV, m_NormalTexture->m_pSRV, m_NoiseTexture->m_pSRV, m_DiffuseTexture->m_pSRV };
+    DirectX11::PSSetShaderResources(0, 4, srvs);
 
     DirectX11::Draw(4, 0);
 
-    ID3D11ShaderResourceView* nullSRV[3] = { nullptr, nullptr, nullptr };
-    DirectX11::PSSetShaderResources(0, 3, nullSRV);
+    ID3D11ShaderResourceView* nullSRV[4] = { nullptr, nullptr, nullptr, nullptr };
+    DirectX11::PSSetShaderResources(0, 4, nullSRV);
     DirectX11::UnbindRenderTargets();
 }
 
 void SSAOPass::ControlPanel()
 {
+    ImGui::PushID(this);
+    ImGui::Text("SSAO");
+    ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
+    ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
+    ImGui::PopID();
 }
 
 void SSAOPass::Resize(uint32_t width, uint32_t height)

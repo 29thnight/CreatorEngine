@@ -89,7 +89,6 @@ ID3D11CommandList* Mesh::Draw(ID3D11DeviceContext* _defferedContext)
 
 
 UIMesh::UIMesh()
-	
 {
 	m_vertices = UIQuad;
 	m_indices = UIIndices;

@@ -19,6 +19,7 @@ namespace InternalPath
 	inline std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
     inline file::path DynamicSolutionDir{};
 	inline file::path BaseProjectPath{};
+	inline file::path ProjectSettingsPath{};
 
     inline void Initialize()
     {
@@ -42,6 +43,8 @@ namespace InternalPath
         ShaderSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
 
 		DynamicSolutionDir		= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+		ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
+
 		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
 
@@ -81,6 +84,10 @@ namespace InternalPath
 		if (!file::exists(PrecompiledShaderPath))
 		{
 			file::create_directories(PrecompiledShaderPath);
+		}
+		if (!file::exists(ProjectSettingsPath))
+		{
+			file::create_directories(ProjectSettingsPath);
 		}
     }
 };
@@ -151,5 +158,10 @@ public:
 	static inline file::path DynamicSolutionPath(const std::string_view& path)
 	{
 		return file::path(InternalPath::DynamicSolutionDir) / path;
+	}
+
+	static inline file::path ProjectSettingPath(const std::string_view& path)
+	{
+		return file::path(InternalPath::ProjectSettingsPath) / path;
 	}
 };

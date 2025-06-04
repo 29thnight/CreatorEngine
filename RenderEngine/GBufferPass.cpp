@@ -8,9 +8,7 @@
 #include "LightController.h"
 #include "LightProperty.h"
 #include "Benchmark.hpp"
-#include "MeshRenderer.h"
-
-XMMATRIX InitialMatrix[MAX_BONES]{};
+#include "RenderCommand.h"
 
 GBufferPass::GBufferPass()
 {
@@ -91,93 +89,23 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
-	Animator* currentAnimator = nullptr;
+	HashedGuid currentAnimatorGuid{};
+	//TODO : Change deferredContext Render
+	for (RenderCommand& RenderCommand : camera.m_defferdQueue)
+	{	
+		scene.UpdateModel(RenderCommand.m_worldMatrix);
 
-
-	
-	/*std::map<std::string, std::vector<GameObject*>> instanceObjects;
-
-	for (auto sceneObject : m_deferredQueue)
-	{
-		MeshRenderer* meshRenderer = sceneObject->GetComponent<MeshRenderer>();
-		if (nullptr == meshRenderer) continue;
-		if (!meshRenderer->IsEnabled()) continue;
-
-		instanceObjects[meshRenderer->m_Mesh->GetName()].push_back(sceneObject);
-	}
-
-	for (auto& sceneObjectmap : instanceObjects)
-	{
-		auto& sceneObjects = sceneObjectmap.second;
-		MeshRenderer* meshRenderer = sceneObjects[0]->GetComponent<MeshRenderer>();
-		Material* mat = meshRenderer->m_Material;
-		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
-
-		if (mat->m_pBaseColor)
+		HashedGuid animatorGuid = RenderCommand.m_animatorGuid;
+		if (RenderCommand.m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
-		}
-		if (mat->m_pNormal)
-		{
-			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
-		}
-		if (mat->m_pOccRoughMetal)
-		{
-			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-		}
-		if (mat->m_AOMap)
-		{
-			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
-		}
-		for (auto& sceneObject : sceneObjects)
-		{
-			sceneObject->m_transform.GetWorldMatrix();
-			Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
-			if (nullptr != animator && animator->IsEnabled())
+			if (animatorGuid != currentAnimatorGuid)
 			{
-				if (animator != currentAnimator)
-				{
-					DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
-					currentAnimator = animator;
-				}
+				DirectX11::UpdateBuffer(m_boneBuffer.Get(), RenderCommand.m_finalTransforms);
+				currentAnimatorGuid = RenderCommand.m_animatorGuid;
 			}
 		}
-		UINT offset = 0;
-		auto mesh = meshRenderer->m_Mesh;
-		uint32 stride = mesh->GetStride();
-		DirectX11::IASetVertexBuffers(0, 1, mesh->GetVertexBuffer().GetAddressOf(), &stride, &offset);
-		DirectX11::IASetIndexBuffer(mesh->GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
-		DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		DirectX11::DrawIndexedInstanced(mesh->GetIndices().size(), sceneObjects.size(),0,0,0);
-	}*/
-	
-	for (auto& meshRenderer : camera.m_defferdQueue)
-	{		
-		
-		if (nullptr == meshRenderer) continue;
-		if (!meshRenderer->IsEnabled()) continue;
 
-		GameObject* sceneObject = meshRenderer->GetOwner();
-		if (sceneObject->IsDestroyMark()) continue;
-		if (sceneObject->m_parentIndex == -1) continue;
-
-		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-
-		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
-		if (nullptr != animator && animator->IsEnabled())
-		{
-			if (animator != currentAnimator)
-			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
-				currentAnimator = animator;
-			}
-		}
-		else
-		{
-			DirectX11::UpdateBuffer(m_boneBuffer.Get(), InitialMatrix);
-		}
-
-		Material* mat = meshRenderer->m_Material;
+		Material* mat = RenderCommand.m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 
 		if (mat->m_pBaseColor)
@@ -201,7 +129,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		meshRenderer->m_Mesh->Draw();
+		RenderCommand.m_Mesh->Draw();
 	}
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
