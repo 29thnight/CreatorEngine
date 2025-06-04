@@ -791,6 +791,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						}
 						auto& controller = animator->m_animationControllers[selectedControllerIndex];
 						std::string fileName = controller->name + ".node_editor.json";
+
 						if (!controller->StateVec.empty())
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
@@ -817,22 +818,35 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								ImGui::End();
 							}
 
+							static bool isOpenPopUp;
+
 							if (ed::ShowBackgroundContextMenu())
+							{
+								isOpenPopUp = true;
+								/*ImGui::OpenPopup("NodeEditorContextMenu");*/
+							}
+							else
+							{
+								isOpenPopUp = false;
+							}
+
+							controller->m_nodeEditor->EndEdit();
+
+							if (isOpenPopUp)
 							{
 								ImGui::OpenPopup("NodeEditorContextMenu");
 							}
+
 							if (ImGui::BeginPopup("NodeEditorContextMenu"))
 							{
 								if (ImGui::MenuItem("Add Node"))
 								{
 									controller->CreateState_UI();
+									isOpenPopUp = false;
 								}
 
 								ImGui::EndPopup();
 							}
-
-
-							controller->m_nodeEditor->EndEdit();
 							
 						}
 					}
