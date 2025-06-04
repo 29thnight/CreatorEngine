@@ -10,6 +10,7 @@ public:
    ReflectAnimationState
 	[[Serializable]]
 	AnimationState() = default;
+	~AnimationState();
 	AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name) {}
 
 

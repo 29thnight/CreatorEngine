@@ -784,15 +784,21 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
 						static int linkIndex = -1;
+						static int rightClickNodeIndex = -1;
+						static bool isOpenPopUp;
+						static bool isOpenNodePopUp;
 						if (preSelectIndex != selectedControllerIndex)
 						{
 							linkIndex = -1;
+							rightClickNodeIndex = -1;
 							preSelectIndex = selectedControllerIndex;
+							isOpenPopUp = false;
+							isOpenNodePopUp = false;
 						}
 						auto& controller = animator->m_animationControllers[selectedControllerIndex];
 						std::string fileName = controller->name + ".node_editor.json";
 
-						if (!controller->StateVec.empty())
+						//if (!controller->StateVec.empty())
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
 							for (auto& state : controller->StateVec)
@@ -808,8 +814,16 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								}
 							}
 							controller->m_nodeEditor->DrawLink(&linkIndex);
-							controller->m_nodeEditor->DrawNode();
+							controller->m_nodeEditor->DrawNode(&rightClickNodeIndex);
+
 							
+							if (rightClickNodeIndex != -1)
+							{
+								isOpenNodePopUp = true;
+							}
+
+							
+
 							if (linkIndex != -1)
 							{
 								ImGui::Begin("cur Link");
@@ -817,13 +831,18 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								ImGui::Text("To:  %s", controller->m_nodeEditor->Links[linkIndex]->toNode.c_str());
 								ImGui::End();
 							}
-
-							static bool isOpenPopUp;
+							
 
 							if (ed::ShowBackgroundContextMenu())
 							{
+								
+
+								if (isOpenNodePopUp)
+								{
+									isOpenNodePopUp = false;
+									rightClickNodeIndex = -1;
+								}
 								isOpenPopUp = true;
-								/*ImGui::OpenPopup("NodeEditorContextMenu");*/
 							}
 							else
 							{
@@ -831,6 +850,29 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							}
 
 							controller->m_nodeEditor->EndEdit();
+							if (isOpenNodePopUp)
+							{
+								ImGui::OpenPopup("NodeMenu");
+							}
+							if (ImGui::BeginPopup("NodeMenu"))
+							{
+								if (ImGui::MenuItem("Make Transition"))
+								{
+									//
+									controller->m_nodeEditor->MakeNewLink();
+									isOpenNodePopUp = false;
+									rightClickNodeIndex = -1;
+								}
+
+								if (ImGui::MenuItem("Delete State"))
+								{
+									controller->DeleteState(controller->StateVec[rightClickNodeIndex]->m_name);
+									isOpenNodePopUp = false;
+									rightClickNodeIndex = -1;
+								}
+
+								ImGui::EndPopup();
+							}
 
 							if (isOpenPopUp)
 							{
@@ -847,7 +889,13 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 								ImGui::EndPopup();
 							}
-							
+
+							if (ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+							{
+								ImGui::CloseCurrentPopup();
+								isOpenNodePopUp = false;
+								rightClickNodeIndex = -1;
+							}
 						}
 					}
 

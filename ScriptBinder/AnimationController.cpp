@@ -10,6 +10,12 @@ void AnimationController::SetNextState(std::string stateName)
 	m_nextState = FindState(stateName);
 }
 
+AnimationController::~AnimationController()
+{
+	if (m_nodeEditor)
+		delete m_nodeEditor;
+}
+
 bool AnimationController::BlendingAnimation(float tick)
 {
 	blendingTime += tick;
@@ -44,8 +50,9 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		return nullptr;//*****
-		//m_curState = StateVec[0].get();
+		
+		m_curState = StateVec[0].get();
+		//return nullptr;//*****
 	}
 
 	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
@@ -190,6 +197,55 @@ void AnimationController::CreateState_UI()
 	StateNameSet.insert(uniqueName);
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
+}
+
+void AnimationController::DeleteState(std::string stateName)
+{
+	auto it = std::find_if(StateVec.begin(), StateVec.end(),
+		[&](const std::shared_ptr<AnimationState>& state)
+		{
+			return state->m_name == stateName;
+		});
+
+	if (it->get() == m_curState)
+	{
+		m_curState = nullptr;
+	}
+
+	for (auto& state : StateVec)
+	{
+		auto& transitions = state->Transitions;
+		
+				transitions.erase(
+					std::remove_if(transitions.begin(), transitions.end(),
+						[&](const std::shared_ptr<AniTransition>& t)
+						{
+							return t->GetCurState() == stateName || t->GetNextState() == stateName;
+						}),
+					transitions.end());
+	}
+	if (it != StateVec.end())
+	{
+		StateVec.erase(it); 
+	}
+}
+
+
+
+void AnimationController::DeleteTransiton(const std::string& fromStateName, const std::string& toStateName)
+{
+	auto state = FindState(fromStateName);
+	if (!state) return;
+
+	auto& transitions = state->Transitions;
+
+	transitions.erase(
+		std::remove_if(transitions.begin(), transitions.end(),
+			[&](const std::shared_ptr<AniTransition>& t)
+			{
+				return t->GetCurState() == fromStateName && t->GetNextState() == toStateName;
+			}),
+		transitions.end());
 }
 
 AnimationState* AnimationController::FindState(std::string stateName)

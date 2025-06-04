@@ -57,17 +57,26 @@ void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std:
 	Links.push_back(newLink);
 }
 
-void NodeEditor::DrawNode()
+
+
+void NodeEditor::DrawNode(int* selectedNodeIndex)
 {
 	ed::Style& style = ed::GetStyle();
 	style.LinkStrength = 0.0f;
 
-	for (auto& node : Nodes)
+	for (size_t i = 0; i < Nodes.size(); ++i)
 	{
+        auto& node = Nodes[i];
 		ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(node->name));
 		ed::BeginNode(nodeID);
 		ImGui::Text(node->name.c_str());
 		ed::EndNode();
+
+
+        if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(1)) {
+            if (selectedNodeIndex)
+                *selectedNodeIndex = i;  // 선택한 링크 인덱스 기록
+        }
 	}
 
 }
@@ -126,6 +135,10 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         }
  
     }
+}
+
+void NodeEditor::MakeNewLink()
+{
 }
 
 bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold)

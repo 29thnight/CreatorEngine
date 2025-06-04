@@ -29,9 +29,10 @@ public:
 	void EndEdit();
 	void MakeNode(std::string nodeName);
 	void MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName);
-	void DrawNode(); 
+	void DrawNode(int* selectedNodeIndex = nullptr);
 	void DrawLink(int* selectedLinkIndex = nullptr);
 
+	void MakeNewLink();
 
 	bool IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold = 5.0f);
 

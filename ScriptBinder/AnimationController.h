@@ -17,7 +17,7 @@ public:
    ReflectAnimationController
 	[[Serializable]]
     AnimationController() = default;
-
+	~AnimationController();
     [[Property]]
     std::string name = "None";
 	[[Property]]
@@ -48,6 +48,9 @@ public:
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
 	[[Method]]
 	void CreateState_UI();
+
+	void DeleteState(std::string stateName);
+	void DeleteTransiton(const std::string& fromStateName, const std::string& toStateName);
 
 	AnimationState* FindState(std::string stateName);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
