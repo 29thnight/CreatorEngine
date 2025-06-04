@@ -102,7 +102,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			return;
 		}
 		Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-		scene.m_LightController->GetLight(0).GetLightViewMatrix();
 		std::vector<float> cascadeEnd = devideCascadeEnd(camera, g_cascadeCut);
 		//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
 
