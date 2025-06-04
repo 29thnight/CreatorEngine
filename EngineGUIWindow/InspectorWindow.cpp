@@ -738,6 +738,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				{
 					int i = 0;
 					static int selectedControllerIndex = 0;
+					static int preSelectIndex = 0;
 					ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
 					ImGui::Text("Controllers");
 					ImGui::Separator();
@@ -782,6 +783,12 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::Separator();
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
+						static int linkIndex = -1;
+						if (preSelectIndex != selectedControllerIndex)
+						{
+							linkIndex = -1;
+							preSelectIndex = selectedControllerIndex;
+						}
 						auto& controller = animator->m_animationControllers[selectedControllerIndex];
 						std::string fileName = controller->name + ".node_editor.json";
 						if (!controller->StateVec.empty())
@@ -789,65 +796,44 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							controller->m_nodeEditor->MakeEdit(fileName);
 							for (auto& state : controller->StateVec)
 							{
-								controller->m_nodeEditor->DrawNode(state->m_name);
-
-								/*ed::Style& style = ed::GetStyle();
-								style.LinkStrength = 0.0f; 
-								ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(state->m_name));
-								ed::BeginNode(nodeID);
-								ImGui::Text(state->m_name.c_str());
-								ed::PinId inputPinID = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 0);
-								ed::PinId outputPinID = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
-								ed::BeginPin(inputPinID, ed::PinKind::Input);
-								ImGui::Dummy(ImVec2(1, 1));
-								ed::EndPin();
-
-								ed::BeginPin(outputPinID, ed::PinKind::Output);
-								ImGui::Dummy(ImVec2(1, 1));
-								ed::EndPin();
-
-								ed::EndNode();*/
-
-								
+								controller->m_nodeEditor->MakeNode(state->m_name);
 							}
-
-
 							for (auto& state : controller->StateVec)
 							{
 								for (auto& trans : state->Transitions)
 								{
-									//ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetCurState()));
-									//ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(trans->GetNextState()));
-
-									//ed::PinId startPin = ed::PinId((static_cast<uint64_t>(nodeID) << 1) | 1);
-									//ed::PinId endPin = ed::PinId((static_cast<uint64_t>(nextnodeID) << 1) | 0);
-									//ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(trans->m_name));
-									////ed::Link(linkId, startPin, endPin);
-									//auto id = static_cast<uint64_t>(linkId);
-									//DrawMyLink(trans->m_name, trans->GetCurState(), trans->GetNextState());
-									//ImGui::SetCursorScreenPos();
-									controller->m_nodeEditor->DrawLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+									controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+									
 								}
 							}
-							/*ed::End();
-							ed::SetCurrentEditor(nullptr);*/
-							controller->m_nodeEditor->EndEdit();
-							if (ImGui::CollapsingHeader("States"))
+							controller->m_nodeEditor->DrawLink(&linkIndex);
+							controller->m_nodeEditor->DrawNode();
+							
+							if (linkIndex != -1)
 							{
-								const auto& mat_animationState_type = Meta::Find("AnimationState");
-								for (auto& shardAnimationState : controller->StateVec)
+								ImGui::Begin("cur Link");
+								ImGui::Text("From:  %s", controller->m_nodeEditor->Links[linkIndex]->fromNode.c_str());
+								ImGui::Text("To:  %s", controller->m_nodeEditor->Links[linkIndex]->toNode.c_str());
+								ImGui::End();
+							}
+
+							if (ed::ShowBackgroundContextMenu())
+							{
+								ImGui::OpenPopup("NodeEditorContextMenu");
+							}
+							if (ImGui::BeginPopup("NodeEditorContextMenu"))
+							{
+								if (ImGui::MenuItem("Add Node"))
 								{
-									AnimationState* AnimationState = shardAnimationState.get();
-									ImGui::PushID(AnimationState->m_name.c_str());
-									if (ImGui::CollapsingHeader(AnimationState->m_name.c_str()))
-									{
-										Meta::DrawProperties(AnimationState, *mat_animationState_type);
-										//Meta::DrawMethods(AnimationState, *mat_controller_type);
-									}
-									ImGui::PopID();
+									controller->CreateState_UI();
 								}
 
+								ImGui::EndPopup();
 							}
+
+
+							controller->m_nodeEditor->EndEdit();
+							
 						}
 					}
 
