@@ -65,3 +65,4 @@ public:
 };
 
 
+inline static XMMATRIX InitialMatrix[Skeleton::MAX_BONES]{};
