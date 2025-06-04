@@ -19,7 +19,7 @@ void SceneManager::Editor()
     {
         CreateEditorOnlyPlayScene();
         ScriptManager->UpdateSceneManager(SceneManager::GetInstance().get());
-        m_activeScene->Reset();
+        m_activeScene.load()->Reset();
 		m_isEditorSceneLoaded = true;
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
@@ -30,20 +30,20 @@ void SceneManager::Editor()
     if (!m_isGameStart)
     {
         ScriptManager->ReloadDynamicLibrary();
-		m_activeScene->Awake();
+		m_activeScene.load()->Awake();
 	}
 }
 
 void SceneManager::Initialization()
 {
-	m_activeScene->Awake();
-    m_activeScene->OnEnable();
-    m_activeScene->Start();
+	m_activeScene.load()->Awake();
+    m_activeScene.load()->OnEnable();
+    m_activeScene.load()->Start();
 }
 
 void SceneManager::Physics(float deltaSecond)
 {
-    m_activeScene->FixedUpdate(deltaSecond);
+    m_activeScene.load()->FixedUpdate(deltaSecond);
 }
 
 void SceneManager::InputEvents(float deltaSecond)
@@ -53,10 +53,10 @@ void SceneManager::InputEvents(float deltaSecond)
 
 void SceneManager::GameLogic(float deltaSecond)
 {
-    m_activeScene->Update(deltaSecond);
-    m_activeScene->YieldNull();
+    m_activeScene.load()->Update(deltaSecond);
+    m_activeScene.load()->YieldNull();
     InternalAnimationUpdateEvent.Broadcast(deltaSecond);
-    m_activeScene->LateUpdate(deltaSecond);
+    m_activeScene.load()->LateUpdate(deltaSecond);
 }
 
 void SceneManager::SceneRendering(float deltaSecond)
@@ -77,6 +77,7 @@ void SceneManager::GUIRendering()
 void SceneManager::EndOfFrame()
 {
 	CoroutineManagers->yield_WaitForEndOfFrame();
+    endOfFrameEvent.Broadcast();
 }
 
 void SceneManager::Pausing()
@@ -85,15 +86,15 @@ void SceneManager::Pausing()
 
 void SceneManager::DisableOrEnable()
 {
-    m_activeScene->OnDisable();
-    m_activeScene->OnDestroy();
+    m_activeScene.load()->OnDisable();
+    m_activeScene.load()->OnDestroy();
 }
 
 void SceneManager::Decommissioning()
 {
-    m_activeScene->OnDisable();
-    m_activeScene->AllDestroyMark();
-    m_activeScene->OnDestroy();
+    m_activeScene.load()->OnDisable();
+    m_activeScene.load()->AllDestroyMark();
+    m_activeScene.load()->OnDestroy();
 }
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
@@ -121,11 +122,11 @@ Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 	std::ofstream sceneFileOut(saveSceneFileName);
     MetaYml::Node sceneNode{};
 
-    m_activeScene->m_SceneObjects[0]->m_name = saveSceneFileName.stem().string();
+    m_activeScene.load()->m_SceneObjects[0]->m_name = saveSceneFileName.stem().string();
 
     try
     {
-        sceneNode = Meta::Serialize(m_activeScene);
+        sceneNode = Meta::Serialize(m_activeScene.load());
     }
 	catch (const std::exception& e)
 	{
@@ -147,9 +148,9 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         if (m_activeScene)
         {
-            m_activeScene->AllDestroyMark();
-            m_activeScene->OnDisable();
-            m_activeScene->OnDestroy();
+            m_activeScene.load()->AllDestroyMark();
+            m_activeScene.load()->OnDisable();
+            m_activeScene.load()->OnDestroy();
 			Scene* swapScene = m_activeScene;
 			m_activeScene = nullptr;
 
@@ -198,7 +199,7 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 {
 	std::vector<MeshRenderer*> meshRenderers;
-	for (const auto& renderer : m_activeScene->m_SceneObjects)
+	for (const auto& renderer : m_activeScene.load()->m_SceneObjects)
 	{
 		if (auto ptr = renderer->GetComponent<MeshRenderer>(); nullptr != ptr)
 		{
@@ -215,7 +216,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
     try
     {
         //resetSelectedObjectEvent.Broadcast();
-        sceneNode = Meta::Serialize(m_activeScene);
+        sceneNode = Meta::Serialize(m_activeScene.load());
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
@@ -249,9 +250,9 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	if (m_activeScene)
 	{
         resetSelectedObjectEvent.Broadcast();
-		m_activeScene->AllDestroyMark();
-		m_activeScene->OnDisable();
-		m_activeScene->OnDestroy();
+		m_activeScene.load()->AllDestroyMark();
+		m_activeScene.load()->OnDisable();
+		m_activeScene.load()->OnDestroy();
 		m_activeScene = nullptr;
 	}
 
@@ -273,7 +274,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
 {
     if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
     {
-        auto obj = m_activeScene->LoadGameObject(
+        auto obj = m_activeScene.load()->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
             GameObjectType::Empty,

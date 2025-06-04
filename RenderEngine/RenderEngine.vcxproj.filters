@@ -410,6 +410,9 @@
     <ClCompile Include="Effect\ParticleSystem.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
+    <ClCompile Include="RenderCommand.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -624,6 +627,9 @@
     </ClInclude>
     <ClInclude Include="Effect\ParticleSystem.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderCommand.h">
+      <Filter>Objects</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

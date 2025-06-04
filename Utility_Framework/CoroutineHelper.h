@@ -17,6 +17,7 @@ enum class YieldInstructionType
     WaitUntil,
     WaitForSignal,
     WaitForEndOfFrame,
+    OnRender
 };
 
 struct YieldInstruction
@@ -57,6 +58,7 @@ struct YieldInstruction
         case YieldInstructionType::WaitForEndOfFrame:
         case YieldInstructionType::Null:
         case YieldInstructionType::None:
+        case YieldInstructionType::OnRender:
             return true; // 처리 큐 전환 후 1프레임 대기
         default:
             return true;

@@ -144,6 +144,8 @@ public:
 		return isSuccess;
 	}
 
+	std::atomic<bool> m_isRenderPaused{ false };
+
 private:
     std::atomic_bool m_isGameView{ false };
     std::string m_currentEngineGitHash{ ENGINE_VERSION };

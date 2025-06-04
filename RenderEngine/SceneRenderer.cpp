@@ -565,20 +565,28 @@ void SceneRenderer::ReApplyCurrCubeMap()
 
 void SceneRenderer::PrepareRender()
 {
-	Benchmark banch;
-	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*>& staticMeshes = m_currentScene->GetStaticMeshRenderers();
-	std::vector<MeshRenderer*>& skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
-	for (auto& mesh : staticMeshes)
+	if (GameSceneStart || GameSceneEnd)
 	{
-		if (false == mesh->IsEnabled() || 
-			false == mesh->IsNeedUpdateCulling()) continue;
-
-		CullingManagers->UpdateMesh(mesh);
+		return;
 	}
 
-	for (auto& camera : CameraManagement->m_cameras)
+	Benchmark banch;
+	auto m_currentScene = SceneManagers->GetActiveScene();
+	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
+	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+
+	//for (auto& mesh : staticMeshes)
+	//{
+	//	if (false == mesh->IsEnabled() || 
+	//		false == mesh->IsNeedUpdateCulling()) continue;
+
+	//	CullingManagers->UpdateMesh(mesh);
+	//}
+
+	for (auto camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
@@ -592,30 +600,35 @@ void SceneRenderer::PrepareRender()
 		//	camera->PushRenderQueue(culledMesh);
 		//}
 
-		m_threadPool->Enqueue([&camera, &skinnedMeshes, &staticMeshes]
+		for (auto mesh : staticMeshes)
 		{
-			for (auto& mesh : staticMeshes)
+			if (false == mesh->IsEnabled()) continue;
+
+			m_threadPool->Enqueue([camera, mesh]
 			{
-				if (false == mesh->IsEnabled()) continue;
 				auto frustum = camera->GetFrustum();
 
 				if (frustum.Intersects(mesh->GetBoundingBox()))
 				{
 					camera->PushRenderQueue(mesh);
 				}
-			}
+			});
+		}
 
-			for (auto& skinnedMesh : skinnedMeshes)
+		for (auto skinnedMesh : skinnedMeshes)
+		{
+			if (false == skinnedMesh->IsEnabled()) continue;
+
+			m_threadPool->Enqueue([camera, skinnedMesh]
 			{
-				if (false == skinnedMesh->IsEnabled()) continue;
-
 				auto frustum = camera->GetFrustum();
+
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					camera->PushRenderQueue(skinnedMesh);
 				}
-			}
-		});
+			});
+		}
 	}
 
 	m_threadPool->NotifyAllAndWait();

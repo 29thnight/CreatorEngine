@@ -8,6 +8,7 @@
 #include "LightController.h"
 #include "LightProperty.h"
 #include "Benchmark.hpp"
+#include "RenderCommand.h"
 
 ForwardPass::ForwardPass()
 {
@@ -56,28 +57,23 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
-	Animator* currentAnimator = nullptr;
+	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& meshRenderer : camera.m_forwardQueue)
+	for (RenderCommand& RenderCommand : camera.m_forwardQueue)
 	{
-		if (nullptr == meshRenderer) continue;
-		if (!meshRenderer->IsEnabled()) continue;
+		scene.UpdateModel(RenderCommand.m_worldMatrix);
 
-		GameObject* sceneObject = meshRenderer->GetOwner();
-		if (sceneObject->IsDestroyMark()) continue;
-
-		scene.UpdateModel(sceneObject->m_transform.GetWorldMatrix());
-		Animator* animator = scene.GetScene()->m_SceneObjects[sceneObject->m_parentIndex]->GetComponent<Animator>();
-		if (nullptr != animator && animator->IsEnabled())
+		HashedGuid animatorGuid = RenderCommand.m_animatorGuid;
+		if (RenderCommand.m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			if (animator != currentAnimator)
+			if (animatorGuid != currentAnimatorGuid)
 			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), animator->m_FinalTransforms);
-				currentAnimator = animator;
+				DirectX11::UpdateBuffer(m_boneBuffer.Get(), RenderCommand.m_finalTransforms);
+				currentAnimatorGuid = RenderCommand.m_animatorGuid;
 			}
 		}
 
-		Material* mat = meshRenderer->m_Material;
+		Material* mat = RenderCommand.m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 
 		if (mat->m_pBaseColor)
@@ -101,7 +97,7 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		meshRenderer->m_Mesh->Draw();
+		RenderCommand.m_Mesh->Draw();
 	}
 
 	ID3D11DepthStencilState* nullDepthStencilState = nullptr;

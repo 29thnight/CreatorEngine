@@ -19,7 +19,7 @@ namespace DirectX11
 		double GetTotalSeconds() const { return TicksToSeconds(m_totalTicks); }
 
 		// Get total number of updates since start of the program.
-		uint32_t GetFrameCount() const { return m_frameCount; }
+		uint64_t GetFrameCount() const { return m_frameCount; }
 
 		// Get the current framerate.
 		uint32_t GetFramesPerSecond() const { return m_framesPerSecond; }
@@ -182,7 +182,7 @@ namespace DirectX11
 		uint32 m_fixedLeftOverTicks{};
 
 		// framerate 추적용 멤버입니다.
-		uint32 m_frameCount{};
+		uint64 m_frameCount{};
 		uint32 m_framesPerSecond{};
 		uint32 m_framesThisSecond{};
 		uint64 m_qpcSecondCounter{};

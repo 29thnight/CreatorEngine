@@ -171,6 +171,7 @@
     <ClCompile Include="GizmoLinePass.cpp" />
     <ClCompile Include="GizmoPass.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
+    <ClCompile Include="RenderCommand.cpp" />
     <ClCompile Include="ScreenSpaceReflectionPass.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="BlitPass.cpp" />
@@ -241,6 +242,7 @@
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
+    <ClInclude Include="RenderCommand.h" />
     <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ScreenSpaceReflectionPass.h" />
     <ClInclude Include="ShaderSystem.h" />

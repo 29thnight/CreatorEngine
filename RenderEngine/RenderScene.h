@@ -3,12 +3,14 @@
 #include "Texture.h"
 #include "../ScriptBinder/GameObject.h"
 #include "AnimationJob.h"
+#include "RenderCommand.h"
 
 class GameObject;
 class Scene;
 class LightController;
 class HierarchyWindow;
 class InspectorWindow;
+class MeshRenderer;
 class RenderScene
 {
 public:
@@ -29,6 +31,9 @@ public:
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
+	void RegisterCommand(MeshRenderer* meshRendererPtr);
+	void UnregisterCommand(MeshRenderer* meshRendererPtr);
+
 	Scene* GetScene() { return m_currentScene; }
 
 private:
@@ -38,6 +43,7 @@ private:
 
 	Scene* m_currentScene{};
 	AnimationJob m_animationJob{};
+	std::unordered_map<HashedGuid, std::shared_ptr<RenderCommand>> m_proxyMap;
 	ID3D11Buffer* m_ModelBuffer;
 	bool m_isPlaying = false;
 };

@@ -110,8 +110,7 @@ namespace lm {
 		// rects에 각 메쉬의 해상도를 넣어줌
 		rects.clear();
 
-		for (auto& obj : m_renderscene->GetScene()->m_SceneObjects) {
-			auto* renderer = obj->GetComponent<MeshRenderer>();
+		for (auto& renderer : SceneManagers->GetAllMeshRenderers()) {
 			if (renderer == nullptr) continue;
 			if (!renderer->IsEnabled()) continue;
 			if (renderer->m_Mesh == nullptr)continue;
@@ -126,7 +125,7 @@ namespace lm {
 				Debug->LogError("The size of one object exceeds the range. : " + std::to_string(size));
 
 			r.data = renderer;
-			r.worldMat = obj->m_transform.GetWorldMatrix();
+			r.worldMat = renderer->GetOwner()->m_transform.GetWorldMatrix();
 			renderer->m_LightMapping.ligthmapResolution = size;
 			renderer->m_LightMapping.lightmapTiling.x = size / canvasSize;
 			renderer->m_LightMapping.lightmapTiling.y = size / canvasSize;
@@ -203,8 +202,8 @@ namespace lm {
 		///*m_trianglesInScene.clear();
 		//m_triIndices.clear();
 		//bvhNodes.clear();*/
-		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
-			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
+		for (auto& meshrenderer : SceneManagers->GetAllMeshRenderers()) {
+			//auto meshrenderer = mesh->GetComponent<MeshRenderer>();
 			if (meshrenderer == nullptr) continue;
 			if (!meshrenderer->IsEnabled()) continue;
 			if (meshrenderer->m_Mesh == nullptr) continue;
@@ -354,22 +353,21 @@ namespace lm {
 
 		g_progressWindow->SetStatusText(L"Prepare...");
 		Prepare();
-		co_yield ReturnNull();
+		co_yield OnRender();
 		//TestPrepare();
 		g_progressWindow->SetStatusText(L"PrepareRectangles...");
 		PrepareRectangles();
-		co_yield ReturnNull();
+		co_yield OnRender();
 		g_progressWindow->SetStatusText(L"CalculateRectangles...");
 		CalculateRectangles();
-		co_yield ReturnNull();
+		co_yield OnRender();
 		g_progressWindow->SetStatusText(L"PrepareTriangles...");
 		PrepareTriangles();
 
-
 		int index = 0; // 삼각형에 id부여.
 		// 씬의 모든 삼각형을 가져옴.
-		for (auto& mesh : m_renderscene->GetScene()->m_SceneObjects) {
-			auto meshrenderer = mesh->GetComponent<MeshRenderer>();
+		for (auto& meshrenderer : SceneManagers->GetAllMeshRenderers()) {
+			//auto meshrenderer = mesh->GetComponent<MeshRenderer>();
 			if (meshrenderer == nullptr) continue;
 			if (!meshrenderer->IsEnabled()) continue;
 			if (meshrenderer->m_Mesh == nullptr) continue;
@@ -377,7 +375,7 @@ namespace lm {
 			//auto& name = m->GetName();
 			auto& indices = m->GetIndices();
 			auto& vertices = m->GetVertices();
-			auto worldMatrix = mesh->m_transform.GetWorldMatrix();
+			auto worldMatrix = meshrenderer->GetOwner()->m_transform.GetWorldMatrix();
 			for (int i = 0; i < indices.size() / 3; i++) {
 				Triangle t{};
 				int i0 = indices[i * 3];
@@ -406,13 +404,13 @@ namespace lm {
 				m_trianglesInScene.push_back(t);
 				m_triIndices.push_back(index++);
 			}
-			co_yield ReturnNull();
+			co_yield OnRender();
 		}
 		if (index > 0) {
 			g_progressWindow->SetProgress(20);
 			g_progressWindow->SetStatusText(L"BuildBVH...");
 			int bvh = BuildBVH(m_trianglesInScene, m_triIndices, 0, m_triIndices.size());
-			co_yield ReturnNull();
+			co_yield OnRender();
 			g_progressWindow->SetProgress(30);
 			g_progressWindow->SetStatusText(L"Update Buffer...");
 			//DrawRectangles(m_pPositionMapPass);
@@ -504,8 +502,6 @@ namespace lm {
 			DirectX11::CSSetShaderResources(10, 1, &TriangleBufferSRV);
 			DirectX11::CSSetShaderResources(11, 1, &TriangleIndiceBufferSRV);
 			DirectX11::CSSetShaderResources(12, 1, &BVHBufferSRV);
-
-
 
 			int lightmapIndex = -1;
 
@@ -627,15 +623,15 @@ namespace lm {
 				UINT numGroupsX = (UINT)ceil(canvasSize / 16.0f);
 				UINT numGroupsY = (UINT)ceil(canvasSize / 16.0f);
 				DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
-				co_yield ReturnNull();
+				co_yield OnRender();
 
 				DirectX11::CSSetUnorderedAccessViews(0, 3, nullUAV, nullptr);
 				m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-				co_yield ReturnNull();
+				co_yield OnRender();
 			}
 
 			DirectX11::CSSetUnorderedAccessViews(0, 3, nullUAV, nullptr);
-			co_yield ReturnNull();// ReturnNull();
+			co_yield OnRender();// ReturnNull();
 
 			//DilateLightMap();
 			//for (auto& lightmap : lightmaps) {
@@ -680,11 +676,11 @@ namespace lm {
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
 					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-					co_yield ReturnNull();
+					co_yield OnRender();
 
 					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-					co_yield ReturnNull();
+					co_yield OnRender();
 
 					UnBindLightmapPS();
 					// msaa 덮어쓰기.
@@ -693,14 +689,14 @@ namespace lm {
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
 					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-					co_yield ReturnNull();
+					co_yield OnRender();
 
 					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-					co_yield ReturnNull();
+					co_yield OnRender();
 				}
 			}
-			co_yield ReturnNull();
+			co_yield OnRender();
 			g_progressWindow->SetProgress(70);
 			g_progressWindow->SetStatusText(L"Baking indirect...");
 			//DrawIndirectLight(m_pPositionMapPass);
@@ -826,7 +822,7 @@ namespace lm {
 						UINT numGroupsX = (UINT)ceil(canvasSize / 32.0f);
 						UINT numGroupsY = (UINT)ceil(canvasSize / 32.0f);
 						DeviceState::g_pDeviceContext->Dispatch(numGroupsX, numGroupsY, 1);
-						co_yield ReturnNull();
+						co_yield OnRender();
 
 						std::wstring progressText = L"baked indirect... ";
 						progressText += L"(" + std::to_wstring(i + 1) + L"/" + std::to_wstring(indirectCount) + L") ";
@@ -837,7 +833,7 @@ namespace lm {
 						ID3D11ShaderResourceView* nullsrv3[3] = { nullptr, nullptr, nullptr };
 						DirectX11::CSSetShaderResources(0, 3, nullsrv3);
 						m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-						co_yield ReturnNull();
+						co_yield OnRender();
 					}
 				}
 				for (auto& lightmap : indirectMaps) {
@@ -852,11 +848,11 @@ namespace lm {
 						DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
 						DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
 						DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-						co_yield ReturnNull();
+						co_yield OnRender();
 
 						DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 						m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-						co_yield ReturnNull();
+						co_yield OnRender();
 
 						UnBindLightmapPS();
 						// msaa 덮어쓰기.
@@ -865,11 +861,11 @@ namespace lm {
 						DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
 						DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
 						DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-						co_yield ReturnNull();
+						co_yield OnRender();
 
 						DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 						m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-						co_yield ReturnNull();
+						co_yield OnRender();
 					}
 				}
 
@@ -882,11 +878,11 @@ namespace lm {
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[j]->m_pUAV, nullptr); // 외각선 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &indirectMaps[j]->m_pSRV); // 라이트맵 텍스처
 					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-					co_yield ReturnNull();
+					co_yield OnRender();
 
 					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-					co_yield ReturnNull();
+					co_yield OnRender();
 					//
 					//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
 				}
@@ -896,7 +892,7 @@ namespace lm {
 			}
 			g_progressWindow->SetProgress(90);
 			g_progressWindow->SetStatusText(L"Complete Bake Lightmap...");
-			co_yield ReturnNull();
+			co_yield OnRender();
 
 			for (int i = 0; i < directionalMaps.size(); i++) {
 				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
@@ -907,7 +903,7 @@ namespace lm {
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &directionalMaps[i]->m_pSRV);
 				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-				co_yield ReturnNull();
+				co_yield OnRender();
 
 				UnBindLightmapPS();
 				DirectX11::CSSetShader(m_NormalizeTextureColor->GetShader(), nullptr, 0);
@@ -916,11 +912,11 @@ namespace lm {
 				DirectX11::CSSetUnorderedAccessViews(0, 1, &directionalMaps[i]->m_pUAV, nullptr);
 				DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV);
 				DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-				co_yield ReturnNull();
+				co_yield OnRender();
 
 				DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 				m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-				co_yield ReturnNull();
+				co_yield OnRender();
 			}
 
 			if (useEnvironmentMap) {
@@ -933,16 +929,16 @@ namespace lm {
 					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmaps[i]->m_pUAV, nullptr); // 외각선 텍스처
 					DirectX11::CSSetShaderResources(0, 1, &environmentMaps[i]->m_pSRV); // 라이트맵 텍스처
 					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
-					co_yield ReturnNull();
+					co_yield OnRender();
 
 					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
 					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
-					co_yield ReturnNull();
+					co_yield OnRender();
 					//
 					//DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(indirectMaps[i]->m_pUAV, Colors::Transparent);
 				}
 			}
-			co_yield ReturnNull();
+			co_yield OnRender();
 			g_progressWindow->SetProgress(100);
 			g_progressWindow->SetStatusText(L"Save Lightmap Image...");
 			// 200mb ~ 300mb 잡아 먹음. 필요할때만 키기

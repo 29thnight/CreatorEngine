@@ -137,7 +137,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 		auto activeScene = SceneManagers->GetActiveScene();
 
-
 		for (auto& meshRenderer : activeScene->GetMeshRenderers())
 		{
 			if (!meshRenderer->IsEnabled()) continue;

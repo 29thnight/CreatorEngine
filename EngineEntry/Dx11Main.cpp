@@ -20,6 +20,9 @@
 
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
+std::atomic<uint64> gameFrame{};
+std::atomic<uint64> renderFrame{};
+std::atomic<double> frameDeltaTime{};
 FenceFlag fenceGameToRender;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
@@ -37,13 +40,13 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
     g_progressWindow->SetProgress(55);
 #ifdef EDITOR
-	m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
-	m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
-	m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
-	m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
-	m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
+	m_gizmoRenderer     = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
+	m_renderPassWindow  = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
+	m_sceneViewWindow   = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
+	m_menuBarWindow     = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
+	m_gameViewWindow    = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
+	m_hierarchyWindow   = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
+	m_inspectorWindow   = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
     g_progressWindow->SetProgress(60);
 #endif // !EDITOR
 
@@ -83,7 +86,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
-        m_sceneRenderer->OnWillRenderObject(deltaSecond);
         m_sceneRenderer->SceneRendering();
     });
     g_progressWindow->SetProgress(82);
@@ -96,6 +98,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     {
         OnGui();
     });
+
+    m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]() 
+    {
+        m_sceneRenderer->OnWillRenderObject(frameDeltaTime);
+    });
+
     g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
@@ -103,14 +111,15 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	isGameToRender = true;
 
-   /* m_renderThread = std::thread([&] 
+    m_renderThread = std::thread([&] 
 	{
 		while (isGameToRender)
 		{
+            CoroutineManagers->yield_OnRender();
 			RenderWorkerThread();
 		}
 	});
-    m_renderThread.detach();*/
+    m_renderThread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -146,11 +155,11 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 
     m_sceneRenderer->ReApplyCurrCubeMap();
 }
-
+ 
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-	//SpinLock lock(gameToRenderLock);
+	SpinLock lock(gameToRenderLock);
 
     m_timeSystem.Tick([&]
     {
@@ -200,8 +209,15 @@ void DirectX11::Dx11Main::Update()
 	}
 #endif // !EDITOR
 
-    //fenceGameToRender.Wait();
-    //fenceGameToRender.Reset();
+    if(gameFrame > renderFrame)
+    {
+        fenceGameToRender.Wait();
+    }
+
+    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+    SceneManagers->EndOfFrame();
+
+    fenceGameToRender.Reset();
 }
 
 bool DirectX11::Dx11Main::Render()
@@ -210,11 +226,22 @@ bool DirectX11::Dx11Main::Render()
 	if (m_timeSystem.GetFrameCount() == 0)
     { 
         fenceGameToRender.Signal();
+        renderFrame.store(gameFrame);
+        return false;
+    }
+
+    auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+    auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
+    
+    if (GameSceneStart || GameSceneEnd)
+    {
+        fenceGameToRender.Signal();
+        renderFrame.store(gameFrame);
         return false;
     }
 
 	{
-        SceneManagers->SceneRendering(m_timeSystem.GetElapsedSeconds());
+        SceneManagers->SceneRendering(frameDeltaTime);
 #if defined(EDITOR)
 		SceneManagers->OnDrawGizmos();
         SceneManagers->GUIRendering();
@@ -222,6 +249,7 @@ bool DirectX11::Dx11Main::Render()
 	}
 
     fenceGameToRender.Signal();
+    renderFrame.store(gameFrame);
 	return true;
 }
 
@@ -241,6 +269,8 @@ void DirectX11::Dx11Main::InfoWindow()
         << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
+
+    gameFrame = m_timeSystem.GetFrameCount();
 }
 
 void DirectX11::Dx11Main::OnGui()

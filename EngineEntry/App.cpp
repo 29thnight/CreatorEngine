@@ -107,10 +107,10 @@ void Core::App::Run()
 	{
 		// 메인 루프
 		m_main->Update();
-		if (m_main->Render())
-		{
-			m_deviceResources->Present();
-		}
+		//if (m_main->Render())
+		//{
+		//	m_deviceResources->Present();
+		//}
 		m_main->DisableOrEnable();
 	});
 }

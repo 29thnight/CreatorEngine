@@ -13,7 +13,6 @@ enum class BoneRegion
 };
 AUTO_REGISTER_ENUM(BoneRegion)
 
-
 class Bone;
 class Animation;
 class Skeleton
@@ -93,3 +92,5 @@ public:
 	double m_duration{};
 	double m_ticksPerSecond{};
 };
+
+inline static XMMATRIX InitialMatrix[Skeleton::MAX_BONES]{};

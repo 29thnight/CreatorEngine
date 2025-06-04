@@ -108,6 +108,11 @@ void CoroutineManager::yield_OtherEvent()
     ProcessQueue(waitForSignalQueue);
 }
 
+void CoroutineManager::yield_OnRender()
+{
+    ProcessQueue(onRenderQueue);
+}
+
 void CoroutineManager::ProcessQueue(LinkedList<CoroutineWrapper>& queue)
 {
     float deltaTime = Time != nullptr ? Time->GetElapsedSeconds() : 0.16f;
@@ -162,6 +167,9 @@ void CoroutineManager::ProcessQueue(LinkedList<CoroutineWrapper>& queue)
                 break;
             case YieldInstructionType::WaitForEndOfFrame:
                 waitForEndOfFrameQueue.Link(wrapper);
+                break;
+            case YieldInstructionType::OnRender:
+                onRenderQueue.Link(wrapper);
                 break;
             default:
                 nullQueue.Link(wrapper);

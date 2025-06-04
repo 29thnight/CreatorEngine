@@ -6,9 +6,11 @@
 #include "Skeleton.h"
 #include "LightController.h"
 #include "Benchmark.hpp"
+#include "MeshRenderer.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
+#include "RenderCommand.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 
@@ -60,4 +62,28 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
 {
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
+}
+
+void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr) return;
+
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) != m_proxyMap.end()) return;
+
+	// Create a new proxy for the mesh renderer and insert it into the map
+	auto managedCommand = std::make_shared<RenderCommand>(meshRendererPtr);
+	m_proxyMap[meshRendererGuid] = managedCommand;
+}
+
+void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr) return;
+
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
+
+	m_proxyMap.erase(meshRendererGuid);
 }

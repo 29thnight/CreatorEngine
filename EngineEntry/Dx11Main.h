@@ -60,6 +60,7 @@ namespace DirectX11
         Core::DelegateHandle m_SceneRenderingEventHandle;
 		Core::DelegateHandle m_OnGizmoEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
+		Core::DelegateHandle m_EndOfFrameEventHandle;
 		
 		std::thread m_renderThread;
 
