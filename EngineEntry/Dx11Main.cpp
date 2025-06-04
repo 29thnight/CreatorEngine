@@ -117,6 +117,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	{
 		while (isGameToRender)
 		{
+            if (m_isInvokeResize)
+            {
+                CreateWindowSizeDependentResources();
+                m_isInvokeResize = false;
+            }
+
             CoroutineManagers->yield_OnRender();
 			RenderWorkerThread();
 		}
@@ -213,8 +219,8 @@ void DirectX11::Dx11Main::Update()
 
     if(gameFrame > renderFrame)
     {
-        fenceGameToRender.Wait();
     }
+        fenceGameToRender.Wait();
 
     frameDeltaTime = m_timeSystem.GetElapsedSeconds();
     SceneManagers->EndOfFrame();
@@ -300,6 +306,11 @@ void DirectX11::Dx11Main::RenderWorkerThread()
 	{
 		m_deviceResources->Present();
 	}
+}
+
+void DirectX11::Dx11Main::InvokeResizeFlag()
+{
+    m_isInvokeResize = true;
 }
 
 // 릴리스가 필요한 디바이스 리소스를 렌더러에 알립니다.
