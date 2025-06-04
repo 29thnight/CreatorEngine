@@ -9,6 +9,7 @@ struct alignas(16) SSAOBuffer
 	Mathf::Vector4 m_SampleKernel[64];
 	Mathf::Vector4 m_CameraPosition;
 	float m_Radius;
+	float m_Thickness;
 	Mathf::Vector2 m_windowSize;
 };
 
@@ -18,7 +19,7 @@ public:
 	SSAOPass();
 	~SSAOPass();
 
-	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal);
+	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal, Texture* diffuse);
 	void ReloadDSV(ID3D11ShaderResourceView* depth);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -32,4 +33,8 @@ private:
 
 	Texture* m_NormalTexture;
 	Texture* m_RenderTarget;
+	Texture* m_DiffuseTexture;
+
+	float radius = 0.1f;
+	float thickness = 0.1f;
 };

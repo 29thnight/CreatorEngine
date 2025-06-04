@@ -153,74 +153,90 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
     io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
     io.Fonts->Build();
 
-	ImGui::ContextRegister("LightMap", true, [&]() {
+    ImGui::ContextRegister("LightMap", true, [&]() {
+        auto& useTestLightmap = m_sceneRenderer->useTestLightmap;
+        auto& m_pPositionMapPass = m_sceneRenderer->m_pPositionMapPass;
+        auto& lightMap = m_sceneRenderer->lightMap;
+        auto& m_renderScene = m_sceneRenderer->m_renderScene;
+        auto& m_pLightMapPass = m_sceneRenderer->m_pLightMapPass;
 
-		ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
-		ImGui::Text("LightMap");
-		if (ImGui::CollapsingHeader("Settings")) {
-			ImGui::Checkbox("LightmapPass On/Off", &m_sceneRenderer->useTestLightmap);
+        ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
+        ImGui::Text("LightMap");
+        if (ImGui::CollapsingHeader("Settings")) {
+            ImGui::Checkbox("LightmapPass On/Off", &useTestLightmap);
 
-			ImGui::Text("Position and NormalMap Settings");
-			ImGui::DragInt("PositionMap Size", &m_sceneRenderer->m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
-			if (ImGui::Button("Clear position normal maps")) {
-                m_sceneRenderer->m_pPositionMapPass->ClearTextures();
-			}
-			ImGui::Checkbox("IsPositionMapDilateOn", &m_sceneRenderer->m_pPositionMapPass->isDilateOn);
-			ImGui::DragInt("PosNorm Dilate Count", &m_sceneRenderer->m_pPositionMapPass->posNormDilateCount, 1, 0, 16);
-			ImGui::Text("LightMap Bake Settings");
-			ImGui::DragInt("LightMap Size", &m_sceneRenderer->lightMap.canvasSize, 128, 512, 8192);
-			ImGui::DragFloat("Bias", &m_sceneRenderer->lightMap.bias, 0.001f, 0.001f, 0.2f);
-			ImGui::DragInt("Padding", &m_sceneRenderer->lightMap.padding);
-			ImGui::DragInt("UV Size", &m_sceneRenderer->lightMap.rectSize, 1, 20, m_sceneRenderer->lightMap.canvasSize - (m_sceneRenderer->lightMap.padding * 2));
-			ImGui::DragInt("LeafCount", &m_sceneRenderer->lightMap.leafCount, 1, 0, 1024);
-			ImGui::DragInt("Indirect Count", &m_sceneRenderer->lightMap.indirectCount, 1, 0, 128);
-			ImGui::DragInt("Indirect Sample Count", &m_sceneRenderer->lightMap.indirectSampleCount, 1, 0, 512);
-			ImGui::DragInt("Dilate Count", &m_sceneRenderer->lightMap.dilateCount, 1, 0, 16);
-			ImGui::DragInt("Direct MSAA Count", &m_sceneRenderer->lightMap.directMSAACount, 1, 0, 16);
-			ImGui::DragInt("Indirect MSAA Count", &m_sceneRenderer->lightMap.indirectMSAACount, 1, 0, 16);
-			ImGui::Checkbox("Use Environment Map", &m_sceneRenderer->lightMap.useEnvironmentMap);
-		}
+            ImGui::Text("Position and NormalMap Settings");
+            ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
+            if (ImGui::Button("Clear position normal maps")) {
+                m_pPositionMapPass->ClearTextures();
+            }
+            ImGui::Checkbox("IsPositionMapDilateOn", &m_pPositionMapPass->isDilateOn);
+            ImGui::DragInt("PosNorm Dilate Count", &m_pPositionMapPass->posNormDilateCount, 1, 0, 16);
+            ImGui::Text("LightMap Bake Settings");
+            ImGui::DragInt("LightMap Size", &lightMap.canvasSize, 128, 512, 8192);
+            ImGui::DragFloat("Bias", &lightMap.bias, 0.001f, 0.001f, 0.2f);
+            ImGui::DragInt("Padding", &lightMap.padding);
+            ImGui::DragInt("UV Size", &lightMap.rectSize, 1, 20, lightMap.canvasSize - (lightMap.padding * 2));
+            ImGui::DragInt("LeafCount", &lightMap.leafCount, 1, 0, 1024);
+            ImGui::DragInt("Indirect Count", &lightMap.indirectCount, 1, 0, 128);
+            ImGui::DragInt("Indirect Sample Count", &lightMap.indirectSampleCount, 1, 0, 512);
+            //ImGui::DragInt("Dilate Count", &lightMap.dilateCount, 1, 0, 16);
+            ImGui::DragInt("Direct MSAA Count", &lightMap.directMSAACount, 1, 0, 16);
+            ImGui::DragInt("Indirect MSAA Count", &lightMap.indirectMSAACount, 1, 0, 16);
+            ImGui::Checkbox("Use Environment Map", &lightMap.useEnvironmentMap);
+        }
 
-		if (ImGui::Button("Generate LightMap"))
-		{
-			Camera c{};
-			// 皋浆喊肺 positionMap 积己
-            m_sceneRenderer->m_pPositionMapPass->Execute(*m_sceneRenderer->m_renderScene, c);
-			// lightMap 积己
-            m_sceneRenderer->lightMap.GenerateLightMap(m_sceneRenderer->m_renderScene, m_sceneRenderer->m_pPositionMapPass, m_sceneRenderer->m_pLightMapPass);
+        if (ImGui::Button("Generate LightMap"))
+        {
+            Camera c{};
+            // 皋浆喊肺 positionMap 积己
+            m_pPositionMapPass->Execute(*m_renderScene, c);
+            // lightMap 积己
+            lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
 
-			//m_pLightMapPass->Initialize(lightMap.lightmaps);
-		}
+            //m_pLightMapPass->Initialize(lightMap.lightmaps);
+        }
 
-		if (ImGui::CollapsingHeader("Baked Maps")) {
-			if (m_sceneRenderer->lightMap.imgSRV)
-			{
-				ImGui::Text("LightMaps");
-				for (int i = 0; i < m_sceneRenderer->lightMap.lightmaps.size(); i++) {
-					if (ImGui::ImageButton("##LightMap", (ImTextureID)m_sceneRenderer->lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("indirectMaps");
-				for (int i = 0; i < m_sceneRenderer->lightMap.indirectMaps.size(); i++) {
-					if (ImGui::ImageButton("##IndirectMap", (ImTextureID)m_sceneRenderer->lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-				ImGui::Text("environmentMaps");
-				for (int i = 0; i < m_sceneRenderer->lightMap.environmentMaps.size(); i++) {
-					if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)m_sceneRenderer->lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
-						//ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
-					}
-				}
-			}
-			else {
-				ImGui::Text("No LightMap");
-			}
-		}
+        if (ImGui::CollapsingHeader("Baked Maps")) {
+            if (lightMap.imgSRV)
+            {
+                ImGui::Text("LightMaps");
+                for (int i = 0; i < lightMap.lightmaps.size(); i++) {
+                    if (ImGui::ImageButton("##LightMap", (ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)lightMap.lightmaps[i]->m_pSRV, ImVec2(512, 512));
+                    }
+                }
+                //ImGui::Text("indirectMaps");
+                //for (int i = 0; i < lightMap.indirectMaps.size(); i++) {
+                //	if (ImGui::ImageButton("##IndirectMap", (ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(300, 300))) {
+                //		//ImGui::Image((ImTextureID)lightMap.indirectMaps[i]->m_pSRV, ImVec2(512, 512));
+                //	}
+                //}
+                ImGui::Text("environmentMaps");
+                for (int i = 0; i < lightMap.environmentMaps.size(); i++) {
+                    if (ImGui::ImageButton("##EnvironmentMap", (ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
+                    }
+                }
+                ImGui::Text("directionalMaps");
+                for (int i = 0; i < lightMap.directionalMaps.size(); i++) {
+                    if (ImGui::ImageButton("##DirectionalMap", (ImTextureID)lightMap.directionalMaps[i]->m_pSRV, ImVec2(300, 300))) {
+                        //ImGui::Image((ImTextureID)lightMap.environmentMaps[i]->m_pSRV, ImVec2(512, 512));
+                    }
+                }
+            }
+            else {
+                ImGui::Text("No LightMap");
+            }
+        }
 
-		ImGui::EndChild();
-	});
+        ImGui::EndChild();
+    });
+
+
+
+
+    
 
     ImGui::GetContext("LightMap").Close();
 }

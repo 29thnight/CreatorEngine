@@ -48,11 +48,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"AmbientOcclusion",
-		DXGI_FORMAT_R16_UNORM,
+		//DXGI_FORMAT_R16_UNORM,
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
 	);
-	ao->CreateRTV(DXGI_FORMAT_R16_UNORM);
-	ao->CreateSRV(DXGI_FORMAT_R16_UNORM);
+	ao->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	ao->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_ambientOcclusionTexture = MakeUniqueTexturePtr(ao);
 
 	//Buffer 생성
@@ -83,7 +84,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     m_pSSAOPass->Initialize(
         ao,
         m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture.get()
+        m_normalTexture.get(),
+		m_diffuseTexture.get()
     );
 
     //deferredPass
@@ -182,7 +184,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 				Texture* texture = Texture::LoadFormPath(fileName);
 				if (texture == nullptr) break;
-				scene->m_lightmapTextures.push_back(texture);
+				scene->m_directionalmapTextures.push_back(texture);
 			}
 
 			m_pLightMapPass->Initialize(scene->m_lightmapTextures, scene->m_directionalmapTextures);
@@ -406,16 +408,17 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
+		//[3] SSAOPass
+		{
+			DirectX11::BeginEvent(L"SSAOPass");
+			Benchmark banch;
+			m_pSSAOPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
 		if (!useTestLightmap)
         {
-			//[3] SSAOPass
-			{
-				DirectX11::BeginEvent(L"SSAOPass");
-				Benchmark banch;
-				m_pSSAOPass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
-				DirectX11::EndEvent();
-			}
 			//[4] DeferredPass
 			{
 				DirectX11::BeginEvent(L"DeferredPass");

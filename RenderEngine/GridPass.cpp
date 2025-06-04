@@ -36,6 +36,8 @@ GridPass::GridPass()
     };
     m_pso->CreateInputLayout(std::move(vertexLayoutDesc));
 
+    m_pso->m_blendState = DeviceState::g_pBlendState;
+
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
     rasterizerDesc.AntialiasedLineEnable = true;
@@ -102,6 +104,8 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 
+    m_pso->Apply();
+
     auto deviceContext = DeviceState::g_pDeviceContext;
 
 	m_gridConstant.world = XMMatrixIdentity();
@@ -120,8 +124,6 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(1, 1, m_pCamPosBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_pGridConstantBuffer.Get(), &m_gridConstant);
 	DirectX11::UpdateBuffer(m_pUniformBuffer.Get(), &m_gridUniform);
-
-    m_pso->Apply();
 
     ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
     DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);

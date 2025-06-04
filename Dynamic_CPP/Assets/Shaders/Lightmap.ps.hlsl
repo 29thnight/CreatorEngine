@@ -161,16 +161,18 @@ float4 main(VertexShaderOutput IN) : SV_TARGET
     //float2 lightmapUV = (IN.texCoord1 + temp) * size + offset;
     float4 lightmapColor = lightmap.SampleLevel(LinearSampler, lightmapUV, 0.0);
     float3 lightDirection = directionalmaps.SampleLevel(LinearSampler, lightmapUV, 0.0).xyz;
-    
+    lightDirection = lightDirection * 2.0 - 1.0;
     lightDirection = normalize(lightDirection);
+
+    lightDirection = -lightDirection;
     float3 Lo = float3(0, 0, 0);
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo.rgb, metallic);
     
     LightingInfo li;
-    li.H = normalize(-lightDirection + surf.V);
-    li.NdotH = normalize(dot(surf.N, li.H));
-    li.NdotL = dot(surf.N, -lightDirection);
+    li.H = normalize(lightDirection + surf.V);
+    li.NdotH = dot(surf.N, li.H);
+    li.NdotL = dot(surf.N, lightDirection);
     
     float NDF = DistributionGGX(max(0.0, li.NdotH), gRoughness);
     float G = GeometrySmith(max(0.0, surf.NdotV), max(0.0, li.NdotL), gRoughness);
@@ -184,10 +186,11 @@ float4 main(VertexShaderOutput IN) : SV_TARGET
     float3 numerator = NDF * G * F;
     float denominator = 4.0 * max(surf.NdotV, 0.0) * NdotL;
     float3 specular = numerator / max(denominator, 0.001);
-
-    Lo += (kD * albedo.rgb / PI + specular) * lightmapColor.rgb * NdotL;
+    float3 brdf = kD * albedo.rgb / PI;
+    brdf += specular;
+    Lo += brdf * lightmapColor.rgb * NdotL;
     
-    float3 colour = albedo.rgb * saturate(lightmapColor.rgb) + Lo + emissive.rgb;
+    float3 colour = Lo + emissive.rgb;
 
     return float4(colour, albedo.a);
     

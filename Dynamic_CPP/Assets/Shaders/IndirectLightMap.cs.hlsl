@@ -322,7 +322,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     //GroupMemoryBarrierWithGroupSync();
     //indirect /= sampleCount;//Indirect_Max_Sampling_Count;
     g_IndirectLightMap[DTid.xy] += float4(indirect, 1);
-    g_DirectionalMap[DTid.xy] += float4(flnalDirectional, 0);
+    g_DirectionalMap[DTid.xy] += float4(flnalDirectional, 1);
 }
 
 /*
