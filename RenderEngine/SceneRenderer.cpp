@@ -192,6 +192,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 
 	m_renderScene = new RenderScene();
+	SceneManagers->m_ActiveRenderScene = m_renderScene;
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
@@ -338,11 +339,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	if(ShaderSystem->IsReloading())
-	{
-		ReloadShaders();
-	}
-
 	m_renderScene->Update(deltaTime);
 	//m_pEffectPass->Update(deltaTime);
 	PrepareRender();
@@ -350,6 +346,11 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::SceneRendering()
 {
+	if (ShaderSystem->IsReloading())
+	{
+		ReloadShaders();
+	}
+
 	DirectX11::ResetCallCount();
 
 	for(auto& camera : CameraManagement->m_cameras)
