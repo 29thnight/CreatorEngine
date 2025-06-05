@@ -9,6 +9,10 @@
 #include "LightProperty.h"
 #include "Benchmark.hpp"
 
+//==============
+#include "Terrain.h"
+
+
 XMMATRIX InitialMatrix[MAX_BONES]{};
 
 GBufferPass::GBufferPass()
@@ -91,6 +95,21 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	Animator* currentAnimator = nullptr;
+
+	for (auto& obj : scene.GetScene()->m_SceneObjects) {
+		if (obj->IsDestroyMark()) continue;
+		if (obj->HasComponent<TerrainComponent>()) {
+
+			auto terrain = obj->GetComponent<TerrainComponent>();
+			auto terrainMesh = terrain->GetMesh();
+			if (terrainMesh)
+			{
+				scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+				terrainMesh->Draw();
+			}
+		}
+	}
+	
 
 	for (auto& meshRenderer : camera.m_defferdQueue)
 	{	

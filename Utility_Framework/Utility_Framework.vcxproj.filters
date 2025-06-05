@@ -234,6 +234,9 @@
     <ClInclude Include="DebugStreamBuf.h">
       <Filter>Utility</Filter>
     </ClInclude>
+    <ClInclude Include="FileDialog.h">
+      <Filter>WindowsApplication\CoreWindow</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

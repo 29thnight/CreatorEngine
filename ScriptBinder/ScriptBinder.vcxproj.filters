@@ -216,6 +216,9 @@
     <ClCompile Include="TagManager.cpp">
       <Filter>Managers\TagManager</Filter>
     </ClCompile>
+    <ClCompile Include="Terrain.cpp">
+      <Filter>Classes\Components\PhysicsComponent\Terrain</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -371,9 +374,6 @@
     <ClInclude Include="RagdollComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="RaycastComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="SphereColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
@@ -418,6 +418,15 @@
     </ClInclude>
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="ArticulationData.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="ArticulationLoader.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkData.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -179,6 +179,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="TagManager.cpp" />
+    <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
     <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="TransCondition.cpp" />
@@ -237,7 +238,6 @@
     <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
-    <ClInclude Include="RaycastComponent.h" />
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />

@@ -5,6 +5,7 @@ class SceneRenderer;
 class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
+class TerrainComponent;
 class InspectorWindow
 {
 public:
@@ -17,4 +18,5 @@ private:
 	bool m_openNewScriptPopup{ false };
 	void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
+	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 };
