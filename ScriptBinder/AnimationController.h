@@ -30,6 +30,7 @@ public:
 
 	std::set<std::string> StateNameSet;
 
+	[[Property]]
 	NodeEditor* m_nodeEditor;
 	//ax::NodeEditor::EditorContext* conEdit;
 	//어디에서든지 전이가능한 state모음

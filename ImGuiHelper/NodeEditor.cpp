@@ -6,9 +6,21 @@ void NodeEditor::MakeEdit(std::string filePath)
 	if (!m_nodeContext)
 	{
 		ed::Config config;
-		config.SettingsFile = filePath.c_str();
+        m_filePath = "NodeEditor\\" + filePath;
+        config.SettingsFile = m_filePath.c_str();
 		m_nodeContext = ed::CreateEditor(&config);
 	}
+    for (auto node : Nodes)
+    {
+        delete node;
+    }
+    Nodes.clear();
+
+    for (auto link : Links)
+    {
+        delete link;
+    }
+    Links.clear();
 	ed::SetCurrentEditor(m_nodeContext);
 	ed::Begin("Node Editor");
 }
@@ -18,17 +30,7 @@ void NodeEditor::EndEdit()
 	ed::End();
 	ed::SetCurrentEditor(nullptr);
 
-	for (auto node : Nodes)
-	{
-		delete node;
-	}
-	Nodes.clear();
-
-	for (auto link : Links)
-	{
-		delete link;
-	}
-	Links.clear();
+	
 }
 
 void NodeEditor::MakeNode(std::string nodeName)
@@ -75,7 +77,10 @@ void NodeEditor::DrawNode(int* selectedNodeIndex)
 
         if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(1)) {
             if (selectedNodeIndex)
+            {
                 *selectedNodeIndex = i;  // 선택한 링크 인덱스 기록
+                seletedCurNodeIndex = i;
+            }
         }
 	}
 
@@ -127,6 +132,24 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         float thickness = 3.0f;
         drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
 
+        float t = 0.5f;
+        ImVec2 midPos = ImBezierCubicCalc(p1_offset, cp1, cp2, p2_offset, t);
+        ImVec2 tangent =
+            ImBezierCubicCalcDerivative(p1_offset, cp1, cp2, p2_offset, t);
+        float tangentLength = sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+        if (tangentLength > 0.0001f)
+            tangent = ImVec2(tangent.x / tangentLength, tangent.y / tangentLength);
+        float triSize = 10.0f;
+        ImVec2 triP1 = midPos + tangent * triSize; // 앞쪽 꼭짓점
+        ImVec2 triP2 = midPos - tangent * triSize * 0.5f + ImVec2(-tangent.y, tangent.x) * triSize * 0.5f; // 좌측 뒤쪽
+        ImVec2 triP3 = midPos - tangent * triSize * 0.5f + ImVec2(tangent.y, -tangent.x) * triSize * 0.5f; // 우측 뒤쪽
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        ImVec2 triP1_screen = triP1 + windowPos;
+        ImVec2 triP2_screen = triP2 + windowPos;
+        ImVec2 triP3_screen = triP3 + windowPos;
+
+        drawList->AddTriangleFilled(triP1_screen, triP2_screen, triP3_screen, color);
+       // drawList->AddCircleFilled(midPos, 5.0f, IM_COL32(0, 255, 0, 255));
         bool hovered = IsMouseNearLink(p1_offset, cp1, cp2, p2_offset,5.0f);
         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
@@ -137,9 +160,63 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
     }
 }
 
-void NodeEditor::MakeNewLink()
+void NodeEditor::Update()
 {
+    if (needMakeLink == true && seletedCurNodeIndex != -1)
+    {
+        ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(Nodes[seletedCurNodeIndex]->name));
+        ImVec2 pos = ed::GetNodePosition(nodeID);
+        ImVec2 size = ed::GetNodeSize(nodeID);
+        ImVec2 p1 = ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+        ImVec2 p2 = ImGui::GetMousePos();
+        ImVec2 dir = p2 - p1;
+        float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+        ImVec2 normDir = ImVec2(dir.x / length, dir.y / length);
+        ImVec2 perpendicular = ImVec2(-normDir.y, normDir.x);
+        float offsetAmount = 5.0f;
+        ImVec2 offset = perpendicular * offsetAmount;
+
+        ImVec2 p1_offset = p1 + offset;
+        ImVec2 p2_offset = p2 + offset;
+        ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
+        ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
+        ImU32 color = IM_COL32(255, 255, 255, 255);
+        float thickness = 3.0f;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
+
+        for (size_t i = 0; i < Nodes.size(); ++i)
+        {
+            auto& node = Nodes[i];
+            ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(node->name));
+            if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
+            {
+                if (i != seletedCurNodeIndex)
+                {
+                    if(m_retrunIndex)
+                     *m_retrunIndex = i;
+
+                    needMakeLink = false;
+                    m_retrunIndex = nullptr;
+                }
+            }
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            needMakeLink = false;
+        }
+    }
 }
+
+
+
+void NodeEditor::MakeNewLink(int* returnIndex)
+{
+    needMakeLink = true;
+    m_retrunIndex = returnIndex;
+}
+
+
 
 bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold)
 {
@@ -171,5 +248,12 @@ bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVe
     return false;
 }
 
+ImVec2 NodeEditor::ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t)
+{
+    float u = 1.0f - t;
+    return
+        ImVec2(3 * u * u * (p1.x - p0.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
+            3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y));
+}
 
 

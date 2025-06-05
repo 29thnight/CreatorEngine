@@ -734,68 +734,118 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 			if(showControllersWindow)
 			{
 				ImGui::Begin("Animation Controllers", &showControllersWindow);
-				//if (ImGui::CollapsingHeader("Controllers"))
+				int i = 0;
+				static int selectedControllerIndex = 0;
+				static int preSelectIndex = 0;
+				static int linkIndex = -1;
+				static int rightClickNodeIndex = -1;
+				static int targetNodeIndex = -1;
+				auto& controllers = animator->m_animationControllers;
+				auto& controller = animator->m_animationControllers[selectedControllerIndex];
+				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
+				if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				{
-					int i = 0;
-					static int selectedControllerIndex = 0;
-					static int preSelectIndex = 0;
-					ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
-					ImGui::Text("Controllers");
-					ImGui::Separator();
-
-					auto& controllers = animator->m_animationControllers;
-					for(int index = 0; index < controllers.size(); ++index)
+					if (ImGui::BeginTabItem("Layers"))
 					{
-						auto& controller = controllers[index];
-						bool isSelected = (selectedControllerIndex == index);
-						ImGui::PushID(index);
-						
-						float selectableWidth = ImGui::GetContentRegionAvail().x - 33.0f; // 버튼 폭만큼 빼기
-					
-						if (ImGui::Selectable(controller->name.c_str(), isSelected, 0, ImVec2(selectableWidth, 0)))
+						//ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
+						ImGui::Separator();
+
+						for (int index = 0; index < controllers.size(); ++index)
 						{
-							selectedControllerIndex = index;
+							auto& controller = controllers[index];
+							bool isSelected = (selectedControllerIndex == index);
+							ImGui::PushID(index);
+
+							float selectableWidth = ImGui::GetContentRegionAvail().x - 33.0f; // 버튼 폭만큼 빼기
+
+							if (ImGui::Selectable(controller->name.c_str(), isSelected, 0, ImVec2(selectableWidth, 0)))
+							{
+								selectedControllerIndex = index;
+							}
+							ImGui::SameLine();
+							if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+							{
+								ImGui::OpenPopup("ControllerDetailPopup");
+							}
+
+							if (ImGui::BeginPopup("ControllerDetailPopup"))
+							{
+								ImGui::Text("Detail: %s", "ControllerDetailPopup");
+								ImGui::Separator();
+
+								const auto& mat_controller_type = Meta::Find("AnimationController");
+								Meta::DrawProperties(controller, *mat_controller_type);
+								Meta::DrawMethods(controller, *mat_controller_type);
+
+								ImGui::EndPopup();
+							}
+							ImGui::PopID();
 						}
+						ImGui::EndTabItem();
+					}
+					if (ImGui::BeginTabItem("Parameters"))
+					{
+						ImGui::Separator();
+
+						auto& parameters = animator->Parameters;
+						ImGui::Text("parameter");
 						ImGui::SameLine();
-						if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+						if (ImGui::SmallButton(ICON_FA_PLUS))
 						{
-							ImGui::OpenPopup("ControllerDetailPopup");
+							ImGui::OpenPopup("AddParameterPopup");	
 						}
-						
-						if (ImGui::BeginPopup("ControllerDetailPopup"))
+						if (ImGui::BeginPopup("AddParameterPopup"))
 						{
-							ImGui::Text("Detail: %s", "ControllerDetailPopup");
-							ImGui::Separator();
-
-							const auto& mat_controller_type = Meta::Find("AnimationController");
-							Meta::DrawProperties(controller, *mat_controller_type);
-							Meta::DrawMethods(controller, *mat_controller_type);
-
+							if (ImGui::MenuItem("Add Float"))
+							{
+								animator->AddDefaultParameter(ValueType::Float);
+							}
+							if (ImGui::MenuItem("Add Bool"))
+							{
+								animator->AddDefaultParameter(ValueType::Bool);
+							}
 							ImGui::EndPopup();
 						}
-						ImGui::PopID();
-					}
-					ImGui::EndChild();
+						ImGui::Separator();
+						for (int index = 0; index < parameters.size(); ++index)
+						{
+							ImGui::PushID(index);
+							auto& parameter = parameters[index];
+							char buffer[128];
+							strcpy_s(buffer, parameter.name.c_str());
+							buffer[sizeof(buffer) - 1] = '\0';
+							if(ImGui::InputText("", buffer, sizeof(buffer)))
+							{
+								parameter.name = buffer;
+							}
 
+							ImGui::PopID();
+						}
+
+						ImGui::EndTabItem();
+					}
+
+					ImGui::EndTabBar();
+				 }
+					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); 
+					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), true); 
 					ImGui::Text("Controller Info");
 					ImGui::Separator();
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
-						static int linkIndex = -1;
-						static int rightClickNodeIndex = -1;
+						
 						static bool isOpenPopUp;
 						static bool isOpenNodePopUp;
 						if (preSelectIndex != selectedControllerIndex)
 						{
 							linkIndex = -1;
 							rightClickNodeIndex = -1;
+							targetNodeIndex = -1;
 							preSelectIndex = selectedControllerIndex;
 							isOpenPopUp = false;
 							isOpenNodePopUp = false;
 						}
-						auto& controller = animator->m_animationControllers[selectedControllerIndex];
 						std::string fileName = controller->name + ".node_editor.json";
 
 						//if (!controller->StateVec.empty())
@@ -815,28 +865,50 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							}
 							controller->m_nodeEditor->DrawLink(&linkIndex);
 							controller->m_nodeEditor->DrawNode(&rightClickNodeIndex);
-
+							controller->m_nodeEditor->Update();
 							
+							if (targetNodeIndex != -1)
+							{
+								auto states = controller->StateVec;
+								int curIndex = controller->m_nodeEditor->seletedCurNodeIndex;
+								controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
+								targetNodeIndex = -1;
+							}
 							if (rightClickNodeIndex != -1)
 							{
 								isOpenNodePopUp = true;
 							}
+							//if (linkIndex != -1)
+							//{
+							//	std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode;
+							//	std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode;
+							//	ImGui::Begin("cur Link");
+							//	ImGui::Text("From:  %s", fromNode.c_str());
+							//	ImGui::Text("To:  %s", toNode.c_str());
+							//	
+							//	auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
 
-							
+							//	for (auto& transiton : transitions)
+							//	{
+							//		auto conditions = transiton->GetConditions();
 
-							if (linkIndex != -1)
-							{
-								ImGui::Begin("cur Link");
-								ImGui::Text("From:  %s", controller->m_nodeEditor->Links[linkIndex]->fromNode.c_str());
-								ImGui::Text("To:  %s", controller->m_nodeEditor->Links[linkIndex]->toNode.c_str());
-								ImGui::End();
-							}
-							
-
+							//		if (conditions.empty())
+							//		{
+							//			ImGui::Text("empty conditions");
+							//		}
+							//		else
+							//		{
+							//			for (auto& conditon : conditions)
+							//			{
+							//				ImGui::Text("%s", conditon.valueName.c_str());
+							//			}
+							//		}
+							//	}
+							//	//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+							//	ImGui::End();
+							//}
 							if (ed::ShowBackgroundContextMenu())
 							{
-								
-
 								if (isOpenNodePopUp)
 								{
 									isOpenNodePopUp = false;
@@ -848,7 +920,6 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								isOpenPopUp = false;
 							}
-
 							controller->m_nodeEditor->EndEdit();
 							if (isOpenNodePopUp)
 							{
@@ -858,27 +929,22 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								if (ImGui::MenuItem("Make Transition"))
 								{
-									//
-									controller->m_nodeEditor->MakeNewLink();
+									controller->m_nodeEditor->MakeNewLink(&targetNodeIndex);
 									isOpenNodePopUp = false;
 									rightClickNodeIndex = -1;
 								}
-
 								if (ImGui::MenuItem("Delete State"))
 								{
 									controller->DeleteState(controller->StateVec[rightClickNodeIndex]->m_name);
 									isOpenNodePopUp = false;
 									rightClickNodeIndex = -1;
 								}
-
 								ImGui::EndPopup();
 							}
-
 							if (isOpenPopUp)
 							{
 								ImGui::OpenPopup("NodeEditorContextMenu");
 							}
-
 							if (ImGui::BeginPopup("NodeEditorContextMenu"))
 							{
 								if (ImGui::MenuItem("Add Node"))
@@ -900,7 +966,45 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					}
 
 					ImGui::EndChild();
-				}
+					ImGui::SameLine();
+					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), true);
+					ImGui::Text("Inspector");
+					ImGui::Separator();
+
+					if (linkIndex != -1)
+					{
+						ImGui::Text("Transition");
+						ImGui::Separator();
+						std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode;
+						std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode;
+						ImGui::Text("From:  %s", fromNode.c_str());
+						ImGui::Text("To:  %s", toNode.c_str());
+
+						auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
+
+						for (auto& transiton : transitions)
+						{
+							auto conditions = transiton->GetConditions();
+
+							if (conditions.empty())
+							{
+								ImGui::Text("empty conditions");
+							}
+							else
+							{
+								for (auto& conditon : conditions)
+								{
+									ImGui::Text("%s", conditon.valueName.c_str());
+								}
+							}
+						}
+						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+					}
+
+					//Node눌렀을때도 출력 
+
+					ImGui::EndChild();
+				
 				ImGui::End(); // 창 닫기
 			}			
 		}

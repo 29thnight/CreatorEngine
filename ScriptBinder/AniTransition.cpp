@@ -36,3 +36,8 @@ bool AniTransition::CheckTransiton()
 	return false;
 }
 
+std::vector<TransCondition> AniTransition::GetConditions()
+{
+	return conditions;
+}
+

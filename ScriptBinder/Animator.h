@@ -67,6 +67,45 @@ public:
         Parameters.push_back(ConditionParameter(value, vType, valuename));
     }
 
+
+    void AddDefaultParameter(ValueType vType)
+    {
+        
+        std::string baseName;
+        switch (vType)
+        {
+        case ValueType::Float:
+            baseName = " New Float";
+            break;
+        case ValueType::Int:
+            baseName = " New Int";
+            break;
+        case ValueType::Bool:
+            baseName = " New Bool";
+            break;
+        case ValueType::Trigger:
+            baseName = " New Trigger";
+            break;
+        }
+        std::string valueName = baseName;
+        int index = 0;
+        bool isDuplicate = true;
+        while (isDuplicate)
+        {
+            isDuplicate = false;
+            for (auto& parm : Parameters)
+            {
+                if (parm.name == valueName)
+                {
+                    isDuplicate = true;
+                    valueName = baseName + std::to_string(++index);
+                    break;
+                }
+            }
+        }
+        Parameters.push_back(ConditionParameter(0,vType, valueName));
+    }
+
     template<typename T>
     void SetParameter(const std::string valuename, T Value)
     {

@@ -8,6 +8,7 @@ ReflectionField(AnimationController) \
 		meta_property(name) \
 		meta_property(m_curState) \
 		meta_property(StateVec) \
+		meta_property(m_nodeEditor) \
 		meta_property(m_anyStateVec) \
 		meta_property(m_avatarMask) \
 	}); \

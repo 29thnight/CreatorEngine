@@ -32,13 +32,22 @@ public:
 	void DrawNode(int* selectedNodeIndex = nullptr);
 	void DrawLink(int* selectedLinkIndex = nullptr);
 
-	void MakeNewLink();
+	void Update();
+
+
+	void MakeNewLink(int* returnIndex);
+
 
 	bool IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold = 5.0f);
+	ImVec2 ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t);
 
-	ax::NodeEditor::EditorContext* m_nodeContext;
-
+	int seletedCurNodeIndex = -1;
+	ax::NodeEditor::EditorContext* m_nodeContext = nullptr;
+	std::string m_filePath;
 	std::vector<Node*> Nodes;
 	std::vector<Link*> Links;
+	
+	int* m_retrunIndex = nullptr; 
+	bool needMakeLink = false;
 };
 

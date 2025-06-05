@@ -13,6 +13,7 @@ public:
 	~AnimationState();
 	AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name) {}
 
+	std::vector<AniTransition*> FindTransitions(const std::string& toStateName);
 
 	void SetBehaviour(std::string name);
 	[[Property]]

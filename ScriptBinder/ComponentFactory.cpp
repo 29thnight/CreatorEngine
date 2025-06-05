@@ -7,6 +7,7 @@
 #include "AnimationController.h"
 #include "CharacterControllerComponent.h"
 #include "Model.h"
+#include "NodeEditor.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -104,6 +105,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					AnimationController* animationController = new AnimationController();
 					Meta::Deserialize(animationController, layer);
 					animationController->m_owner = animator;
+					animationController->m_nodeEditor = new NodeEditor();
 					//animator->m_animationController = animationController;
 					if (layer["StateVec"])
 					{

@@ -34,8 +34,9 @@ public:
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
 
+	std::vector<TransCondition> GetConditions();
 	[[Property]]
-	std::vector<TransCondition> conditions;
+	std::vector<TransCondition> conditions{};
 
 	AnimationController* m_ownerController{};
 	[[Property]]
