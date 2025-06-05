@@ -31,7 +31,7 @@ void ComponentFactory::Initialize()
    }
 }
 
-void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
+void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
 {
 	if (itNode["ModuleBehavior"])
 	{
@@ -47,6 +47,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     }
 
     auto component = obj->AddComponent((*componentType)).get();
+
     if (component)
     {
         using namespace TypeTrait;
@@ -193,6 +194,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
             Meta::Deserialize(component, itNode);
 			component->SetOwner(obj);
+		}
+
+		if (isEditorToGame)
+		{
+			component->MakeInstanceID();
 		}
     }
 }

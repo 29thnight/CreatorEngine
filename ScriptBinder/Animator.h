@@ -3,13 +3,15 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "AnimationController.h"
 #include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
 class AnimationController;
-class Animator : public Component, public IUpdatable
+class Animator : public Component, public IUpdatable, public IAwakable, public IOnDistroy
 {
 public:
     ReflectAnimator
@@ -26,7 +28,9 @@ public:
         }
     }
 
+    void Awake() override;
     void Update(float tick) override;
+    void OnDistroy() override;
     void SetAnimation(int index);
     [[Method]]
     void UpdateAnimation();

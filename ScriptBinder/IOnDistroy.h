@@ -22,14 +22,6 @@ interface IOnDistroy
             {
                 OnDistroy();
             }
-
-            if (ptr && sceneObject)
-            {
-                if (!ptr->IsEnabled() && sceneObject->IsDestroyMark())
-                {
-                    OnDistroy();
-                }
-            }
         });
     }
     virtual ~IOnDistroy()

@@ -5,7 +5,7 @@ ReflectionFieldInheritance(Component, Object) \
 { \
 	PropertyField \
 	({ \
-		meta_property(m_instanceID) \
+		meta_property(m_FileID) \
 	}); \
 	FieldEnd(Component, PropertyOnlyInheritance) \
 };

@@ -88,6 +88,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
+        m_sceneRenderer->OnWillRenderObject(frameDeltaTime);
         m_sceneRenderer->SceneRendering();
     });
     g_progressWindow->SetProgress(82);
@@ -103,7 +104,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
     m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]() 
     {
-        m_sceneRenderer->OnWillRenderObject(frameDeltaTime);
+        m_sceneRenderer->EndOfFrame(frameDeltaTime);
     });
 
     g_progressWindow->SetProgress(85);
@@ -219,8 +220,8 @@ void DirectX11::Dx11Main::Update()
 
     if(gameFrame > renderFrame)
     {
-    }
         fenceGameToRender.Wait();
+    }
 
     frameDeltaTime = m_timeSystem.GetElapsedSeconds();
     SceneManagers->EndOfFrame();

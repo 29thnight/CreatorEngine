@@ -48,14 +48,12 @@ ShadowMapPass::ShadowMapPass()
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
-
 	shadowViewport.TopLeftX = 0;
 	shadowViewport.TopLeftY = 0;
 	shadowViewport.Width = 2048;
 	shadowViewport.Height = 2048;
 	shadowViewport.MinDepth = 0.0f;
 	shadowViewport.MaxDepth = 1.0f;
-
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
@@ -137,13 +135,8 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			scene.UseModel();
 			for (auto& RenderCommand : camera.m_defferdQueue)
 			{
-
-				//GameObject* sceneObject = meshRenderer->GetOwner();
-				//if (sceneObject->IsDestroyMark()) continue;
-				//if (sceneObject->m_parentIndex == -1) continue;
-				scene.UpdateModel(RenderCommand.m_worldMatrix);
-				//meshRenderer->m_Mesh->Draw();
-				RenderCommand.m_Mesh->Draw();
+				scene.UpdateModel(RenderCommand->m_worldMatrix);
+				RenderCommand->Draw();
 			}
 			DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 			DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);
@@ -189,15 +182,14 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 		shadowMapConstant.m_lightViewProjection[0] = cascadeinfo[2].m_lightViewProjection;
 		m_shadowCamera.UpdateBuffer(true);
 		scene.UseModel();
-		for (auto& RenderCommand : camera.m_defferdQueue)
+		for (auto& MeshRendererProxy : camera.m_defferdQueue)
 		{
-
 			//GameObject* sceneObject = meshRenderer->GetOwner();
 			//if (sceneObject->IsDestroyMark()) continue;
 			//if (sceneObject->m_parentIndex == -1) continue;
-			scene.UpdateModel(RenderCommand.m_worldMatrix);
+			scene.UpdateModel(MeshRendererProxy->m_worldMatrix);
 			//meshRenderer->m_Mesh->Draw();
-			RenderCommand.m_Mesh->Draw();
+			MeshRendererProxy->Draw();
 		}
 		DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 		DeviceState::g_pDeviceContext->RSSetViewports(1, &DeviceState::g_Viewport);

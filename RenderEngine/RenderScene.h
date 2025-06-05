@@ -31,9 +31,14 @@ public:
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
+	void RegisterAnimator(Animator* animatorPtr);
+	void UnregisterAnimator(Animator* animatorPtr);
+
 	void RegisterCommand(MeshRenderer* meshRendererPtr);
+	void UpdateCommand(MeshRenderer* meshRendererPtr);
 	void UnregisterCommand(MeshRenderer* meshRendererPtr);
 
+	MeshRendererProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
 private:
@@ -43,7 +48,8 @@ private:
 
 	Scene* m_currentScene{};
 	AnimationJob m_animationJob{};
-	std::unordered_map<HashedGuid, std::shared_ptr<RenderCommand>> m_proxyMap;
-	ID3D11Buffer* m_ModelBuffer;
+	std::unordered_map<size_t, std::shared_ptr<MeshRendererProxy>> m_proxyMap;
+	std::unordered_map<size_t, Animator*> m_animatorMap;
+	ID3D11Buffer* m_ModelBuffer{};
 	bool m_isPlaying = false;
 };

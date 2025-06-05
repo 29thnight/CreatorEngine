@@ -59,6 +59,7 @@ public:
 
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
+	void EndOfFrame(float deltaTime);
 	void PrepareRender();
 	void SceneRendering();
 	void ReApplyCurrCubeMap();

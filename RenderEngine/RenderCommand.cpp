@@ -7,7 +7,7 @@
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
-RenderCommand::RenderCommand(MeshRenderer* component) :
+MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
     m_Material(component->m_Material),
     m_Mesh(component->m_Mesh),
     m_LightMapping(component->m_LightMapping),
@@ -22,24 +22,23 @@ RenderCommand::RenderCommand(MeshRenderer* component) :
         {
             m_isAnimationEnabled = true;
             m_animatorGuid = animator->GetInstanceID();
-            memcpy(m_finalTransforms, animator->m_FinalTransforms, TRANSFORM_SIZE);
         }
     }
 
     if (!m_isSkinnedMesh)
     {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> RenderCommand
+        //TODO : Change CullingManager Collect Class : MeshRenderer -> MeshRendererProxy
         //CullingManagers->Insert(this);
 
         m_isNeedUptateCulling = true;
     }
 }
 
-RenderCommand::~RenderCommand()
+MeshRendererProxy::~MeshRendererProxy()
 {
 }
 
-RenderCommand::RenderCommand(const RenderCommand& other) :
+MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
     m_Material(other.m_Material),
     m_Mesh(other.m_Mesh),
     m_LightMapping(other.m_LightMapping),
@@ -50,7 +49,7 @@ RenderCommand::RenderCommand(const RenderCommand& other) :
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
 
-RenderCommand::RenderCommand(RenderCommand&& other) noexcept :
+MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
     m_Material(std::exchange(other.m_Material, nullptr)),
     m_Mesh(std::exchange(other.m_Mesh, nullptr)),
     m_LightMapping(other.m_LightMapping),
@@ -59,4 +58,18 @@ RenderCommand::RenderCommand(RenderCommand&& other) noexcept :
     m_animatorGuid(std::exchange(other.m_animatorGuid, {}))
 {
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
+}
+
+void MeshRendererProxy::Draw()
+{
+    if (nullptr == m_Mesh) return;
+
+    m_Mesh->Draw();
+}
+
+ID3D11CommandList* MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
+{
+    if (nullptr == m_Mesh || nullptr == _defferedContext) return nullptr;
+
+    m_Mesh->Draw(_defferedContext);
 }

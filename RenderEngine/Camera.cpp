@@ -42,6 +42,9 @@ Camera::Camera()
 	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+
+	m_defferdQueue.reserve(300);
+	m_forwardQueue.reserve(300);
 }
 
 Camera::~Camera()
@@ -276,11 +279,9 @@ void Camera::ClearRenderTarget()
 	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
-void Camera::PushRenderQueue(MeshRenderer* meshRenderer)
+void Camera::PushRenderQueue(MeshRendererProxy* command)
 {
-	if (nullptr == meshRenderer) return;
-	if (false == meshRenderer->IsEnabled()) return;
-	Material* mat = meshRenderer->m_Material;
+	Material* mat = command->m_Material;
 	if (nullptr == mat) return;
 
 	{
@@ -289,10 +290,10 @@ void Camera::PushRenderQueue(MeshRenderer* meshRenderer)
 		switch (mat->m_renderingMode)
 		{
 		case MaterialRenderingMode::Opaque:
-			m_defferdQueue.emplace_back(meshRenderer);
+			m_defferdQueue.push_back(command);
 			break;
 		case MaterialRenderingMode::Transparent:
-			m_forwardQueue.emplace_back(meshRenderer);
+			m_forwardQueue.push_back(command);
 			break;
 		}
 	}

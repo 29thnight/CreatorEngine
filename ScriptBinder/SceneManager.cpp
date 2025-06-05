@@ -198,15 +198,7 @@ void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
 
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 {
-	std::vector<MeshRenderer*> meshRenderers;
-	for (const auto& renderer : m_activeScene.load()->m_SceneObjects)
-	{
-		if (auto ptr = renderer->GetComponent<MeshRenderer>(); nullptr != ptr)
-		{
-			meshRenderers.push_back(ptr);
-		}
-	}
-	return meshRenderers;
+	return m_activeScene.load()->m_allMeshRenderers;
 }
 
 void SceneManager::CreateEditorOnlyPlayScene()
@@ -292,7 +284,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             {
                 try
                 {
-                    ComponentFactorys->LoadComponent(obj, componentNode);
+                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
                 }
                 catch (const std::exception& e)
                 {

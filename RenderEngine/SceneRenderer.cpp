@@ -192,13 +192,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 
 	m_renderScene = new RenderScene();
-	//SceneManagers->m_ActiveRenderScene = m_renderScene;
+	SceneManagers->m_ActiveRenderScene = m_renderScene;
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
 
-	m_threadPool = new ThreadPool(4);
+	m_threadPool = new ThreadPool;
 
     m_newSceneCreatedEventHandle = newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
@@ -345,8 +345,14 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	m_renderScene->Update(deltaTime);
+	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
+
 	//m_pEffectPass->Update(deltaTime);
+}
+
+void SceneRenderer::EndOfFrame(float deltaTime)
+{
+	m_renderScene->Update(deltaTime);
 	PrepareRender();
 }
 
@@ -563,8 +569,6 @@ void SceneRenderer::SceneRendering()
 		}
 
 		DirectX11::EndEvent();
-
-		camera->ClearRenderQueue();
 	}
 }
 
@@ -580,65 +584,71 @@ void SceneRenderer::PrepareRender()
 
 	if (GameSceneStart || GameSceneEnd)
 	{
+		for (auto camera : CameraManagement->m_cameras)
+		{
+			if (nullptr == camera) continue;
+			camera->ClearRenderQueue();
+		}
+
 		return;
 	}
 
 	Benchmark banch;
+	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
-	//for (auto& mesh : staticMeshes)
-	//{
-	//	if (false == mesh->IsEnabled() || 
-	//		false == mesh->IsNeedUpdateCulling()) continue;
+	for (auto& mesh : staticMeshes)
+	{
+		if (false == mesh->IsEnabled() || 
+			false == mesh->IsNeedUpdateCulling()) continue;
 
-	//	CullingManagers->UpdateMesh(mesh);
-	//}
+		CullingManagers->UpdateMesh(mesh);
+	}
 
 	for (auto camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
-		//std::vector<MeshRenderer*> culledMeshes;
-		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+		camera->ClearRenderQueue();
 
-		//for (auto& culledMesh : culledMeshes)
-		//{
-		//	if (false == culledMesh->IsEnabled()) continue;
-
-		//	camera->PushRenderQueue(culledMesh);
-		//}
-
-		for (auto mesh : staticMeshes)
+		m_threadPool->Enqueue([camera, &staticMeshes, &skinnedMeshes, renderScene]
 		{
-			if (false == mesh->IsEnabled()) continue;
+			//std::vector<MeshRenderer*> culledMeshes;
+			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-			m_threadPool->Enqueue([camera, mesh]
+			for (auto& culledMesh : staticMeshes)
 			{
 				auto frustum = camera->GetFrustum();
-
-				if (frustum.Intersects(mesh->GetBoundingBox()))
+				if (frustum.Intersects(culledMesh->GetBoundingBox()))
 				{
-					camera->PushRenderQueue(mesh);
+					auto proxyObject = renderScene->FindProxy(culledMesh->GetInstanceID());
+					if (proxyObject)
+					{
+						renderScene->UpdateCommand(culledMesh);
+						camera->PushRenderQueue(proxyObject);
+					}
 				}
-			});
-		}
+			}
 
-		for (auto skinnedMesh : skinnedMeshes)
-		{
-			if (false == skinnedMesh->IsEnabled()) continue;
-
-			m_threadPool->Enqueue([camera, skinnedMesh]
+			for (auto& skinnedMesh : skinnedMeshes)
 			{
-				auto frustum = camera->GetFrustum();
+				if (false == skinnedMesh->IsEnabled()) continue;
 
+				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
-					camera->PushRenderQueue(skinnedMesh);
+					auto proxyObject = renderScene->FindProxy(skinnedMesh->GetInstanceID());
+					//for test
+					if(proxyObject)
+					{
+						renderScene->UpdateCommand(skinnedMesh);
+						camera->PushRenderQueue(proxyObject);
+					}
 				}
-			});
-		}
+			}
+		});
 	}
 
 	m_threadPool->NotifyAllAndWait();

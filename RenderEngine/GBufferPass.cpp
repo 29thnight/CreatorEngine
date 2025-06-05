@@ -91,21 +91,21 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
-	for (RenderCommand& RenderCommand : camera.m_defferdQueue)
+	for (auto& MeshRendererProxy : camera.m_defferdQueue)
 	{	
-		scene.UpdateModel(RenderCommand.m_worldMatrix);
+		scene.UpdateModel(MeshRendererProxy->m_worldMatrix);
 
-		HashedGuid animatorGuid = RenderCommand.m_animatorGuid;
-		if (RenderCommand.m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
+		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
 			if (animatorGuid != currentAnimatorGuid)
 			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), RenderCommand.m_finalTransforms);
-				currentAnimatorGuid = RenderCommand.m_animatorGuid;
+				DirectX11::UpdateBuffer(m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
+				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
 			}
 		}
 
-		Material* mat = RenderCommand.m_Material;
+		Material* mat = MeshRendererProxy->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 
 		if (mat->m_pBaseColor)
@@ -129,7 +129,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		RenderCommand.m_Mesh->Draw();
+		MeshRendererProxy->Draw();
 	}
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
