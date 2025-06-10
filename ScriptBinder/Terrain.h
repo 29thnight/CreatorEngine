@@ -555,16 +555,16 @@ public:
 
 
 		
-        
+
         DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 		TerrainAddLayerBuffer addLayerBuffer;
 		addLayerBuffer.slice = newLayer.m_layerID;
         DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
+		DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
 
 
         const UINT offsets[]{ 0 };
 
-        DirectX11::UnbindRenderTargets();
         ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
         ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
         DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, offsets);

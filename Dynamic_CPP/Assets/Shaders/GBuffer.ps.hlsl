@@ -91,7 +91,8 @@ GBufferOutput main(PixelShaderInput IN)
     [branch]
     if (useTerrainLayers)
     {
-        float2 uv = IN.texCoord * gLayerTiling.x;
+        float2 uv = IN.texCoord * 4096.0;
+        uv.y = -uv.y;
         albedo = LayerAlbedo.SampleLevel(LinearSampler, float3(uv, (float)gLayerIndex),0);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
