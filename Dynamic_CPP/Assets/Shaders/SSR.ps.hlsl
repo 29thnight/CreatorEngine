@@ -22,6 +22,8 @@ Texture2D Diffuse : register(t1);
 Texture2D MetalRough : register(t2);
 Texture2D Normals : register(t3);
 
+Texture2D prevSSR : register(t4);
+
 struct PixelShaderInput // see Fullscreen.vs.hlsl
 {
     float4 position : SV_POSITION;
@@ -39,6 +41,12 @@ cbuffer DeferredCBuffer : register(b0)
     float Time;
     int MaxRayCount;
 }
+
+struct SSROutput
+{
+    float4 output : SV_TARGET0;
+    float4 prevOutput : SV_TARGET1;
+};
 
 float3 ReconstructWorldPosFromDepth(float2 uv, float depth, float4x4 invProj, float4x4 invView)
 {
@@ -84,7 +92,7 @@ float4 Raytrace(float3 reflectionWorld, const int maxCount, float stepSize, floa
     [loop]
     for (int i = 1; i <= maxCount; i++)
     {
-        float3 ray = (i + noise(uv/* + Time*/)) * step;
+        float3 ray = (i + noise(uv + Time)) * step;
         //float3 ray = (i + Hash12(uv * float2(1920, 1080))) * step; // No noise
         float3 rayPos = pos + ray;
         float4 vpPos = mul(ViewProjMatrix, float4(rayPos, 1.0f));
@@ -112,8 +120,10 @@ float4 Raytrace(float3 reflectionWorld, const int maxCount, float stepSize, floa
     return color;
 }
 
-float4 main(PixelShaderInput IN) : SV_TARGET
+SSROutput main(PixelShaderInput IN)
 {
+    SSROutput Out;
+    
     float4 color = Diffuse.Sample(LinearSampler, IN.texCoord);
     
     //uint width, height;
@@ -130,7 +140,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     float depth = DepthTexture.Sample(LinearSampler, IN.texCoord).r;
     if (depth >= 1.0f) 
-        return color;
+        Out.output = color;
     
     float3 normal = Normals.Sample(LinearSampler, IN.texCoord).xyz;
     normal = normalize(normal * 2.0 - 1.0);
@@ -145,10 +155,13 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float reflectFactor = (1.0 - roughness) * (0.04 * (1.0 - metallic) + metallic);
     
     float4 reflectedColor = Raytrace(refDir, MaxRayCount, StepSize, worldSpacePosition.rgb, IN.texCoord);
-
+    
     float edgeFade = saturate(1.f - pow(length(IN.texCoord.xy - 0.5f) * 2.f, 2.f));
     reflectFactor *= edgeFade;
     
+    Out.prevOutput = reflectedColor;
+    
     //return float4(depth, depth, depth, 1);
-    return color + reflectedColor * reflectFactor;
+    Out.output = lerp(prevSSR.Sample(LinearSampler, IN.texCoord) + color + reflectedColor * reflectFactor, color + reflectedColor * reflectFactor, 0.9);
+    return Out;
 }

@@ -114,10 +114,12 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 	Mathf::xMatrix proj = camera.CalculateProjection();
     m_SSAOBuffer.m_ViewProjection = XMMatrixMultiply(view, proj);
     m_SSAOBuffer.m_InverseViewProjection = XMMatrixInverse(nullptr, m_SSAOBuffer.m_ViewProjection);
+    m_SSAOBuffer.m_InverseProjection = camera.CalculateInverseProjection();
     m_SSAOBuffer.m_CameraPosition = camera.m_eyePosition;
     m_SSAOBuffer.m_Radius = radius;
     m_SSAOBuffer.m_Thickness = thickness;
     m_SSAOBuffer.m_windowSize = { (float)DeviceState::g_ClientRect.width, (float)DeviceState::g_ClientRect.height };
+    m_SSAOBuffer.m_frameIndex = Time->GetFrameCount();
 
     DirectX11::UpdateBuffer(m_Buffer.Get(), &m_SSAOBuffer);
 

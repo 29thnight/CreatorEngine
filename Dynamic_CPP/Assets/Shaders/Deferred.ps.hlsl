@@ -120,7 +120,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
     float ao = useAO ? AO.Sample(PointSampler, IN.texCoord).a : 1.0;
     float3 GI = useAO ? AO.Sample(PointSampler, IN.texCoord).rgb : float3(0, 0, 0);
-    ambient *= ao * occlusion;
-    float3 colour = ambient + Lo + emissive + (GI * ao);
+    ambient *= occlusion;
+    float3 colour = (ambient + Lo) * ao + emissive;// + GI * ao; //(albedo * GI * ao);
     return float4(colour, 1.0);
 }

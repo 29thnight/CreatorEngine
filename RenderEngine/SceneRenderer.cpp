@@ -469,6 +469,7 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 		//SSR
+		if (m_pEditorCamera.get() != camera)
 		{
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
 			Benchmark banch;

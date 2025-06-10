@@ -332,7 +332,7 @@ std::vector<ShadowInfo> devideShadowInfo(Camera& camera, std::vector<float> casc
 		{
 			LightDir.Normalize();
 		}
-		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * radius;
+		DirectX::SimpleMath::Vector3 shadowPos = centerPos + LightDir * (-radius);
 		Mathf::Vector3 cascadeExtents = maxExtents - minExtents;
 		Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
 		Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, cascadeExtents.z);
