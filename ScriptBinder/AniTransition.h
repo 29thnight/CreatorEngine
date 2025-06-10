@@ -24,6 +24,8 @@ public:
 		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
+
+	void AddDefaultCondition();
 	void SetCurState(std::string curStatename) {curState = curStatename;}
 	void SetNextState(std::string nextStatename) { nextState = nextStatename; }
 	std::string GetCurState()const { return curState; }
@@ -36,6 +38,8 @@ public:
 	std::vector<TransCondition> conditions;
 
 	AnimationController* m_ownerController{};
+	[[Property]]
+	std::string m_name = "NoName";
 private:
 	[[Property]]
 	std::string curState;
@@ -48,7 +52,7 @@ private:
 	[[Property]]
 	float exitTime =0.f;
 
-	//std::vector<TransConditionVariant> conditions;
+	
 	
 };
 

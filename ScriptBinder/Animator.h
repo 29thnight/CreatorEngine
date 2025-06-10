@@ -3,13 +3,15 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IUpdatable.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "AnimationController.h"
 #include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
 class AnimationController;
-class Animator : public Component, public IUpdatable
+class Animator : public Component, public IUpdatable, public IAwakable, public IOnDistroy
 {
 public:
     ReflectAnimator
@@ -26,16 +28,19 @@ public:
         }
     }
 
+    void Awake() override;
     void Update(float tick) override;
+    void OnDistroy() override;
     void SetAnimation(int index);
     [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
+    [[Method]]
+    void CreateController_UI();
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
-    [[Property]]
     float m_TimeElapsed{};
     [[Property]]
     uint32_t m_AnimIndexChosen{};
@@ -43,16 +48,13 @@ public:
     bool m_isBlend = false;
     float blendT = 0;
     [[Property]]
-    bool m_isLoof{ false };
-    [[Property]]
     int m_AnimIndex{};
     int nextAnimIndex = -1;
-    [[Property]]
     float m_nextTimeElapsed{};
     [[Property]]
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
- 
+
     [[Property]]
     std::vector<AnimationController*> m_animationControllers{};
     [[Property]]

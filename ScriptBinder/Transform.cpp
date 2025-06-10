@@ -1,6 +1,66 @@
 #include "Transform.h"
 #include "GameObject.h"
 
+Transform::Transform(const Transform& other) :
+	position(other.position),
+	rotation(other.rotation),
+	scale(other.scale),
+	m_parentID(other.m_parentID),
+	m_worldMatrix(other.m_worldMatrix),
+	m_localMatrix(other.m_localMatrix),
+	m_inverseMatrix(other.m_inverseMatrix),
+	m_worldScale(other.m_worldScale),
+	m_worldQuaternion(other.m_worldQuaternion),
+	m_worldPosition(other.m_worldPosition)
+{
+}
+
+Transform::Transform(Transform&& other) noexcept :
+	position(std::exchange(other.position, {})),
+	rotation(std::exchange(other.rotation, {})),
+	scale(std::exchange(other.scale, {})),
+	m_parentID(std::exchange(other.m_parentID, {})),
+	m_worldMatrix(std::exchange(other.m_worldMatrix, {})),
+	m_localMatrix(std::exchange(other.m_localMatrix, {})),
+	m_inverseMatrix(std::exchange(other.m_inverseMatrix, {})),
+	m_worldScale(std::exchange(other.m_worldScale, {})),
+	m_worldQuaternion(std::exchange(other.m_worldQuaternion, {})),
+	m_worldPosition(std::exchange(other.m_worldPosition, {}))
+{
+}
+
+Transform& Transform::operator=(const Transform& rhs)
+{
+	position = rhs.position;
+	rotation = rhs.rotation;
+	scale = rhs.scale;
+	m_parentID = rhs.m_parentID;
+	m_worldMatrix = rhs.m_worldMatrix;
+	m_localMatrix = rhs.m_localMatrix;
+	m_inverseMatrix = rhs.m_inverseMatrix;
+	m_worldScale = rhs.m_worldScale;
+	m_worldQuaternion = rhs.m_worldQuaternion;
+	m_worldPosition = rhs.m_worldPosition;
+
+	return *this;
+}
+
+Transform& Transform::operator=(Transform&& rhs) noexcept
+{
+	position			= std::exchange(rhs.position,{});
+	rotation			= std::exchange(rhs.rotation, {});
+	scale				= std::exchange(rhs.scale, {});
+	m_parentID			= std::exchange(rhs.m_parentID, {});
+	m_worldMatrix		= std::exchange(rhs.m_worldMatrix, {});
+	m_localMatrix		= std::exchange(rhs.m_localMatrix, {});
+	m_inverseMatrix		= std::exchange(rhs.m_inverseMatrix, {});
+	m_worldScale		= std::exchange(rhs.m_worldScale, {});
+	m_worldQuaternion	= std::exchange(rhs.m_worldQuaternion, {});
+	m_worldPosition		= std::exchange(rhs.m_worldPosition, {});
+
+	return *this;
+}
+
 Transform& Transform::SetScale(Mathf::Vector3 scale)
 {
 	m_dirty = true;

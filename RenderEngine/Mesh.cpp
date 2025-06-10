@@ -70,7 +70,6 @@ void Mesh::Draw()
 	DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
-
 }
 
 ID3D11CommandList* Mesh::Draw(ID3D11DeviceContext* _defferedContext)
@@ -89,7 +88,6 @@ ID3D11CommandList* Mesh::Draw(ID3D11DeviceContext* _defferedContext)
 
 
 UIMesh::UIMesh()
-	
 {
 	m_vertices = UIQuad;
 	m_indices = UIIndices;

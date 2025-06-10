@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
-
+#include "Skeleton.generated.h"
+#include "Animation.h"
 enum class BoneRegion
 {
 	Root,
@@ -13,20 +14,24 @@ enum class BoneRegion
 };
 AUTO_REGISTER_ENUM(BoneRegion)
 
-
 class Bone;
 class Animation;
 class Skeleton
 {
 public:
+   ReflectSkeleton
+	[[Serializable]]
+	Skeleton() = default;
+	~Skeleton();
+
 	Bone* m_rootBone{};
+	[[Property]]
 	std::vector<Animation> m_animations;
 	std::vector<Bone*> m_bones;
+	[[Property]]
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;
 
-	Skeleton() = default;
-	~Skeleton();
 	static constexpr uint32 MAX_BONES{ 512 };
 
 	Bone* FindBone(const std::string_view& _name);
@@ -59,37 +64,5 @@ public:
 	}
 };
 
-struct NodeAnimation
-{
-	std::string m_name{};
 
-	struct PositionKey
-	{
-		Mathf::xVector m_position;
-		double m_time;
-	};
-	std::vector<PositionKey> m_positionKeys;
-
-	struct RotationKey
-	{
-		Mathf::xVector m_rotation;
-		double m_time;
-	};
-	std::vector<RotationKey> m_rotationKeys;
-
-	struct ScaleKey
-	{
-		Mathf::Vector3 m_scale;
-		double m_time;
-	};
-	std::vector<ScaleKey> m_scaleKeys;
-};
-
-class Animation
-{
-public:
-	std::string m_name{};
-	std::map<std::string, NodeAnimation> m_nodeAnimations;
-	double m_duration{};
-	double m_ticksPerSecond{};
-};
+inline static XMMATRIX InitialMatrix[Skeleton::MAX_BONES]{};

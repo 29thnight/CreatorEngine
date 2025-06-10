@@ -1,6 +1,6 @@
 #include "EffectModules.h"
-#include "Camera.h"
-#include "ShaderSystem.h"
+#include "../Camera.h"
+#include "../ShaderSystem.h"
 
 void ColorModule::Update(float delta, std::vector<ParticleData>& particles)
 {

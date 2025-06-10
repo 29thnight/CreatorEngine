@@ -13,14 +13,16 @@ public:
 	[[Serializable]]
 	AvatarMask() = default;
 
-	//본이 해당아바타 사용중인지
+	//해당아바타가 해당 본 사용중인지
 	bool IsBoneEnabled(BoneRegion region);
-	void UseOnlyUpper() { isUpper = true;  isLower = false; }
-	void UseOnlyLower() { isUpper = false; isLower = true; }
+	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
+	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }
 	[[Property]]
-	bool isUpper = true;
+	bool useAll = true;
 	[[Property]]
-	bool isLower = true;
+	bool useUpper = true;
+	[[Property]]
+	bool useLower = true;
 };
 
 

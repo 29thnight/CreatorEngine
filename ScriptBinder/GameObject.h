@@ -14,8 +14,6 @@ class ModuleBehavior;
 class GameObject : public Object
 {
 public:
-	[[property]]
-	float speed = 0; //***** 이거 언제까지 유지해야함?
 	using Index = int;
 	static constexpr GameObject::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
 	enum class Type
@@ -109,7 +107,6 @@ public:
 public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	[[Property]]
 	HashingString m_tag{ "Untagged" };
 	

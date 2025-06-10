@@ -3,12 +3,14 @@
 #include "Texture.h"
 #include "../ScriptBinder/GameObject.h"
 #include "AnimationJob.h"
+#include "RenderCommand.h"
 
 class GameObject;
 class Scene;
 class LightController;
 class HierarchyWindow;
 class InspectorWindow;
+class MeshRenderer;
 class RenderScene
 {
 public:
@@ -29,21 +31,25 @@ public:
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
-	Scene* GetScene() { return m_currentScene; }
-	GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
+	void RegisterAnimator(Animator* animatorPtr);
+	void UnregisterAnimator(Animator* animatorPtr);
 
-	void ResetSelectedSceneObject();
+	void RegisterCommand(MeshRenderer* meshRendererPtr);
+	void UpdateCommand(MeshRenderer* meshRendererPtr);
+	void UnregisterCommand(MeshRenderer* meshRendererPtr);
+
+	MeshRendererProxy* FindProxy(size_t guid);
+	Scene* GetScene() { return m_currentScene; }
 
 private:
 	friend class HierarchyWindow;
 	friend class InspectorWindow;
 	friend class SceneViewWindow;
 
-	void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
-	
 	Scene* m_currentScene{};
 	AnimationJob m_animationJob{};
-	GameObject* m_selectedSceneObject = nullptr;
-	ID3D11Buffer* m_ModelBuffer;
+	std::unordered_map<size_t, std::shared_ptr<MeshRendererProxy>> m_proxyMap;
+	std::unordered_map<size_t, Animator*> m_animatorMap;
+	ID3D11Buffer* m_ModelBuffer{};
 	bool m_isPlaying = false;
 };

@@ -10,10 +10,12 @@ public:
 	~MenuBarWindow() = default;
 	void RenderMenuBar();
     void ShowLogWindow();
+	void ShowLightMapWindow();
 
 private:
     ImFont* m_koreanFont{ nullptr };
 	SceneRenderer* m_sceneRenderer{ nullptr };
     int  m_selectedLogIndex{};
     bool m_bShowLogWindow{ false };
+	bool m_bShowLightMapWindow{ false };
 };

@@ -83,6 +83,7 @@ cbuffer ShadowMapConstant
     float m_casCadeEnd3{};
     float _epsilon = 0.01;
     int devideShadow = 9; //max = 9 
+    bool32 useCasCade;
 };
 struct cameraView
 {

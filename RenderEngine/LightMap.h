@@ -77,7 +77,7 @@ namespace lm {
 
 		void Prepare();
 		void PrepareRectangles();
-		void CalculateRectangles();
+		bool CalculateRectangles();
 
 		void PrepareTriangles();
 

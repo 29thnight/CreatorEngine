@@ -21,6 +21,7 @@ public:
     void yield_WaitForFixedUpdate();
     void yield_WaitForEndOfFrame();
     void yield_OtherEvent();
+    void yield_OnRender();
 
 private:
     struct CoroutineWrapper : public LinkProperty<CoroutineWrapper>
@@ -44,6 +45,7 @@ private:
     LinkedList<CoroutineWrapper> waitUntilQueue;
     LinkedList<CoroutineWrapper> waitForSignalQueue;
     LinkedList<CoroutineWrapper> waitForEndOfFrameQueue;
+    LinkedList<CoroutineWrapper> onRenderQueue;
 
 	std::unordered_map<std::string, CoroutineWrapper*> coroutineMap;
     std::vector<CoroutineWrapper*> activeCoroutines;
@@ -107,4 +109,9 @@ inline YieldInstruction WaitForEndOfFrame()
 inline YieldInstruction ReturnNull()
 {
     return YieldInstruction{ YieldInstructionType::Null };
+}
+
+inline YieldInstruction OnRender()
+{
+    return YieldInstruction{ YieldInstructionType::OnRender };
 }

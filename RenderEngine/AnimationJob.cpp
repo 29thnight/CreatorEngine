@@ -19,7 +19,7 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
     float duration = time;
     for (UINT i = 0; i < keys.size() - 1; ++i)
     {
-        if (duration < keys[i + 1].m_time)
+        if (duration <= keys[i + 1].m_time)
         {
             return i;
         }
@@ -39,6 +39,7 @@ AnimationJob::~AnimationJob()
 {
 	SceneManagers->sceneLoadedEvent.Remove(m_sceneLoadedHandle);
 	SceneManagers->InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
+    SceneManagers->sceneUnloadedEvent.Remove(m_sceneUnloadedHandle);
 }
 
 void AnimationJob::Update(float deltaTime)
@@ -70,7 +71,13 @@ void AnimationJob::Update(float deltaTime)
                 {
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
-                    animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration);
+                    if(animation.m_isLoop == true)
+                        animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
+                    else
+                    {
+                        if (animationcontroller->m_timeElapsed >= animation.m_duration)
+                            animationcontroller->m_timeElapsed = animation.m_duration;
+                    }
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
@@ -93,7 +100,13 @@ void AnimationJob::Update(float deltaTime)
             {
                 Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
                 animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
-                animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+                if(animation.m_isLoop == true)
+                    animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+                else
+                {
+                    if (animator->m_TimeElapsed >= animation.m_duration)
+                        animator->m_TimeElapsed = animation.m_duration;
+                }
                 AnimationController* animationcontroller = nullptr;
                 if(!animator->m_animationControllers.empty())
                     animationcontroller = animator->m_animationControllers[0];
@@ -278,7 +291,6 @@ XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
 XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
 {
     float t = 0;
-
     // Translation
     XMVECTOR interpPos = nodeAnim.m_positionKeys[0].m_position;
     if (nodeAnim.m_positionKeys.size() > 1)

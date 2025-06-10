@@ -24,6 +24,7 @@ public:
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
+    void MakeInstanceID() { m_instanceID = make_guid(); }
 	HashedGuid GetTypeID() const override final { return m_typeID; }
     std::string ToString() const override final { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
@@ -52,6 +53,6 @@ protected:
 	HashedGuid        m_typeID{ type_guid(Object) };
     [[Property]]
     HashedGuid        m_instanceID{ make_guid() };
-	bool m_destroyMark{ false };
-	bool m_dontDestroyOnLoad{ false };
+	bool              m_destroyMark{ false };
+	bool              m_dontDestroyOnLoad{ false };
 };

@@ -6,26 +6,24 @@
 #include "Skeleton.h"
 #include "LightController.h"
 #include "Benchmark.hpp"
+#include "MeshRenderer.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
+#include "RenderCommand.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 
+constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
+
 RenderScene::~RenderScene()
 {
-	//TODO : ComPtr이라 자동 해제 -> default로 변경할 것
-    ImGui::ContextUnregister("GameObject Hierarchy");
-    ImGui::ContextUnregister("GameObject Inspector");
-
 	Memory::SafeDelete(m_LightController);
 }
 
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
-
-	SceneManagers->resetSelectedObjectEvent.AddRaw(this, &RenderScene::ResetSelectedSceneObject);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -39,11 +37,6 @@ void RenderScene::Update(float deltaSecond)
 	if (m_currentScene == nullptr) return;
 
     m_LightController->m_lightCount = m_currentScene->UpdateLight(m_LightController->m_lightProperties);
-
-	for (auto& objIndex : m_currentScene->m_SceneObjects[0]->m_childrenIndices)
-	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
-	}
 }
 
 void RenderScene::ShadowStage(Camera& camera)
@@ -73,51 +66,95 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
 }
 
-void RenderScene::ResetSelectedSceneObject()
+void RenderScene::RegisterAnimator(Animator* animatorPtr)
 {
-	m_selectedSceneObject = nullptr;
+	if (nullptr == animatorPtr) return;
+
+	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
+
+	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
+
+	m_animatorMap[animatorGuid] = animatorPtr;
 }
 
-void RenderScene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
+void RenderScene::UnregisterAnimator(Animator* animatorPtr)
 {
-	if(!m_currentScene) return;
+	if (nullptr == animatorPtr) return;
 
-	const auto& obj = m_currentScene->GetGameObject(objIndex);
+	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
-	if (!obj || obj->IsDestroyMark())
+	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
+
+	m_animatorMap.erase(animatorGuid);
+}
+
+void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr) return;
+
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) != m_proxyMap.end()) return;
+
+	// Create a new proxy for the mesh renderer and insert it into the map
+	auto managedCommand = std::make_shared<MeshRendererProxy>(meshRendererPtr);
+	m_proxyMap[meshRendererGuid] = managedCommand;
+}
+
+MeshRendererProxy* RenderScene::FindProxy(size_t guid)
+{
+	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
+
+	return m_proxyMap[guid].get();
+}
+
+void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr || meshRendererPtr->IsDestroyMark()) return;
+
+	auto owner = meshRendererPtr->GetOwner();
+	if(nullptr == owner || owner->IsDestroyMark()) return;
+
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
+	
+	auto& proxyObject = m_proxyMap[meshRendererGuid];
+
+	if (nullptr == proxyObject) return;
+
+	HashedGuid aniGuid = proxyObject->m_animatorGuid;
+
+	if(m_animatorMap.find(aniGuid) != m_animatorMap.end() 
+		&& proxyObject->IsSkinnedMesh())
 	{
-		return;
+		auto* dstPalete = &proxyObject->m_finalTransforms;
+		auto* srcPalete = &m_animatorMap[aniGuid]->m_FinalTransforms;
+
+		memcpy(dstPalete, srcPalete, TRANSFORM_SIZE);
 	}
 
-	if(GameObjectType::Bone == obj->GetType())
-	{
-		const auto& animator = m_currentScene->GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		if (!animator || !animator->IsEnabled())
-		{
-			return;
-		}
-		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
-		if (bone)
-		{
-			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
-		}
-	}
-	else
-	{
-		if (obj->m_transform.IsDirty())
-		{
-			auto renderer = obj->GetComponent<MeshRenderer>();
-			if (renderer)
-			{
-				renderer->SetNeedUpdateCulling(true);
-			}
-		}
-		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-		obj->m_transform.SetAndDecomposeMatrix(model);
-	}
+	proxyObject->m_worldMatrix = worldMatrix;
 
-	for (auto& childIndex : obj->m_childrenIndices)
+	constexpr int INVAILD_INDEX = -1;
+
+	int& lightMapIndex		= meshRendererPtr->m_LightMapping.lightmapIndex;
+	int& proxyLightMapIndex = proxyObject->m_LightMapping.lightmapIndex;
+
+	if(INVAILD_INDEX != lightMapIndex && proxyLightMapIndex != lightMapIndex)
 	{
-		UpdateModelRecursive(childIndex, model);
+		proxyObject->m_LightMapping = meshRendererPtr->m_LightMapping;
 	}
+}
+
+void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr) return;
+
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
+
+	m_proxyMap.erase(meshRendererGuid);
 }

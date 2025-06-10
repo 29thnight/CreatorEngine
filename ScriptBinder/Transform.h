@@ -12,6 +12,12 @@ public:
     Transform() = default;
     ~Transform() = default;
 
+	Transform(const Transform& other);
+	Transform(Transform&& other) noexcept;
+
+	Transform& operator=(const Transform& rhs);
+	Transform& operator=(Transform&& rhs) noexcept;
+
     [[Property]]
 	Mathf::Vector4 position{ 0.f, 0.f, 0.f, 1.f };
     [[Property]]

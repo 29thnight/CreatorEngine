@@ -1,5 +1,5 @@
 #include "Sampler.hlsli"
-#define MAX_LIGHTS 4
+#define MAX_LIGHTS 20
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
@@ -154,7 +154,7 @@ inline bool RayTriangleIntersect(float3 orig, float3 dir, Triangle tri, out floa
     float3 edge2 = v2 - v0;
     float3 pvec = cross(dir, edge2);    // 평행한 직선은 외적이 0이 되므로 오류 발생 가능성 있음.
     float det = dot(edge1, pvec);       // 크기가 0인 벡터와의 내적은 0임. 아래에서 처리하므로 문제없음.
-    if (det > -1e-6)                    // 빛이 오는 방향에서 막는 삼각형 검출.
+    if (abs(det) < 1e-6)                    // 빛이 오는 방향에서 막는 삼각형 검출.
         return false;
 
     float invDet = 1.0 / det;
@@ -317,7 +317,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             continue;
 
         float3 toLight;
-        float distance = 10000.0;
+        float distance = 1000000000.0;
         float attenuation = 1.0;
         float NdotL = 0.0;
 
@@ -338,8 +338,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 continue;
             
             // Distance attenuation (Point, Spot)
-            float att = light.constantAtt + light.linearAtt * distance + light.quadAtt * (distance * distance);
-            attenuation = 1.0 / max(att, 0.001);
+            float att = light.constantAtt + (light.linearAtt * distance) + (light.quadAtt * distance * distance);
+            attenuation = 1.0 / att; //1.0 / max(att, 0.001);
             
             
             //// 부드러운 거리감쇠를 생각했으나 너무 선형적임. 1 - (d^2 / r^2)으로? 위에 이미 있었네.
@@ -368,8 +368,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         finalColor.a = 1;
         if (!blocked)
         {
-            finalColor.rgb += NdotL * attenuation * light.color.rgb * light.intencity;
-            dominantDir += normalize(light.direction.xyz) * luminance(light.color.rgb) * light.intencity;
+            finalColor.rgb += light.color.rgb * NdotL * attenuation /** light.intencity*/;
+            dominantDir += -toLight * luminance(light.color.rgb * NdotL * attenuation) /* * light.intencity*/;
         }
     }
     SurfaceInfo surf;

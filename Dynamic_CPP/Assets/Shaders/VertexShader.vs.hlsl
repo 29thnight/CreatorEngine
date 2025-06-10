@@ -18,6 +18,11 @@ cbuffer BoneTransformation : register(b3)
     matrix BoneTransforms[50];
 }
 
+
+
+StructuredBuffer<matrix> models : register(t0);
+StructuredBuffer<matrix> BoneTransforms2 : register(t1);
+
 struct AppData
 {
     float3 position : POSITION;
@@ -55,6 +60,7 @@ VertexShaderOutput main(AppData IN)
         IN.normal = normalize(mul(boneTransform, float4(IN.normal, 0.0f)));
         IN.tangent = normalize(mul(boneTransform, float4(IN.tangent, 0.0f)));
         IN.binormal = normalize(mul(boneTransform, float4(IN.binormal, 0.0f)));
+        
     }
 
     VertexShaderOutput OUT;

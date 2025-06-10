@@ -22,6 +22,9 @@
     <Filter Include="소스 파일\CollapsingHeader">
       <UniqueIdentifier>{351c0fd0-8ac4-45e2-a515-5a47000c00fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\NodeEditior">
+      <UniqueIdentifier>{728d96ad-0a9d-425e-9a0c-8df97fe3f51d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGuiContext.h">
@@ -51,6 +54,9 @@
     <ClInclude Include="ImGuiMath.h">
       <Filter>소스 파일\NodeEditorHelper</Filter>
     </ClInclude>
+    <ClInclude Include="NodeEditor.h">
+      <Filter>소스 파일\NodeEditior</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp">
@@ -58,6 +64,9 @@
     </ClCompile>
     <ClCompile Include="widgets.cpp">
       <Filter>소스 파일\NodeEditorHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeEditor.cpp">
+      <Filter>소스 파일\NodeEditior</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

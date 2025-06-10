@@ -4,6 +4,7 @@
 #include "Material.h"
 #include "CullingManager.h"
 #include "SceneManager.h"
+#include "RenderScene.h"
 #include "Scene.h"
 
 MeshRenderer::MeshRenderer()
@@ -19,9 +20,11 @@ MeshRenderer::~MeshRenderer()
 void MeshRenderer::Awake()
 {
     auto scene = SceneManagers->GetActiveScene();
+    auto renderScene = SceneManagers->m_ActiveRenderScene;
     if (scene)
     {
         scene->CollectMeshRenderer(this);
+        renderScene->RegisterCommand(this);
     }
 
     if(!m_isSkinnedMesh)
@@ -36,9 +39,11 @@ void MeshRenderer::OnDistroy()
 {
     CullingManagers->Remove(this);
 	auto scene = SceneManagers->GetActiveScene();
+    auto renderScene = SceneManagers->m_ActiveRenderScene;
 	if (scene)
 	{
 		scene->UnCollectMeshRenderer(this);
+        renderScene->UnregisterCommand(this);
 	}
 }
 

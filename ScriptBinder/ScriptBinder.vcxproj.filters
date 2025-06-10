@@ -204,7 +204,7 @@
     <ClCompile Include="InputActionManager.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
-    <ClCompile Include="InputAction.cpp">
+    <ClCompile Include="ActionMap.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
     <ClCompile Include="MeshRenderer.cpp">
@@ -395,10 +395,10 @@
     <ClInclude Include="ModuleBehaviorInfo.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
-    <ClInclude Include="InputActionManager.h">
+    <ClInclude Include="ActionMap.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
-    <ClInclude Include="InputAction.h">
+    <ClInclude Include="InputActionManager.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">

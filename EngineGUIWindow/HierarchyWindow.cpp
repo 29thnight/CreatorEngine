@@ -28,7 +28,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 		{
 			scene = SceneManagers->GetActiveScene();
 			renderScene = m_sceneRenderer->m_renderScene;
-			selectedSceneObject = renderScene->m_selectedSceneObject;
+			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)
 			{
@@ -46,7 +46,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 				if (false == ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
-					renderScene->m_selectedSceneObject = nullptr;
+					scene->m_selectedSceneObject = nullptr;
 				}
 			}
 
@@ -60,7 +60,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					if (selectedSceneObject)
 					{
 						scene->DestroyGameObject(selectedSceneObject->m_index);
-						renderScene->m_selectedSceneObject = nullptr;
+						scene->m_selectedSceneObject = nullptr;
 					}
 				}
 				ImGui::Separator();
@@ -111,7 +111,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
 			{
 				scene->DestroyGameObject(selectedSceneObject->m_index);
-				renderScene->m_selectedSceneObject = nullptr;
+				scene->m_selectedSceneObject = nullptr;
 			}
 		}
 
@@ -190,7 +190,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			{
 				for (auto& obj : scene->m_SceneObjects)
 				{
-					if (0 == obj->m_index || obj->m_parentIndex > 0) continue;
+					if (!obj || 0 == obj->m_index || obj->m_parentIndex > 0) continue;
 
 					ImGui::PushID((int)&obj);
 					DrawSceneObject(obj);
@@ -208,7 +208,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto& selectedSceneObject = m_sceneRenderer->m_renderScene->m_selectedSceneObject;
+	auto& selectedSceneObject = scene->m_selectedSceneObject;
 
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
 	if (obj.get() == selectedSceneObject)
@@ -237,8 +237,8 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 			if (prevSelection != newSelection)
 			{
 				Meta::MakeCustomChangeCommand(
-					[=]() { m_sceneRenderer->m_renderScene->m_selectedSceneObject = prevSelection; },
-					[=]() { m_sceneRenderer->m_renderScene->m_selectedSceneObject = newSelection; }
+					[=]() { scene->m_selectedSceneObject = prevSelection; },
+					[=]() { scene->m_selectedSceneObject = newSelection; }
 				);
 
 				// 즉시 반영
@@ -246,7 +246,6 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 			}
 		}
 	}
-
 
 	if (ImGui::BeginDragDropSource())
 	{

@@ -1,10 +1,20 @@
 #include "Animator.h"
 #include "AnimationController.h"
+#include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
+#include "NodeEditor.h"
+
+void Animator::Awake()
+{
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (renderScene)
+	{
+		renderScene->RegisterAnimator(this);
+	}
+}
 
 void Animator::Update(float tick)
 {
-	
 	if (m_animationControllers.empty()) return;
 
 	for (auto& animationController : m_animationControllers)
@@ -21,7 +31,15 @@ void Animator::Update(float tick)
 	}
 }
 
-
+void Animator::OnDistroy()
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (renderScene)
+	{
+		renderScene->UnregisterAnimator(this);
+	}
+}
 
 void Animator::SetAnimation(int index)
 {
@@ -51,16 +69,27 @@ void Animator::CreateController(std::string name)
 	animationController->m_owner = this;
 	animationController->name = name;
 	animationController->CreateMask();
+	animationController->m_nodeEditor = new NodeEditor();
+	m_animationControllers.push_back(animationController);
+}
+
+void Animator::CreateController_UI()
+{
+	AnimationController* animationController = new AnimationController();
+	animationController->m_owner = this;
+	animationController->CreateMask();
 	m_animationControllers.push_back(animationController);
 }
 
 AnimationController* Animator::GetController(std::string name)
 {
-	for (auto& Controller : m_animationControllers)
-	{
-		if (Controller->name == name)
-			return Controller;
-	}
+        for (auto& Controller : m_animationControllers)
+        {
+                if (Controller->name == name)
+                        return Controller;
+        }
+        // Return nullptr when no controller with the specified name exists
+        return nullptr;
 }
 
 

@@ -20,6 +20,8 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+#include "NodeEditor.h"
+namespace ed = ax::NodeEditor;
 static const std::unordered_set<std::string> ignoredKeys = {
 	"guid",
 	"importSettings"
@@ -154,6 +156,7 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
 	}
 }
 
+#include "imgui-node-editor/imgui_node_editor.h"
 constexpr XMVECTOR FORWARD = XMVECTOR{ 0.f, 0.f, 1.f, 0.f };
 constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 
@@ -179,7 +182,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		{
 			scene = SceneManagers->GetActiveScene();
 			renderScene = m_sceneRenderer->m_renderScene;
-			selectedSceneObject = renderScene->m_selectedSceneObject;
+			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)
 			{
@@ -401,6 +404,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					else if (nullptr != moduleBehavior)
 					{
 						ImGuiDrawHelperModuleBehavior(moduleBehavior);
+					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<Animator>())
+					{
+						Animator* animator = dynamic_cast<Animator*> (component.get());
+						if (nullptr != animator)
+						{
+							ImGuiDrawHelperAnimator(animator);
+						}
 					}
 					else if (type)
 					{
@@ -703,6 +714,202 @@ void InspectorWindow::ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavi
 		ImGui::PopStyleVar(2);
 	}
 }
+
+void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
+{
+	if (animator)
+	{
+		static bool showControllersWindow = false;
+		const auto& aniType = Meta::Find(animator->GetTypeID());
+		Meta::DrawProperties(animator, *aniType);
+		Meta::DrawMethods(animator, *aniType);
+		if (ImGui::CollapsingHeader("animations"))
+		{
+			for (auto& animation : animator->m_Skeleton->m_animations)
+			{
+				ImGui::PushID(animation.m_name.c_str());
+				const auto& mat_info_type = Meta::Find("Animation");
+				Meta::DrawProperties(&animation, *mat_info_type);
+
+				ImGui::PopID();
+			}
+		}
+
+		if (!animator->m_animationControllers.empty())
+		{
+			ImGui::Text("Controllers ");
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_BOX))
+			{
+				showControllersWindow = !showControllersWindow;
+			}
+			if(showControllersWindow)
+			{
+				ImGui::Begin("Animation Controllers", &showControllersWindow);
+				//if (ImGui::CollapsingHeader("Controllers"))
+				{
+					int i = 0;
+					static int selectedControllerIndex = 0;
+					static int preSelectIndex = 0;
+					ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
+					ImGui::Text("Controllers");
+					ImGui::Separator();
+
+					auto& controllers = animator->m_animationControllers;
+					for(int index = 0; index < controllers.size(); ++index)
+					{
+						auto& controller = controllers[index];
+						bool isSelected = (selectedControllerIndex == index);
+						ImGui::PushID(index);
+						
+						float selectableWidth = ImGui::GetContentRegionAvail().x - 33.0f; // 버튼 폭만큼 빼기
+					
+						if (ImGui::Selectable(controller->name.c_str(), isSelected, 0, ImVec2(selectableWidth, 0)))
+						{
+							selectedControllerIndex = index;
+						}
+						ImGui::SameLine();
+						if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+						{
+							ImGui::OpenPopup("ControllerDetailPopup");
+						}
+						
+						if (ImGui::BeginPopup("ControllerDetailPopup"))
+						{
+							ImGui::Text("Detail: %s", "ControllerDetailPopup");
+							ImGui::Separator();
+
+							const auto& mat_controller_type = Meta::Find("AnimationController");
+							Meta::DrawProperties(controller, *mat_controller_type);
+							Meta::DrawMethods(controller, *mat_controller_type);
+
+							ImGui::EndPopup();
+						}
+						ImGui::PopID();
+					}
+					ImGui::EndChild();
+
+					ImGui::SameLine();
+					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); 
+					ImGui::Text("Controller Info");
+					ImGui::Separator();
+					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
+					{
+						static int linkIndex = -1;
+						if (preSelectIndex != selectedControllerIndex)
+						{
+							linkIndex = -1;
+							preSelectIndex = selectedControllerIndex;
+						}
+						auto& controller = animator->m_animationControllers[selectedControllerIndex];
+						std::string fileName = controller->name + ".node_editor.json";
+
+						if (!controller->StateVec.empty())
+						{
+							controller->m_nodeEditor->MakeEdit(fileName);
+							for (auto& state : controller->StateVec)
+							{
+								controller->m_nodeEditor->MakeNode(state->m_name);
+							}
+							for (auto& state : controller->StateVec)
+							{
+								for (auto& trans : state->Transitions)
+								{
+									controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+									
+								}
+							}
+							controller->m_nodeEditor->DrawLink(&linkIndex);
+							controller->m_nodeEditor->DrawNode();
+							
+							if (linkIndex != -1)
+							{
+								ImGui::Begin("cur Link");
+								ImGui::Text("From:  %s", controller->m_nodeEditor->Links[linkIndex]->fromNode.c_str());
+								ImGui::Text("To:  %s", controller->m_nodeEditor->Links[linkIndex]->toNode.c_str());
+								ImGui::End();
+							}
+
+							static bool isOpenPopUp;
+
+							if (ed::ShowBackgroundContextMenu())
+							{
+								isOpenPopUp = true;
+								/*ImGui::OpenPopup("NodeEditorContextMenu");*/
+							}
+							else
+							{
+								isOpenPopUp = false;
+							}
+
+							controller->m_nodeEditor->EndEdit();
+
+							if (isOpenPopUp)
+							{
+								ImGui::OpenPopup("NodeEditorContextMenu");
+							}
+
+							if (ImGui::BeginPopup("NodeEditorContextMenu"))
+							{
+								if (ImGui::MenuItem("Add Node"))
+								{
+									controller->CreateState_UI();
+									isOpenPopUp = false;
+								}
+
+								ImGui::EndPopup();
+							}
+							
+						}
+					}
+
+					ImGui::EndChild();
+				}
+				ImGui::End(); // 창 닫기
+			}			
+		}
+	}
+}
+
+void InspectorWindow::DrawMyLink(std::string linkName, std::string from, std::string to)
+{
+	ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(linkName));
+	ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(from));
+	ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(to));
+	ed::LinkId reverselinkId = static_cast<ed::LinkId>(std::hash<std::string>{}(std::string(to + " to " + from)));
+	ImVec2 p1 = ed::GetNodePosition(nodeID);
+	ImVec2 p2 = ed::GetNodePosition(nextnodeID);
+
+	// 오프셋을 줘서 겹침 방지
+	//float offset = ((linkId % 3) - 1) * 20.0f;
+	
+	// 중간 꺾이는 지점
+	//ImVec2 mid1 = ImVec2(p1.x + offset, p1.y);
+	//ImVec2 mid2 = ImVec2(p1.x + offset, p2.y);
+
+
+	ImVec2 dir = p2 - p1;          // 상대 방향
+	float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+	ImVec2 normDir = ImVec2(dir.x / length, dir.y / length); // 정규화
+
+
+	// 현재 윈도우에서 DrawList 얻기
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+
+
+	ImU32 color = IM_COL32(255, 255, 255, 255);
+	float thickness = 2.0f;
+
+
+
+	// 3단 꺾인 직선 그리기
+	drawList->AddLine(p1, p2, color, thickness);
+	/*drawList->AddLine(p1, mid1, color, thickness);
+	drawList->AddLine(mid1, mid2, color, thickness);
+	drawList->AddLine(mid2, p2, color, thickness);*/
+}
+
 
 void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 {

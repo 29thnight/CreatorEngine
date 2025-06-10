@@ -59,12 +59,12 @@ void InputManager::KeyBoardUpdate()
 
 bool InputManager::IsKeyDown(unsigned int key) const
 {
-    return keyboardstate.GetKeyState(key) == KeyState::Pressed;
+    return keyboardstate.GetKeyState(key) == KeyState::Down;
 }
 
 bool InputManager::IsKeyPressed(unsigned int key) const
 {
-    return keyboardstate.GetKeyState(key) == KeyState::Hold;
+    return keyboardstate.GetKeyState(key) == KeyState::Pressed;
   
 }
 
@@ -184,7 +184,7 @@ bool InputManager::IsWheelDown()
 
 bool InputManager::IsMouseButtonDown(MouseKey button)
 {
-    return mousestate.GetKeyState(static_cast<size_t>(button)) == KeyState::Hold;
+    return mousestate.GetKeyState(static_cast<size_t>(button)) == KeyState::Down;
 }
 
 bool InputManager::IsMouseButtonPressed(MouseKey button)
@@ -322,12 +322,12 @@ bool InputManager::IsControllerConnected(DWORD Index)
 
 bool InputManager::IsControllerButtonDown(DWORD index, ControllerButton btn) const
 {
-    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Pressed;
+    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Down;
 }
 
 bool InputManager::IsControllerButtonPressed(DWORD index, ControllerButton btn) const
 {
-    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Hold;
+    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Pressed;
 }
 
 bool InputManager::IsControllerButtonReleased(DWORD index, ControllerButton btn) const

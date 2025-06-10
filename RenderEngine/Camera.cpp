@@ -4,6 +4,7 @@
 #include "ImGuiRegister.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "RenderCommand.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -41,6 +42,9 @@ Camera::Camera()
 	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+
+	m_defferdQueue.reserve(300);
+	m_forwardQueue.reserve(300);
 }
 
 Camera::~Camera()
@@ -208,7 +212,7 @@ void Camera::HandleMovement(float deltaTime)
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
-	if (InputManagement->IsMouseButtonDown(MouseKey::RIGHT))
+	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT))
 	{
 		// 마우스 이동량 가져오기
 		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
@@ -275,21 +279,28 @@ void Camera::ClearRenderTarget()
 	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
-void Camera::PushRenderQueue(MeshRenderer* meshRenderer)
+void Camera::PushRenderQueue(MeshRendererProxy* command)
 {
-	if (nullptr == meshRenderer) return;
-	if (false == meshRenderer->IsEnabled()) return;
-	Material* mat = meshRenderer->m_Material;
+	Material* mat = command->m_Material;
 	if (nullptr == mat) return;
-	switch (mat->m_renderingMode)
+
 	{
-	case MaterialRenderingMode::Opaque:
-		m_defferdQueue.push_back(meshRenderer);
-		break;
-	case MaterialRenderingMode::Transparent:
-		m_forwardQueue.push_back(meshRenderer);
-		break;
+		std::unique_lock lock(m_cameraMutex);
+
+		switch (mat->m_renderingMode)
+		{
+		case MaterialRenderingMode::Opaque:
+			m_defferdQueue.push_back(command);
+			break;
+		case MaterialRenderingMode::Transparent:
+			m_forwardQueue.push_back(command);
+			break;
+		}
 	}
+}
+
+void Camera::SortRenderQueue()
+{
 }
 
 void Camera::ClearRenderQueue()

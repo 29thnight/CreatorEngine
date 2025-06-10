@@ -5,6 +5,7 @@
 class Scene;
 class Object;
 class MeshRenderer;
+class RenderScene;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -64,9 +65,13 @@ public:
     Core::Delegate<void>        sceneUnloadedEvent{};
     Core::Delegate<void>        newSceneCreatedEvent{};
 	Core::Delegate<void>        resetSelectedObjectEvent{};
+    Core::Delegate<void>        endOfFrameEvent{};
 
-    bool                        m_isGameStart{ false };
+    std::atomic_bool            m_isGameStart{ false };
+	std::atomic_bool			m_isEditorSceneLoaded{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
+
+    RenderScene*                m_ActiveRenderScene{ nullptr };
 
 private:
     void CreateEditorOnlyPlayScene();
@@ -76,10 +81,9 @@ private:
 private:
     std::vector<Scene*>         m_scenes{};
     std::vector<Object*>        m_dontDestroyOnLoadObjects{};
-    Scene*                      m_activeScene{};
+    std::atomic<Scene*>         m_activeScene{};
 	std::string                 m_LoadSceneName{};
     std::atomic_size_t          m_activeSceneIndex{};
-	bool						m_isEditorSceneLoaded{ false };
 };
 
 static auto& SceneManagers = SceneManager::GetInstance();
@@ -95,4 +99,5 @@ static auto& sceneLoadedEvent = SceneManagers->sceneLoadedEvent;
 static auto& sceneUnloadedEvent = SceneManagers->sceneUnloadedEvent;
 static auto& newSceneCreatedEvent = SceneManagers->newSceneCreatedEvent;
 static auto& resetSelectedObjectEvent = SceneManagers->resetSelectedObjectEvent;
+static auto& endOfFrameEvent = SceneManagers->endOfFrameEvent;
 #pragma endregion

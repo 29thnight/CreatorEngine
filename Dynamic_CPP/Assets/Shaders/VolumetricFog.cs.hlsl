@@ -15,6 +15,7 @@ cbuffer VolumetricFogCBuffer : register(b0)
 {
     float4x4 InvViewProj;
     float4x4 PrevViewProj;
+    
     float4x4 ShadowMatrix;
     float4 SunDirection;
     float4 SunColor;
@@ -46,7 +47,7 @@ float GetVisibility(float3 voxelWorldPoint, float4x4 svp)
     float4 ShadowCoord = lightSpacePos / lightSpacePos.w;
     ShadowCoord.rg = ShadowCoord.rg * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
     
-    return ShadowTexture.SampleCmpLevelZero(CascadedPcfShadowMapSampler, float3(ShadowCoord.xy, 0), ShadowCoord.z).r;
+    return ShadowTexture.SampleCmpLevelZero(CascadedPcfShadowMapSampler, float3(ShadowCoord.xy, 2), ShadowCoord.z).r;
 }
 
 [numthreads(8, 8, 1)]
@@ -60,7 +61,7 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
         float3 voxelWorldPos = GetWorldPosFromVoxelID(texCoord, jitter, CameraNearFar_FrameIndex_PreviousFrameBlend.x, CameraNearFar_FrameIndex_PreviousFrameBlend.y, InvViewProj, VolumeSize.xyz);
         float3 voxelWorldPosNoJitter = GetWorldPosFromVoxelID(texCoord, 0.0f, CameraNearFar_FrameIndex_PreviousFrameBlend.x, CameraNearFar_FrameIndex_PreviousFrameBlend.y, InvViewProj, VolumeSize.xyz);
         float3 viewDir = normalize(CameraPosition.xyz - voxelWorldPos);
-
+    
         float3 lighting = float3(0.0, 0.0, 0.0);
         float visibility = GetVisibility(voxelWorldPos, ShadowMatrix);
         //float visibility2 = GetVisibility(voxelWorldPosNoJitter, ShadowMatrix);

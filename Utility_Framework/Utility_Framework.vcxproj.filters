@@ -79,6 +79,9 @@
     <Filter Include="Core.Octree">
       <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Memory\FenceFlag">
+      <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -233,6 +236,12 @@
     </ClInclude>
     <ClInclude Include="DebugStreamBuf.h">
       <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.FenceFlag.h">
+      <Filter>Core.Memory\FenceFlag</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.FenceFlagGroup.h">
+      <Filter>Core.Memory\FenceFlag</Filter>
     </ClInclude>
     <ClInclude Include="FileDialog.h">
       <Filter>WindowsApplication\CoreWindow</Filter>

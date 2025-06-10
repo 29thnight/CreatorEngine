@@ -59,6 +59,8 @@ public:
 
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
+	void EndOfFrame(float deltaTime);
+	void PrepareRender();
 	void SceneRendering();
 	void ReApplyCurrCubeMap();
 
@@ -66,7 +68,6 @@ private:
 	void InitializeDeviceState();
 	void InitializeImGui();
 	void InitializeTextures();
-	void PrepareRender();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
 	void ApplyNewCubeMap(const std::string_view& filename);

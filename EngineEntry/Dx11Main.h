@@ -35,6 +35,10 @@ namespace DirectX11
         void OnGui();
 		void DisableOrEnable();
 
+		void RenderWorkerThread();
+
+		void InvokeResizeFlag();
+
 		// IDeviceNotify
 		virtual void OnDeviceLost() override;
 		virtual void OnDeviceRestored() override;
@@ -58,6 +62,7 @@ namespace DirectX11
         Core::DelegateHandle m_SceneRenderingEventHandle;
 		Core::DelegateHandle m_OnGizmoEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
+		Core::DelegateHandle m_EndOfFrameEventHandle;
 		
 		std::thread m_renderThread;
 
@@ -66,6 +71,7 @@ namespace DirectX11
 		bool m_isGameView = false;
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;
+		std::atomic_bool m_isInvokeResize = false;
 
 		bool m_isSelectUI = false;
 		bool m_isSelectText = false;

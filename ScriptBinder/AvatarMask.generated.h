@@ -5,8 +5,9 @@ ReflectionField(AvatarMask) \
 { \
 	PropertyField \
 	({ \
-		meta_property(isUpper) \
-		meta_property(isLower) \
+		meta_property(useAll) \
+		meta_property(useUpper) \
+		meta_property(useLower) \
 	}); \
 	FieldEnd(AvatarMask, PropertyOnly) \
 };
