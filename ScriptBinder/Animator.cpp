@@ -83,11 +83,13 @@ void Animator::CreateController_UI()
 
 AnimationController* Animator::GetController(std::string name)
 {
-	for (auto& Controller : m_animationControllers)
-	{
-		if (Controller->name == name)
-			return Controller;
-	}
+        for (auto& Controller : m_animationControllers)
+        {
+                if (Controller->name == name)
+                        return Controller;
+        }
+        // Return nullptr when no controller with the specified name exists
+        return nullptr;
 }
 
 
