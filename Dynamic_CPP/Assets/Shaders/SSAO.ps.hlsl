@@ -40,7 +40,7 @@ float3 CalculateWorldFromDepth(float depth, float2 texCoord)
     // Also in range [0, 1] due to DirectX Convention
     float4 clipSpace = float4(clipXY, depth, 1);
     float4 worldSpace = mul(inverseViewProjection, clipSpace);
-    //worldSpace /= worldSpace.w;
+    worldSpace /= worldSpace.w;
     return worldSpace.xyz;
 }
 
@@ -55,7 +55,7 @@ float3 CalculateViewSpaceFromDepth(float depth, float2 texCoord)
     // Also in range [0, 1] due to DirectX Convention
     float4 clipSpace = float4(clipXY, depth, 1);
     float4 viewSpace = mul(inverseProjection, clipSpace);
-    //viewSpace /= viewSpace.w;
+    viewSpace /= viewSpace.w;
     return viewSpace.xyz;
 }
 
