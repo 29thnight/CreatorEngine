@@ -72,5 +72,16 @@ AnimationController* Animator::GetController(std::string name)
 	}
 }
 
+ConditionParameter* Animator::FindParameter(std::string valueName)
+{
+	for (auto& parameter : Parameters)
+	{
+		if (parameter.name == valueName)
+		{
+			return &parameter;
+		}
+	}
+}
+
 
 

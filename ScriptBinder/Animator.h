@@ -118,6 +118,7 @@ public:
         }
     }
   
+    ConditionParameter* FindParameter(std::string valueName);
 private:
     bool m_IsEnabled = false;
     

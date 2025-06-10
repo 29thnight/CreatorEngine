@@ -7,17 +7,26 @@
 #include <vector>
 namespace ed = ax::NodeEditor;
 
-struct Link
+enum class SelectedType
 {
-	std::string fromNode;
-	std::string toNode;
-	bool haveReverse = false;
+	None,
+	Node,
+	Link,
 };
 struct Node
 {
+	int id;
 	std::string name;
-
 };
+struct Link
+{
+	Node* fromNode;
+	Node* toNode;
+	//std::string fromNode;
+	//std::string toNode;
+	bool haveReverse = false;
+};
+
 
 
 class NodeEditor
@@ -40,8 +49,11 @@ public:
 
 	bool IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold = 5.0f);
 	ImVec2 ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t);
-
+	int startNodeId = 1000;
+	Node* FindNode(std::string nodeName);
+	SelectedType m_selectedType = SelectedType::None;
 	int seletedCurNodeIndex = -1;
+	int seletedCurLinkIndex = -1;
 	ax::NodeEditor::EditorContext* m_nodeContext = nullptr;
 	std::string m_filePath;
 	std::vector<Node*> Nodes;

@@ -4,7 +4,7 @@
 #include "AniTransition.generated.h"
 #include "ConditionParameter.h"
 
-
+class AnimationState;
 class AnimationController;
 class AniTransition
 {
@@ -12,7 +12,8 @@ public:
    ReflectAniTransition
 	[[Serializable]]
 	AniTransition() = default;
-	AniTransition(std::string curStatename, std::string nextStatename);
+	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
+	AniTransition(AnimationState* _curState, AnimationState* _nextState, AnimationController* owner);
 	~AniTransition();
 
 	template<typename T>
@@ -25,11 +26,18 @@ public:
 		conditions.push_back(newTrans);
 	}
 
-	void AddDefaultCondition();
-	void SetCurState(std::string curStatename) {curState = curStatename;}
-	void SetNextState(std::string nextStatename) { nextState = nextStatename; }
-	std::string GetCurState()const { return curState; }
-	std::string GetNextState()const { return nextState; }
+	void AddConditionDefault(std::string ownerValueName, ConditionType cType, ValueType vType)
+	{
+
+		TransCondition newTrans(0, cType, vType);
+		newTrans.valueName = ownerValueName;
+		newTrans.m_ownerController = m_ownerController;
+		conditions.push_back(newTrans);
+	}
+	void SetCurState(std::string curStatename);
+	void SetNextState(std::string nextStatename);
+	std::string GetCurState();
+	std::string GetNextState();
 	bool CheckTransiton();
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
@@ -41,11 +49,13 @@ public:
 	AnimationController* m_ownerController{};
 	[[Property]]
 	std::string m_name = "NoName";
+	[[Property]]
+	AnimationState* curState = nullptr;
+	[[Property]]
+	AnimationState* nextState = nullptr;
 private:
-	[[Property]]
-	std::string curState;
-	[[Property]]
-	std::string nextState;
+	
+	//std::string nextState;
 	// 전이시간이자 블렌딩될 시간
 	[[Property]]
 	float blendTime =0.2f;

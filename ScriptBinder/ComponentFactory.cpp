@@ -127,6 +127,21 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
 									sharedTransition->m_ownerController = animationController;
+
+									if (transition["curState"])
+									{
+										auto& curState = transition["curState"];
+										std::string name = curState["m_name"].as<std::string>();
+
+										sharedTransition->SetCurState(name);
+									}
+									if (transition["nextState"])
+									{
+										auto& nextState = transition["nextState"];
+										std::string name = nextState["m_name"].as<std::string>();
+										sharedTransition->SetNextState(name);
+									}
+								
 									if (transition["conditions"])
 									{
 										auto& conditionNode = transition["conditions"];

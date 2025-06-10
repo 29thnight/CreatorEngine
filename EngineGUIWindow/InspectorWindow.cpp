@@ -738,16 +738,18 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				static int selectedControllerIndex = 0;
 				static int preSelectIndex = 0;
 				static int linkIndex = -1;
-				static int rightClickNodeIndex = -1;
+				static int ClickNodeIndex = -1;
 				static int targetNodeIndex = -1;
+				static int selectedTransitionIndex = -1;
+				static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
 				auto& controllers = animator->m_animationControllers;
 				auto& controller = animator->m_animationControllers[selectedControllerIndex];
-				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
+				auto& nodeEdtior = controller->m_nodeEditor;
+				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), true); 
 				if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				{
 					if (ImGui::BeginTabItem("Layers"))
 					{
-						//ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
 						ImGui::Separator();
 
 						for (int index = 0; index < controllers.size(); ++index)
@@ -840,15 +842,13 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						if (preSelectIndex != selectedControllerIndex)
 						{
 							linkIndex = -1;
-							rightClickNodeIndex = -1;
+							ClickNodeIndex = -1;
 							targetNodeIndex = -1;
 							preSelectIndex = selectedControllerIndex;
 							isOpenPopUp = false;
 							isOpenNodePopUp = false;
 						}
 						std::string fileName = controller->name + ".node_editor.json";
-
-						//if (!controller->StateVec.empty())
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
 							for (auto& state : controller->StateVec)
@@ -864,7 +864,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								}
 							}
 							controller->m_nodeEditor->DrawLink(&linkIndex);
-							controller->m_nodeEditor->DrawNode(&rightClickNodeIndex);
+							controller->m_nodeEditor->DrawNode(&ClickNodeIndex);
 							controller->m_nodeEditor->Update();
 							
 							if (targetNodeIndex != -1)
@@ -874,45 +874,16 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
 								targetNodeIndex = -1;
 							}
-							if (rightClickNodeIndex != -1)
+							if (ClickNodeIndex != -1)
 							{
 								isOpenNodePopUp = true;
 							}
-							//if (linkIndex != -1)
-							//{
-							//	std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode;
-							//	std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode;
-							//	ImGui::Begin("cur Link");
-							//	ImGui::Text("From:  %s", fromNode.c_str());
-							//	ImGui::Text("To:  %s", toNode.c_str());
-							//	
-							//	auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
-
-							//	for (auto& transiton : transitions)
-							//	{
-							//		auto conditions = transiton->GetConditions();
-
-							//		if (conditions.empty())
-							//		{
-							//			ImGui::Text("empty conditions");
-							//		}
-							//		else
-							//		{
-							//			for (auto& conditon : conditions)
-							//			{
-							//				ImGui::Text("%s", conditon.valueName.c_str());
-							//			}
-							//		}
-							//	}
-							//	//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
-							//	ImGui::End();
-							//}
 							if (ed::ShowBackgroundContextMenu())
 							{
 								if (isOpenNodePopUp)
 								{
 									isOpenNodePopUp = false;
-									rightClickNodeIndex = -1;
+									ClickNodeIndex = -1;
 								}
 								isOpenPopUp = true;
 							}
@@ -931,13 +902,18 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								{
 									controller->m_nodeEditor->MakeNewLink(&targetNodeIndex);
 									isOpenNodePopUp = false;
-									rightClickNodeIndex = -1;
+									ClickNodeIndex = -1;
 								}
 								if (ImGui::MenuItem("Delete State"))
 								{
-									controller->DeleteState(controller->StateVec[rightClickNodeIndex]->m_name);
+									controller->DeleteState(controller->StateVec[ClickNodeIndex]->m_name);
 									isOpenNodePopUp = false;
-									rightClickNodeIndex = -1;
+									
+									if (ClickNodeIndex == nodeEdtior->seletedCurNodeIndex)
+									{
+										nodeEdtior->seletedCurNodeIndex = -1;
+									}
+									ClickNodeIndex = -1;
 								}
 								ImGui::EndPopup();
 							}
@@ -960,7 +936,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								ImGui::CloseCurrentPopup();
 								isOpenNodePopUp = false;
-								rightClickNodeIndex = -1;
+								ClickNodeIndex = -1;
 							}
 						}
 					}
@@ -971,12 +947,17 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::Text("Inspector");
 					ImGui::Separator();
 
-					if (linkIndex != -1)
+					if (controller->m_nodeEditor->m_selectedType == SelectedType::Link && linkIndex != -1)
 					{
+						if (preInspectorIndex != linkIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
+						preInspectorIndex = linkIndex;
 						ImGui::Text("Transition");
 						ImGui::Separator();
-						std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode;
-						std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode;
+						std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode->name;
+						std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode->name;
 						ImGui::Text("From:  %s", fromNode.c_str());
 						ImGui::Text("To:  %s", toNode.c_str());
 
@@ -1000,6 +981,156 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						}
 						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
 					}
+					else if (nodeEdtior->m_selectedType == SelectedType::Node && nodeEdtior->seletedCurNodeIndex != -1)
+					{
+						if (preInspectorIndex != nodeEdtior->seletedCurNodeIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
+						preInspectorIndex = nodeEdtior->seletedCurNodeIndex;
+						ImGui::Text("State");
+						ImGui::Separator();
+						ImGui::PushID(nodeEdtior->seletedCurNodeIndex);
+						auto& state = controller->StateVec[nodeEdtior->seletedCurNodeIndex];
+						char buffer[128];
+						strcpy_s(buffer, state->m_name.c_str());
+						buffer[sizeof(buffer) - 1] = '\0';
+						ImGui::Text("State Name");
+						ImGui::SameLine();
+						if (ImGui::InputText("##State Name", buffer, sizeof(buffer)))
+						{
+							state->m_name = buffer;
+							nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+						}
+
+
+						ImGui::Text("Animation Index");
+						ImGui::SameLine();
+						if (ImGui::InputInt("##Animation Index", &state->AnimationIndex))
+						{
+
+						}
+
+						ImGui::Separator();
+						ImGui::Text("Transitions");
+						if (state->Transitions.empty())
+						{
+							ImGui::Text("Empty Transiton");
+						}
+						else
+						{
+							for (int i = 0; i < state->Transitions.size(); ++i)
+							{
+								std::string curStateName = state->Transitions[i]->GetCurState();
+								std::string nextStateName = state->Transitions[i]->GetNextState();
+								std::string transitionName = curStateName + " to " + nextStateName;
+								if (ImGui::Selectable(transitionName.c_str(), true))
+								{
+									selectedTransitionIndex = i;
+								}
+							}
+						}
+
+
+						if (selectedTransitionIndex != -1)
+						{
+							ImGui::Separator();
+							ImGui::Separator();
+							ImGui::Text("Conditions");
+							ImGui::Separator();
+							auto& transition = state->Transitions[selectedTransitionIndex];
+							auto& conditions = transition->conditions;
+							if (conditions.empty())
+							{
+								ImGui::Text("Empty Conditions");
+							}
+							else
+							{
+								for (int i = 0; i < conditions.size(); ++i)
+								{
+									ImGui::PushID(i);
+									auto& condition = conditions[i];
+									std::string parmName = condition.valueName;
+									auto parameter = animator->FindParameter(parmName);
+									auto& compareParameter = condition.CompareParameter;
+									ImGui::Text(parmName.c_str());
+									ImGui::SameLine();
+
+									if(ImGui::Selectable(condition.GetConditionType().c_str(), true, 0,ImVec2(70, 0)))
+									{
+										ImGui::OpenPopup("ConditionTypeMenu");
+									}
+									ImGui::SameLine();
+									//값
+									if (parameter->vType == ValueType::Int)
+									{
+										
+										ImGui::InputInt("##", &compareParameter.iValue);
+									}
+									else if (parameter->vType == ValueType::Float)
+									{
+										ImGui::InputFloat("##", &compareParameter.fValue);
+									}
+									else if (parameter->vType == ValueType::Bool)
+									{
+										ImGui::Text("Bool");	
+									}
+									else if (parameter->vType == ValueType::Trigger)
+									{
+										ImGui::Text("trigger");
+									}
+
+									if (ImGui::BeginPopup("ConditionTypeMenu"))
+									{
+										if (ImGui::MenuItem("Greater"))
+										{
+											condition.SetConditionType(ConditionType::Greater);
+										}
+										else if (ImGui::MenuItem("Less"))
+										{
+											condition.SetConditionType(ConditionType::Less);
+										}
+										else if (ImGui::MenuItem("Equal"))
+										{
+											condition.SetConditionType(ConditionType::Equal);
+										}
+										else if (ImGui::MenuItem("NotEqual"))
+										{
+											condition.SetConditionType(ConditionType::NotEqual);
+										}
+
+										ImGui::EndPopup();
+
+
+									
+
+									}
+									ImGui::PopID();
+								}
+
+							}
+							if (ImGui::Button("+"))
+							{
+								if (animator->Parameters.empty())
+								{
+
+								}
+								else
+								{
+									auto firstParam = animator->Parameters[0];
+									transition->AddConditionDefault(firstParam.name, ConditionType::None, firstParam.vType);
+								}
+								
+							}
+							ImGui::SameLine(); 
+							if (ImGui::Button("-"))
+							{
+
+							}
+
+						}
+						ImGui::PopID();
+					}
 
 					//Node눌렀을때도 출력 
 
@@ -1009,44 +1140,5 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 			}			
 		}
 	}
-}
-
-void InspectorWindow::DrawMyLink(std::string linkName, std::string from, std::string to)
-{
-	ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(linkName));
-	ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(from));
-	ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(to));
-	ed::LinkId reverselinkId = static_cast<ed::LinkId>(std::hash<std::string>{}(std::string(to + " to " + from)));
-	ImVec2 p1 = ed::GetNodePosition(nodeID);
-	ImVec2 p2 = ed::GetNodePosition(nextnodeID);
-
-	// 오프셋을 줘서 겹침 방지
-	//float offset = ((linkId % 3) - 1) * 20.0f;
-	
-	// 중간 꺾이는 지점
-	//ImVec2 mid1 = ImVec2(p1.x + offset, p1.y);
-	//ImVec2 mid2 = ImVec2(p1.x + offset, p2.y);
-
-
-	ImVec2 dir = p2 - p1;          // 상대 방향
-	float length = sqrt(dir.x * dir.x + dir.y * dir.y);
-	ImVec2 normDir = ImVec2(dir.x / length, dir.y / length); // 정규화
-
-
-	// 현재 윈도우에서 DrawList 얻기
-	ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-
-
-	ImU32 color = IM_COL32(255, 255, 255, 255);
-	float thickness = 2.0f;
-
-
-
-	// 3단 꺾인 직선 그리기
-	drawList->AddLine(p1, p2, color, thickness);
-	/*drawList->AddLine(p1, mid1, color, thickness);
-	drawList->AddLine(mid1, mid2, color, thickness);
-	drawList->AddLine(mid2, p2, color, thickness);*/
 }
 

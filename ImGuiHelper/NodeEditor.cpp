@@ -23,6 +23,7 @@ void NodeEditor::MakeEdit(std::string filePath)
     Links.clear();
 	ed::SetCurrentEditor(m_nodeContext);
 	ed::Begin("Node Editor");
+    startNodeId = 1000;
 }
 
 void NodeEditor::EndEdit()
@@ -37,19 +38,20 @@ void NodeEditor::MakeNode(std::string nodeName)
 {
 	Node* newNode = new Node();
 	newNode->name = nodeName;
+    newNode->id = startNodeId++;
 	Nodes.push_back(newNode);
 }
 
 void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName)
 {
 	Link* newLink = new Link();
-	newLink->fromNode = fromNodeName;
-	newLink->toNode = toNodeName;
+	newLink->fromNode = FindNode(fromNodeName);
+	newLink->toNode = FindNode(toNodeName);
 
 
 	for (auto& link : Links)
 	{
-		if (link->toNode == fromNodeName && link->fromNode == toNodeName)
+		if (link->toNode == FindNode(fromNodeName) && link->fromNode == FindNode(toNodeName))
 		{
 			newLink->haveReverse = true;
 			break;
@@ -66,21 +68,29 @@ void NodeEditor::DrawNode(int* selectedNodeIndex)
 	ed::Style& style = ed::GetStyle();
 	style.LinkStrength = 0.0f;
 
+    
 	for (size_t i = 0; i < Nodes.size(); ++i)
 	{
         auto& node = Nodes[i];
-		ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(node->name));
+        ed::NodeId nodeID = node->id;
 		ed::BeginNode(nodeID);
 		ImGui::Text(node->name.c_str());
 		ed::EndNode();
 
 
-        if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(1)) {
+        if (needMakeLink == false &&  ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(1))
+        {
             if (selectedNodeIndex)
             {
                 *selectedNodeIndex = i;  // 선택한 링크 인덱스 기록
-                seletedCurNodeIndex = i;
             }
+            seletedCurNodeIndex = i;
+            m_selectedType = SelectedType::Node;
+        }
+        else if (needMakeLink == false &&  ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
+        {
+            seletedCurNodeIndex = i;
+            m_selectedType = SelectedType::Node;
         }
 	}
 
@@ -93,8 +103,8 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
     {
         auto& link = Links[i];
 
-        ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(link->fromNode));
-        ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(link->toNode));
+        ed::NodeId nodeID = link->fromNode->id;
+        ed::NodeId nextnodeID = link->toNode->id;
 
         ImVec2 pos = ed::GetNodePosition(nodeID);
         ImVec2 size = ed::GetNodeSize(nodeID);
@@ -125,7 +135,8 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
 
-        if (*selectedLinkIndex == i)
+        
+        if (selectedLinkIndex != nullptr && *selectedLinkIndex == i)
         {
             color = IM_COL32(255, 255, 0, 255);
         }
@@ -149,12 +160,12 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         ImVec2 triP3_screen = triP3 + windowPos;
 
         drawList->AddTriangleFilled(triP1_screen, triP2_screen, triP3_screen, color);
-       // drawList->AddCircleFilled(midPos, 5.0f, IM_COL32(0, 255, 0, 255));
         bool hovered = IsMouseNearLink(p1_offset, cp1, cp2, p2_offset,5.0f);
-        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        if (hovered && ImGui::IsMouseClicked(0))
         {
             if (selectedLinkIndex)
-                *selectedLinkIndex = i;  // 선택한 링크 인덱스 기록
+                *selectedLinkIndex = i;  
+            m_selectedType = SelectedType::Link;
         }
  
     }
@@ -164,7 +175,7 @@ void NodeEditor::Update()
 {
     if (needMakeLink == true && seletedCurNodeIndex != -1)
     {
-        ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(Nodes[seletedCurNodeIndex]->name));
+        ed::NodeId nodeID = Nodes[seletedCurNodeIndex]->id;
         ImVec2 pos = ed::GetNodePosition(nodeID);
         ImVec2 size = ed::GetNodeSize(nodeID);
         ImVec2 p1 = ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
@@ -188,12 +199,13 @@ void NodeEditor::Update()
         for (size_t i = 0; i < Nodes.size(); ++i)
         {
             auto& node = Nodes[i];
-            ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(node->name));
+            ed::NodeId nodeID = node->id;
             if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
             {
                 if (i != seletedCurNodeIndex)
                 {
                     if(m_retrunIndex)
+
                      *m_retrunIndex = i;
 
                     needMakeLink = false;
@@ -206,6 +218,10 @@ void NodeEditor::Update()
             needMakeLink = false;
         }
     }
+
+
+
+
 }
 
 
@@ -255,5 +271,16 @@ ImVec2 NodeEditor::ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p
         ImVec2(3 * u * u * (p1.x - p0.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
             3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y));
 }
+
+Node* NodeEditor::FindNode(std::string nodeName)
+{
+    for (auto& node : Nodes)
+    {
+        if (node->name == nodeName)
+            return node;
+    }
+}
+
+
 
 

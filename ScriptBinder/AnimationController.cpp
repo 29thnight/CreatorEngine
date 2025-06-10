@@ -266,17 +266,23 @@ AnimationState* AnimationController::FindState(std::string stateName)
 AniTransition* AnimationController::CreateTransition(const std::string& curStateName, const std::string& nextStateName)
 {
 	
-	for (auto& trans : FindState(curStateName)->Transitions)
+	auto curstate = FindState(curStateName);
+	if (!curstate) return nullptr;
+	for (auto& trans : curstate->Transitions)
 	{
 		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
 			return trans.get();
 
 	}
 	
-	auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
+	auto nextstate = FindState(nextStateName);
+	if (!nextstate) return nullptr;
+	auto transition = std::make_shared<AniTransition>();
+	transition->curState = curstate;
+	transition->nextState = nextstate;
 	transition->m_ownerController = this;
 	transition->m_name = curStateName + " to " + nextStateName;
-	FindState(curStateName)->Transitions.push_back(transition);
+	curstate->Transitions.push_back(transition);
 	return transition.get();
 }
 

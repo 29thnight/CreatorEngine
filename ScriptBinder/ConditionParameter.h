@@ -74,6 +74,26 @@ public:
 	{
 		tValue = false; 
 	}
+
+	template<typename T>
+	T GetValue()
+	{
+		switch (vType)
+		{
+		case ValueType::Float:
+			return fValue;
+			break;
+		case ValueType::Int:
+			return iValue;
+			break;
+		case ValueType::Bool:
+			return bValue;
+			break;
+		case ValueType::Trigger:
+			return bValue;
+			break;
+		}
+	}
 	[[Property]]
 	ValueType vType =ValueType::Float;
 	[[Property]]
