@@ -17,14 +17,18 @@
 #include "UIManager.h"
 #include "SpinLock.h"
 #include "Core.FenceFlag.h"
+#include "Core.FenceFlagGroup.h"
 #include "InputActionManager.h"
 
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
-std::atomic<uint64> gameFrame{};
-std::atomic<uint64> renderFrame{};
 std::atomic<double> frameDeltaTime{};
 FenceFlag fenceGameToRender;
+FenceFlagGroup renderFence(2);
+
+std::atomic_ullong th1;
+std::atomic_ullong th2;
+std::atomic_ullong th3;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -118,6 +122,17 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	{
 		while (isGameToRender)
 		{
+            if (!m_isInvokeResize)
+            {
+                RenderWorkerThread();
+            }
+		}
+	});
+    
+    m_RHI_Thread = std::thread([&]
+    {
+        while (isGameToRender)
+        {
             if (m_isInvokeResize)
             {
                 CreateWindowSizeDependentResources();
@@ -125,10 +140,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
             }
 
             CoroutineManagers->yield_OnRender();
-			RenderWorkerThread();
-		}
-	});
+            RHIWorkerThread();
+        }
+    });
+    
     m_renderThread.detach();
+    m_RHI_Thread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -170,6 +187,8 @@ void DirectX11::Dx11Main::Update()
 	// EditorUpdate
 	SpinLock lock(gameToRenderLock);
 
+    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+
     m_timeSystem.Tick([&]
     {
         InfoWindow();
@@ -177,16 +196,16 @@ void DirectX11::Dx11Main::Update()
         if(!SceneManagers->m_isGameStart)
         {
             SceneManagers->Editor();
-            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->InputEvents(frameDeltaTime);
             SceneManagers->GameLogic();
         }
         else
         {
 			SceneManagers->Editor();
             SceneManagers->Initialization();
-			SceneManagers->Physics(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
+			SceneManagers->Physics(frameDeltaTime);
+            SceneManagers->InputEvents(frameDeltaTime);
+            SceneManagers->GameLogic(frameDeltaTime);
         }
 #endif // !EDITOR
     });
@@ -218,34 +237,31 @@ void DirectX11::Dx11Main::Update()
 	}
 #endif // !EDITOR
 
-    if(gameFrame > renderFrame)
+    renderFence.Wait();
+
+    //for debug
+    if (0 != m_timeSystem.GetFrameCount())
     {
-        fenceGameToRender.Wait();
+        th1++;
+        //std::cout << "game_thread" << th1 << " " << "render_thread" << th3 << " " << "RHI_thread" << th2 << std::endl;
     }
 
-    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
-    SceneManagers->EndOfFrame();
 
-    fenceGameToRender.Reset();
+    SceneManagers->EndOfFrame();
+    DisableOrEnable();
+    
+    renderFence.Reset();
 }
 
-bool DirectX11::Dx11Main::Render()
+bool DirectX11::Dx11Main::RHIRender()
 {
-	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (m_timeSystem.GetFrameCount() == 0)
-    { 
-        fenceGameToRender.Signal();
-        renderFrame.store(gameFrame);
-        return false;
-    }
-
     auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
-    
-    if (GameSceneStart || GameSceneEnd)
-    {
-        fenceGameToRender.Signal();
-        renderFrame.store(gameFrame);
+
+	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
+	if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    { 
+        renderFence.Signal(1);
         return false;
     }
 
@@ -257,8 +273,8 @@ bool DirectX11::Dx11Main::Render()
 #endif // !EDITOR
 	}
 
-    fenceGameToRender.Signal();
-    renderFrame.store(gameFrame);
+    th2++;
+    renderFence.Signal(1);
 	return true;
 }
 
@@ -278,8 +294,6 @@ void DirectX11::Dx11Main::InfoWindow()
         << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
-
-    gameFrame = m_timeSystem.GetFrameCount();
 }
 
 void DirectX11::Dx11Main::OnGui()
@@ -303,7 +317,24 @@ void DirectX11::Dx11Main::DisableOrEnable()
 
 void DirectX11::Dx11Main::RenderWorkerThread()
 {
-	if (Render())
+    auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+    auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
+
+    // 처음 업데이트하기 전에 아무 것도 하지 마세요.
+    if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    {
+        renderFence.Signal(0);
+        return;
+    }
+
+    m_sceneRenderer->CreateCommandListPass();
+    th3++;
+    renderFence.Signal(0);
+}
+
+void DirectX11::Dx11Main::RHIWorkerThread()
+{
+	if (RHIRender())
 	{
 		m_deviceResources->Present();
 	}

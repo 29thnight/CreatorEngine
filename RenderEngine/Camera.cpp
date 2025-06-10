@@ -55,6 +55,43 @@ Camera::~Camera()
 	}
 }
 
+Camera::Camera(bool isShadow)
+{
+	if(isShadow)
+	{
+		m_aspectRatio = DeviceState::g_aspectRatio;
+
+		m_cameraIndex = CameraManagement->GetCameraCount();
+
+		std::string cameraRTVName = "ShadowCamera_RTV";
+
+		auto renderTexture = TextureHelper::CreateRenderTexture(
+			DeviceState::g_ClientRect.width,
+			DeviceState::g_ClientRect.height,
+			cameraRTVName,
+			DXGI_FORMAT_R16G16B16A16_FLOAT
+		);
+		m_renderTarget.swap(renderTexture);
+
+		auto depthStencil = TextureHelper::CreateDepthTexture(
+			DeviceState::g_ClientRect.width,
+			DeviceState::g_ClientRect.height,
+			"ShadowCamera_DSV"
+		);
+		m_depthStencil.swap(depthStencil);
+
+		XMMATRIX identity = XMMatrixIdentity();
+
+		std::string viewBufferName = "ShadowCamera_ViewBuffer";
+		std::string projBufferName = "ShadowCamera_ProjBuffer";
+
+		m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+		DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+		m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+		DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+	}
+}
+
 Mathf::xMatrix Camera::CalculateProjection(bool shadow)
 {
 	if (0 == m_nearPlane)
@@ -261,10 +298,10 @@ void Camera::UpdateBuffer(bool shadow)
 	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext)
+void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 {
 	Mathf::xMatrix view = CalculateView();
-	Mathf::xMatrix proj = CalculateProjection();
+	Mathf::xMatrix proj = CalculateProjection(shadow);
 
 	deferredContext->UpdateSubresource(m_ViewBuffer.Get(), 0, nullptr, &view, 0, 0);
 	deferredContext->UpdateSubresource(m_ProjBuffer.Get(), 0, nullptr, &proj, 0, 0);
@@ -301,6 +338,24 @@ void Camera::PushRenderQueue(MeshRendererProxy* command)
 
 void Camera::SortRenderQueue()
 {
+	auto sortByAnimatorAndMaterialGuid = [](MeshRendererProxy* a, MeshRendererProxy* b)
+	{
+		if (a->m_animatorGuid == b->m_animatorGuid)
+		{
+			return a->m_materialGuid < b->m_materialGuid;
+		}
+		return a->m_animatorGuid < b->m_animatorGuid;
+	};
+
+	if(!m_defferdQueue.empty())
+	{
+		std::sort(m_defferdQueue.begin(), m_defferdQueue.end(), sortByAnimatorAndMaterialGuid);
+	}
+
+	if(!m_forwardQueue.empty())
+	{
+		std::sort(m_forwardQueue.begin(), m_forwardQueue.end(), sortByAnimatorAndMaterialGuid);
+	}
 }
 
 void Camera::ClearRenderQueue()

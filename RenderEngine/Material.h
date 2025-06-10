@@ -50,5 +50,6 @@ public:
 	FileGuid m_fileGuid{};
     [[Property]]
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
+	HashedGuid m_materialGuid{ make_guid() };
 };
 

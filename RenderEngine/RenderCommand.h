@@ -25,12 +25,13 @@ public:
 	bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
 	void Draw();
-	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _defferedContext);
 
 public:
 	Material*		m_Material{ nullptr };
 	Mesh*			m_Mesh{ nullptr };
 	HashedGuid		m_animatorGuid{};
+	HashedGuid      m_materialGuid{};
 
 public:
 	Mathf::xMatrix	  m_finalTransforms[MAX_BONES]{};

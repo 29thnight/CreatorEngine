@@ -6,13 +6,15 @@
 
 class MeshRenderer;
 class MeshRendererProxy;
-class Camera
+class Camera //TODO : shadowCamera 분리가 필요
 {
 public:
    ReflectCamera
 	[[Serializable]]
 	Camera();
 	~Camera();
+
+	Camera(bool isShadow);
 
 	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
@@ -29,7 +31,7 @@ public:
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
-	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
+	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 	void ClearRenderTarget();
 
 	void PushRenderQueue(MeshRendererProxy* meshRenderer);

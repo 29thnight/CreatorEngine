@@ -46,6 +46,11 @@ void RenderScene::ShadowStage(Camera& camera)
 	m_LightController->RenderAnyShadowMap(*this, camera);
 }
 
+void RenderScene::CreateShadowCommandList(Camera& camera)
+{
+	m_LightController->CreateShadowCommandList(*this, camera);
+}
+
 void RenderScene::UseModel()
 {
 	DirectX11::VSSetConstantBuffer(0, 1, &m_ModelBuffer);

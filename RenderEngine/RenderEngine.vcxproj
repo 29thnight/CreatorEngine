@@ -245,6 +245,7 @@
     <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="RenderCommand.h" />
+    <ClInclude Include="RenderJob.h" />
     <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ScreenSpaceReflectionPass.h" />
     <ClInclude Include="ShaderSystem.h" />

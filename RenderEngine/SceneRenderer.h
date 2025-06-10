@@ -62,6 +62,7 @@ public:
 	void EndOfFrame(float deltaTime);
 	void PrepareRender();
 	void SceneRendering();
+	void CreateCommandListPass();
 	void ReApplyCurrCubeMap();
 
 private:

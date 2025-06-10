@@ -83,13 +83,13 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	deviceContext->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
 
 	camera.UpdateBuffer();
-	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController->m_pLightBuffer);
 	scene.UseModel();
-
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
 	HashedGuid currentAnimatorGuid{};
+	HashedGuid currentMaterialGuid{};
 	//TODO : Change deferredContext Render
 	for (auto& MeshRendererProxy : camera.m_defferdQueue)
 	{	
@@ -104,6 +104,12 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
 			}
 		}
+
+		//HashedGuid materialGuid = MeshRendererProxy->m_materialGuid;
+		//if (HashedGuid::INVAILD_ID != materialGuid && materialGuid != currentMaterialGuid)
+		//{
+
+		//}
 
 		Material* mat = MeshRendererProxy->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);

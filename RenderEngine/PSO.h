@@ -31,6 +31,7 @@ public:
 	~PipelineStateObject();
 
 	void Apply();
+	void Apply(ID3D11DeviceContext* defferdContext);
 	void CreateInputLayout();
 	void CreateInputLayout(InputLayOutContainer&& vertexLayoutDesc);
 	void ReloadShaders();

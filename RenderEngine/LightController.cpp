@@ -155,6 +155,14 @@ void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 	}
 }
 
+void LightController::CreateShadowCommandList(RenderScene& scene, Camera& camera)
+{
+	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
+	{
+		m_shadowMapPass->CreateRenderCommandList(scene, camera);
+	}
+}
+
 Texture* LightController::GetShadowMapTexture()
 {
 	return m_shadowMapPass->m_shadowMapTexture.get();

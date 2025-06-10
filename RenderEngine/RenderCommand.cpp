@@ -23,6 +23,8 @@ MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
             m_isAnimationEnabled = true;
             m_animatorGuid = animator->GetInstanceID();
         }
+
+        m_materialGuid = m_Material->m_materialGuid;
     }
 
     if (!m_isSkinnedMesh)
@@ -44,7 +46,8 @@ MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
     m_LightMapping(other.m_LightMapping),
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(other.m_worldMatrix),
-    m_animatorGuid(other.m_animatorGuid)
+    m_animatorGuid(other.m_animatorGuid),
+    m_materialGuid(other.m_materialGuid)
 {
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
@@ -55,7 +58,8 @@ MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
     m_LightMapping(other.m_LightMapping),
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(std::exchange(other.m_worldMatrix, {})),
-    m_animatorGuid(std::exchange(other.m_animatorGuid, {}))
+    m_animatorGuid(std::exchange(other.m_animatorGuid, {})),
+    m_materialGuid(std::exchange(other.m_materialGuid, {}))
 {
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
@@ -67,9 +71,9 @@ void MeshRendererProxy::Draw()
     m_Mesh->Draw();
 }
 
-ID3D11CommandList* MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
+void MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
 {
-    if (nullptr == m_Mesh || nullptr == _defferedContext) return nullptr;
+    if (nullptr == m_Mesh || nullptr == _defferedContext) return;
 
     m_Mesh->Draw(_defferedContext);
 }

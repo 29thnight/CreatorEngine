@@ -228,6 +228,12 @@
     <Filter Include="RenderTaskScheduler">
       <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset\JobSystem\Animation">
+      <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\JobSystem\RenderThread">
+      <UniqueIdentifier>{9111173d-d1d0-4bd4-81df-b0c27a303b41}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -238,9 +244,6 @@
     </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="AnimationJob.cpp">
-      <Filter>Asset\JobSystem</Filter>
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
@@ -416,6 +419,9 @@
     <ClCompile Include="Animation.cpp">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="AnimationJob.cpp">
+      <Filter>Asset\JobSystem\Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -438,9 +444,6 @@
     </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimationJob.h">
-      <Filter>Asset\JobSystem</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Resources\Shader</Filter>
@@ -637,6 +640,12 @@
     <ClInclude Include="Animation.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AnimationJob.h">
+      <Filter>Asset\JobSystem\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderJob.h">
+      <Filter>Asset\JobSystem\RenderThread</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -801,9 +810,6 @@
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
@@ -818,6 +824,9 @@
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>

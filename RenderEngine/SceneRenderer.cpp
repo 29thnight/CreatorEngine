@@ -200,7 +200,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_threadPool = new ThreadPool;
 
-    m_newSceneCreatedEventHandle = newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+    m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
@@ -216,34 +216,34 @@ SceneRenderer::~SceneRenderer()
 
 void SceneRenderer::InitializeDeviceState()
 {
-    DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
-    DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-    DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-    DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-    DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
-    DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
-    DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
-    DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
-    DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
-    DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
-    DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
-	DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+    DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
+    DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+    DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+    DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+    DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+    DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
+    DeviceState::g_Viewport				= m_deviceResources->GetScreenViewport();
+    DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+    DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+    DeviceState::g_ClientRect			= m_deviceResources->GetOutputSize();
+    DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
+	DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
 
 	m_resizeEventHandle = OnResizeEvent.AddLambda([&](uint32_t width, uint32_t height)
 	{
-		DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
-		DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-		DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-		DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-		DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
-		DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
+		DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
+		DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+		DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+		DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+		DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+		DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
 		//DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
-		DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
-		DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
-		DeviceState::g_ClientRect = m_deviceResources->GetLogicalSize();
-		DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
-		DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+		DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+		DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+		DeviceState::g_ClientRect			= m_deviceResources->GetLogicalSize();
+		DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
+		DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
 
 		m_pSSAOPass->ReloadDSV(m_deviceResources->GetDepthStencilViewSRV());
 
@@ -330,7 +330,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
 	player.GetPlayer(testt);*/
 
-
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
@@ -386,7 +385,6 @@ void SceneRenderer::SceneRendering()
 		//[1] ShadowMapPass
 		{
 			DirectX11::BeginEvent(L"ShadowMapPass");
-			static int count = 0;
 			Benchmark banch;
 			camera->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
@@ -572,6 +570,20 @@ void SceneRenderer::SceneRendering()
 	}
 }
 
+void SceneRenderer::CreateCommandListPass()
+{
+	for (auto& camera : CameraManagement->m_cameras)
+	{
+		if (nullptr == camera) continue;
+
+		{
+			m_renderScene->CreateShadowCommandList(*camera);
+		}
+	}
+
+	m_renderScene->m_LightController->m_shadowMapPass->SwapQueue();
+}
+
 void SceneRenderer::ReApplyCurrCubeMap()
 {
 	ApplyNewCubeMap(m_pSkyBoxPass->CurrentSkyBoxTextureName().string());
@@ -599,24 +611,23 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
-	for (auto& mesh : staticMeshes)
-	{
-		if (false == mesh->IsEnabled() || 
-			false == mesh->IsNeedUpdateCulling()) continue;
+	//for (auto& mesh : staticMeshes)
+	//{
+	//	if (false == mesh->IsEnabled() || 
+	//		false == mesh->IsNeedUpdateCulling()) continue;
 
-		CullingManagers->UpdateMesh(mesh);
-	}
+	//	CullingManagers->UpdateMesh(mesh);
+	//}
 
 	for (auto camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
-		camera->ClearRenderQueue();
-
 		m_threadPool->Enqueue([camera, &staticMeshes, &skinnedMeshes, renderScene]
 		{
 			//std::vector<MeshRenderer*> culledMeshes;
 			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+			camera->ClearRenderQueue();
 
 			for (auto& culledMesh : staticMeshes)
 			{
@@ -640,7 +651,6 @@ void SceneRenderer::PrepareRender()
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					auto proxyObject = renderScene->FindProxy(skinnedMesh->GetInstanceID());
-					//for test
 					if(proxyObject)
 					{
 						renderScene->UpdateCommand(skinnedMesh);
@@ -648,6 +658,8 @@ void SceneRenderer::PrepareRender()
 					}
 				}
 			}
+
+			camera->SortRenderQueue();
 		});
 	}
 

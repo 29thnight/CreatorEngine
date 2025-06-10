@@ -316,6 +316,17 @@ namespace DirectX11
         DeviceState::g_pDeviceContext->Draw(vertexCount, startVertexLocation);
     }
 
+	//[unsafe]
+	inline void ExecuteCommandList(ID3D11CommandList* pCommandList, BOOL RestoreContextState)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->ExecuteCommandList(pCommandList, RestoreContextState);
+	}
+
     //[unsafe]
     inline void UnbindRenderTargets()
     {
@@ -405,6 +416,17 @@ namespace DirectX11
 	}
 
 	//[unsafe]
+	inline void RSSetViewports(UINT NumViewports, const D3D11_VIEWPORT* pViewports)
+	{
+		if (!DeviceState::g_pDeviceContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		DeviceState::g_pDeviceContext->RSSetViewports(NumViewports, pViewports);
+	}
+
+	//[unsafe]
 	inline void InitSetUp()
 	{
 		if (!DeviceState::g_pDeviceContext)
@@ -429,5 +451,196 @@ namespace DirectX11
 			return;
 		}
 		DeviceState::g_pDeviceContext->CopyResource(pDstResource, pSrcResource);
+	}
+
+	//[safe]
+	inline void UpdateBuffer(ID3D11DeviceContext* deferredContext, ID3D11Buffer* buffer, const void* data)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+
+		deferredContext->UpdateSubresource(buffer, 0, nullptr, data, 0, 0);
+	}
+
+	//[safe]
+	inline void OMSetRenderTargets(ID3D11DeviceContext* deferredContext, uint32 numViews, ID3D11RenderTargetView* const* renderTargetViews, ID3D11DepthStencilView* depthStencilView)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->OMSetRenderTargets(numViews, renderTargetViews, depthStencilView);
+	}
+
+	//[safe]
+	inline void DrawIndexed(ID3D11DeviceContext* deferredContext, uint32 indexCount, uint32 startIndexLocation, int baseVertexLocation)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		DeviceState::g_renderCallCount++;
+		deferredContext->DrawIndexed(indexCount, startIndexLocation, baseVertexLocation);
+	}
+
+	//[safe]
+	inline void ClearRenderTargetView(ID3D11DeviceContext* deferredContext, ID3D11RenderTargetView* rtv, const float color[4])
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->ClearRenderTargetView(rtv, color);
+	}
+
+	//[safe]
+	inline void ClearDepthStencilView(ID3D11DeviceContext* deferredContext, ID3D11DepthStencilView* dsv, uint32 clearFlags, float depth, uint8 stencil)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->ClearDepthStencilView(dsv, clearFlags, depth, stencil);
+	}
+
+	//[safe]
+	inline void VSSetConstantBuffer(ID3D11DeviceContext* deferredContext, uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->VSSetConstantBuffers(slot, numBuffers, buffer);
+	}
+
+	//[safe]
+	inline void PSSetConstantBuffer(ID3D11DeviceContext* deferredContext, uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->PSSetConstantBuffers(slot, numBuffers, buffer);
+	}
+
+	//[safe]
+	inline void IASetVertexBuffers(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numBuffers, ID3D11Buffer* const* buffers, const uint32* strides, const uint32* offsets)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->IASetVertexBuffers(startSlot, numBuffers, buffers, strides, offsets);
+	}
+
+	//[safe]
+	inline void IASetIndexBuffer(ID3D11DeviceContext* deferredContext, ID3D11Buffer* buffer, DXGI_FORMAT format, uint32 offset)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->IASetIndexBuffer(buffer, format, offset);
+	}
+
+	//[safe]
+	inline void VSSetShader(ID3D11DeviceContext* deferredContext, ID3D11VertexShader* shader, ID3D11ClassInstance* const* classes, uint32 count)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->VSSetShader(shader, classes, count);
+	}
+
+	//[safe]
+	inline void PSSetShader(ID3D11DeviceContext* deferredContext, ID3D11PixelShader* shader, ID3D11ClassInstance* const* classes, uint32 count)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->PSSetShader(shader, classes, count);
+	}
+
+	//[safe]
+	inline void Draw(ID3D11DeviceContext* deferredContext, uint32 vertexCount, uint32 startVertexLocation)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		DeviceState::g_renderCallCount++;
+		deferredContext->Draw(vertexCount, startVertexLocation);
+	}
+
+	//[safe]
+	inline void Dispatch(ID3D11DeviceContext* deferredContext, uint32 x, uint32 y, uint32 z)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->Dispatch(x, y, z);
+	}
+
+	//[safe]
+	inline void CopyResource(ID3D11DeviceContext* deferredContext, ID3D11Resource* dst, ID3D11Resource* src)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> deferredContext is null");
+			return;
+		}
+		deferredContext->CopyResource(dst, src);
+	}
+
+	//[safe]
+	inline void RSSetViewports(ID3D11DeviceContext* deferredContext, UINT NumViewports, const D3D11_VIEWPORT* pViewports)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->RSSetViewports(NumViewports, pViewports);
+	}
+
+	//[safe]
+	inline void UnbindRenderTargets(ID3D11DeviceContext* deferredContext)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		ID3D11RenderTargetView* nullRTV = nullptr;
+		deferredContext->OMSetRenderTargets(1, &nullRTV, nullptr);
+	}
+
+	//[safe]
+	inline void FinishCommandList(ID3D11DeviceContext* deferredContext, BOOL RestoreDeferredContextState, ID3D11CommandList** ppCommandList)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->FinishCommandList(RestoreDeferredContextState, ppCommandList);
 	}
 }
