@@ -14,8 +14,6 @@
 #include "Terrain.h"
 
 
-XMMATRIX InitialMatrix[MAX_BONES]{};
-
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -95,7 +93,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
-	Animator* currentAnimator = nullptr;
+	
 
 	for (auto& obj : scene.GetScene()->m_SceneObjects) {
 		if (obj->IsDestroyMark()) continue;
@@ -117,7 +115,7 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	}
 	
 
-	for (auto& meshRenderer : camera.m_defferdQueue)
+	
 	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
 	for (auto& MeshRendererProxy : camera.m_defferdQueue)
