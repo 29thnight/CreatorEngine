@@ -13,7 +13,7 @@
 #include "SceneManager.h"
 #include "EngineSetting.h"
 #include "CullingManager.h"
-
+#include <barrier>
 #include "UIManager.h"
 #include "SpinLock.h"
 #include "Core.FenceFlag.h"
@@ -23,9 +23,9 @@
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
 std::atomic<double> frameDeltaTime{};
-FenceFlag fenceGameToRender;
 FenceFlagGroup renderFence(2);
-
+std::barrier renderBarrier(3);
+//for Fence Test
 std::atomic_ullong th1;
 std::atomic_ullong th2;
 std::atomic_ullong th3;
@@ -237,7 +237,8 @@ void DirectX11::Dx11Main::Update()
 	}
 #endif // !EDITOR
 
-    renderFence.Wait();
+    //renderFence.Wait();
+    renderBarrier.arrive_and_wait();
 
     //for debug
     if (0 != m_timeSystem.GetFrameCount())
@@ -250,7 +251,7 @@ void DirectX11::Dx11Main::Update()
     SceneManagers->EndOfFrame();
     DisableOrEnable();
     
-    renderFence.Reset();
+    //renderFence.Reset();
 }
 
 bool DirectX11::Dx11Main::RHIRender()
@@ -261,7 +262,8 @@ bool DirectX11::Dx11Main::RHIRender()
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
 	if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     { 
-        renderFence.Signal(1);
+        //renderFence.Signal(1);
+        renderBarrier.arrive_and_wait();
         return false;
     }
 
@@ -274,7 +276,9 @@ bool DirectX11::Dx11Main::RHIRender()
 	}
 
     th2++;
-    renderFence.Signal(1);
+    //renderFence.Signal(1);
+
+    renderBarrier.arrive_and_wait();
 	return true;
 }
 
@@ -323,13 +327,15 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     // 처음 업데이트하기 전에 아무 것도 하지 마세요.
     if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     {
-        renderFence.Signal(0);
+        //renderFence.Signal(0);
+        renderBarrier.arrive_and_wait();
         return;
     }
 
     m_sceneRenderer->CreateCommandListPass();
     th3++;
-    renderFence.Signal(0);
+    //renderFence.Signal(0);
+    renderBarrier.arrive_and_wait();
 }
 
 void DirectX11::Dx11Main::RHIWorkerThread()
