@@ -102,9 +102,14 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 			auto terrain = obj->GetComponent<TerrainComponent>();
 			auto terrainMesh = terrain->GetMesh();
+
 			if (terrainMesh)
 			{
+				DirectX11::PSSetConstantBuffer(12, 1, terrain->m_layerBuffer.GetAddressOf());
 				scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+
+				DirectX11::PSSetShaderResources(6, 1, terrain->GetLayerSRV());
+				DirectX11::PSSetShaderResources(7, 1, terrain->GetSplatMapSRV());
 				terrainMesh->Draw();
 			}
 		}

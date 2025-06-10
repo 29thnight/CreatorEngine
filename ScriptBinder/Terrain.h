@@ -157,8 +157,8 @@ struct TerrainBrush
 struct TerrainLayer
 {
     uint32_t m_layerID{ 0 };
-    ID3D11ShaderResourceView* diffuseTexture{ nullptr };
-    ID3D11ShaderResourceView* normalTexture{ nullptr };
+    ID3D11Texture2D* diffuseTexture{ nullptr };
+    ID3D11ShaderResourceView* diffuseSRV{ nullptr };
     float fileFactor{ 1.0f };
 };
 
@@ -168,6 +168,13 @@ struct LayerDesc
 	std::wstring diffuseTexturePath;
 	std::wstring normalTexturePath;
     float tilling;
+};
+
+cbuffer TerrainLayerBuffer
+{
+	bool32 useLayer{ false };
+    int layerIndex;
+    float4 layerTilling;
 };
 
 //-----------------------------------------------------------------------------
@@ -248,6 +255,41 @@ public:
             indices,
             (uint32_t)m_width
         );
+
+		//레이어 텍스처 배열 초기화
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = 512;
+        desc.Height = 512;
+        desc.MipLevels = 1;
+		desc.ArraySize = 4; //최대 레이어 수
+        desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+
+        DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &m_layerTextureArray);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+		uavDesc.Format = desc.Format;
+		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
+		uavDesc.Texture2DArray.MipSlice = 0;
+		uavDesc.Texture2DArray.FirstArraySlice = 0;
+        uavDesc.Texture2DArray.ArraySize = desc.ArraySize;
+
+		DeviceState::g_pDevice->CreateUnorderedAccessView(m_layerTextureArray, &uavDesc, &p_outTextureUAV);
+
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MipLevels = 1;
+        srvDesc.Texture2DArray.ArraySize = 4; // 최대 레이어 수
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+
+        DeviceState::g_pDevice->CreateShaderResourceView(m_layerTextureArray, &srvDesc, &m_layerSRV);
+
+
+		InitSplatMapTexture(m_width, m_height);
     }
 
     void Resize(int newWidth, int newHeight)
@@ -300,17 +342,8 @@ public:
             m_pMesh = new TerrainMesh(m_name.ToString(), verts, indices, (uint32_t)m_width);
         }
 
-        // 4) 쿼드트리 해제 후 재구축
-        //if (m_rootNode)
-        //{
-        //    DestroyQuadTree(m_rootNode);
-        //    m_rootNode = nullptr;
-        //}
-        //m_rootNode = BuildQuadTree(0, 0, m_width - 1, m_height - 1);
-
-        //// 5) 렌더러에도 새 메시/쿼드트리 전달 (가정: m_renderer가 이미 존재)
-        //m_renderer->ReleaseResources();      // 기존 GPU 리소스 해제
-        //m_renderer->Initialize(this);       // 새 크기/쿼드트리로 다시 초기화
+		// 4) 스플랫 맵 텍스처 초기화
+        InitSplatMapTexture(m_width, m_height);
     }
 
     // 브러시 적용
@@ -387,6 +420,10 @@ public:
             (uint32_t)patchW,
             (uint32_t)patchH
         );
+
+
+		// 레이어 페인트 splet 맵 업데이트
+        UpdateSplatMapPatch(minX,minY,patchW,patchH);
     }
 
     // 변경된 영역(minX..maxX, minY..maxY) 주변 노멀이 올바르게 보이도록 +1 픽셀 확장
@@ -426,15 +463,14 @@ public:
     // 레이어 페인팅
     void PaintLayer(uint32_t layerId, int x, int y, float strength)
     {
-        for (size_t i = 0; i < m_layers.size(); ++i)
-        {
-            if (m_layers[i].m_layerID == layerId)
-            {
-                int idx = y * m_width + x;
-                m_layerHeightMap[i][idx] = std::clamp(m_layerHeightMap[i][idx] + strength, 0.0f, 1.0f);
-                break;
-            }
-        }
+		if (layerId >= m_layers.size()) return; // 유효한 레이어인지 확인
+		int idx = y * m_width + x;
+		if (idx < 0 || idx >= m_height * m_width) return; // 범위 체크
+		// 해당 레이어 가중치 업데이트
+		m_layerHeightMap[layerId][idx] += strength;
+		if (m_layerHeightMap[layerId][idx] < 0.0f) {
+			m_layerHeightMap[layerId][idx] = 0.0f; // 음수 방지
+		}
     }
 
 	std::vector<uint32_t> GetLayerCount() const
@@ -460,43 +496,104 @@ public:
 
 
     //layer 관련 함수
-	void AddLayer(const std::wstring& diffuseFile,const std::wstring& nomalFile,float tilling) {
+	void AddLayer(const std::wstring& diffuseFile,float tilling) {
 	
 		TerrainLayer newLayer;
 		newLayer.m_layerID = m_nextLayerID++;
 		newLayer.fileFactor = tilling;
 		// diffuseTexture 로드
+        
 		if (!diffuseFile.empty()) {
+            ID3D11Resource* diffuseResource = nullptr;
+            ID3D11Texture2D* diffuseTexture = nullptr;
             ID3D11ShaderResourceView* diffuseSRV = nullptr;
-            if (CreateTextureFromFile(DeviceState::g_pDevice,diffuseFile,&diffuseSRV))
+            if (CreateTextureFromFile(DeviceState::g_pDevice,diffuseFile, &diffuseResource, &diffuseSRV)==S_OK)
             {
-                newLayer.diffuseTexture = diffuseSRV;
+				diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
+
+				//DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &diffuseTexture);
+          
+				newLayer.diffuseTexture = diffuseTexture;
+                newLayer.diffuseSRV = diffuseSRV;
+            }
+            else {
+				throw std::runtime_error("Failed to load diffuse texture: " + std::string(diffuseFile.begin(), diffuseFile.end()));
             }
 		}
-		// normalTexture 로드
-		if (!nomalFile.empty()) {
-			ID3D11ShaderResourceView* normalSRV = nullptr;
-			if (CreateTextureFromFile(DeviceState::g_pDevice, nomalFile, &normalSRV))
-			{
-				newLayer.normalTexture = normalSRV;
-			}
-		}
+        
+
 		m_layers.push_back(newLayer);
+		m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
 		
 		LayerDesc desc;
 		desc.layerID = newLayer.m_layerID;
         desc.diffuseTexturePath = diffuseFile;
-		desc.normalTexturePath = nomalFile;
 		desc.tilling = tilling;
+
+		TerrainLayerBuffer buff;
+		buff.useLayer = true;
+        buff.layerIndex = newLayer.m_layerID;
+        buff.layerTilling = { tilling, 0.0f, 0.0f, 0.0f }; // Tiling은 x,y로 설정
+        
+		m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+        DirectX11::UpdateBuffer(m_layerBuffer.Get() ,&buff);
+
+
+		
+        
+        const UINT offsets[]{ 0 };
+
+        DirectX11::UnbindRenderTargets();
+        ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
+        ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
+        DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, offsets);
+        ID3D11ShaderResourceView* srvs[]{ m_layers[0].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
+        ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
+        DirectX11::CSSetShaderResources(0, 1, srvs);
+
+        uint32 threadGroupCountX = (uint32)ceilf(DeviceState::g_ClientRect.width / 16.0f);
+        uint32 threadGroupCountY = (uint32)ceilf(DeviceState::g_ClientRect.height / 16.0f);
+
+        //(512 + 15) / 16, (512 + 15) / 16, 4
+        DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
+
+        DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, offsets);
+        DirectX11::CSSetShaderResources(0, 1, nullSRVs);
+
+
+        for (UINT j = 0; j < m_layers.size(); ++j)
+        {
+            DeviceState::g_pDeviceContext->CopySubresourceRegion(
+                m_layerTextureArray,                      // 대상 Texture2DArray
+                D3D11CalcSubresource(0, j, 1),     // (MipLevel, ArraySlice, MipLevels)
+                0, 0, 0,
+                m_layers[j].diffuseTexture,                // 각각의 개별 텍스처
+                0,
+                nullptr
+            );
+           /* DeviceState::g_pDeviceContext->UpdateSubresource(
+                m_layerTextureArray,
+                D3D11CalcSubresource(0, j, 1),
+                nullptr,
+                m_layers[j].diffuseTexture,
+                0,
+                0
+            );*/
+        }
     }
 
 
-	void InitSplatMapTexture()
+	void InitSplatMapTexture(UINT width,UINT height)
 	{
+
+        m_splatMapTexture.Reset();
+		m_splatMapSRV.Reset();
+
+
 		// 스플랫맵 텍스처 초기화
 		D3D11_TEXTURE2D_DESC desc = {};
-		desc.Width = m_width;
-		desc.Height = m_height;
+		desc.Width = width;
+		desc.Height = height;
 		desc.MipLevels = 1;
 		desc.ArraySize = 1;
 		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // RGBA 8-bit format
@@ -566,7 +663,7 @@ public:
 		}
 
 		D3D11_MAPPED_SUBRESOURCE mapped = {};
-		HRESULT hr = DeviceState::g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &mapped);
+		HRESULT hr = DeviceState::g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         if (FAILED(hr)) {
             throw std::runtime_error("Failed to map splat map texture");
             return;
@@ -582,6 +679,15 @@ public:
 		DeviceState::g_pDeviceContext->Unmap(m_splatMapTexture.Get(), 0);
     }
 
+	ID3D11ShaderResourceView** GetSplatMapSRV()
+	{
+        return m_splatMapSRV.GetAddressOf();
+	}
+
+	ID3D11ShaderResourceView** GetLayerSRV()
+	{
+		return &m_layerSRV;
+	}
 
 
     // 현재 브러시 정보 저장/반환
@@ -595,6 +701,7 @@ public:
 
     // Mesh 접근자
     TerrainMesh* GetMesh() const { return m_pMesh; }
+    ComPtr<ID3D11Buffer> m_layerBuffer; // 레이어 정보 버퍼
 
 private:
     unsigned int m_terrainID{ 0 };
@@ -606,13 +713,20 @@ private:
 	uint32_t m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
     std::vector<TerrainLayer>            m_layers;
 	std::vector<LayerDesc>               m_layerDescs; // 레이어 설명 (ID, 텍스처 경로 등)
+    
 
 
-    std::vector<std::vector<float>>      m_layerHeightMap;
+	std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
 	ComPtr<ID3D11Texture2D> m_splatMapTexture; // 스플랫맵 텍스처
 	ComPtr<ID3D11ShaderResourceView> m_splatMapSRV; // 스플랫맵 SRV
 
+	ID3D11UnorderedAccessView* p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
+
+	ID3D11Texture2D* m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
+	ID3D11ShaderResourceView* m_layerSRV = nullptr; // 최대 4개 레이어 SRV
+
+	
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
     TerrainMesh* m_pMesh{ nullptr };

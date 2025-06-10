@@ -11,6 +11,9 @@ Texture2D OcclusionRoughnessMetal : register(t2);
 Texture2D AoMap : register(t3);
 Texture2D Emissive : register(t5);
 
+Texture2DArray LayerAlbedo : register(t6);
+Texture2D SplatTexture : register(t7);
+
 cbuffer PBRMaterial : register(b0)
 {
     float4 gAlbedo;
@@ -24,6 +27,14 @@ cbuffer PBRMaterial : register(b0)
     int gNormalState;
     int gConvertToLinear;
 }
+
+cbuffer TerrainLayerConstants : register(b12)
+{
+    int useTerrainLayers;
+    int gLayerIndex;
+    float4 gLayerTiling;
+};
+
 
 struct PixelShaderInput
 {
@@ -76,6 +87,18 @@ GBufferOutput main(PixelShaderInput IN)
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
     }
+    
+    [branch]
+    if (useTerrainLayers)
+    {
+        float2 uv = IN.texCoord1 * gLayerTiling.x;
+        albedo = LayerAlbedo.SampleLevel(LinearSampler, float3(uv, (float)gLayerIndex),0);
+        if (gConvertToLinear)
+            albedo = SRGBtoLINEAR(albedo);
+    }
+        
+    
+    
 
     float occlusion = 1;
 
