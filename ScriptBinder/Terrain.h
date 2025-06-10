@@ -12,7 +12,9 @@
 //-----------------------------------------------------------------------------
 #include "DirectXHelper.h"
 
-
+struct alignas(16) TerrainAddLayerBuffer {
+    UINT slice;
+};
 
 ////-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -229,6 +231,12 @@ public:
 
 
         m_computeShader = &ShaderSystem->ComputeShaders["TerrainTexture"];
+        m_AddLayerBuffer = DirectX11::CreateBuffer(
+			sizeof(TerrainAddLayerBuffer),
+			D3D11_BIND_CONSTANT_BUFFER,
+			nullptr
+		);
+
 
         std::vector<uint32_t> indices;
         indices.reserve((m_width - 1) * (m_height - 1) * 6);
@@ -519,7 +527,9 @@ public:
 				//DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &diffuseTexture);
           
 				newLayer.diffuseTexture = diffuseTexture;
+                DirectX::SetName(newLayer.diffuseTexture, "TerrainTex");
                 newLayer.diffuseSRV = diffuseSRV;
+				DirectX::SetName(newLayer.diffuseSRV, "TerrainTexSRV");
             }
             else {
 				throw std::runtime_error("Failed to load diffuse texture: " + std::string(diffuseFile.begin(), diffuseFile.end()));
@@ -545,20 +555,25 @@ public:
 
 
 		
-        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
         
+        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+		TerrainAddLayerBuffer addLayerBuffer;
+		addLayerBuffer.slice = newLayer.m_layerID;
+        DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
+
+
         const UINT offsets[]{ 0 };
 
         DirectX11::UnbindRenderTargets();
         ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
         ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
         DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, offsets);
-        ID3D11ShaderResourceView* srvs[]{ m_layers[0].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
+        //ID3D11ShaderResourceView* srvs = { m_layers[newLayer.m_layerID].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
         ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
-        DirectX11::CSSetShaderResources(0, 1, srvs);
+        DirectX11::CSSetShaderResources(0, 1, &newLayer.diffuseSRV);
 
-        uint32 threadGroupCountX = (uint32)ceilf(DeviceState::g_ClientRect.width / 16.0f);
-        uint32 threadGroupCountY = (uint32)ceilf(DeviceState::g_ClientRect.height / 16.0f);
+        uint32 threadGroupCountX = (uint32)ceilf(512 / 16.0f);
+        uint32 threadGroupCountY = (uint32)ceilf(512 / 16.0f);
 
         //(512 + 15) / 16, (512 + 15) / 16, 4
         DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
@@ -567,25 +582,25 @@ public:
         DirectX11::CSSetShaderResources(0, 1, nullSRVs);
 
 
-        for (UINT j = 0; j < m_layers.size(); ++j)
-        {
-            DeviceState::g_pDeviceContext->CopySubresourceRegion(
-                m_layerTextureArray,                      // 대상 Texture2DArray
-                D3D11CalcSubresource(0, j, 1),     // (MipLevel, ArraySlice, MipLevels)
-                0, 0, 0,
-                m_layers[j].diffuseTexture,                // 각각의 개별 텍스처
-                0,
-                nullptr
-            );
-           /* DeviceState::g_pDeviceContext->UpdateSubresource(
-                m_layerTextureArray,
-                D3D11CalcSubresource(0, j, 1),
-                nullptr,
-                m_layers[j].diffuseTexture,
-                0,
-                0
-            );*/
-        }
+        //for (UINT j = 0; j < m_layers.size(); ++j)
+        //{
+        //    DeviceState::g_pDeviceContext->CopySubresourceRegion(
+        //        m_layerTextureArray,                      // 대상 Texture2DArray
+        //        D3D11CalcSubresource(0, j, 1),     // (MipLevel, ArraySlice, MipLevels)
+        //        0, 0, 0,
+        //        m_layers[j].diffuseTexture,                // 각각의 개별 텍스처
+        //        0,
+        //        nullptr
+        //    );
+        //   /* DeviceState::g_pDeviceContext->UpdateSubresource(
+        //        m_layerTextureArray,
+        //        D3D11CalcSubresource(0, j, 1),
+        //        nullptr,
+        //        m_layers[j].diffuseTexture,
+        //        0,
+        //        0
+        //    );*/
+        //}
     }
 
 
@@ -708,7 +723,7 @@ public:
     // Mesh 접근자
     TerrainMesh* GetMesh() const { return m_pMesh; }
     ComPtr<ID3D11Buffer> m_layerBuffer; // 레이어 정보 버퍼
-
+	ComPtr<ID3D11Buffer> m_AddLayerBuffer; // 레이어 추가용 버퍼
 private:
     unsigned int m_terrainID{ 0 };
     FileGuid m_trrainAssetGuid{};

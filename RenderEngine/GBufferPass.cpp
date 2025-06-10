@@ -110,6 +110,9 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 				DirectX11::PSSetShaderResources(6, 1, terrain->GetLayerSRV());
 				DirectX11::PSSetShaderResources(7, 1, terrain->GetSplatMapSRV());
 				terrainMesh->Draw();
+				ID3D11ShaderResourceView* nullSRV = nullptr;
+				DirectX11::PSSetShaderResources(6, 1, &nullSRV);
+				DirectX11::PSSetShaderResources(7, 1, &nullSRV);
 			}
 		}
 	}
