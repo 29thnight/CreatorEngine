@@ -25,6 +25,5 @@ private:
 	void ImGuiDrawHelperAnimator(Animator* animator);
 
 	void DrawMyLink(std::string linkName, std::string from, std::string to);
-};
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 };
