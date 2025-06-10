@@ -5,6 +5,8 @@
 #include "TerrainComponent.generated.h"
 #include "DeviceState.h"
 #include "Mesh.h" // Vertex 정의 포함
+#include "Shader.h"
+#include "ShaderSystem.h"
 
 
 //-----------------------------------------------------------------------------
@@ -224,6 +226,9 @@ public:
                 );
             }
         }
+
+
+        m_computeShader = &ShaderSystem->ComputeShaders["TerrainTexture"];
 
         std::vector<uint32_t> indices;
         indices.reserve((m_width - 1) * (m_height - 1) * 6);
@@ -540,6 +545,7 @@ public:
 
 
 		
+        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
         
         const UINT offsets[]{ 0 };
 
@@ -726,7 +732,7 @@ private:
 	ID3D11Texture2D* m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
 	ID3D11ShaderResourceView* m_layerSRV = nullptr; // 최대 4개 레이어 SRV
 
-	
+    ShaderPtr<ComputeShader>	m_computeShader;
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
     TerrainMesh* m_pMesh{ nullptr };
