@@ -5,6 +5,7 @@
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "RenderCommand.h"
+#include "RenderScene.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -43,8 +44,47 @@ Camera::Camera()
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 
-	m_defferdQueue.reserve(300);
+	m_deferredQueue.reserve(300);
 	m_forwardQueue.reserve(300);
+
+
+	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
+	Texture* shadowMapTexture = Texture::CreateArray(
+		desc.m_textureWidth,
+		desc.m_textureHeight,
+		"Shadow Map",
+		DXGI_FORMAT_R32_TYPELESS,
+		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE,
+		cascadeCount
+	);
+
+	for (int i = 0; i < cascadeCount; ++i)
+	{
+		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
+	}
+
+	for (int i = 0; i < cascadeCount; i++)
+	{
+		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
+		depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+		depthStencilViewDesc.Texture2DArray.ArraySize = 1;
+		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
+
+		DirectX11::ThrowIfFailed(
+			DeviceState::g_pDevice->CreateDepthStencilView(
+				shadowMapTexture->m_pTexture,
+				&depthStencilViewDesc,
+				&m_shadowMapDSVarr[i]
+			)
+		);
+	}
+
+	//안에서 배열은 3으로 고정중 필요하면 수정
+	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
+	shadowMapTexture->m_textureType = TextureType::ImageTexture;
+	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
+
 }
 
 Camera::~Camera()
@@ -327,7 +367,7 @@ void Camera::PushRenderQueue(MeshRendererProxy* command)
 		switch (mat->m_renderingMode)
 		{
 		case MaterialRenderingMode::Opaque:
-			m_defferdQueue.push_back(command);
+			m_deferredQueue.push_back(command);
 			break;
 		case MaterialRenderingMode::Transparent:
 			m_forwardQueue.push_back(command);
@@ -347,9 +387,9 @@ void Camera::SortRenderQueue()
 		return a->m_animatorGuid < b->m_animatorGuid;
 	};
 
-	if(!m_defferdQueue.empty())
+	if(!m_deferredQueue.empty())
 	{
-		std::sort(m_defferdQueue.begin(), m_defferdQueue.end(), sortByAnimatorAndMaterialGuid);
+		std::sort(m_deferredQueue.begin(), m_deferredQueue.end(), sortByAnimatorAndMaterialGuid);
 	}
 
 	if(!m_forwardQueue.empty())
@@ -360,6 +400,6 @@ void Camera::SortRenderQueue()
 
 void Camera::ClearRenderQueue()
 {
-	m_defferdQueue.clear();
+	m_deferredQueue.clear();
 	m_forwardQueue.clear();
 }

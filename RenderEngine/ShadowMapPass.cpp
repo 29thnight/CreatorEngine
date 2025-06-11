@@ -50,53 +50,19 @@ ShadowMapPass::ShadowMapPass() : m_shadowCamera(true)
 	shadowViewport.MinDepth = 0.0f;
 	shadowViewport.MaxDepth = 1.0f;
 
-	//m_threadPool = new ThreadPool; //일단 잠시 대기
+	m_threadPool = new ThreadPool;
 
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	DeviceState::g_pDevice->CreateDeferredContext(0, &defferdContext1);
 
 	m_cascadeinfo.resize(cascadeCount);
+	m_shadowCamera.m_isOrthographic = true;
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
 {
-	Texture* shadowMapTexture = Texture::CreateArray(
-		width, 
-		height, 
-		"Shadow Map",
-		DXGI_FORMAT_R32_TYPELESS, 
-		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE, 
-		cascadeCount
-	);
 
-	for(int i = 0; i < cascadeCount; ++i)
-	{
-		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
-	}
-
-	for (int i = 0; i < cascadeCount; i++)
-	{
-		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
-		depthStencilViewDesc.Format							= DXGI_FORMAT_D32_FLOAT;
-		depthStencilViewDesc.ViewDimension					= D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
-		depthStencilViewDesc.Texture2DArray.ArraySize		= 1;
-		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
-
-		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateDepthStencilView(
-				shadowMapTexture->m_pTexture,
-				&depthStencilViewDesc,
-				&m_shadowMapDSVarr[i]
-			)
-		);
-	}
-
-	//안에서 배열은 3으로 고정중 필요하면 수정
-	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
-	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
-	m_shadowCamera.m_isOrthographic = true;
 }
 
 void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
@@ -110,6 +76,7 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 			if (cmdQueuePtr->try_pop(CommandJob))
 			{
 				DirectX11::ExecuteCommandList(CommandJob, true);
+				Memory::SafeDelete(CommandJob);
 			}
 		}
 
@@ -123,10 +90,41 @@ void ShadowMapPass::ControlPanel()
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
 	ImGui::Checkbox("UseCasCade", &g_useCascade);
+
+	static auto& cameras = CameraManagement->m_cameras;
+	static std::vector<Camera*> cameraPtrs{};
+	static Camera* selectedCamera{};
+	static int selectedIndex = 0;
+	static size_t lastCameraCount = 0;
+	static const char* name{};
+
+	size_t currentCount = CameraManagement->GetCameraCount();
+	if (currentCount != lastCameraCount)
+	{
+		lastCameraCount = currentCount;
+
+		cameraPtrs.clear();
+		for (auto cam : cameras)
+		{
+			if (nullptr != cam)
+			{
+				cameraPtrs.push_back(cam);
+			}
+		}
+	}
+
+	ImGui::SliderInt("CameraIndex", &selectedIndex, 0, cameraPtrs.size() - 1);
+
+	if (cameraPtrs[selectedIndex] != selectedCamera)
+	{
+		selectedCamera = cameraPtrs[selectedIndex];
+	}
+
 	for (int i = 0; i < cascadeCount; ++i)
 	{
-		ImGui::Image((ImTextureID)sliceSRV[i], ImVec2(256, 256));
+		ImGui::Image((ImTextureID)selectedCamera->sliceSRV[i], ImVec2(256, 256));
 	}
+
 	ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f);
 }
 
@@ -143,7 +141,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RenderScene& scene, Camera& c
 	{
 		for (int i = 0; i < cascadeCount; i++)
 		{
-			DirectX11::ClearDepthStencilView(defferdContextPtr1, m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+			DirectX11::ClearDepthStencilView(defferdContextPtr1, camera.m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		}
 		return;
 	}
@@ -151,7 +149,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RenderScene& scene, Camera& c
 	auto  lightdir		= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc			= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
 	auto& constantRef	= scene.m_LightController->m_shadowMapConstant;		//type = ShadowMapConstant&
-	auto  constantCopy	= scene.m_LightController->m_shadowMapConstant;		//type = ShadowMapConstant
+	auto& constantCopy	= camera.m_shadowMapConstant = constantRef;		//type = ShadowMapConstant
 	auto  projMat		= camera.CalculateProjection();						//type = Mathf::xMatrix
 
 	m_pso->Apply(defferdContextPtr1);
@@ -159,11 +157,13 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RenderScene& scene, Camera& c
 	DevideCascadeEnd(camera);
 	DevideShadowInfo(camera, lightdir);
 
-	constantRef.devideShadow	= m_settingConstant.devideShadow;
-	constantRef._epsilon		= m_settingConstant._epsilon;
-	constantCopy.m_casCadeEnd1	= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[1], 1.f }, projMat).z;
-	constantCopy.m_casCadeEnd2	= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[2], 1.f }, projMat).z;
-	constantCopy.m_casCadeEnd3	= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[3], 1.f }, projMat).z;
+	constantRef.devideShadow		= m_settingConstant.devideShadow;
+	constantRef._epsilon			= m_settingConstant._epsilon;
+	constantCopy.m_casCadeEnd1		= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[1], 1.f }, projMat).z;
+	constantCopy.m_casCadeEnd2		= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[2], 1.f }, projMat).z;
+	constantCopy.m_casCadeEnd3		= Mathf::Vector4::Transform({ 0, 0, m_cascadeEnd[3], 1.f }, projMat).z;
+	constantCopy.m_shadowMapWidth	= desc.m_textureWidth;
+	constantCopy.m_shadowMapHeight  = desc.m_textureHeight;
 
 	scene.UseModel(defferdContextPtr1);
 	DirectX11::RSSetViewports(defferdContextPtr1, 1, &shadowViewport);
@@ -180,13 +180,12 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RenderScene& scene, Camera& c
 		m_shadowCamera.m_viewWidth				= cascadeInfo.m_viewWidth;
 		m_shadowCamera.m_nearPlane				= cascadeInfo.m_nearPlane;
 		m_shadowCamera.m_farPlane				= cascadeInfo.m_farPlane;
-		constantCopy.m_shadowMapWidth			= desc.m_textureWidth;
-		constantCopy.m_shadowMapHeight			= desc.m_textureHeight;
 		constantCopy.m_lightViewProjection[i]	= cascadeInfo.m_lightViewProjection;
 
-		DirectX11::ClearDepthStencilView(defferdContextPtr1, m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
-		DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, m_shadowMapDSVarr[i]);
+		DirectX11::ClearDepthStencilView(defferdContextPtr1, camera.m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, camera.m_shadowMapDSVarr[i]);
 		m_shadowCamera.UpdateBuffer(defferdContextPtr1, true);
+		DirectX11::UpdateBuffer(defferdContextPtr1, scene.m_LightController->m_shadowMapBuffer, &constantCopy);
 
 		CreateCommandListProxyToShadow(scene, camera);
 
@@ -195,7 +194,6 @@ void ShadowMapPass::CreateCommandListCascadeShadow(RenderScene& scene, Camera& c
 		PushQueue(camera.m_cameraIndex, pCommandList);
 	}
 
-	DirectX11::UpdateBuffer(defferdContextPtr1, scene.m_LightController->m_shadowMapBuffer, &constantCopy);
 	DirectX11::RSSetViewports(defferdContextPtr1, 1, &DeviceState::g_Viewport);
 	DirectX11::UnbindRenderTargets(defferdContextPtr1);
 
@@ -212,7 +210,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(RenderScene& scene, Camera& ca
 
 	if (!m_abled)
 	{
-		DirectX11::ClearDepthStencilView(defferdContextPtr1, m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		DirectX11::ClearDepthStencilView(defferdContextPtr1, camera.m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		return;
 	}
 
@@ -238,8 +236,8 @@ void ShadowMapPass::CreateCommandListNormalShadow(RenderScene& scene, Camera& ca
 	constantCopy.m_shadowMapHeight			= desc.m_textureHeight;
 	constantCopy.m_lightViewProjection[0]	= m_cascadeinfo[2].m_lightViewProjection;
 
-	DirectX11::ClearDepthStencilView(defferdContextPtr1, m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
-	DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, m_shadowMapDSVarr[0]);
+	DirectX11::ClearDepthStencilView(defferdContextPtr1, camera.m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+	DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, camera.m_shadowMapDSVarr[0]);
 	DirectX11::VSSetConstantBuffer(defferdContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::RSSetViewports(defferdContextPtr1, 1, &shadowViewport);
 	m_shadowCamera.UpdateBuffer(defferdContextPtr1, true);
@@ -247,7 +245,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(RenderScene& scene, Camera& ca
 
 	CreateCommandListProxyToShadow(scene, camera);
 
-	DirectX11::UpdateBuffer(defferdContextPtr1, scene.m_LightController->m_shadowMapBuffer, &constantCopy);
+	//DirectX11::UpdateBuffer(defferdContextPtr1, scene.m_LightController->m_shadowMapBuffer, &constantCopy);
 	DirectX11::RSSetViewports(defferdContextPtr1, 1, &DeviceState::g_Viewport);
 	DirectX11::UnbindRenderTargets(defferdContextPtr1);
 
@@ -264,7 +262,7 @@ void ShadowMapPass::CreateCommandListProxyToShadow(RenderScene& scene, Camera& c
 
 	HashedGuid currentAnimatorGuid{};
 
-	for (auto& MeshRendererProxy : camera.m_defferdQueue)
+	for (auto& MeshRendererProxy : scene.GetShadowRenderQueue())
 	{
 		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdContextPtr1);
 
@@ -280,42 +278,22 @@ void ShadowMapPass::CreateCommandListProxyToShadow(RenderScene& scene, Camera& c
 
 		MeshRendererProxy->Draw(defferdContextPtr1);
 	}
-
-	for (auto& MeshRendererProxy : camera.m_forwardQueue)
-	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdContextPtr1);
-
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
-		{
-			if (animatorGuid != currentAnimatorGuid)
-			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
-			}
-		}
-
-		MeshRendererProxy->Draw(defferdContextPtr1);
-	}
 }
 
 void ShadowMapPass::DevideCascadeEnd(Camera& camera)
 {
-	if(m_cascadeEnd.size() != m_cascadeDevideRatios.size() || m_cascadeDevideRatios.size() != m_cascadeRatioSize)
+	m_cascadeEnd.clear();
+
+	m_cascadeEnd.push_back(camera.m_nearPlane);
+
+	float distanceZ = camera.m_farPlane - camera.m_nearPlane;
+
+	for (float ratio : m_cascadeDevideRatios)
 	{
-		m_cascadeEnd.reserve(m_cascadeDevideRatios.size() + CASCADE_BEGIN_END_COUNT);
-
-		m_cascadeEnd.push_back(camera.m_nearPlane);
-
-		float distanceZ = camera.m_farPlane - camera.m_nearPlane;
-
-		for (float ratio : m_cascadeDevideRatios)
-		{
-			m_cascadeEnd.push_back(ratio * distanceZ);
-		}
-
-		m_cascadeEnd.push_back(camera.m_farPlane);
+		m_cascadeEnd.push_back(ratio * distanceZ);
 	}
+
+	m_cascadeEnd.push_back(camera.m_farPlane);
 }
 
 void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)

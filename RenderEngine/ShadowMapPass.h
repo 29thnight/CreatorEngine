@@ -9,7 +9,6 @@ class LightController;
 
 constexpr int cascadeCount = 3;
 
-
 struct ShadowInfo
 {
 	Mathf::xVector m_eyePosition{};
@@ -38,23 +37,17 @@ public:
 
 	Camera m_shadowCamera;
 
-	UniqueTexturePtr m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
-	ID3D11DepthStencilView* m_shadowMapDSV{ nullptr };
-	ComPtr<ID3D11Buffer> m_boneBuffer;
+	//UniqueTexturePtr			m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
+	//ID3D11ShaderResourceView*	sliceSRV[3]{};
+	//ID3D11DepthStencilView*		m_shadowMapDSVarr[cascadeCount]{};
+	ComPtr<ID3D11Buffer>		m_boneBuffer;
+	D3D11_VIEWPORT				shadowViewport;
+	ShadowMapConstant			m_settingConstant;
+	FrustumContainer			sliceFrustums;
 
-	D3D11_VIEWPORT shadowViewport;
-	ID3D11ShaderResourceView* shadowMapSRV = nullptr;
-	ID3D11ShaderResourceView* sliceSRV[3]{};
-
-	//그림자 적용할 빛마다 3개 현재는 빛 1개에만 적용가능
-	ID3D11DepthStencilView* m_shadowMapDSVarr[cascadeCount]{};
-	ShadowMapConstant m_settingConstant;
-
-	FrustumContainer sliceFrustums;
-
-	std::vector<float>		m_cascadeDevideRatios = { 0.15, 0.5 };
-	std::vector<float>		m_cascadeEnd;
-	std::vector<ShadowInfo> m_cascadeinfo;
+	std::vector<float>			m_cascadeDevideRatios = { 0.15f, 0.5f };
+	std::vector<float>			m_cascadeEnd;
+	std::vector<ShadowInfo>		m_cascadeinfo;
 
 	ThreadPool* m_threadPool{ nullptr };
 

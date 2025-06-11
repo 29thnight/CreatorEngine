@@ -225,9 +225,6 @@
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderTaskScheduler">
-      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\JobSystem\Animation">
       <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
     </Filter>

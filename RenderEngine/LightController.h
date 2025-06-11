@@ -31,7 +31,7 @@ public:
 
 	const LightProperties& GetProperties() { return m_lightProperties; }
 
-	Texture* GetShadowMapTexture();
+	//Texture* GetShadowMapTexture();
 
 	ShadowMapPass* GetShadowMapPass() { return m_shadowMapPass.get(); }
 

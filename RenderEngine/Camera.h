@@ -1,5 +1,6 @@
 #pragma once
 #include "ProjectionType.h"
+#include "LightProperty.h"
 #include "DeviceResources.h"
 #include "Texture.h"
 #include "Camera.generated.h"
@@ -44,6 +45,7 @@ public:
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
 	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
+	static constexpr int cascadeCount = 3;
 
 	Mathf::xVector m_eyePosition{ XMVectorSet(0, 1, -10, 1) };
 	Mathf::xVector m_forward{ FORWARD };
@@ -75,18 +77,24 @@ public:
 	bool m_isOrthographic{ false };
 	ApplyRenderPipelinePass m_applyRenderPipelinePass{};
 
-	ComPtr<ID3D11Buffer> m_ViewBuffer;
-	ComPtr<ID3D11Buffer> m_ProjBuffer;
-    UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
-    UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
+	ComPtr<ID3D11Buffer>	m_ViewBuffer;
+	ComPtr<ID3D11Buffer>	m_ProjBuffer;
+    UniqueTexturePtr		m_renderTarget{ nullptr, TextureHelper::deleter };
+    UniqueTexturePtr		m_depthStencil{ nullptr, TextureHelper::deleter };
 
-	std::vector<MeshRendererProxy*> m_defferdQueue;
+	UniqueTexturePtr			m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
+	ID3D11DepthStencilView*		m_shadowMapDSVarr[cascadeCount]{};
+	ID3D11ShaderResourceView*	sliceSRV[3]{};
+	ShadowMapConstant			m_shadowMapConstant;
+
+	std::vector<MeshRendererProxy*> m_deferredQueue;
 	std::vector<MeshRendererProxy*> m_forwardQueue;
 
 	std::mutex m_cameraMutex;
 };
 
 class SceneRenderer;
+class ShadowMapPass;
 class CameraContainer : public Singleton<CameraContainer>
 {
 private:
@@ -172,6 +180,7 @@ public:
 
 private:
 	friend class SceneRenderer;
+	friend class ShadowMapPass;
 	std::vector<Camera*> m_cameras;
 };
 

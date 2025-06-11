@@ -17,8 +17,14 @@ interface IUpdatable
 
         m_updateEventHandle = subscribedScene->UpdateEvent.AddLambda([this](float deltaSecond)
         {
+            GameObject* sceneObject{};
+
             auto ptr = dynamic_cast<Component*>(this);
-			auto sceneObject = ptr->GetOwner();
+            if(nullptr != ptr) 
+            {
+                sceneObject = ptr->GetOwner();
+            }
+
 			if (nullptr != ptr && sceneObject)
 			{
                 if (!ptr->IsEnabled() && sceneObject->IsDestroyMark())

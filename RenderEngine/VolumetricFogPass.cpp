@@ -221,7 +221,7 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &data);
 	DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-	DirectX11::CSSetShaderResources(0, 1, &scene.m_LightController->GetShadowMapTexture()->m_pSRV);
+	DirectX11::CSSetShaderResources(0, 1, &camera.m_shadowMapTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(1, 1, &m_pBlueNoiseTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
 	DirectX11::CSSetUnorderedAccessViews(0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);

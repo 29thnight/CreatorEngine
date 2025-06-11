@@ -643,4 +643,15 @@ namespace DirectX11
 		}
 		deferredContext->FinishCommandList(RestoreDeferredContextState, ppCommandList);
 	}
+
+	//[safe]
+	inline void PSSetShaderResources(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
+	}
 }

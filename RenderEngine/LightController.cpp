@@ -163,7 +163,7 @@ void LightController::CreateShadowCommandList(RenderScene& scene, Camera& camera
 	}
 }
 
-Texture* LightController::GetShadowMapTexture()
-{
-	return m_shadowMapPass->m_shadowMapTexture.get();
-}
+//Texture* LightController::GetShadowMapTexture()
+//{
+//	return m_shadowMapPass->m_shadowMapTexture.get();
+//}

@@ -21,7 +21,7 @@ public:
 	// 스레드별로 고유 ID로 signal (index 0~count-1)
 	void Signal(uint32_t threadIndex)
 	{
-		// 이미 true인 경우 다른 스레드가 Reset을 아직 하지 않은 상태일 수 있음
+		// 이미 true인 경우 다른 스레드가 Reset을 아직 하지 않은 상태일 수 있음 -> 삭제 예정
 		while (m_signaledFlags[threadIndex].load(std::memory_order_acquire))
 		{
 			_mm_pause();

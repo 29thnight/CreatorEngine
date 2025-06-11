@@ -19,7 +19,7 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
     flag compileFlag{};
 
 #if defined(_DEBUG)
-    compileFlag |= D3DCOMPILE_DEBUG;
+    compileFlag |= D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 #if defined(NDEBUG)
     //compileFlag |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
@@ -70,6 +70,29 @@ ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
 			FileWriter writer{ csoPath };
 			writer.write(static_cast<char*>(shaderBlob->GetBufferPointer()), shaderBlob->GetBufferSize());
 			writer.flush();
+
+#if defined(_DEBUG)
+            ComPtr<ID3DBlob> debugBlob;
+            // Debug 정보가 shaderBlob에 내장되어 있는지 추출
+            D3DGetBlobPart(
+                shaderBlob->GetBufferPointer(),
+                shaderBlob->GetBufferSize(),
+                D3D_BLOB_DEBUG_INFO,
+                0,
+                &debugBlob
+            );
+
+            if (debugBlob)
+            {
+                // 실제 PDB 파일로 저장
+                std::string pdbPath = PathFinder::RelativeToPrecompiledShader().string() + filePath.stem().string() + ".cso";
+                FileWriter writer{ pdbPath };
+                writer.write(static_cast<char*>(debugBlob->GetBufferPointer()), debugBlob->GetBufferSize());
+                writer.flush();
+
+                debugBlob->Release();
+            }
+#endif
 		}
 
     }

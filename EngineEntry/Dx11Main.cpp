@@ -13,22 +13,15 @@
 #include "SceneManager.h"
 #include "EngineSetting.h"
 #include "CullingManager.h"
-#include <barrier>
 #include "UIManager.h"
 #include "SpinLock.h"
-#include "Core.FenceFlag.h"
-#include "Core.FenceFlagGroup.h"
+#include "Core.Barrier.h"
 #include "InputActionManager.h"
 
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
 std::atomic<double> frameDeltaTime{};
-FenceFlagGroup renderFence(2);
-std::barrier renderBarrier(3);
-//for Fence Test
-std::atomic_ullong th1;
-std::atomic_ullong th2;
-std::atomic_ullong th3;
+Barrier renderBarrier(3);
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -237,21 +230,13 @@ void DirectX11::Dx11Main::Update()
 	}
 #endif // !EDITOR
 
-    //renderFence.Wait();
-    renderBarrier.arrive_and_wait();
+    renderBarrier.ArriveAndWait();
 
-    //for debug
-    if (0 != m_timeSystem.GetFrameCount())
-    {
-        th1++;
-        //std::cout << "game_thread" << th1 << " " << "render_thread" << th3 << " " << "RHI_thread" << th2 << std::endl;
-    }
-
-
-    SceneManagers->EndOfFrame();
     DisableOrEnable();
-    
-    //renderFence.Reset();
+    SceneManagers->EndOfFrame();
+
+    renderBarrier.ArriveAndWait();
+
 }
 
 bool DirectX11::Dx11Main::RHIRender()
@@ -262,8 +247,8 @@ bool DirectX11::Dx11Main::RHIRender()
 	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
 	if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     { 
-        //renderFence.Signal(1);
-        renderBarrier.arrive_and_wait();
+        renderBarrier.ArriveAndWait();
+        renderBarrier.ArriveAndWait();
         return false;
     }
 
@@ -275,10 +260,8 @@ bool DirectX11::Dx11Main::RHIRender()
 #endif // !EDITOR
 	}
 
-    th2++;
-    //renderFence.Signal(1);
-
-    renderBarrier.arrive_and_wait();
+    renderBarrier.ArriveAndWait();
+    renderBarrier.ArriveAndWait();
 	return true;
 }
 
@@ -327,15 +310,15 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     // 처음 업데이트하기 전에 아무 것도 하지 마세요.
     if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     {
-        //renderFence.Signal(0);
-        renderBarrier.arrive_and_wait();
+        renderBarrier.ArriveAndWait();
+        renderBarrier.ArriveAndWait();
         return;
     }
 
     m_sceneRenderer->CreateCommandListPass();
-    th3++;
-    //renderFence.Signal(0);
-    renderBarrier.arrive_and_wait();
+
+    renderBarrier.ArriveAndWait();
+    renderBarrier.ArriveAndWait();
 }
 
 void DirectX11::Dx11Main::RHIWorkerThread()
