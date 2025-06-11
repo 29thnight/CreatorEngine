@@ -22,22 +22,15 @@ cbuffer gBrush : register(b0)
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float dist = length(IN.wPosition.xz - gBrushWorldPosition);
-    float2 uv = IN.position.xy;
-    uv.y = -uv.y;
-    
-    //float4 color = targetTexture.SampleLevel(LinearSampler, IN.position.xy/2, 0);
-    //float4 color = targetTexture.SampleLevel(LinearSampler, uv, 0);
-    float2 color = IN.position.xy;
-    //if (dist < gBrushRadius)
-    //{
-    //    // If within brush radius, return a color (e.g., white)
-        
-    //    return lerp(float4(0, dist / gBrushRadius, 1 - dist / gBrushRadius, 1), color, 0.5);
-        
-    //}
-    //else
-    //{
-     
-    //}
-    return float4(color, 0, 1); //float4(position.xy 0, 0);
+    float invBrushRadius = 1.0 / gBrushRadius;
+    float clampRadius = dist * invBrushRadius;
+    if (dist < gBrushRadius)
+    {
+        // If within brush radius, return a color (e.g., white)
+        return float4(0, clampRadius, 1.0 - clampRadius, 1);
+    }
+    else
+    {
+        return float4(0, 0, 0, 0);
+    }
 }
