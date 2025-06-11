@@ -42,7 +42,7 @@ public:
         DirectX11::ThrowIfFailed(
             DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
         );
-        DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
+        //DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 
         // 인덱스 버퍼는 변하지 않으므로 IMMUTABLE로 생성
         D3D11_BUFFER_DESC ibDesc = {};
@@ -55,7 +55,7 @@ public:
         ibInit.pSysMem = m_indices.data();
 
         DeviceState::g_pDevice->CreateBuffer(&ibDesc, &ibInit, m_indexBuffer.GetAddressOf());
-        DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
+        //DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
     }
 
     ~TerrainMesh() = default;
@@ -567,10 +567,11 @@ public:
 
         ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
         ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
-        DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, offsets);
+        DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
         //ID3D11ShaderResourceView* srvs = { m_layers[newLayer.m_layerID].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
         ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
         DirectX11::CSSetShaderResources(0, 1, &newLayer.diffuseSRV);
+		DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
 
         uint32 threadGroupCountX = (uint32)ceilf(512 / 16.0f);
         uint32 threadGroupCountY = (uint32)ceilf(512 / 16.0f);
@@ -578,7 +579,7 @@ public:
         //(512 + 15) / 16, (512 + 15) / 16, 4
         DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
 
-        DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, offsets);
+        DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
         DirectX11::CSSetShaderResources(0, 1, nullSRVs);
 
 
@@ -676,10 +677,10 @@ public:
 					patchData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A 채널에 가중치 저장
                 }
                 
-                for (int layerIdx = (int)m_layers.size(); layerIdx < 4; ++layerIdx) // 나머지 채널은 0으로 초기화
-                {
-					patchData[dstOffset + layerIdx] = 0; // R, G, B, A 채널에 0 저장
-                }
+     //           for (int layerIdx = (int)m_layers.size(); layerIdx < 4; ++layerIdx) // 나머지 채널은 0으로 초기화
+     //           {
+					//patchData[dstOffset + layerIdx] = 0; // R, G, B, A 채널에 0 저장
+     //           }
 			}
 		}
 

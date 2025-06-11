@@ -998,7 +998,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			std::string difuseFileNameStr = difuseFileName.empty() ? "" : std::string(difuseFileName.begin(), difuseFileName.end());
 			if (!difuseFile.empty())
 			{
-				terrainComponent->AddLayer(difuseFileName, 1.0f);
+				terrainComponent->AddLayer(difuseFileName, 4096.0f);
 			}
 			ImGui::CloseCurrentPopup();
 		}

@@ -31,7 +31,6 @@ cbuffer PBRMaterial : register(b0)
 cbuffer TerrainLayerConstants : register(b12)
 {
     int useTerrainLayers;
-    int gLayerIndex;
     float4 gLayerTiling;
 };
 
@@ -91,9 +90,27 @@ GBufferOutput main(PixelShaderInput IN)
     [branch]
     if (useTerrainLayers)
     {
-        float2 uv = IN.texCoord * 4096.0;
+        float2 uv = IN.texCoord;
         uv.y = -uv.y;
-        albedo = LayerAlbedo.SampleLevel(LinearSampler, float3(uv, (float)gLayerIndex),0);
+        
+        float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv * gLayerTiling.x, (float) 0), 0);
+        float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv * gLayerTiling.y, (float) 1), 0);
+        float3 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv * gLayerTiling.z, (float) 2), 0);
+        float3 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv * gLayerTiling.w, (float) 3), 0);
+        
+        float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
+        
+        float weigt0 = splat.r;
+        float weigt1 = splat.g;
+        float weigt2 = splat.b;
+        float weigt3 = splat.a;
+        
+        
+        
+        float3 color = layer0 * weigt0 + layer1 * weigt1 + layer2 * weigt2 + layer3 * weigt3;
+        
+        albedo = float4(color, 1.0);
+
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
     }
