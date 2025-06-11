@@ -713,7 +713,7 @@ public:
 
     // 현재 브러시 정보 저장/반환
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
-    TerrainBrush& GetCurrentBrush() { return *m_currentBrush; }
+    TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
 
     // Collider용 접근자
     int GetWidth()  const { return m_width; }

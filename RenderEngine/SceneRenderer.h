@@ -32,6 +32,7 @@
 #include "Effect/EffectManager.h"
 
 #include "TestPlayer.h"
+#include "TerrainGizmoPass.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -108,6 +109,8 @@ private:
 	std::unique_ptr<VolumetricFogPass> m_pVolumetricFogPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
+
+	std::unique_ptr<TerrainGizmoPass>   m_pTerrainGizmoPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;
 

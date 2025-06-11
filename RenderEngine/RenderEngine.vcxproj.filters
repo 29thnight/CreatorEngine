@@ -416,6 +416,9 @@
     <ClCompile Include="Animation.cpp">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="TerrainGizmoPass.cpp">
+      <Filter>RenderPass\GizmoPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -637,6 +640,9 @@
     <ClInclude Include="Animation.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="TerrainGizmoPass.h">
+      <Filter>RenderPass\GizmoPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -822,6 +828,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TerrainTexture.cs.hlsl">
       <Filter>Shaders\Common</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TerrainDebugBrush.ps.hlsl">
+      <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

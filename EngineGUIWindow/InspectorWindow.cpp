@@ -913,7 +913,7 @@ void InspectorWindow::DrawMyLink(std::string linkName, std::string from, std::st
 
 void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 {
-	TerrainBrush& g_CurrentBrush = terrainComponent->GetCurrentBrush();
+	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
 
 	int prewidth = terrainComponent->m_width;
 	int preheight = terrainComponent->m_height;
@@ -953,24 +953,24 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 	{
 		// 모드 선택
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer" };
-		int currentMode = static_cast<int>(g_CurrentBrush.m_mode);
+		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
 		if (ImGui::Combo("Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
-			g_CurrentBrush.m_mode = static_cast<TerrainBrush::Mode>(currentMode);
+			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);
 
 		// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
-		ImGui::SliderFloat("Radius", &g_CurrentBrush.m_radius, 1.0f, 50.0f);
+		ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
 
 		// 세기 슬라이더
-		ImGui::SliderFloat("Strength", &g_CurrentBrush.m_strength, 0.0f, 1.0f);
+		ImGui::SliderFloat("Strength", &g_CurrentBrush->m_strength, 0.0f, 1.0f);
 
 		// Flatten 옵션일 때만 목표 높이 입력
-		if (g_CurrentBrush.m_mode == TerrainBrush::Mode::Flatten)
+		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 		{
-			ImGui::InputFloat("Target Height", &g_CurrentBrush.m_flatTargetHeight);
+			ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
 		}
 
 		// PaintLayer 옵션일 때만 레이어 선택
-		if (g_CurrentBrush.m_mode == TerrainBrush::Mode::PaintLayer)
+		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
 		{
 			// 에디터가 가지고 있는 레이어 리스트에서 ID와 이름을 보여줌
 			static int selectedLayerIndex = 0;
@@ -979,7 +979,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				layerNames.push_back(std::to_string(layer+1).c_str());
 			if (ImGui::Combo("Layer ID", &selectedLayerIndex, layerNames.data(), (int)layerNames.size()))
 			{
-				g_CurrentBrush.m_layerID = selectedLayerIndex;
+				g_CurrentBrush->m_layerID = selectedLayerIndex;
 			}
 
 			if (ImGui::Button("AddLayer")) {

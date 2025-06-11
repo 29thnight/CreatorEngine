@@ -471,8 +471,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			}
 
 			TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
-			terrainComponent->SetTerrainBrush(terrainBrush);
-			if (ImGui::IsWindowHovered()&&ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			if (terrainComponent != nullptr) {
+				terrainComponent->SetTerrainBrush(terrainBrush);
 				ImVec2 mousePos = ImGui::GetMousePos();
 				Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
 
@@ -484,7 +484,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				if (direction.y >= 0.0f)
 				{
 					// Ray가 위로 가거나 평면과 만날 수 없는 방향이면 무시
-					return;
+					//return;
 				}
 
 				// t 계산: Y=0 평면 얻기
@@ -492,7 +492,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				if (t < 0.0f)
 				{
 					// Ray가 뒤쪽 공간을 향해 있을 경우 무시
-					return;
+					//return;
 				}
 
 				// 충돌 지점 P = origin + t * direction
@@ -511,14 +511,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				if (tileX < 0 || tileX >= terrainComponent->m_width ||
 					tileY < 0 || tileY >= terrainComponent->m_height)
 				{
-					return; // 맵 영역 밖을 클릭했으면 무시
+					//return; // 맵 영역 밖을 클릭했으면 무시
 				}
 
 				terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
-				terrainComponent->ApplyBrush(*terrainBrush);
-
-
+				if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+					terrainComponent->ApplyBrush(*terrainBrush);
+				}
 			}
 		}
 			
