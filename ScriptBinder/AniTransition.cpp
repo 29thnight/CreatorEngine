@@ -3,15 +3,9 @@
 #include "AnimationState.h"
 
 
-//AniTransition::AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner)
-//{
-//	m_ownerController = owner;
-//	SetCurState(curStatename);
-//	SetNextState(nextStatename);
-//}
-AniTransition::AniTransition(AnimationState* _curState, AnimationState* _nextState, AnimationController* owner)
+
+AniTransition::AniTransition(AnimationState* _curState, AnimationState* _nextState)
 {
-	m_ownerController = owner;
 	curState = _curState;
 	nextState = _nextState;
 }
@@ -21,18 +15,6 @@ AniTransition::~AniTransition()
 
 }
 
-
-
-
-void AniTransition::SetCurState(std::string curStatename)
-{
-	 curState = m_ownerController->FindState(curStatename); 
-}
-
-void AniTransition::SetNextState(std::string nextStatename)
-{
-	 nextState = m_ownerController->FindState(nextStatename); 
-}
 
 bool AniTransition::CheckTransiton()
 {
@@ -57,6 +39,26 @@ bool AniTransition::CheckTransiton()
 std::vector<TransCondition> AniTransition::GetConditions()
 {
 	return conditions;
+}
+
+void AniTransition::SetCurState(std::string curStateName)
+{
+	curState = m_ownerController->FindState(curStateName);
+}
+
+void AniTransition::SetCurState(AnimationState* _curState)
+{
+	curState = _curState;
+}
+
+void AniTransition::SetNextState(std::string nextStateName)
+{
+	nextState = m_ownerController->FindState(nextStateName);
+}
+
+void AniTransition::SetNextState(AnimationState* _nextStat)
+{
+	nextState = _nextStat;
 }
 
 std::string AniTransition::GetCurState()

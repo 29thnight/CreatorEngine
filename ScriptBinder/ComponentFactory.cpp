@@ -126,7 +126,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
-									sharedTransition->m_ownerController = animationController;
+									sharedTransition->m_ownerController = animationController; 
 
 									if (transition["curState"])
 									{

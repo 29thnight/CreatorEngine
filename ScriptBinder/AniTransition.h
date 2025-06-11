@@ -13,7 +13,7 @@ public:
 	[[Serializable]]
 	AniTransition() = default;
 	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
-	AniTransition(AnimationState* _curState, AnimationState* _nextState, AnimationController* owner);
+	AniTransition(AnimationState* _curState, AnimationState* _nextState);
 	~AniTransition();
 
 	template<typename T>
@@ -34,8 +34,10 @@ public:
 		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
-	void SetCurState(std::string curStatename);
-	void SetNextState(std::string nextStatename);
+	void SetCurState(std::string curStateName);
+	void SetCurState(AnimationState* _curState);
+	void SetNextState(std::string nextStateName);
+	void SetNextState(AnimationState* _nextStat);
 	std::string GetCurState();
 	std::string GetNextState();
 	bool CheckTransiton();
