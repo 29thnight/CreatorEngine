@@ -19,11 +19,12 @@ cbuffer gBrush : register(b0)
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float dist = length(IN.wPosition.xz - gBrushWorldPosition);
-    
+    float invBrushRadius = 1.0 / gBrushRadius;
+    float clampRadius = dist * invBrushRadius;
     if (dist < gBrushRadius)
     {
         // If within brush radius, return a color (e.g., white)
-        return float4(0, dist / gBrushRadius, 1 - dist / gBrushRadius, 1);
+        return float4(0, clampRadius, 1.0 - clampRadius, 1);
     }
     else
     {
