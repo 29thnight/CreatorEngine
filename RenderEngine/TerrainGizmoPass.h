@@ -20,5 +20,7 @@ public:
 
 private:
 	ComPtr<ID3D11Buffer> m_Buffer{};
+	Texture* copyTexture{ nullptr };
+
 };
 

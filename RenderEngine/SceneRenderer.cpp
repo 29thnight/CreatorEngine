@@ -445,14 +445,14 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
-		if(camera == m_pEditorCamera.get())
+		/*if(camera == m_pEditorCamera.get())
 		{
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
 			Benchmark banch;
 			m_pTerrainGizmoPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("TerrainGizmoPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
-		}
+		}*/
 
 		{
 			DirectX11::BeginEvent(L"ForwardPass");

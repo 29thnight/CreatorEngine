@@ -30,6 +30,10 @@ TerrainGizmoPass::TerrainGizmoPass()
         )
     );
 
+    copyTexture = Texture::Create(DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height, "copy", DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET);
+
+	copyTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
 	m_Buffer = DirectX11::CreateBuffer(
 		sizeof(MaterialInfomation),
 		D3D11_BIND_CONSTANT_BUFFER,
@@ -46,6 +50,9 @@ TerrainGizmoPass::TerrainGizmoPass()
 void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
+    
+	DirectX11::CopyResource(copyTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+
     auto& deviceContext = DeviceState::g_pDeviceContext;
 	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
@@ -67,6 +74,7 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
                     DirectX11::UpdateBuffer(m_Buffer.Get(), &terrainGizmoBuffer);
                     DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
+					DirectX11::PSSetShaderResources(0, 1, &copyTexture->m_pSRV);
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix());
                     terrainMesh->Draw();

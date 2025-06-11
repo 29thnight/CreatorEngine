@@ -975,11 +975,25 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			// 에디터가 가지고 있는 레이어 리스트에서 ID와 이름을 보여줌
 			static int selectedLayerIndex = 0;
 			std::vector<const char*> layerNames;
-			for (auto& layer : terrainComponent->GetLayerCount())
-				layerNames.push_back(std::to_string(layer+1).c_str());
+
+			layerNames = terrainComponent->GetLayerNames();
+
+
 			if (ImGui::Combo("Layer ID", &selectedLayerIndex, layerNames.data(), (int)layerNames.size()))
 			{
 				g_CurrentBrush->m_layerID = selectedLayerIndex;
+			}
+
+			LayerDesc* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
+			if (layer != nullptr) {
+				float tiling = layer->tilling;
+				float tempTiling = tiling;
+				ImGui::DragFloat("tiling", &tempTiling, 1.0f, 0.01, 4096.0f);
+				if (tempTiling!= tiling)
+				{
+					layer->tilling = tempTiling;
+					terrainComponent->UpdateLayerDesc(selectedLayerIndex);
+				}
 			}
 
 			if (ImGui::Button("AddLayer")) {
@@ -995,7 +1009,6 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		{
 			file::path difuseFile = ShowOpenFileDialog(L"");
 			std::wstring difuseFileName = difuseFile.filename().wstring();
-			std::string difuseFileNameStr = difuseFileName.empty() ? "" : std::string(difuseFileName.begin(), difuseFileName.end());
 			if (!difuseFile.empty())
 			{
 				terrainComponent->AddLayer(difuseFileName, 4096.0f);

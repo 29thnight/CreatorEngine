@@ -169,16 +169,18 @@ struct TerrainLayer
 struct LayerDesc
 {
 	uint32_t layerID{ 0 };
+	std::string layerName;
 	std::wstring diffuseTexturePath;
-	std::wstring normalTexturePath;
     float tilling;
 };
 
 cbuffer TerrainLayerBuffer
 {
 	bool32 useLayer{ false };
-    int layerIndex;
-    float4 layerTilling;
+    float layerTilling0;
+    float layerTilling1;
+    float layerTilling2;
+    float layerTilling3;
 };
 
 //-----------------------------------------------------------------------------
@@ -236,6 +238,9 @@ public:
 			D3D11_BIND_CONSTANT_BUFFER,
 			nullptr
 		);
+
+        m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+        
 
 
         std::vector<uint32_t> indices;
@@ -479,21 +484,95 @@ public:
 		if (layerId >= m_layers.size()) return; // 유효한 레이어인지 확인
 		int idx = y * m_width + x;
 		if (idx < 0 || idx >= m_height * m_width) return; // 범위 체크
+
 		// 해당 레이어 가중치 업데이트
 		m_layerHeightMap[layerId][idx] += strength;
-		if (m_layerHeightMap[layerId][idx] < 0.0f) {
-			m_layerHeightMap[layerId][idx] = 0.0f; // 음수 방지
-		}
+        
+        float sum = 0.0f;
+        for (auto& layer : m_layerHeightMap) {
+			sum += layer[idx];
+        }
+		//오버플로우 처리
+        if (sum > 1.0f) {
+			// 가중치가 1.0f를 초과하면 오버플로우 발생
+            // 편집 하지 않는 각 레이어의 가중치를 비율에 따라 조정
+            if (m_layerHeightMap.size() > 1) {
+                float overflow = sum - 1.0f/ (m_layerHeightMap.size()-1);
+                for (auto& layer : m_layerHeightMap) {
+                    if (layer != m_layerHeightMap[layerId]) {
+                        layer[idx] -= overflow;
+                        if (layer[idx] < 0.0f) {
+                            layer[idx] = 0.0f; // 음수 방지
+                        }
+                    }
+                }
+            }
+            else {
+				// 레이어가 하나뿐인 경우, 그냥 1.0f로 설정
+				m_layerHeightMap[layerId][idx] = 1.0f;
+            }
+        }
     }
 
-	std::vector<uint32_t> GetLayerCount() const
+	std::vector<LayerDesc> GetLayerCount() const
 	{
-		std::vector<uint32_t> layerIDs;
-		layerIDs.reserve(m_layers.size());
-		for (const auto& layer : m_layers)
-			layerIDs.push_back(layer.m_layerID);
-		return layerIDs;
+		return m_layerDescs;
 	}
+
+	LayerDesc* GetLayerDesc(uint32_t layerID)
+	{
+		for (auto& desc : m_layerDescs)
+		{
+			if (desc.layerID == layerID)
+			{
+				return &desc;
+			}
+		}
+		return nullptr; // 해당 레이어 ID가 없을 경우 nullptr 반환
+		//throw std::runtime_error("Layer ID not found");
+	}
+
+    void UpdateLayerDesc(uint32_t layerID) {
+        TerrainLayerBuffer layerBuffer;
+        if (m_layerDescs.size() > 0)
+        {
+            layerBuffer.useLayer = true;
+        }
+
+        float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        for (int i = 0; i < m_layerDescs.size(); ++i)
+        {
+            if (i < m_layerDescs.size())
+            {
+                tilefector[i] = m_layerDescs[i].tilling;
+            }
+            else
+            {
+                tilefector[i] = 1.0f; // 기본값
+            }
+        }
+
+		//tilefector[layerID] = newDesc.tilling; // 업데이트된 타일링 값
+		//layerBuffer.layerTilling = DirectX::XMFLOAT4(tilefector[0] / 4096, tilefector[1] / 4096, tilefector[2] / 4096, tilefector[3] / 4096);
+
+		layerBuffer.layerTilling0 = tilefector[0] / 4096;
+		layerBuffer.layerTilling1 = tilefector[1] / 4096;
+		layerBuffer.layerTilling2 = tilefector[2] / 4096;
+		layerBuffer.layerTilling3 = tilefector[3] / 4096;
+
+		DirectX11::UpdateBuffer(m_layerBuffer.Get(), &layerBuffer);
+    }
+
+	std::vector<const char*> GetLayerNames()
+	{	
+		m_layerNames.clear(); // 이전 이름들 초기화
+		for (const auto& desc : m_layerDescs)
+		{
+			m_layerNames.push_back(desc.layerName.c_str());
+		}
+		return m_layerNames;
+	}
+
 
 
     void Save(){
@@ -539,21 +618,42 @@ public:
 
 		m_layers.push_back(newLayer);
 		m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
-		
+        
 		LayerDesc desc;
 		desc.layerID = newLayer.m_layerID;
+		desc.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
         desc.diffuseTexturePath = diffuseFile;
 		desc.tilling = tilling;
 
-		TerrainLayerBuffer buff;
-		buff.useLayer = true;
-        buff.layerIndex = newLayer.m_layerID;
-        buff.layerTilling = { tilling, 0.0f, 0.0f, 0.0f }; // Tiling은 x,y로 설정
+		m_layerDescs.push_back(desc);
+		
+		
+
+		TerrainLayerBuffer layerBuffer;
+        if (m_layers.size() > 0)
+        {
+		    layerBuffer.useLayer = true;
+        }
         
-		m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
-        DirectX11::UpdateBuffer(m_layerBuffer.Get() ,&buff);
+		float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		for(int i = 0; i < m_layerDescs.size(); ++i)
+		{
+			if (i < m_layers.size())
+			{
+                tilefector[i] = m_layerDescs[i].tilling;
+			}
+			else
+			{
+                tilefector[i] = 1.0f; // 기본값
+			}
+		}
 
-
+		//layerBuffer.layerTilling = DirectX::XMFLOAT4(tilefector[0] / 4096, tilefector[1] / 4096, tilefector[2] / 4096, tilefector[3] / 4096);
+        layerBuffer.layerTilling0 = tilefector[0] / 4096;
+        layerBuffer.layerTilling1 = tilefector[1] / 4096;
+        layerBuffer.layerTilling2 = tilefector[2] / 4096;
+        layerBuffer.layerTilling3 = tilefector[3] / 4096;
+		DirectX11::UpdateBuffer(m_layerBuffer.Get(), &layerBuffer);
 		
 
         DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
@@ -736,7 +836,7 @@ private:
     std::vector<TerrainLayer>            m_layers;
 	std::vector<LayerDesc>               m_layerDescs; // 레이어 설명 (ID, 텍스처 경로 등)
     
-
+	std::vector<const char*> m_layerNames; // 레이어 이름들 (디버깅용)
 
 	std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
