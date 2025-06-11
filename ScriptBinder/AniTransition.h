@@ -22,6 +22,7 @@ public:
 
 		TransCondition newTrans(Comparevalue,cType,vType);
 		newTrans.valueName = ownerValueName;
+		
 		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
@@ -34,9 +35,11 @@ public:
 		newTrans.m_ownerController = m_ownerController;
 		conditions.push_back(newTrans);
 	}
-	void SetCurState(std::string curStateName);
+
+	void DeleteCondition(int _index);
+	void SetCurState(std::string _curStateName);
 	void SetCurState(AnimationState* _curState);
-	void SetNextState(std::string nextStateName);
+	void SetNextState(std::string _nextStateName);
 	void SetNextState(AnimationState* _nextStat);
 	std::string GetCurState();
 	std::string GetNextState();
@@ -51,13 +54,16 @@ public:
 	AnimationController* m_ownerController{};
 	[[Property]]
 	std::string m_name = "NoName";
-	[[Property]]
+
 	AnimationState* curState = nullptr;
-	[[Property]]
 	AnimationState* nextState = nullptr;
+
+	[[Property]]
+	std::string curStateName{};
+	[[Property]]
+	std::string nextStateName{};
 private:
 	
-	//std::string nextState;
 	// 전이시간이자 블렌딩될 시간
 	[[Property]]
 	float blendTime =0.2f;

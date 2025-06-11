@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "AvatarMask.generated.h"
+#include "BoneMask.h"
 
 class Skeleton;
 class Bone;
@@ -17,6 +18,13 @@ public:
 	bool IsBoneEnabled(BoneRegion region);
 	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
 	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }
+
+	bool IsBoneEnabled(const std::string& name);
+	void MakeBoneMask(std::vector<Bone*> Bones);
+	[[Property]]
+	std::vector<BoneMask> m_BoneMasks;
+	[[Property]]
+	bool isHumanoid = false;
 	[[Property]]
 	bool useAll = true;
 	[[Property]]

@@ -57,7 +57,7 @@ void Animator::CreateController_UI()
 {
 	AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
-	animationController->name = "New Controller" + m_animationControllers.size();
+	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
 	animationController->CreateMask();
 	animationController->m_nodeEditor = new NodeEditor();
 	m_animationControllers.push_back(animationController);

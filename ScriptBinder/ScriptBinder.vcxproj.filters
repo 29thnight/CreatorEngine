@@ -419,6 +419,18 @@
     <ClInclude Include="IOnDisable.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
+    <ClInclude Include="ArticulationData.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="ArticulationLoader.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkData.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneMask.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

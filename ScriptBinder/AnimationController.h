@@ -32,7 +32,6 @@ public:
 
 	[[Property]]
 	NodeEditor* m_nodeEditor;
-	//ax::NodeEditor::EditorContext* conEdit;
 	//어디에서든지 전이가능한 state모음
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;
@@ -58,7 +57,6 @@ public:
 	
 	AvatarMask* GetAvatarMask() { return &m_avatarMask; }
 	void CreateMask();
-	void CheckMask();
 	Animator* m_owner{};
 	float m_timeElapsed;
 	float m_nextTimeElapsed;

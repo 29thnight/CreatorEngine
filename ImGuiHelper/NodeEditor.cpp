@@ -30,8 +30,6 @@ void NodeEditor::EndEdit()
 {
 	ed::End();
 	ed::SetCurrentEditor(nullptr);
-
-	
 }
 
 void NodeEditor::MakeNode(std::string nodeName)
@@ -133,8 +131,8 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
 
         // 그리기
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
-
+        //ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
+        ImU32 color = IM_COL32(255, 255, 255, 255);
         
         if (selectedLinkIndex != nullptr && *selectedLinkIndex == i)
         {
@@ -233,6 +231,28 @@ void NodeEditor::MakeNewLink(int* returnIndex)
 }
 
 
+
+void NodeEditor::ReNameJson(std::string filepath)
+{
+
+    std::string newFilePath = "NodeEditor\\" + filepath + ".json";
+
+    // 이전 파일이 존재하면 새 경로로 복사 or 이동
+    if (std::filesystem::exists(m_filePath))
+    {
+        std::filesystem::rename(m_filePath, newFilePath);
+    }
+
+    // 파일 경로 업데이트
+    m_filePath = newFilePath;
+
+    // NodeEditor가 이미 열려있다면 새 파일 경로로 저장 설정 변경
+    if (m_nodeContext)
+    {
+        ed::Config config = ed::GetConfig(m_nodeContext);
+        config.SettingsFile = m_filePath.c_str();
+    }
+}
 
 bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold)
 {

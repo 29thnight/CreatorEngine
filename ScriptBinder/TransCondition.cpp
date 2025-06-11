@@ -17,6 +17,10 @@ bool TransCondition::CheckTrans()
 				return parameter.fValue > CompareParameter.fValue;
 			case ConditionType::Less:
 				return parameter.fValue < CompareParameter.fValue;
+			case ConditionType::Equal:
+				return parameter.fValue == CompareParameter.fValue;
+			case ConditionType::NotEqual:
+				return parameter.fValue != CompareParameter.fValue;
 			}
 		}
 		else if (parameter.vType == ValueType::Int)
@@ -27,16 +31,20 @@ bool TransCondition::CheckTrans()
 				return parameter.iValue > CompareParameter.iValue;
 			case ConditionType::Less:
 				return parameter.iValue < CompareParameter.iValue;
+			case ConditionType::Equal:
+				return parameter.iValue == CompareParameter.iValue;
+			case ConditionType::NotEqual:
+				return parameter.iValue != CompareParameter.iValue;
 			}
 		}
 		else if (parameter.vType == ValueType::Bool)
 		{
 			switch (cType)
 			{
-			case ConditionType::Equal:
-				return parameter.bValue == CompareParameter.bValue;
-			case ConditionType::NotEqual:
-				return parameter.bValue == CompareParameter.bValue;
+			case ConditionType::True:
+				return CompareParameter.bValue;
+			case ConditionType::False:
+				return !CompareParameter.bValue;
 			}
 		}
 		else if (parameter.vType == ValueType::Trigger)
@@ -47,4 +55,29 @@ bool TransCondition::CheckTrans()
 	
 
 	return false;
+}
+
+void TransCondition::SetCondition(std::string _parameterName)
+{
+	ConditionParameter* parameter = m_ownerController->m_owner->FindParameter(_parameterName);
+	valueName = parameter->name;
+		switch (parameter->vType)
+		{
+		case ValueType::Float:
+			cType = ConditionType::Greater;
+			CompareParameter.fValue = 0;
+			break;
+		case ValueType::Int:
+			cType = ConditionType::Greater;
+			CompareParameter.iValue = 0;
+			break;
+		case ValueType::Bool:
+			cType = ConditionType::True;
+			CompareParameter.bValue = true;
+			break;
+		case ValueType::Trigger:
+			cType = ConditionType::None;
+			break;
+		}
+	
 }

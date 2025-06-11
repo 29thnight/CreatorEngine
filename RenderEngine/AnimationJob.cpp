@@ -256,6 +256,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     for (auto& controller : animator.m_animationControllers)
     {
         auto mask = controller->GetAvatarMask();
+        
         if (mask->IsBoneEnabled(bone->m_region) == true)
         {
             globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;

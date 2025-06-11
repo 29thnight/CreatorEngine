@@ -278,8 +278,8 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 	auto nextstate = FindState(nextStateName);
 	if (!nextstate) return nullptr;
 	auto transition = std::make_shared<AniTransition>();
-	transition->curState = curstate;
-	transition->nextState = nextstate;
+	transition->SetCurState(curstate);
+	transition->SetNextState(nextstate);
 	transition->m_ownerController = this;
 	transition->m_name = curStateName + " to " + nextStateName;
 	curstate->Transitions.push_back(transition);
@@ -290,8 +290,7 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 void AnimationController::CreateMask()
 {
 	m_owner->m_Skeleton->MarkRegionSkeleton();
+	m_avatarMask.MakeBoneMask(m_owner->m_Skeleton->m_bones);
+	
 }
 
-void AnimationController::CheckMask()
-{
-}

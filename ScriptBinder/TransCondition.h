@@ -26,7 +26,7 @@ public:
 				_cType = ConditionType::Greater;
 				break;
 			case ValueType::Bool:
-				_cType = ConditionType::Equal;
+				_cType = ConditionType::True;
 				break;
 			case ValueType::Trigger:
 				_cType = ConditionType::None;
@@ -49,10 +49,17 @@ public:
 			return "Greater";
 		case ConditionType::Less:
 			return "Less";
+		case ConditionType::True:
+			return "True";
+		case ConditionType::False:
+			return "False";
 		case ConditionType::None:
 			return "None";
 		}
 	}
+
+	void SetCondition(std::string _parameterName);
+
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
 	//타입 ,값 ,함수 
 	[[Property]]

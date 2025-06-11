@@ -75,16 +75,16 @@ public:
         switch (vType)
         {
         case ValueType::Float:
-            baseName = " New Float";
+            baseName = "NewFloat";
             break;
         case ValueType::Int:
-            baseName = " New Int";
+            baseName = "NewInt";
             break;
         case ValueType::Bool:
-            baseName = " New Bool";
+            baseName = "NewBool";
             break;
         case ValueType::Trigger:
-            baseName = " New Trigger";
+            baseName = "NewTrigger";
             break;
         }
         std::string valueName = baseName;

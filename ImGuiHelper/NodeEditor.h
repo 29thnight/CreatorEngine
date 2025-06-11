@@ -46,7 +46,7 @@ public:
 
 	void MakeNewLink(int* returnIndex);
 
-
+	void ReNameJson(std::string filepath);
 	bool IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold = 5.0f);
 	ImVec2 ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t);
 	int startNodeId = 1000;

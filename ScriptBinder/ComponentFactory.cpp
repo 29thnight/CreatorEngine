@@ -121,26 +121,16 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							if (state["Transitions"])
 							{
 								auto& transitionNode = state["Transitions"];
+								
 								for (auto& transition : transitionNode)
 								{
 									std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
 									sharedTransition->m_ownerController = animationController; 
-
-									if (transition["curState"])
-									{
-										auto& curState = transition["curState"];
-										std::string name = curState["m_name"].as<std::string>();
-
-										sharedTransition->SetCurState(name);
-									}
-									if (transition["nextState"])
-									{
-										auto& nextState = transition["nextState"];
-										std::string name = nextState["m_name"].as<std::string>();
-										sharedTransition->SetNextState(name);
-									}
+									//sharedTransition->SetCurState(sharedTransition->curStateName);
+									//sharedTransition->SetNextState(sharedTransition->nextStateName);
+									
 								
 									if (transition["conditions"])
 									{
@@ -156,6 +146,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 								}
 							}
 						}
+
+						
 					}
 					if (layer["m_curState"])
 					{
@@ -163,6 +155,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 						std::string name = curNode["m_name"].as<std::string>();
 						animationController->m_curState = animationController->FindState(name);
 					}
+
+					for (auto& state : animationController->StateVec)
+					{
+						for (auto& transition : state->Transitions)
+						{
+							transition->SetCurState(transition->curStateName);
+							transition->SetNextState(transition->nextStateName);
+						}
+					}
+
+						
 					animator->m_animationControllers.push_back(animationController);
 				}
 			}

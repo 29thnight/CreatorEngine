@@ -107,6 +107,11 @@ void TestPlayer::Update(float deltaTime)
 		ani->SetParameter("Idleparm", true);
 	}
 
+	if (InputManagement->IsKeyDown('L'))
+	{
+		ani->SetParameter("StopPunch", true);
+	}
+
 	_player->m_transform.AddPosition({ speed * deltaTime* dir.x,0, speed * deltaTime * dir.y });
 }
 
