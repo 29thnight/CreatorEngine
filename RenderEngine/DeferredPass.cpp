@@ -26,6 +26,8 @@ ID3D11ShaderResourceView* nullSRV[10] = {
     nullptr
 };
 
+ID3D11RenderTargetView* nullRTVs[2] = { nullptr, nullptr };
+
 DeferredPass::DeferredPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
@@ -119,8 +121,10 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
         m_EmissiveTexture->m_pSRV
     };
 
-    auto rtv = renderData->m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+    ID3D11RenderTargetView* nullRTV = nullptr;
+    ID3D11RenderTargetView* views[]{ renderData->m_renderTarget->GetRTV(), nullRTV };
+
+    DirectX11::OMSetRenderTargets(1, views, nullptr);
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
@@ -138,9 +142,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::Draw(4, 0);
 
     DirectX11::PSSetShaderResources(0, 10, nullSRV);
-    //DirectX11::UnbindRenderTargets();
-    ID3D11RenderTargetView* nullview[2] = { nullptr, nullptr };
-    DirectX11::OMSetRenderTargets(2, nullview, nullptr);
+    DirectX11::OMSetRenderTargets(1, nullRTVs, nullptr);
 }
 
 void DeferredPass::ControlPanel()

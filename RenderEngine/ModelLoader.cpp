@@ -470,7 +470,6 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 {
 	static int modelSeparator = 0;
 	int nextIndex = parentIndex;
-	static bool isSkinnedMesh = false;
 
 	if (true == isRoot)
 	{
@@ -485,11 +484,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_animator->SetEnabled(true);
 			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
-			isSkinnedMesh = true;
+			m_isSkinnedMesh = true;
 		}
 		else
 		{
-			isSkinnedMesh = false;
+			m_isSkinnedMesh = false;
 		}
 
 		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
@@ -512,7 +511,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
-			meshRenderer->m_isSkinnedMesh = isSkinnedMesh;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
 			
@@ -543,7 +542,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		meshRenderer->SetEnabled(true);
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = isSkinnedMesh;
+		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -597,7 +596,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 {
 	int nextIndex = parentIndex;
 	std::shared_ptr<GameObject> rootObject;
-	static bool isSkinnedMesh = false;
 
 	if (true == isRoot)
 	{
@@ -611,11 +609,11 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			m_animator->SetEnabled(true);
 			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
-			isSkinnedMesh = true;
+			m_isSkinnedMesh = true;
 		}
 		else
 		{
-			isSkinnedMesh = false;
+			m_isSkinnedMesh = false;
 		}
 
 		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
@@ -638,7 +636,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
-			meshRenderer->m_isSkinnedMesh = isSkinnedMesh;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
 			return rootObject.get();
@@ -667,7 +665,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		meshRenderer->SetEnabled(true);
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = isSkinnedMesh;
+		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}

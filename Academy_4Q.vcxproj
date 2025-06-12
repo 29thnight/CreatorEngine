@@ -124,7 +124,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <Profile>true</Profile>
+      <Profile>false</Profile>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
     <PreBuildEvent>

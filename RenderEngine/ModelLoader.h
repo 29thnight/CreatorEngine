@@ -77,5 +77,6 @@ private:
 
 	bool m_hasBones{ false };
 	bool m_isInitialized{ false };
+	bool m_isSkinnedMesh{ false };
 	int m_modelRootIndex{ 0 };
 };
