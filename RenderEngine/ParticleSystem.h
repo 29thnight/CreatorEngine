@@ -1,10 +1,11 @@
 #pragma once
-#include "../Texture.h"
+#include "Texture.h"
 #include "RenderModules.h"
-#include "../IRenderPass.h"
+#include "IRenderPass.h"
 #include "SpawnModuleCS.h"
 #include "MovementModuleCS.h"
-#include "LifeModuleCS.h"
+//#include "LifeModuleCS.h"
+#include "ColorModuleCS.h"
 
 // maxparticles
 class ParticleSystem
@@ -84,6 +85,8 @@ public:
 
 	void ReleaseBuffers();
 
+	void ReleaseParticleBuffers();
+
 	ID3D11ShaderResourceView* GetCurrentRenderingSRV() const;
 
 private:
@@ -92,37 +95,13 @@ private:
 
 	void CreateParticleBuffer(UINT numParticles);
 
-
-	
 private:
 
-	// 공유 버퍼 스왑용 정리
-	void CreateSharedBuffers();
-
-	void ReleaseSharedBuffer();
-
 	void InitializeParticleIndices();
-
-	void SwapIndexBuffer();   
-
-	ID3D11Buffer* m_currentIndicesBuffer;
-	ID3D11Buffer* m_nextIndicesBuffer;
-	ID3D11UnorderedAccessView* m_currentIndicesUAV;
-	ID3D11UnorderedAccessView* m_nextIndicesUAV;
-
-	// 비활성 파티클 관리용 버퍼
-	ID3D11Buffer* m_inactiveIndicesBuffer = nullptr;
-	ID3D11Buffer* m_inactiveCountBuffer = nullptr;
-	ID3D11Buffer* m_activeCountBuffer = nullptr;
-
-	ID3D11UnorderedAccessView* m_inactiveIndicesUAV = nullptr;
-	ID3D11UnorderedAccessView* m_inactiveCountUAV = nullptr;
-	ID3D11UnorderedAccessView* m_activeCountUAV = nullptr;
 
 protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
 
-	// data members
 	bool m_isRunning;
 	bool m_isPaused;
 	std::vector<ParticleData> m_particleData;

@@ -99,9 +99,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 중력 적용 (설정된 경우)
         if (useGravity != 0)
         {
-            // 가속도에 중력 강도 적용
+            // 가속도에 중력 강도 적용    
             particle.velocity += particle.acceleration * gravityStrength * deltaTime * easingFactor;
-            particle.color = float4(1, 0, 0, 1);
+            //particle.color = float4(1, 0, 0, 1);
         }
         // 위치 및 회전 업데이트
         particle.position += particle.velocity * deltaTime * easingFactor;

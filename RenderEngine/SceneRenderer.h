@@ -30,7 +30,7 @@
 #include "LightMap.h"
 #include "PositionMapPass.h"
 #include "LightMapPass.h"
-#include "Effect/EffectManager.h"
+#include "EffectManager.h"
 
 #include "SSGIPass.h"
 #include "LightingPass.h"

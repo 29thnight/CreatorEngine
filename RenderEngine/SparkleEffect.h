@@ -1,6 +1,6 @@
 #pragma once
 #include "ParticleSystem.h"
-#include "../ShaderSystem.h"
+#include "ShaderSystem.h"
 #include "Effects.h"
 #include "BillboardModuleGPU.h"
 
