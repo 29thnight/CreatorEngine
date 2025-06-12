@@ -6,48 +6,50 @@ void NodeEditor::MakeEdit(std::string filePath)
 	if (!m_nodeContext)
 	{
 		ed::Config config;
-		config.SettingsFile = filePath.c_str();
+        m_filePath = "NodeEditor\\" + filePath;
+        config.SettingsFile = m_filePath.c_str();
 		m_nodeContext = ed::CreateEditor(&config);
 	}
+    for (auto node : Nodes)
+    {
+        delete node;
+    }
+    Nodes.clear();
+
+    for (auto link : Links)
+    {
+        delete link;
+    }
+    Links.clear();
 	ed::SetCurrentEditor(m_nodeContext);
 	ed::Begin("Node Editor");
+    startNodeId = 1000;
 }
 
 void NodeEditor::EndEdit()
 {
 	ed::End();
 	ed::SetCurrentEditor(nullptr);
-
-	for (auto node : Nodes)
-	{
-		delete node;
-	}
-	Nodes.clear();
-
-	for (auto link : Links)
-	{
-		delete link;
-	}
-	Links.clear();
 }
 
 void NodeEditor::MakeNode(std::string nodeName)
 {
 	Node* newNode = new Node();
 	newNode->name = nodeName;
+    newNode->id = startNodeId++;
 	Nodes.push_back(newNode);
 }
 
 void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName)
 {
 	Link* newLink = new Link();
-	newLink->fromNode = fromNodeName;
-	newLink->toNode = toNodeName;
+	newLink->fromNode = FindNode(fromNodeName);
+	newLink->toNode = FindNode(toNodeName);
 
 
 	for (auto& link : Links)
 	{
-		if (link->toNode == fromNodeName && link->fromNode == toNodeName)
+		if (link->toNode == FindNode(fromNodeName) && link->fromNode == FindNode(toNodeName))
 		{
 			newLink->haveReverse = true;
 			break;
@@ -57,17 +59,37 @@ void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std:
 	Links.push_back(newLink);
 }
 
-void NodeEditor::DrawNode()
+
+
+void NodeEditor::DrawNode(int* selectedNodeIndex)
 {
 	ed::Style& style = ed::GetStyle();
 	style.LinkStrength = 0.0f;
 
-	for (auto& node : Nodes)
+    
+	for (size_t i = 0; i < Nodes.size(); ++i)
 	{
-		ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(node->name));
+        auto& node = Nodes[i];
+        ed::NodeId nodeID = node->id;
 		ed::BeginNode(nodeID);
 		ImGui::Text(node->name.c_str());
 		ed::EndNode();
+
+
+        if (needMakeLink == false &&  ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(1))
+        {
+            if (selectedNodeIndex)
+            {
+                *selectedNodeIndex = i;  // 선택한 링크 인덱스 기록
+            }
+            seletedCurNodeIndex = i;
+            m_selectedType = SelectedType::Node;
+        }
+        else if (needMakeLink == false &&  ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
+        {
+            seletedCurNodeIndex = i;
+            m_selectedType = SelectedType::Node;
+        }
 	}
 
 }
@@ -79,8 +101,8 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
     {
         auto& link = Links[i];
 
-        ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(link->fromNode));
-        ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(link->toNode));
+        ed::NodeId nodeID = link->fromNode->id;
+        ed::NodeId nextnodeID = link->toNode->id;
 
         ImVec2 pos = ed::GetNodePosition(nodeID);
         ImVec2 size = ed::GetNodeSize(nodeID);
@@ -109,22 +131,126 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
 
         // 그리기
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
-
-        if (*selectedLinkIndex == i)
+        //ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
+        ImU32 color = IM_COL32(255, 255, 255, 255);
+        
+        if (selectedLinkIndex != nullptr && *selectedLinkIndex == i)
         {
             color = IM_COL32(255, 255, 0, 255);
         }
         float thickness = 3.0f;
         drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
 
+        float t = 0.5f;
+        ImVec2 midPos = ImBezierCubicCalc(p1_offset, cp1, cp2, p2_offset, t);
+        ImVec2 tangent =
+            ImBezierCubicCalcDerivative(p1_offset, cp1, cp2, p2_offset, t);
+        float tangentLength = sqrt(tangent.x * tangent.x + tangent.y * tangent.y);
+        if (tangentLength > 0.0001f)
+            tangent = ImVec2(tangent.x / tangentLength, tangent.y / tangentLength);
+        float triSize = 10.0f;
+        ImVec2 triP1 = midPos + tangent * triSize; // 앞쪽 꼭짓점
+        ImVec2 triP2 = midPos - tangent * triSize * 0.5f + ImVec2(-tangent.y, tangent.x) * triSize * 0.5f; // 좌측 뒤쪽
+        ImVec2 triP3 = midPos - tangent * triSize * 0.5f + ImVec2(tangent.y, -tangent.x) * triSize * 0.5f; // 우측 뒤쪽
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        ImVec2 triP1_screen = triP1 + windowPos;
+        ImVec2 triP2_screen = triP2 + windowPos;
+        ImVec2 triP3_screen = triP3 + windowPos;
+
+        drawList->AddTriangleFilled(triP1_screen, triP2_screen, triP3_screen, color);
         bool hovered = IsMouseNearLink(p1_offset, cp1, cp2, p2_offset,5.0f);
-        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        if (hovered && ImGui::IsMouseClicked(0))
         {
             if (selectedLinkIndex)
-                *selectedLinkIndex = i;  // 선택한 링크 인덱스 기록
+                *selectedLinkIndex = i;  
+            m_selectedType = SelectedType::Link;
         }
  
+    }
+}
+
+void NodeEditor::Update()
+{
+    if (needMakeLink == true && seletedCurNodeIndex != -1)
+    {
+        ed::NodeId nodeID = Nodes[seletedCurNodeIndex]->id;
+        ImVec2 pos = ed::GetNodePosition(nodeID);
+        ImVec2 size = ed::GetNodeSize(nodeID);
+        ImVec2 p1 = ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+        ImVec2 p2 = ImGui::GetMousePos();
+        ImVec2 dir = p2 - p1;
+        float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+        ImVec2 normDir = ImVec2(dir.x / length, dir.y / length);
+        ImVec2 perpendicular = ImVec2(-normDir.y, normDir.x);
+        float offsetAmount = 5.0f;
+        ImVec2 offset = perpendicular * offsetAmount;
+
+        ImVec2 p1_offset = p1 + offset;
+        ImVec2 p2_offset = p2 + offset;
+        ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
+        ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
+        ImU32 color = IM_COL32(255, 255, 255, 255);
+        float thickness = 3.0f;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
+
+        for (size_t i = 0; i < Nodes.size(); ++i)
+        {
+            auto& node = Nodes[i];
+            ed::NodeId nodeID = node->id;
+            if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
+            {
+                if (i != seletedCurNodeIndex)
+                {
+                    if(m_retrunIndex)
+
+                     *m_retrunIndex = i;
+
+                    needMakeLink = false;
+                    m_retrunIndex = nullptr;
+                }
+            }
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            needMakeLink = false;
+        }
+    }
+
+
+
+
+}
+
+
+
+void NodeEditor::MakeNewLink(int* returnIndex)
+{
+    needMakeLink = true;
+    m_retrunIndex = returnIndex;
+}
+
+
+
+void NodeEditor::ReNameJson(std::string filepath)
+{
+
+    std::string newFilePath = "NodeEditor\\" + filepath + ".json";
+
+    // 이전 파일이 존재하면 새 경로로 복사 or 이동
+    if (std::filesystem::exists(m_filePath))
+    {
+        std::filesystem::rename(m_filePath, newFilePath);
+    }
+
+    // 파일 경로 업데이트
+    m_filePath = newFilePath;
+
+    // NodeEditor가 이미 열려있다면 새 파일 경로로 저장 설정 변경
+    if (m_nodeContext)
+    {
+        ed::Config config = ed::GetConfig(m_nodeContext);
+        config.SettingsFile = m_filePath.c_str();
     }
 }
 
@@ -157,6 +283,24 @@ bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVe
     }
     return false;
 }
+
+ImVec2 NodeEditor::ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t)
+{
+    float u = 1.0f - t;
+    return
+        ImVec2(3 * u * u * (p1.x - p0.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
+            3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y));
+}
+
+Node* NodeEditor::FindNode(std::string nodeName)
+{
+    for (auto& node : Nodes)
+    {
+        if (node->name == nodeName)
+            return node;
+    }
+}
+
 
 
 

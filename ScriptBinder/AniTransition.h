@@ -3,8 +3,7 @@
 #include "TransCondition.h"
 #include "AniTransition.generated.h"
 #include "ConditionParameter.h"
-
-
+class AnimationState;
 class AnimationController;
 class AniTransition
 {
@@ -12,7 +11,8 @@ public:
    ReflectAniTransition
 	[[Serializable]]
 	AniTransition() = default;
-	AniTransition(std::string curStatename, std::string nextStatename);
+	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
+	AniTransition(AnimationState* _curState, AnimationState* _nextState);
 	~AniTransition();
 
 	template<typename T>
@@ -22,29 +22,49 @@ public:
 		TransCondition newTrans(Comparevalue,cType,vType);
 		newTrans.valueName = ownerValueName;
 		newTrans.m_ownerController = m_ownerController;
+		newTrans.SetValue(ownerValueName);
 		conditions.push_back(newTrans);
 	}
 
-	void AddDefaultCondition();
-	void SetCurState(std::string curStatename) {curState = curStatename;}
-	void SetNextState(std::string nextStatename) { nextState = nextStatename; }
-	std::string GetCurState()const { return curState; }
-	std::string GetNextState()const { return nextState; }
+	void AddConditionDefault(std::string ownerValueName, ConditionType cType, ValueType vType)
+	{
+
+		TransCondition newTrans(0, cType, vType);
+		newTrans.valueName = ownerValueName;
+		newTrans.m_ownerController = m_ownerController;
+		newTrans.SetValue(ownerValueName);
+		newTrans.SetCondition(ownerValueName);
+		conditions.push_back(newTrans);
+	}
+
+	void DeleteCondition(int _index);
+	void SetCurState(std::string _curStateName);
+	void SetCurState(AnimationState* _curState);
+	void SetNextState(std::string _nextStateName);
+	void SetNextState(AnimationState* _nextStat);
+	std::string GetCurState();
+	std::string GetNextState();
 	bool CheckTransiton();
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
 
+	std::vector<TransCondition> GetConditions();
 	[[Property]]
-	std::vector<TransCondition> conditions;
+	std::vector<TransCondition> conditions{};
 
 	AnimationController* m_ownerController{};
 	[[Property]]
 	std::string m_name = "NoName";
+
+	AnimationState* curState = nullptr;
+	AnimationState* nextState = nullptr;
+
+	[[Property]]
+	std::string curStateName{};
+	[[Property]]
+	std::string nextStateName{};
 private:
-	[[Property]]
-	std::string curState;
-	[[Property]]
-	std::string nextState;
+	
 	// 전이시간이자 블렌딩될 시간
 	[[Property]]
 	float blendTime =0.2f;

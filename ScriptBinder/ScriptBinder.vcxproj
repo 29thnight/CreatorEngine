@@ -197,6 +197,7 @@
     <ClInclude Include="ArticulationData.h" />
     <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
+    <ClInclude Include="BoneMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />

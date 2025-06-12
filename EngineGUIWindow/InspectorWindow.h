@@ -23,5 +23,4 @@ private:
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);
 
-	void DrawMyLink(std::string linkName, std::string from, std::string to);
 };

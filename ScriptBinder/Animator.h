@@ -26,6 +26,12 @@ public:
         {
             delete Controller;
         }
+
+        for (auto& param : Parameters)
+        {
+            delete param; // 하나씩 해제
+        }
+        Parameters.clear(); // 벡터 비우기
     }
 
     void Awake() override;
@@ -58,17 +64,58 @@ public:
     [[Property]]
     std::vector<AnimationController*> m_animationControllers{};
     [[Property]]
-    std::vector<ConditionParameter> Parameters;
+    std::vector<ConditionParameter*> Parameters;
 
     template<typename T>
     void AddParameter(const std::string valuename, T value, ValueType vType)
     {
         for (auto& parm : Parameters)
         {
-            if (parm.name == valuename)
+            if (parm->name == valuename)
                 return;
         }
-        Parameters.push_back(ConditionParameter(value, vType, valuename));
+        ConditionParameter* newParameter = new ConditionParameter(value, vType, valuename);
+        Parameters.push_back(newParameter);
+    }
+    void DeleteParameter(int index);
+
+    void AddDefaultParameter(ValueType vType)
+    {
+        
+        std::string baseName;
+        switch (vType)
+        {
+        case ValueType::Float:
+            baseName = "NewFloat";
+            break;
+        case ValueType::Int:
+            baseName = "NewInt";
+            break;
+        case ValueType::Bool:
+            baseName = "NewBool";
+            break;
+        case ValueType::Trigger:
+            baseName = "NewTrigger";
+            break;
+        }
+        std::string valueName = baseName;
+        int index = 0;
+        bool isDuplicate = true;
+        while (isDuplicate)
+        {
+            isDuplicate = false;
+            for (auto& parm : Parameters)
+            {
+                if (parm->name == valueName)
+                {
+                    isDuplicate = true;
+                    valueName = baseName + std::to_string(++index);
+                    break;
+                }
+            }
+        }
+        ConditionParameter* newParameter = new ConditionParameter(0, vType, valueName);
+        Parameters.push_back(newParameter);
     }
 
     template<typename T>
@@ -76,13 +123,14 @@ public:
     {
         for (auto& param : Parameters)
         {
-            if (param.name == valuename)
+            if (param->name == valuename)
             {
-                param.UpdateParameter(Value);
+                param->UpdateParameter(Value);
             }
         }
     }
   
+    ConditionParameter* FindParameter(std::string valueName);
 private:
     bool m_IsEnabled = false;
     
