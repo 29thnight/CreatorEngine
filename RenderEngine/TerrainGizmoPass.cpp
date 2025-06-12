@@ -54,12 +54,15 @@ TerrainGizmoPass::TerrainGizmoPass()
 
 void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
     m_pso->Apply();
     
-	DirectX11::CopyResource(m_pTempTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
 
     for (auto& obj : scene.GetScene()->m_SceneObjects) {
@@ -89,8 +92,6 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
     }
     ID3D11RenderTargetView* nullrtv = nullptr;
     deviceContext->OMSetRenderTargets(1, &nullrtv, nullptr);
-
-
 }
 
 void TerrainGizmoPass::ControlPanel()
