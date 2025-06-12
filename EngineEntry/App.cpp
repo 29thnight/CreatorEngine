@@ -107,11 +107,6 @@ void Core::App::Run()
 	{
 		// 메인 루프
 		m_main->Update();
-		//if (m_main->Render())
-		//{
-		//	m_deviceResources->Present();
-		//}
-		m_main->DisableOrEnable();
 	});
 }
 
@@ -180,7 +175,7 @@ LRESULT Core::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 		}
 	}
 
-	m_main->CreateWindowSizeDependentResources();
+	m_main->InvokeResizeFlag();
 
 	return 0;
 }

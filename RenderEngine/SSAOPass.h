@@ -6,11 +6,13 @@ struct alignas(16) SSAOBuffer
 {
 	Mathf::xMatrix m_ViewProjection;
 	Mathf::xMatrix m_InverseViewProjection;
+	Mathf::xMatrix m_InverseProjection;
 	Mathf::Vector4 m_SampleKernel[64];
 	Mathf::Vector4 m_CameraPosition;
 	float m_Radius;
 	float m_Thickness;
 	Mathf::Vector2 m_windowSize;
+	UINT m_frameIndex;
 };
 
 class SSAOPass final : public IRenderPass

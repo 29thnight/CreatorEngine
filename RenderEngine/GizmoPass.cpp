@@ -69,16 +69,18 @@ GizmoPass::GizmoPass()
 
 void GizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
-	auto deviceContext = DeviceState::g_pDeviceContext;
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
 
 	DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
 	GizmoCameraBuffer cameraBuffer{ 
 		.VP = XMMatrixMultiply(camera.CalculateView(), camera.CalculateProjection()), 

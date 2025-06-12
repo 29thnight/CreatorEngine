@@ -119,7 +119,7 @@ namespace lm {
 		int indirectCount = 2;
 
 		// 외각선에 픽셀 추가.
-		int dilateCount = 0; // 이제 사용 안해도될듯 포지면맵 단계에서 미리 픽셀 늘려두면 됨.
+		//int dilateCount = 0; // 이제 사용 안해도될듯 포지면맵 단계에서 미리 픽셀 늘려두면 됨.
 		// 라이트맵 블러처리.
 		int directMSAACount = 2;
 		// 간접광 블러처리.

@@ -5,6 +5,7 @@
 class Scene;
 class Object;
 class MeshRenderer;
+class RenderScene;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -69,6 +70,8 @@ public:
     std::atomic_bool            m_isGameStart{ false };
 	std::atomic_bool			m_isEditorSceneLoaded{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
+
+    RenderScene*                m_ActiveRenderScene{ nullptr };
 
 private:
     void CreateEditorOnlyPlayScene();

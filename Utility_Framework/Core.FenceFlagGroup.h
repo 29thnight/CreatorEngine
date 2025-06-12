@@ -6,36 +6,58 @@ class FenceFlagGroup
 {
 public:
 	explicit FenceFlagGroup(uint32_t count)
-		: m_targetCount(count), m_currentCount(0)
+		: m_targetCount(count)
 	{
+		m_signaledFlags = new std::atomic_bool[count];
+		for (uint32_t i = 0; i < count; ++i)
+			m_signaledFlags[i].store(false, std::memory_order_relaxed);
 	}
 
-	// 각 스레드가 완료되었을 때 호출
-	void Signal()
+	~FenceFlagGroup()
 	{
-		uint32_t old = m_currentCount.fetch_add(1, std::memory_order_acq_rel);
-		// optional assert
-		// assert(old < m_targetCount);
+		delete[] m_signaledFlags;
 	}
 
-	// 모든 스레드가 Signal() 호출할 때까지 대기
+	// 스레드별로 고유 ID로 signal (index 0~count-1)
+	void Signal(uint32_t threadIndex)
+	{
+		// 이미 true인 경우 다른 스레드가 Reset을 아직 하지 않은 상태일 수 있음 -> 삭제 예정
+		while (m_signaledFlags[threadIndex].load(std::memory_order_acquire))
+		{
+			_mm_pause();
+		}
+
+		m_signaledFlags[threadIndex].store(true, std::memory_order_release);
+	}
+
 	void Wait()
 	{
-		while (m_currentCount.load(std::memory_order_acquire) < m_targetCount)
+		while (true)
 		{
-			_mm_pause(); // or std::this_thread::yield();
+			bool allReady = true;
+			for (uint32_t i = 0; i < m_targetCount; ++i)
+			{
+				if (!m_signaledFlags[i].load(std::memory_order_acquire))
+				{
+					allReady = false;
+					break;
+				}
+			}
+
+			if (allReady)
+				break;
+
+			_mm_pause();
 		}
 	}
 
-	// 다시 사용할 수 있도록 초기화
-	void Reset(uint32_t newTargetCount = 0)
+	void Reset()
 	{
-		m_currentCount.store(0, std::memory_order_release);
-		if (newTargetCount != 0)
-			m_targetCount = newTargetCount;
+		for (uint32_t i = 0; i < m_targetCount; ++i)
+			m_signaledFlags[i].store(false, std::memory_order_release);
 	}
 
 private:
-	std::atomic<uint32_t> m_currentCount;
 	uint32_t m_targetCount;
+	std::atomic_bool* m_signaledFlags;
 };

@@ -22,3 +22,8 @@ void Sampler::Use(uint32 slot)
 {
 	DeviceState::g_pDeviceContext->PSSetSamplers(slot, 1, &m_SamplerState);
 }
+
+void Sampler::Use(ID3D11DeviceContext* defferedContext, uint32 slot)
+{
+	defferedContext->PSSetSamplers(slot, 1, &m_SamplerState);
+}

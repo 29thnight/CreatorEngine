@@ -107,7 +107,6 @@ public:
 public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-	HashedGuid m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
 	[[Property]]
 	HashingString m_tag{ "Untagged" };
 	

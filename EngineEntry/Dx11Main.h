@@ -30,12 +30,15 @@ namespace DirectX11
 		void SceneInitialize();
 		void CreateWindowSizeDependentResources();
 		void Update();
-		bool Render();
+		bool RHIRender();
         void InfoWindow();
         void OnGui();
 		void DisableOrEnable();
 
 		void RenderWorkerThread();
+		void RHIWorkerThread();
+
+		void InvokeResizeFlag();
 
 		// IDeviceNotify
 		virtual void OnDeviceLost() override;
@@ -63,12 +66,14 @@ namespace DirectX11
 		Core::DelegateHandle m_EndOfFrameEventHandle;
 		
 		std::thread m_renderThread;
+		std::thread m_RHI_Thread;
 
 		//std::unique_ptr<Scene> m_scene;
 		//BT_Editor m_btEditor;
 		bool m_isGameView = false;
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;
+		std::atomic_bool m_isInvokeResize = false;
 
 		bool m_isSelectUI = false;
 		bool m_isSelectText = false;

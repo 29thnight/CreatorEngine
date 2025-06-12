@@ -7,7 +7,7 @@
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
-RenderCommand::RenderCommand(MeshRenderer* component) :
+MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
     m_Material(component->m_Material),
     m_Mesh(component->m_Mesh),
     m_LightMapping(component->m_LightMapping),
@@ -22,41 +22,58 @@ RenderCommand::RenderCommand(MeshRenderer* component) :
         {
             m_isAnimationEnabled = true;
             m_animatorGuid = animator->GetInstanceID();
-            memcpy(m_finalTransforms, animator->m_FinalTransforms, TRANSFORM_SIZE);
         }
+
+        m_materialGuid = m_Material->m_materialGuid;
     }
 
     if (!m_isSkinnedMesh)
     {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> RenderCommand
+        //TODO : Change CullingManager Collect Class : MeshRenderer -> MeshRendererProxy
         //CullingManagers->Insert(this);
 
         m_isNeedUptateCulling = true;
     }
 }
 
-RenderCommand::~RenderCommand()
+MeshRendererProxy::~MeshRendererProxy()
 {
 }
 
-RenderCommand::RenderCommand(const RenderCommand& other) :
+MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
     m_Material(other.m_Material),
     m_Mesh(other.m_Mesh),
     m_LightMapping(other.m_LightMapping),
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(other.m_worldMatrix),
-    m_animatorGuid(other.m_animatorGuid)
+    m_animatorGuid(other.m_animatorGuid),
+    m_materialGuid(other.m_materialGuid)
 {
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
 
-RenderCommand::RenderCommand(RenderCommand&& other) noexcept :
+MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
     m_Material(std::exchange(other.m_Material, nullptr)),
     m_Mesh(std::exchange(other.m_Mesh, nullptr)),
     m_LightMapping(other.m_LightMapping),
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(std::exchange(other.m_worldMatrix, {})),
-    m_animatorGuid(std::exchange(other.m_animatorGuid, {}))
+    m_animatorGuid(std::exchange(other.m_animatorGuid, {})),
+    m_materialGuid(std::exchange(other.m_materialGuid, {}))
 {
     memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
+}
+
+void MeshRendererProxy::Draw()
+{
+    if (nullptr == m_Mesh) return;
+
+    m_Mesh->Draw();
+}
+
+void MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
+{
+    if (nullptr == m_Mesh || nullptr == _defferedContext) return;
+
+    m_Mesh->Draw(_defferedContext);
 }

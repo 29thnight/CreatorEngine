@@ -16,7 +16,7 @@ public:
 	virtual ~ParticleModule() = default;
 	virtual void Initialize() {}
 	virtual void Update(float delta, std::vector<ParticleData>& particles) {}
-
+	virtual void Release() {}
 	void SetEasingType(EasingEffect type)
 	{
 		m_easingType = type;
@@ -52,7 +52,7 @@ public:
 	}
 
 	// 더블 버퍼를 위해 설정
-	void SetBuffers(ID3D11UnorderedAccessView* inputUAV, ID3D11ShaderResourceView* inputSRV, ID3D11UnorderedAccessView* outputUAV, ID3D11ShaderResourceView* outputSRV)
+	virtual void SetBuffers(ID3D11UnorderedAccessView* inputUAV, ID3D11ShaderResourceView* inputSRV, ID3D11UnorderedAccessView* outputUAV, ID3D11ShaderResourceView* outputSRV)
 	{
 		m_inputUAV = inputUAV;
 		m_inputSRV = inputSRV;

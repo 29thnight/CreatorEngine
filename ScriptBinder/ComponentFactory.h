@@ -12,7 +12,7 @@ private:
 
 public:
 	void Initialize();
-	void LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode);
+	void LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame = false);
 
 	std::unordered_map<std::string, const Meta::Type*> m_componentTypes{};
 };

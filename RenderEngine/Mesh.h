@@ -67,7 +67,7 @@ public:
 	~Mesh();
 
 	void Draw();
-	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _defferedContext);
 
 	std::string GetName() const { return m_name; }
 

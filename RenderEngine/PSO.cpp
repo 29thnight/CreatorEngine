@@ -10,71 +10,71 @@ namespace PSOHelper
 	ID3D11GeometryShader* nullGeometryShader = nullptr;
 	ID3D11ComputeShader* nullComputeShader = nullptr;
 
-	inline void VSSetShader(VertexShader* shader)
+	inline void VSSetShader(ID3D11DeviceContext* pDeviceContext, VertexShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->VSSetShader(nullVertexShader, nullptr, 0);
+			pDeviceContext->VSSetShader(nullVertexShader, nullptr, 0);
 			return;
 		}
 
-		DeviceState::g_pDeviceContext->VSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->VSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void PSSetShader(PixelShader* shader)
+	inline void PSSetShader(ID3D11DeviceContext* pDeviceContext, PixelShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->PSSetShader(nullPixelShader, nullptr, 0);
+			pDeviceContext->PSSetShader(nullPixelShader, nullptr, 0);
 			return;
 		}
-		DeviceState::g_pDeviceContext->PSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->PSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void HSSetShader(HullShader* shader)
+	inline void HSSetShader(ID3D11DeviceContext* pDeviceContext, HullShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->HSSetShader(nullHullShader, nullptr, 0);
+			pDeviceContext->HSSetShader(nullHullShader, nullptr, 0);
 			return;
 		}
-		DeviceState::g_pDeviceContext->HSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->HSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void DSSetShader(DomainShader* shader)
+	inline void DSSetShader(ID3D11DeviceContext* pDeviceContext, DomainShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->DSSetShader(nullDomainShader, nullptr, 0);
+			pDeviceContext->DSSetShader(nullDomainShader, nullptr, 0);
 			return;
 		}
-		DeviceState::g_pDeviceContext->DSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->DSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void GSSetShader(GeometryShader* shader)
+	inline void GSSetShader(ID3D11DeviceContext* pDeviceContext, GeometryShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->GSSetShader(nullGeometryShader, nullptr, 0);
+			pDeviceContext->GSSetShader(nullGeometryShader, nullptr, 0);
 			return;
 		}
-		DeviceState::g_pDeviceContext->GSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->GSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void CSSetShader(ComputeShader* shader)
+	inline void CSSetShader(ID3D11DeviceContext* pDeviceContext, ComputeShader* shader)
 	{
 		if (!shader)
 		{
-			DeviceState::g_pDeviceContext->CSSetShader(nullComputeShader, nullptr, 0);
+			pDeviceContext->CSSetShader(nullComputeShader, nullptr, 0);
 			return;
 		}
-		DeviceState::g_pDeviceContext->CSSetShader(shader->GetShader(), nullptr, 0);
+		pDeviceContext->CSSetShader(shader->GetShader(), nullptr, 0);
 	}
 
-	inline void IASetInputLayout(ID3D11InputLayout* inputLayout)
+	inline void IASetInputLayout(ID3D11DeviceContext* pDeviceContext, ID3D11InputLayout* inputLayout)
 	{
 		if (!inputLayout) return;
-		DeviceState::g_pDeviceContext->IASetInputLayout(inputLayout);
+		pDeviceContext->IASetInputLayout(inputLayout);
 	}
 }
 
@@ -96,12 +96,12 @@ void PipelineStateObject::Apply()
 	DeviceState::g_pDeviceContext->IASetInputLayout(m_inputLayout);
 	DeviceState::g_pDeviceContext->IASetPrimitiveTopology(m_primitiveTopology);
 
-	PSOHelper::VSSetShader(m_vertexShader);
-	PSOHelper::PSSetShader(m_pixelShader);
-	PSOHelper::HSSetShader(m_hullShader);
-	PSOHelper::DSSetShader(m_domainShader);
-	PSOHelper::GSSetShader(m_geometryShader);
-	PSOHelper::CSSetShader(m_computeShader);
+	PSOHelper::VSSetShader(DeviceState::g_pDeviceContext, m_vertexShader);
+	PSOHelper::PSSetShader(DeviceState::g_pDeviceContext, m_pixelShader);
+	PSOHelper::HSSetShader(DeviceState::g_pDeviceContext, m_hullShader);
+	PSOHelper::DSSetShader(DeviceState::g_pDeviceContext, m_domainShader);
+	PSOHelper::GSSetShader(DeviceState::g_pDeviceContext, m_geometryShader);
+	PSOHelper::CSSetShader(DeviceState::g_pDeviceContext, m_computeShader);
 
 	DeviceState::g_pDeviceContext->RSSetState(m_rasterizerState);
 	DeviceState::g_pDeviceContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
@@ -110,8 +110,28 @@ void PipelineStateObject::Apply()
 	for (uint32 i = 0; i < m_samplers.size(); ++i)
 	{
 		m_samplers[i]->Use(i);
-		//ID3D11SamplerState* sampler = m_samplers[i]->m_SamplerState;
-		//DeviceState::g_pDeviceContext->PSSetSamplers(i, 1, &sampler);
+	}
+}
+
+void PipelineStateObject::Apply(ID3D11DeviceContext* defferdContext)
+{
+	defferdContext->IASetInputLayout(m_inputLayout);
+	defferdContext->IASetPrimitiveTopology(m_primitiveTopology);
+
+	PSOHelper::VSSetShader(defferdContext, m_vertexShader);
+	PSOHelper::PSSetShader(defferdContext, m_pixelShader);
+	PSOHelper::HSSetShader(defferdContext, m_hullShader);
+	PSOHelper::DSSetShader(defferdContext, m_domainShader);
+	PSOHelper::GSSetShader(defferdContext, m_geometryShader);
+	PSOHelper::CSSetShader(defferdContext, m_computeShader);
+
+	defferdContext->RSSetState(m_rasterizerState);
+	defferdContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
+	defferdContext->OMSetDepthStencilState(m_depthStencilState, 0);
+
+	for (uint32 i = 0; i < m_samplers.size(); ++i)
+	{
+		m_samplers[i]->Use(defferdContext, i);
 	}
 }
 
@@ -186,12 +206,12 @@ void PipelineStateObject::Reset()
     DeviceState::g_pDeviceContext->IASetInputLayout(nullptr);
     DeviceState::g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    PSOHelper::VSSetShader(nullptr);
-    PSOHelper::PSSetShader(nullptr);
-    PSOHelper::HSSetShader(nullptr);
-    PSOHelper::DSSetShader(nullptr);
-    PSOHelper::GSSetShader(nullptr);
-    PSOHelper::CSSetShader(nullptr);
+    PSOHelper::VSSetShader(DeviceState::g_pDeviceContext, nullptr);
+	PSOHelper::PSSetShader(DeviceState::g_pDeviceContext, nullptr);
+	PSOHelper::HSSetShader(DeviceState::g_pDeviceContext, nullptr);
+	PSOHelper::DSSetShader(DeviceState::g_pDeviceContext, nullptr);
+	PSOHelper::GSSetShader(DeviceState::g_pDeviceContext, nullptr);
+	PSOHelper::CSSetShader(DeviceState::g_pDeviceContext, nullptr);
 
     DeviceState::g_pDeviceContext->RSSetState(nullptr);
     DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);

@@ -64,14 +64,40 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	);
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	m_prevSSRTexture = Texture::Create(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"PreviousSSRTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+	);
+	m_prevSSRTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_prevSSRTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+	m_prevCopiedSSRTexture = Texture::Create(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"PreviousCopiedSSRTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+	);
+	m_prevCopiedSSRTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_prevCopiedSSRTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 
 void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
+
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, nullptr);
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
+	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, m_prevSSRTexture->m_pTexture);
+	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV()};
+	DirectX11::OMSetRenderTargets(2, view, nullptr);
 
 	camera.UpdateBuffer();
 	CBData cbData;
@@ -87,15 +113,16 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
 	ID3D11ShaderResourceView* srvs[4] = {
-		camera.m_depthStencil->m_pSRV,
+		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,//m_DiffuseTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
-		m_NormalTexture->m_pSRV
+		m_NormalTexture->m_pSRV,
+		m_prevCopiedSSRTexture->m_pSRV
 	};
-	DirectX11::PSSetShaderResources(0, 4, srvs);
+	DirectX11::PSSetShaderResources(0, 5, srvs);
 
 	DirectX11::Draw(4, 0);
 

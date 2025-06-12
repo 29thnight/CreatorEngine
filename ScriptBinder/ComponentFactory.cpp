@@ -32,7 +32,7 @@ void ComponentFactory::Initialize()
    }
 }
 
-void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode)
+void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
 {
 	if (itNode["ModuleBehavior"])
 	{
@@ -48,6 +48,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
     }
 
     auto component = obj->AddComponent((*componentType)).get();
+
     if (component)
     {
         using namespace TypeTrait;
@@ -79,7 +80,10 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			if (itNode["m_Motion"])
 			{
 				FileGuid guid = itNode["m_Motion"].as<std::string>();
-				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				if(guid != nullFileGuid)
+				{
+					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				}
 			}
 
 			if (itNode["Parameters"])
@@ -220,6 +224,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
             Meta::Deserialize(component, itNode);
 			component->SetOwner(obj);
+		}
+
+		if (isEditorToGame)
+		{
+			component->MakeInstanceID();
 		}
     }
 }

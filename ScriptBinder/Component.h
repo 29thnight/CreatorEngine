@@ -25,8 +25,8 @@ public:
 protected:
 	GameObject*		m_pOwner{};
 	Transform*		m_pTransform{ nullptr };
-    [[Property]]
-	HashedGuid		m_instanceID{ TypeTrait::GUIDCreator::MakeGUID() };
+	[[Property]]
+	FileGuid m_FileID{};
 };
 
 #include "Component.inl"

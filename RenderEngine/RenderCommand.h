@@ -8,14 +8,14 @@ class Material;
 class Mesh;
 class OctreeNode;
 class MeshRenderer;
-class RenderCommand
+class MeshRendererProxy
 {
 public:
-	RenderCommand(MeshRenderer* component);
-	~RenderCommand();
+	MeshRendererProxy(MeshRenderer* component);
+	~MeshRendererProxy();
 
-	RenderCommand(const RenderCommand& other);
-	RenderCommand(RenderCommand&& other) noexcept;
+	MeshRendererProxy(const MeshRendererProxy& other);
+	MeshRendererProxy(MeshRendererProxy&& other) noexcept;
 
 public:
 	bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
@@ -24,19 +24,34 @@ public:
 	void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
 	bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-public:
-	Material*	m_Material{ nullptr };
-	Mesh*		m_Mesh{ nullptr };
-	HashedGuid  m_animatorGuid{};
+	void Draw();
+	void Draw(ID3D11DeviceContext* _defferedContext);
+
+	friend bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b);
 
 public:
-	DirectX::XMMATRIX m_finalTransforms[MAX_BONES]{};
+	Material*		m_Material{ nullptr };
+	Mesh*			m_Mesh{ nullptr };
+	HashedGuid		m_animatorGuid{};
+	HashedGuid      m_materialGuid{};
+
+public:
+	Mathf::xMatrix	  m_finalTransforms[MAX_BONES]{};
 	LightMapping	  m_LightMapping;
 	bool			  m_isSkinnedMesh{ false };
 	bool			  m_isAnimationEnabled{ false };
-	Mathf::xMatrix    m_worldMatrix{};
+	Mathf::xMatrix    m_worldMatrix;
 
 private:
 	bool m_isNeedUptateCulling{ false };
 	//std::unordered_set<OctreeNode*> m_OctreeNodes;
 };
+
+inline bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b)
+{
+	if (a->m_animatorGuid == b->m_animatorGuid)
+	{
+		return a->m_materialGuid < b->m_materialGuid;
+	}
+	return a->m_animatorGuid < b->m_animatorGuid;
+}

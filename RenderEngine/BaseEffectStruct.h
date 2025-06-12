@@ -24,7 +24,6 @@ struct alignas(16) ParticleData
 	float3 pad5;
 };
 
-
 struct alignas(16) EffectParameters		// °øÅë effectparams
 {
 	float time;

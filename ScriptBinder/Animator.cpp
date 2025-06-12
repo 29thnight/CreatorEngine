@@ -1,10 +1,20 @@
 #include "Animator.h"
 #include "AnimationController.h"
+#include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
 #include "NodeEditor.h"
+
+void Animator::Awake()
+{
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (renderScene)
+	{
+		renderScene->RegisterAnimator(this);
+	}
+}
+
 void Animator::Update(float tick)
 {
-	
 	if (m_animationControllers.empty()) return;
 
 	for (auto& animationController : m_animationControllers)
@@ -18,6 +28,16 @@ void Animator::Update(float tick)
 		{
 			param->ResetTrigger();
 		}
+	}
+}
+
+void Animator::OnDistroy()
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (renderScene)
+	{
+		renderScene->UnregisterAnimator(this);
 	}
 }
 
@@ -65,11 +85,13 @@ void Animator::CreateController_UI()
 
 AnimationController* Animator::GetController(std::string name)
 {
-	for (auto& Controller : m_animationControllers)
-	{
-		if (Controller->name == name)
-			return Controller;
-	}
+        for (auto& Controller : m_animationControllers)
+        {
+                if (Controller->name == name)
+                        return Controller;
+        }
+        // Return nullptr when no controller with the specified name exists
+        return nullptr;
 }
 
 void Animator::DeleteParameter(int index)

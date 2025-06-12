@@ -13,6 +13,19 @@ struct alignas(16) DeferredBuffer
 	float m_envMapIntensity{ 1.f };
 };
 
+ID3D11ShaderResourceView* nullSRV[10] = {
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr
+};
+
 DeferredPass::DeferredPass()
 {
     m_pso = std::make_unique<PipelineStateObject>();
@@ -76,75 +89,58 @@ void DeferredPass::DisableAmbientOcclusion()
 void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
-
-    //DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
-    ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &view, nullptr);
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
 
     auto& lightManager = scene.m_LightController;
 
-	//for (auto& light : lightManager->m_lightProperties.m_lights)
-	//{
-	//	if (light.m_lightType == LightType::DirectionalLight)
-	//	{
- //           light.m_lightStatus = LightStatus::StaticShadows;
-	//		break;
-	//	}
-	//}
+    cameraView cameraview{};
+    cameraview.cameraView = camera.CalculateView();
 
+    DeferredBuffer buffer{};
+    buffer.m_InverseProjection      = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    buffer.m_InverseView            = XMMatrixInverse(nullptr, cameraview.cameraView);
+    buffer.m_useAmbientOcclusion    = m_UseAmbientOcclusion;
+    buffer.m_useEnvironmentMap      = m_UseEnvironmentMap;
+	buffer.m_envMapIntensity        = m_envMapIntensity;
+        
+    bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
+
+    ID3D11ShaderResourceView* srvs[10] = {
+        renderData->m_depthStencil->m_pSRV,
+        m_DiffuseTexture->m_pSRV,
+        m_MetalRoughTexture->m_pSRV,
+        m_NormalTexture->m_pSRV,
+        (isShadowMapRender)     ? renderData->m_shadowMapTexture->m_pSRV : nullptr,
+        m_UseAmbientOcclusion   ? m_AmbientOcclusionTexture->m_pSRV      : nullptr,
+        m_UseEnvironmentMap     ? m_EnvironmentMap->m_pSRV               : nullptr,
+        m_UseEnvironmentMap     ? m_PreFilter->m_pSRV                    : nullptr,
+        m_UseEnvironmentMap     ? m_BrdfLut->m_pSRV                      : nullptr,
+        m_EmissiveTexture->m_pSRV
+    };
+
+    auto rtv = renderData->m_renderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
+    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
+    DirectX11::PSSetConstantBuffer(10, 1, m_shadowcamBuffer.GetAddressOf());
+    DirectX11::PSSetShaderResources(0, 10, srvs);
+
     if (lightManager->hasLightWithShadows)
     {
         DirectX11::PSSetConstantBuffer(2, 1, &lightManager->m_shadowMapBuffer);
     }
 
-    DeferredBuffer buffer{};
-    buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
-    buffer.m_InverseView = XMMatrixInverse(nullptr, camera.CalculateView());
-    buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
-    buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
-	buffer.m_envMapIntensity = m_envMapIntensity;
-
-    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
-
-    cameraView cameraview{};
-    cameraview.cameraView = camera.CalculateView();
-    DirectX11::PSSetConstantBuffer(10, 1, m_shadowcamBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
-    ID3D11ShaderResourceView* srvs[10] = {
-        camera.m_depthStencil->m_pSRV,
-        m_DiffuseTexture->m_pSRV,
-        m_MetalRoughTexture->m_pSRV,
-        m_NormalTexture->m_pSRV,
-        (lightManager->hasLightWithShadows && m_UseLightWithShadows) ? lightManager->GetShadowMapTexture()->m_pSRV : nullptr,
-        m_UseAmbientOcclusion ? m_AmbientOcclusionTexture->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr,
-        m_EmissiveTexture->m_pSRV
-    };
-
-    DirectX11::PSSetShaderResources(0, 10, srvs);
-
+    DirectX11::UpdateBuffer(lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
     DirectX11::Draw(4, 0);
 
-    ID3D11ShaderResourceView* nullSRV[10] = {
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-		nullptr,
-		nullptr
-    };
-
     DirectX11::PSSetShaderResources(0, 10, nullSRV);
-    DirectX11::UnbindRenderTargets();
+    //DirectX11::UnbindRenderTargets();
+    ID3D11RenderTargetView* nullview[2] = { nullptr, nullptr };
+    DirectX11::OMSetRenderTargets(2, nullview, nullptr);
 }
 
 void DeferredPass::ControlPanel()
@@ -153,4 +149,9 @@ void DeferredPass::ControlPanel()
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+}
+
+void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)
+{
+    m_LightEmissiveTexture = lightEmissive;
 }
