@@ -254,6 +254,9 @@ void SparkleEffect::Render(RenderScene& scene, Camera& camera)
     if (!m_isRunning) // || m_activeParticleCount == 0)
         return;
 
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
     m_billboardModule->m_particleSRV = GetCurrentRenderingSRV();
     m_billboardModule->m_instanceCount = m_maxParticles;
 
@@ -261,8 +264,8 @@ void SparkleEffect::Render(RenderScene& scene, Camera& camera)
 
     m_renderModules[0]->SaveRenderState();
 
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    deviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+    deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
     ID3D11ShaderResourceView* srv = m_sparkleTexture->m_pSRV;
     DirectX11::PSSetShaderResources(0, 1, &srv);
