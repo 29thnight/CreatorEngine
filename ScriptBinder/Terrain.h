@@ -183,6 +183,13 @@ cbuffer TerrainLayerBuffer
     float layerTilling3;
 };
 
+//cbuffer TerrainGizmoBuffer
+//{
+//    float2 gBrushPosition;
+//    float gBrushRadius;
+//};
+
+
 //-----------------------------------------------------------------------------
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
@@ -240,7 +247,7 @@ public:
 		);
 
         m_layerBuffer = DirectX11::CreateBuffer(sizeof(TerrainLayerBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
-        
+		//m_gizmoBuffer = DirectX11::CreateBuffer(sizeof(TerrainGizmoBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 
         std::vector<uint32_t> indices;
@@ -824,6 +831,7 @@ public:
     // Mesh 접근자
     TerrainMesh* GetMesh() const { return m_pMesh; }
     ComPtr<ID3D11Buffer> m_layerBuffer; // 레이어 정보 버퍼
+	//ComPtr<ID3D11Buffer> m_gizmoBuffer; //editor용 gizmo 버퍼
 	ComPtr<ID3D11Buffer> m_AddLayerBuffer; // 레이어 추가용 버퍼
 private:
     unsigned int m_terrainID{ 0 };

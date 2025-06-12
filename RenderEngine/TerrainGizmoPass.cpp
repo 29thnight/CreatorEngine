@@ -56,7 +56,7 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
     auto& deviceContext = DeviceState::g_pDeviceContext;
 	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
-
+    DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
     for (auto& obj : scene.GetScene()->m_SceneObjects) {
         if (obj->IsDestroyMark()) continue;
@@ -81,7 +81,10 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
                 }
             }
         }
+        
     }
+    ID3D11BlendState* nullBlendState = nullptr;
+    DirectX11::OMSetBlendState(nullBlendState, nullptr, 0xFFFFFFFF);
 
 }
 

@@ -65,6 +65,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
+	m_pEditorCamera->m_applyRenderPipelinePass.m_TerrainGizmoPass = true;
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
@@ -445,14 +446,14 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
-		/*if(camera == m_pEditorCamera.get())
+		if(camera == m_pEditorCamera.get())
 		{
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
 			Benchmark banch;
 			m_pTerrainGizmoPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("TerrainGizmoPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
-		}*/
+		}
 
 		{
 			DirectX11::BeginEvent(L"ForwardPass");

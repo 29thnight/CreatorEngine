@@ -93,7 +93,9 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::VSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 
-	
+	if (camera.m_applyRenderPipelinePass.m_TerrainGizmoPass) {
+		TerrainGizmoBuffer terrainGizmoBuffer = {};
+	}
 
 	for (auto& obj : scene.GetScene()->m_SceneObjects) {
 		if (obj->IsDestroyMark()) continue;
@@ -104,6 +106,19 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 			if (terrainMesh)
 			{
+				TerrainGizmoBuffer terrainGizmoBuffer = {};
+				auto terrainBrush = terrain->GetCurrentBrush();
+				if (terrainBrush != nullptr) {
+					terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
+					terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
+					DirectX11::UpdateBuffer(terrain->m_gizmoBuffer.Get(), &terrainGizmoBuffer);
+					DirectX11::PSSetConstantBuffer(0, 1, terrain->m_gizmoBuffer.GetAddressOf());
+				}
+				else
+				{
+					DirectX11::PSSetConstantBuffer(0, 1, nullptr);
+				}
+
 				DirectX11::PSSetConstantBuffer(12, 1, terrain->m_layerBuffer.GetAddressOf());
 				scene.UpdateModel(obj->m_transform.GetWorldMatrix());
 

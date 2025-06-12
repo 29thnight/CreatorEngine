@@ -20,4 +20,5 @@ struct ApplyRenderPipelinePass
 	bool m_WireFramePass{ true };
 	bool m_GridPass{ false };
 	bool m_BlitPass{ false };
+	bool m_TerrainGizmoPass{ false };
 };
