@@ -99,10 +99,10 @@ void GridPass::PrepareCameraType(Camera* camera)
 
 void GridPass::Execute(RenderScene& scene, Camera& camera)
 {
-	if (camera.m_applyRenderPipelinePass.m_GridPass == false)
-	{
-		return;
-	}
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
+	if (camera.m_applyRenderPipelinePass.m_GridPass == false) return;
 
     m_pso->Apply();
 
@@ -125,8 +125,8 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::UpdateBuffer(m_pGridConstantBuffer.Get(), &m_gridConstant);
 	DirectX11::UpdateBuffer(m_pUniformBuffer.Get(), &m_gridUniform);
 
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+    DeviceState::g_pDeviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
     UINT stride = sizeof(GridVertex);
     UINT offset = 0;

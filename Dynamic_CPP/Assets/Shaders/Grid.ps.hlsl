@@ -63,7 +63,7 @@ float4 main(VS_OUTPUT input) : SV_TARGET
     // 최종 알파값 (각각의 패턴에 따른 알파 합산 후 페이드 적용)
     float alphaGrid = step_line * gridColor.a;
     //float alphaChec = chec * checkerColor.a;
-    float alpha = saturate(alphaGrid /*+ alphaChec*/) * fadeFactor;
+    float alpha = saturate(alphaGrid /*+ alphaChec*/) * fadeFactor * (1 - saturate(distPlanar / 100.f));
     
     // 최종 색상 (프리멀티플라이드 알파 블렌딩)
     float3 color = (checkerColor.rgb /** alphaChec*/) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);

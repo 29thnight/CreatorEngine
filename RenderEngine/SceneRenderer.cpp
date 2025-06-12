@@ -34,7 +34,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_deviceResources(deviceResources)
 {
     InitializeDeviceState();
-    InitializeImGui();
+    InitializeShadowMapDesc();
+
+	m_threadPool = new ThreadPool;
+	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
+	m_renderScene = new RenderScene();
+	SceneManagers->m_ActiveRenderScene = m_renderScene;
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -65,7 +70,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
-	m_pEditorCamera->m_applyRenderPipelinePass.m_TerrainGizmoPass = true;
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
@@ -160,6 +164,16 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//lightmapPass
 	m_pLightMapPass = std::make_unique<LightMapPass>();
+
+
+	//SSGIPass
+	m_pSSGIPass = std::make_unique<SSGIPass>();
+	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get());
+
+	//LighingPass
+	m_pLightingPass = std::make_unique<LightingPass>();
+	m_pLightingPass->Initialize(m_lightingTexture.get());
+
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
 			auto scene = SceneManagers->GetActiveScene();
@@ -194,16 +208,11 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
 
-	m_renderScene = new RenderScene();
-	SceneManagers->m_ActiveRenderScene = m_renderScene;
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
-
-	m_threadPool = new ThreadPool;
-
-    m_newSceneCreatedEventHandle = newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+    m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
@@ -219,34 +228,34 @@ SceneRenderer::~SceneRenderer()
 
 void SceneRenderer::InitializeDeviceState()
 {
-    DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
-    DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-    DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-    DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-    DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
-    DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
-    DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
-    DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
-    DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
-    DeviceState::g_ClientRect = m_deviceResources->GetOutputSize();
-    DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
-	DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+    DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
+    DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+    DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+    DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+    DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+    DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
+    DeviceState::g_Viewport				= m_deviceResources->GetScreenViewport();
+    DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+    DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+    DeviceState::g_ClientRect			= m_deviceResources->GetOutputSize();
+    DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
+	DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
 
 	m_resizeEventHandle = OnResizeEvent.AddLambda([&](uint32_t width, uint32_t height)
 	{
-		DeviceState::g_pDevice = m_deviceResources->GetD3DDevice();
-		DeviceState::g_pDeviceContext = m_deviceResources->GetD3DDeviceContext();
-		DeviceState::g_pDepthStencilView = m_deviceResources->GetDepthStencilView();
-		DeviceState::g_pDepthStencilState = m_deviceResources->GetDepthStencilState();
-		DeviceState::g_pRasterizerState = m_deviceResources->GetRasterizerState();
-		DeviceState::g_pBlendState = m_deviceResources->GetBlendState();
+		DeviceState::g_pDevice				= m_deviceResources->GetD3DDevice();
+		DeviceState::g_pDeviceContext		= m_deviceResources->GetD3DDeviceContext();
+		DeviceState::g_pDepthStencilView	= m_deviceResources->GetDepthStencilView();
+		DeviceState::g_pDepthStencilState	= m_deviceResources->GetDepthStencilState();
+		DeviceState::g_pRasterizerState		= m_deviceResources->GetRasterizerState();
+		DeviceState::g_pBlendState			= m_deviceResources->GetBlendState();
 		//TODO : 빌드 옵션에 따라서 GameViewport를 사용하게 해야겠네???
 		//DeviceState::g_Viewport = m_deviceResources->GetScreenViewport();
-		DeviceState::g_backBufferRTV = m_deviceResources->GetBackBufferRenderTargetView();
-		DeviceState::g_depthStancilSRV = m_deviceResources->GetDepthStencilViewSRV();
-		DeviceState::g_ClientRect = m_deviceResources->GetLogicalSize();
-		DeviceState::g_aspectRatio = m_deviceResources->GetAspectRatio();
-		DeviceState::g_annotation = m_deviceResources->GetAnnotation();
+		DeviceState::g_backBufferRTV		= m_deviceResources->GetBackBufferRenderTargetView();
+		DeviceState::g_depthStancilSRV		= m_deviceResources->GetDepthStencilViewSRV();
+		DeviceState::g_ClientRect			= m_deviceResources->GetLogicalSize();
+		DeviceState::g_aspectRatio			= m_deviceResources->GetAspectRatio();
+		DeviceState::g_annotation			= m_deviceResources->GetAnnotation();
 
 		m_pSSAOPass->ReloadDSV(m_deviceResources->GetDepthStencilViewSRV());
 
@@ -254,9 +263,17 @@ void SceneRenderer::InitializeDeviceState()
 	});
 }
 
-void SceneRenderer::InitializeImGui()
+void SceneRenderer::InitializeShadowMapDesc()
 {
-	
+	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
+	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
+	desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } *-50.f;
+	desc.m_viewWidth = 100;
+	desc.m_viewHeight = 100;
+	desc.m_nearPlane = 0.1f;
+	desc.m_farPlane = 1000.0f;
+	desc.m_textureWidth = 2048;
+	desc.m_textureHeight = 2048;
 }
 
 void SceneRenderer::InitializeTextures()
@@ -300,6 +317,14 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
+
+	auto lightingTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"LightingRTV",
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+    m_lightingTexture.swap(lightingTexture);
 }
 
 void SceneRenderer::NewCreateSceneInitialize()
@@ -315,23 +340,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 	auto lightComponent1 = lightObj1->AddComponent<LightComponent>();
 	lightComponent1->m_lightStatus = LightStatus::StaticShadows;
 
-	ShadowMapRenderDesc desc;
-	desc.m_lookAt = XMVectorSet(0, 0, 0, 1);
-	desc.m_eyePosition = Mathf::Vector4{ -1, -1, 1, 0 } * -50.f;
-	desc.m_viewWidth = 100;
-	desc.m_viewHeight = 100;
-	desc.m_nearPlane = 0.1f;
-	desc.m_farPlane = 1000.0f;
-	desc.m_textureWidth = 2048;
-	desc.m_textureHeight = 2048;
-
+	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
-
-	/*DataSystems->LoadModel("Punch.fbx");
-	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/
 
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
@@ -368,9 +379,10 @@ void SceneRenderer::SceneRendering()
 
 	DirectX11::ResetCallCount();
 
-	for(auto& camera : CameraManagement->m_cameras)
+	for (auto& camera : CameraManagement->m_cameras)
 	{
-		if (nullptr == camera) continue;
+		if (!RenderPassData::VaildCheck(camera)) continue;
+		auto renderData = RenderPassData::GetData(camera);
 
 		if (camera != m_pEditorCamera.get())
 		{
@@ -389,9 +401,9 @@ void SceneRenderer::SceneRendering()
 		//[1] ShadowMapPass
 		{
 			DirectX11::BeginEvent(L"ShadowMapPass");
-			static int count = 0;
 			Benchmark banch;
-			camera->ClearRenderTarget();
+			//TODO : 여기 한번 정리 해보자
+			renderData->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
@@ -403,13 +415,6 @@ void SceneRenderer::SceneRendering()
 		{
 			DirectX11::BeginEvent(L"GBufferPass");
 			Benchmark banch;
-			ID3D11RenderTargetView* views[]{
-				m_diffuseTexture->GetRTV(),
-				m_metalRoughTexture->GetRTV(),
-				m_normalTexture->GetRTV(),
-				m_emissiveTexture->GetRTV()
-			};
-			m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 			m_pGBufferPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
@@ -440,6 +445,7 @@ void SceneRenderer::SceneRendering()
 				DirectX11::BeginEvent(L"DeferredPass");
 				Benchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
@@ -454,6 +460,14 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("TerrainGizmoPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
+		//{
+		//	DirectX11::BeginEvent(L"SSGIPass");
+		//	Benchmark banch;
+		//	m_pSSGIPass->Execute(*m_renderScene, *camera);
+		//	RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
+		//	DirectX11::EndEvent();
+		//}
 
 		{
 			DirectX11::BeginEvent(L"ForwardPass");
@@ -481,6 +495,7 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 		//SSR
+		if (m_pEditorCamera.get() != camera)
 		{
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
 			Benchmark banch;
@@ -584,6 +599,41 @@ void SceneRenderer::SceneRendering()
 	}
 }
 
+void SceneRenderer::CreateCommandListPass()
+{
+	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
+
+	ID3D11RenderTargetView* views[]{
+		m_diffuseTexture->GetRTV(),
+		m_metalRoughTexture->GetRTV(),
+		m_normalTexture->GetRTV(),
+		m_emissiveTexture->GetRTV()
+	};
+	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+
+	for (auto& camera : CameraManagement->m_cameras)
+	{
+		if (nullptr == camera) continue;
+
+		m_commandThreadPool->Enqueue([&]
+		{
+			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_renderScene->CreateShadowCommandList(defferdContext , *camera);
+		});
+
+		m_commandThreadPool->Enqueue([&]
+		{
+			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+		});
+
+		m_commandThreadPool->NotifyAllAndWait();
+	}
+
+	shadowMapPass->SwapQueue();
+	m_pGBufferPass->SwapQueue();
+}
+
 void SceneRenderer::ReApplyCurrCubeMap()
 {
 	ApplyNewCubeMap(m_pSkyBoxPass->CurrentSkyBoxTextureName().string());
@@ -593,54 +643,74 @@ void SceneRenderer::PrepareRender()
 {
 	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
 	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
-
-	if (GameSceneStart || GameSceneEnd)
+	
+	m_renderScene->ClearShadowRenderQueue();
+	for (auto camera : CameraManagement->m_cameras)
 	{
-		for (auto camera : CameraManagement->m_cameras)
+		if (nullptr == camera) continue;
+
+		if (!RenderPassData::VaildCheck(camera))
 		{
-			if (nullptr == camera) continue;
-			camera->ClearRenderQueue();
+			return;
 		}
 
-		return;
+		auto data = RenderPassData::GetData(camera);
+
+		data->ClearRenderQueue();
 	}
 
 	Benchmark banch;
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
-	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
-
-	for (auto& mesh : staticMeshes)
+	
+	m_threadPool->Enqueue([renderScene, m_currentScene]
 	{
-		if (false == mesh->IsEnabled() || 
-			false == mesh->IsNeedUpdateCulling()) continue;
+		std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
+		for (auto& mesh : allMeshes)
+		{
+			auto shadowProxy = renderScene->FindProxy(mesh->GetInstanceID());
+			if (shadowProxy)
+			{
+				renderScene->UpdateCommand(mesh);
+				renderScene->PushShadowRenderQueue(shadowProxy);
+			}
+		}
+	});
 
-		CullingManagers->UpdateMesh(mesh);
-	}
+	//for (auto& mesh : staticMeshes)
+	//{
+	//	if (false == mesh->IsEnabled() || 
+	//		false == mesh->IsNeedUpdateCulling()) continue;
+
+	//	CullingManagers->UpdateMesh(mesh);
+	//}
 
 	for (auto camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
-		camera->ClearRenderQueue();
-
-		m_threadPool->Enqueue([camera, &staticMeshes, &skinnedMeshes, renderScene]
+		if (!RenderPassData::VaildCheck(camera))
 		{
+			return;
+		}
+
+		auto data = RenderPassData::GetData(camera);
+
+		m_threadPool->Enqueue([camera, data, m_currentScene, renderScene]
+		{
+			std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
+			std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+
 			//std::vector<MeshRenderer*> culledMeshes;
 			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
-
+			//camera->ClearRenderQueue();
 			for (auto& culledMesh : staticMeshes)
 			{
 				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(culledMesh->GetBoundingBox()))
 				{
-					auto proxyObject = renderScene->FindProxy(culledMesh->GetInstanceID());
-					if (proxyObject)
-					{
-						renderScene->UpdateCommand(culledMesh);
-						camera->PushRenderQueue(proxyObject);
-					}
+					auto proxy = renderScene->FindProxy(culledMesh->GetInstanceID());
+					data->PushRenderQueue(proxy);
 				}
 			}
 
@@ -651,15 +721,12 @@ void SceneRenderer::PrepareRender()
 				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
-					auto proxyObject = renderScene->FindProxy(skinnedMesh->GetInstanceID());
-					//for test
-					if(proxyObject)
-					{
-						renderScene->UpdateCommand(skinnedMesh);
-						camera->PushRenderQueue(proxyObject);
-					}
+					auto proxy = renderScene->FindProxy(skinnedMesh->GetInstanceID());
+					data->PushRenderQueue(proxy);
 				}
 			}
+
+			data->SortRenderQueue();
 		});
 	}
 

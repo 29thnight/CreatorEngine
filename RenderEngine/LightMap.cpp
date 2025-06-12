@@ -701,6 +701,42 @@ namespace lm {
 					co_yield OnRender();
 				}
 			}
+
+			for (auto& lightmap : environmentMaps) {
+				ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+
+				for (int i = 0; i < directMSAACount; i++) {
+					UnBindLightmapPS();
+					// msaa
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetShader(m_MSAAcomputeShader->GetShader(), nullptr, 0);
+					DeviceState::g_pDeviceContext->ClearUnorderedAccessViewFloat(tempTexture->m_pUAV, Colors::Transparent);
+					DirectX11::CSSetUnorderedAccessViews(0, 1, &tempTexture->m_pUAV, nullptr); // 외각선 텍스처
+					DirectX11::CSSetShaderResources(0, 1, &lightmap->m_pSRV); // 라이트맵 텍스처
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+					co_yield OnRender();
+
+					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
+					co_yield OnRender();
+
+					UnBindLightmapPS();
+					// msaa 덮어쓰기.
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetShader(m_edgeCoverComputeShader->GetShader(), nullptr, 0);
+					DirectX11::CSSetUnorderedAccessViews(0, 1, &lightmap->m_pUAV, nullptr); // 라이트맵 텍스처
+					DirectX11::CSSetShaderResources(0, 1, &tempTexture->m_pSRV); // 외각선 텍스처
+					DirectX11::Dispatch(canvasSize / 16.f, canvasSize / 16.f, 1);
+					DirectX11::CSSetShaderResources(0, 1, nullSRV);
+					DirectX11::CSSetUnorderedAccessViews(0, 2, nullUAV, nullptr);
+					co_yield OnRender();
+
+					m_pLightMapPass->Initialize(lightmaps, directionalMaps);
+					co_yield OnRender();
+				}
+			}
+
 			co_yield OnRender();
 			g_progressWindow->SetProgress(70);
 			g_progressWindow->SetStatusText(L"Baking indirect...");

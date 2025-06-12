@@ -183,46 +183,48 @@ void VolumetricFogPass::Initialize(const std::string_view& fileName)
 void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
-	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-	ID3D11ShaderResourceView* nullSRVall[3] = { nullptr, nullptr, nullptr };
-	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
+	ID3D11ShaderResourceView*  nullSRV[1]		= { nullptr };
+	ID3D11ShaderResourceView*  nullSRVall[3]	= { nullptr, nullptr, nullptr };
+	ID3D11UnorderedAccessView* nullUAV[1]		= { nullptr };
 
 	DirectX11::CSSetShader(m_pMainShader->GetShader(), nullptr, 0);
 	DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &m_pClampSampler);
 	DeviceState::g_pDeviceContext->CSSetSamplers(2, 1, &m_pShadowSamper);
 
-	int readIndex = mCurrentTexture3DRead;
-	int writeIndex = !mCurrentTexture3DRead;
+	int readIndex	= mCurrentTexture3DRead;
+	int writeIndex	= !mCurrentTexture3DRead;
 
-	Mathf::Vector4 lightdir = scene.m_LightController->GetLight(0).m_direction;
-	Mathf::Color4 lightColor = scene.m_LightController->GetLight(0).m_color;
-	lightColor.w = scene.m_LightController->GetLight(0).m_intencity;
-	std::vector<float> cascadeEnd = devideCascadeEnd(camera, g_cascadeCut);
-	//std::vector<float> cascadeEnd = devideCascadeEnd(camera, cascadeCount, 0.55f);
-	std::vector<ShadowInfo> cascadeinfo = devideShadowInfo(camera, cascadeEnd, lightdir);
+	Mathf::Vector4 lightdir		= scene.m_LightController->GetLight(0).m_direction;
+	Mathf::Color4  lightColor	= scene.m_LightController->GetLight(0).m_color;
+	lightColor.w				= scene.m_LightController->GetLight(0).m_intencity;
+	Mathf::Matrix viewProjMat	= camera.CalculateView() * camera.CalculateProjection();
+
+	//GIT_COMBINE_WARN_BEGIN : shadowMapPass 코드 정리로 인한 로직 변경되었으니 병합 전 확인 바람. by Hero.P
+	auto shadowMapPass	= scene.m_LightController->GetShadowMapPass();
+	auto& cascadeInfo	= camera.m_cascadeinfo[2];
+	auto& useCascade	= shadowMapPass->m_useCascade;
 
 	MainCB data{};
-	data.InvViewProj = XMMatrixTranspose(XMMatrixInverse(nullptr, camera.CalculateView() * camera.CalculateProjection()));
-	data.PrevViewProj = mPrevViewProj;
-
-	data.ShadowMatrix = cascadeinfo[2].m_lightViewProjection; /** XMLoadFloat4x4(&MatrixHelper::GetProjectionShadowMatrix())*/;
-	if (g_useCascade == false) //sehwan &&&&&
-	{
-		data.ShadowMatrix = cascadeinfo[2].m_lightViewProjection;
-	}
-	data.SunDirection = -lightdir;
-	data.SunColor = lightColor;
-	data.CameraPosition = XMFLOAT4{ camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2], 1.0f };
+	data.InvViewProj								 = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProjMat));
+	data.PrevViewProj								 = mPrevViewProj;
+	data.ShadowMatrix								 = cascadeInfo.m_lightViewProjection;
+	data.SunDirection								 = -lightdir;
+	data.SunColor									 = lightColor;
+	data.CameraPosition								 = XMFLOAT4{ camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2], 1.0f };
 	data.CameraNearFar_FrameIndex_PreviousFrameBlend = XMFLOAT4{ mCustomNearPlane, mCustomFarPlane, static_cast<float>(Time->GetFrameCount()), mPreviousFrameBlendFactor };
-	data.VolumeSize = XMFLOAT4{ static_cast<float>(mCurrentVoxelVolumeSizeX), static_cast<float>(mCurrentVoxelVolumeSizeY), VOXEL_VOLUME_SIZE_Z, 0.0f };
-	data.Anisotropy = mAnisotropy;
-	data.Density = mDensity;
-	data.Strength = mStrength;
-	data.ThicknessFactor = mThicknessFactor;
-	DirectX11::UpdateBuffer(m_Buffer.Get(), &data);
+	data.VolumeSize									 = XMFLOAT4{ static_cast<float>(mCurrentVoxelVolumeSizeX), static_cast<float>(mCurrentVoxelVolumeSizeY), VOXEL_VOLUME_SIZE_Z, 0.0f };
+	data.Anisotropy									 = mAnisotropy;
+	data.Density									 = mDensity;
+	data.Strength									 = mStrength;
+	data.ThicknessFactor							 = mThicknessFactor;
+	//GIT_COMBINE_WARN_END : shadowMapPass 코드 정리로 인한 로직 변경되었으니 병합 전 확인 바람. by Hero.P
 
+	DirectX11::UpdateBuffer(m_Buffer.Get(), &data);
 	DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-	DirectX11::CSSetShaderResources(0, 1, &scene.m_LightController->GetShadowMapTexture()->m_pSRV);
+	DirectX11::CSSetShaderResources(0, 1, &renderData->m_shadowMapTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(1, 1, &m_pBlueNoiseTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
 	DirectX11::CSSetUnorderedAccessViews(0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);
@@ -257,7 +259,7 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 	// composite
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
 	CompositeCB compositeData{};
@@ -270,10 +272,10 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_CompositeBuffer.Get(), &compositeData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_CompositeBuffer.GetAddressOf());
 
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	ID3D11ShaderResourceView* pTextures[3] = {
 		m_CopiedTexture->m_pSRV,
-		camera.m_depthStencil->m_pSRV,
+		renderData->m_depthStencil->m_pSRV,
 		mFinalVoxelInjectionTexture3DSRV
 	};
 	DirectX11::PSSetShaderResources(0, 3, pTextures);

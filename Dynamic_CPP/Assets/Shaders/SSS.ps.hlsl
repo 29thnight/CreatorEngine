@@ -1,5 +1,9 @@
 #include "Sampler.hlsli"
-
+#define NUM_SAMPLE 200
+#define DENSITY 2.
+#define WEIGHT 0.2
+#define DECAY 0.92
+#define EXPOSURE 0.4
 Texture2D DepthTexture : register(t0);
 Texture2D Diffuse : register(t1);
 Texture2D MetalRough : register(t2);
@@ -91,7 +95,32 @@ float4 main(PixelShaderInput input) : SV_TARGET
         // Accumulate:
         colorBlurred.rgb += kernel[i].rgb * color.rgb;
     }
-
+    
+    //{
+    //    // Normalized pixel coordinates (from 0 to 1)
+    //    float2 uv = input.texCoord;
+    //    float4 col = Diffuse.Sample(PointSampler, uv);
+    //    float2 lightPos = g_direction; 
+    //    float2 sampleStep = (uv - lightPos) * 0.5;
+    //    sampleStep *= DENSITY / float(NUM_SAMPLE);  
+    //    float illuminationDecay = 1.;
+    //    for (int i = 0; i < NUM_SAMPLE; i++)
+    //    {
+    //        uv -= sampleStep;
+    //        float4 sampleCol = Diffuse.Sample(PointSampler, uv);
+    //    
+    //     sampleCol *= illuminationDecay * WEIGHT;
+    //     col += sampleCol;
+    //    
+    //        float brightness = (sampleCol.x + sampleCol.y + sampleCol.z) / 3.;
+    //        brightness *= illuminationDecay * WEIGHT;
+    //        col += brightness;
+    //    
+    //        illuminationDecay *= DECAY;
+    //    }
+    //    float4 fragColor = float4(col.xyz * g_strength, 1);
+    //    colorBlurred += fragColor;
+    //}
     //return colorM;
     return colorBlurred;
 }

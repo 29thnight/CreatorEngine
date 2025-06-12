@@ -7,6 +7,7 @@
 #include "AnimationController.h"
 #include "CharacterControllerComponent.h"
 #include "Model.h"
+#include "NodeEditor.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -79,7 +80,10 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			if (itNode["m_Motion"])
 			{
 				FileGuid guid = itNode["m_Motion"].as<std::string>();
-				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				if(guid != nullFileGuid)
+				{
+					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				}
 			}
 
 			if (itNode["Parameters"])
@@ -88,8 +92,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 				for (auto& param : paramNode)
 				{
-					ConditionParameter aniParam;
-					Meta::Deserialize(&aniParam, param);
+					ConditionParameter* aniParam = new ConditionParameter();
+					Meta::Deserialize(aniParam, param);
 					animator->Parameters.push_back(aniParam);
 				}
 			}
@@ -105,7 +109,18 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					AnimationController* animationController = new AnimationController();
 					Meta::Deserialize(animationController, layer);
 					animationController->m_owner = animator;
-					//animator->m_animationController = animationController;
+					animationController->m_nodeEditor = new NodeEditor();
+
+					if (animationController->useMask == true)
+					{
+						if (layer["m_avatarMask"])
+						{
+							auto& MaskNode = layer["m_avatarMask"];
+							AvatarMask avatarMask;
+							Meta::Deserialize(&avatarMask, MaskNode);
+							animationController->ReCreateMask(&avatarMask);
+						}
+					}
 					if (layer["StateVec"])
 					{
 						auto& StatesNode = layer["StateVec"];
@@ -120,12 +135,14 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							if (state["Transitions"])
 							{
 								auto& transitionNode = state["Transitions"];
+								
 								for (auto& transition : transitionNode)
 								{
 									std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
-									sharedTransition->m_ownerController = animationController;
+									sharedTransition->m_ownerController = animationController; 
+								
 									if (transition["conditions"])
 									{
 										auto& conditionNode = transition["conditions"];
@@ -135,6 +152,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 											Meta::Deserialize(&newcondition, condition);
 											newcondition.m_ownerController = animationController;
 											sharedTransition->conditions.push_back(newcondition);
+											newcondition.SetValue(newcondition.valueName);
+				
 										}
 									}
 								}
@@ -147,6 +166,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 						std::string name = curNode["m_name"].as<std::string>();
 						animationController->m_curState = animationController->FindState(name);
 					}
+
+					for (auto& state : animationController->StateVec)
+					{
+						for (auto& transition : state->Transitions)
+						{
+							transition->SetCurState(transition->curStateName);
+							transition->SetNextState(transition->nextStateName);
+						}
+					}
+
+						
 					animator->m_animationControllers.push_back(animationController);
 				}
 			}

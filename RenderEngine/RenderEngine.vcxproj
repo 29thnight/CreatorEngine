@@ -151,34 +151,36 @@
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
+    <ClCompile Include="ColorModuleCS.cpp" />
     <ClCompile Include="CullingManager.cpp" />
-    <ClCompile Include="Effect\BillboardModuleGPU.cpp" />
-    <ClCompile Include="Effect\EaseInOut.cpp" />
-    <ClCompile Include="Effect\EffectManager.cpp" />
-    <ClCompile Include="Effect\EffectModules.cpp">
+    <ClCompile Include="BillboardModuleGPU.cpp" />
+    <ClCompile Include="EaseInOut.cpp" />
+    <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="Effect\LifeModule.cpp" />
-    <ClCompile Include="Effect\LifeModuleCS.cpp" />
-    <ClCompile Include="Effect\MovementModule.cpp" />
-    <ClCompile Include="Effect\MovementModuleCS.cpp" />
-    <ClCompile Include="Effect\ParticleModule.cpp" />
-    <ClCompile Include="Effect\ParticleSystem.cpp" />
-    <ClCompile Include="Effect\RenderModules.cpp" />
-    <ClCompile Include="Effect\SparkleEffect.cpp" />
-    <ClCompile Include="Effect\SpawnModule.cpp" />
-    <ClCompile Include="Effect\SpawnModuleCS.cpp" />
+    <ClCompile Include="MovementModule.cpp" />
+    <ClCompile Include="MovementModuleCS.cpp" />
+    <ClCompile Include="ParticleModule.cpp" />
+    <ClCompile Include="ParticleSystem.cpp" />
+    <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="SparkleEffect.cpp" />
+    <ClCompile Include="SpawnModule.cpp" />
+    <ClCompile Include="SpawnModuleCS.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
     <ClCompile Include="GizmoLinePass.cpp" />
     <ClCompile Include="GizmoPass.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
+    <ClCompile Include="LightingPass.cpp" />
     <ClCompile Include="RenderCommand.cpp" />
+    <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ScreenSpaceReflectionPass.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
     <ClCompile Include="BlitPass.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />
+    <ClCompile Include="SSGIPass.cpp" />
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TestPlayer.cpp" />
@@ -220,32 +222,34 @@
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="ColorGradingPass.h" />
+    <ClInclude Include="ColorModuleCS.h" />
     <ClInclude Include="CullingManager.h" />
-    <ClInclude Include="Effect\BaseEffectStruct.h" />
-    <ClInclude Include="Effect\BillboardModuleGPU.h" />
-    <ClInclude Include="Effect\EaseInOut.h" />
-    <ClInclude Include="Effect\EffectManager.h" />
-    <ClInclude Include="Effect\EffectModules.h">
+    <ClInclude Include="BaseEffectStruct.h" />
+    <ClInclude Include="BillboardModuleGPU.h" />
+    <ClInclude Include="EaseInOut.h" />
+    <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="Effect\LifeModule.h" />
-    <ClInclude Include="Effect\LifeModuleCS.h" />
-    <ClInclude Include="Effect\MovementModule.h" />
-    <ClInclude Include="Effect\MovementModuleCS.h" />
-    <ClInclude Include="Effect\ParticleModule.h" />
-    <ClInclude Include="Effect\ParticleSystem.h" />
-    <ClInclude Include="Effect\RenderModules.h" />
-    <ClInclude Include="Effect\SparkleEffect.h" />
-    <ClInclude Include="Effect\SpawnModule.h" />
-    <ClInclude Include="Effect\SpawnModuleCS.h" />
+    <ClInclude Include="MovementModule.h" />
+    <ClInclude Include="MovementModuleCS.h" />
+    <ClInclude Include="ParticleModule.h" />
+    <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="SparkleEffect.h" />
+    <ClInclude Include="SpawnModule.h" />
+    <ClInclude Include="SpawnModuleCS.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoLinePass.h" />
     <ClInclude Include="GizmoPass.h" />
     <ClInclude Include="GizmoRenderer.h" />
+    <ClInclude Include="LightingPass.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="RenderCommand.h" />
+    <ClInclude Include="RenderJob.h" />
+    <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ScreenSpaceReflectionPass.h" />
     <ClInclude Include="ShaderSystem.h" />
@@ -255,6 +259,7 @@
     <ClInclude Include="LightMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
+    <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TestPlayer.h" />
@@ -608,6 +613,14 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -687,14 +700,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>

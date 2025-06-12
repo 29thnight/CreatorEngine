@@ -1,15 +1,15 @@
 #include "SparkleEffect.h"
 #include "ImGuiRegister.h"
-#include "../Camera.h"
+#include "Camera.h"
 #include "RenderModules.h"
-#include "../DataSystem.h"
+#include "DataSystem.h"
 
 SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) : ParticleSystem(maxParticles), m_delta(0.0f)
 {
     m_position = position;
 
     // 실제 텍스처 사진
-    m_sparkleTexture = DataSystems->LoadTexture("123.png");
+    m_sparkleTexture = DataSystems->LoadTexture("star.png");
     {
         ImGui::ContextRegister("Sparkle Effect", true, [&]()
             {
@@ -77,48 +77,45 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
                         if (ImGui::Button("point"))
                         {
                             auto module = GetModule<SpawnModuleCS>();
-                            module->SetEmitterShape(EmitterType::point);
+                            module->SetEmitterType(EmitterType::point);
                         }
                         if (ImGui::Button("sphere"))
                         {
                             auto module = GetModule<SpawnModuleCS>();
-                            module->SetEmitterShape(EmitterType::sphere);
+                            module->SetEmitterType(EmitterType::sphere);
                         }
                         if (ImGui::Button("box"))
                         {
                             auto module = GetModule<SpawnModuleCS>();
-                            module->SetEmitterShape(EmitterType::box);
+                            module->SetEmitterType(EmitterType::box);
                         }
                         if (ImGui::Button("cone"))
                         {
                             auto module = GetModule<SpawnModuleCS>();
-                            module->SetEmitterShape(EmitterType::cone);
+                            module->SetEmitterType(EmitterType::cone);
                         }
                         if (ImGui::Button("circle"))
                         {
                             auto module = GetModule<SpawnModuleCS>();
-                            module->SetEmitterShape(EmitterType::circle);
+                            module->SetEmitterType(EmitterType::circle);
                         }
                         {
-                            auto module = GetModule<LifeModuleCS>();
                             ImGui::InputScalar("MaxParticles", ImGuiDataType_U32, &m_max);
                             if (ImGui::Button("SetMaxParticles"))
                             {
                                 ResizeParticleSystem(m_max);
                             }
-
-                            ImGui::Text("Active Particles: %d / %d", module->GetActiveParticleCount(), m_maxParticles);
+                            ImGui::Text("Active Particles: %d / %d", m_activeParticleCount, m_maxParticles);
                             ImGui::Text("Instance Count: %d", m_billboardModule ? m_billboardModule->m_instanceCount : 0);
                         }
                         {
                             ImGui::InputFloat("Spawn Rate", &m_rate);
                             auto module = GetModule<SpawnModuleCS>();
-                            ImGui::Text("Spawn Rate : %f", module->m_spawnRate);
+                            ImGui::Text("Spawn Rate : %d", static_cast<int>(module->GetSpawnRate()));
                             if (ImGui::Button("SetSpawnRate"))
                             {
                                 module->SetSpawnRate(m_rate);
-                            }
-                           
+                            } 
                         }
                         ImGui::EndTabItem();
                     }
@@ -150,14 +147,14 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
 
                     if (ImGui::BeginTabItem("Tab 4"))
                     {
-                        auto& particleTemplate = GetModule<SpawnModuleCS>()->m_particleTemplate;
-                        ImGui::SliderFloat3("velocity", &particleTemplate.velocity.x, -50.f, 50.f);
-                        ImGui::SliderFloat3("accelaration", &particleTemplate.acceleration.x, -50.f, 50.f);
-                        ImGui::SliderFloat2("size", &particleTemplate.size.x, -50.f, 50.f);
-                        ImGui::ColorEdit4("color", &particleTemplate.color.x);
-                        ImGui::SliderFloat("lifetime", &particleTemplate.lifeTime, 0.0f, 50.0f);
-                        ImGui::SliderFloat("rotation", &particleTemplate.rotation, -50.0f, 50.0f);
-                        ImGui::SliderFloat("rotatespeed", &particleTemplate.rotatespeed, -50.0f, 50.0f);
+                        //auto& particleTemplate = GetModule<SpawnModuleCS>()->m_particleTemplate;
+                        //ImGui::SliderFloat3("velocity", &particleTemplate.velocity.x, -50.f, 50.f);
+                        //ImGui::SliderFloat3("accelaration", &particleTemplate.acceleration.x, -50.f, 50.f);
+                        //ImGui::SliderFloat2("size", &particleTemplate.size.x, -50.f, 50.f);
+                        //ImGui::ColorEdit4("color", &particleTemplate.color.x);
+                        //ImGui::SliderFloat("lifetime", &particleTemplate.lifeTime, 0.0f, 50.0f);
+                        //ImGui::SliderFloat("rotation", &particleTemplate.rotation, -50.0f, 50.0f);
+                        //ImGui::SliderFloat("rotatespeed", &particleTemplate.rotatespeed, -50.0f, 50.0f);
 
                         ImGui::EndTabItem();
                     }
@@ -181,17 +178,13 @@ void SparkleEffect::InitializeModules()
 {
     // 스폰 모듈 추가 (이펙트의 위치는 m_position)
     //AddModule<SpawnModule>(10.0f, EmitterType::box);
-    AddModule<LifeModuleCS>();
-    AddModule<SpawnModuleCS>(10.0f, EmitterType::box, 1000000);
-
-
-
-
-    // 수명 모듈 추가
-    //AddModule<LifeModule>();
+    //AddModule<LifeModuleCS>();
+    AddModule<SpawnModuleCS>();
 
     // 움직임 모듈 추가 (중력 없음, 자유롭게 움직이는 반짝임)
     auto movementModule = AddModule<MovementModuleCS>();
+
+    auto colorModule = AddModule<ColorModuleCS>();
     //movementModule->SetUseGravity(false);
 
     // 색상 모듈 추가 (반짝이는 효과를 위한 투명도 변화)
@@ -244,6 +237,14 @@ void SparkleEffect::Update(float delta)
 
     UpdateInstanceData();
 
+    auto module = GetModule<SpawnModuleCS>();
+    float rate = module->GetSpawnRate();
+    auto tem = module->GetTemplate();
+    m_activeParticleCount = static_cast<int>(rate * tem.lifeTime);
+    if (m_activeParticleCount >= m_maxParticles)
+    {
+        m_activeParticleCount = m_maxParticles;
+    }
     // 기본 업데이트 호출 (모듈 업데이트 포함)
     ParticleSystem::Update(delta);
 }
@@ -253,15 +254,18 @@ void SparkleEffect::Render(RenderScene& scene, Camera& camera)
     if (!m_isRunning) // || m_activeParticleCount == 0)
         return;
 
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
     m_billboardModule->m_particleSRV = GetCurrentRenderingSRV();
-    m_billboardModule->m_instanceCount = m_activeParticleCount;
+    m_billboardModule->m_instanceCount = m_maxParticles;
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
 
     m_renderModules[0]->SaveRenderState();
 
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    deviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+    deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
     ID3D11ShaderResourceView* srv = m_sparkleTexture->m_pSRV;
     DirectX11::PSSetShaderResources(0, 1, &srv);

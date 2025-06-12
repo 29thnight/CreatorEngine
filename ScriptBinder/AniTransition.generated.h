@@ -7,8 +7,8 @@ ReflectionField(AniTransition) \
 	({ \
 		meta_property(conditions) \
 		meta_property(m_name) \
-		meta_property(curState) \
-		meta_property(nextState) \
+		meta_property(curStateName) \
+		meta_property(nextStateName) \
 		meta_property(blendTime) \
 		meta_property(exitTime) \
 	}); \

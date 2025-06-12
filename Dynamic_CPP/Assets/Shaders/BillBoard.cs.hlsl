@@ -28,27 +28,27 @@ cbuffer CameraConstants : register(b0)
     uint BillboardCount;
 };
 
-// ºôº¸µå ÀÔ·Â µ¥ÀÌÅÍ
+// ë¹Œë³´ë“œ ì…ë ¥ ë°ì´í„°
 StructuredBuffer<BillboardInput> InputBillboards : register(t0);
 
-// Ãâ·Â ¹öÆÛ (º¯È¯µÈ Á¤Á¡)
+// ì¶œë ¥ ë²„í¼ (ë³€í™˜ëœ ì •ì )
 RWStructuredBuffer<VertexOutput> OutputVertices : register(u0);
 
-// ºôº¸µå Å×ÀÌºí (°¢ Á¤Á¡ÀÇ ·ÎÄÃ ÁÂÇ¥¿Í ÅØ½ºÃ³ ÁÂÇ¥)
+// ë¹Œë³´ë“œ í…Œì´ë¸” (ê° ì •ì ì˜ ë¡œì»¬ ì¢Œí‘œì™€ í…ìŠ¤ì²˜ ì¢Œí‘œ)
 static const float2 QuadPositions[4] =
 {
-    float2(-1, -1), // ÁÂÇÏ´Ü
-    float2(1, -1), // ¿ìÇÏ´Ü 
-    float2(-1, 1), // ÁÂ»ó´Ü
-    float2(1, 1) // ¿ì»ó´Ü
+    float2(-1, -1), // ì¢Œí•˜ë‹¨
+    float2(1, -1), // ìš°í•˜ë‹¨ 
+    float2(-1, 1), // ì¢Œìƒë‹¨
+    float2(1, 1) // ìš°ìƒë‹¨
 };
 
 static const float2 QuadTexCoords[4] =
 {
-    float2(0, 1), // ÁÂÇÏ´Ü
-    float2(1, 1), // ¿ìÇÏ´Ü
-    float2(0, 0), // ÁÂ»ó´Ü
-    float2(1, 0) // ¿ì»ó´Ü
+    float2(0, 1), // ì¢Œí•˜ë‹¨
+    float2(1, 1), // ìš°í•˜ë‹¨
+    float2(0, 0), // ì¢Œìƒë‹¨
+    float2(1, 0) // ìš°ìƒë‹¨
 };
 
 [numthreads(64, 1, 1)]
@@ -56,28 +56,28 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint billboardIndex = DTid.x;
     
-    // ÀÎµ¦½º°¡ ¹üÀ§¸¦ ¹ş¾î³ª¸é Á¾·á
+    // ì¸ë±ìŠ¤ê°€ ë²”ìœ„ë¥¼ ë²—ì–´ë‚˜ë©´ ì¢…ë£Œ
     if (billboardIndex >= BillboardCount)
         return;
     
-    // ºôº¸µå µ¥ÀÌÅÍ °¡Á®¿À±â
+    // ë¹Œë³´ë“œ ë°ì´í„° ê°€ì ¸ì˜¤ê¸°
     BillboardInput billboard = InputBillboards[billboardIndex];
     
-    // 4°³ÀÇ Á¤Á¡ Ã³¸® (ºôº¸µå ´ç Äõµå)
+    // 4ê°œì˜ ì •ì  ì²˜ë¦¬ (ë¹Œë³´ë“œ ë‹¹ ì¿¼ë“œ)
     for (int i = 0; i < 4; i++)
     {
-        // ÄõµåÀÇ ·ÎÄÃ ÁÂÇ¥ °¡Á®¿À±â
+        // ì¿¼ë“œì˜ ë¡œì»¬ ì¢Œí‘œ ê°€ì ¸ì˜¤ê¸°
         float2 localPos = QuadPositions[i];
         
-        // ºôº¸µå À§Ä¡ °è»ê
+        // ë¹Œë³´ë“œ ìœ„ì¹˜ ê³„ì‚°
         float3 worldPos = billboard.Position;
         worldPos += CameraRight * localPos.x * billboard.Scale.x;
         worldPos += CameraUp * localPos.y * billboard.Scale.y;
         
-        // ¿ùµå-ºä-Åõ¿µ º¯È¯
+        // ì›”ë“œ-ë·°-íˆ¬ì˜ ë³€í™˜
         float4 clipPos = mul(mul(float4(worldPos, 1.0f), View), Projection);
         
-        // °á°ú ÀúÀå (ºôº¸µå ´ç 4°³ÀÇ Á¤Á¡)
+        // ê²°ê³¼ ì €ì¥ (ë¹Œë³´ë“œ ë‹¹ 4ê°œì˜ ì •ì )
         uint vertexIndex = billboardIndex * 4 + i;
         
         VertexOutput vertex;

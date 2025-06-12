@@ -61,8 +61,11 @@ void ColorGradingPass::Initialize(const std::string_view& fileName)
 void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
 	timer += DirectX11::TimeSystem::TimeSysInstance->GetElapsedSeconds();
@@ -74,7 +77,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 
-	DirectX11::CopyResource(m_pCopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_pCopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
 	DirectX11::PSSetShaderResources(0, 1, &m_pCopiedTexture->m_pSRV);
 	DirectX11::PSSetShaderResources(1, 1, &m_pColorGradingTexture->m_pSRV);

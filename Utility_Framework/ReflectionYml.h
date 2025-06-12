@@ -29,7 +29,6 @@ namespace Meta
 {
 	inline void PropertyToYamlNode(const Meta::Property& prop, MetaYml::Node& node, std::any& value)
 	{
-		HashingString ty_name = prop.typeName.c_str();
 		HashedGuid typeID = prop.typeID;
 
 		if (typeID == GUIDCreator::GetTypeID<int>())

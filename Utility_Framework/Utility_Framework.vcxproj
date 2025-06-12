@@ -22,6 +22,7 @@
     <ClInclude Include="Benchmark.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
+    <ClInclude Include="Core.Barrier.h" />
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.FenceFlag.h" />

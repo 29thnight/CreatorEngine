@@ -182,7 +182,7 @@ namespace DirectX11
 		uint32 m_fixedLeftOverTicks{};
 
 		// framerate 추적용 멤버입니다.
-		uint64 m_frameCount{};
+		std::atomic<uint64> m_frameCount{};
 		uint32 m_framesPerSecond{};
 		uint32 m_framesThisSecond{};
 		uint64 m_qpcSecondCounter{};

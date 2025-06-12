@@ -3,7 +3,6 @@
 #define interface struct
 #endif
 
-//TODO : 
 interface
 [[deprecated("Will be change IRenderable interface soon, Please! Don't inheritance this interface")]]
 IRenderable

@@ -10,6 +10,13 @@ void AnimationController::SetNextState(std::string stateName)
 	m_nextState = FindState(stateName);
 }
 
+AnimationController::~AnimationController()
+{
+	if (m_nodeEditor)
+		delete m_nodeEditor;
+	DeleteAvatarMask();
+}
+
 bool AnimationController::BlendingAnimation(float tick)
 {
 	blendingTime += tick;
@@ -44,8 +51,11 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		return nullptr;//*****
-		//m_curState = StateVec[0].get();
+		if (!StateVec.empty())
+			m_curState = StateVec[0].get();
+		else
+			return nullptr;
+		//return nullptr;//*****
 	}
 
 	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
@@ -192,6 +202,55 @@ void AnimationController::CreateState_UI()
 	StateVec.back()->index = StateVec.size() - 1;
 }
 
+void AnimationController::DeleteState(std::string stateName)
+{
+	auto it = std::find_if(StateVec.begin(), StateVec.end(),
+		[&](const std::shared_ptr<AnimationState>& state)
+		{
+			return state->m_name == stateName;
+		});
+
+	if (it->get() == m_curState)
+	{
+		m_curState = nullptr;
+	}
+
+	for (auto& state : StateVec)
+	{
+		auto& transitions = state->Transitions;
+		
+				transitions.erase(
+					std::remove_if(transitions.begin(), transitions.end(),
+						[&](const std::shared_ptr<AniTransition>& t)
+						{
+							return t->GetCurState() == stateName || t->GetNextState() == stateName;
+						}),
+					transitions.end());
+	}
+	if (it != StateVec.end())
+	{
+		StateVec.erase(it); 
+	}
+}
+
+
+
+void AnimationController::DeleteTransiton(const std::string& fromStateName, const std::string& toStateName)
+{
+	auto state = FindState(fromStateName);
+	if (!state) return;
+
+	auto& transitions = state->Transitions;
+
+	transitions.erase(
+		std::remove_if(transitions.begin(), transitions.end(),
+			[&](const std::shared_ptr<AniTransition>& t)
+			{
+				return t->GetCurState() == fromStateName && t->GetNextState() == toStateName;
+			}),
+		transitions.end());
+}
+
 AnimationState* AnimationController::FindState(std::string stateName)
 {
 	for (auto& state : StateVec)
@@ -208,26 +267,55 @@ AnimationState* AnimationController::FindState(std::string stateName)
 AniTransition* AnimationController::CreateTransition(const std::string& curStateName, const std::string& nextStateName)
 {
 	
-	for (auto& trans : FindState(curStateName)->Transitions)
+	auto curstate = FindState(curStateName);
+	if (!curstate) return nullptr;
+	for (auto& trans : curstate->Transitions)
 	{
 		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
 			return trans.get();
 
 	}
 	
-	auto transition = std::make_shared<AniTransition>(curStateName, nextStateName);
+	auto nextstate = FindState(nextStateName);
+	if (!nextstate) return nullptr;
+	auto transition = std::make_shared<AniTransition>();
+	transition->SetCurState(curstate);
+	transition->SetNextState(nextstate);
 	transition->m_ownerController = this;
 	transition->m_name = curStateName + " to " + nextStateName;
-	FindState(curStateName)->Transitions.push_back(transition);
+	curstate->Transitions.push_back(transition);
 	return transition.get();
 }
 
 
 void AnimationController::CreateMask()
 {
-	m_owner->m_Skeleton->MarkRegionSkeleton();
+	if (!m_avatarMask)
+	{
+		useMask = true;
+		m_owner->m_Skeleton->MarkRegionSkeleton();
+		m_avatarMask = new AvatarMask();
+		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
+	}
+	
 }
 
-void AnimationController::CheckMask()
+void AnimationController::ReCreateMask(AvatarMask* mask)
 {
+	CreateMask();
+	m_avatarMask->isHumanoid = mask->isHumanoid;
+	m_avatarMask->useAll = mask->useAll;
+	m_avatarMask->useUpper = mask->useUpper;
+	m_avatarMask->useLower = mask->useLower;
 }
+
+void AnimationController::DeleteAvatarMask()
+{
+	if (m_avatarMask)
+	{
+		useMask = false;
+		delete m_avatarMask;
+		m_avatarMask = nullptr;
+	}
+}
+

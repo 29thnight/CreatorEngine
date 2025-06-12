@@ -98,6 +98,33 @@ namespace DirectX11
         }
     }
 
+   inline ID3D11ShaderResourceView* CreateSRVForArraySlice(
+        ID3D11Device* device,
+        ID3D11Texture2D* textureArray,
+        DXGI_FORMAT format,
+        uint32_t arraySlice)
+    {
+        D3D11_TEXTURE2D_DESC texDesc{};
+        textureArray->GetDesc(&texDesc);
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = format;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.MipLevels = texDesc.MipLevels;
+        srvDesc.Texture2DArray.FirstArraySlice = arraySlice;
+        srvDesc.Texture2DArray.ArraySize = 1;
+
+        ID3D11ShaderResourceView* sliceSRV = nullptr;
+        HRESULT hr = device->CreateShaderResourceView(textureArray, &srvDesc, &sliceSRV);
+        if (FAILED(hr))
+        {
+            return nullptr;
+        }
+
+        return sliceSRV;
+    }
+
     class SharedMap final
     {
     public:

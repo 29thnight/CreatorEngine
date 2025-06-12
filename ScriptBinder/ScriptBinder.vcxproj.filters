@@ -428,6 +428,9 @@
     <ClInclude Include="LinkData.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
+    <ClInclude Include="BoneMask.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

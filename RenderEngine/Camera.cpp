@@ -5,33 +5,21 @@
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "RenderCommand.h"
+#include "RenderScene.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
+
+
 
 Camera::Camera()
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
 
 	m_cameraIndex = CameraManagement->GetCameraCount();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
 
-	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
-
-    auto renderTexture = TextureHelper::CreateRenderTexture(  
-       DeviceState::g_ClientRect.width,  
-       DeviceState::g_ClientRect.height,  
-       cameraRTVName,  
-       DXGI_FORMAT_R16G16B16A16_FLOAT  
-    );  
-    m_renderTarget.swap(renderTexture);
-
-
-	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"Camera_" + std::to_string(m_cameraIndex) + "_DSV"
-	);
-    m_depthStencil.swap(depthStencil);
+	renderScene->AddRenderPassData(m_cameraIndex);
 
 	XMMATRIX identity = XMMatrixIdentity();
 
@@ -43,8 +31,7 @@ Camera::Camera()
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 
-	m_defferdQueue.reserve(300);
-	m_forwardQueue.reserve(300);
+	m_cascadeinfo.resize(cascadeCount);
 }
 
 Camera::~Camera()
@@ -52,6 +39,28 @@ Camera::~Camera()
 	if (m_cameraIndex != -1)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
+		auto renderScene = SceneManagers->m_ActiveRenderScene;
+		renderScene->RemoveRenderPassData(m_cameraIndex);
+	}
+}
+
+Camera::Camera(bool isShadow)
+{
+	if(isShadow)
+	{
+		m_aspectRatio = DeviceState::g_aspectRatio;
+
+		m_cameraIndex = CameraManagement->GetCameraCount();
+
+		XMMATRIX identity = XMMatrixIdentity();
+
+		std::string viewBufferName = "ShadowCamera_ViewBuffer";
+		std::string projBufferName = "ShadowCamera_ProjBuffer";
+
+		m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+		DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+		m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+		DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 	}
 }
 
@@ -140,41 +149,41 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 
 	return frustum;
 }
-
-void Camera::ResizeRelease()
-{
-	if (m_renderTarget)
-	{
-		m_renderTarget.reset();
-	}
-
-	if (m_depthStencil)
-	{
-		m_depthStencil.reset();
-	}
-}
-
-void Camera::ResizeResources()
-{
-	m_aspectRatio = DeviceState::g_aspectRatio;
-
-	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
-	auto renderTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		cameraRTVName,
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-	m_renderTarget.swap(renderTexture);
-
-	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
-	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		depthName
-	);
-	m_depthStencil.swap(depthStencil);
-}
+//
+//void Camera::ResizeRelease()
+//{
+//	if (m_renderTarget)
+//	{
+//		m_renderTarget.reset();
+//	}
+//
+//	if (m_depthStencil)
+//	{
+//		m_depthStencil.reset();
+//	}
+//}
+//
+//void Camera::ResizeResources()
+//{
+//	m_aspectRatio = DeviceState::g_aspectRatio;
+//
+//	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+//	auto renderTexture = TextureHelper::CreateRenderTexture(
+//		DeviceState::g_ClientRect.width,
+//		DeviceState::g_ClientRect.height,
+//		cameraRTVName,
+//		DXGI_FORMAT_R16G16B16A16_FLOAT
+//	);
+//	m_renderTarget.swap(renderTexture);
+//
+//	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
+//	auto depthStencil = TextureHelper::CreateDepthTexture(
+//		DeviceState::g_ClientRect.width,
+//		DeviceState::g_ClientRect.height,
+//		depthName
+//	);
+//	m_depthStencil.swap(depthStencil);
+//}
 
 void Camera::RegisterContainer()
 {
@@ -261,10 +270,10 @@ void Camera::UpdateBuffer(bool shadow)
 	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext)
+void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 {
 	Mathf::xMatrix view = CalculateView();
-	Mathf::xMatrix proj = CalculateProjection();
+	Mathf::xMatrix proj = CalculateProjection(shadow);
 
 	deferredContext->UpdateSubresource(m_ViewBuffer.Get(), 0, nullptr, &view, 0, 0);
 	deferredContext->UpdateSubresource(m_ProjBuffer.Get(), 0, nullptr, &proj, 0, 0);
@@ -273,38 +282,56 @@ void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext)
 	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-void Camera::ClearRenderTarget()
-{
-	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
-	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-}
+//void Camera::ClearRenderTarget()
+//{
+//	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
+//	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+//}
 
-void Camera::PushRenderQueue(MeshRendererProxy* command)
-{
-	Material* mat = command->m_Material;
-	if (nullptr == mat) return;
+//void Camera::PushRenderQueue(MeshRendererProxy* command)
+//{
+//	Material* mat = command->m_Material;
+//	if (nullptr == mat) return;
+//
+//	{
+//		std::unique_lock lock(m_cameraMutex);
+//
+//		switch (mat->m_renderingMode)
+//		{
+//		case MaterialRenderingMode::Opaque:
+//			m_deferredQueue.push_back(command);
+//			break;
+//		case MaterialRenderingMode::Transparent:
+//			m_forwardQueue.push_back(command);
+//			break;
+//		}
+//	}
+//}
 
-	{
-		std::unique_lock lock(m_cameraMutex);
-
-		switch (mat->m_renderingMode)
-		{
-		case MaterialRenderingMode::Opaque:
-			m_defferdQueue.push_back(command);
-			break;
-		case MaterialRenderingMode::Transparent:
-			m_forwardQueue.push_back(command);
-			break;
-		}
-	}
-}
-
-void Camera::SortRenderQueue()
-{
-}
-
-void Camera::ClearRenderQueue()
-{
-	m_defferdQueue.clear();
-	m_forwardQueue.clear();
-}
+//void Camera::SortRenderQueue()
+//{
+//	auto sortByAnimatorAndMaterialGuid = [](MeshRendererProxy* a, MeshRendererProxy* b)
+//	{
+//		if (a->m_animatorGuid == b->m_animatorGuid)
+//		{
+//			return a->m_materialGuid < b->m_materialGuid;
+//		}
+//		return a->m_animatorGuid < b->m_animatorGuid;
+//	};
+//
+//	if(!m_deferredQueue.empty())
+//	{
+//		std::sort(m_deferredQueue.begin(), m_deferredQueue.end(), sortByAnimatorAndMaterialGuid);
+//	}
+//
+//	if(!m_forwardQueue.empty())
+//	{
+//		std::sort(m_forwardQueue.begin(), m_forwardQueue.end(), sortByAnimatorAndMaterialGuid);
+//	}
+//}
+//
+//void Camera::ClearRenderQueue()
+//{
+//	m_deferredQueue.clear();
+//	m_forwardQueue.clear();
+//}
