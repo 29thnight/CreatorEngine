@@ -819,11 +819,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 									}
 								}
 								ImGui::Separator();
-
-								
 								ImGui::EndPopup();
-
-
 							}
 							ImGui::PopID();
 						}
@@ -1154,21 +1150,22 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 											{
 												ImGui::Text("trigger");
 											}
-											if (ImGui::BeginPopup("ConditionIndexSelect"))
-											{
-												for (auto& param : animator->Parameters)
-												{
-													if (ImGui::MenuItem(param->name.c_str()))
-													{
-														condition.SetCondition(param->name);
-													}
-												}
-												ImGui::EndPopup();
-											}
 										}
 										else
 										{
 											ImGui::Text("No Parmeter", ImVec2(70, 0));
+										}
+
+										if (ImGui::BeginPopup("ConditionIndexSelect"))
+										{
+											for (auto& param : animator->Parameters)
+											{
+												if (ImGui::MenuItem(param->name.c_str()))
+												{
+													condition.SetCondition(param->name);
+												}
+											}
+											ImGui::EndPopup();
 										}
 										if (ImGui::BeginPopup("ConditionTypeMenu"))
 										{
