@@ -70,12 +70,15 @@ void SSGIPass::Initialize(Texture* diffuse, Texture* normal, Texture* lightEmiss
 
 void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 {
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
     m_pso->Apply();
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
     ID3D11ShaderResourceView* srv[4] = {
-        camera.m_depthStencil->m_pSRV,
-        camera.m_renderTarget->m_pSRV,
+        renderData->m_depthStencil->m_pSRV,
+        renderData->m_renderTarget->m_pSRV,
         m_pNormalTexture->m_pSRV,
         m_pLightEmissiveTexture->m_pSRV
     };
@@ -97,7 +100,7 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::CSSetShaderResources(0, 4, nullsrv);
     DirectX11::CSSetUnorderedAccessViews(0, 1, &nulluav, nullptr);
 
-	DirectX11::CopyResource(camera.m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
+	DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
 }
 
 void SSGIPass::ControlPanel()
