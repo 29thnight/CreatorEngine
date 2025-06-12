@@ -22,17 +22,22 @@
     <ClInclude Include="CustomCollapsingHeader.h" />
     <ClInclude Include="drawing.h" />
     <ClInclude Include="fa.h" />
+    <ClInclude Include="IconsFontAwesome4.h" />
     <ClInclude Include="IconsFontAwesome6.h" />
+    <ClInclude Include="ImGui.h" />
     <ClInclude Include="ImGuiContext.h" />
     <ClInclude Include="ImGuiMath.h" />
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />
     <ClInclude Include="NodeEditor.h" />
+    <ClInclude Include="Profiler.h" />
     <ClInclude Include="widgets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="NodeEditor.cpp" />
+    <ClCompile Include="Profiler.cpp" />
+    <ClCompile Include="ProfilerWindow.cpp" />
     <ClCompile Include="widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
