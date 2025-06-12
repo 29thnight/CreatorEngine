@@ -56,11 +56,14 @@ WireFramePass::~WireFramePass()
 
 void WireFramePass::Execute(RenderScene& scene, Camera& camera)
 {
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
     m_pso->Apply();
 
 	auto& deviceContext = DeviceState::g_pDeviceContext;
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+    DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
 	camera.UpdateBuffer();
 	scene.UseModel();

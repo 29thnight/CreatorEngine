@@ -5,10 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
     <Filter Include="리소스 파일">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
@@ -24,6 +20,12 @@
     </Filter>
     <Filter Include="소스 파일\NodeEditior">
       <UniqueIdentifier>{728d96ad-0a9d-425e-9a0c-8df97fe3f51d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Profiler">
+      <UniqueIdentifier>{9cfdee49-ed17-43d1-8491-2a984c5a3cd1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\ImGuiHeader">
+      <UniqueIdentifier>{124ca35f-a6c4-4762-a42b-dd7a728b6b19}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -57,6 +59,15 @@
     <ClInclude Include="NodeEditor.h">
       <Filter>소스 파일\NodeEditior</Filter>
     </ClInclude>
+    <ClInclude Include="Profiler.h">
+      <Filter>소스 파일\Profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="IconsFontAwesome4.h">
+      <Filter>소스 파일\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui.h">
+      <Filter>소스 파일\ImGuiHeader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp">
@@ -67,6 +78,12 @@
     </ClCompile>
     <ClCompile Include="NodeEditor.cpp">
       <Filter>소스 파일\NodeEditior</Filter>
+    </ClCompile>
+    <ClCompile Include="Profiler.cpp">
+      <Filter>소스 파일\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfilerWindow.cpp">
+      <Filter>소스 파일\Profiler</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -27,10 +27,13 @@ public:
 	LightController& SetEyePosition(Mathf::xVector eyePosition);
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
 	void RenderAnyShadowMap(RenderScene& scene, Camera& camera);
+	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
 	const LightProperties& GetProperties() { return m_lightProperties; }
 
-	Texture* GetShadowMapTexture();
+	//Texture* GetShadowMapTexture();
+
+	ShadowMapPass* GetShadowMapPass() { return m_shadowMapPass.get(); }
 
 	uint32 m_lightCount{ 0 };
 
@@ -44,13 +47,13 @@ private:
 	friend class RenderScene;
 	friend class VolumetricFogPass;
 
-	ID3D11Buffer* m_pLightBuffer{ nullptr };
-    ID3D11Buffer* m_pLightCountBuffer{ nullptr };
-	ShadowMapRenderDesc m_shadowMapRenderDesc;
-	ShadowMapConstant m_shadowMapConstant;
-	LightProperties m_lightProperties;
-    LightCount m_lightCountStruct;
-	bool hasLightWithShadows{ false };
-	ID3D11Buffer* m_shadowMapBuffer{ nullptr };
-	std::unique_ptr<ShadowMapPass> m_shadowMapPass;
+	ID3D11Buffer*					m_pLightBuffer{ nullptr };
+    ID3D11Buffer*					m_pLightCountBuffer{ nullptr };
+	ShadowMapRenderDesc				m_shadowMapRenderDesc;
+	ShadowMapConstant				m_shadowMapConstant;
+	LightProperties					m_lightProperties;
+    LightCount						m_lightCountStruct;
+	bool							hasLightWithShadows{ false };
+	ID3D11Buffer*					m_shadowMapBuffer{ nullptr };
+	std::unique_ptr<ShadowMapPass>	m_shadowMapPass;
 };

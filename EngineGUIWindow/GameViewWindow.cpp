@@ -26,7 +26,11 @@ void GameViewWindow::RenderGameViewWindow()
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
 
-		ImGui::Image((ImTextureID)CameraManagement->GetLastCamera()->m_renderTarget->m_pSRV, imageSize);
+		auto scene = SceneManagers->m_ActiveRenderScene;
+		auto camera = CameraManagement->GetLastCamera();
+		auto renderData = RenderPassData::GetData(camera);
+
+		ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

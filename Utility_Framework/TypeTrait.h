@@ -241,6 +241,8 @@ struct FileGuid
 	}
 };
 
+static inline FileGuid nullFileGuid;
+
 namespace std {
 	template <>
 	struct hash<FileGuid>

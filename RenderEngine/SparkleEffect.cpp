@@ -12,67 +12,19 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
     m_sparkleTexture = DataSystems->LoadTexture("star.png");
     {
         ImGui::ContextRegister("Sparkle Effect", true, [&]()
-            {
+        {
                 //ImGui::SetWindowFocus("Sparkle Effect");
 
-                if (ImGui::BeginTabBar("Setting"))
+            if (ImGui::BeginTabBar("Setting"))
+            {
+                if (ImGui::BeginTabItem("Tab 1"))
                 {
-
-                    if (ImGui::BeginTabItem("Tab 1"))
+                    if (ImGui::Button("Play"))
                     {
-                        if (ImGui::Button("Play"))
-                        {
-                            Play();
-                        }
-
-                        if (ImGui::Button("Stop"))
-                        {
-                            Stop();
-                        }
-
-                        if (ImGui::Button("Resume"))
-                        {
-                            Resume();
-                        }
-
-                        if (ImGui::Button("Pause"))
-                        {
-                            Pause();
-                        }
-                        
-                        if (ImGui::Button("Show Module List"))
-                        {
-                            ImGui::OpenPopup("Module List");
-                        }
-
-                        if (ImGui::BeginPopup("Module List"))
-                        {
-                            ImGui::Text("Particle Modules");
-                            ImGui::Separator();
-
-                            int index = 0;
-                            for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
-                            {
-                                ParticleModule& module = *it;
-                                ImGui::Text("Node %d: %s", index++, typeid(module).name());
-
-                                // 각 모듈에 대한 추가 정보를 표시하려면:
-                                ImGui::Indent();
-                                ImGui::Text("Easing: %s", module.IsEasingEnabled() ? "Enabled" : "Disabled");
-                                // 여기에 더 많은 모듈 속성 표시
-                                ImGui::Unindent();
-                            }
-
-                            ImGui::Separator();
-                            ImGui::Text("Total nodes: %d", index);
-
-                            ImGui::EndPopup();
-                        }
-
-                        ImGui::EndTabItem();
+                        Play();
                     }
 
-                    if (ImGui::BeginTabItem("Tab 2"))
+                    if (ImGui::Button("Stop"))
                     {
                         if (ImGui::Button("point"))
                         {
@@ -120,32 +72,12 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
                         ImGui::EndTabItem();
                     }
 
-                    if (ImGui::BeginTabItem("Tab 3"))
+                    if (ImGui::Button("Resume"))
                     {
-                        // 위치 조정 UI
-                        ImGui::Text("Position");
-                        ImGui::SliderFloat("X", &m_position.x, -50.0f, 50.0f);
-                        ImGui::SliderFloat("Y", &m_position.y, -50.0f, 50.0f);
-                        ImGui::SliderFloat("Z", &m_position.z, -50.0f, 50.0f);
-
-                        SetPosition(m_position);
-
-                        if (ImGui::Button("Spawn Burst"))
-                        {
-                            SpawnSparklesBurst(20);
-                        }
-
-                        static bool isG = false;
-                        if (ImGui::Checkbox("Gravity", &isG))
-                        {
-                            auto module = GetModule<MovementModuleCS>();
-                            module->SetUseGravity(isG);
-                        }
-
-                        ImGui::EndTabItem();
+                        Resume();
                     }
 
-                    if (ImGui::BeginTabItem("Tab 4"))
+                    if (ImGui::Button("Pause"))
                     {
                         //auto& particleTemplate = GetModule<SpawnModuleCS>()->m_particleTemplate;
                         //ImGui::SliderFloat3("velocity", &particleTemplate.velocity.x, -50.f, 50.f);
@@ -158,10 +90,132 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
 
                         ImGui::EndTabItem();
                     }
-                    ImGui::EndTabBar();
+                    
+                    if (ImGui::Button("Show Module List"))
+                    {
+                        ImGui::OpenPopup("Module List");
+                    }
+
+                    if (ImGui::BeginPopup("Module List"))
+                    {
+                        ImGui::Text("Particle Modules");
+                        ImGui::Separator();
+
+                        int index = 0;
+                        for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+                        {
+                            ParticleModule& module = *it;
+                            ImGui::Text("Node %d: %s", index++, typeid(module).name());
+
+                            // 각 모듈에 대한 추가 정보를 표시하려면:
+                            ImGui::Indent();
+                            ImGui::Text("Easing: %s", module.IsEasingEnabled() ? "Enabled" : "Disabled");
+                            // 여기에 더 많은 모듈 속성 표시
+                            ImGui::Unindent();
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Text("Total nodes: %d", index);
+
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::EndTabItem();
                 }
 
-            });
+                if (ImGui::BeginTabItem("Tab 2"))
+                {
+                    if (ImGui::Button("point"))
+                    {
+                        auto module = GetModule<SpawnModuleCS>();
+                        module->SetEmitterShape(EmitterType::point);
+                    }
+                    if (ImGui::Button("sphere"))
+                    {
+                        auto module = GetModule<SpawnModuleCS>();
+                        module->SetEmitterShape(EmitterType::sphere);
+                    }
+                    if (ImGui::Button("box"))
+                    {
+                        auto module = GetModule<SpawnModuleCS>();
+                        module->SetEmitterShape(EmitterType::box);
+                    }
+                    if (ImGui::Button("cone"))
+                    {
+                        auto module = GetModule<SpawnModuleCS>();
+                        module->SetEmitterShape(EmitterType::cone);
+                    }
+                    if (ImGui::Button("circle"))
+                    {
+                        auto module = GetModule<SpawnModuleCS>();
+                        module->SetEmitterShape(EmitterType::circle);
+                    }
+                    {
+                        auto module = GetModule<LifeModuleCS>();
+                        ImGui::InputScalar("MaxParticles", ImGuiDataType_U32, &m_max);
+                        if (ImGui::Button("SetMaxParticles"))
+                        {
+                            ResizeParticleSystem(m_max);
+                        }
+
+                        ImGui::Text("Active Particles: %d / %d", module->GetActiveParticleCount(), m_maxParticles);
+                        ImGui::Text("Instance Count: %d", m_billboardModule ? m_billboardModule->m_instanceCount : 0);
+                    }
+                    {
+                        ImGui::InputFloat("Spawn Rate", &m_rate);
+                        auto module = GetModule<SpawnModuleCS>();
+                        ImGui::Text("Spawn Rate : %f", module->m_spawnRate);
+                        if (ImGui::Button("SetSpawnRate"))
+                        {
+                            module->SetSpawnRate(m_rate);
+                        }
+                       
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Tab 3"))
+                {
+                    // 위치 조정 UI
+                    ImGui::Text("Position");
+                    ImGui::SliderFloat("X", &m_position.x, -50.0f, 50.0f);
+                    ImGui::SliderFloat("Y", &m_position.y, -50.0f, 50.0f);
+                    ImGui::SliderFloat("Z", &m_position.z, -50.0f, 50.0f);
+
+                    SetPosition(m_position);
+
+                    if (ImGui::Button("Spawn Burst"))
+                    {
+                        SpawnSparklesBurst(20);
+                    }
+
+                    static bool isG = false;
+                    if (ImGui::Checkbox("Gravity", &isG))
+                    {
+                        auto module = GetModule<MovementModuleCS>();
+                        module->SetUseGravity(isG);
+                    }
+
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Tab 4"))
+                {
+                    auto& particleTemplate = GetModule<SpawnModuleCS>()->m_particleTemplate;
+                    ImGui::SliderFloat3("velocity", &particleTemplate.velocity.x, -50.f, 50.f);
+                    ImGui::SliderFloat3("accelaration", &particleTemplate.acceleration.x, -50.f, 50.f);
+                    ImGui::SliderFloat2("size", &particleTemplate.size.x, -50.f, 50.f);
+                    ImGui::ColorEdit4("color", &particleTemplate.color.x);
+                    ImGui::SliderFloat("lifetime", &particleTemplate.lifeTime, 0.0f, 50.0f);
+                    ImGui::SliderFloat("rotation", &particleTemplate.rotation, -50.0f, 50.0f);
+                    ImGui::SliderFloat("rotatespeed", &particleTemplate.rotatespeed, -50.0f, 50.0f);
+
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+
+        });
     }
 
     InitializeModules();
@@ -257,12 +311,10 @@ void SparkleEffect::Render(RenderScene& scene, Camera& camera)
     m_billboardModule->m_particleSRV = GetCurrentRenderingSRV();
     m_billboardModule->m_instanceCount = m_maxParticles;
 
-    auto& deviceContext = DeviceState::g_pDeviceContext;
-
     m_renderModules[0]->SaveRenderState();
 
     ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-    deviceContext->OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+    DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
 
     ID3D11ShaderResourceView* srv = m_sparkleTexture->m_pSRV;
     DirectX11::PSSetShaderResources(0, 1, &srv);

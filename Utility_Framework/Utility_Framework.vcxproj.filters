@@ -243,6 +243,9 @@
     <ClInclude Include="Core.FenceFlagGroup.h">
       <Filter>Core.Memory\FenceFlag</Filter>
     </ClInclude>
+    <ClInclude Include="Core.Barrier.h">
+      <Filter>Core.Memory\FenceFlag</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

@@ -155,7 +155,15 @@ void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 	}
 }
 
-Texture* LightController::GetShadowMapTexture()
+void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
-	return m_shadowMapPass->m_shadowMapTexture.get();
+	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
+	{
+		m_shadowMapPass->CreateRenderCommandList(deferredContext, scene, camera);
+	}
 }
+
+//Texture* LightController::GetShadowMapTexture()
+//{
+//	return m_shadowMapPass->m_shadowMapTexture.get();
+//}

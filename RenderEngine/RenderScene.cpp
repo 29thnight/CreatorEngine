@@ -16,6 +16,8 @@
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
+ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
+
 RenderScene::~RenderScene()
 {
 	Memory::SafeDelete(m_LightController);
@@ -24,6 +26,7 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
+	m_shadowRenderQueue.reserve(500);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -46,6 +49,11 @@ void RenderScene::ShadowStage(Camera& camera)
 	m_LightController->RenderAnyShadowMap(*this, camera);
 }
 
+void RenderScene::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, Camera& camera)
+{
+	m_LightController->CreateShadowCommandList(deferredContext, *this, camera);
+}
+
 void RenderScene::UseModel()
 {
 	DirectX11::VSSetConstantBuffer(0, 1, &m_ModelBuffer);
@@ -64,6 +72,39 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
 {
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
+
+
+}
+
+RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
+{
+	auto it = m_renderDataMap.find(cameraIndex);
+	if (it != m_renderDataMap.end())
+	{
+		return m_renderDataMap[cameraIndex].get();
+	}
+
+	auto newRenderData = std::make_shared<RenderPassData>();
+	newRenderData->Initalize(cameraIndex);
+	m_renderDataMap[cameraIndex] = newRenderData;
+
+	return newRenderData.get();
+}
+
+RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
+{
+	auto it = m_renderDataMap.find(cameraIndex);
+	if (it == m_renderDataMap.end())
+	{
+		return nullptr;
+	}
+
+	return m_renderDataMap[cameraIndex].get();
+}
+
+void RenderScene::RemoveRenderPassData(size_t cameraIndex)
+{
+	m_renderDataMap.erase(cameraIndex);
 }
 
 void RenderScene::RegisterAnimator(Animator* animatorPtr)
@@ -157,4 +198,25 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
 	m_proxyMap.erase(meshRendererGuid);
+}
+
+void RenderScene::PushShadowRenderQueue(MeshRendererProxy* proxy)
+{
+	std::unique_lock lock(m_shadowRenderMutex);
+
+	m_shadowRenderQueue.push_back(proxy);
+}
+
+RenderScene::ProxyContainer RenderScene::GetShadowRenderQueue()
+{
+	std::unique_lock lock(m_shadowRenderMutex);
+
+	return m_shadowRenderQueue;
+}
+
+void RenderScene::ClearShadowRenderQueue()
+{
+	std::unique_lock lock(m_shadowRenderMutex);
+
+	m_shadowRenderQueue.clear();
 }

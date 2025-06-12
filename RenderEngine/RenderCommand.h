@@ -25,12 +25,15 @@ public:
 	bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
 	void Draw();
-	ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _defferedContext);
+
+	friend bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b);
 
 public:
 	Material*		m_Material{ nullptr };
 	Mesh*			m_Mesh{ nullptr };
 	HashedGuid		m_animatorGuid{};
+	HashedGuid      m_materialGuid{};
 
 public:
 	Mathf::xMatrix	  m_finalTransforms[MAX_BONES]{};
@@ -43,3 +46,12 @@ private:
 	bool m_isNeedUptateCulling{ false };
 	//std::unordered_set<OctreeNode*> m_OctreeNodes;
 };
+
+inline bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b)
+{
+	if (a->m_animatorGuid == b->m_animatorGuid)
+	{
+		return a->m_materialGuid < b->m_materialGuid;
+	}
+	return a->m_animatorGuid < b->m_animatorGuid;
+}

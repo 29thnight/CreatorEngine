@@ -89,6 +89,7 @@ struct cameraView
 {
     Mathf::xMatrix cameraView;
 };
+
 struct ShadowMapRenderDesc
 {
     Mathf::xVector m_eyePosition{};

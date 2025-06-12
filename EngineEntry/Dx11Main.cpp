@@ -13,21 +13,22 @@
 #include "SceneManager.h"
 #include "EngineSetting.h"
 #include "CullingManager.h"
-
 #include "UIManager.h"
 #include "SpinLock.h"
-#include "Core.FenceFlag.h"
+#include "Core.Barrier.h"
 #include "InputActionManager.h"
+#include "Profiler.h"
 
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
-std::atomic<uint64> gameFrame{};
-std::atomic<uint64> renderFrame{};
 std::atomic<double> frameDeltaTime{};
-FenceFlag fenceGameToRender;
+Barrier renderBarrier(3);
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
+    gCPUProfiler.Initialize(5, 1024);
+    PROFILE_REGISTER_THREAD("GameThread");
+
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
 	m_deviceResources->RegisterDeviceNotify(this);
 
@@ -114,28 +115,48 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 	isGameToRender = true;
 
+    PROFILE_FRAME();
+
     m_renderThread = std::thread([&] 
 	{
+        PROFILE_REGISTER_THREAD("RenderThread");
 		while (isGameToRender)
 		{
+            if (!m_isInvokeResize)
+            {
+                RenderWorkerThread();
+            }
+		}
+	});
+    
+    m_RHI_Thread = std::thread([&]
+    {
+        PROFILE_REGISTER_THREAD("RHI-Thread");
+        while (isGameToRender)
+        {
             if (m_isInvokeResize)
             {
                 CreateWindowSizeDependentResources();
                 m_isInvokeResize = false;
             }
 
+            //
             CoroutineManagers->yield_OnRender();
-			RenderWorkerThread();
-		}
-	});
+            RHIWorkerThread();
+            //PROFILE_CPU_END();
+        }
+    });
+    
     m_renderThread.detach();
+    m_RHI_Thread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
 {
 	m_deviceResources->RegisterDeviceNotify(nullptr);
-    SceneManagers->Decommissioning();
 	isGameToRender = false;
+    SceneManagers->Decommissioning();
+    gCPUProfiler.Shutdown();
 }
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
@@ -170,6 +191,9 @@ void DirectX11::Dx11Main::Update()
 	// EditorUpdate
 	SpinLock lock(gameToRenderLock);
 
+    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+
+    PROFILE_CPU_BEGIN("MainThread");
     m_timeSystem.Tick([&]
     {
         InfoWindow();
@@ -177,16 +201,16 @@ void DirectX11::Dx11Main::Update()
         if(!SceneManagers->m_isGameStart)
         {
             SceneManagers->Editor();
-            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
+            SceneManagers->InputEvents(frameDeltaTime);
             SceneManagers->GameLogic();
         }
         else
         {
 			SceneManagers->Editor();
             SceneManagers->Initialization();
-			SceneManagers->Physics(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->InputEvents(m_timeSystem.GetElapsedSeconds());
-            SceneManagers->GameLogic(m_timeSystem.GetElapsedSeconds());
+			SceneManagers->Physics(frameDeltaTime);
+            SceneManagers->InputEvents(frameDeltaTime);
+            SceneManagers->GameLogic(frameDeltaTime);
         }
 #endif // !EDITOR
     });
@@ -216,36 +240,30 @@ void DirectX11::Dx11Main::Update()
 	{
 		Physics->ConnectPVD();
 	}
+    PROFILE_CPU_END();
 #endif // !EDITOR
 
-    if(gameFrame > renderFrame)
-    {
-        fenceGameToRender.Wait();
-    }
+    renderBarrier.ArriveAndWait();
 
-    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+    PROFILE_CPU_BEGIN("EndOfFrame");
+    DisableOrEnable();
     SceneManagers->EndOfFrame();
+    PROFILE_CPU_END();
 
-    fenceGameToRender.Reset();
+    PROFILE_FRAME();
+    renderBarrier.ArriveAndWait();
 }
 
-bool DirectX11::Dx11Main::Render()
+bool DirectX11::Dx11Main::RHIRender()
 {
-	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
-	if (m_timeSystem.GetFrameCount() == 0)
-    { 
-        fenceGameToRender.Signal();
-        renderFrame.store(gameFrame);
-        return false;
-    }
-
+    PROFILE_CPU_BEGIN("RHIWorkerThread");
     auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
-    
-    if (GameSceneStart || GameSceneEnd)
-    {
-        fenceGameToRender.Signal();
-        renderFrame.store(gameFrame);
+
+	// 처음 업데이트하기 전에 아무 것도 렌더링하지 마세요.
+	if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    { 
+        PROFILE_CPU_END();
         return false;
     }
 
@@ -257,8 +275,7 @@ bool DirectX11::Dx11Main::Render()
 #endif // !EDITOR
 	}
 
-    fenceGameToRender.Signal();
-    renderFrame.store(gameFrame);
+    PROFILE_CPU_END();
 	return true;
 }
 
@@ -278,8 +295,6 @@ void DirectX11::Dx11Main::InfoWindow()
         << "<Dx11>";
 
     SetWindowText(m_deviceResources->GetWindow()->GetHandle(), woss.str().c_str());
-
-    gameFrame = m_timeSystem.GetFrameCount();
 }
 
 void DirectX11::Dx11Main::OnGui()
@@ -291,6 +306,7 @@ void DirectX11::Dx11Main::OnGui()
 		m_sceneViewWindow->RenderSceneViewWindow();
 		m_gameViewWindow->RenderGameViewWindow();
         m_gizmoRenderer->EditorView();
+        DrawProfilerHUD();
         m_imguiRenderer->Render();
         m_imguiRenderer->EndRender();
     }
@@ -303,10 +319,36 @@ void DirectX11::Dx11Main::DisableOrEnable()
 
 void DirectX11::Dx11Main::RenderWorkerThread()
 {
-	if (Render())
+    PROFILE_CPU_BEGIN("RenderWorkerThread");
+    auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
+    auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
+
+    // 처음 업데이트하기 전에 아무 것도 하지 마세요.
+    if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
+    {
+        PROFILE_CPU_END();
+        renderBarrier.ArriveAndWait();
+        renderBarrier.ArriveAndWait();
+        return;
+    }
+
+    m_sceneRenderer->CreateCommandListPass();
+    PROFILE_CPU_END();
+
+    renderBarrier.ArriveAndWait();
+    renderBarrier.ArriveAndWait();
+}
+
+void DirectX11::Dx11Main::RHIWorkerThread()
+{
+	if (RHIRender())
 	{
+        PROFILE_CPU_BEGIN("Present");
 		m_deviceResources->Present();
+        PROFILE_CPU_END();
 	}
+    renderBarrier.ArriveAndWait();
+    renderBarrier.ArriveAndWait();
 }
 
 void DirectX11::Dx11Main::InvokeResizeFlag()
