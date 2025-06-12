@@ -94,7 +94,6 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	auto renderData = RenderPassData::GetData(&camera);
 
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, m_prevSSRTexture->m_pTexture);
 	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV()};
 	DirectX11::OMSetRenderTargets(2, view, nullptr);
@@ -115,7 +114,7 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
-	ID3D11ShaderResourceView* srvs[4] = {
+	ID3D11ShaderResourceView* srvs[5] = {
 		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,//m_DiffuseTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
