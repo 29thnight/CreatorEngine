@@ -1,5 +1,12 @@
 #include "AvatarMask.h"
 #include "Skeleton.h"
+AvatarMask::~AvatarMask()
+{
+    for (auto& mask : m_BoneMasks)
+    {
+        delete mask;
+    }
+}
 bool AvatarMask::IsBoneEnabled(BoneRegion region)
 {
     if (useAll)
@@ -30,22 +37,25 @@ bool AvatarMask::IsBoneEnabled(const std::string& name)
 {
     for (const auto& mask : m_BoneMasks)
     {
-        if (mask.boneName == name)
-            return mask.isEnabled;
+        if (mask->boneName == name)
+            return mask->isEnabled;
     }
     return false; 
     //&&&&& map 고려 성능
 }
 
-void AvatarMask::MakeBoneMask(std::vector<Bone*> Bones)
+BoneMask* AvatarMask::MakeBoneMask(Bone* Bone)
 {
-    m_BoneMasks.clear();
-    for (auto& Bone : Bones)
-    {
-        BoneMask newMask;
-        newMask.boneName = Bone->m_name;
-        newMask.isEnabled = true;
-        m_BoneMasks.push_back(newMask);
-    }
-}
 
+    BoneMask* newMask = new BoneMask();
+    newMask->boneName = Bone->m_name;
+    newMask->isEnabled = true;
+
+    m_BoneMasks.push_back(newMask);
+    for (auto& child : Bone->m_children)
+    {
+        BoneMask* childMask = MakeBoneMask(child);
+        newMask->m_children.push_back(childMask);
+    }
+    return newMask;
+}

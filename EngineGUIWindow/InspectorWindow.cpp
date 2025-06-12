@@ -785,11 +785,26 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 								ImGui::Text("Avatar Mask"); 
 								ImGui::SameLine();
-								if (ImGui::SmallButton(ICON_FA_PUZZLE_PIECE))
+								if (controller->useMask)
 								{
-									//&&&&& 아바타 마스크 새창에서 뛰우기
-									AvatarControllerIndex = i;
-									showAvatarMaskWindow = !showAvatarMaskWindow;
+									if (ImGui::SmallButton(ICON_FA_PUZZLE_PIECE))
+									{
+										AvatarControllerIndex = i;
+										showAvatarMaskWindow = !showAvatarMaskWindow;
+									}
+									ImGui::SameLine();
+
+									if (ImGui::Button("Delete Avatar"))
+									{
+										controller->DeleteAvatarMask();
+									}
+								}
+								else
+								{
+									if (ImGui::Button("Craete Avatar"))
+									{
+										controller->CreateMask();
+									}
 								}
 								ImGui::Separator();
 
@@ -803,14 +818,44 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 						if (showAvatarMaskWindow)
 						{
+							
 							if (ImGui::Begin("AvatarMask", &showAvatarMaskWindow))
 							{
 								// 내용물 UI 작성
 								ImGui::Text(controllers[AvatarControllerIndex]->name.c_str());
 								ImGui::Separator();
-								ImGui::Text(controllers[AvatarControllerIndex]->GetAvatarMask()->m_BoneMasks[0].boneName.c_str());
+								auto avatarMask = controllers[AvatarControllerIndex]->GetAvatarMask();
+								ImGui::Checkbox("isHumaniod", &avatarMask->isHumanoid);
+								ImGui::Separator();
+								ImGui::Separator();
+								auto& rootMask = avatarMask->RootMask;
+								std::function<void(BoneMask*)> drawMaskTree;
+								if (rootMask)
+								{
+									drawMaskTree = [&](BoneMask* mask)
+										{
+											// 고유 ID 만들기
+											std::string label = mask->boneName + "##" + mask->boneName;
+
+											// TreeNode는 펼칠 수 있는 드롭다운 역할
+											if (ImGui::TreeNode(label.c_str()))
+											{
+												// Checkbox를 트리 노드 안에 표시
+												ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
+
+												for (auto& child : mask->m_children)
+												{
+													drawMaskTree(child); // 재귀 호출
+												}
+
+												ImGui::TreePop();
+											}
+										};
+									drawMaskTree(rootMask); // depth 0에서 시작
+								}
+
 							}
-							ImGui::End(); // 반드시 필요
+							ImGui::End(); 
 						}
 						ImGui::Separator();
 						if (ImGui::Button("Create Layer"))
@@ -856,7 +901,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							ImGui::PushID(index);
 							auto& parameter = parameters[index];
 							char buffer[128];
-							strcpy_s(buffer, parameter.name.c_str());
+							strcpy_s(buffer, parameter->name.c_str());
 							buffer[sizeof(buffer) - 1] = '\0';
 							if(ImGui::InputText("", buffer, sizeof(buffer)))
 							{
@@ -869,7 +914,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 										{
 											for (auto& condition : transtion->conditions)
 											{
-												if (condition.valueName == parameter.name)
+												if (condition.valueName == parameter->name)
 												{
 													condition.valueName = buffer;
 												}
@@ -877,7 +922,12 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 										}
 									}
 								}
-								parameter.name = buffer;
+								parameter->name = buffer;
+							}
+							ImGui::SameLine();
+							if (ImGui::SmallButton(ICON_FA_MINUS))
+							{
+								animator->DeleteParameter(index);
 							}
 
 							ImGui::PopID();
@@ -1047,53 +1097,67 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 									{
 										ImGui::PushID(i);
 										auto& condition = conditions[i];
-										std::string parmName = condition.valueName;
-										auto parameter = animator->FindParameter(parmName);
+										auto parameter = condition.valueParameter;
+										std::string parameterName;
+										if (parameter == nullptr)
+										{
+											parameterName = "NoParameter";
+										}
+										else
+										{
+											parameterName = parameter->name;
+										}
 										auto& compareParameter = condition.CompareParameter;
-
-										if (ImGui::Button(condition.valueName.c_str(), ImVec2(140, 0)))
+				
+										if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
 										{
 											ImGui::OpenPopup("ConditionIndexSelect");
 										}
 										ImGui::SameLine();
-										if (parameter->vType != ValueType::Trigger)
+										if (parameter != nullptr)
 										{
-											if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
+											if (parameter->vType != ValueType::Trigger)
 											{
-												ImGui::OpenPopup("ConditionTypeMenu");
-											}
-										}
-										ImGui::SameLine();
-										ImGui::SetNextItemWidth(120);
-										if (parameter->vType == ValueType::Int)
-										{
-
-											ImGui::InputInt("##", &compareParameter.iValue);
-										}
-										else if (parameter->vType == ValueType::Float)
-										{
-											ImGui::InputFloat("##", &compareParameter.fValue);
-										}
-										else if (parameter->vType == ValueType::Bool)
-										{
-											ImGui::Checkbox("##", &compareParameter.bValue);
-										}
-										else if (parameter->vType == ValueType::Trigger)
-										{
-											ImGui::Text("trigger");
-										}
-										if (ImGui::BeginPopup("ConditionIndexSelect"))
-										{
-											for (auto& param : animator->Parameters)
-											{
-												if (ImGui::MenuItem(param.name.c_str()))
+												if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
 												{
-													condition.SetCondition(param.name);
+													ImGui::OpenPopup("ConditionTypeMenu");
 												}
 											}
-											ImGui::EndPopup();
-										}
+											ImGui::SameLine();
+											ImGui::SetNextItemWidth(120);
+											if (parameter->vType == ValueType::Int)
+											{
 
+												ImGui::InputInt("##", &compareParameter.iValue);
+											}
+											else if (parameter->vType == ValueType::Float)
+											{
+												ImGui::InputFloat("##", &compareParameter.fValue);
+											}
+											else if (parameter->vType == ValueType::Bool)
+											{
+												ImGui::Checkbox("##", &compareParameter.bValue);
+											}
+											else if (parameter->vType == ValueType::Trigger)
+											{
+												ImGui::Text("trigger");
+											}
+											if (ImGui::BeginPopup("ConditionIndexSelect"))
+											{
+												for (auto& param : animator->Parameters)
+												{
+													if (ImGui::MenuItem(param->name.c_str()))
+													{
+														condition.SetCondition(param->name);
+													}
+												}
+												ImGui::EndPopup();
+											}
+										}
+										else
+										{
+											ImGui::Text("No Parmeter", ImVec2(70, 0));
+										}
 										if (ImGui::BeginPopup("ConditionTypeMenu"))
 										{
 											if (parameter->vType == ValueType::Int || parameter->vType == ValueType::Float)
@@ -1132,7 +1196,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 									else
 									{
 										auto firstParam = animator->Parameters[0];
-										transiton->AddConditionDefault(firstParam.name, ConditionType::None, firstParam.vType);
+										transiton->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
 									}
 								}
 							}
@@ -1210,51 +1274,66 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								{
 									ImGui::PushID(i);
 									auto& condition = conditions[i];
-									std::string parmName = condition.valueName;
-									auto parameter = animator->FindParameter(parmName);
+									auto parameter = condition.valueParameter;
+									std::string parameterName;
+									if (parameter == nullptr)
+									{
+										parameterName = "NoParameter";
+									}
+									else
+									{
+										parameterName = parameter->name;
+									}
 									auto& compareParameter = condition.CompareParameter;
 
-									if (ImGui::Button(condition.valueName.c_str(), ImVec2(140, 0)))
+									if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
 									{
 										ImGui::OpenPopup("ConditionIndexSelect");
 									}
 									ImGui::SameLine();
-
-									if (parameter->vType != ValueType::Trigger)
+									if (parameter != nullptr)
 									{
-										if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
+										if (parameter->vType != ValueType::Trigger)
 										{
-											ImGui::OpenPopup("ConditionTypeMenu");
-										}
-									}
-									ImGui::SameLine();
-									ImGui::SetNextItemWidth(120);
-									if (parameter->vType == ValueType::Int)
-									{
-										ImGui::InputInt("##", &compareParameter.iValue);
-									}
-									else if (parameter->vType == ValueType::Float)
-									{
-										ImGui::InputFloat("##", &compareParameter.fValue);
-									}
-									else if (parameter->vType == ValueType::Bool)
-									{
-										ImGui::Checkbox("##", &compareParameter.bValue);
-									}
-									else if (parameter->vType == ValueType::Trigger)
-									{
-										ImGui::Text("trigger");
-									}
-									if (ImGui::BeginPopup("ConditionIndexSelect"))
-									{
-										for (auto& param : animator->Parameters)
-										{
-											if (ImGui::MenuItem(param.name.c_str()))
+											if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
 											{
-												condition.SetCondition(param.name);
+												ImGui::OpenPopup("ConditionTypeMenu");
 											}
 										}
-										ImGui::EndPopup();
+										ImGui::SameLine();
+										ImGui::SetNextItemWidth(120);
+										if (parameter->vType == ValueType::Int)
+										{
+
+											ImGui::InputInt("##", &compareParameter.iValue);
+										}
+										else if (parameter->vType == ValueType::Float)
+										{
+											ImGui::InputFloat("##", &compareParameter.fValue);
+										}
+										else if (parameter->vType == ValueType::Bool)
+										{
+											ImGui::Checkbox("##", &compareParameter.bValue);
+										}
+										else if (parameter->vType == ValueType::Trigger)
+										{
+											ImGui::Text("trigger");
+										}
+										if (ImGui::BeginPopup("ConditionIndexSelect"))
+										{
+											for (auto& param : animator->Parameters)
+											{
+												if (ImGui::MenuItem(param->name.c_str()))
+												{
+													condition.SetCondition(param->name);
+												}
+											}
+											ImGui::EndPopup();
+										}
+									}
+									else
+									{
+										ImGui::Text("No Parmeter", ImVec2(70, 0));
 									}
 									if (ImGui::BeginPopup("ConditionTypeMenu"))
 									{
@@ -1294,7 +1373,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								else
 								{
 									auto firstParam = animator->Parameters[0];
-									transition->AddConditionDefault(firstParam.name, ConditionType::None, firstParam.vType);
+									transition->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
 								}
 							}
 						}

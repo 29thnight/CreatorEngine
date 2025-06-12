@@ -72,6 +72,7 @@ void AniTransition::SetNextState(AnimationState* _nextState)
 	nextStateName = nextState->m_name;
 }
 
+
 std::string AniTransition::GetCurState()
 {
 	return curState->m_name;

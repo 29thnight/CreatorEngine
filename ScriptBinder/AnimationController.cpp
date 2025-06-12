@@ -14,6 +14,7 @@ AnimationController::~AnimationController()
 {
 	if (m_nodeEditor)
 		delete m_nodeEditor;
+	DeleteAvatarMask();
 }
 
 bool AnimationController::BlendingAnimation(float tick)
@@ -289,8 +290,32 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 
 void AnimationController::CreateMask()
 {
-	m_owner->m_Skeleton->MarkRegionSkeleton();
-	m_avatarMask.MakeBoneMask(m_owner->m_Skeleton->m_bones);
+	if (!m_avatarMask)
+	{
+		useMask = true;
+		m_owner->m_Skeleton->MarkRegionSkeleton();
+		m_avatarMask = new AvatarMask();
+		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
+	}
 	
+}
+
+void AnimationController::ReCreateMask(AvatarMask* mask)
+{
+	CreateMask();
+	m_avatarMask->isHumanoid = mask->isHumanoid;
+	m_avatarMask->useAll = mask->useAll;
+	m_avatarMask->useUpper = mask->useUpper;
+	m_avatarMask->useLower = mask->useLower;
+}
+
+void AnimationController::DeleteAvatarMask()
+{
+	if (m_avatarMask)
+	{
+		useMask = false;
+		delete m_avatarMask;
+		m_avatarMask = nullptr;
+	}
 }
 

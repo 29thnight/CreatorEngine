@@ -14,7 +14,6 @@ public:
 	template<typename T>
 	TransCondition(T Comparevalue, ConditionType _cType, ValueType vType) :CompareParameter(Comparevalue, vType)
 	{
-		
 		if (_cType == ConditionType::None)
 		{
 			switch (vType)
@@ -58,12 +57,15 @@ public:
 		}
 	}
 
+	void SetValue(std::string valueName);
 	void SetCondition(std::string _parameterName);
 
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
 	//타입 ,값 ,함수 
 	[[Property]]
 	std::string valueName{};
+
+	ConditionParameter* valueParameter;
 	[[Property]]
 	ConditionType cType = ConditionType::Equal;
 	[[Property]]

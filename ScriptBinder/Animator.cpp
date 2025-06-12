@@ -14,9 +14,9 @@ void Animator::Update(float tick)
 
 	for (auto& param : Parameters)
 	{
-		if (param.vType == ValueType::Trigger)
+		if (param->vType == ValueType::Trigger)
 		{
-			param.ResetTrigger();
+			param->ResetTrigger();
 		}
 	}
 }
@@ -48,7 +48,7 @@ void Animator::CreateController(std::string name)
 	AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = name;
-	animationController->CreateMask();
+	//animationController->CreateMask(); &&&&& 기본은 마스크없게 
 	animationController->m_nodeEditor = new NodeEditor();
 	m_animationControllers.push_back(animationController);
 }
@@ -58,7 +58,7 @@ void Animator::CreateController_UI()
 	AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
-	animationController->CreateMask();
+	//animationController->CreateMask();
 	animationController->m_nodeEditor = new NodeEditor();
 	m_animationControllers.push_back(animationController);
 }
@@ -72,15 +72,25 @@ AnimationController* Animator::GetController(std::string name)
 	}
 }
 
+void Animator::DeleteParameter(int index)
+{
+	if (index >= 0 && index < Parameters.size())
+	{
+		delete Parameters[index];
+		Parameters.erase(Parameters.begin() + index);
+	}
+}
+
 ConditionParameter* Animator::FindParameter(std::string valueName)
 {
 	for (auto& parameter : Parameters)
 	{
-		if (parameter.name == valueName)
+		if (parameter->name == valueName)
 		{
-			return &parameter;
+			return parameter;
 		}
 	}
+	return nullptr; 
 }
 
 

@@ -16,8 +16,11 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	AnimationFactorys->ReisterFactory("Punch", []() {return new RunAni(); });
 
 	auto animation = player->GetComponent<Animator>();
+	animation->AddParameter("Speed", speed, ValueType::Float);
+	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
 	auto controller = animation->GetController("upper");
+	controller->CreateMask();
 	controller->CreateState("Idle",0);
 	controller->CreateState("Walk",2);
 	controller->CreateState("Run",1); 
@@ -30,6 +33,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	animation->CreateController("lower");
 	auto lowercontroller = animation->GetController("lower");
+	lowercontroller->CreateMask();
 	lowercontroller->CreateState("Idle", 0);
 	lowercontroller->CreateState("Walk", 2);
 	lowercontroller->CreateState("Run",  1);
@@ -40,10 +44,6 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	lowercontroller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
 	lowercontroller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	lowercontroller->GetAvatarMask()->UseOnlyLower();
-	animation->AddParameter("Speed",speed, ValueType::Float);
-	animation->AddParameter("Walkparm", false, ValueType::Trigger);
-	animation->AddParameter("Idleparm", false, ValueType::Trigger);
-	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 
 	auto playerMap = InputActionManagers->AddActionMap("Player");
 	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});

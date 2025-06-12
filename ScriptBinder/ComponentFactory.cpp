@@ -88,8 +88,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 				for (auto& param : paramNode)
 				{
-					ConditionParameter aniParam;
-					Meta::Deserialize(&aniParam, param);
+					ConditionParameter* aniParam = new ConditionParameter();
+					Meta::Deserialize(aniParam, param);
 					animator->Parameters.push_back(aniParam);
 				}
 			}
@@ -106,7 +106,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					Meta::Deserialize(animationController, layer);
 					animationController->m_owner = animator;
 					animationController->m_nodeEditor = new NodeEditor();
-					//animator->m_animationController = animationController;
+
+					if (animationController->useMask == true)
+					{
+						if (layer["m_avatarMask"])
+						{
+							auto& MaskNode = layer["m_avatarMask"];
+							AvatarMask avatarMask;
+							Meta::Deserialize(&avatarMask, MaskNode);
+							animationController->ReCreateMask(&avatarMask);
+						}
+					}
 					if (layer["StateVec"])
 					{
 						auto& StatesNode = layer["StateVec"];
@@ -128,9 +138,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
 									sharedTransition->m_ownerController = animationController; 
-									//sharedTransition->SetCurState(sharedTransition->curStateName);
-									//sharedTransition->SetNextState(sharedTransition->nextStateName);
-									
 								
 									if (transition["conditions"])
 									{
@@ -141,13 +148,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 											Meta::Deserialize(&newcondition, condition);
 											newcondition.m_ownerController = animationController;
 											sharedTransition->conditions.push_back(newcondition);
+											newcondition.SetValue(newcondition.valueName);
+				
 										}
 									}
 								}
 							}
 						}
-
-						
 					}
 					if (layer["m_curState"])
 					{

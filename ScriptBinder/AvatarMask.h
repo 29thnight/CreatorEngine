@@ -13,18 +13,19 @@ public:
    ReflectAvatarMask
 	[[Serializable]]
 	AvatarMask() = default;
-
+	~AvatarMask();
 	//해당아바타가 해당 본 사용중인지
 	bool IsBoneEnabled(BoneRegion region);
 	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
 	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }
 
+	BoneMask* RootMask;
 	bool IsBoneEnabled(const std::string& name);
-	void MakeBoneMask(std::vector<Bone*> Bones);
+	BoneMask* MakeBoneMask(Bone* Bone);
 	[[Property]]
-	std::vector<BoneMask> m_BoneMasks;
+	std::vector<BoneMask*> m_BoneMasks;
 	[[Property]]
-	bool isHumanoid = false;
+	bool isHumanoid = false;  //상하체 분리만 쓸거면 체크 &&&&&
 	[[Property]]
 	bool useAll = true;
 	[[Property]]

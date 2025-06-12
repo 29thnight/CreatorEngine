@@ -3,7 +3,6 @@
 #include "TransCondition.h"
 #include "AniTransition.generated.h"
 #include "ConditionParameter.h"
-
 class AnimationState;
 class AnimationController;
 class AniTransition
@@ -22,8 +21,8 @@ public:
 
 		TransCondition newTrans(Comparevalue,cType,vType);
 		newTrans.valueName = ownerValueName;
-		
 		newTrans.m_ownerController = m_ownerController;
+		newTrans.SetValue(ownerValueName);
 		conditions.push_back(newTrans);
 	}
 
@@ -33,6 +32,8 @@ public:
 		TransCondition newTrans(0, cType, vType);
 		newTrans.valueName = ownerValueName;
 		newTrans.m_ownerController = m_ownerController;
+		newTrans.SetValue(ownerValueName);
+		newTrans.SetCondition(ownerValueName);
 		conditions.push_back(newTrans);
 	}
 
