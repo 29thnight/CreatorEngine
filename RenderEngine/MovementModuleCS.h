@@ -31,13 +31,6 @@ public:
     // Compute shader methods
     bool InitializeCompute();
 
-    // Set input/output buffers
-    void SetInputOutput(ID3D11ShaderResourceView* inputSRV, ID3D11UnorderedAccessView* outputUAV)
-    {
-        m_inputSRV = inputSRV;
-        m_outputUAV = outputUAV;
-    }
-
 private:
     void UpdateConstantBuffers(float delta);
     void Release();

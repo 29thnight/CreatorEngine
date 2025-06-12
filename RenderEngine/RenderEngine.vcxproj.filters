@@ -207,9 +207,6 @@
     <Filter Include="RenderPass\EffectPass\2.Spawn">
       <UniqueIdentifier>{5a66f3af-b204-4c58-9c8e-75c9e4ce26f1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\EffectPass\3.Life">
-      <UniqueIdentifier>{4bf2c439-800f-469a-8a43-da4b2745e407}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\4.Movement">
       <UniqueIdentifier>{4feada2b-4d1b-422e-92f1-734fddcfbaa6}</UniqueIdentifier>
     </Filter>
@@ -222,9 +219,6 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\EffectPass\ColorModule">
-      <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderTaskScheduler">
       <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
     </Filter>
@@ -233,6 +227,9 @@
     </Filter>
     <Filter Include="RenderPass\LighingPass">
       <UniqueIdentifier>{a359d5c3-6d5e-401a-b22d-5da78f89f927}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\EffectPass\3.Color">
+      <UniqueIdentifier>{f45f55f2-237b-4f3c-a329-565776d89912}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -374,46 +371,40 @@
     <ClCompile Include="CullingManager.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\EffectModules.cpp">
+    <ClCompile Include="EffectModules.cpp">
       <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\EaseInOut.cpp">
+    <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\ParticleModule.cpp">
+    <ClCompile Include="ParticleModule.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\SparkleEffect.cpp">
+    <ClCompile Include="SparkleEffect.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\SpawnModule.cpp">
+    <ClCompile Include="SpawnModule.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\SpawnModuleCS.cpp">
+    <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\LifeModule.cpp">
-      <Filter>RenderPass\EffectPass\3.Life</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\LifeModuleCS.cpp">
-      <Filter>RenderPass\EffectPass\3.Life</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\MovementModule.cpp">
+    <ClCompile Include="MovementModule.cpp">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\MovementModuleCS.cpp">
+    <ClCompile Include="MovementModuleCS.cpp">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\BillboardModuleGPU.cpp">
+    <ClCompile Include="BillboardModuleGPU.cpp">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\RenderModules.cpp">
+    <ClCompile Include="RenderModules.cpp">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\EffectManager.cpp">
+    <ClCompile Include="EffectManager.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\ParticleSystem.cpp">
+    <ClCompile Include="ParticleSystem.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
     <ClCompile Include="RenderCommand.cpp">
@@ -427,6 +418,9 @@
     </ClCompile>
     <ClCompile Include="LightingPass.cpp">
       <Filter>RenderPass\LighingPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ColorModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -598,49 +592,43 @@
     <ClInclude Include="CullingManager.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\EffectModules.h">
+    <ClInclude Include="EffectModules.h">
       <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\EaseInOut.h">
+    <ClInclude Include="EaseInOut.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\ParticleModule.h">
+    <ClInclude Include="ParticleModule.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\SparkleEffect.h">
+    <ClInclude Include="SparkleEffect.h">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\BaseEffectStruct.h">
+    <ClInclude Include="BaseEffectStruct.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\SpawnModule.h">
+    <ClInclude Include="SpawnModule.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\SpawnModuleCS.h">
+    <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\LifeModule.h">
-      <Filter>RenderPass\EffectPass\3.Life</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\LifeModuleCS.h">
-      <Filter>RenderPass\EffectPass\3.Life</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\MovementModule.h">
+    <ClInclude Include="MovementModule.h">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\MovementModuleCS.h">
+    <ClInclude Include="MovementModuleCS.h">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\BillboardModuleGPU.h">
+    <ClInclude Include="BillboardModuleGPU.h">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\RenderModules.h">
+    <ClInclude Include="RenderModules.h">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\EffectManager.h">
+    <ClInclude Include="EffectManager.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\ParticleSystem.h">
+    <ClInclude Include="ParticleSystem.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
     <ClInclude Include="RenderCommand.h">
@@ -654,6 +642,9 @@
     </ClInclude>
     <ClInclude Include="LightingPass.h">
       <Filter>RenderPass\LighingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ColorModuleCS.h">
+      <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -813,12 +804,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LifeModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
@@ -832,12 +817,6 @@
       <Filter>Shaders\LightMap</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl" />
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>

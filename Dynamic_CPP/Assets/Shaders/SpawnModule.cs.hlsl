@@ -1,6 +1,6 @@
-// SpawnModule.hlsl
-// ÆÄÆ¼Å¬ÀÇ »ı¼º¿¡ °üÇÑ ÄÄÇ»Æ® ¼ÎÀÌ´õ
+// SpawnModule.hlsl - íŒŒí‹°í´ ìŠ¤í° ì»´í“¨íŠ¸ ì…°ì´ë”
 
+// íŒŒí‹°í´ ë°ì´í„° êµ¬ì¡°ì²´
 struct ParticleData
 {
     float3 position;
@@ -13,55 +13,52 @@ struct ParticleData
     float age;
     float lifeTime;
     float rotation;
-    float rotatespeed;
+    float rotateSpeed;
     float2 pad4;
     float4 color;
     uint isActive;
     float3 pad5;
 };
 
-
-cbuffer SpawnParams : register(b0)
+// ìŠ¤í° íŒŒë¼ë¯¸í„°
+cbuffer SpawnParameters : register(b0)
 {
-    float gSpawnRate;
-    float gDeltaTime;
-    int gEmitterType;
-    float pad;
-    float3 gEmitterSize;
-    float gEmitterRadius;
-    uint gMaxParticles;
-    float3 gPad;
+    float gSpawnRate; // ì´ˆë‹¹ ìƒì„±í•  íŒŒí‹°í´ ìˆ˜
+    float gDeltaTime; // í”„ë ˆì„ ì‹œê°„
+    float gCurrentTime; // ëˆ„ì ëœ ì´ ì‹œê°„
+    int gEmitterType; // ì´ë¯¸í„° íƒ€ì… (0:Point, 1:Sphere, 2:Box, 3:Cone, 4:Circle)
+    
+    float gEmitterRadius; // êµ¬/ì›/ì½˜ ì´ë¯¸í„° ë°˜ì§€ë¦„
+    float3 gEmitterSize; // ë°•ìŠ¤/ì½˜ ì´ë¯¸í„° í¬ê¸°
+    uint gMaxParticles; // ìµœëŒ€ íŒŒí‹°í´ ìˆ˜
 }
 
-
-cbuffer ParticleTemplateParams : register(b1)
+// íŒŒí‹°í´ í…œí”Œë¦¿
+cbuffer ParticleTemplate : register(b1)
 {
-    float gLifeTime;
-    float gRotateSpeed;
-    float2 gSize;
-    float4 gColor;
-    float3 gVelocity;
-    float gPad1;
-    float3 gAcceleration; // ÃÊ±â °¡¼Óµµ 
-    float gPad2; // ÆĞµù
-    float gMinVerticalVelocity; // ÃÖ¼Ò ¼öÁ÷ ¼Óµµ
-    float gMaxVerticalVelocity; // ÃÖ´ë ¼öÁ÷ ¼Óµµ
-    float gHorizontalVelocityRange; // ¼öÆò ¼Óµµ ¹üÀ§
-    float gPad3; // ÆĞµù
+    float gLifeTime; // íŒŒí‹°í´ ìˆ˜ëª…
+    float gRotateSpeed; // íšŒì „ ì†ë„
+    float2 gSize; // íŒŒí‹°í´ í¬ê¸°
+    
+    float4 gColor; // íŒŒí‹°í´ ìƒ‰ìƒ
+    
+    float3 gVelocity; // ê¸°ë³¸ ì†ë„
+    float gMinVerticalVelocity;
+    
+    float3 gAcceleration; // ê°€ì†ë„
+    float gMaxVerticalVelocity;
+    
+    float gHorizontalVelocityRange; // ìˆ˜í‰ ì†ë„ ë²”ìœ„
+    float3 pad;
 }
 
-// ÆÄÆ¼Å¬ ¹öÆÛ (register u0¿¡ ¹ÙÀÎµù)
-RWStructuredBuffer<ParticleData> gParticles : register(u0);
-// ·£´ı Ä«¿îÅÍ ¹öÆÛ (register u1¿¡ ¹ÙÀÎµù)
-RWStructuredBuffer<uint> gRandomCounter : register(u1);
-RWStructuredBuffer<float> gTimeBuffer : register(u2);
-// »õ·Î Ãß°¡: ½ºÆù Ä«¿îÅÍ¿Í ÇÊ¿äÇÑ ÆÄÆ¼Å¬ ¼ö¸¦ À§ÇÑ ¹öÆÛ
-RWStructuredBuffer<uint> gSpawnCounter : register(u3);
+// ë²„í¼ ë°”ì¸ë”©
+StructuredBuffer<ParticleData> gParticlesInput : register(t0);
+RWStructuredBuffer<ParticleData> gParticlesOutput : register(u0);
+RWStructuredBuffer<uint> gRandomSeed : register(u1);
 
-RWStructuredBuffer<uint> gInactiveParticleIndices : register(u4);
-RWStructuredBuffer<uint> gInactiveParticleCount : register(u5);
-// ³­¼ö »ı¼º ÇÔ¼ö
-uint wang_hash(uint seed)
+// Wang Hash ê¸°ë°˜ ê³ í’ˆì§ˆ ë‚œìˆ˜ ìƒì„±
+uint WangHash(uint seed)
 {
     seed = (seed ^ 61) ^ (seed >> 16);
     seed *= 9;
@@ -71,185 +68,182 @@ uint wang_hash(uint seed)
     return seed;
 }
 
-float rand(inout uint state)
+float RandomFloat01(uint seed)
 {
-    state = wang_hash(state);
-    return float(state) / 4294967296.0; // 2^32
+    return float(WangHash(seed)) / 4294967295.0;
 }
 
-// ÆÄÆ¼Å¬ ÃÊ±âÈ­ ÇÔ¼ö
-// ÆÄÆ¼Å¬ ÃÊ±âÈ­ ÇÔ¼ö °³¼±
-void InitializeParticle(inout ParticleData particle, inout uint seed)
+float RandomRange(uint seed, float minVal, float maxVal)
 {
-    // ¸ğµç ÇÊµå¸¦ ¸ÕÀú 0À¸·Î ÃÊ±âÈ­
-    particle.position = float3(0, 0, 0);
-    particle.pad1 = 0.0f;
-    particle.velocity = float3(0, 0, 0);
-    particle.pad2 = 0.0f;
-    particle.acceleration = float3(0, 0, 0);
-    particle.pad3 = 0.0f;
-    particle.size = float2(0, 0);
-    particle.age = 0.0f;
-    particle.lifeTime = 0.0f;
-    particle.rotation = 0.0f;
-    particle.rotatespeed = 0.0f;
-    particle.pad4 = float2(0, 0);
-    particle.color = float4(0, 0, 0, 1);
-    particle.isActive = 0;
-    particle.pad5 = float3(0, 0, 0);
-    
-    // ÀÌÁ¦ ½ÇÁ¦ °ªÀ¸·Î ¼³Á¤
-    particle.position = float3(0, 0, 0); // ±âº»°ª, ÀÌÈÄ ÀÌ¹ÌÅÍ Å¸ÀÔ¿¡ µû¶ó º¯°æµÊ
-    particle.velocity = gVelocity;
-    particle.acceleration = gAcceleration;
-    particle.size = gSize;
-    particle.age = 0.0f;
-    particle.lifeTime = 15.0f;
-    particle.rotation = 0.0f;
-    particle.rotatespeed = gRotateSpeed;
-    particle.color = gColor;
-    particle.isActive = 1;
-    
-    // ÀÌ¹ÌÅÍ Å¸ÀÔ¿¡ µû¸¥ À§Ä¡ ¼³Á¤
+    return lerp(minVal, maxVal, RandomFloat01(seed));
+}
+
+// ì´ë¯¸í„°ë³„ ìœ„ì¹˜ ìƒì„±
+float3 GenerateEmitterPosition(uint seed)
+{
     switch (gEmitterType)
     {
-        case 0: // point
-            particle.position = float3(0.0f, 0.0f, 0.0f);
-            break;
+        case 0: // Point Emitter
+            return float3(0, 0, 0);
             
-        case 1: // sphere
+        case 1: // Sphere Emitter
         {
-                float theta = rand(seed) * 6.28318f; // 0 ~ 2¥ğ (¹æÀ§°¢)
-                float phi = rand(seed) * 3.14159f; // 0 ~ ¥ğ (°íµµ°¢)
-                float radius = gEmitterRadius * pow(rand(seed), 1 / 3.0); // ±Õµî ºĞÆ÷¸¦ À§ÇÑ r °è»ê
+            // êµ¬ ë‚´ë¶€ ê· ë“±ë¶„í¬
+                float theta = RandomFloat01(seed) * 6.28318530718;
+                float phi = RandomFloat01(seed + 1) * 3.14159265359;
+                float r = gEmitterRadius * pow(RandomFloat01(seed + 2), 0.33333);
             
-                particle.position = float3(
-                radius * sin(phi) * cos(theta),
-                radius * sin(phi) * sin(theta),
-                radius * cos(phi)
+                return float3(
+                r * sin(phi) * cos(theta),
+                r * sin(phi) * sin(theta),
+                r * cos(phi)
             );
-                break;
             }
         
-        case 2: // box
+        case 2: // Box Emitter
         {
-                particle.position = float3(
-                (rand(seed) - 0.5f) * 2.0f * gEmitterSize.x,
-                (rand(seed) - 0.5f) * 2.0f * gEmitterSize.y,
-                (rand(seed) - 0.5f) * 2.0f * gEmitterSize.z
+                return float3(
+                RandomRange(seed, -gEmitterSize.x * 0.5, gEmitterSize.x * 0.5),
+                RandomRange(seed + 1, -gEmitterSize.y * 0.5, gEmitterSize.y * 0.5),
+                RandomRange(seed + 2, -gEmitterSize.z * 0.5, gEmitterSize.z * 0.5)
             );
-                break;
             }
         
-        case 3: // cone
+        case 3: // Cone Emitter
         {
-                float theta = rand(seed) * 6.28318f;
-                float height = rand(seed) * gEmitterSize.y;
-                float radiusAtHeight = gEmitterRadius * (1.0f - height / gEmitterSize.y);
+                float height = RandomFloat01(seed) * gEmitterSize.y;
+                float angle = RandomFloat01(seed + 1) * 6.28318530718;
+                float radiusAtHeight = gEmitterRadius * (1.0 - height / gEmitterSize.y);
+                float r = sqrt(RandomFloat01(seed + 2)) * radiusAtHeight;
             
-                particle.position = float3(
-                radiusAtHeight * cos(theta),
+                return float3(
+                r * cos(angle),
                 height,
-                radiusAtHeight * sin(theta)
+                r * sin(angle)
             );
-                break;
             }
         
-        case 4: // circle
+        case 4: // Circle Emitter
         {
-                float theta = rand(seed) * 6.28318f;
-                float radius = sqrt(rand(seed)) * gEmitterRadius; // ±Õµî ºĞÆ÷¸¦ À§ÇÑ Á¦°ö±Ù
+                float angle = RandomFloat01(seed) * 6.28318530718;
+                float r = sqrt(RandomFloat01(seed + 1)) * gEmitterRadius;
             
-                particle.position = float3(
-                radius * cos(theta),
-                0.0f,
-                radius * sin(theta)
+                return float3(
+                r * cos(angle),
+                0.0,
+                r * sin(angle)
             );
-                break;
             }
+        
+        default:
+            return float3(0, 0, 0);
     }
-    
-    // ÃÊ±â ¼Óµµ¿¡ ·£´ı º¯µ¿ Ãß°¡
-    float3 baseVelocity = gVelocity;
-    float3 randomVelocity = float3(0, 0, 0);
+}
 
-    if (gHorizontalVelocityRange > 0.0f || gMaxVerticalVelocity > gMinVerticalVelocity)
-    {
-        float verticalVelocity = lerp(gMinVerticalVelocity, gMaxVerticalVelocity, rand(seed));
-        float angle = rand(seed) * 6.28318f;
-        float magnitude = rand(seed) * gHorizontalVelocityRange;
+// ì´ˆê¸° ì†ë„ ìƒì„±
+float3 GenerateInitialVelocity(uint seed)
+{
+    float3 velocity = gVelocity;
     
-        randomVelocity = float3(
-            magnitude * cos(angle),
-            verticalVelocity,
-            magnitude * sin(angle)
+    // ëœë¤ ì†ë„ ì¶”ê°€
+    if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
+    {
+        float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
+        float horizontalAngle = RandomFloat01(seed + 1) * 6.28318530718;
+        float horizontalMag = RandomFloat01(seed + 2) * gHorizontalVelocityRange;
+        
+        velocity += float3(
+            horizontalMag * cos(horizontalAngle),
+            verticalVel,
+            horizontalMag * sin(horizontalAngle)
         );
     }
     
-    particle.velocity = baseVelocity + randomVelocity;
-    particle.acceleration = gAcceleration;
+    return velocity;
 }
 
-// ½º·¹µå ±×·ì Å©±â Á¤ÀÇ
-#define THREAD_GROUP_SIZE 1024
+// íŒŒí‹°í´ ì´ˆê¸°í™” (ì™„ì „í•œ ë²„ì „)
+void InitializeParticle(inout ParticleData particle, uint seed)
+{
+    particle.position = GenerateEmitterPosition(seed);
+    particle.velocity = GenerateInitialVelocity(seed + 100);
+    particle.acceleration = gAcceleration;
+    particle.size = gSize;
+    particle.age = 0.0;
+    particle.lifeTime = gLifeTime;
+    particle.rotation = 0.0;
+    particle.rotateSpeed = gRotateSpeed;
+    particle.color = gColor;
+    particle.isActive = 1;
+}
+
+#define THREAD_GROUP_SIZE 64
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    // Ã¹ ¹øÂ° ½º·¹µå¸¸ ÀÌ¹ø ÇÁ·¹ÀÓ¿¡ »ı¼ºÇÒ ÆÄÆ¼Å¬ ¼ö °è»ê
-    if (DTid.x == 0)
+    uint particleIndex = DTid.x;
+    
+    // ë²”ìœ„ ì²´í¬
+    if (particleIndex >= gMaxParticles)
+        return;
+    
+    // íŒŒí‹°í´ ë°ì´í„° ë³µì‚¬
+    ParticleData particle = gParticlesInput[particleIndex];
+    
+    // ê¸°ì¡´ í™œì„± íŒŒí‹°í´ ì—…ë°ì´íŠ¸
+    if (particle.isActive == 1)
     {
-        // ºñÈ°¼º Ä«¿îÅÍ °ª È®ÀÎ
-        uint inactiveCount = gInactiveParticleCount[0];
+        particle.age += gDeltaTime;
         
-        // »ı¼ºÇÒ ÆÄÆ¼Å¬ ¼ö °è»ê 
-        float particlesPerSecond = gSpawnRate;
-        float particlesThisFrame = particlesPerSecond * gDeltaTime;
+        // ìˆ˜ëª… ì²´í¬
+        if (particle.age >= particle.lifeTime)
+        {
+            particle.isActive = 0;
+            particle.age = 0.0;
+        }
+    }
+    // ë¹„í™œì„± íŒŒí‹°í´ - ìŠ¤í° ì²´í¬
+    else
+    {
+        // ê° íŒŒí‹°í´ì˜ ìŠ¤í° ì‹œê°„ ê³„ì‚° (ìˆœí™˜ì )
+        float particleSpawnTime = float(particleIndex) / gSpawnRate;
         
-        // ´©Àû ¼Ò¼öÁ¡ Ã³¸®
-        float fractionalPart = frac(gTimeBuffer[0]);
-        float totalParticles = particlesThisFrame + fractionalPart;
+        // ìˆœí™˜ ìŠ¤í°: íŒŒí‹°í´ì´ ì£½ì€ í›„ ë‹¤ì‹œ ìŠ¤í°ë˜ë„ë¡
+        float spawnCycle = float(gMaxParticles) / gSpawnRate; // ì „ì²´ ì‚¬ì´í´ ì‹œê°„
+        float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0); // 2ë°° ì—¬ìœ 
         
-        // »ı¼ºÇÒ ÆÄÆ¼Å¬ ¼ö (Á¤¼öºÎ)
-        uint particlesToSpawn = min(uint(totalParticles), inactiveCount);
+        // í˜„ì¬ ì‚¬ì´í´ì—ì„œ ì´ íŒŒí‹°í´ì˜ ìŠ¤í° ì‹œê°„ì´ ë˜ì—ˆëŠ”ì§€ ì²´í¬
+        bool shouldSpawn = false;
         
-        // ³²Àº ¼Ò¼öÁ¡ ºÎºĞÀº ´ÙÀ½ ÇÁ·¹ÀÓÀ¸·Î
-        float remainingFraction = frac(totalParticles);
+        // ì²« ë²ˆì§¸ ì‚¬ì´í´ì—ì„œ ìŠ¤í° ì²´í¬
+        if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
+        {
+            shouldSpawn = true;
+        }
+        // ë‘ ë²ˆì§¸ ì‚¬ì´í´ì—ì„œ ìŠ¤í° ì²´í¬ (ì¬ìŠ¤í°)
+        else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
+                 cycleTime < (spawnCycle + particleSpawnTime + (1.0 / gSpawnRate)))
+        {
+            shouldSpawn = true;
+        }
         
-        // »ı¼ºÇÒ ÆÄÆ¼Å¬ ¼ö ÀúÀå
-        gSpawnCounter[0] = particlesToSpawn;
-        
-        // ³²Àº ¼Ò¼öÁ¡ ÀúÀå
-        gTimeBuffer[0] = remainingFraction;
+        if (shouldSpawn)
+        {
+            // ê³ í’ˆì§ˆ ëœë¤ ì‹œë“œ ìƒì„±
+            uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
+            
+            // íŒŒí‹°í´ ì´ˆê¸°í™” (ì´ì œ ëª¨ë“  ì´ë¯¸í„° íƒ€ì… ì§€ì›)
+            InitializeParticle(particle, seed);
+        }
     }
     
-    // ±×·ì µ¿±âÈ­
-    GroupMemoryBarrierWithGroupSync();
+    // ê²°ê³¼ ì €ì¥
+    gParticlesOutput[particleIndex] = particle;
     
-    // °¢ ½º·¹µå´Â Àü¿ª ÀÎµ¦½º¸¦ »ç¿ëÇÏ¿© ÆÄÆ¼Å¬ Ã³¸®
-    uint globalIndex = DTid.x;
-    uint spawnCount = gSpawnCounter[0];
-    uint inactiveCount = gInactiveParticleCount[0];
-    
-    // »ı¼ºÇÒ ÆÄÆ¼Å¬ ¼öº¸´Ù ÀÛ°í, ºñÈ°¼º ÆÄÆ¼Å¬ÀÌ ÃæºĞÈ÷ ÀÖ´Â °æ¿ì
-    if (globalIndex < spawnCount && globalIndex < inactiveCount)
+    // ì²« ë²ˆì§¸ ìŠ¤ë ˆë“œì—ì„œë§Œ ê¸€ë¡œë²Œ ëœë¤ ì‹œë“œ ì—…ë°ì´íŠ¸
+    if (DTid.x == 0)
     {
-        // ºñÈ°¼º ÀÎµ¦½º¿¡¼­ ÆÄÆ¼Å¬ ½½·Ô °¡Á®¿À±â
-        uint particleIndex = gInactiveParticleIndices[globalIndex];
-        
-        // À¯È¿ÇÑ ÀÎµ¦½ºÀÎÁö È®ÀÎ
-        if (particleIndex < gMaxParticles)
-        {
-            // ³­¼ö ½Ãµå »ı¼º
-            uint seed = wang_hash(particleIndex + DTid.x + gRandomCounter[0]);
-            InterlockedAdd(gRandomCounter[0], 1);
-            
-            // ÆÄÆ¼Å¬ ÃÊ±âÈ­
-            ParticleData particle = (ParticleData) 0;
-            InitializeParticle(particle, seed);
-            
-            // Áß¿ä: ÆÄÆ¼Å¬ µ¥ÀÌÅÍ¸¦ GPU ¹öÆÛ¿¡ ÀúÀå
-            gParticles[particleIndex] = particle;
-        }
+        gRandomSeed[0] = WangHash(gRandomSeed[0] + 1);
     }
 }

@@ -57,8 +57,8 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID)
     // 파티클이 활성화되지 않았으면 화면 밖으로 이동
     if (particle.isActive != 1)
     {
-        output.Position = float4(2.0, 2.0, 2.0, 1.0); // 화면 밖으로
-        output.TexCoord = input.TexCoord;
+        output.Position = float4(2.0, 2.0, 2.0, 0.0); // 화면 밖으로
+        output.TexCoord = float2(0, 0);
         output.TexIndex = 0;
         output.Color = float4(0, 0, 0, 0);
         return output;

@@ -1,9 +1,8 @@
-#include "../ShaderSystem.h"
+#include "ShaderSystem.h"
 #include "MovementModuleCS.h"
 
 void MovementModuleCS::Initialize()
 {
-    // 컴퓨트 셰이더 로드 (ShaderSystem에서 관리되는 컴퓨트 셰이더 가져오기)
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();
 }
@@ -111,8 +110,6 @@ void MovementModuleCS::Release()
     // 포인터 초기화
     m_computeShader = nullptr;
     m_movementParamsBuffer = nullptr;
-    m_inputSRV = nullptr;
-    m_outputUAV = nullptr;
 
     m_isInitialized = false;
 }
