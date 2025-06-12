@@ -966,7 +966,8 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		// Flatten 옵션일 때만 목표 높이 입력
 		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 		{
-			ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
+			//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
+			ImGui::SliderFloat("Strength", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 		}
 
 		// PaintLayer 옵션일 때만 레이어 선택
@@ -1000,6 +1001,26 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				ImGui::OpenPopup("AddLayerPopup");
 			}
 		}
+
+		//save , load
+		if (ImGui::Button("Save Terrain"))
+		{
+			file::path savePath = ShowSaveFileDialog(L"");
+			std::wstring folderPath = savePath.parent_path().wstring();
+			std::wstring fileName = savePath.filename().wstring();
+			terrainComponent->Save(folderPath, fileName);
+		}
+
+		if (ImGui::Button("Load Terrain"))
+		{
+			//todo:
+			/*file::path loadPath = ShowOpenFileDialog(L"");
+			if (!loadPath.empty())
+			{
+				terrainComponent->Load();
+			}*/
+		}
+
 	}
 
 	// 레이어 추가 팝업

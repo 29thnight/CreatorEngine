@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Core.Thread.hpp"
 #include "Component.h"
 #include "ResourceAllocator.h"
 #include "TerrainCollider.h"
@@ -163,7 +164,7 @@ struct TerrainLayer
     uint32_t m_layerID{ 0 };
     ID3D11Texture2D* diffuseTexture{ nullptr };
     ID3D11ShaderResourceView* diffuseSRV{ nullptr };
-    float fileFactor{ 1.0f };
+    float tilling{ 1.0f };
 };
 
 struct LayerDesc
@@ -197,12 +198,8 @@ class TerrainComponent : public Component
 {
 public:
     ReflectTerrainComponent
-        [[Serializable(Inheritance:Component)]]
-    TerrainComponent() {
-        m_name = "TerrainComponent";
-        m_typeID = TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>();
-        Initialize();
-    }
+    [[Serializable(Inheritance:Component)]]
+    TerrainComponent();
     virtual ~TerrainComponent() = default;
 
     [[Property]] 
@@ -398,9 +395,11 @@ public:
                     {
                     case TerrainBrush::Mode::Raise:
                         m_heightMap[idx] += t;
+						if (m_heightMap[idx] > m_maxHeight) m_heightMap[idx] = m_maxHeight; // 최대 높이 제한
                         break;
                     case TerrainBrush::Mode::Lower:
                         m_heightMap[idx] -= t;
+						if (m_heightMap[idx] < m_minHeight) m_heightMap[idx] = m_minHeight; // 최소 높이 제한
                         break;
                     case TerrainBrush::Mode::Flatten:
                         m_heightMap[idx] = brush.m_flatTargetHeight;
@@ -582,13 +581,19 @@ public:
 
 
 
-    void Save(){
-
-    }
+    void Save(const std::wstring& assetRoot, const std::wstring& name);
 
     void Load(){
 
     }
+
+    void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
+	void LoadEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
+
+	void SaveEditorSplatMap(const std::wstring& pngPath);
+	void LoadSplatMap(const std::wstring& pngPath);
+
+
 
     void loatFromPng(const std::string& filepath, std::vector<std::vector<float>>& outLayerWeights, int& outWidth, int& outHeights);
 
@@ -599,7 +604,7 @@ public:
 	
 		TerrainLayer newLayer;
 		newLayer.m_layerID = m_nextLayerID++;
-		newLayer.fileFactor = tilling;
+		newLayer.tilling = tilling;
 		// diffuseTexture 로드
         
 		if (!diffuseFile.empty()) {
@@ -864,4 +869,11 @@ private:
 
     float m_textureWidth;
     float m_textureHeight;
+
+	float m_minHeight{ -100.0f }; // 최소 높이 
+	float m_maxHeight{ 500.0f }; // 최대 높이
+    //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
+
+
+    ThreadPool m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
 };
