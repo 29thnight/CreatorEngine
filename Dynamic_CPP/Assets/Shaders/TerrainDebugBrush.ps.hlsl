@@ -21,6 +21,11 @@ cbuffer gBrush : register(b0)
 
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
+    float4 clipPos = IN.position;
+    float3 ndc = clipPos.xyz / clipPos.w;
+    float2 uv = 0.5 * ndc.xy + 0.5; // Convert NDC to UV space
+    uv.y = -uv.y;
+    
     float dist = length(IN.wPosition.xz - gBrushWorldPosition);
     float invBrushRadius = 1.0 / gBrushRadius;
     float clampRadius = dist * invBrushRadius;
@@ -31,6 +36,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     }
     else
     {
-        return float4(0, 0, 0, 0);
+        return targetTexture.Sample(LinearSampler, uv);
+
     }
 }

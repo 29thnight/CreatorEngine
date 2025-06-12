@@ -30,12 +30,17 @@ TerrainGizmoPass::TerrainGizmoPass()
         )
     );
 
-    copyTexture = Texture::Create(DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height, "copy", DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET);
+    m_pTempTexture = Texture::Create(
+        DeviceState::g_ClientRect.width, 
+        DeviceState::g_ClientRect.height, 
+        "copy", 
+        DXGI_FORMAT_R16G16B16A16_FLOAT, 
+        D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET);
 
-	copyTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+    m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	m_Buffer = DirectX11::CreateBuffer(
-		sizeof(MaterialInfomation),
+		sizeof(TerrainGizmoBuffer),
 		D3D11_BIND_CONSTANT_BUFFER,
 		nullptr
 	);
@@ -51,12 +56,11 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
     
-	DirectX11::CopyResource(copyTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_pTempTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
-	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
-    DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
     for (auto& obj : scene.GetScene()->m_SceneObjects) {
         if (obj->IsDestroyMark()) continue;
@@ -74,7 +78,7 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
                     DirectX11::UpdateBuffer(m_Buffer.Get(), &terrainGizmoBuffer);
                     DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-					DirectX11::PSSetShaderResources(0, 1, &copyTexture->m_pSRV);
+					DirectX11::PSSetShaderResources(0, 1, &m_pTempTexture->m_pSRV);
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix());
                     terrainMesh->Draw();
@@ -83,8 +87,9 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
         }
         
     }
-    ID3D11BlendState* nullBlendState = nullptr;
-    DirectX11::OMSetBlendState(nullBlendState, nullptr, 0xFFFFFFFF);
+    ID3D11RenderTargetView* nullrtv = nullptr;
+    deviceContext->OMSetRenderTargets(1, &nullrtv, nullptr);
+
 
 }
 
