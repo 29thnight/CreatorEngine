@@ -161,6 +161,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pLightMapPass = std::make_unique<LightMapPass>();
 
 
+	//SSGIPass
+	m_pSSGIPass = std::make_unique<SSGIPass>();
+	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get());
+
 	//LighingPass
 	m_pLightingPass = std::make_unique<LightingPass>();
 	m_pLightingPass->Initialize(m_lightingTexture.get());
@@ -451,11 +455,20 @@ void SceneRenderer::SceneRendering()
 				DirectX11::BeginEvent(L"DeferredPass");
 				Benchmark banch;
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
 			}
 		}
+
+		//{
+		//	DirectX11::BeginEvent(L"SSGIPass");
+		//	Benchmark banch;
+		//	m_pSSGIPass->Execute(*m_renderScene, *camera);
+		//	RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
+		//	DirectX11::EndEvent();
+		//}
 
 		{
 			DirectX11::BeginEvent(L"ForwardPass");

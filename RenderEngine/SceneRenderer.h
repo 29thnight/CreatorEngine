@@ -31,6 +31,7 @@
 #include "LightMapPass.h"
 #include "Effect/EffectManager.h"
 
+#include "SSGIPass.h"
 #include "LightingPass.h"
 
 #include "TestPlayer.h"
@@ -111,6 +112,7 @@ private:
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 
+	std::unique_ptr<SSGIPass>			m_pSSGIPass{};
 	std::unique_ptr<LightingPass>       m_pLightingPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;

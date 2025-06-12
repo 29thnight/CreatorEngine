@@ -172,6 +172,7 @@
     <ClCompile Include="GizmoLinePass.cpp" />
     <ClCompile Include="GizmoPass.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
+    <ClCompile Include="LightingPass.cpp" />
     <ClCompile Include="RenderCommand.cpp" />
     <ClCompile Include="ScreenSpaceReflectionPass.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="LightMapPass.cpp" />
     <ClCompile Include="PositionMapPass.cpp" />
+    <ClCompile Include="SSGIPass.cpp" />
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
@@ -241,6 +243,7 @@
     <ClInclude Include="GizmoLinePass.h" />
     <ClInclude Include="GizmoPass.h" />
     <ClInclude Include="GizmoRenderer.h" />
+    <ClInclude Include="LightingPass.h" />
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
@@ -254,6 +257,7 @@
     <ClInclude Include="LightMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
+    <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
     <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
@@ -605,6 +609,14 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSAO.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSR.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

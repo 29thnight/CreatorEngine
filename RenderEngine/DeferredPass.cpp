@@ -78,8 +78,8 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     m_pso->Apply();
 
     //DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::Transparent);
-    ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(1, &view, nullptr);
+    ID3D11RenderTargetView* view[2] = { camera.m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
+    DirectX11::OMSetRenderTargets(2, view, nullptr);
 
     auto& lightManager = scene.m_LightController;
 
@@ -144,7 +144,9 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     };
 
     DirectX11::PSSetShaderResources(0, 10, nullSRV);
-    DirectX11::UnbindRenderTargets();
+    //DirectX11::UnbindRenderTargets();
+    ID3D11RenderTargetView* nullview[2] = { nullptr, nullptr };
+    DirectX11::OMSetRenderTargets(2, nullview, nullptr);
 }
 
 void DeferredPass::ControlPanel()
@@ -153,4 +155,9 @@ void DeferredPass::ControlPanel()
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+}
+
+void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)
+{
+    m_LightEmissiveTexture = lightEmissive;
 }

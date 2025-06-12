@@ -29,6 +29,12 @@ TextureCube PrefilteredSpecMap : register(t7);
 Texture2D BrdfLUT : register(t8);
 Texture2D Emissive : register(t9);
 
+struct gOutput
+{
+    float4 Default : SV_TARGET0;
+    float4 LightEmissive : SV_TARGET1;
+};
+
 float3 CalculateWorldFromDepth(float depth, float2 texCoord)
 {
     // clip space between [-1, 1]
@@ -48,7 +54,7 @@ float3 CalculateWorldFromDepth(float depth, float2 texCoord)
     return worldSpace.xyz;
 }
 
-float4 main(PixelShaderInput IN) : SV_TARGET
+gOutput main(PixelShaderInput IN) : SV_TARGET
 {
     float depth = DepthTexture.Sample(PointSampler, IN.texCoord).r;
     float3 posW = CalculateWorldFromDepth(depth, IN.texCoord);
@@ -118,9 +124,14 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         ambient = (kD * diffuse + specular) * envMapIntensity;
     }
 
-    float ao = useAO ? AO.Sample(PointSampler, IN.texCoord).a : 1.0;
-    float3 GI = useAO ? AO.Sample(PointSampler, IN.texCoord).rgb : float3(0, 0, 0);
+    //float ao = useAO ? AO.Sample(PointSampler, IN.texCoord).a : 1.0;
+    //float3 GI = useAO ? AO.Sample(PointSampler, IN.texCoord).rgb : float3(0, 0, 0);
     ambient *= occlusion;
-    float3 colour = (ambient + Lo) * ao + emissive;// + GI * ao; //(albedo * GI * ao);
-    return float4(colour, 1.0);
+    float3 colour = ambient + Lo + emissive; //(ambient + Lo) * ao + emissive;// + GI * ao; //(albedo * GI * ao);
+    
+    gOutput output;
+    output.Default = float4(colour, 1.0);
+    output.LightEmissive = float4(Lo + emissive, 1.0);
+    return output;
+    //return float4(colour, 1.0);
 }

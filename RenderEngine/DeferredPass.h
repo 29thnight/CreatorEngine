@@ -14,6 +14,8 @@ public:
     void DisableAmbientOcclusion();
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+
+    void UseLightAndEmissiveRTV(Texture* lightEmissive);
 private:
     Texture* m_DiffuseTexture{};
     Texture* m_MetalRoughTexture{};
@@ -23,6 +25,8 @@ private:
     Texture* m_EnvironmentMap{};
     Texture* m_PreFilter{};
     Texture* m_BrdfLut{};
+
+    Texture* m_LightEmissiveTexture{};
 
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };
