@@ -13,6 +13,7 @@ public:
 	UniqueTexturePtr		  m_renderTarget{ TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr		  m_depthStencil{ TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr		  m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr		  m_SSRPrevTexture{ TEXTURE_NULL_INITIALIZER };
 	ID3D11DepthStencilView*   m_shadowMapDSVarr[cascadeCount]{};
 	ID3D11ShaderResourceView* sliceSRV[3]{};
 	ProxyContainer			  m_deferredQueue;

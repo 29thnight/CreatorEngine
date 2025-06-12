@@ -72,16 +72,6 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_prevSSRTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"PreviousSSRTexture",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
-	);
-	m_prevSSRTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_prevSSRTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-
 	m_prevCopiedSSRTexture = Texture::Create(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
