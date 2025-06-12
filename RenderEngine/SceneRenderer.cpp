@@ -351,6 +351,11 @@ void SceneRenderer::NewCreateSceneInitialize()
 	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
+	DataSystems->LoadModel("Punch.fbx");
+	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	testt = Model::LoadModelToSceneObj(model[0], *scene);
+	player.GetPlayer(testt);
+
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 }
@@ -358,12 +363,12 @@ void SceneRenderer::NewCreateSceneInitialize()
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-
 	//m_pEffectPass->Update(deltaTime);
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
+	player.Update(deltaTime);
 	m_renderScene->Update(deltaTime);
 	PrepareRender();
 }
