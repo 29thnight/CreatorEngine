@@ -17,7 +17,7 @@ public:
    ReflectAnimationController
 	[[Serializable]]
     AnimationController() = default;
-
+	~AnimationController();
     [[Property]]
     std::string name = "None";
 	[[Property]]
@@ -30,8 +30,8 @@ public:
 
 	std::set<std::string> StateNameSet;
 
+	[[Property]]
 	NodeEditor* m_nodeEditor;
-	//ax::NodeEditor::EditorContext* conEdit;
 	//어디에서든지 전이가능한 state모음
 	[[Property]]
 	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;
@@ -49,12 +49,16 @@ public:
 	[[Method]]
 	void CreateState_UI();
 
+	void DeleteState(std::string stateName);
+	void DeleteTransiton(const std::string& fromStateName, const std::string& toStateName);
+
 	AnimationState* FindState(std::string stateName);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
 	
-	AvatarMask* GetAvatarMask() { return &m_avatarMask; }
+	AvatarMask* GetAvatarMask() { return m_avatarMask; }
 	void CreateMask();
-	void CheckMask();
+	void ReCreateMask(AvatarMask* mask);//팩토리에서 옮길때 쓸용
+	void DeleteAvatarMask(); 
 	Animator* m_owner{};
 	float m_timeElapsed;
 	float m_nextTimeElapsed;
@@ -64,7 +68,10 @@ public:
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};
 	[[Property]]
-	AvatarMask m_avatarMask{};
+	AvatarMask* m_avatarMask{};
+	[[Property]]
+	bool useMask = false;
+	//&&&&& 아바타마스크 포인터로바꿈 수정필요
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;

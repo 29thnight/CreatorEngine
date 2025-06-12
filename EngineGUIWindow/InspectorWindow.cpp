@@ -734,65 +734,232 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 			if(showControllersWindow)
 			{
 				ImGui::Begin("Animation Controllers", &showControllersWindow);
-				//if (ImGui::CollapsingHeader("Controllers"))
+				int i = 0;
+				static int selectedControllerIndex = 0;
+				static int preSelectIndex = 0;
+				static int linkIndex = -1;
+				static int ClickNodeIndex = -1;
+				static int targetNodeIndex = -1;
+				static int selectedTransitionIndex = -1;
+				static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
+				static int AvatarControllerIndex = -1;
+				static bool showAvatarMaskWindow = false;
+				auto& controllers = animator->m_animationControllers;
+				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), true); 
+				if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				{
-					int i = 0;
-					static int selectedControllerIndex = 0;
-					static int preSelectIndex = 0;
-					ImGui::BeginChild("Controllers", ImVec2(200, 500), true); // 고정 너비, 스크롤 가능
-					ImGui::Text("Controllers");
-					ImGui::Separator();
-
-					auto& controllers = animator->m_animationControllers;
-					for(int index = 0; index < controllers.size(); ++index)
+					if (ImGui::BeginTabItem("Layers"))
 					{
-						auto& controller = controllers[index];
-						bool isSelected = (selectedControllerIndex == index);
-						ImGui::PushID(index);
-						
-						float selectableWidth = ImGui::GetContentRegionAvail().x - 33.0f; // 버튼 폭만큼 빼기
-					
-						if (ImGui::Selectable(controller->name.c_str(), isSelected, 0, ImVec2(selectableWidth, 0)))
+						ImGui::Separator();
+						for (int index = 0; index < controllers.size(); ++index)
 						{
-							selectedControllerIndex = index;
+							auto& controller = controllers[index];
+							bool isSelected = (selectedControllerIndex == index);
+							ImGui::PushID(index);
+
+							if (ImGui::Selectable(controller->name.c_str(), true,0,ImVec2(150,0)))
+							{
+								selectedControllerIndex = index;
+							}
+							ImGui::SameLine();
+							if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+							{
+								ImGui::OpenPopup("ControllerDetailPopup");
+							}
+
+							if (ImGui::BeginPopup("ControllerDetailPopup"))
+							{
+								ImGui::Text("Detail: %s", "ControllerDetailPopup");
+								ImGui::Separator();
+
+								char buffer[128];
+								strcpy_s(buffer, controller->name.c_str());
+								buffer[sizeof(buffer) - 1] = '\0';
+								ImGui::Text("Name");
+								ImGui::SameLine();
+								if (ImGui::InputText("##Controller Name", buffer, sizeof(buffer)))
+								{
+									controller->name = buffer;
+									controller->m_nodeEditor->ReNameJson(buffer);
+								}
+
+								ImGui::Text("Avatar Mask"); 
+								ImGui::SameLine();
+								if (controller->useMask)
+								{
+									if (ImGui::SmallButton(ICON_FA_PUZZLE_PIECE))
+									{
+										AvatarControllerIndex = i;
+										showAvatarMaskWindow = !showAvatarMaskWindow;
+									}
+									ImGui::SameLine();
+
+									if (ImGui::Button("Delete Avatar"))
+									{
+										controller->DeleteAvatarMask();
+									}
+								}
+								else
+								{
+									if (ImGui::Button("Craete Avatar"))
+									{
+										controller->CreateMask();
+									}
+								}
+								ImGui::Separator();
+
+								
+								ImGui::EndPopup();
+
+
+							}
+							ImGui::PopID();
 						}
+
+						if (showAvatarMaskWindow)
+						{
+							
+							if (ImGui::Begin("AvatarMask", &showAvatarMaskWindow))
+							{
+								// 내용물 UI 작성
+								ImGui::Text(controllers[AvatarControllerIndex]->name.c_str());
+								ImGui::Separator();
+								auto avatarMask = controllers[AvatarControllerIndex]->GetAvatarMask();
+								ImGui::Checkbox("isHumaniod", &avatarMask->isHumanoid);
+								ImGui::Separator();
+								ImGui::Separator();
+								auto& rootMask = avatarMask->RootMask;
+								std::function<void(BoneMask*)> drawMaskTree;
+								if (rootMask)
+								{
+									drawMaskTree = [&](BoneMask* mask)
+										{
+											// 고유 ID 만들기
+											std::string label = mask->boneName + "##" + mask->boneName;
+
+											// TreeNode는 펼칠 수 있는 드롭다운 역할
+											if (ImGui::TreeNode(label.c_str()))
+											{
+												// Checkbox를 트리 노드 안에 표시
+												ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
+
+												for (auto& child : mask->m_children)
+												{
+													drawMaskTree(child); // 재귀 호출
+												}
+
+												ImGui::TreePop();
+											}
+										};
+									drawMaskTree(rootMask); // depth 0에서 시작
+								}
+
+							}
+							ImGui::End(); 
+						}
+						ImGui::Separator();
+						if (ImGui::Button("Create Layer"))
+						{
+							animator->CreateController_UI();
+						}
+						ImGui::EndTabItem();
+					}
+					if (ImGui::BeginTabItem("Parameters"))
+					{
+						ImGui::Separator();
+
+						auto& parameters = animator->Parameters;
+						ImGui::Text("parameter");
 						ImGui::SameLine();
-						if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+						if (ImGui::SmallButton(ICON_FA_PLUS))
 						{
-							ImGui::OpenPopup("ControllerDetailPopup");
+							ImGui::OpenPopup("AddParameterPopup");	
 						}
-						
-						if (ImGui::BeginPopup("ControllerDetailPopup"))
+						if (ImGui::BeginPopup("AddParameterPopup"))
 						{
-							ImGui::Text("Detail: %s", "ControllerDetailPopup");
-							ImGui::Separator();
-
-							const auto& mat_controller_type = Meta::Find("AnimationController");
-							Meta::DrawProperties(controller, *mat_controller_type);
-							Meta::DrawMethods(controller, *mat_controller_type);
-
+							if (ImGui::MenuItem("Add Float"))
+							{
+								animator->AddDefaultParameter(ValueType::Float);
+							}
+							if (ImGui::MenuItem("Add Int"))
+							{
+								animator->AddDefaultParameter(ValueType::Int);
+							}
+							if (ImGui::MenuItem("Add Bool"))
+							{
+								animator->AddDefaultParameter(ValueType::Bool);
+							}
+							if (ImGui::MenuItem("Add Trigger"))
+							{
+								animator->AddDefaultParameter(ValueType::Trigger);
+							}
 							ImGui::EndPopup();
 						}
-						ImGui::PopID();
-					}
-					ImGui::EndChild();
+						ImGui::Separator();
+						for (int index = 0; index < parameters.size(); ++index)
+						{
+							ImGui::PushID(index);
+							auto& parameter = parameters[index];
+							char buffer[128];
+							strcpy_s(buffer, parameter->name.c_str());
+							buffer[sizeof(buffer) - 1] = '\0';
+							if(ImGui::InputText("", buffer, sizeof(buffer)))
+							{
+							
+								for (auto& controller : controllers)
+								{
+									for (auto& state : controller->StateVec)
+									{
+										for (auto& transtion : state->Transitions)
+										{
+											for (auto& condition : transtion->conditions)
+											{
+												if (condition.valueName == parameter->name)
+												{
+													condition.valueName = buffer;
+												}
+											}
+										}
+									}
+								}
+								parameter->name = buffer;
+							}
+							ImGui::SameLine();
+							if (ImGui::SmallButton(ICON_FA_MINUS))
+							{
+								animator->DeleteParameter(index);
+							}
 
+							ImGui::PopID();
+						}
+
+						ImGui::EndTabItem();
+					}
+
+					ImGui::EndTabBar();
+				 }
+					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Controller Info", ImVec2(0, 500), true); 
+					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), true); 
 					ImGui::Text("Controller Info");
 					ImGui::Separator();
+					auto& controller = animator->m_animationControllers[selectedControllerIndex];
+					auto& nodeEdtior = controller->m_nodeEditor;
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
-						static int linkIndex = -1;
+						//auto& controller = animator->m_animationControllers[selectedControllerIndex];
+						static bool isOpenPopUp;
+						static bool isOpenNodePopUp;
 						if (preSelectIndex != selectedControllerIndex)
 						{
 							linkIndex = -1;
+							ClickNodeIndex = -1;
+							targetNodeIndex = -1;
 							preSelectIndex = selectedControllerIndex;
+							isOpenPopUp = false;
+							isOpenNodePopUp = false;
 						}
-						auto& controller = animator->m_animationControllers[selectedControllerIndex];
 						std::string fileName = controller->name + ".node_editor.json";
-
-						if (!controller->StateVec.empty())
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
 							for (auto& state : controller->StateVec)
@@ -808,35 +975,63 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								}
 							}
 							controller->m_nodeEditor->DrawLink(&linkIndex);
-							controller->m_nodeEditor->DrawNode();
+							controller->m_nodeEditor->DrawNode(&ClickNodeIndex);
+							controller->m_nodeEditor->Update();
 							
-							if (linkIndex != -1)
+							if (targetNodeIndex != -1)
 							{
-								ImGui::Begin("cur Link");
-								ImGui::Text("From:  %s", controller->m_nodeEditor->Links[linkIndex]->fromNode.c_str());
-								ImGui::Text("To:  %s", controller->m_nodeEditor->Links[linkIndex]->toNode.c_str());
-								ImGui::End();
+								auto states = controller->StateVec;
+								int curIndex = controller->m_nodeEditor->seletedCurNodeIndex;
+								controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
+								targetNodeIndex = -1;
 							}
-
-							static bool isOpenPopUp;
-
+							if (ClickNodeIndex != -1)
+							{
+								isOpenNodePopUp = true;
+							}
 							if (ed::ShowBackgroundContextMenu())
 							{
+								if (isOpenNodePopUp)
+								{
+									isOpenNodePopUp = false;
+									ClickNodeIndex = -1;
+								}
 								isOpenPopUp = true;
-								/*ImGui::OpenPopup("NodeEditorContextMenu");*/
 							}
 							else
 							{
 								isOpenPopUp = false;
 							}
-
 							controller->m_nodeEditor->EndEdit();
-
+							if (isOpenNodePopUp)
+							{
+								ImGui::OpenPopup("NodeMenu");
+							}
+							if (ImGui::BeginPopup("NodeMenu"))
+							{
+								if (ImGui::MenuItem("Make Transition"))
+								{
+									controller->m_nodeEditor->MakeNewLink(&targetNodeIndex);
+									isOpenNodePopUp = false;
+									ClickNodeIndex = -1;
+								}
+								if (ImGui::MenuItem("Delete State"))
+								{
+									controller->DeleteState(controller->StateVec[ClickNodeIndex]->m_name);
+									isOpenNodePopUp = false;
+									
+									if (ClickNodeIndex == controller->m_nodeEditor->seletedCurNodeIndex)
+									{
+										controller->m_nodeEditor->seletedCurNodeIndex = -1;
+									}
+									ClickNodeIndex = -1;
+								}
+								ImGui::EndPopup();
+							}
 							if (isOpenPopUp)
 							{
 								ImGui::OpenPopup("NodeEditorContextMenu");
 							}
-
 							if (ImGui::BeginPopup("NodeEditorContextMenu"))
 							{
 								if (ImGui::MenuItem("Add Node"))
@@ -847,54 +1042,350 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 								ImGui::EndPopup();
 							}
-							
+
+							if (ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+							{
+								ImGui::CloseCurrentPopup();
+								isOpenNodePopUp = false;
+								ClickNodeIndex = -1;
+							}
 						}
 					}
 
 					ImGui::EndChild();
-				}
-				ImGui::End(); // 창 닫기
-			}			
+					ImGui::SameLine();
+					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), true);
+					ImGui::Text("Inspector");
+					ImGui::Separator();
+					if (controller->m_nodeEditor->m_selectedType == SelectedType::Link && linkIndex != -1)
+					{
+						if (preInspectorIndex != linkIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
+						preInspectorIndex = linkIndex;
+						ImGui::Text("Transitions");
+						ImGui::Separator();
+						std::string fromNode = controller->m_nodeEditor->Links[linkIndex]->fromNode->name;
+						std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode->name;
+						auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
+
+						for (auto& transiton : transitions)
+						{
+							std::string curStateName = transiton->GetCurState();
+							std::string nextStateName = transiton->GetNextState();
+							std::string transitionName = curStateName + " to " + nextStateName;
+							if (ImGui::Selectable(transitionName.c_str(), true))
+							{
+								selectedTransitionIndex = i;
+							}
+
+							if (selectedTransitionIndex != -1)
+							{
+								ImGui::Separator();
+								ImGui::Separator();
+								ImGui::Text("Conditions");
+								ImGui::Separator();
+								auto& conditions = transiton->conditions;
+								if (conditions.empty())
+								{
+									ImGui::Text("Empty Conditions");
+								}
+								else
+								{
+									for (int i = 0; i < conditions.size(); ++i)
+									{
+										ImGui::PushID(i);
+										auto& condition = conditions[i];
+										auto parameter = condition.valueParameter;
+										std::string parameterName;
+										if (parameter == nullptr)
+										{
+											parameterName = "NoParameter";
+										}
+										else
+										{
+											parameterName = parameter->name;
+										}
+										auto& compareParameter = condition.CompareParameter;
+				
+										if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
+										{
+											ImGui::OpenPopup("ConditionIndexSelect");
+										}
+										ImGui::SameLine();
+										if (parameter != nullptr)
+										{
+											if (parameter->vType != ValueType::Trigger)
+											{
+												if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
+												{
+													ImGui::OpenPopup("ConditionTypeMenu");
+												}
+											}
+											ImGui::SameLine();
+											ImGui::SetNextItemWidth(120);
+											if (parameter->vType == ValueType::Int)
+											{
+
+												ImGui::InputInt("##", &compareParameter.iValue);
+											}
+											else if (parameter->vType == ValueType::Float)
+											{
+												ImGui::InputFloat("##", &compareParameter.fValue);
+											}
+											else if (parameter->vType == ValueType::Bool)
+											{
+												ImGui::Checkbox("##", &compareParameter.bValue);
+											}
+											else if (parameter->vType == ValueType::Trigger)
+											{
+												ImGui::Text("trigger");
+											}
+											if (ImGui::BeginPopup("ConditionIndexSelect"))
+											{
+												for (auto& param : animator->Parameters)
+												{
+													if (ImGui::MenuItem(param->name.c_str()))
+													{
+														condition.SetCondition(param->name);
+													}
+												}
+												ImGui::EndPopup();
+											}
+										}
+										else
+										{
+											ImGui::Text("No Parmeter", ImVec2(70, 0));
+										}
+										if (ImGui::BeginPopup("ConditionTypeMenu"))
+										{
+											if (parameter->vType == ValueType::Int || parameter->vType == ValueType::Float)
+											{
+												if (ImGui::MenuItem("Greater"))
+													condition.SetConditionType(ConditionType::Greater);
+												else if (ImGui::MenuItem("Less"))
+													condition.SetConditionType(ConditionType::Less);
+												else if (ImGui::MenuItem("Equal"))
+													condition.SetConditionType(ConditionType::Equal);
+												else if (ImGui::MenuItem("NotEqual"))
+													condition.SetConditionType(ConditionType::NotEqual);
+											}
+											else if (parameter->vType == ValueType::Bool)
+											{
+												if (ImGui::MenuItem("True"))
+													condition.SetConditionType(ConditionType::True);
+												else if (ImGui::MenuItem("False"))
+													condition.SetConditionType(ConditionType::False);
+											}
+											ImGui::EndPopup();
+										}
+										ImGui::SameLine();
+										if (ImGui::Button("-"))
+										{
+											transiton->DeleteCondition(i);
+										}
+										ImGui::PopID();
+									}
+								}
+								if (ImGui::Button("+"))
+								{
+									if (animator->Parameters.empty())
+									{
+									}
+									else
+									{
+										auto firstParam = animator->Parameters[0];
+										transiton->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
+									}
+								}
+							}
+							if (ImGui::Button("Delete Transition All"))
+							{
+								linkIndex = -1;
+								controller->DeleteTransiton(transiton->GetCurState(), transiton->GetNextState());
+							}
+						}
+						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+					}
+					else if (nodeEdtior->m_selectedType == SelectedType::Node && nodeEdtior->seletedCurNodeIndex != -1)
+					{
+						//&&&&& behaviour script 관리할 공간 만들기필요
+						if (preInspectorIndex != nodeEdtior->seletedCurNodeIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
+						preInspectorIndex = nodeEdtior->seletedCurNodeIndex;
+						ImGui::Text("State");
+						ImGui::Separator();
+						ImGui::PushID(nodeEdtior->seletedCurNodeIndex);
+						auto& state = controller->StateVec[nodeEdtior->seletedCurNodeIndex];
+						char buffer[128];
+						strcpy_s(buffer, state->m_name.c_str());
+						buffer[sizeof(buffer) - 1] = '\0';
+						ImGui::Text("State Name");
+						ImGui::SameLine();
+						if (ImGui::InputText("##State Name", buffer, sizeof(buffer)))
+						{
+							state->m_name = buffer;
+							nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+						}
+						ImGui::Text("Animation Index");
+						ImGui::SameLine();
+						if (ImGui::InputInt("##Animation Index", &state->AnimationIndex))
+						{
+
+						}
+
+						ImGui::Separator();
+						ImGui::Text("Transitions");
+						if (state->Transitions.empty())
+						{
+							ImGui::Text("Empty Transiton");
+						}
+						else
+						{
+							for (int i = 0; i < state->Transitions.size(); ++i)
+							{
+								std::string curStateName = state->Transitions[i]->GetCurState();
+								std::string nextStateName = state->Transitions[i]->GetNextState();
+								std::string transitionName = curStateName + " to " + nextStateName;
+								if (ImGui::Selectable(transitionName.c_str(), true))
+								{
+									selectedTransitionIndex = i;
+								}
+							}
+						}
+						if (selectedTransitionIndex != -1)
+						{
+							ImGui::Separator();
+							ImGui::Separator();
+							ImGui::Text("Conditions");
+							ImGui::Separator();
+							auto& transition = state->Transitions[selectedTransitionIndex];
+							auto& conditions = transition->conditions;
+							if (conditions.empty())
+							{
+								ImGui::Text("Empty Conditions");
+							}
+							else
+							{
+								for (int i = 0; i < conditions.size(); ++i)
+								{
+									ImGui::PushID(i);
+									auto& condition = conditions[i];
+									auto parameter = condition.valueParameter;
+									std::string parameterName;
+									if (parameter == nullptr)
+									{
+										parameterName = "NoParameter";
+									}
+									else
+									{
+										parameterName = parameter->name;
+									}
+									auto& compareParameter = condition.CompareParameter;
+
+									if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
+									{
+										ImGui::OpenPopup("ConditionIndexSelect");
+									}
+									ImGui::SameLine();
+									if (parameter != nullptr)
+									{
+										if (parameter->vType != ValueType::Trigger)
+										{
+											if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
+											{
+												ImGui::OpenPopup("ConditionTypeMenu");
+											}
+										}
+										ImGui::SameLine();
+										ImGui::SetNextItemWidth(120);
+										if (parameter->vType == ValueType::Int)
+										{
+
+											ImGui::InputInt("##", &compareParameter.iValue);
+										}
+										else if (parameter->vType == ValueType::Float)
+										{
+											ImGui::InputFloat("##", &compareParameter.fValue);
+										}
+										else if (parameter->vType == ValueType::Bool)
+										{
+											ImGui::Checkbox("##", &compareParameter.bValue);
+										}
+										else if (parameter->vType == ValueType::Trigger)
+										{
+											ImGui::Text("trigger");
+										}
+										if (ImGui::BeginPopup("ConditionIndexSelect"))
+										{
+											for (auto& param : animator->Parameters)
+											{
+												if (ImGui::MenuItem(param->name.c_str()))
+												{
+													condition.SetCondition(param->name);
+												}
+											}
+											ImGui::EndPopup();
+										}
+									}
+									else
+									{
+										ImGui::Text("No Parmeter", ImVec2(70, 0));
+									}
+									if (ImGui::BeginPopup("ConditionTypeMenu"))
+									{
+										if (parameter->vType == ValueType::Int || parameter->vType == ValueType::Float)
+										{
+											if (ImGui::MenuItem("Greater"))
+												condition.SetConditionType(ConditionType::Greater);
+											else if (ImGui::MenuItem("Less"))
+												condition.SetConditionType(ConditionType::Less);
+											else if (ImGui::MenuItem("Equal"))
+												condition.SetConditionType(ConditionType::Equal);
+											else if (ImGui::MenuItem("NotEqual"))
+												condition.SetConditionType(ConditionType::NotEqual);
+										}
+										else if (parameter->vType == ValueType::Bool)
+										{
+											if (ImGui::MenuItem("True"))
+												condition.SetConditionType(ConditionType::True);
+											else if (ImGui::MenuItem("False"))
+												condition.SetConditionType(ConditionType::False);
+										}
+										ImGui::EndPopup();
+									}
+									ImGui::SameLine();
+									if (ImGui::Button("-"))
+									{
+										transition->DeleteCondition(i);
+									}
+									ImGui::PopID();
+								}
+							}
+							if (ImGui::Button("+"))
+							{
+								if (animator->Parameters.empty())
+								{
+								}
+								else
+								{
+									auto firstParam = animator->Parameters[0];
+									transition->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
+								}
+							}
+						}
+						ImGui::PopID();
+					}
+					ImGui::EndChild();
+				ImGui::End();
+			}		
+
+
+
 		}
 	}
-}
-
-void InspectorWindow::DrawMyLink(std::string linkName, std::string from, std::string to)
-{
-	ed::LinkId linkId = static_cast<ed::LinkId>(std::hash<std::string>{}(linkName));
-	ed::NodeId nodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(from));
-	ed::NodeId nextnodeID = static_cast<ed::NodeId>(std::hash<std::string>{}(to));
-	ed::LinkId reverselinkId = static_cast<ed::LinkId>(std::hash<std::string>{}(std::string(to + " to " + from)));
-	ImVec2 p1 = ed::GetNodePosition(nodeID);
-	ImVec2 p2 = ed::GetNodePosition(nextnodeID);
-
-	// 오프셋을 줘서 겹침 방지
-	//float offset = ((linkId % 3) - 1) * 20.0f;
-	
-	// 중간 꺾이는 지점
-	//ImVec2 mid1 = ImVec2(p1.x + offset, p1.y);
-	//ImVec2 mid2 = ImVec2(p1.x + offset, p2.y);
-
-
-	ImVec2 dir = p2 - p1;          // 상대 방향
-	float length = sqrt(dir.x * dir.x + dir.y * dir.y);
-	ImVec2 normDir = ImVec2(dir.x / length, dir.y / length); // 정규화
-
-
-	// 현재 윈도우에서 DrawList 얻기
-	ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-
-
-	ImU32 color = IM_COL32(255, 255, 255, 255);
-	float thickness = 2.0f;
-
-
-
-	// 3단 꺾인 직선 그리기
-	drawList->AddLine(p1, p2, color, thickness);
-	/*drawList->AddLine(p1, mid1, color, thickness);
-	drawList->AddLine(mid1, mid2, color, thickness);
-	drawList->AddLine(mid2, p2, color, thickness);*/
 }
 
