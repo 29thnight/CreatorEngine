@@ -31,6 +31,8 @@
 #include "LightMapPass.h"
 #include "Effect/EffectManager.h"
 
+#include "LightingPass.h"
+
 #include "TestPlayer.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
@@ -103,11 +105,13 @@ private:
 	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
 	std::unique_ptr<ScreenSpaceReflectionPass> m_pScreenSpaceReflectionPass{};
 	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
-	std::unique_ptr<VignettePass> m_pVignettePass{};
-	std::unique_ptr<ColorGradingPass> m_pColorGradingPass{};
-	std::unique_ptr<VolumetricFogPass> m_pVolumetricFogPass{};
+	std::unique_ptr<VignettePass>		m_pVignettePass{};
+	std::unique_ptr<ColorGradingPass>	m_pColorGradingPass{};
+	std::unique_ptr<VolumetricFogPass>	m_pVolumetricFogPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
+
+	std::unique_ptr<LightingPass>       m_pLightingPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;
 
@@ -118,6 +122,8 @@ private:
 	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
+
+	UniqueTexturePtr m_lightingTexture		   { TEXTURE_NULL_INITIALIZER };
 
 	//sampler
 	Sampler* m_linearSampler{};

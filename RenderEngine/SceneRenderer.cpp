@@ -159,6 +159,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//lightmapPass
 	m_pLightMapPass = std::make_unique<LightMapPass>();
+
+
+	//LighingPass
+	m_pLightingPass = std::make_unique<LightingPass>();
+	m_pLightingPass->Initialize(m_lightingTexture.get());
+
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
 			auto scene = SceneManagers->GetActiveScene();
@@ -297,6 +303,14 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
+
+	auto lightingTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"LightingRTV",
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+    m_lightingTexture.swap(lightingTexture);
 }
 
 void SceneRenderer::NewCreateSceneInitialize()

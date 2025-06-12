@@ -48,14 +48,14 @@ float3 CalculateViewSpaceFromDepth(float depth, float2 texCoord)
 {
     // clip space between [-1, 1]
     // flip y so that +ve y is upwards
-    float2 clipXY = texCoord * 2.0 - 1.0;
+    float2 clipXY = texCoord;// * 2.0 - 1.0;
     clipXY.y = -clipXY.y;
 
     // NOTE: depth is not linearized
     // Also in range [0, 1] due to DirectX Convention
     float4 clipSpace = float4(clipXY, depth, 1);
     float4 viewSpace = mul(inverseProjection, clipSpace);
-    viewSpace /= viewSpace.w;
+    //viewSpace /= viewSpace.w;
     return viewSpace.xyz;
 }
 
@@ -64,7 +64,7 @@ float3 TangentSpacePos(float3 p, float3 np)
     float3 eyeVec = normalize(p);
     float3 upVec = abs(np.z) < 0.999 ? float3(0, 0, 1) : float3(0, 1, 0);
     float3 tangent = normalize(cross(upVec, np));
-    float3 bitangent = cross(np, tangent);
+    float3 bitangent = -cross(np, tangent);
     return float3(dot(p, tangent), dot(p, bitangent), dot(p, eyeVec));
 }
 float3 TangentSpacePos(float3x3 tbn, float3 p)
@@ -76,7 +76,7 @@ float3 TangentSpaceNorm(float3 p, float3 np)
     float3 eyeVec = normalize(p);
     float3 upVec = abs(np.z) < 0.999 ? float3(0, 0, 1) : float3(0, 1, 0);
     float3 tangent = normalize(cross(upVec, np));
-    float3 bitangent = cross(np, tangent);
+    float3 bitangent = -cross(np, tangent);
     return float3(dot(np, tangent), dot(np, bitangent), dot(np, eyeVec));
 }
 float2 GetDirection(uint i, float2 noise)
@@ -90,55 +90,55 @@ float ARand21(float2 p)
 }
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    float depth = gDepthTex.Sample(PointSampler, IN.texCoord).r;
-    if (depth >= 1)
-        return float4(1.0, 1.0, 1.0, 1.0);
+    //float depth = gDepthTex.Sample(PointSampler, IN.texCoord).r;
+    //if (depth >= 1)
+    //    return float4(1.0, 1.0, 1.0, 1.0);
 
-    float3 posW = CalculateWorldFromDepth(depth, IN.texCoord);
-    float3 normal = gNormalTex.Sample(PointSampler, IN.texCoord).rgb;
-    normal = normalize(normal * 2.0 - 1.0);
-    float centerDepth = distance(posW, cameraPos.xyz);
-    float2 noiseScale = windowSize / 4.0;
-    float3 randDir = gNoise.Sample(PointSampler, IN.texCoord * noiseScale).rgb;
+    //float3 posW = CalculateWorldFromDepth(depth, IN.texCoord);
+    //float3 normal = gNormalTex.Sample(PointSampler, IN.texCoord).rgb;
+    //normal = normalize(normal * 2.0 - 1.0);
+    //float centerDepth = distance(posW, cameraPos.xyz);
+    //float2 noiseScale = windowSize / 4.0;
+    //float3 randDir = gNoise.Sample(PointSampler, IN.texCoord * noiseScale).rgb;
 
-    float3 tangent = normalize(randDir - normal * dot(randDir, normal));
-    float3 bitangent = cross(normal, tangent);
-    float3x3 tbn = transpose(float3x3(tangent, bitangent, normal));
+    //float3 tangent = normalize(randDir - normal * dot(randDir, normal));
+    //float3 bitangent = cross(normal, tangent);
+    //float3x3 tbn = transpose(float3x3(tangent, bitangent, normal));
 
-    float occlusion = 0.0;
-    for (int i = 0; i < 64; ++i)
-    {
-        // find out a desired world position to sample
-        float3 kernelPosW = mul(tbn, kernel[i].rgb);
-        float3 samplePosW = posW + kernelPosW * radius;
-        float sampleDepth = distance(samplePosW, cameraPos.xyz);
+    //float occlusion = 0.0;
+    //for (int i = 0; i < 64; ++i)
+    //{
+    //    // find out a desired world position to sample
+    //    float3 kernelPosW = mul(tbn, kernel[i].rgb);
+    //    float3 samplePosW = posW + kernelPosW * radius;
+    //    float sampleDepth = distance(samplePosW, cameraPos.xyz);
 
-        // project it to the clip space so we know where can sample from the depth buffer
-        float4 samplePosClip = mul(viewProjection, float4(samplePosW, 1));
-        samplePosClip /= samplePosClip.w;
+    //    // project it to the clip space so we know where can sample from the depth buffer
+    //    float4 samplePosClip = mul(viewProjection, float4(samplePosW, 1));
+    //    samplePosClip /= samplePosClip.w;
 
-        // invert y and put to [0 - 1]
-        float2 sampleUV = float2(samplePosClip.x, -samplePosClip.y) * 0.5f + 0.5f;
+    //    // invert y and put to [0 - 1]
+    //    float2 sampleUV = float2(samplePosClip.x, -samplePosClip.y) * 0.5f + 0.5f;
 
-        // reject samples outside of the range
-        if (sampleUV.x < 0 || sampleUV.x > 1 || sampleUV.y < 0 || sampleUV.y > 1)
-        {
-            occlusion += 0.0;
-            continue;
-        }
+    //    // reject samples outside of the range
+    //    if (sampleUV.x < 0 || sampleUV.x > 1 || sampleUV.y < 0 || sampleUV.y > 1)
+    //    {
+    //        occlusion += 0.0;
+    //        continue;
+    //    }
 
-        // sample our scene for actual depth
-        float depthFromTex = gDepthTex.Sample(PointSampler, sampleUV.xy).r;
-        float3 scenePos = CalculateWorldFromDepth(depthFromTex, sampleUV.xy);
-        float sceneDepth = distance(scenePos, cameraPos.xyz);
+    //    // sample our scene for actual depth
+    //    float depthFromTex = gDepthTex.Sample(PointSampler, sampleUV.xy).r;
+    //    float3 scenePos = CalculateWorldFromDepth(depthFromTex, sampleUV.xy);
+    //    float sceneDepth = distance(scenePos, cameraPos.xyz);
 
-        float depthDiff = abs(sceneDepth - centerDepth);
-        float rangeCheck = smoothstep(0.0, 1.0, radius / depthDiff);
-        occlusion += step(sceneDepth, sampleDepth) * rangeCheck;
-    }
-    occlusion /= 64.0;
-    float factor = 1 - occlusion;
-    return float4(factor, factor, factor, factor);
+    //    float depthDiff = abs(sceneDepth - centerDepth);
+    //    float rangeCheck = smoothstep(0.0, 1.0, radius / depthDiff);
+    //    occlusion += step(sceneDepth, sampleDepth) * rangeCheck;
+    //}
+    //occlusion /= 64.0;
+    //float factor = 1 - occlusion;
+    //return float4(factor, factor, factor, factor);
     
     
     
@@ -377,71 +377,86 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     
     
     
-    //float AO = 0;
-    //float3 GI = 0;
-    //for (int i = 0; i < Nd; ++i)
-    //{
-    //    float2 noise = frac(sin(dot(uv, uint2(12.9898, 78.233))) * float2(43758.5453, 12345.6789));
-    //    float2 dir = GetDirection(i, noise);
-    //    //float angle = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453)) * (2 * PI / Nd);
-    //    //float2 dir = float2(cos(angle), sin(angle));
+    float2 uv = IN.texCoord;
+    float depth = gDepthTex.Sample(PointSampler, IN.texCoord).r;
+    if (depth >= 1)
+        return float4(1.0, 0, 0, 1.0);
+    
+    float3 p = CalculateViewSpaceFromDepth(depth, IN.texCoord);
+    float3 np = gNormalTex.Sample(PointSampler, IN.texCoord).rgb;
+    np = normalize(np * 2.0 - 1.0);
+    p = TangentSpacePos(p, np);    
+    
+    float AO = 0;
+    float3 GI = 0;
+    for (int i = 0; i < Nd; ++i)
+    {
+        float2 noise = frac(sin(dot(uv, uint2(12.9898, 78.233))) * float2(43758.5453, 12345.6789));
+        float2 dir = GetDirection(i, noise);
+        //float angle = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453)) * (2 * PI / Nd);
+        //float2 dir = float2(cos(angle), sin(angle));
 
-    //    uint bitmask = 0;
+        uint bitmask = 0;
 
-    //    for (int j = 0; j < Ns; ++j)
-    //    {
-    //        float step = radius * ((j + 1.0) / (Ns + 1.0));
-    //        float2 offsetUV = uv + dir * step;
+        for (int j = 0; j < Ns; ++j)
+        {
+            float pixelPerUnit = 1080.0 / (2.0f * tan(60 * 0.5f));
+            float r = radius / depth * pixelPerUnit / 100.0;
+            float step = r * ((j + 1.0) / (Ns + 1.0));
+            float2 offsetUV = uv + dir * step;
 
-    //        float3 sf = CalculateViewSpaceFromDepth(gDepthTex.Sample(PointSampler, offsetUV).r, offsetUV); //SamplePosition(offsetUV);
-    //        float3 nj = normalize(gNormalTex.Sample(PointSampler, offsetUV).rgb * 2.0 - 1.0);
-    //        sf = TangentSpacePos(sf, nj);
+            float3 sf = CalculateViewSpaceFromDepth(gDepthTex.Sample(PointSampler, offsetUV).r, offsetUV); //SamplePosition(offsetUV);
+            float3 nj = normalize(gNormalTex.Sample(PointSampler, offsetUV).rgb * 2.0 - 1.0);
+            sf = TangentSpacePos(sf, nj);
             
             
-    //        float3 sb = sf - (thickness * p / length(p));
-    //        float3 delta = sf - p;
+            float3 sb = sf - (thickness * p / length(p));
+            float3 delta = sf - p;
             
-    //        float theta_f = atan2(sf.y, sf.x);
-    //        float theta_b = atan2(sb.y, sb.x);
-    //        float thetaMin = min(theta_f, theta_b);
-    //        float thetaMax = max(theta_f, theta_b);
-    //        uint a = uint(floor((thetaMin + PI / 2) / PI * Nb));
-    //        uint b = uint(ceil((thetaMax - thetaMin + PI / 2) / PI * Nb));
-    //        uint bj = ((1u << b) - 1u) ^ ((1u << a) - 1u);
+            float theta_f = atan2(sf.y, sf.x);
+            float theta_b = atan2(sb.y, sb.x);
+            float thetaMin = min(theta_f, theta_b);
+            float thetaMax = max(theta_f, theta_b);
+            uint a = uint(floor((thetaMin + PI / 2) / PI * Nb));
+            uint b = uint(ceil((thetaMax - thetaMin + PI / 2) / PI * Nb));
+            uint bj = ((1u << b) - 1u) ^ ((1u << a) - 1u);
             
-    //        //float3 cj = GBuffer2.Load(int3(sampleCoord, 0)).xyz;
-    //        float3 lj = normalize(sf - p);
-    //        uint newBits = bj & (~bitmask);
-    //        uint bitCount = countbits(newBits);
-    //        // Thickness check
-    //        //if (abs(dot(delta, np)) > thickness)
-    //        //    continue;
+            //float3 cj = GBuffer2.Load(int3(sampleCoord, 0)).xyz;
+            float3 lj = normalize(sf - p);
+            uint newBits = bj & (~bitmask);
+            uint bitCount = countbits(newBits);
+            // Thickness check
+            //if (abs(dot(delta, np)) > thickness)
+            //    continue;
 
-    //        //float3 lj = normalize(delta);
-    //        //float3 nj = normalize(gNormalTex.Sample(PointSampler, offsetUV).rgb * 2.0 - 1.0);
-    //        //float3 col = gColor.Sample(PointSampler, offsetUV).rgb;
+            //float3 lj = normalize(delta);
+            //float3 nj = normalize(gNormalTex.Sample(PointSampler, offsetUV).rgb * 2.0 - 1.0);
+            float3 col = gColor.Sample(PointSampler, offsetUV).rgb;
 
-    //        //float theta = atan2(delta.y, delta.x);
-    //        //if (theta < 0)
-    //        //    theta += 2 * PI;
+            //float theta = atan2(delta.y, delta.x);
+            //if (theta < 0)
+            //    theta += 2 * PI;
 
-    //        //int bitIndex = int((theta / (2 * PI)) * Nb);
-    //        //uint bj = 1 << bitIndex;
+            //int bitIndex = int((theta / (2 * PI)) * Nb);
+            //uint bj = 1 << bitIndex;
 
-    //        // GI 누적 (가리지 않은 방향만 반영)
-    //        //if ((bitmask & bj) == 0)
-    //        //{
-    //        //    float weight = saturate(dot(np, lj)) * saturate(dot(nj, -lj));
-    //        //    GI += col * weight;
-    //        //}
-    //        GI += ( /*cj * */bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj));
-    //        bitmask |= bj; // 가렸다면 업데이트
-    //    }
+            // GI 누적 (가리지 않은 방향만 반영)
+            //if ((bitmask & bj) == 0)
+            //{
+            //    float weight = saturate(dot(np, lj)) * saturate(dot(nj, -lj));
+            //    GI += col * weight;
+            //}
+            GI += ( /*cj * */bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj)) * col * 10.0;
+            bitmask |= bj; // 가렸다면 업데이트
+        }
 
-    //    AO += 1.0 - (countbits(bitmask) / (float) Nb);
-    //}
+        AO += 1.0 - (countbits(bitmask) / (float) Nb);
+    }
 
-    //AO /= Nd;
-    //GI /= Nd;
-    //return float4(p, AO);
+    AO /= Nd;
+    GI /= Nd;
+    return float4(GI, AO);
+    //float2 noise = frac(sin(dot(uv, uint2(12.9898, 78.233))) * float2(43758.5453, 12345.6789));
+    //return float4(GetDirection(0, noise), 0, 1);
+
 }
