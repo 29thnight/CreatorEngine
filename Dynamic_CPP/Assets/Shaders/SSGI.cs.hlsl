@@ -49,12 +49,12 @@ float2 GetDirection(uint i, float2 noise)
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     float2 uv = float2(DTid.xy) / screenSize;
-    float depth = gDepthTex.Sample(PointSampler, uv).r;
+    float depth = gDepthTex.SampleLevel(PointSampler, uv, 0).r;
     if (depth >= 1)
         gOutput[DTid.xy] = float4(1.0, 0, 0, 1.0);
     
     float3 p = CalculateViewSpaceFromDepth(depth, uv);
-    float3 np = gNormalTex.Sample(PointSampler, uv).rgb;
+    float3 np = gNormalTex.SampleLevel(PointSampler, uv, 0).rgb;
     np = normalize(np * 2.0 - 1.0);
     p = TangentSpacePos(p, np);
     
@@ -114,7 +114,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             //    float weight = saturate(dot(np, lj)) * saturate(dot(nj, -lj));
             //    GI += col * weight;
             //}
-            GI += ( cj * bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj))/* * col * 10.0*/;
+            GI += (cj * bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj)) /* * col * 10.0*/;
             bitmask |= bj; // 가렸다면 업데이트
         }
 
