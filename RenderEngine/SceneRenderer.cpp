@@ -434,14 +434,14 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 		}
 
-		//[3] SSAOPass
-		{
-			DirectX11::BeginEvent(L"SSAOPass");
-			Benchmark banch;
-			m_pSSAOPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
+		////[3] SSAOPass
+		//{
+		//	DirectX11::BeginEvent(L"SSAOPass");
+		//	Benchmark banch;
+		//	m_pSSAOPass->Execute(*m_renderScene, *camera);
+		//	RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
+		//	DirectX11::EndEvent();
+		//}
 
 		if (!useTestLightmap)
         {
@@ -457,6 +457,13 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
+		{
+			DirectX11::BeginEvent(L"SSGIPass");
+			Benchmark banch;
+			m_pSSGIPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 		if(camera == m_pEditorCamera.get())
 		{
 			DirectX11::BeginEvent(L"TerrainGizmoPass");

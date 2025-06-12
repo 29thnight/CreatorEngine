@@ -21,6 +21,11 @@ private:
 	Texture* m_pTempTexture{ nullptr };
 	ComPtr<ID3D11Buffer> m_Buffer;
 
+	ComputeShader* m_pSSGIShader{};
+
+	Sampler* sample = nullptr;
+	Sampler* pointSample = nullptr;
+
 	float radius = 0.5f;
 	float thickness = 0.2f;
 };

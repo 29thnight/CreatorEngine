@@ -76,6 +76,14 @@ void RenderPassData::Initalize(uint32 index)
 		cascadeCount
 	);
 
+	auto ssrTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"prevSSRTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+	m_SSRPrevTexture.swap(ssrTexture);
+
 	for (int i = 0; i < cascadeCount; ++i)
 	{
 		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);

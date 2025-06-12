@@ -19,7 +19,6 @@ private:
 	Texture* m_EmissiveTexture{};
 
 	Texture* m_CopiedTexture{};
-	Texture* m_prevSSRTexture{};
 	Texture* m_prevCopiedSSRTexture{};
 
 	ComPtr<ID3D11Buffer> m_Buffer{};

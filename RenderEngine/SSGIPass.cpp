@@ -12,10 +12,10 @@ cbuffer SSGIParams
 
 SSGIPass::SSGIPass()
 {
-    m_pso = std::make_unique<PipelineStateObject>();
+    //m_pso = std::make_unique<PipelineStateObject>();
     //m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
     //m_pso->m_pixelShader = &ShaderSystem->PixelShaders["SSGI"];
-	m_pso->m_computeShader = &ShaderSystem->ComputeShaders["SSGI"];
+    m_pSSGIShader = &ShaderSystem->ComputeShaders["SSGI"];
     //m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
     m_Buffer = DirectX11::CreateBuffer(sizeof(SSGIParams), D3D11_BIND_CONSTANT_BUFFER, nullptr);
@@ -40,11 +40,8 @@ SSGIPass::SSGIPass()
     //    )
     //);
 
-    auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-    auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
-
-    m_pso->m_samplers.push_back(linearSampler);
-    m_pso->m_samplers.push_back(pointSampler);
+    sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
     m_pTempTexture = Texture::Create(
         DeviceState::g_ClientRect.width,
@@ -53,7 +50,7 @@ SSGIPass::SSGIPass()
         DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
     );
-    m_pTempTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+    m_pTempTexture->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 
@@ -73,9 +70,10 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    m_pso->Apply();
-
     auto& deviceContext = DeviceState::g_pDeviceContext;
+	DirectX11::CSSetShader(m_pSSGIShader->GetShader(), nullptr, 0);
+    DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
+    DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 1
     ID3D11ShaderResourceView* srv[4] = {
         renderData->m_depthStencil->m_pSRV,
         renderData->m_renderTarget->m_pSRV,
@@ -83,7 +81,7 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
         m_pLightEmissiveTexture->m_pSRV
     };
 	SSGIParams params;
-    params.inverseProjection = camera.CalculateInverseProjection();
+    params.inverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
 	params.screenSize = { DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height };
     params.radius = radius;;
 	params.thickness = thickness;
@@ -105,6 +103,11 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 
 void SSGIPass::ControlPanel()
 {
+    ImGui::PushID(this);
+    ImGui::Text("SSGI");
+    ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
+    ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
+    ImGui::PopID();
 }
 
 void SSGIPass::Resize(uint32_t width, uint32_t height)
