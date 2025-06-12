@@ -277,7 +277,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // ERROR 메시지에 Breakpoint
-        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, FALSE);
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
 
         // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);

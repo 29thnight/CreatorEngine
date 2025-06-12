@@ -1,18 +1,32 @@
 #pragma once
 #include "ProjectionType.h"
+#include "LightProperty.h"
 #include "DeviceResources.h"
 #include "Texture.h"
 #include "Camera.generated.h"
 
+struct ShadowInfo
+{
+	Mathf::xVector m_eyePosition{};
+	Mathf::xVector m_lookAt{};
+	float m_nearPlane{};
+	float m_farPlane{};
+	float m_viewWidth{};
+	float m_viewHeight{};
+	Mathf::xMatrix m_lightViewProjection{};
+};
+
 class MeshRenderer;
 class MeshRendererProxy;
-class Camera
+class Camera //TODO : shadowCamera 분리가 필요
 {
 public:
    ReflectCamera
 	[[Serializable]]
 	Camera();
 	~Camera();
+
+	Camera(bool isShadow);
 
 	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
@@ -29,12 +43,7 @@ public:
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
-	void UpdateBuffer(ID3D11DeviceContext* deferredContext);
-	void ClearRenderTarget();
-
-	void PushRenderQueue(MeshRendererProxy* meshRenderer);
-	void SortRenderQueue();
-	void ClearRenderQueue();
+	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 
 	[[Property]]
 	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
@@ -42,6 +51,7 @@ public:
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
 	static constexpr Mathf::xVector UP = { 0.f, 1.f, 0.f };
+	static constexpr int cascadeCount = 3;
 
 	Mathf::xVector m_eyePosition{ XMVectorSet(0, 1, -10, 1) };
 	Mathf::xVector m_forward{ FORWARD };
@@ -69,22 +79,21 @@ public:
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 
+	std::vector<float>			m_cascadeDevideRatios = { 0.15f, 0.5f };
+	std::vector<float>			m_cascadeEnd;
+	std::vector<ShadowInfo>		m_cascadeinfo;
+	ShadowMapConstant           m_shadowMapConstant;
+
 	bool m_isActive{ true };
 	bool m_isOrthographic{ false };
-	ApplyRenderPipelinePass m_applyRenderPipelinePass{};
+	ApplyRenderPipelinePass m_applyRenderPipelinePass{}; //TODO : Bitflag로 변경예정
 
-	ComPtr<ID3D11Buffer> m_ViewBuffer;
-	ComPtr<ID3D11Buffer> m_ProjBuffer;
-    UniqueTexturePtr m_renderTarget{ nullptr, TextureHelper::deleter };
-    UniqueTexturePtr m_depthStencil{ nullptr, TextureHelper::deleter };
-
-	std::vector<MeshRendererProxy*> m_defferdQueue;
-	std::vector<MeshRendererProxy*> m_forwardQueue;
-
-	std::mutex m_cameraMutex;
+	ComPtr<ID3D11Buffer>	m_ViewBuffer;
+	ComPtr<ID3D11Buffer>	m_ProjBuffer;
 };
 
 class SceneRenderer;
+class ShadowMapPass;
 class CameraContainer : public Singleton<CameraContainer>
 {
 private:
@@ -170,6 +179,7 @@ public:
 
 private:
 	friend class SceneRenderer;
+	friend class ShadowMapPass;
 	std::vector<Camera*> m_cameras;
 };
 

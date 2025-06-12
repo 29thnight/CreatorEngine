@@ -48,17 +48,17 @@ void BlitPass::Initialize(ID3D11RenderTargetView* backBufferRTV)
 
 void BlitPass::Execute(RenderScene& scene, Camera& camera)
 {
-    if(false == camera.m_applyRenderPipelinePass.m_BlitPass)
-	{
-		return;
-	}
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
+    if(false == camera.m_applyRenderPipelinePass.m_BlitPass) return;
 
     m_pso->Apply();
 
 	ID3D11RenderTargetView* rtv = m_backBufferRTV;
 	DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-	DirectX11::PSSetShaderResources(0, 1, &camera.m_renderTarget->m_pSRV);
+	DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);
 	DirectX11::Draw(4, 0);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;

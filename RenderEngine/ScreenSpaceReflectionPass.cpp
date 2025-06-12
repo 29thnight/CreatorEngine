@@ -89,9 +89,14 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
+
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, m_prevSSRTexture->m_pTexture);
-	ID3D11RenderTargetView* view[2] = { camera.m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV()};
+	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV()};
 	DirectX11::OMSetRenderTargets(2, view, nullptr);
 
 	camera.UpdateBuffer();
@@ -108,10 +113,10 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
-	ID3D11ShaderResourceView* srvs[5] = {
-		camera.m_depthStencil->m_pSRV,
+	ID3D11ShaderResourceView* srvs[4] = {
+		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,//m_DiffuseTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
 		m_NormalTexture->m_pSRV,

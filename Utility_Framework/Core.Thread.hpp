@@ -4,6 +4,8 @@
 #include <functional>
 #include "concurrent_queue.h"
 
+inline thread_local DWORD g_currentThreadIndex = -1;
+
 using namespace Concurrency;
 
 using ThreadID = unsigned int;
@@ -11,6 +13,7 @@ using ThreadIndex = unsigned int;
 using TaskType = std::function<void()>;
 
 class ThreadPool;
+class RenderThreadPool;
 class Thread;
 enum ThreadCondition : DWORD
 {
@@ -101,6 +104,7 @@ class Thread
 {
 private:
 	friend class ThreadPool;
+	friend class RenderThreadPool;
 
 public:
 	Thread() = default;
@@ -111,7 +115,8 @@ public:
 		m_executeFunction = executeFunction;
 
 		auto ThreadProc = [](void* pThis) -> unsigned { static_cast<Thread*>(pThis)->StatusHandler(); return 0U; };
-		m_thread._Handle = reinterpret_cast<void*>(_beginthreadex(nullptr, 0, ThreadProc, this, 0, &m_thread._ID));
+		m_thread._Handle = reinterpret_cast<void*>(
+			_beginthreadex(nullptr, 0, ThreadProc, this, 0, &m_thread._ID));
 	}
 
 	static inline DWORD GetNumberOfProcessors()
@@ -124,6 +129,8 @@ public:
 private:
 	void StatusHandler()
 	{
+		g_currentThreadIndex = m_thread._Index;
+
 		while (true)
 		{
 			DWORD condition = m_thread.WaitForCondition();

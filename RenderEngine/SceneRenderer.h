@@ -20,6 +20,7 @@
 #include "VignettePass.h"
 #include "ColorGradingPass.h"
 #include "VolumetricFogPass.h"
+#include "RenderJob.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -65,11 +66,12 @@ public:
 	void EndOfFrame(float deltaTime);
 	void PrepareRender();
 	void SceneRendering();
+	void CreateCommandListPass();
 	void ReApplyCurrCubeMap();
 
 private:
 	void InitializeDeviceState();
-	void InitializeImGui();
+	void InitializeShadowMapDesc();
 	void InitializeTextures();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
@@ -142,6 +144,7 @@ private:
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
 	ThreadPool* m_threadPool = nullptr;
+	RenderThreadPool* m_commandThreadPool = nullptr;
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

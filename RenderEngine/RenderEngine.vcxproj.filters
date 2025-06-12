@@ -225,8 +225,14 @@
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderTaskScheduler">
-      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
+    <Filter Include="Asset\JobSystem\Animation">
+      <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\JobSystem\RenderThread">
+      <UniqueIdentifier>{9111173d-d1d0-4bd4-81df-b0c27a303b41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\RenderPassData">
+      <UniqueIdentifier>{673fe224-15e4-4d86-bd2f-b7a1e9c91dfa}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\SSGIPass">
       <UniqueIdentifier>{f3445376-0cf9-47a8-96d0-3b26a554257d}</UniqueIdentifier>
@@ -244,9 +250,6 @@
     </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="AnimationJob.cpp">
-      <Filter>Asset\JobSystem</Filter>
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
@@ -428,6 +431,12 @@
     <ClCompile Include="LightingPass.cpp">
       <Filter>RenderPass\LighingPass</Filter>
     </ClCompile>
+    <ClCompile Include="AnimationJob.cpp">
+      <Filter>Asset\JobSystem\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassData.cpp">
+      <Filter>Resources\RenderPassData</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -450,9 +459,6 @@
     </ClInclude>
     <ClInclude Include="DataSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimationJob.h">
-      <Filter>Asset\JobSystem</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Resources\Shader</Filter>
@@ -649,6 +655,15 @@
     <ClInclude Include="Animation.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AnimationJob.h">
+      <Filter>Asset\JobSystem\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderJob.h">
+      <Filter>Asset\JobSystem\RenderThread</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassData.h">
+      <Filter>Resources\RenderPassData</Filter>
+    </ClInclude>
     <ClInclude Include="SSGIPass.h">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClInclude>
@@ -819,9 +834,6 @@
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
@@ -840,6 +852,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

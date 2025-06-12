@@ -62,13 +62,14 @@ void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
 
 void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
 
-	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, camera.m_renderTarget->m_pDSV);
-	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
+	DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 	camera.UpdateBuffer();
 
 	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());

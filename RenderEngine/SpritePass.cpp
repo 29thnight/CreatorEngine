@@ -69,11 +69,14 @@ void SpritePass::Execute(RenderScene& scene, Camera& camera)
 		return;
 	}
 
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	m_pso->Apply();
 
-	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV);
+	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
 
 	deviceContext->OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
 	deviceContext->OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);

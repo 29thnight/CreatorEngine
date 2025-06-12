@@ -42,13 +42,15 @@ AAPass::~AAPass()
 void AAPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!m_isApply) return;
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
 
 	const UINT offsets[]{ 0 };
 	m_pso->Apply();
 
 	DirectX11::UnbindRenderTargets();
 
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
 	DirectX11::UpdateBuffer(m_FXAAParametersBuffer.Get(), &m_FXAAParameters);
 
@@ -71,7 +73,7 @@ void AAPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, offsets);
 	DirectX11::CSSetShaderResources(0, 1, nullSRVs);
 
-	DirectX11::CopyResource(camera.m_renderTarget->m_pTexture, m_AntiAliasingTexture->m_pTexture);
+	DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_AntiAliasingTexture->m_pTexture);
 }
 
 void AAPass::ControlPanel()

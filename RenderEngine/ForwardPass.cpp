@@ -44,10 +44,13 @@ ForwardPass::~ForwardPass()
 
 void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 {
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
 
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, camera.m_depthStencil->m_pDSV);
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &view, renderData->m_depthStencil->m_pDSV);
 	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 
@@ -59,7 +62,7 @@ void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 
 	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& MeshRendererProxy : camera.m_forwardQueue)
+	for (auto& MeshRendererProxy : renderData->m_forwardQueue)
 	{
 		scene.UpdateModel(MeshRendererProxy->m_worldMatrix);
 

@@ -79,7 +79,10 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			if (itNode["m_Motion"])
 			{
 				FileGuid guid = itNode["m_Motion"].as<std::string>();
-				animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				if(guid != nullFileGuid)
+				{
+					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+				}
 			}
 
 			if (itNode["Parameters"])

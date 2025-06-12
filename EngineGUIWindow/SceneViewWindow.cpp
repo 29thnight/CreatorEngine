@@ -160,7 +160,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		float x = windowWidth;
 		float y = windowHeight;
 
-		ImGui::Image((ImTextureID)cam->m_renderTarget->m_pSRV, ImVec2(x, y));
+		auto scene = SceneManagers->m_ActiveRenderScene;
+
+		auto renderData = RenderPassData::GetData(cam);
+
+		ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, ImVec2(x, y));
 		imageMin = ImGui::GetItemRectMin();
 		imageMax = ImGui::GetItemRectMax();
 
