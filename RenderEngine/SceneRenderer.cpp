@@ -606,7 +606,7 @@ void SceneRenderer::SceneRendering()
 
 void SceneRenderer::CreateCommandListPass()
 {
-	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
+	//auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
 
 	ID3D11RenderTargetView* views[]{
 		m_diffuseTexture->GetRTV(),
@@ -629,14 +629,12 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->Enqueue([&]
 		{
 			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
 			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 		});
 
 		m_commandThreadPool->NotifyAllAndWait();
 	}
-
-	shadowMapPass->SwapQueue();
-	m_pGBufferPass->SwapQueue();
 }
 
 void SceneRenderer::ReApplyCurrCubeMap()
@@ -664,9 +662,11 @@ void SceneRenderer::PrepareRender()
 		data->ClearRenderQueue();
 	}
 
-	Benchmark banch;
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
+	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
+	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+
 	
 	m_threadPool->Enqueue([renderScene, m_currentScene]
 	{
@@ -701,11 +701,12 @@ void SceneRenderer::PrepareRender()
 
 		auto data = RenderPassData::GetData(camera);
 
-		m_threadPool->Enqueue([camera, data, m_currentScene, renderScene]
+		m_threadPool->Enqueue([camera, data, staticMeshes, skinnedMeshes, renderScene]
 		{
-			std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
-			std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
-
+			if (0 == staticMeshes.size())
+			{
+				std::cout << camera->m_cameraIndex << " Mesh Vector Size zero" << std::endl;
+			}
 			//std::vector<MeshRenderer*> culledMeshes;
 			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 			//camera->ClearRenderQueue();
@@ -736,6 +737,11 @@ void SceneRenderer::PrepareRender()
 	}
 
 	m_threadPool->NotifyAllAndWait();
+
+
+	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
+	shadowMapPass->SwapQueue();
+	m_pGBufferPass->SwapQueue();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

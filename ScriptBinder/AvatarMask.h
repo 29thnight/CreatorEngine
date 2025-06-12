@@ -19,7 +19,7 @@ public:
 	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
 	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }
 
-	BoneMask* RootMask;
+	BoneMask* RootMask{ nullptr };
 	bool IsBoneEnabled(const std::string& name);
 	BoneMask* MakeBoneMask(Bone* Bone);
 	[[Property]]
