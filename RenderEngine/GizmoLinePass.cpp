@@ -67,7 +67,9 @@ GizmoLinePass::GizmoLinePass()
 
 void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 {
-    auto deviceContext = DeviceState::g_pDeviceContext;
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
 
     auto activeScene = SceneManagers->GetActiveScene();
@@ -75,7 +77,7 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 	auto selectedObject = activeScene->GetSelectSceneObject();
 	if (nullptr == selectedObject) return;
 
-    ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
     GizmoCameraBuffer cameraBuffer{

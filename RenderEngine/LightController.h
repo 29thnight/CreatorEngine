@@ -27,7 +27,7 @@ public:
 	LightController& SetEyePosition(Mathf::xVector eyePosition);
 	void SetLightWithShadows(uint32 index, ShadowMapRenderDesc& desc);
 	void RenderAnyShadowMap(RenderScene& scene, Camera& camera);
-	void CreateShadowCommandList(RenderScene& scene, Camera& camera);
+	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
 	const LightProperties& GetProperties() { return m_lightProperties; }
 

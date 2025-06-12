@@ -54,10 +54,6 @@ GBufferPass::GBufferPass()
 	{
 		InitialMatrix[i] = XMMatrixIdentity();
 	}
-
-	DeviceState::g_pDevice->CreateDeferredContext(0, &defferdContext1);
-
-	m_threadPool = new ThreadPool;
 }
 
 GBufferPass::~GBufferPass()
@@ -102,24 +98,28 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 			}
 		}
 	}
-
-	ID3D11DeviceContext* defferdPtr = defferdContext1.Get();
 }
 
-void GBufferPass::CreateRenderCommandList(RenderScene& scene, Camera& camera)
+void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
-	ID3D11DeviceContext* defferdPtr = defferdContext1.Get();
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+	RenderPassData* data{ nullptr };
 
 	m_pso->Apply(defferdPtr);
 
-	//auto& deviceContext = DeviceState::g_pDeviceContext;
+	if(!RenderPassData::VaildCheck(&camera))
+	{
+		return;
+	}
+
+	data = RenderPassData::GetData(&camera);
 
 	for (auto& RTV : m_renderTargetViews)
 	{
 		defferdPtr->ClearRenderTargetView(RTV, Colors::Transparent);
 	}
 
-	defferdPtr->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, camera.m_depthStencil->m_pDSV);
+	defferdPtr->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
 
 	camera.UpdateBuffer(defferdPtr);
 	scene.UseModel(defferdPtr);
@@ -131,7 +131,7 @@ void GBufferPass::CreateRenderCommandList(RenderScene& scene, Camera& camera)
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& MeshRendererProxy : camera.m_deferredQueue)
+	for (auto& MeshRendererProxy : data->m_deferredQueue)
 	{
 		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdPtr);
 

@@ -183,6 +183,9 @@ void VolumetricFogPass::Initialize(const std::string_view& fileName)
 void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	ID3D11ShaderResourceView*  nullSRV[1]		= { nullptr };
 	ID3D11ShaderResourceView*  nullSRVall[3]	= { nullptr, nullptr, nullptr };
 	ID3D11UnorderedAccessView* nullUAV[1]		= { nullptr };
@@ -201,7 +204,7 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 	//GIT_COMBINE_WARN_BEGIN : shadowMapPass 코드 정리로 인한 로직 변경되었으니 병합 전 확인 바람. by Hero.P
 	auto shadowMapPass	= scene.m_LightController->GetShadowMapPass();
-	auto& cascadeInfo	= shadowMapPass->m_cascadeinfo[2];
+	auto& cascadeInfo	= camera.m_cascadeinfo[2];
 	auto& useCascade	= shadowMapPass->m_useCascade;
 
 	MainCB data{};
@@ -221,7 +224,7 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &data);
 	DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-	DirectX11::CSSetShaderResources(0, 1, &camera.m_shadowMapTexture->m_pSRV);
+	DirectX11::CSSetShaderResources(0, 1, &renderData->m_shadowMapTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(1, 1, &m_pBlueNoiseTexture->m_pSRV);
 	DirectX11::CSSetShaderResources(2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
 	DirectX11::CSSetUnorderedAccessViews(0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);
@@ -256,7 +259,7 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 
 	// composite
 	m_pso->Apply();
-	ID3D11RenderTargetView* view = camera.m_renderTarget->GetRTV();
+	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(1, &view, nullptr);
 
 	CompositeCB compositeData{};
@@ -269,10 +272,10 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::UpdateBuffer(m_CompositeBuffer.Get(), &compositeData);
 	DirectX11::PSSetConstantBuffer(0, 1, m_CompositeBuffer.GetAddressOf());
 
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	ID3D11ShaderResourceView* pTextures[3] = {
 		m_CopiedTexture->m_pSRV,
-		camera.m_depthStencil->m_pSRV,
+		renderData->m_depthStencil->m_pSRV,
 		mFinalVoxelInjectionTexture3DSRV
 	};
 	DirectX11::PSSetShaderResources(0, 3, pTextures);

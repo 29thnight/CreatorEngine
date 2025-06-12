@@ -562,7 +562,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	if (GameObjectType::Bone == obj->GetType())
 	{
 		const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
-		if (!animator || !animator->IsEnabled())
+		if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
 		{
 			return;
 		}

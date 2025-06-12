@@ -35,7 +35,7 @@ public:
 
 	//virtual std::string ToString() abstract;
 	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
-	virtual void CreateRenderCommandList(RenderScene& scene, Camera& camera) {}
+	virtual void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) {}
 	virtual void ControlPanel() {};
 	void ReloadShaders() { m_pso->ReloadShaders(); }
 	virtual void ResizeRelease() {};

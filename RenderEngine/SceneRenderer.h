@@ -20,6 +20,7 @@
 #include "VignettePass.h"
 #include "ColorGradingPass.h"
 #include "VolumetricFogPass.h"
+#include "RenderJob.h"
 
 #include "Model.h"
 #include "LightController.h"
@@ -135,6 +136,7 @@ private:
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
 	ThreadPool* m_threadPool = nullptr;
+	RenderThreadPool* m_commandThreadPool = nullptr;
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

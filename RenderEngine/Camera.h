@@ -5,6 +5,17 @@
 #include "Texture.h"
 #include "Camera.generated.h"
 
+struct ShadowInfo
+{
+	Mathf::xVector m_eyePosition{};
+	Mathf::xVector m_lookAt{};
+	float m_nearPlane{};
+	float m_farPlane{};
+	float m_viewWidth{};
+	float m_viewHeight{};
+	Mathf::xMatrix m_lightViewProjection{};
+};
+
 class MeshRenderer;
 class MeshRendererProxy;
 class Camera //TODO : shadowCamera 분리가 필요
@@ -33,11 +44,6 @@ public:
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
-	void ClearRenderTarget();
-
-	void PushRenderQueue(MeshRendererProxy* meshRenderer);
-	void SortRenderQueue();
-	void ClearRenderQueue();
 
 	[[Property]]
 	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
@@ -73,24 +79,17 @@ public:
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 
+	std::vector<float>			m_cascadeDevideRatios = { 0.15f, 0.5f };
+	std::vector<float>			m_cascadeEnd;
+	std::vector<ShadowInfo>		m_cascadeinfo;
+	ShadowMapConstant           m_shadowMapConstant;
+
 	bool m_isActive{ true };
 	bool m_isOrthographic{ false };
-	ApplyRenderPipelinePass m_applyRenderPipelinePass{};
+	ApplyRenderPipelinePass m_applyRenderPipelinePass{}; //TODO : Bitflag로 변경예정
 
 	ComPtr<ID3D11Buffer>	m_ViewBuffer;
 	ComPtr<ID3D11Buffer>	m_ProjBuffer;
-    UniqueTexturePtr		m_renderTarget{ nullptr, TextureHelper::deleter };
-    UniqueTexturePtr		m_depthStencil{ nullptr, TextureHelper::deleter };
-
-	UniqueTexturePtr			m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
-	ID3D11DepthStencilView*		m_shadowMapDSVarr[cascadeCount]{};
-	ID3D11ShaderResourceView*	sliceSRV[3]{};
-	ShadowMapConstant			m_shadowMapConstant;
-
-	std::vector<MeshRendererProxy*> m_deferredQueue;
-	std::vector<MeshRendererProxy*> m_forwardQueue;
-
-	std::mutex m_cameraMutex;
 };
 
 class SceneRenderer;

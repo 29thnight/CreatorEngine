@@ -59,16 +59,19 @@ PostProcessingPass::~PostProcessingPass()
 
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 {
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
 	// Copy the back buffer to a texture
 	PrepaerShaderState();
-	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, camera.m_renderTarget->m_pTexture);
+
+	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
 	if (m_PostProcessingApply.m_Bloom)
 	{
 		BloomPass(scene, camera);
 	}
 
-	DirectX11::CopyResource(camera.m_renderTarget->m_pTexture, m_CopiedTexture->m_pTexture);
+	DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_CopiedTexture->m_pTexture);
 }
 
 void PostProcessingPass::ControlPanel()

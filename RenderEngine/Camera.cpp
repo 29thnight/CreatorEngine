@@ -10,29 +10,16 @@
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
+
+
 Camera::Camera()
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
 
 	m_cameraIndex = CameraManagement->GetCameraCount();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
 
-	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
-
-    auto renderTexture = TextureHelper::CreateRenderTexture(  
-       DeviceState::g_ClientRect.width,  
-       DeviceState::g_ClientRect.height,  
-       cameraRTVName,  
-       DXGI_FORMAT_R16G16B16A16_FLOAT  
-    );  
-    m_renderTarget.swap(renderTexture);
-
-
-	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"Camera_" + std::to_string(m_cameraIndex) + "_DSV"
-	);
-    m_depthStencil.swap(depthStencil);
+	renderScene->AddRenderPassData(m_cameraIndex);
 
 	XMMATRIX identity = XMMatrixIdentity();
 
@@ -44,47 +31,7 @@ Camera::Camera()
 	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 
-	m_deferredQueue.reserve(300);
-	m_forwardQueue.reserve(300);
-
-
-	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
-	Texture* shadowMapTexture = Texture::CreateArray(
-		desc.m_textureWidth,
-		desc.m_textureHeight,
-		"Shadow Map",
-		DXGI_FORMAT_R32_TYPELESS,
-		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE,
-		cascadeCount
-	);
-
-	for (int i = 0; i < cascadeCount; ++i)
-	{
-		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
-	}
-
-	for (int i = 0; i < cascadeCount; i++)
-	{
-		CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
-		depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
-		depthStencilViewDesc.Texture2DArray.ArraySize = 1;
-		depthStencilViewDesc.Texture2DArray.FirstArraySlice = i;
-
-		DirectX11::ThrowIfFailed(
-			DeviceState::g_pDevice->CreateDepthStencilView(
-				shadowMapTexture->m_pTexture,
-				&depthStencilViewDesc,
-				&m_shadowMapDSVarr[i]
-			)
-		);
-	}
-
-	//안에서 배열은 3으로 고정중 필요하면 수정
-	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
-	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
-
+	m_cascadeinfo.resize(cascadeCount);
 }
 
 Camera::~Camera()
@@ -92,6 +39,8 @@ Camera::~Camera()
 	if (m_cameraIndex != -1)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
+		auto renderScene = SceneManagers->m_ActiveRenderScene;
+		renderScene->RemoveRenderPassData(m_cameraIndex);
 	}
 }
 
@@ -102,23 +51,6 @@ Camera::Camera(bool isShadow)
 		m_aspectRatio = DeviceState::g_aspectRatio;
 
 		m_cameraIndex = CameraManagement->GetCameraCount();
-
-		std::string cameraRTVName = "ShadowCamera_RTV";
-
-		auto renderTexture = TextureHelper::CreateRenderTexture(
-			DeviceState::g_ClientRect.width,
-			DeviceState::g_ClientRect.height,
-			cameraRTVName,
-			DXGI_FORMAT_R16G16B16A16_FLOAT
-		);
-		m_renderTarget.swap(renderTexture);
-
-		auto depthStencil = TextureHelper::CreateDepthTexture(
-			DeviceState::g_ClientRect.width,
-			DeviceState::g_ClientRect.height,
-			"ShadowCamera_DSV"
-		);
-		m_depthStencil.swap(depthStencil);
 
 		XMMATRIX identity = XMMatrixIdentity();
 
@@ -217,41 +149,41 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 
 	return frustum;
 }
-
-void Camera::ResizeRelease()
-{
-	if (m_renderTarget)
-	{
-		m_renderTarget.reset();
-	}
-
-	if (m_depthStencil)
-	{
-		m_depthStencil.reset();
-	}
-}
-
-void Camera::ResizeResources()
-{
-	m_aspectRatio = DeviceState::g_aspectRatio;
-
-	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
-	auto renderTexture = TextureHelper::CreateRenderTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		cameraRTVName,
-		DXGI_FORMAT_R16G16B16A16_FLOAT
-	);
-	m_renderTarget.swap(renderTexture);
-
-	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
-	auto depthStencil = TextureHelper::CreateDepthTexture(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		depthName
-	);
-	m_depthStencil.swap(depthStencil);
-}
+//
+//void Camera::ResizeRelease()
+//{
+//	if (m_renderTarget)
+//	{
+//		m_renderTarget.reset();
+//	}
+//
+//	if (m_depthStencil)
+//	{
+//		m_depthStencil.reset();
+//	}
+//}
+//
+//void Camera::ResizeResources()
+//{
+//	m_aspectRatio = DeviceState::g_aspectRatio;
+//
+//	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
+//	auto renderTexture = TextureHelper::CreateRenderTexture(
+//		DeviceState::g_ClientRect.width,
+//		DeviceState::g_ClientRect.height,
+//		cameraRTVName,
+//		DXGI_FORMAT_R16G16B16A16_FLOAT
+//	);
+//	m_renderTarget.swap(renderTexture);
+//
+//	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
+//	auto depthStencil = TextureHelper::CreateDepthTexture(
+//		DeviceState::g_ClientRect.width,
+//		DeviceState::g_ClientRect.height,
+//		depthName
+//	);
+//	m_depthStencil.swap(depthStencil);
+//}
 
 void Camera::RegisterContainer()
 {
@@ -350,56 +282,56 @@ void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
 }
 
-void Camera::ClearRenderTarget()
-{
-	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
-	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-}
+//void Camera::ClearRenderTarget()
+//{
+//	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
+//	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+//}
 
-void Camera::PushRenderQueue(MeshRendererProxy* command)
-{
-	Material* mat = command->m_Material;
-	if (nullptr == mat) return;
+//void Camera::PushRenderQueue(MeshRendererProxy* command)
+//{
+//	Material* mat = command->m_Material;
+//	if (nullptr == mat) return;
+//
+//	{
+//		std::unique_lock lock(m_cameraMutex);
+//
+//		switch (mat->m_renderingMode)
+//		{
+//		case MaterialRenderingMode::Opaque:
+//			m_deferredQueue.push_back(command);
+//			break;
+//		case MaterialRenderingMode::Transparent:
+//			m_forwardQueue.push_back(command);
+//			break;
+//		}
+//	}
+//}
 
-	{
-		std::unique_lock lock(m_cameraMutex);
-
-		switch (mat->m_renderingMode)
-		{
-		case MaterialRenderingMode::Opaque:
-			m_deferredQueue.push_back(command);
-			break;
-		case MaterialRenderingMode::Transparent:
-			m_forwardQueue.push_back(command);
-			break;
-		}
-	}
-}
-
-void Camera::SortRenderQueue()
-{
-	auto sortByAnimatorAndMaterialGuid = [](MeshRendererProxy* a, MeshRendererProxy* b)
-	{
-		if (a->m_animatorGuid == b->m_animatorGuid)
-		{
-			return a->m_materialGuid < b->m_materialGuid;
-		}
-		return a->m_animatorGuid < b->m_animatorGuid;
-	};
-
-	if(!m_deferredQueue.empty())
-	{
-		std::sort(m_deferredQueue.begin(), m_deferredQueue.end(), sortByAnimatorAndMaterialGuid);
-	}
-
-	if(!m_forwardQueue.empty())
-	{
-		std::sort(m_forwardQueue.begin(), m_forwardQueue.end(), sortByAnimatorAndMaterialGuid);
-	}
-}
-
-void Camera::ClearRenderQueue()
-{
-	m_deferredQueue.clear();
-	m_forwardQueue.clear();
-}
+//void Camera::SortRenderQueue()
+//{
+//	auto sortByAnimatorAndMaterialGuid = [](MeshRendererProxy* a, MeshRendererProxy* b)
+//	{
+//		if (a->m_animatorGuid == b->m_animatorGuid)
+//		{
+//			return a->m_materialGuid < b->m_materialGuid;
+//		}
+//		return a->m_animatorGuid < b->m_animatorGuid;
+//	};
+//
+//	if(!m_deferredQueue.empty())
+//	{
+//		std::sort(m_deferredQueue.begin(), m_deferredQueue.end(), sortByAnimatorAndMaterialGuid);
+//	}
+//
+//	if(!m_forwardQueue.empty())
+//	{
+//		std::sort(m_forwardQueue.begin(), m_forwardQueue.end(), sortByAnimatorAndMaterialGuid);
+//	}
+//}
+//
+//void Camera::ClearRenderQueue()
+//{
+//	m_deferredQueue.clear();
+//	m_forwardQueue.clear();
+//}

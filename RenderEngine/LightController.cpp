@@ -155,11 +155,11 @@ void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 	}
 }
 
-void LightController::CreateShadowCommandList(RenderScene& scene, Camera& camera)
+void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
 	{
-		m_shadowMapPass->CreateRenderCommandList(scene, camera);
+		m_shadowMapPass->CreateRenderCommandList(deferredContext, scene, camera);
 	}
 }
 

@@ -654,4 +654,15 @@ namespace DirectX11
 		}
 		deferredContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
 	}
+
+	//[safe]
+	inline void IASetPrimitiveTopology(ID3D11DeviceContext* deferredContext, D3D11_PRIMITIVE_TOPOLOGY topology)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->IASetPrimitiveTopology(topology);
+	}
 }

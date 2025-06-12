@@ -101,9 +101,10 @@ void SSAOPass::ReloadDSV(ID3D11ShaderResourceView* depth)
 
 void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 {
-    m_pso->Apply();
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
 
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+    m_pso->Apply();
 
 	DirectX11::ClearRenderTargetView(m_RenderTarget->GetRTV(), Colors::Transparent);
 
@@ -123,7 +124,12 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
 
-    ID3D11ShaderResourceView* srvs[4] = { camera.m_depthStencil->m_pSRV, m_NormalTexture->m_pSRV, m_NoiseTexture->m_pSRV, m_DiffuseTexture->m_pSRV };
+    ID3D11ShaderResourceView* srvs[4] = { 
+        renderData->m_depthStencil->m_pSRV, 
+        m_NormalTexture->m_pSRV, 
+        m_NoiseTexture->m_pSRV, 
+        m_DiffuseTexture->m_pSRV 
+    };
     DirectX11::PSSetShaderResources(0, 4, srvs);
 
     DirectX11::Draw(4, 0);

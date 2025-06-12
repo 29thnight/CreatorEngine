@@ -1,40 +1,9 @@
 #pragma once
 #include "Camera.h"
-#include "Texture.h"
 #include "../ScriptBinder/GameObject.h"
 #include "AnimationJob.h"
 #include "RenderCommand.h"
-
-class MeshRendererProxy;
-class RenderPassData
-{
-public:
-	using ProxyContainer = std::vector<MeshRendererProxy*>;
-	static constexpr int cascadeCount = 3;
-public:
-	UniqueTexturePtr		  m_renderTarget{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr		  m_depthStencil{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr		  m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
-	ID3D11DepthStencilView*	  m_shadowMapDSVarr[cascadeCount]{};
-	ID3D11ShaderResourceView* sliceSRV[3]{};
-	ProxyContainer			  m_deferredQueue;
-	ProxyContainer			  m_forwardQueue;
-	std::atomic_bool          m_isInitalized{ false };
-	std::mutex				  m_dataMutex;
-
-	void Initalize(uint32 index);
-
-	ID3D11RenderTargetView*			GetRTV();
-	ID3D11DepthStencilView*		    GetDSV();
-	ID3D11ShaderResourceView*&  GetDepthSRV();
-	ID3D11ShaderResourceView*&  GetShadowSRV();
-
-	void PushRenderQueue(MeshRendererProxy* proxy);
-	void SortRenderQueue();
-	void ClearRenderQueue();
-
-	void ClearRenderTarget();
-};
+#include "RenderPassData.h"
 
 class GameObject;
 class Scene;
@@ -63,14 +32,15 @@ public:
 
 	void Update(float deltaSecond);
 	void ShadowStage(Camera& camera);
-	void CreateShadowCommandList(Camera& camera);
+	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, Camera& camera);
 	void UseModel();
 	void UseModel(ID3D11DeviceContext* deferredContext);
 	void UpdateModel(const Mathf::xMatrix& model);
 	void UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext);
 
-	/*RenderPassData* AddRenderPassData(size_t cameraIndex);
-	RenderPassData* GetRenderPassData(size_t cameraIndex);*/
+	RenderPassData* AddRenderPassData(size_t cameraIndex);
+	RenderPassData* GetRenderPassData(size_t cameraIndex);
+	void RemoveRenderPassData(size_t cameraIndex);
 
 	void RegisterAnimator(Animator* animatorPtr);
 	void UnregisterAnimator(Animator* animatorPtr);

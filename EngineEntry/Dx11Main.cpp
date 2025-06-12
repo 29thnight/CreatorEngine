@@ -244,13 +244,13 @@ void DirectX11::Dx11Main::Update()
 #endif // !EDITOR
 
     renderBarrier.ArriveAndWait();
-    PROFILE_FRAME();
 
     PROFILE_CPU_BEGIN("EndOfFrame");
     DisableOrEnable();
     SceneManagers->EndOfFrame();
     PROFILE_CPU_END();
 
+    PROFILE_FRAME();
     renderBarrier.ArriveAndWait();
 }
 

@@ -37,6 +37,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     InitializeShadowMapDesc();
 
 	m_threadPool = new ThreadPool;
+	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
 	m_renderScene = new RenderScene();
 	SceneManagers->m_ActiveRenderScene = m_renderScene;
 
@@ -364,9 +365,8 @@ void SceneRenderer::SceneRendering()
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{
-		if (nullptr == camera) continue;
-		//auto data = m_renderScene->GetRenderPassData(camera->m_cameraIndex);
-		//if (nullptr == data) continue;
+		if (!RenderPassData::VaildCheck(camera)) continue;
+		auto renderData = RenderPassData::GetData(camera);
 
 		if (camera != m_pEditorCamera.get())
 		{
@@ -387,7 +387,7 @@ void SceneRenderer::SceneRendering()
 			DirectX11::BeginEvent(L"ShadowMapPass");
 			Benchmark banch;
 			//TODO : 여기 한번 정리 해보자
-			camera->ClearRenderTarget();
+			renderData->ClearRenderTarget();
 			m_renderScene->ShadowStage(*camera);
 			Clear(DirectX::Colors::Transparent, 1.0f, 0);
 			UnbindRenderTargets();
@@ -566,24 +566,34 @@ void SceneRenderer::SceneRendering()
 
 void SceneRenderer::CreateCommandListPass()
 {
+	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
+
+	ID3D11RenderTargetView* views[]{
+		m_diffuseTexture->GetRTV(),
+		m_metalRoughTexture->GetRTV(),
+		m_normalTexture->GetRTV(),
+		m_emissiveTexture->GetRTV()
+	};
+	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
+
 	for (auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
+		m_commandThreadPool->Enqueue([&]
 		{
-			m_renderScene->CreateShadowCommandList(*camera);
-			ID3D11RenderTargetView* views[]{
-				m_diffuseTexture->GetRTV(),
-				m_metalRoughTexture->GetRTV(),
-				m_normalTexture->GetRTV(),
-				m_emissiveTexture->GetRTV()
-			};
-			m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
-			m_pGBufferPass->CreateRenderCommandList(*m_renderScene, *camera);
-		}
-	}
+			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_renderScene->CreateShadowCommandList(defferdContext , *camera);
+		});
 
-	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
+		m_commandThreadPool->Enqueue([&]
+		{
+			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+		});
+
+		m_commandThreadPool->NotifyAllAndWait();
+	}
 
 	shadowMapPass->SwapQueue();
 	m_pGBufferPass->SwapQueue();
@@ -604,25 +614,33 @@ void SceneRenderer::PrepareRender()
 	{
 		if (nullptr == camera) continue;
 
-		camera->ClearRenderQueue();
+		if (!RenderPassData::VaildCheck(camera))
+		{
+			return;
+		}
+
+		auto data = RenderPassData::GetData(camera);
+
+		data->ClearRenderQueue();
 	}
 
 	Benchmark banch;
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
-	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
-	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
-	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	
-	for (auto& mesh : allMeshes)
+	m_threadPool->Enqueue([renderScene, m_currentScene]
 	{
-		auto shadowProxy = renderScene->FindProxy(mesh->GetInstanceID());
-		if (shadowProxy)
+		std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
+		for (auto& mesh : allMeshes)
 		{
-			renderScene->UpdateCommand(mesh);
-			m_renderScene->PushShadowRenderQueue(shadowProxy);
+			auto shadowProxy = renderScene->FindProxy(mesh->GetInstanceID());
+			if (shadowProxy)
+			{
+				renderScene->UpdateCommand(mesh);
+				renderScene->PushShadowRenderQueue(shadowProxy);
+			}
 		}
-	}
+	});
 
 	//for (auto& mesh : staticMeshes)
 	//{
@@ -636,8 +654,18 @@ void SceneRenderer::PrepareRender()
 	{
 		if (nullptr == camera) continue;
 
-		m_threadPool->Enqueue([camera, &staticMeshes, &skinnedMeshes, renderScene]
+		if (!RenderPassData::VaildCheck(camera))
 		{
+			return;
+		}
+
+		auto data = RenderPassData::GetData(camera);
+
+		m_threadPool->Enqueue([camera, data, m_currentScene, renderScene]
+		{
+			std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
+			std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
+
 			//std::vector<MeshRenderer*> culledMeshes;
 			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 			//camera->ClearRenderQueue();
@@ -647,7 +675,7 @@ void SceneRenderer::PrepareRender()
 				if (frustum.Intersects(culledMesh->GetBoundingBox()))
 				{
 					auto proxy = renderScene->FindProxy(culledMesh->GetInstanceID());
-					camera->PushRenderQueue(proxy);
+					data->PushRenderQueue(proxy);
 				}
 			}
 
@@ -659,11 +687,11 @@ void SceneRenderer::PrepareRender()
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					auto proxy = renderScene->FindProxy(skinnedMesh->GetInstanceID());
-					camera->PushRenderQueue(proxy);
+					data->PushRenderQueue(proxy);
 				}
 			}
 
-			camera->SortRenderQueue();
+			data->SortRenderQueue();
 		});
 	}
 

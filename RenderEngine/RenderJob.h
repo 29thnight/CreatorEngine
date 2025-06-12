@@ -112,3 +112,11 @@ private:
 	concurrent_queue<TaskType> m_concurrentTasks;
 	DWORD m_numThreads{};
 };
+
+static inline ID3D11DeviceContext* GetLocalDefferdContext(RenderThreadPool* poolPtr)
+{
+	auto index = poolPtr->GetCurrentThreadIndex();
+	auto defferdContext = poolPtr->GetDeferredContext(index);
+
+	return defferdContext;
+}

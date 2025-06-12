@@ -28,8 +28,9 @@ void GameViewWindow::RenderGameViewWindow()
 
 		auto scene = SceneManagers->m_ActiveRenderScene;
 		auto camera = CameraManagement->GetLastCamera();
+		auto renderData = RenderPassData::GetData(camera);
 
-		ImGui::Image((ImTextureID)camera->m_renderTarget->m_pSRV, imageSize);
+		ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

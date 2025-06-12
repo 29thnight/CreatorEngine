@@ -111,32 +111,35 @@ void LightMapPass::Initialize(std::vector<Texture*>& lightmaps, std::vector<Text
 
 void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 {
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
+
 	m_pso->Apply();
 
 	auto& deviceContext = DeviceState::g_pDeviceContext;
 	//DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::White);
-	DirectX11::ClearDepthStencilView(camera.m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
-	ID3D11RenderTargetView* rtv = camera.m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, camera.m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
+	DirectX11::ClearDepthStencilView(renderData->m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+	DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
 
 	camera.UpdateBuffer();
 	scene.UseModel();
 
 	Animator* currentAnimator = nullptr;
-	for (auto& obj : scene.GetScene()->m_SceneObjects) 
+	Scene* activeScene = scene.GetScene();
+	for (auto& renderer : activeScene->GetMeshRenderers())
 	{
-		MeshRenderer* meshRenderer = obj->GetComponent<MeshRenderer>();
-		if (nullptr == meshRenderer) continue;
-		if (!meshRenderer->IsEnabled()) continue;
+		if (!renderer || !renderer->IsEnabled()) continue;
 
 		CB buf{};
-		buf.offset = meshRenderer->m_LightMapping.lightmapOffset;
-		buf.size = meshRenderer->m_LightMapping.lightmapTiling;
+		buf.offset = renderer->m_LightMapping.lightmapOffset;
+		buf.size = renderer->m_LightMapping.lightmapTiling;
 		buf.cameraPos = XMFLOAT3(camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2]);
-		buf.lightmapIndex = meshRenderer->m_LightMapping.lightmapIndex;
+		buf.lightmapIndex = renderer->m_LightMapping.lightmapIndex;
 		DirectX11::UpdateBuffer(m_cbuffer.Get(), &buf);
 		DirectX11::PSSetConstantBuffer(1, 1, m_cbuffer.GetAddressOf());
 
+		auto obj = renderer->GetOwner();
 		scene.UpdateModel(obj->m_transform.GetWorldMatrix());
 		Animator* animator = scene.GetScene()->m_SceneObjects[obj->m_parentIndex]->GetComponent<Animator>();
 		if (nullptr != animator && animator->IsEnabled())
@@ -148,16 +151,16 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 			}
 		}
 
-		Material* mat = meshRenderer->m_Material;
+		Material* mat = renderer->m_Material;
 		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
 		DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
 		
-		if (meshRenderer->m_LightMapping.lightmapIndex >= 0) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
+		if (renderer->m_LightMapping.lightmapIndex >= 0) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
 		{
-			if(m_plightmaps != nullptr && (*m_plightmaps).size() > meshRenderer->m_LightMapping.lightmapIndex)
-				DirectX11::PSSetShaderResources(14, 1, &(*m_plightmaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
-			if(m_pDirectionalMaps != nullptr && (*m_pDirectionalMaps).size() > meshRenderer->m_LightMapping.lightmapIndex)
-				DirectX11::PSSetShaderResources(15, 1, &(*m_pDirectionalMaps)[meshRenderer->m_LightMapping.lightmapIndex]->m_pSRV);
+			if(m_plightmaps != nullptr && (*m_plightmaps).size() > renderer->m_LightMapping.lightmapIndex)
+				DirectX11::PSSetShaderResources(14, 1, &(*m_plightmaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
+			if(m_pDirectionalMaps != nullptr && (*m_pDirectionalMaps).size() > renderer->m_LightMapping.lightmapIndex)
+				DirectX11::PSSetShaderResources(15, 1, &(*m_pDirectionalMaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
 		}
 		
 		if (mat->m_pBaseColor)
@@ -181,7 +184,7 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		meshRenderer->m_Mesh->Draw();
+		renderer->m_Mesh->Draw();
 	}
 }
 

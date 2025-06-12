@@ -89,6 +89,8 @@ void DeferredPass::DisableAmbientOcclusion()
 void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 {
     m_pso->Apply();
+    if (!RenderPassData::VaildCheck(&camera)) return;
+    auto renderData = RenderPassData::GetData(&camera);
 
     auto& lightManager = scene.m_LightController;
 
@@ -105,19 +107,19 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
 
     ID3D11ShaderResourceView* srvs[10] = {
-        camera.m_depthStencil->m_pSRV,
+        renderData->m_depthStencil->m_pSRV,
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
         m_NormalTexture->m_pSRV,
-        (isShadowMapRender)     ? camera.m_shadowMapTexture->m_pSRV             : nullptr,
-        m_UseAmbientOcclusion   ? m_AmbientOcclusionTexture->m_pSRV             : nullptr,
-        m_UseEnvironmentMap     ? m_EnvironmentMap->m_pSRV                      : nullptr,
-        m_UseEnvironmentMap     ? m_PreFilter->m_pSRV                           : nullptr,
-        m_UseEnvironmentMap     ? m_BrdfLut->m_pSRV                             : nullptr,
+        (isShadowMapRender)     ? renderData->m_shadowMapTexture->m_pSRV : nullptr,
+        m_UseAmbientOcclusion   ? m_AmbientOcclusionTexture->m_pSRV      : nullptr,
+        m_UseEnvironmentMap     ? m_EnvironmentMap->m_pSRV               : nullptr,
+        m_UseEnvironmentMap     ? m_PreFilter->m_pSRV                    : nullptr,
+        m_UseEnvironmentMap     ? m_BrdfLut->m_pSRV                      : nullptr,
         m_EmissiveTexture->m_pSRV
     };
 
-    auto rtv = camera.m_renderTarget->GetRTV();
+    auto rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);

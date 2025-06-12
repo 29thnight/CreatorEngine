@@ -231,6 +231,9 @@
     <Filter Include="Asset\JobSystem\RenderThread">
       <UniqueIdentifier>{9111173d-d1d0-4bd4-81df-b0c27a303b41}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\RenderPassData">
+      <UniqueIdentifier>{673fe224-15e4-4d86-bd2f-b7a1e9c91dfa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -418,6 +421,9 @@
     </ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassData.cpp">
+      <Filter>Resources\RenderPassData</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -642,6 +648,9 @@
     </ClInclude>
     <ClInclude Include="RenderJob.h">
       <Filter>Asset\JobSystem\RenderThread</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassData.h">
+      <Filter>Resources\RenderPassData</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
