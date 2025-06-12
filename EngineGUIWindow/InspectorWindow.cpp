@@ -14,6 +14,9 @@
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
 #include "CustomCollapsingHeader.h"
+#include "Terrain.h"
+#include "FileDialog.h"
+
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -388,6 +391,15 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						{
 							ImGuiDrawHelperMeshRenderer(meshRenderer);
 						}
+					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<TerrainComponent>()) {
+
+						TerrainComponent* terrain = dynamic_cast<TerrainComponent*>(component.get());
+						if (nullptr != terrain)
+						{
+							ImGuiDrawHelperTerrainComponent(terrain);
+						}
+
 					}
 					else if (nullptr != moduleBehavior)
 					{
@@ -1386,6 +1398,136 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 
 		}
+	}
+}
+
+
+void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
+{
+	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
+
+	int prewidth = terrainComponent->m_width;
+	int preheight = terrainComponent->m_height;
+	int editWidth = terrainComponent->m_width;
+	int editHeight = terrainComponent->m_height;
+
+	
+	//bool change_edit = ImGui::IsItemDeactivatedAfterEdit();
+	
+	if (ImGui::InputInt("Width", &editWidth)) {
+		if (ImGui::IsItemDeactivatedAfterEdit())
+		{
+			if(editWidth < 1)
+			{
+				editWidth = 1;
+			}
+		}
+	}
+	if (ImGui::InputInt("Height", &editHeight)) {
+		if (ImGui::IsItemDeactivatedAfterEdit())
+		{
+			if (editHeight < 1)
+			{
+				editHeight = 1;
+			}
+		}
+	}	
+
+	if (prewidth != editWidth || preheight != editHeight)
+	{
+		terrainComponent->Resize(editWidth, editHeight);
+	}
+
+
+	// ImGui UI 예시 (에디터 툴 패널 내부)
+	if (ImGui::CollapsingHeader("Terrain Brush"))
+	{
+		// 모드 선택
+		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer" };
+		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
+		if (ImGui::Combo("Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
+			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);
+
+		// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
+		ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
+
+		// 세기 슬라이더
+		ImGui::SliderFloat("Strength", &g_CurrentBrush->m_strength, 0.0f, 1.0f);
+
+		// Flatten 옵션일 때만 목표 높이 입력
+		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
+		{
+			//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
+			ImGui::SliderFloat("Strength", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
+		}
+
+		// PaintLayer 옵션일 때만 레이어 선택
+		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
+		{
+			// 에디터가 가지고 있는 레이어 리스트에서 ID와 이름을 보여줌
+			static int selectedLayerIndex = 0;
+			std::vector<const char*> layerNames;
+
+			layerNames = terrainComponent->GetLayerNames();
+
+
+			if (ImGui::Combo("Layer ID", &selectedLayerIndex, layerNames.data(), (int)layerNames.size()))
+			{
+				g_CurrentBrush->m_layerID = selectedLayerIndex;
+			}
+
+			LayerDesc* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
+			if (layer != nullptr) {
+				float tiling = layer->tilling;
+				float tempTiling = tiling;
+				ImGui::DragFloat("tiling", &tempTiling, 1.0f, 0.01, 4096.0f);
+				if (tempTiling!= tiling)
+				{
+					layer->tilling = tempTiling;
+					terrainComponent->UpdateLayerDesc(selectedLayerIndex);
+				}
+			}
+
+			if (ImGui::Button("AddLayer")) {
+				ImGui::OpenPopup("AddLayerPopup");
+			}
+		}
+
+		//save , load
+		if (ImGui::Button("Save Terrain"))
+		{
+			file::path savePath = ShowSaveFileDialog(L"");
+			std::wstring folderPath = savePath.parent_path().wstring();
+			std::wstring fileName = savePath.filename().wstring();
+			terrainComponent->Save(folderPath, fileName);
+		}
+
+		if (ImGui::Button("Load Terrain"))
+		{
+			//todo:
+			/*file::path loadPath = ShowOpenFileDialog(L"");
+			if (!loadPath.empty())
+			{
+				terrainComponent->Load();
+			}*/
+		}
+
+	}
+
+	// 레이어 추가 팝업
+	if (ImGui::BeginPopup("AddLayerPopup"))
+	{
+		if (ImGui::Button("Add"))
+		{
+			file::path difuseFile = ShowOpenFileDialog(L"");
+			std::wstring difuseFileName = difuseFile.filename().wstring();
+			if (!difuseFile.empty())
+			{
+				terrainComponent->AddLayer(difuseFileName, 4096.0f);
+			}
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
 	}
 }
 

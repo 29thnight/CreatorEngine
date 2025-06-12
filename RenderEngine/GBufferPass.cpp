@@ -10,6 +10,10 @@
 #include "Benchmark.hpp"
 #include "RenderCommand.h"
 
+//==============
+#include "Terrain.h"
+
+
 GBufferPass::GBufferPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -128,6 +132,30 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
+	for (auto& obj : scene.GetScene()->m_SceneObjects) {
+		if (obj->IsDestroyMark()) continue;
+		if (obj->HasComponent<TerrainComponent>()) {
+
+			auto terrain = obj->GetComponent<TerrainComponent>();
+			auto terrainMesh = terrain->GetMesh();
+
+			if (terrainMesh)
+			{
+				DirectX11::PSSetConstantBuffer(12, 1, terrain->m_layerBuffer.GetAddressOf());
+				scene.UpdateModel(obj->m_transform.GetWorldMatrix());
+
+				DirectX11::PSSetShaderResources(6, 1, terrain->GetLayerSRV());
+				DirectX11::PSSetShaderResources(7, 1, terrain->GetSplatMapSRV());
+				terrainMesh->Draw();
+				ID3D11ShaderResourceView* nullSRV = nullptr;
+				DirectX11::PSSetShaderResources(6, 1, &nullSRV);
+				DirectX11::PSSetShaderResources(7, 1, &nullSRV);
+			}
+		}
+	}
+	
+
+	
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
 	//TODO : Change deferredContext Render

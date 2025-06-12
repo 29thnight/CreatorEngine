@@ -22,6 +22,8 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <Xinput.h>
+
+
 using namespace Microsoft::WRL;
 //STL
 #include <array>

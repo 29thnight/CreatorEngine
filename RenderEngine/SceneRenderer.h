@@ -36,6 +36,7 @@
 #include "LightingPass.h"
 
 #include "TestPlayer.h"
+#include "TerrainGizmoPass.h"
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -116,6 +117,8 @@ private:
 
 	std::unique_ptr<SSGIPass>			m_pSSGIPass{};
 	std::unique_ptr<LightingPass>       m_pLightingPass{};
+
+	std::unique_ptr<TerrainGizmoPass>   m_pTerrainGizmoPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;
 

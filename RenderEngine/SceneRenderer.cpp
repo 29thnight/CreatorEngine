@@ -206,6 +206,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		}
 	);
 
+	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
+
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
@@ -453,6 +455,15 @@ void SceneRenderer::SceneRendering()
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
 			}
+		}
+
+		if(camera == m_pEditorCamera.get())
+		{
+			DirectX11::BeginEvent(L"TerrainGizmoPass");
+			Benchmark banch;
+			m_pTerrainGizmoPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("TerrainGizmoPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//{

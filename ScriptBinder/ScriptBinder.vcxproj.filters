@@ -216,6 +216,9 @@
     <ClCompile Include="TagManager.cpp">
       <Filter>Managers\TagManager</Filter>
     </ClCompile>
+    <ClCompile Include="Terrain.cpp">
+      <Filter>Classes\Components\PhysicsComponent\Terrain</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -369,9 +372,6 @@
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="RagdollComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="RaycastComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="SphereColliderComponent.h">

@@ -460,6 +460,44 @@ void PhysicsManager::DrawDebugInfo()
 	
 }
 
+void PhysicsManager::RayCast(RayEvent& rayEvent)
+{
+	RayCastInput inputInfo;
+
+	inputInfo.origin = rayEvent.origin;
+	inputInfo.direction = rayEvent.direction;
+	inputInfo.distance = rayEvent.distance;
+	inputInfo.layerNumber = rayEvent.layerMask;
+
+	auto result = Physics->RayCast(inputInfo,rayEvent.isStatic);
+
+	if (result.hasBlock)
+	{
+		rayEvent.resultData->hasBlock = result.hasBlock;
+		rayEvent.resultData->blockObject = m_colliderContainer[result.id].gameObject;
+		rayEvent.resultData->blockPoint = result.blockPosition;
+	}
+
+	rayEvent.resultData->hitCount = result.hitSize;
+	rayEvent.resultData->hitObjects.reserve(result.hitSize);
+	rayEvent.resultData->hitPoints.reserve(result.hitSize);
+	rayEvent.resultData->hitObjectLayer.reserve(result.hitSize);
+
+	for (int i = 0; i < result.hitSize; i++)
+	{
+		rayEvent.resultData->hitObjects.push_back(m_colliderContainer[result.hitId[i]].gameObject);
+		rayEvent.resultData->hitPoints.push_back(result.contectPoints[i]);
+		rayEvent.resultData->hitObjectLayer.push_back(result.hitLayerNumber[i]);
+	}
+
+	if (rayEvent.bUseDebugDraw)
+	{
+		//todo : debug draw
+		//origin , direction , distance
+	}
+
+}
+
 void PhysicsManager::AddTerrainCollider(GameObject* object)
 {
 	if (!object->HasComponent<TerrainColliderComponent>()) {

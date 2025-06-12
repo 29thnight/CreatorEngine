@@ -42,6 +42,7 @@
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
+    <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />

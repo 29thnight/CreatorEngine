@@ -9,6 +9,7 @@ class MeshRenderer;
 class ModuleBehavior;
 class Animator;
 
+class TerrainComponent;
 class InspectorWindow
 {
 public:
@@ -23,4 +24,6 @@ private:
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);
 
+	void DrawMyLink(std::string linkName, std::string from, std::string to);
+	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 };

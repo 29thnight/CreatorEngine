@@ -11,6 +11,9 @@ Texture2D OcclusionRoughnessMetal : register(t2);
 Texture2D AoMap : register(t3);
 Texture2D Emissive : register(t5);
 
+Texture2DArray LayerAlbedo : register(t6);
+Texture2D SplatTexture : register(t7);
+
 cbuffer PBRMaterial : register(b0)
 {
     float4 gAlbedo;
@@ -24,6 +27,16 @@ cbuffer PBRMaterial : register(b0)
     int gNormalState;
     int gConvertToLinear;
 }
+
+cbuffer TerrainLayerConstants : register(b12)
+{
+    int useTerrainLayers;
+    float gLayerTiling0;
+    float gLayerTiling1;
+    float gLayerTiling2;
+    float gLayerTiling3;
+};
+
 
 struct PixelShaderInput
 {
@@ -76,6 +89,45 @@ GBufferOutput main(PixelShaderInput IN)
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
     }
+    
+    [branch]
+    if (useTerrainLayers)
+    {
+        float2 uv = IN.texCoord;
+        uv.y = -uv.y;
+        
+        float2 uv0 = uv * gLayerTiling0 * 4096;
+        float2 uv1 = uv * gLayerTiling1 * 4096;
+        float2 uv2 = uv * gLayerTiling2 * 4096;
+        float2 uv3 = uv * gLayerTiling3 * 4096;
+        
+        float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0);
+        float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0);
+        float3 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0);
+        float3 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0);
+        
+        float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
+        
+        float weigt0 = splat.r;
+        float weigt1 = splat.g;
+        float weigt2 = splat.b;
+        float weigt3 = splat.a;
+        
+        
+        
+        float3 color = layer0 * weigt0 + layer1 * weigt1 + layer2 * weigt2 + layer3 * weigt3;
+        //color = layer0;
+        
+        //color.r = gLayerTiling.r - 1.0;
+        //color.bg = 0;
+        albedo = float4(color, 1.0);
+
+        if (gConvertToLinear)
+            albedo = SRGBtoLINEAR(albedo);
+    }
+        
+    
+    
 
     float occlusion = 1;
 
