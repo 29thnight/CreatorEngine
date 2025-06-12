@@ -221,6 +221,7 @@
     </Filter>
     <Filter Include="RenderTaskScheduler">
       <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
+	</Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -429,6 +430,7 @@
     </ClCompile>
     <ClCompile Include="ColorModuleCS.cpp">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
+	</ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem\Animation</Filter>
     </ClCompile>
@@ -824,6 +826,7 @@
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
+	</FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
