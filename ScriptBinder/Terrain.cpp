@@ -51,19 +51,21 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::wstring splatMapPath = (terrainPath / (name + L"_SplatMap.png")).wstring();
 	std::wstring metaPath = (terrainPath / (name + L".meta")).wstring();
 
-	//스레드로 이미지 저장 부터
-	m_threadPool.Enqueue(
-		[this, heightMapPath]() 
-		{
-			SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
-		}
-	);
-	m_threadPool.Enqueue(
-		[this, splatMapPath]() 
-		{
-			SaveEditorSplatMap(splatMapPath);
-		}
-	);
+	////스레드로 이미지 저장 부터
+	//m_threadPool.Enqueue(
+	//	[this, heightMapPath]() 
+	//	{
+	//		SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
+	//	}
+	//);
+	//m_threadPool.Enqueue(
+	//	[this, splatMapPath]() 
+	//	{
+	//		SaveEditorSplatMap(splatMapPath);
+	//	}
+	//);
+	SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
+	SaveEditorSplatMap(splatMapPath);
 
 	//레이어에 사용되었던 텍스쳐들 복사
 	for (const auto& layer : m_layerDescs) 

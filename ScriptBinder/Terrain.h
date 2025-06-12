@@ -69,16 +69,12 @@ public:
         DirectX11::DrawIndexed((UINT)m_indices.size(), 0, 0);
     }
 
-    ID3D11CommandList* Draw(ID3D11DeviceContext* _deferredContext) {
+    void Draw(ID3D11DeviceContext* _deferredContext) {
         UINT offset = 0;
-        _deferredContext->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-        _deferredContext->IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        _deferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        _deferredContext->DrawIndexed((UINT)m_indices.size(), 0, 0);
-
-        ID3D11CommandList* commandList;
-        _deferredContext->FinishCommandList(false, &commandList);
-        return commandList;
+        DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+        DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+        DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
     }
 
     std::string GetName() const { return m_name; }
