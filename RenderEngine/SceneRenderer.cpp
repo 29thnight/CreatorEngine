@@ -345,6 +345,11 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
 
+	//DataSystems->LoadModel("Punch.fbx");
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt);
+
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
 
@@ -359,8 +364,8 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
+	//player.Update(deltaTime);
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-
 	//m_pEffectPass->Update(deltaTime);
 }
 
