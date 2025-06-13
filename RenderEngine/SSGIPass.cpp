@@ -97,7 +97,7 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 	DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_pTempTexture->m_pUAV, nullptr);
     
-    DirectX11::Dispatch(DeviceState::g_ClientRect.width / 16, DeviceState::g_ClientRect.height / 16, 1);
+    DirectX11::Dispatch(DeviceState::g_ClientRect.width / 32, DeviceState::g_ClientRect.height / 32, 1);
 
     ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
     ID3D11UnorderedAccessView* nulluav = nullptr;

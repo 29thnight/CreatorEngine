@@ -12,6 +12,14 @@ Texture2D<float4> gLightEmissive : register(t3);
 
 RWTexture2D<float4> gOutput : register(u0);
 
+uint2 twobytwoSample[4] =
+{
+    { 0, 0 },
+    { 0, 1 },
+    { 1, 0 },
+    { 1, 1 }
+};
+
 cbuffer SSGIParams : register(b0)
 {
     float4x4 invVP;
@@ -162,8 +170,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     //gOutput[DTid.xy] = float4(float3(AO, AO, AO), 1);
     
+    uint2 twobytwo = twobytwoSample[frameIndex % 4];
+    float2 invScreenSize = 1.0 / screenSize;
     
-    float2 uv = float2(DTid.xy) / screenSize;
+    // DTid.xy = screenSize / 2 = (960, 540)
+    float2 uv = float2(DTid.xy * 2 + twobytwo) * invScreenSize;
+    //float2 uv = float2(DTid.xy) / screenSize;
+    //uv *= 2.0;
     float depth = gDepthTex.SampleLevel(PointSampler, uv, 0);
     uint indirect = 0u;
     uint occlusion = 0u;
@@ -225,8 +238,18 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     visibility /= Nd;
     lighting /= Nd;
-    float3 col = gColor.SampleLevel(PointSampler, uv, 0).rgb;
-    float3 lm = gLightEmissive.SampleLevel(PointSampler, uv, 0).rgb;
-
-    gOutput[DTid.xy] = float4((col + lighting) * visibility, 1);
+    
+    //float3 col = gColor.SampleLevel(PointSampler, uv, 0).rgb;
+    //gOutput[DTid.xy] = float4((col + lighting) * visibility, 1);
+    
+    
+    float3 col0 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 0)) * invScreenSize, 0).rgb;
+    float3 col1 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 0)) * invScreenSize, 0).rgb;
+    float3 col2 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 1)) * invScreenSize, 0).rgb;
+    float3 col3 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 1)) * invScreenSize, 0).rgb;
+    
+    gOutput[DTid.xy * 2 + uint2(0,0)] = float4((col0 + lighting) * visibility, 1);
+    gOutput[DTid.xy * 2 + uint2(1,0)] = float4((col1 + lighting) * visibility, 1);
+    gOutput[DTid.xy * 2 + uint2(0,1)] = float4((col2 + lighting) * visibility, 1);
+    gOutput[DTid.xy * 2 + uint2(1,1)] = float4((col3 + lighting) * visibility, 1);
 }
