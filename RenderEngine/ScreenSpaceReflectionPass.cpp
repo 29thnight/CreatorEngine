@@ -101,8 +101,8 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	cbData.maxRayCount = maxRayCount;
 
 	m_pso->Apply();
-	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, m_prevSSRTexture->m_pTexture);
-	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV() };
+	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, renderData->m_SSRPrevTexture->m_pTexture);
+	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
 	DirectX11::OMSetRenderTargets(2, view, nullptr);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 

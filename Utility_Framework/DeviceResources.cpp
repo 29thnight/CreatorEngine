@@ -277,7 +277,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // ERROR 메시지에 Breakpoint
-        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, FALSE);
+        m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
 
         // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
@@ -327,8 +327,6 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
     ID3D11RenderTargetView* nullViews[] = { nullptr };
     m_d3dContext->OMSetRenderTargets(ARRAYSIZE(nullViews), nullViews, nullptr);
     m_d3dRenderTargetView = nullptr;
-    //m_d2dContext->SetTarget(nullptr);
-    //m_d2dTargetBitmap = nullptr;
     m_d3dDepthStencilView = nullptr;
     m_d3dContext->Flush1(D3D11_CONTEXT_TYPE_ALL, nullptr);
     m_d3dContext->ClearState();
@@ -371,7 +369,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.SampleDesc.Quality = 0;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
         swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;	// 모든 Microsoft Store 앱은 이 SwapEffect를 사용해야 합니다.
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.Flags = 0;
         swapChainDesc.Scaling = scaling;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;

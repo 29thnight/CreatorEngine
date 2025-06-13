@@ -111,6 +111,16 @@ void RenderPassData::Initalize(uint32 index)
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
 
+	XMMATRIX identity = XMMatrixIdentity();
+
+	std::string viewBufferName = "Camera(" + std::to_string(index) + ")ViewBuffer";
+	std::string projBufferName = "Camera(" + std::to_string(index) + ")ProjBuffer";
+
+	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
+
 	m_shadowCamera.m_isOrthographic = true;
 
 	m_isInitalized = true;

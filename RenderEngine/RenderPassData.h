@@ -22,6 +22,12 @@ public:
 	std::atomic_bool          m_isInitalized{ false };
 	std::mutex				  m_dataMutex;
 
+	Mathf::xMatrix            m_frameCalculatedView{};
+	Mathf::xMatrix            m_frameCalculatedProjection{};
+
+	ComPtr<ID3D11Buffer>	m_ViewBuffer;
+	ComPtr<ID3D11Buffer>	m_ProjBuffer;
+
 	RenderPassData();
 	~RenderPassData();
 
