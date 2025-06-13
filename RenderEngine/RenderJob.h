@@ -60,7 +60,7 @@ public:
 	{
 		for (DWORD i = 0; i < m_numThreads; ++i)
 		{
-			m_workers[i].thread.m_thread.Joinable();
+			m_eventNotification.Notify(i); // 각 스레드 깨우기
 		}
 		m_eventNotification.Wait();
 	}
@@ -102,6 +102,10 @@ private:
 			if (m_concurrentTasks.try_pop(task))
 			{
 				task(); // 사용자 정의 함수 안에서 GetDeferredContext(threadIndex) 사용 가능
+			}
+			else
+			{
+				_mm_pause(); // busy-wait 잠시 대기
 			}
 		}
 	}

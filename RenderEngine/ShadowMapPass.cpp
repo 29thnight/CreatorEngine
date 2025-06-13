@@ -226,24 +226,24 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* defferdCo
 
 	auto  lightdir			= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc				= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constantCopy		= camera.m_shadowMapConstant;		//type = ShadowMapConstant
+	auto& constantCopy		= camera.m_shadowMapConstant;						//type = ShadowMapConstant
 
 	m_pso->Apply(defferdContextPtr1);
 
 	DevideCascadeEnd(camera);
 	DevideShadowInfo(camera, lightdir);
 
-	constantCopy.devideShadow				= m_settingConstant.devideShadow;
-	constantCopy._epsilon					= m_settingConstant._epsilon;
+	constantCopy.devideShadow							= m_settingConstant.devideShadow;
+	constantCopy._epsilon								= m_settingConstant._epsilon;
 	renderData->m_shadowCamera.m_eyePosition			= camera.m_cascadeinfo[2].m_eyePosition;
 	renderData->m_shadowCamera.m_lookAt					= camera.m_cascadeinfo[2].m_lookAt;
 	renderData->m_shadowCamera.m_viewHeight				= camera.m_cascadeinfo[2].m_viewHeight;
 	renderData->m_shadowCamera.m_viewWidth				= camera.m_cascadeinfo[2].m_viewWidth;
 	renderData->m_shadowCamera.m_nearPlane				= camera.m_cascadeinfo[2].m_nearPlane;
 	renderData->m_shadowCamera.m_farPlane				= camera.m_cascadeinfo[2].m_farPlane;
-	constantCopy.m_shadowMapWidth			= desc.m_textureWidth;
-	constantCopy.m_shadowMapHeight			= desc.m_textureHeight;
-	constantCopy.m_lightViewProjection[0]	= camera.m_cascadeinfo[2].m_lightViewProjection;
+	constantCopy.m_shadowMapWidth						= desc.m_textureWidth;
+	constantCopy.m_shadowMapHeight						= desc.m_textureHeight;
+	constantCopy.m_lightViewProjection[0]				= camera.m_cascadeinfo[2].m_lightViewProjection;
 
 	DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
 	DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[0]);

@@ -57,6 +57,10 @@ public:
 	MeshRendererProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
+	void OnProxyDistroy();
+
+	static std::queue<HashedGuid> RegisteredDistroyProxyGUIDs;
+
 private:
 	friend class HierarchyWindow;
 	friend class InspectorWindow;
@@ -70,5 +74,6 @@ private:
 	ProxyContainer  m_shadowRenderQueue;
 	ID3D11Buffer*	m_ModelBuffer{};
 	std::mutex      m_shadowRenderMutex;
+	std::atomic_flag m_proxyMapFlag{};
 	bool			m_isPlaying = false;
 };

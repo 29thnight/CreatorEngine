@@ -15,6 +15,7 @@
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
+std::queue<HashedGuid> RenderScene::RegisteredDistroyProxyGUIDs;
 
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
@@ -72,8 +73,6 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model)
 void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* deferredContext)
 {
 	deferredContext->UpdateSubresource(m_ModelBuffer, 0, nullptr, &model, 0, 0);
-
-
 }
 
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
@@ -124,6 +123,8 @@ void RenderScene::UnregisterAnimator(Animator* animatorPtr)
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
+	SpinLock lock(m_proxyMapFlag);
+
 	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
 
 	m_animatorMap.erase(animatorGuid);
@@ -147,6 +148,16 @@ MeshRendererProxy* RenderScene::FindProxy(size_t guid)
 	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
 
 	return m_proxyMap[guid].get();
+}
+
+void RenderScene::OnProxyDistroy()
+{
+	while (!RenderScene::RegisteredDistroyProxyGUIDs.empty())
+	{
+		auto ID = RenderScene::RegisteredDistroyProxyGUIDs.back();
+		m_proxyMap.erase(ID);
+		RenderScene::RegisteredDistroyProxyGUIDs.pop();
+	}
 }
 
 void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
@@ -197,7 +208,8 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
-	m_proxyMap.erase(meshRendererGuid);
+	m_proxyMap[meshRendererGuid]->DistroyProxy();
+	//m_proxyMap.erase(meshRendererGuid);
 }
 
 void RenderScene::PushShadowRenderQueue(MeshRendererProxy* proxy)

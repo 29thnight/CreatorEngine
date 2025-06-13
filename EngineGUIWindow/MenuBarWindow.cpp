@@ -52,11 +52,13 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         auto& lightMap = m_sceneRenderer->lightMap;
         auto& m_renderScene = m_sceneRenderer->m_renderScene;
         auto& m_pLightMapPass = m_sceneRenderer->m_pLightMapPass;
+        static bool isLightMapSwitch{ useTestLightmap.load() };
 
         ImGui::BeginChild("LightMap", ImVec2(600, 600), false);
         ImGui::Text("LightMap");
         if (ImGui::CollapsingHeader("Settings")) {
-            ImGui::Checkbox("LightmapPass On/Off", &useTestLightmap);
+
+            ImGui::Checkbox("LightmapPass On/Off", &isLightMapSwitch);
 
             ImGui::Text("Position and NormalMap Settings");
             ImGui::DragInt("PositionMap Size", &m_pPositionMapPass->posNormMapSize, 128, 512, 8192);
@@ -124,6 +126,8 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         }
 
         ImGui::EndChild();
+
+        useTestLightmap.store(isLightMapSwitch);
     });
 
 
