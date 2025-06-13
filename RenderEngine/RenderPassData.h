@@ -13,6 +13,7 @@ public:
 	UniqueTexturePtr		  m_renderTarget{ TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr		  m_depthStencil{ TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr		  m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr		  m_SSRPrevTexture{ TEXTURE_NULL_INITIALIZER };
 	ID3D11DepthStencilView*   m_shadowMapDSVarr[cascadeCount]{};
 	ID3D11ShaderResourceView* sliceSRV[3]{};
 	ProxyContainer			  m_deferredQueue;
@@ -20,6 +21,12 @@ public:
 	Camera					  m_shadowCamera;
 	std::atomic_bool          m_isInitalized{ false };
 	std::mutex				  m_dataMutex;
+
+	Mathf::xMatrix            m_frameCalculatedView{};
+	Mathf::xMatrix            m_frameCalculatedProjection{};
+
+	ComPtr<ID3D11Buffer>	m_ViewBuffer;
+	ComPtr<ID3D11Buffer>	m_ProjBuffer;
 
 	RenderPassData();
 	~RenderPassData();

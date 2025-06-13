@@ -13,7 +13,7 @@ struct alignas(16) DeferredBuffer
 	float m_envMapIntensity{ 1.f };
 };
 
-ID3D11ShaderResourceView* nullSRV[10] = {
+ID3D11ShaderResourceView* nullSRV10[10] = {
     nullptr,
     nullptr,
     nullptr,
@@ -121,10 +121,8 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
         m_EmissiveTexture->m_pSRV
     };
 
-    ID3D11RenderTargetView* nullRTV = nullptr;
-    ID3D11RenderTargetView* views[]{ renderData->m_renderTarget->GetRTV(), nullRTV };
-
-    DirectX11::OMSetRenderTargets(1, views, nullptr);
+    ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV()};
+    DirectX11::OMSetRenderTargets(2, rtv, nullptr);
     DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
     DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
@@ -141,7 +139,7 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::UpdateBuffer(lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
     DirectX11::Draw(4, 0);
 
-    DirectX11::PSSetShaderResources(0, 10, nullSRV);
+    DirectX11::PSSetShaderResources(0, 10, nullSRV10);
     DirectX11::OMSetRenderTargets(1, nullRTVs, nullptr);
 }
 

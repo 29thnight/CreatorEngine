@@ -231,7 +231,6 @@ public:
             }
         }
 
-
         m_computeShader = &ShaderSystem->ComputeShaders["TerrainTexture"];
         m_AddLayerBuffer = DirectX11::CreateBuffer(
 			sizeof(TerrainAddLayerBuffer),

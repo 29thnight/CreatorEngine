@@ -149,41 +149,6 @@ DirectX::BoundingFrustum Camera::GetFrustum()
 
 	return frustum;
 }
-//
-//void Camera::ResizeRelease()
-//{
-//	if (m_renderTarget)
-//	{
-//		m_renderTarget.reset();
-//	}
-//
-//	if (m_depthStencil)
-//	{
-//		m_depthStencil.reset();
-//	}
-//}
-//
-//void Camera::ResizeResources()
-//{
-//	m_aspectRatio = DeviceState::g_aspectRatio;
-//
-//	std::string cameraRTVName = "Camera_" + std::to_string(m_cameraIndex) + "_RTV";
-//	auto renderTexture = TextureHelper::CreateRenderTexture(
-//		DeviceState::g_ClientRect.width,
-//		DeviceState::g_ClientRect.height,
-//		cameraRTVName,
-//		DXGI_FORMAT_R16G16B16A16_FLOAT
-//	);
-//	m_renderTarget.swap(renderTexture);
-//
-//	std::string depthName = "Camera_" + std::to_string(m_cameraIndex) + "_DSV";
-//	auto depthStencil = TextureHelper::CreateDepthTexture(
-//		DeviceState::g_ClientRect.width,
-//		DeviceState::g_ClientRect.height,
-//		depthName
-//	);
-//	m_depthStencil.swap(depthStencil);
-//}
 
 void Camera::RegisterContainer()
 {
@@ -281,57 +246,3 @@ void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 	deferredContext->VSSetConstantBuffers(1, 1, m_ViewBuffer.GetAddressOf());
 	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
 }
-
-//void Camera::ClearRenderTarget()
-//{
-//	DirectX11::ClearRenderTargetView(m_renderTarget->GetRTV(), DirectX::Colors::Transparent);
-//	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-//}
-
-//void Camera::PushRenderQueue(MeshRendererProxy* command)
-//{
-//	Material* mat = command->m_Material;
-//	if (nullptr == mat) return;
-//
-//	{
-//		std::unique_lock lock(m_cameraMutex);
-//
-//		switch (mat->m_renderingMode)
-//		{
-//		case MaterialRenderingMode::Opaque:
-//			m_deferredQueue.push_back(command);
-//			break;
-//		case MaterialRenderingMode::Transparent:
-//			m_forwardQueue.push_back(command);
-//			break;
-//		}
-//	}
-//}
-
-//void Camera::SortRenderQueue()
-//{
-//	auto sortByAnimatorAndMaterialGuid = [](MeshRendererProxy* a, MeshRendererProxy* b)
-//	{
-//		if (a->m_animatorGuid == b->m_animatorGuid)
-//		{
-//			return a->m_materialGuid < b->m_materialGuid;
-//		}
-//		return a->m_animatorGuid < b->m_animatorGuid;
-//	};
-//
-//	if(!m_deferredQueue.empty())
-//	{
-//		std::sort(m_deferredQueue.begin(), m_deferredQueue.end(), sortByAnimatorAndMaterialGuid);
-//	}
-//
-//	if(!m_forwardQueue.empty())
-//	{
-//		std::sort(m_forwardQueue.begin(), m_forwardQueue.end(), sortByAnimatorAndMaterialGuid);
-//	}
-//}
-//
-//void Camera::ClearRenderQueue()
-//{
-//	m_deferredQueue.clear();
-//	m_forwardQueue.clear();
-//}

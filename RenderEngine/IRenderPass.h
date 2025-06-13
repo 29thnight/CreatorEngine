@@ -23,12 +23,13 @@ struct IViewEvent
 };
 
 using namespace concurrency;
+using CommandQueue = concurrent_queue<ID3D11CommandList*>;
 
 class IRenderPass abstract : public IViewEvent
 {
 public:
-	using CommandQueue = concurrent_queue<ID3D11CommandList*>;
-	using CommandQueueMap = std::unordered_map<size_t, CommandQueue>;
+	using CommandQueueMap = std::unordered_map<size_t, std::array<CommandQueue, 10>>;
+	using FrameQueueArray = std::array<std::array<CommandQueue, 10>, 3>;
 public:
 	IRenderPass() = default;
 	virtual ~IRenderPass() = default;
@@ -41,30 +42,28 @@ public:
 	virtual void ResizeRelease() {};
 	virtual void Resize(uint32_t width, uint32_t height) {}
 
-	void PushQueue(size_t key, ID3D11CommandList* command) { m_commandQueueMapArr[(size_t)!m_frame][key].push(command); }
+	void PushQueue(size_t key, ID3D11CommandList* command) 
+	{ 
+		size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+		m_frameQueues[index][key].push(command);
+	}
 
 	CommandQueue* GetCommandQueue(size_t key)
 	{
-		auto& frameCommandQueue = m_commandQueueMapArr[(size_t)m_frame];
-
-		auto it = frameCommandQueue.find(key);
-		if (it != frameCommandQueue.end())
-		{
-			return &it->second;
-		}
-
-		return nullptr;
+		size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+		return &m_frameQueues[prevIndex][key];
 	}
 
 	void SwapQueue()
 	{
-		m_frame = !m_frame;
+		m_frame.fetch_add(1, std::memory_order_relaxed);
 	}
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
-	std::array<CommandQueueMap, 2> m_commandQueueMapArr{};
+	CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
+	FrameQueueArray m_frameQueues;
 
 	bool m_abled{ true };
-	std::atomic_bool m_frame{};
+	std::atomic_ullong m_frame{};
 };

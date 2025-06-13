@@ -30,7 +30,7 @@ float3 CalculateViewSpaceFromDepth(float depth, float2 texCoord)
 {
     // clip space between [-1, 1]
     // flip y so that +ve y is upwards
-    float2 clipXY = texCoord; // * 2.0 - 1.0;
+    float2 clipXY = texCoord * 2.0 - 1.0;
     clipXY.y = -clipXY.y;
 
     // NOTE: depth is not linearized
@@ -49,7 +49,7 @@ float2 GetDirection(uint i, float2 noise)
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     float2 uv = float2(DTid.xy) / screenSize;
-    float depth = gDepthTex.SampleLevel(PointSampler, uv, 0).r;
+    float depth = gDepthTex.SampleLevel(PointSampler, uv, 0);
     if (depth >= 1)
         gOutput[DTid.xy] = float4(1.0, 0, 0, 1.0);
     
@@ -75,8 +75,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
             float r = radius / depth * pixelPerUnit / 100.0;
             float step = r * ((j + 1.0) / (Ns + 1.0));
             float2 offsetUV = uv + dir * step;
-
-            float3 sf = CalculateViewSpaceFromDepth(gDepthTex.SampleLevel(PointSampler, offsetUV, 0).r, offsetUV); //SamplePosition(offsetUV);
+            float sDepth = gDepthTex.SampleLevel(PointSampler, offsetUV, 0);
+            float3 sf = CalculateViewSpaceFromDepth(sDepth, offsetUV); //SamplePosition(offsetUV);
             float3 nj = normalize(gNormalTex.SampleLevel(PointSampler, offsetUV, 0).rgb * 2.0 - 1.0);
             sf = TangentSpacePos(sf, nj);
             
@@ -91,7 +91,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             uint b = uint(ceil((thetaMax - thetaMin + PI / 2) / PI * Nb));
             uint bj = ((1u << b) - 1u) ^ ((1u << a) - 1u);
             
-            float3 cj = gLightEmissive.SampleLevel(LinearSampler, offsetUV, 0).xyz;
+            float3 cj = gLightEmissive.SampleLevel(PointSampler, offsetUV, 0).xyz;
             float3 lj = normalize(sf - p);
             uint newBits = bj & (~bitmask);
             uint bitCount = countbits(newBits);
@@ -114,7 +114,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             //    float weight = saturate(dot(np, lj)) * saturate(dot(nj, -lj));
             //    GI += col * weight;
             //}
-            GI += (cj * bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj)) /* * col * 10.0*/;
+            GI += (cj * bitCount / float(Nb)) * saturate(dot(np, lj)) * saturate(dot(nj, -lj)) * 100.0; /* * col * 10.0*/;
             bitmask |= bj; // 가렸다면 업데이트
         }
 
@@ -124,5 +124,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     AO /= Nd;
     GI /= Nd;
+    
     gOutput[DTid.xy] = float4((col + GI) * AO, 1);
 }

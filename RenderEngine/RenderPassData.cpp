@@ -76,6 +76,14 @@ void RenderPassData::Initalize(uint32 index)
 		cascadeCount
 	);
 
+	auto ssrTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"prevSSRTexture",
+		DXGI_FORMAT_R16G16B16A16_FLOAT
+	);
+	m_SSRPrevTexture.swap(ssrTexture);
+
 	for (int i = 0; i < cascadeCount; ++i)
 	{
 		sliceSRV[i] = DirectX11::CreateSRVForArraySlice(DeviceState::g_pDevice, shadowMapTexture->m_pTexture, DXGI_FORMAT_R32_FLOAT, i);
@@ -102,6 +110,16 @@ void RenderPassData::Initalize(uint32 index)
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
+
+	XMMATRIX identity = XMMatrixIdentity();
+
+	std::string viewBufferName = "Camera(" + std::to_string(index) + ")ViewBuffer";
+	std::string projBufferName = "Camera(" + std::to_string(index) + ")ProjBuffer";
+
+	m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());
+	m_ProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
+	DirectX::SetName(m_ProjBuffer.Get(), projBufferName.c_str());
 
 	m_shadowCamera.m_isOrthographic = true;
 

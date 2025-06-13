@@ -17,6 +17,13 @@ struct alignas(16) CBData
 	int maxRayCount;
 };
 
+ID3D11ShaderResourceView* nullSRV[4] = {
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr
+};
+
 ScreenSpaceReflectionPass::ScreenSpaceReflectionPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -65,16 +72,6 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_prevSSRTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"PreviousSSRTexture",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
-	);
-	m_prevSSRTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_prevSSRTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-
 	m_prevCopiedSSRTexture = Texture::Create(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -93,12 +90,6 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	m_pso->Apply();
-	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, m_prevSSRTexture->m_pTexture);
-	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), m_prevSSRTexture->GetRTV()};
-	DirectX11::OMSetRenderTargets(2, view, nullptr);
-
-	camera.UpdateBuffer();
 	CBData cbData;
 	cbData.m_InverseProjection = camera.CalculateInverseProjection();
 	cbData.m_InverseView = camera.CalculateInverseView();
@@ -109,8 +100,14 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 	cbData.Time = (float)Time->GetTotalSeconds();
 	cbData.maxRayCount = maxRayCount;
 
-	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
+	m_pso->Apply();
+	DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, renderData->m_SSRPrevTexture->m_pTexture);
+	ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
+	DirectX11::OMSetRenderTargets(2, view, nullptr);
 	DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
+
+	camera.UpdateBuffer();
+	DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
 
 	DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
@@ -122,17 +119,8 @@ void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 		m_prevCopiedSSRTexture->m_pSRV
 	};
 	DirectX11::PSSetShaderResources(0, 5, srvs);
-
 	DirectX11::Draw(4, 0);
-
-	ID3D11ShaderResourceView* nullSRV[4] = {
-		nullptr,
-		nullptr,
-		nullptr,
-		nullptr
-	};
 	DirectX11::PSSetShaderResources(0, 4, nullSRV);
-	//DirectX11::UnbindRenderTargets();
 }
 
 void ScreenSpaceReflectionPass::ControlPanel()
