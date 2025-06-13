@@ -1,5 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Thread.hpp"
+#include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "ResourceAllocator.h"
 #include "TerrainCollider.h"
@@ -158,16 +159,10 @@ struct TerrainBrush
 struct TerrainLayer
 {
     uint32_t m_layerID{ 0 };
+    std::string layerName;
+    std::wstring diffuseTexturePath;
     ID3D11Texture2D* diffuseTexture{ nullptr };
     ID3D11ShaderResourceView* diffuseSRV{ nullptr };
-    float tilling{ 1.0f };
-};
-
-struct LayerDesc
-{
-	uint32_t layerID{ 0 };
-	std::string layerName;
-	std::wstring diffuseTexturePath;
     float tilling;
 };
 
@@ -515,16 +510,16 @@ public:
         }
     }
 
-	std::vector<LayerDesc> GetLayerCount() const
+	std::vector<TerrainLayer> GetLayerCount() const
 	{
-		return m_layerDescs;
+		return m_layers;
 	}
 
-	LayerDesc* GetLayerDesc(uint32_t layerID)
+    TerrainLayer* GetLayerDesc(uint32_t layerID)
 	{
-		for (auto& desc : m_layerDescs)
+		for (auto& desc : m_layers)
 		{
-			if (desc.layerID == layerID)
+			if (desc.m_layerID == layerID)
 			{
 				return &desc;
 			}
@@ -535,17 +530,17 @@ public:
 
     void UpdateLayerDesc(uint32_t layerID) {
         TerrainLayerBuffer layerBuffer;
-        if (m_layerDescs.size() > 0)
+        if (m_layers.size() > 0)
         {
             layerBuffer.useLayer = true;
         }
 
         float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        for (int i = 0; i < m_layerDescs.size(); ++i)
+        for (int i = 0; i < m_layers.size(); ++i)
         {
-            if (i < m_layerDescs.size())
+            if (i < m_layers.size())
             {
-                tilefector[i] = m_layerDescs[i].tilling;
+                tilefector[i] = m_layers[i].tilling;
             }
             else
             {
@@ -567,7 +562,7 @@ public:
 	std::vector<const char*> GetLayerNames()
 	{	
 		m_layerNames.clear(); // 이전 이름들 초기화
-		for (const auto& desc : m_layerDescs)
+		for (const auto& desc : m_layers)
 		{
 			m_layerNames.push_back(desc.layerName.c_str());
 		}
@@ -578,28 +573,29 @@ public:
 
     void Save(const std::wstring& assetRoot, const std::wstring& name);
 
-    void Load(){
-
-    }
+    bool Load(const std::wstring& filePath);
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
-	void LoadEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
+	bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
 	void SaveEditorSplatMap(const std::wstring& pngPath);
-	void LoadSplatMap(const std::wstring& pngPath);
+	bool LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
 
-
+    void TestSaveLayerTexture(const std::wstring& saveDir);
 
     void loatFromPng(const std::string& filepath, std::vector<std::vector<float>>& outLayerWeights, int& outWidth, int& outHeights);
 
 
 
     //layer 관련 함수
-	void AddLayer(const std::wstring& diffuseFile,float tilling) {
+	void AddLayer(const std::wstring& path,const std::wstring& diffuseFile,float tilling) {
 	
 		TerrainLayer newLayer;
 		newLayer.m_layerID = m_nextLayerID++;
 		newLayer.tilling = tilling;
+        newLayer.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
+        newLayer.diffuseTexturePath = path;
+        newLayer.tilling = tilling;
 		// diffuseTexture 로드
         
 		if (!diffuseFile.empty()) {
@@ -626,14 +622,6 @@ public:
 		m_layers.push_back(newLayer);
 		m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
         
-		LayerDesc desc;
-		desc.layerID = newLayer.m_layerID;
-		desc.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
-        desc.diffuseTexturePath = diffuseFile;
-		desc.tilling = tilling;
-
-		m_layerDescs.push_back(desc);
-		
 		
 
 		TerrainLayerBuffer layerBuffer;
@@ -643,16 +631,9 @@ public:
         }
         
 		float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		for(int i = 0; i < m_layerDescs.size(); ++i)
+		for(int i = 0; i < m_layers.size(); ++i)
 		{
-			if (i < m_layers.size())
-			{
-                tilefector[i] = m_layerDescs[i].tilling;
-			}
-			else
-			{
-                tilefector[i] = 1.0f; // 기본값
-			}
+            tilefector[i] = m_layers[i].tilling;
 		}
 
 		//layerBuffer.layerTilling = DirectX::XMFLOAT4(tilefector[0] / 4096, tilefector[1] / 4096, tilefector[2] / 4096, tilefector[3] / 4096);
@@ -689,28 +670,83 @@ public:
         DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
         DirectX11::CSSetShaderResources(0, 1, nullSRVs);
 
-
-        //for (UINT j = 0; j < m_layers.size(); ++j)
-        //{
-        //    DeviceState::g_pDeviceContext->CopySubresourceRegion(
-        //        m_layerTextureArray,                      // 대상 Texture2DArray
-        //        D3D11CalcSubresource(0, j, 1),     // (MipLevel, ArraySlice, MipLevels)
-        //        0, 0, 0,
-        //        m_layers[j].diffuseTexture,                // 각각의 개별 텍스처
-        //        0,
-        //        nullptr
-        //    );
-        //   /* DeviceState::g_pDeviceContext->UpdateSubresource(
-        //        m_layerTextureArray,
-        //        D3D11CalcSubresource(0, j, 1),
-        //        nullptr,
-        //        m_layers[j].diffuseTexture,
-        //        0,
-        //        0
-        //    );*/
-        //}
     }
 
+    void RemoveLayer(uint32_t layerID);
+
+	void ClearLayers()
+	{
+		m_layers.clear();
+		m_layerHeightMap.clear();
+		m_nextLayerID = 0;
+		// 레이어 텍스처 배열 초기화
+		if (m_layerTextureArray) {
+			m_layerTextureArray->Release();
+			m_layerTextureArray = nullptr;
+		}
+		if (p_outTextureUAV) {
+			p_outTextureUAV->Release();
+			p_outTextureUAV = nullptr;
+		}
+		if (m_layerSRV) {
+			m_layerSRV->Release();
+			m_layerSRV = nullptr;
+		}
+	}
+
+	//metadata load된 데이터로 레이어 초기화
+    void LoadLayers() {
+        TerrainLayerBuffer layerBuffer;
+        if (m_layers.size() > 0)
+        {
+            layerBuffer.useLayer = true;
+        }
+
+        float tilefector[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        for (int i = 0; i < m_layers.size(); ++i)
+        {
+            tilefector[i] = m_layers[i].tilling;
+        }
+
+        //layerBuffer.layerTilling = DirectX::XMFLOAT4(tilefector[0] / 4096, tilefector[1] / 4096, tilefector[2] / 4096, tilefector[3] / 4096);
+        layerBuffer.layerTilling0 = tilefector[0] / 4096;
+        layerBuffer.layerTilling1 = tilefector[1] / 4096;
+        layerBuffer.layerTilling2 = tilefector[2] / 4096;
+        layerBuffer.layerTilling3 = tilefector[3] / 4096;
+        DirectX11::UpdateBuffer(m_layerBuffer.Get(), &layerBuffer);
+
+
+        DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
+
+        for (auto layer : m_layers)
+        {
+            TerrainAddLayerBuffer addLayerBuffer;
+            addLayerBuffer.slice = layer.m_layerID;
+            DirectX11::UpdateBuffer(m_AddLayerBuffer.Get(), &addLayerBuffer);
+            DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
+            const UINT offsets[]{ 0 };
+
+            ID3D11UnorderedAccessView* uavs[] = { p_outTextureUAV };
+            ID3D11UnorderedAccessView* nullUAVs[]{ nullptr };
+            DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+            //ID3D11ShaderResourceView* srvs = { m_layers[newLayer.m_layerID].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
+            ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
+            DirectX11::CSSetShaderResources(0, 1, &layer.diffuseSRV);
+            DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
+
+            uint32 threadGroupCountX = (uint32)ceilf(512 / 16.0f);
+            uint32 threadGroupCountY = (uint32)ceilf(512 / 16.0f);
+
+            //(512 + 15) / 16, (512 + 15) / 16, 4
+            DirectX11::Dispatch(threadGroupCountX, threadGroupCountY, 1);
+
+            DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
+            DirectX11::CSSetShaderResources(0, 1, nullSRVs);
+        }
+
+
+        
+    }
 
 	void InitSplatMapTexture(UINT width,UINT height)
 	{
@@ -839,31 +875,27 @@ private:
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
 
+
+	//== 레이어 관련 변수들 ==
 	uint32_t m_nextLayerID{ 0 }; // 다음 레이어 ID
 	uint32_t m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
-    std::vector<TerrainLayer>            m_layers;
-	std::vector<LayerDesc>               m_layerDescs; // 레이어 설명 (ID, 텍스처 경로 등)
-    
+	std::vector<TerrainLayer>            m_layers; // 레이어 정보들
 	std::vector<const char*> m_layerNames; // 레이어 이름들 (디버깅용)
-
 	std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
 	ComPtr<ID3D11Texture2D> m_splatMapTexture; // 스플랫맵 텍스처
 	ComPtr<ID3D11ShaderResourceView> m_splatMapSRV; // 스플랫맵 SRV
-
 	ID3D11UnorderedAccessView* p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
 
 	ID3D11Texture2D* m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
-	ID3D11ShaderResourceView* m_layerSRV = nullptr; // 최대 4개 레이어 SRV
+	ID3D11ShaderResourceView* m_layerSRV = nullptr; // m_layerTextureArray에 대한 SRV
+	ShaderPtr<ComputeShader>	m_computeShader; // 터레인 각 텍스쳐를 -> m_layerTextureArray에 저장하는 컴퓨트 셰이더
+    //========================
 
-    ShaderPtr<ComputeShader>	m_computeShader;
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
     TerrainMesh* m_pMesh{ nullptr };
     TerrainBrush* m_currentBrush{ nullptr };
-
-    float m_textureWidth;
-    float m_textureHeight;
 
 	float m_minHeight{ -100.0f }; // 최소 높이 
 	float m_maxHeight{ 500.0f }; // 최대 높이

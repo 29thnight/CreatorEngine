@@ -20,6 +20,7 @@ namespace InternalPath
     inline file::path DynamicSolutionDir{};
 	inline file::path BaseProjectPath{};
 	inline file::path ProjectSettingsPath{};
+	inline file::path TerrainSourcePath{};
 
     inline void Initialize()
     {
@@ -47,6 +48,8 @@ namespace InternalPath
 
 		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
+
+		TerrainSourcePath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
 
 		//dir not exist -> create dir
 		if (!file::exists(DataPath))
@@ -88,6 +91,10 @@ namespace InternalPath
 		if (!file::exists(ProjectSettingsPath))
 		{
 			file::create_directories(ProjectSettingsPath);
+		}
+		if (!file::exists(TerrainSourcePath))
+		{
+			file::create_directories(TerrainSourcePath);
 		}
     }
 };
@@ -163,5 +170,10 @@ public:
 	static inline file::path ProjectSettingPath(const std::string_view& path)
 	{
 		return file::path(InternalPath::ProjectSettingsPath) / path;
+	}
+
+	static inline file::path TerrainSourcePath(const std::string_view& path)
+	{
+		return file::path(InternalPath::TerrainSourcePath) / path;
 	}
 };
