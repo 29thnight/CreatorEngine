@@ -98,6 +98,23 @@ void Animator::DeleteParameter(int index)
 {
 	if (index >= 0 && index < Parameters.size())
 	{
+		for (auto& controller : m_animationControllers)
+		{
+			for (auto& state : controller->StateVec)
+			{
+				for (auto& transition : state->Transitions)
+				{
+					for (auto& condition : transition->conditions)
+					{
+						if (condition.valueParameter == Parameters[index])
+						{
+							condition.valueParameter = nullptr;
+						}
+					}
+				}
+
+			}
+		}
 		delete Parameters[index];
 		Parameters.erase(Parameters.begin() + index);
 	}

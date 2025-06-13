@@ -118,6 +118,22 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							auto& MaskNode = layer["m_avatarMask"];
 							AvatarMask avatarMask;
 							Meta::Deserialize(&avatarMask, MaskNode);
+							avatarMask.RootMask = avatarMask.MakeBoneMask(animationController->m_owner->m_Skeleton->m_rootBone);
+							if (MaskNode["m_BoneMasks"])
+							{
+								auto& boneMaskNode = MaskNode["m_BoneMasks"];
+								int i = 0;
+
+								for (auto& boneMask : boneMaskNode)
+								{
+									BoneMask* newboneMask = new BoneMask();
+									Meta::Deserialize(newboneMask, boneMask);
+									avatarMask.m_BoneMasks[i]->isEnabled = newboneMask->isEnabled;
+									i++;
+								}
+							}
+							//AvatarMask* avatarMask = new AvatarMask();
+							//Meta::Deserialize(avatarMask, MaskNode);
 							animationController->ReCreateMask(&avatarMask);
 						}
 					}

@@ -19,15 +19,17 @@ public:
 	void UseOnlyUpper() { useAll = false; useUpper = true;  useLower = false; }
 	void UseOnlyLower() { useAll = false; useUpper = false; useLower = true; }
 
+
+	void ReCreateMask(AvatarMask* _otherMask);
 	BoneMask* RootMask;
 	bool IsBoneEnabled(const std::string& name);
 	BoneMask* MakeBoneMask(Bone* Bone);
 	[[Property]]
 	std::vector<BoneMask*> m_BoneMasks;
 	[[Property]]
-	bool isHumanoid = false;  //상하체 분리만 쓸거면 체크 &&&&&
+	bool isHumanoid = true;  //상하체 분리만 쓸거면 체크 &&&&&
 	[[Property]]
-	bool useAll = true;
+	bool useAll = false;
 	[[Property]]
 	bool useUpper = true;
 	[[Property]]

@@ -258,10 +258,20 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         auto mask = controller->GetAvatarMask();
         if (mask != nullptr) //마스크 있으면
         {
-            
-            if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+
+            if(mask->isHumanoid)
             {
-                globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+                {
+                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                }
+            }
+            else
+            {
+                if (mask->IsBoneEnabled(bone->m_name) == true)
+                {
+                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                }
             }
         }
         else

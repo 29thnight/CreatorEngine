@@ -289,12 +289,13 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 
 
 void AnimationController::CreateMask()
+
 {
 	if (!m_avatarMask)
 	{
 		useMask = true;
 		m_owner->m_Skeleton->MarkRegionSkeleton();
-		m_avatarMask = new AvatarMask();
+		m_avatarMask = new AvatarMask;
 		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
 	}
 	
@@ -302,20 +303,22 @@ void AnimationController::CreateMask()
 
 void AnimationController::ReCreateMask(AvatarMask* mask)
 {
+	if (m_avatarMask)
+	{
+		delete m_avatarMask;
+		m_avatarMask = nullptr;
+	}
 	CreateMask();
-	m_avatarMask->isHumanoid = mask->isHumanoid;
-	m_avatarMask->useAll = mask->useAll;
-	m_avatarMask->useUpper = mask->useUpper;
-	m_avatarMask->useLower = mask->useLower;
+	m_avatarMask->ReCreateMask(mask);
 }
 
 void AnimationController::DeleteAvatarMask()
 {
-	if (m_avatarMask)
-	{
-		useMask = false;
+    if (m_avatarMask)
+    {
+        useMask = false;
 		delete m_avatarMask;
 		m_avatarMask = nullptr;
-	}
+    }
 }
 

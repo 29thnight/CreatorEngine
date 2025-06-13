@@ -16,7 +16,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	AnimationFactorys->ReisterFactory("Punch", []() {return new RunAni(); });
 
 	auto animation = player->GetComponent<Animator>();
-	animation->AddParameter("Speed", speed, ValueType::Float);
+	/*animation->AddParameter("Speed", speed, ValueType::Float);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
 	auto controller = animation->GetController("upper");
@@ -32,6 +32,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
 	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	animation->CreateController("lower");
+	controller->GetAvatarMask()->UseOnlyUpper();
 	auto lowercontroller = animation->GetController("lower");
 	lowercontroller->CreateMask();
 	lowercontroller->CreateState("Idle", 0);
@@ -43,7 +44,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	lowercontroller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 5.3f, ConditionType::Less, ValueType::Float);
 	lowercontroller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
 	lowercontroller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
-	lowercontroller->GetAvatarMask()->UseOnlyLower();
+	lowercontroller->GetAvatarMask()->UseOnlyLower();*/
 
 	auto playerMap = InputActionManagers->AddActionMap("Player");
 	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
@@ -61,23 +62,9 @@ void TestPlayer::Update(float deltaTime)
 {
 	auto _player = GameObject::Find("Punch");
 	auto ani = _player->GetComponent<Animator>();
-	auto controller = ani->GetController("upper");
-	if (InputManagement->IsKeyDown('1'))
-	{
-		std::cout << "press 1" << std::endl;
-		ani->SetAnimation(0);
-	}
-	if (InputManagement->IsKeyDown('2'))
-	{
-		std::cout << "press 2" << std::endl;
-		ani->SetAnimation(2);
-	}
-	if (InputManagement->IsKeyDown('3'))
-	{
-		std::cout << "press 3" << std::endl;
-		ani->SetAnimation(1);
-	}
-	else if(InputManagement->IsKeyPressed('P'))
+
+	
+	if(InputManagement->IsKeyPressed('P'))
 	{
 		speed += 0.05;
 	}
@@ -97,22 +84,12 @@ void TestPlayer::Update(float deltaTime)
 
 	ani->SetParameter("Speed", speed);
 
-	if (InputManagement->IsKeyDown('I'))
-	{
-		ani->SetParameter("Walkparm", true);
-	}
-
-	if (InputManagement->IsKeyDown('U'))
-	{
-		ani->SetParameter("Idleparm", true);
-	}
 
 	if (InputManagement->IsKeyDown('L'))
 	{
 		ani->SetParameter("StopPunch", true);
 	}
 
-	_player->m_transform.AddPosition({ speed * deltaTime* dir.x,0, speed * deltaTime * dir.y });
 }
 
 void TestPlayer::Punch()

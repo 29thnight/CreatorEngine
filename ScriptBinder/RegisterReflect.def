@@ -16,6 +16,7 @@
 #include "Animator.h"
 #include "AniTransition.h"
 #include "AvatarMask.h"
+#include "BoneMask.h"
 #include "BoxColliderComponent.h"
 #include "Canvas.h"
 #include "CharacterControllerComponent.h"
@@ -49,6 +50,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(AnimationState);
     AUTO_REGISTER_CLASS(Animator);
     AUTO_REGISTER_CLASS(AvatarMask);
+    AUTO_REGISTER_CLASS(BoneMask);
     AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Camera);
     AUTO_REGISTER_CLASS(CameraComponent);
