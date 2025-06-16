@@ -70,42 +70,6 @@ void SSGIPass::Initialize(Texture* diffuse, Texture* normal, Texture* lightEmiss
 
 void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 {
- //   if (!RenderPassData::VaildCheck(&camera)) return;
- //   auto renderData = RenderPassData::GetData(&camera);
-
- //   auto& deviceContext = DeviceState::g_pDeviceContext;
-	//DirectX11::CSSetShader(m_pSSGIShader->GetShader(), nullptr, 0);
- //   DeviceState::g_pDeviceContext->CSSetSamplers(0, 1, &sample->m_SamplerState); // sampler 0
- //   DeviceState::g_pDeviceContext->CSSetSamplers(1, 1, &pointSample->m_SamplerState); // sampler 1
- //   ID3D11ShaderResourceView* srv[4] = {
- //       renderData->m_depthStencil->m_pSRV,
- //       renderData->m_renderTarget->m_pSRV,
- //       m_pNormalTexture->m_pSRV,
- //       m_pLightEmissiveTexture->m_pSRV
- //   };
-	//SSGIParams params;
- //   params.invVP = camera.CalculateInverseView() * camera.CalculateInverseProjection();
- //   params.proj = camera.CalculateProjection();
- //   params.inverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
-	//params.screenSize = { DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height };
- //   params.radius = radius;;
-	//params.thickness = thickness;
- //   params.frameIndex = Time->GetFrameCount();
-	//DirectX11::UpdateBuffer(m_Buffer.Get(), &params);
-
- //   DirectX11::CSSetShaderResources(0, 4, srv);
-	//DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-	//DirectX11::CSSetUnorderedAccessViews(0, 1, &m_pTempTexture->m_pUAV, nullptr);
- //   
- //   DirectX11::Dispatch(DeviceState::g_ClientRect.width / 32, DeviceState::g_ClientRect.height / 32, 1);
-
- //   ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
- //   ID3D11UnorderedAccessView* nulluav = nullptr;
- //   DirectX11::CSSetShaderResources(0, 4, nullsrv);
- //   DirectX11::CSSetUnorderedAccessViews(0, 1, &nulluav, nullptr);
-
-	//DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
-
     auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
 
     if (nullptr != cmdQueuePtr)

@@ -369,6 +369,26 @@ bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float 
 
 }
 
+void TerrainComponent::Awake()
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (scene)
+	{
+		scene->CollectTerrainComponent(this);
+	}
+}
+
+void TerrainComponent::OnDistroy()
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	if (scene)
+	{
+		scene->UnCollectTerrainComponent(this);
+	}
+}
+
 void TerrainComponent::TestSaveLayerTexture(const std::wstring& saveDir)
 {
 	namespace fs = std::filesystem;

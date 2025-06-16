@@ -268,21 +268,21 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 
 	HashedGuid currentAnimatorGuid{};
 
-	for (auto& MeshRendererProxy : scene.GetShadowRenderQueue())
+	for (auto& PrimitiveRenderProxy : scene.GetShadowRenderQueue())
 	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdContextPtr1);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdContextPtr1);
 
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
+		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
 			if (animatorGuid != currentAnimatorGuid)
 			{
-				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
+				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		MeshRendererProxy->Draw(defferdContextPtr1);
+		PrimitiveRenderProxy->Draw(defferdContextPtr1);
 	}
 }
 

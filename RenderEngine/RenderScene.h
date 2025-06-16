@@ -18,8 +18,8 @@ class ProxyCommand;
 class RenderScene
 {
 public:
-	using ProxyContainer		= std::vector<MeshRendererProxy*>;
-	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<MeshRendererProxy>>;
+	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
+	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, Animator*>;
 	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
 	using RenderDataMap			= std::unordered_map<size_t, std::shared_ptr<RenderPassData>>;
@@ -56,12 +56,12 @@ public:
 	ProxyCommand MakeProxyCommand(MeshRenderer* meshRendererPtr);
 	void UnregisterCommand(MeshRenderer* meshRendererPtr);
 
-	void PushShadowRenderQueue(MeshRendererProxy* proxy);
+	void PushShadowRenderQueue(PrimitiveRenderProxy* proxy);
 	ProxyContainer GetShadowRenderQueue();
 	void ClearShadowRenderQueue();
 
 
-	MeshRendererProxy* FindProxy(size_t guid);
+	PrimitiveRenderProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDistroy();

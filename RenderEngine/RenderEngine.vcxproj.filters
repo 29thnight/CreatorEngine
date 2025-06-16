@@ -255,6 +255,12 @@
     <Filter Include="Objects\Camera">
       <UniqueIdentifier>{bb8be9e6-5794-4727-90b2-edd452792566}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\TerrainMesh">
+      <UniqueIdentifier>{bfd970ae-77fc-4ef9-b351-ee73412bf4a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\TerrainMaterial">
+      <UniqueIdentifier>{fd500c50-9230-4251-bbeb-fb03a9d7e57b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -696,6 +702,12 @@
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Objects\Camera</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainMesh.h">
+      <Filter>Resources\TerrainMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainMaterial.h">
+      <Filter>Resources\TerrainMaterial</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

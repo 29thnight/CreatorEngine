@@ -3,11 +3,11 @@
 #include "Texture.h"
 
 class Camera;
-class MeshRendererProxy;
+class PrimitiveRenderProxy;
 class RenderPassData
 {
 public:
-	using ProxyContainer = std::vector<MeshRendererProxy*>;
+	using ProxyContainer = std::vector<PrimitiveRenderProxy*>;
 	static constexpr int cascadeCount = 3;
 public:
 	UniqueTexturePtr		  m_renderTarget{ TEXTURE_NULL_INITIALIZER };
@@ -33,7 +33,7 @@ public:
 
 	void Initalize(uint32 index);
 
-	void PushRenderQueue(MeshRendererProxy* proxy);
+	void PushRenderQueue(PrimitiveRenderProxy* proxy);
 	void SortRenderQueue();
 	void ClearRenderQueue();
 

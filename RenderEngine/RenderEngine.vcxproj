@@ -266,6 +266,8 @@
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
+    <ClInclude Include="TerrainMaterial.h" />
+    <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />

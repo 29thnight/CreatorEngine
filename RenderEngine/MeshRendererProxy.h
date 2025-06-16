@@ -3,24 +3,29 @@
 #include "Transform.h"
 #include "LightMapping.h"
 #include "Animator.h"
+#include "TerrainBuffers.h"
 
-enum class ProxyType
+enum class PrimitiveProxyType
 {
-
+   MeshRenderer,
+   TerrainComponent
 };
 
 class Material;
 class Mesh;
 class OctreeNode;
 class MeshRenderer;
-class MeshRendererProxy
+class TerrainMesh;
+class TerrainComponent;
+class PrimitiveRenderProxy
 {
 public:
-	MeshRendererProxy(MeshRenderer* component);
-	~MeshRendererProxy();
+	PrimitiveRenderProxy(MeshRenderer* component);
+	PrimitiveRenderProxy(TerrainComponent* component);
+	~PrimitiveRenderProxy();
 
-	MeshRendererProxy(const MeshRendererProxy& other);
-	MeshRendererProxy(MeshRendererProxy&& other) noexcept;
+	PrimitiveRenderProxy(const PrimitiveRenderProxy& other);
+	PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcept;
 
 public:
 	bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
@@ -32,31 +37,41 @@ public:
 	void Draw();
 	void Draw(ID3D11DeviceContext* _defferedContext);
 
-	friend bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b);
+	friend bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b);
 
 	void DistroyProxy();
 
 public:
-	Material*		m_Material{ nullptr };
-	Mesh*			m_Mesh{ nullptr };
-	HashedGuid		m_animatorGuid{};
-	HashedGuid      m_materialGuid{};
-	HashedGuid      m_instancedID{};
+	//공통
+	PrimitiveProxyType	m_proxyType{ PrimitiveProxyType::MeshRenderer };
+	Mathf::xMatrix		m_worldMatrix;
+	HashedGuid			m_instancedID{};
+	bool				m_isCulled{ false };
 
 public:
-	Mathf::xMatrix*	  m_finalTransforms{};
-	LightMapping	  m_LightMapping;
-	bool			  m_isSkinnedMesh{ false };
-	bool			  m_isAnimationEnabled{ false };
-	bool              m_isInstanced{ false };
-	bool              m_isCulled{ false };
-	Mathf::xMatrix    m_worldMatrix;
+	//meshRenderer type
+	Material*			m_Material{ nullptr };
+	Mesh*				m_Mesh{ nullptr };
+	HashedGuid			m_animatorGuid{};
+	HashedGuid			m_materialGuid{};
+	Mathf::xMatrix*		m_finalTransforms{};
+	LightMapping		m_LightMapping;
+	//TODO : bitflag 처리
+	bool				m_isSkinnedMesh{ false };
+	bool				m_isAnimationEnabled{ false };
+	bool				m_isInstanced{ false };
+
+public:
+	//terrain type
+	TerrainMesh*		m_terrainMesh{ nullptr };
+	TerrainGizmoBuffer  m_terrainGizmoBuffer{};
+	TerrainLayerBuffer  m_terrainlayerBuffer{};
 
 private:
-	bool m_isNeedUptateCulling{ false };
+	bool				m_isNeedUptateCulling{ false };
 };
 
-inline bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b)
+inline bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b)
 {
 	if (a->m_animatorGuid == b->m_animatorGuid)
 	{

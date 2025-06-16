@@ -721,4 +721,26 @@ namespace DirectX11
 		}
 		deferredContext->CSSetSamplers(StartSlot, NumSamplers, ppSamplers);
 	}
+
+	//[safe]
+	inline void OMSetDepthStencilState(ID3D11DeviceContext* deferredContext, ID3D11DepthStencilState* depthStencilState, uint32 stencilRef)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->OMSetDepthStencilState(depthStencilState, stencilRef);
+	}
+
+	//[safe]
+	inline void OMSetBlendState(ID3D11DeviceContext* deferredContext, ID3D11BlendState* blendState, const float blendFactor[4], uint32 sampleMask)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->OMSetBlendState(blendState, blendFactor, sampleMask);
+	}
 }

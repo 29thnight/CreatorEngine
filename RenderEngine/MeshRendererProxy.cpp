@@ -8,7 +8,7 @@
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
-MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
+PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     m_Material(component->m_Material),
     m_Mesh(component->m_Mesh),
     m_LightMapping(component->m_LightMapping),
@@ -31,18 +31,22 @@ MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
 
     if (!m_isSkinnedMesh)
     {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> MeshRendererProxy
+        //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
         //CullingManagers->Insert(this);
 
         m_isNeedUptateCulling = true;
     }
 }
 
-MeshRendererProxy::~MeshRendererProxy()
+PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component)
 {
 }
 
-MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
+PrimitiveRenderProxy::~PrimitiveRenderProxy()
+{
+}
+
+PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_Material(other.m_Material),
     m_Mesh(other.m_Mesh),
     m_LightMapping(other.m_LightMapping),
@@ -54,7 +58,7 @@ MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
 {
 }
 
-MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
+PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcept :
     m_Material(std::exchange(other.m_Material, nullptr)),
     m_Mesh(std::exchange(other.m_Mesh, nullptr)),
     m_LightMapping(other.m_LightMapping),
@@ -66,21 +70,21 @@ MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
 {
 }
 
-void MeshRendererProxy::Draw()
+void PrimitiveRenderProxy::Draw()
 {
     if (nullptr == m_Mesh) return;
 
     m_Mesh->Draw();
 }
 
-void MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
+void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _defferedContext)
 {
     if (nullptr == m_Mesh || nullptr == _defferedContext) return;
 
     m_Mesh->Draw(_defferedContext);
 }
 
-void MeshRendererProxy::DistroyProxy()
+void PrimitiveRenderProxy::DistroyProxy()
 {
     RenderScene::RegisteredDistroyProxyGUIDs.push(m_instancedID);
 }

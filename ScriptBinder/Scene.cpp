@@ -4,6 +4,7 @@
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
+#include "Terrain.h"
 #include "Animator.h"
 #include "Skeleton.h"
 
@@ -446,6 +447,22 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 			std::erase_if(m_staticMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
         }
 		std::erase_if(m_allMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
+	}
+}
+
+void Scene::CollectTerrainComponent(TerrainComponent* ptr)
+{
+	if (ptr)
+	{
+		m_terrainComponents.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
 	}
 }
 

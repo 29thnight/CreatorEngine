@@ -44,74 +44,98 @@ ForwardPass::~ForwardPass()
 
 void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 {
+	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
+
+	if (nullptr != cmdQueuePtr)
+	{
+		while (!cmdQueuePtr->empty())
+		{
+			ID3D11CommandList* CommandJob;
+			if (cmdQueuePtr->try_pop(CommandJob))
+			{
+				DirectX11::ExecuteCommandList(CommandJob, true);
+				Memory::SafeDelete(CommandJob);
+			}
+		}
+	}
+}
+
+void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+{
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	m_pso->Apply();
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+
+	m_pso->Apply(defferdPtr);
 
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, renderData->m_depthStencil->m_pDSV);
-	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
-	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetRenderTargets(defferdPtr, 1, &view, renderData->m_depthStencil->m_pDSV);
+	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+	scene.UseModel(defferdPtr);
+	DirectX11::OMSetDepthStencilState(defferdPtr, DeviceState::g_pDepthStencilState, 1);
+	DirectX11::OMSetBlendState(defferdPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
-	camera.UpdateBuffer();
-	DirectX11::PSSetConstantBuffer(1, 1, &scene.m_LightController->m_pLightBuffer);
-	scene.UseModel();
-	DirectX11::PSSetConstantBuffer(3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::PSSetConstantBuffer(0, 1, m_materialBuffer.GetAddressOf());
-
+	camera.UpdateBuffer(defferdPtr);
 	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& MeshRendererProxy : renderData->m_forwardQueue)
+	for (auto& PrimitiveRenderProxy : renderData->m_forwardQueue)
 	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdPtr);
 
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
+		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
 			if (animatorGuid != currentAnimatorGuid)
 			{
-				DirectX11::UpdateBuffer(m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
+				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		Material* mat = MeshRendererProxy->m_Material;
-		DirectX11::UpdateBuffer(m_materialBuffer.Get(), &mat->m_materialInfo);
+		Material* mat = PrimitiveRenderProxy->m_Material;
+		DirectX11::UpdateBuffer(defferdPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
 
 		if (mat->m_pBaseColor)
 		{
-			DirectX11::PSSetShaderResources(0, 1, &mat->m_pBaseColor->m_pSRV);
+			DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
 		}
 		if (mat->m_pNormal)
 		{
-			DirectX11::PSSetShaderResources(1, 1, &mat->m_pNormal->m_pSRV);
+			DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &mat->m_pNormal->m_pSRV);
 		}
 		if (mat->m_pOccRoughMetal)
 		{
-			DirectX11::PSSetShaderResources(2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+			DirectX11::PSSetShaderResources(defferdPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
 		}
 		if (mat->m_AOMap)
 		{
-			DirectX11::PSSetShaderResources(3, 1, &mat->m_AOMap->m_pSRV);
+			DirectX11::PSSetShaderResources(defferdPtr, 3, 1, &mat->m_AOMap->m_pSRV);
 		}
 		if (mat->m_pEmissive)
 		{
-			DirectX11::PSSetShaderResources(5, 1, &mat->m_pEmissive->m_pSRV);
+			DirectX11::PSSetShaderResources(defferdPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		MeshRendererProxy->Draw();
+		PrimitiveRenderProxy->Draw(defferdPtr);
 	}
 
 	ID3D11DepthStencilState* nullDepthStencilState = nullptr;
 	ID3D11BlendState* nullBlendState = nullptr;
 
-	DirectX11::OMSetDepthStencilState(nullDepthStencilState, 1);
-	DirectX11::OMSetBlendState(nullBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetDepthStencilState(defferdPtr, nullDepthStencilState, 1);
+	DirectX11::OMSetBlendState(defferdPtr, nullBlendState, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets();
+	DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &nullSRV);
+	DirectX11::UnbindRenderTargets(defferdPtr);
+
+	ID3D11CommandList* commandList{};
+	defferdPtr->FinishCommandList(false, &commandList);
+	PushQueue(camera.m_cameraIndex, commandList);
 }
 
 void ForwardPass::ControlPanel()
