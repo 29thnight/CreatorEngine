@@ -6,7 +6,7 @@
 #include "AvatarMask.h"
 void AnimationController::SetNextState(std::string stateName)
 {
-	
+
 	m_nextState = FindState(stateName);
 }
 
@@ -16,6 +16,8 @@ AnimationController::~AnimationController()
 		delete m_nodeEditor;
 	DeleteAvatarMask();
 }
+
+
 
 bool AnimationController::BlendingAnimation(float tick)
 {
@@ -42,7 +44,7 @@ bool AnimationController::BlendingAnimation(float tick)
 void AnimationController::SetCurState(std::string stateName)
 {
 	m_curState = FindState(stateName);
-	
+
 	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
 	m_AnimationIndex = m_curState->AnimationIndex;
 }
@@ -51,28 +53,31 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		if (!StateVec.empty())
-			m_curState = StateVec[0].get();
+		if (!StateVec.size() >= 2)   //0번은 anystate라없음
+			m_curState = StateVec[1].get();
 		else
 			return nullptr;
 		//return nullptr;//*****
 	}
 
-	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
+	if (m_curState == nullptr) return nullptr;
+
+
+	AnimationState* aniState = GetAniState().get();
+	if (aniState)
 	{
-		for (auto& state : m_anyStateVec)
+		if (!aniState->Transitions.empty())
 		{
-			for (auto& trans : state->Transitions)
+			for (auto& trans : aniState->Transitions)
 			{
 				if (true == trans->CheckTransiton())
 				{
+					if (trans->nextState != nullptr && m_curState != trans->nextState);
 					return trans;
 				}
 			}
 		}
 	}
-
-
 	if (m_curState->Transitions.empty()) return nullptr;
 	for (auto& trans : m_curState->Transitions)
 	{
@@ -164,6 +169,16 @@ int AnimationController::GetAnimatonIndexformState(std::string stateName)
 		if (state->m_name == stateName)
 			return state->AnimationIndex;
 	}
+}
+
+std::shared_ptr<AnimationState> AnimationController::GetAniState()
+{
+	for (auto& state : StateVec)
+	{
+		if (state->m_isAny == true)
+			return state;
+	}
+	return nullptr;
 }
 
 AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isAny)

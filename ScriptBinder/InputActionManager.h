@@ -9,7 +9,7 @@ public:
 	~InputActionManager() = default;
 	void Update(float tick);
 	ActionMap* AddActionMap(std::string name);
-
+	void DeleteActionMap(std::string name);
 	ActionMap* FindActionMap(std::string name);
 	
 private:

@@ -43,6 +43,8 @@ public:
     void CreateController(std::string name);
     [[Method]]
     void CreateController_UI();
+    void DeleteController(int index);
+    void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
@@ -61,6 +63,7 @@ public:
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
 
+    //std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; &&&&& shared로 고치면 erase는 그냥가능
     [[Property]]
     std::vector<AnimationController*> m_animationControllers{};
     [[Property]]

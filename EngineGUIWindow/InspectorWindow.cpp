@@ -773,6 +773,22 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								selectedControllerIndex = index;
 							}
+
+							if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+							{
+								ImGui::OpenPopup("RightClickMenu");
+								selectedControllerIndex = index;
+							}
+							if (ImGui::BeginPopup("RightClickMenu"))
+							{
+								if (ImGui::MenuItem("Copy Contorller")) { /* 삭제 로직 */ }
+								if (ImGui::MenuItem("Delete Controller")) 
+								{  
+									animator->DeleteController(selectedControllerIndex);
+									selectedControllerIndex = -1;
+								}
+								ImGui::EndPopup();
+							}
 							ImGui::SameLine();
 							if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
 							{
@@ -959,7 +975,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::EndChild();
 					ImGui::SameLine();
 					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), true);
-					if(!animator->m_animationControllers.empty())
+					if(!animator->m_animationControllers.empty() && selectedControllerIndex != -1)
 						controller= animator->m_animationControllers[selectedControllerIndex];
 					std::string controllerName;
 					if (controller)
@@ -990,16 +1006,17 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						std::string fileName = controller->name + ".node_editor.json";
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
+
 							for (auto& state : controller->StateVec)
 							{
 								controller->m_nodeEditor->MakeNode(state->m_name);
 							}
+							
 							for (auto& state : controller->StateVec)
 							{
 								for (auto& trans : state->Transitions)
 								{
-									controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
-									
+									controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);	
 								}
 							}
 							controller->m_nodeEditor->DrawLink(&linkIndex);
@@ -1010,7 +1027,14 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								auto states = controller->StateVec;
 								int curIndex = controller->m_nodeEditor->seletedCurNodeIndex;
-								controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
+								if (states[targetNodeIndex]->m_isAny == true)
+								{
+
+								}
+								else
+								{
+									controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
+								}
 								targetNodeIndex = -1;
 							}
 							if (ClickNodeIndex != -1)
@@ -1254,20 +1278,48 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						buffer[sizeof(buffer) - 1] = '\0';
 						ImGui::Text("State Name");
 						ImGui::SameLine();
-						if (ImGui::InputText("##State Name", buffer, sizeof(buffer)))
+						if (state->m_isAny == false)
 						{
-							state->m_name = buffer;
-							nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+							if (ImGui::InputText("##State Name", buffer, sizeof(buffer)))
+							{
+								nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+								for (auto& state : controller->StateVec)
+								{
+									for (auto& transiton : state->Transitions)
+									{
+										if (transiton->curStateName == state->m_name)
+										{
+											transiton->curStateName = buffer;
+										}
+										if (transiton->nextStateName == state->m_name)
+										{
+											transiton->nextStateName = buffer;
+										}
+									}
+								}
+								state->m_name = buffer;
+							}
 						}
-						ImGui::Text("Animation Index");
-						ImGui::SameLine();
-						if (ImGui::InputInt("##Animation Index", &state->AnimationIndex))
+						else
+						{
+							ImGui::Text(state->m_name.c_str());
+						}
+						if (state->m_isAny == false)
+						{
+							ImGui::Text("Animation Index");
+							ImGui::SameLine();
+							if (ImGui::InputInt("##Animation Index", &state->AnimationIndex))
+							{
+
+							}
+							if (ImGui::Button("SetCurState"))
+							{
+								controller->SetCurState(state->m_name);
+							}
+						}
+						else
 						{
 
-						}
-						if (ImGui::Button("SetCurState"))
-						{
-							controller->SetCurState(state->m_name);
 						}
 						ImGui::Separator();
 						ImGui::Text("Transitions");

@@ -60,16 +60,18 @@ void AnimationJob::Update(float deltaTime)
 
     for(auto& animator : m_currAnimator)
     {
-        m_UpdateThreadPool.Enqueue([&]
+        std::vector<AnimationController*> controllers = animator->m_animationControllers;
+        m_UpdateThreadPool.Enqueue([&, controllers]
         {
             Skeleton* skeleton = animator->m_Skeleton;
 
             //컨트롤러별로 상,하체 등등이 분리되있다면
             if (animator->UsesMultipleControllers() == true)
             {
-                for (auto& animationcontroller : animator->m_animationControllers)
+                for (auto& animationcontroller : controllers)
                 {
-                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
+                    if (animationcontroller == nullptr) continue;
+                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()]; //&&&&& delete 바로해서 터짐 수정필요
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
                     if(animation.m_isLoop == true)
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
