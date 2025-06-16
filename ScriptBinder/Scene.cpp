@@ -360,17 +360,12 @@ std::pair<size_t, Light&> Scene::AddLight()
 
 Light& Scene::GetLight(size_t index)
 {
-	if (index < m_lights.size())
-	{
-		return m_lights[index];
-	}
-
-	if(0 == m_lights.size())
+	if (index > m_lights.size())
 	{
 		AddLight();
 	}
 
-	return m_lights[0];
+	return m_lights[index];
 }
 
 void Scene::RemoveLight(size_t index)
