@@ -10,9 +10,11 @@
 #include "Shader.h"
 #include "ShaderSystem.h"
 
-
 //-----------------------------------------------------------------------------
 #include "DirectXHelper.h"
+
+//BUILD_FLAG ==> 차후에 constexpr build 플래그로 변경 예정
+
 
 struct alignas(16) TerrainAddLayerBuffer {
     UINT slice;
@@ -29,8 +31,10 @@ public:
     TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
-        // ★ 버텍스 버퍼는 DYNAMIC + WRITE_DISCARD로 생성
         D3D11_BUFFER_DESC vbDesc = {};
+        
+#ifndef BUILD_FLAG
+        // ★ 버텍스 버퍼는 DYNAMIC + WRITE_DISCARD로 생성
         vbDesc.Usage = D3D11_USAGE_DYNAMIC;
         vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
         vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -40,6 +44,18 @@ public:
 
         D3D11_SUBRESOURCE_DATA vbInit = {};
         vbInit.pSysMem = m_vertices.data();
+#else
+		//build 된 상태에서는 버텍스 버퍼를 IMMUTABLE로 생성
+        vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
+        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vbDesc.CPUAccessFlags = 0;
+        vbDesc.MiscFlags = 0;
+        vbDesc.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA vbInit = {};
+        vbInit.pSysMem = m_vertices.data();
+#endif // !BUILD_FLAG
+
 
         DirectX11::ThrowIfFailed(
             DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
@@ -82,6 +98,8 @@ public:
     const std::vector<Vertex>& GetVertices() { return m_vertices; }
     const std::vector<uint32>& GetIndices() { return m_indices; }
 
+#ifndef BUILD_FLAG
+	// 빌드 모드가 아닐 때만 사용
     // 전체 버텍스 업데이트
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
     {
@@ -126,6 +144,8 @@ public:
 
         context->Unmap(m_vertexBuffer.Get(), 0);
     }
+#endif !BUILD_FLAG
+    
 
 private:
     std::string m_name;
@@ -853,6 +873,14 @@ public:
 	{
 		return &m_layerSRV;
 	}
+
+
+    //Build시 저장/반환
+    void BuildOutTrrain(const std::wstring& buildPath, const std::wstring& terrainName);
+	bool LoadRunTimeTerrain(const std::wstring& filePath);
+
+
+
 
 
     // 현재 브러시 정보 저장/반환

@@ -1505,22 +1505,14 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 		}
 
-		if (ImGui::Button("test TextureLayer"))
-		{
-			file::path savePath = ShowSaveFileDialog(L"");
-			std::wstring folderPath = savePath.parent_path().wstring();
-			std::wstring fileName = savePath.filename().wstring();
-			terrainComponent->TestSaveLayerTexture(folderPath);
-		}
-
 		if (ImGui::Button("Load Terrain"))
 		{
 			//todo:
-			/*file::path loadPath = ShowOpenFileDialog(L"");
+			file::path loadPath = ShowOpenFileDialog(L"");
 			if (!loadPath.empty())
 			{
-				terrainComponent->Load();
-			}*/
+				terrainComponent->Load(loadPath);
+			}
 		}
 
 	}
