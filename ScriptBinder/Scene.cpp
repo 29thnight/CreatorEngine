@@ -360,12 +360,7 @@ std::pair<size_t, Light&> Scene::AddLight()
 
 Light& Scene::GetLight(size_t index)
 {
-	size_t count{ index };
-	while (count < m_lights.size())
-	{
-		AddLight();
-		count++;
-	}
+	m_lights.resize(index + 1);
 
 	return m_lights[index];
 }
