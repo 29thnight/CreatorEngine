@@ -310,7 +310,18 @@ void Scene::CollectLightComponent(LightComponent* ptr)
 {
 	if (ptr)
 	{
-		m_lightComponents.push_back(ptr);
+		auto it = std::find_if(
+			m_lightComponents.begin(),
+			m_lightComponents.end(), 
+			[ptr](const auto& light)
+			{
+				return light == ptr;
+			});
+
+		if (it == m_lightComponents.end())
+		{
+			m_lightComponents.push_back(ptr);
+		}
 	}
 }
 
@@ -353,6 +364,12 @@ Light& Scene::GetLight(size_t index)
 	{
 		return m_lights[index];
 	}
+
+	if(0 == m_lights.size())
+	{
+		AddLight();
+	}
+
 	return m_lights[0];
 }
 

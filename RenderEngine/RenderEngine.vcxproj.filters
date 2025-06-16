@@ -246,6 +246,15 @@
     <Filter Include="ProxyCommandQueue\ProxyCommand">
       <UniqueIdentifier>{4c04f4d8-fc3e-4642-a0d6-14775e73de9e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Objects\CullingBox">
+      <UniqueIdentifier>{54c9e5dd-94e1-4189-a183-76aae2bdf312}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\MeshRendererProxy">
+      <UniqueIdentifier>{cc1b22ae-ef48-47f8-86aa-41aa5e558789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects\Camera">
+      <UniqueIdentifier>{bb8be9e6-5794-4727-90b2-edd452792566}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -259,9 +268,6 @@
     </ClCompile>
     <ClCompile Include="ModelLoader.cpp">
       <Filter>Asset\Loader</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera.cpp">
-      <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="RenderScene.cpp">
       <Filter>RenderScene</Filter>
@@ -419,9 +425,6 @@
     <ClCompile Include="ParticleSystem.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
-    <ClCompile Include="MeshRendererProxy.cpp">
-      <Filter>Objects</Filter>
-    </ClCompile>
     <ClCompile Include="Animation.cpp">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClCompile>
@@ -446,6 +449,12 @@
     <ClCompile Include="ProxyCommand.cpp">
       <Filter>ProxyCommandQueue\ProxyCommand</Filter>
     </ClCompile>
+    <ClCompile Include="MeshRendererProxy.cpp">
+      <Filter>Objects\MeshRendererProxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>Objects\Camera</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -453,9 +462,6 @@
     </ClInclude>
     <ClInclude Include="RenderScene.h">
       <Filter>RenderScene</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera.h">
-      <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="AnimationLoader.h">
       <Filter>Asset\Loader</Filter>
@@ -652,9 +658,6 @@
     <ClInclude Include="ParticleSystem.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
-    <ClInclude Include="MeshRendererProxy.h">
-      <Filter>Objects</Filter>
-    </ClInclude>
     <ClInclude Include="Animation.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
@@ -684,6 +687,15 @@
     </ClInclude>
     <ClInclude Include="ProxyCommand.h">
       <Filter>ProxyCommandQueue\ProxyCommand</Filter>
+    </ClInclude>
+    <ClInclude Include="CullingBox.h">
+      <Filter>Objects\CullingBox</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRendererProxy.h">
+      <Filter>Objects\MeshRendererProxy</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Objects\Camera</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

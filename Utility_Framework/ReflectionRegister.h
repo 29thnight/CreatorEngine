@@ -299,7 +299,7 @@ namespace Meta
         EnumAutoRegistrar()
         {
             auto enumType = create_enum_type<Enum>();
-            MetaEnumRegistry->Register(enumType.name, enumType);
+            EnumRegistry::GetInstance()->Register(enumType.name, enumType);
         }
     };
 

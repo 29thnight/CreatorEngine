@@ -48,6 +48,8 @@ public:
 	LightMapping	  m_LightMapping;
 	bool			  m_isSkinnedMesh{ false };
 	bool			  m_isAnimationEnabled{ false };
+	bool              m_isInstanced{ false };
+	bool              m_isCulled{ false };
 	Mathf::xMatrix    m_worldMatrix;
 
 private:

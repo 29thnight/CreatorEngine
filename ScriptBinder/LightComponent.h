@@ -26,11 +26,21 @@ public:
 		{
 			return;
 		}
-        auto pair = scene->AddLight();
-		m_lightIndex = pair.first;
-        Light& light = pair.second;
-		scene->CollectLightComponent(this);
-        ApplyLightData(light);
+
+        if (-1 == m_lightIndex)
+        {
+            auto pair = scene->AddLight();
+            m_lightIndex = pair.first;
+            Light& light = pair.second;
+            scene->CollectLightComponent(this);
+            ApplyLightData(light);
+        }
+        else
+        {
+           auto& light = scene->GetLight(m_lightIndex);
+           scene->CollectLightComponent(this);
+           ApplyLightData(light);
+        }
     }
 
     void Update(float deltaSeconds) override
@@ -75,7 +85,7 @@ public:
 	}
 
     [[Property]]
-    int m_lightIndex{ 0 };
+    int m_lightIndex{ -1 };
 
     Mathf::Vector4 m_position{};
     Mathf::Vector4 m_direction{ -1, -1, 1, 0 };

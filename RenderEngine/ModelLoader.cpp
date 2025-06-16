@@ -203,11 +203,15 @@ void ModelLoader::ProcessMaterials()
 
 Material* ModelLoader::GenerateMaterial(int index)
 {
-    std::string baseName = m_AIScene->mMaterials[index]->GetName().C_Str();
-    std::string uniqueName = baseName;
+	std::string baseName = "DefaultMaterial";
+	if (index > -1)
+	{
+		baseName = m_AIScene->mMaterials[index]->GetName().C_Str();
+	}
 
-    MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
-    m_fileGuid = modelFileNode["guid"].as<std::string>();
+	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
+	m_fileGuid = modelFileNode["guid"].as<std::string>();
+    std::string uniqueName = baseName;
     int suffix = 1;
 
     while (true)
