@@ -156,6 +156,6 @@ public:
 private:
     bool useWireFrame       { false };
 	bool m_bShowRenderState { false };
-	bool useTestLightmap    { false };
+	std::atomic_bool useTestLightmap{ false };
 	bool m_bShowGridSettings{ false };
 };

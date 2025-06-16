@@ -1,6 +1,7 @@
 #include "RenderCommand.h"
 #include "MeshRenderer.h"
 #include "Mesh.h"
+#include "RenderScene.h"
 #include "Material.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
@@ -25,6 +26,7 @@ MeshRendererProxy::MeshRendererProxy(MeshRenderer* component) :
         }
 
         m_materialGuid = m_Material->m_materialGuid;
+        m_instancedID = component->GetInstanceID();
     }
 
     if (!m_isSkinnedMesh)
@@ -76,4 +78,9 @@ void MeshRendererProxy::Draw(ID3D11DeviceContext* _defferedContext)
     if (nullptr == m_Mesh || nullptr == _defferedContext) return;
 
     m_Mesh->Draw(_defferedContext);
+}
+
+void MeshRendererProxy::DistroyProxy()
+{
+    RenderScene::RegisteredDistroyProxyGUIDs.push(m_instancedID);
 }

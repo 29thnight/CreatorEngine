@@ -26,7 +26,7 @@ private:
 	Sampler* sample = nullptr;
 	Sampler* pointSample = nullptr;
 
-	float radius = 0.5f;
-	float thickness = 0.2f;
+	float radius = 0.131f;
+	float thickness = 0.155f;
 };
 

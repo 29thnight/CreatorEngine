@@ -29,11 +29,14 @@ public:
 
 	friend bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b);
 
+	void DistroyProxy();
+
 public:
 	Material*		m_Material{ nullptr };
 	Mesh*			m_Mesh{ nullptr };
 	HashedGuid		m_animatorGuid{};
 	HashedGuid      m_materialGuid{};
+	HashedGuid      m_instancedID{};
 
 public:
 	Mathf::xMatrix	  m_finalTransforms[MAX_BONES]{};
@@ -44,7 +47,6 @@ public:
 
 private:
 	bool m_isNeedUptateCulling{ false };
-	//std::unordered_set<OctreeNode*> m_OctreeNodes;
 };
 
 inline bool SortByAnimationAndMaterialGuid(MeshRendererProxy* a, MeshRendererProxy* b)

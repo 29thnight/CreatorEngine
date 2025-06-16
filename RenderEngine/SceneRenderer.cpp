@@ -21,6 +21,7 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "Trim.h"
+#include "Profiler.h"
 
 #include <iostream>
 #include <string>
@@ -372,6 +373,7 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//player.Update(deltaTime);
 	m_renderScene->Update(deltaTime);
+	m_renderScene->OnProxyDistroy();
 	PrepareRender();
 }
 
@@ -449,8 +451,6 @@ void SceneRenderer::SceneRendering()
 			{
 				DirectX11::BeginEvent(L"DeferredPass");
 				Benchmark banch;
-				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
@@ -464,6 +464,7 @@ void SceneRenderer::SceneRendering()
 			RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
+
 		if(camera == m_pEditorCamera.get())
 		{
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
@@ -629,19 +630,47 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&]
 		{
+			PROFILE_CPU_BEGIN("ShadowPassCommandList");
 			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 			m_renderScene->CreateShadowCommandList(defferdContext , *camera);
+			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&]
 		{
+			PROFILE_CPU_BEGIN("TerrainPassCommandList");
 			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+			PROFILE_CPU_BEGIN("GBufferPassCommandList");
 			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
+		if (useTestLightmap)
+		{
+			m_commandThreadPool->Enqueue([&]
+			{
+				PROFILE_CPU_BEGIN("LightMapPassCommandList");
+				auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+				m_pLightMapPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			});
+		}
+
+		m_commandThreadPool->Enqueue([&]
+		{
+			PROFILE_CPU_BEGIN("DeferredPassCommandList");
+			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
+			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+			m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
+			m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->NotifyAllAndWait();
 	}
+
 }
 
 void SceneRenderer::ReApplyCurrCubeMap()
@@ -674,7 +703,6 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
-	
 	m_threadPool->Enqueue([renderScene, m_currentScene]
 	{
 		std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
@@ -745,10 +773,11 @@ void SceneRenderer::PrepareRender()
 
 	m_threadPool->NotifyAllAndWait();
 
-
 	auto& shadowMapPass = m_renderScene->m_LightController->m_shadowMapPass;
 	shadowMapPass->SwapQueue();
 	m_pGBufferPass->SwapQueue();
+	m_pLightMapPass->SwapQueue();
+	m_pDeferredPass->SwapQueue();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

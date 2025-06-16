@@ -4,10 +4,13 @@
 
 cbuffer SSGIParams
 {
+    XMMATRIX invVP;
+    XMMATRIX proj;
     XMMATRIX inverseProjection;
     float2 screenSize; // 화면 크기
     float radius; // 샘플링 반경
     float thickness; // 두께
+    UINT frameIndex;
 };
 
 SSGIPass::SSGIPass()
@@ -40,7 +43,7 @@ SSGIPass::SSGIPass()
     //    )
     //);
 
-    sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+    sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
     m_pTempTexture = Texture::Create(
@@ -81,17 +84,20 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
         m_pLightEmissiveTexture->m_pSRV
     };
 	SSGIParams params;
+    params.invVP = camera.CalculateInverseView() * camera.CalculateInverseProjection();
+    params.proj = camera.CalculateProjection();
     params.inverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
 	params.screenSize = { DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height };
     params.radius = radius;;
 	params.thickness = thickness;
+    params.frameIndex = Time->GetFrameCount();
 	DirectX11::UpdateBuffer(m_Buffer.Get(), &params);
 
     DirectX11::CSSetShaderResources(0, 4, srv);
 	DirectX11::CSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
 	DirectX11::CSSetUnorderedAccessViews(0, 1, &m_pTempTexture->m_pUAV, nullptr);
     
-    DirectX11::Dispatch(DeviceState::g_ClientRect.width / 16, DeviceState::g_ClientRect.height / 16, 1);
+    DirectX11::Dispatch(DeviceState::g_ClientRect.width / 32, DeviceState::g_ClientRect.height / 32, 1);
 
     ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
     ID3D11UnorderedAccessView* nulluav = nullptr;

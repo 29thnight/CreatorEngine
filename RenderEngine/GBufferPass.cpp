@@ -116,6 +116,10 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 
 	ID3D11DeviceContext* defferdPtr = defferdContext;
 
+	m_pso->Apply(defferdPtr);
+
+	DirectX11::OMSetRenderTargets(defferdPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
+
 	camera.UpdateBuffer(defferdPtr);
 	scene.UseModel(defferdPtr);
 	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
@@ -229,6 +233,14 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* defferdContext, 
 	}
 
 	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);
+
+	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
+	ZeroMemory(nullRTV, sizeof(nullRTV));
+	defferdPtr->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+
+	ID3D11CommandList* commandList{};
+	defferdPtr->FinishCommandList(false, &commandList);
+	PushQueue(camera.m_cameraIndex, commandList);
 }
 
 void GBufferPass::Resize(uint32_t width, uint32_t height)
