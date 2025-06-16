@@ -119,7 +119,7 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     camera.UpdateBuffer(defferdPtr);
     DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &params);
 
-    DirectX11::Dispatch(defferdPtr, DeviceState::g_ClientRect.width / 32, DeviceState::g_ClientRect.height / 32, 1);
+    DirectX11::Dispatch(defferdPtr, DeviceState::g_ClientRect.width / 64, DeviceState::g_ClientRect.height / 64, 1);
 
     ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
     ID3D11UnorderedAccessView* nulluav = nullptr;

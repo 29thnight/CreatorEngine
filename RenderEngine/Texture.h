@@ -115,8 +115,16 @@ public:
 
 	void ResizeRelease();
 
+	void SetSizeRatio(float2 ratio) 
+	{
+		sizeRatio = ratio;
+		m_desc.Width = static_cast<uint32>(size.x / ratio.x);
+		m_desc.Height = static_cast<uint32>(size.y / ratio.y);
+	}
+
 private:
 	float2 size{};
+	float2 sizeRatio{ 1.f, 1.f };
 
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
 	std::vector<CD3D11_RENDER_TARGET_VIEW_DESC> m_rtvDescs;
@@ -156,10 +164,11 @@ namespace TextureHelper
 			height, 
 			name, 
 			format, 
-			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
 		);
 		tex->CreateRTV(format);
 		tex->CreateSRV(format);
+		tex->CreateUAV(format);
 
         return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
 	}

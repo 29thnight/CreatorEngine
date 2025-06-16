@@ -686,6 +686,14 @@ public:
 	}
 
 
+    //Build시 저장/반환
+    void BuildOutTrrain(const std::wstring& buildPath, const std::wstring& terrainName);
+	bool LoadRunTimeTerrain(const std::wstring& filePath);
+
+
+
+
+
     // 현재 브러시 정보 저장/반환
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }

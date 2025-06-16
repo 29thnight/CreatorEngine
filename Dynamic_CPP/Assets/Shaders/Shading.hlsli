@@ -91,6 +91,7 @@ inline void EvalPointLight(SurfaceInfo surf, Light light, inout LightingInfo li)
     else
     {
         li.attenuation = 1.0 / (light.constantAtt + (light.linearAtt * li.distance) + light.quadAtt * (li.distance * li.distance));
+        li.attenuation *= pow(saturate(1 - pow((pow(li.distance, 2) / pow(light.range, 2)), 2)), 2);
     }
     
     li.shadowFactor = 1;
@@ -110,6 +111,7 @@ inline void EvalSpotLight(SurfaceInfo surf, Light light, inout LightingInfo li)
     else
     {
         li.attenuation = 1.0 / (light.constantAtt + (light.linearAtt * li.distance) + light.quadAtt * (li.distance * li.distance));
+        li.attenuation *= pow(saturate(1 - pow((pow(li.distance, 2) / pow(light.range, 2)), 2)), 2);
     }
     
     float minCos = cos(light.spotAngle);

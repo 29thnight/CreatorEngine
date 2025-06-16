@@ -40,9 +40,6 @@
     <Filter Include="Core.Memory\SpinLock">
       <UniqueIdentifier>{4584675b-2578-4d75-a537-a62df1b1dc49}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX11Common\DirectXHelper">
-      <UniqueIdentifier>{190416e9-a93a-4ee9-bd80-ab672916a61b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DirectX11Common\DeviceResources">
       <UniqueIdentifier>{2a34f36f-291f-4ad7-a8f2-591b7a0c90e8}</UniqueIdentifier>
     </Filter>

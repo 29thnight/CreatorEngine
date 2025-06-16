@@ -12,12 +12,20 @@ Texture2D<float4> gLightEmissive : register(t3);
 
 RWTexture2D<float4> gOutput : register(u0);
 
-uint2 twobytwoSample[4] =
+//uint2 twobytwoSample[4] =
+//{
+//    { 0, 0 },
+//    { 0, 1 },
+//    { 1, 0 },
+//    { 1, 1 }
+//};
+
+uint2 twobytwoSample[16] =
 {
-    { 0, 0 },
-    { 0, 1 },
-    { 1, 0 },
-    { 1, 1 }
+    {0,0 },{0,1 },{0,2 },{0,3 },
+    {1,0 },{1,1 },{1,2 },{1,3 },
+    {2,0 },{2,1 },{2,2 },{2,3 },
+    {3,0 },{3,1 },{3,2 },{3,3 }
 };
 
 cbuffer SSGIParams : register(b0)
@@ -170,11 +178,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     //gOutput[DTid.xy] = float4(float3(AO, AO, AO), 1);
     
-    uint2 twobytwo = twobytwoSample[frameIndex % 4];
+    uint2 twobytwo = twobytwoSample[frameIndex % 16];
     float2 invScreenSize = 1.0 / screenSize;
     
     // DTid.xy = screenSize / 2 = (960, 540)
-    float2 uv = float2(DTid.xy * 2 + twobytwo) * invScreenSize;
+    float2 uv = float2(DTid.xy * 4 + twobytwo) * invScreenSize;
     //float2 uv = float2(DTid.xy) / screenSize;
     //uv *= 2.0;
     float depth = gDepthTex.SampleLevel(PointSampler, uv, 0);
@@ -243,13 +251,55 @@ void main(uint3 DTid : SV_DispatchThreadID)
     //gOutput[DTid.xy] = float4((col + lighting) * visibility, 1);
     
     
-    float3 col0 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 0)) * invScreenSize, 0).rgb;
-    float3 col1 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 0)) * invScreenSize, 0).rgb;
-    float3 col2 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 1)) * invScreenSize, 0).rgb;
-    float3 col3 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 1)) * invScreenSize, 0).rgb;
+    //float3 col0 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 0)) * invScreenSize, 0).rgb;
+    //float3 col1 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 0)) * invScreenSize, 0).rgb;
+    //float3 col2 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(0, 1)) * invScreenSize, 0).rgb;
+    //float3 col3 = gColor.SampleLevel(PointSampler, float2(DTid.xy * 2 + float2(1, 1)) * invScreenSize, 0).rgb;
+
+    //for (int i = 0; i < 16; i++)
+    //{
+    //    uint2 suv = twobytwoSample[i];
+    //    float3 col = gColor.SampleLevel(PointSampler, float2(DTid.xy * 4 + suv) * invScreenSize, 0).rgb;
+    //    gOutput[DTid.xy * 4 + suv] = float4((col + lighting) * visibility, 1);
+    //}
     
-    gOutput[DTid.xy * 2 + uint2(0,0)] = float4((col0 + lighting) * visibility, 1);
-    gOutput[DTid.xy * 2 + uint2(1,0)] = float4((col1 + lighting) * visibility, 1);
-    gOutput[DTid.xy * 2 + uint2(0,1)] = float4((col2 + lighting) * visibility, 1);
-    gOutput[DTid.xy * 2 + uint2(1,1)] = float4((col3 + lighting) * visibility, 1);
+    uint2 suv0 = DTid.xy * 4 + uint2(0,0);
+    uint2 suv1 = DTid.xy * 4 + uint2(0,1);
+    uint2 suv2 = DTid.xy * 4 + uint2(0,2);
+    uint2 suv3 = DTid.xy * 4 + uint2(0,3);
+    uint2 suv4 = DTid.xy * 4 + uint2(1,0);
+    uint2 suv5 = DTid.xy * 4 + uint2(1,1);
+    uint2 suv6 = DTid.xy * 4 + uint2(1,2);
+    uint2 suv7 = DTid.xy * 4 + uint2(1,3);
+    uint2 suv8 = DTid.xy * 4 + uint2(2,0);
+    uint2 suv9 = DTid.xy * 4 + uint2(2,1);
+    uint2 suv10= DTid.xy * 4 + uint2(2,2);
+    uint2 suv11= DTid.xy * 4 + uint2(2,3);
+    uint2 suv12= DTid.xy * 4 + uint2(3,0);
+    uint2 suv13= DTid.xy * 4 + uint2(3,1);
+    uint2 suv14= DTid.xy * 4 + uint2(3,2);
+    uint2 suv15= DTid.xy * 4 + uint2(3,3);
+    
+    gOutput[suv0 ] = float4((gColor.SampleLevel(PointSampler, float2(suv0 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv1 ] = float4((gColor.SampleLevel(PointSampler, float2(suv1 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv2 ] = float4((gColor.SampleLevel(PointSampler, float2(suv2 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv3 ] = float4((gColor.SampleLevel(PointSampler, float2(suv3 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv4 ] = float4((gColor.SampleLevel(PointSampler, float2(suv4 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv5 ] = float4((gColor.SampleLevel(PointSampler, float2(suv5 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv6 ] = float4((gColor.SampleLevel(PointSampler, float2(suv6 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv7 ] = float4((gColor.SampleLevel(PointSampler, float2(suv7 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv8 ] = float4((gColor.SampleLevel(PointSampler, float2(suv8 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv9 ] = float4((gColor.SampleLevel(PointSampler, float2(suv9 ) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv10] = float4((gColor.SampleLevel(PointSampler, float2(suv10) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv11] = float4((gColor.SampleLevel(PointSampler, float2(suv11) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv12] = float4((gColor.SampleLevel(PointSampler, float2(suv12) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv13] = float4((gColor.SampleLevel(PointSampler, float2(suv13) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv14] = float4((gColor.SampleLevel(PointSampler, float2(suv14) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    gOutput[suv15] = float4((gColor.SampleLevel(PointSampler, float2(suv15) * invScreenSize, 0).rgb + lighting) * visibility, 1);
+    
+    
+    //gOutput[DTid.xy * 2 + uint2(0, 0)] = float4((col0 + lighting) * visibility, 1);
+    //gOutput[DTid.xy * 2 + uint2(1,0)] = float4((col1 + lighting) * visibility, 1);
+    //gOutput[DTid.xy * 2 + uint2(0,1)] = float4((col2 + lighting) * visibility, 1);
+    //gOutput[DTid.xy * 2 + uint2(1,1)] = float4((col3 + lighting) * visibility, 1);
 }

@@ -12,16 +12,16 @@
 // TerrainMesh: 한 번 생성 후,
 // 내부에 UpdateVertexBufferPatch()를 추가해 “부분 업데이트”가 가능하도록 수정
 //-----------------------------------------------------------------------------
-
-class TerrainMesh
-{
+class TerrainMesh {
 public:
     // meshWidth: 버텍스가 m_width × m_height로 들어왔다고 가정
     TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
-        // ★ 버텍스 버퍼는 DYNAMIC + WRITE_DISCARD로 생성
         D3D11_BUFFER_DESC vbDesc = {};
+
+#ifndef BUILD_FLAG
+        // ★ 버텍스 버퍼는 DYNAMIC + WRITE_DISCARD로 생성
         vbDesc.Usage = D3D11_USAGE_DYNAMIC;
         vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
         vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -31,6 +31,17 @@ public:
 
         D3D11_SUBRESOURCE_DATA vbInit = {};
         vbInit.pSysMem = m_vertices.data();
+#else
+        //build 된 상태에서는 버텍스 버퍼를 IMMUTABLE로 생성
+        vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
+        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vbDesc.CPUAccessFlags = 0;
+        vbDesc.MiscFlags = 0;
+        vbDesc.StructureByteStride = 0;
+        D3D11_SUBRESOURCE_DATA vbInit = {};
+        vbInit.pSysMem = m_vertices.data();
+#endif // !BUILD_FLAG
 
         DirectX11::ThrowIfFailed(
             DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
@@ -61,8 +72,7 @@ public:
         DirectX11::DrawIndexed((UINT)m_indices.size(), 0, 0);
     }
 
-    void Draw(ID3D11DeviceContext* _deferredContext)
-    {
+    void Draw(ID3D11DeviceContext* _deferredContext) {
         UINT offset = 0;
         DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
         DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
@@ -74,6 +84,8 @@ public:
     const std::vector<Vertex>& GetVertices() { return m_vertices; }
     const std::vector<uint32>& GetIndices() { return m_indices; }
 
+#ifndef BUILD_FLAG
+    // 빌드 모드가 아닐 때만 사용
     // 전체 버텍스 업데이트
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
     {
@@ -118,6 +130,8 @@ public:
 
         context->Unmap(m_vertexBuffer.Get(), 0);
     }
+#endif !BUILD_FLAG
+
 
 private:
     std::string m_name;
