@@ -146,6 +146,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
     ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(defferdPtr, 2, rtv, nullptr);
+    DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
     DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(defferdPtr, 11, 1, &lightManager->m_pLightCountBuffer);
     DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_Buffer.GetAddressOf());
