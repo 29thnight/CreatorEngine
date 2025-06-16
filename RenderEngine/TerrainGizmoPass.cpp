@@ -65,6 +65,8 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
 	deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
 
+    camera.UpdateBuffer();
+    scene.UseModel();
     for (auto& obj : scene.GetScene()->m_SceneObjects) {
         if (obj->IsDestroyMark()) continue;
         if (obj->HasComponent<TerrainComponent>()) {

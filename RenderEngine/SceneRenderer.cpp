@@ -345,10 +345,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->Initialize();
 	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
 
-	/*DataSystems->LoadModel("Punch.fbx");
-	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/
+	//DataSystems->LoadModel("Punch.fbx");
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt);
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
 	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);

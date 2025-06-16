@@ -1476,7 +1476,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				g_CurrentBrush->m_layerID = selectedLayerIndex;
 			}
 
-			LayerDesc* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
+			TerrainLayer* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
 			if (layer != nullptr) {
 				float tiling = layer->tilling;
 				float tempTiling = tiling;
@@ -1496,10 +1496,21 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		//save , load
 		if (ImGui::Button("Save Terrain"))
 		{
+			
+			file::path savePath = ShowSaveFileDialog(L"", L"Save File",PathFinder::Relative("Terrain"));
+			if (savePath != L"") {
+				std::wstring folderPath = savePath.parent_path().wstring();
+				std::wstring fileName = savePath.filename().wstring();
+				terrainComponent->Save(folderPath, fileName);
+			}
+		}
+
+		if (ImGui::Button("test TextureLayer"))
+		{
 			file::path savePath = ShowSaveFileDialog(L"");
 			std::wstring folderPath = savePath.parent_path().wstring();
 			std::wstring fileName = savePath.filename().wstring();
-			terrainComponent->Save(folderPath, fileName);
+			terrainComponent->TestSaveLayerTexture(folderPath);
 		}
 
 		if (ImGui::Button("Load Terrain"))
@@ -1520,10 +1531,10 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		if (ImGui::Button("Add"))
 		{
 			file::path difuseFile = ShowOpenFileDialog(L"");
-			std::wstring difuseFileName = difuseFile.filename().wstring();
+			std::wstring difuseFileName = difuseFile.filename();
 			if (!difuseFile.empty())
 			{
-				terrainComponent->AddLayer(difuseFileName, 4096.0f);
+				terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
 			}
 			ImGui::CloseCurrentPopup();
 		}
