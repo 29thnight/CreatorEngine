@@ -39,17 +39,24 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 
 	namespace fs = std::filesystem;
-	fs::path assetPath = fs::path(assetRoot) / L"Assets";
-	fs::path terrainPath = assetPath / L"Terrain";
+	fs::path assetPath = fs::path(assetRoot);
+	fs::path terrainDir = PathFinder::Relative("Terrain");
+	fs::path terrainPath; 
+	//assetPath가 terrainDir 와 같은면 상대 경로로 저장 아니면 풀패스로 저장해야됨
+	if (terrainDir == assetPath) {
+		terrainPath = fs::relative(assetPath, terrainDir);
+	}
+	else {
+		//존재하지 않으면 풀패스로 저장
+		terrainPath = assetPath;
+	}
+	//터레인 내부 텍스쳐 저장 경로
 	fs::path difusePath = terrainPath / L"Texture";
+
+	
 	if (!fs::exists(difusePath)) {
 		fs::create_directories(difusePath);
 	}
-
-	fs::path terrainDir = PathFinder::Relative("Terrain");
-
-
-
 
 	std::wstring heightMapPath = (terrainPath / (name + L"_HeightMap.png")).wstring();
 	std::wstring splatMapPath = (terrainPath / (name + L"_SplatMap.png")).wstring();
