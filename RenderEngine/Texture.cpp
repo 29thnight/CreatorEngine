@@ -429,13 +429,13 @@ void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 	switch (m_textureType)
 	{
 	case TextureType::Texture2D:
-		Resize2DViews(width, height);
+		Resize2DViews(width / sizeRatio.x, height / sizeRatio.y);
 		break;
 	case TextureType::TextureCube:
-		ResizeCubeViews(width); // 큐브는 width = height
+		ResizeCubeViews(width / sizeRatio.x); // 큐브는 width = height
 		break;
 	case TextureType::TextureArray:
-		ResizeArrayViews(width, height);
+		ResizeArrayViews(width / sizeRatio.x, height / sizeRatio.y);
 		break;
 	default:
 		break;
