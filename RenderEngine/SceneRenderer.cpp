@@ -403,10 +403,13 @@ void SceneRenderer::SceneRendering()
 			}
 		}
 
-		std::wstring name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
-		DirectX11::BeginEvent(name);
+		std::wstring w_name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
+		std::string name = "Camera" + std::to_string(camera->m_cameraIndex);
+		PROFILE_CPU_BEGIN(name.c_str());
+		DirectX11::BeginEvent(w_name);
 		//[1] ShadowMapPass
 		{
+			PROFILE_CPU_BEGIN("ShadowMapPass");
 			DirectX11::BeginEvent(L"ShadowMapPass");
 			Benchmark banch;
 			//TODO : 여기 한번 정리 해보자
@@ -416,24 +419,29 @@ void SceneRenderer::SceneRendering()
 			UnbindRenderTargets();
 			RenderStatistics->UpdateRenderState("ShadowMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//[2] GBufferPass
 		{
+			PROFILE_CPU_BEGIN("GBufferPass");
 			DirectX11::BeginEvent(L"GBufferPass");
 			Benchmark banch;
 			m_pGBufferPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("GBufferPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		if (useTestLightmap)
 		{
+			PROFILE_CPU_BEGIN("LightMapPass");
 			DirectX11::BeginEvent(L"LightMapPass");
 			Benchmark banch;
 			m_pLightMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("LightMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		////[3] SSAOPass
@@ -449,29 +457,35 @@ void SceneRenderer::SceneRendering()
         {
 			//[4] DeferredPass
 			{
+				PROFILE_CPU_BEGIN("DeferredPass");
 				DirectX11::BeginEvent(L"DeferredPass");
 				Benchmark banch;
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
+				PROFILE_CPU_END();
 			}
 		}
 
 		{
+			PROFILE_CPU_BEGIN("SSGIPass");
 			DirectX11::BeginEvent(L"SSGIPass");
 			Benchmark banch;
 			m_pSSGIPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		if(camera == m_pEditorCamera.get())
 		{
+			PROFILE_CPU_BEGIN("TerrainGizmoPass");
 			DirectX11::BeginEvent(L"TerrainGizmoPass");
 			Benchmark banch;
 			m_pTerrainGizmoPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("TerrainGizmoPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//{
@@ -483,93 +497,113 @@ void SceneRenderer::SceneRendering()
 		//}
 
 		{
+			PROFILE_CPU_BEGIN("ForwardPass");
 			DirectX11::BeginEvent(L"ForwardPass");
 			Benchmark banch;
 			m_pForwardPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ForwardPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//SSS
 		{
+			PROFILE_CPU_BEGIN("SubsurfaceScatteringPass");
 			DirectX11::BeginEvent(L"SubsurfaceScatteringPass");
 			Benchmark banch;
 			m_pSubsurfaceScatteringPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SubsurfaceScatteringPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//[5] skyBoxPass
 		{
+			PROFILE_CPU_BEGIN("SkyBoxPass");
 			DirectX11::BeginEvent(L"SkyBoxPass");
 			Benchmark banch;
 			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 		//SSR
 		if (m_pEditorCamera.get() != camera)
 		{
+			PROFILE_CPU_BEGIN("ScreenSpaceReflectionPass");
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
 			Benchmark banch;
 			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//VolumetricFogPass
 		if (m_pEditorCamera.get() != camera)
 		{
+			PROFILE_CPU_BEGIN("VolumetricFogPass");
 			DirectX11::BeginEvent(L"VolumetricFogPass");
 			Benchmark banch;
 			m_pVolumetricFogPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("VolumetricFogPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
         //[*] PostProcessPass
         {
+			PROFILE_CPU_BEGIN("PostProcessPass");
 			DirectX11::BeginEvent(L"PostProcessPass");
 			Benchmark banch;
             m_pPostProcessingPass->Execute(*m_renderScene, *camera);
             RenderStatistics->UpdateRenderState("PostProcessPass", banch.GetElapsedTime());
             DirectX11::EndEvent();
+			PROFILE_CPU_END();
         }
 
 		//[6] AAPass
 		{
+			PROFILE_CPU_BEGIN("AAPass");
 			DirectX11::BeginEvent(L"AAPass");
 			Benchmark banch;
 			m_pAAPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("AAPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//[7] ToneMapPass
 		{
+			PROFILE_CPU_BEGIN("ToneMapPass");
 			DirectX11::BeginEvent(L"ToneMapPass");
 			Benchmark banch;
 			m_pToneMapPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ToneMapPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//Vignette
 		{
+			PROFILE_CPU_BEGIN("VignettePass");
 			DirectX11::BeginEvent(L"VignettePass");
 			Benchmark banch;
 			m_pVignettePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("VignettePass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//m_pColorGradingPass
 		{
+			PROFILE_CPU_BEGIN("ColorGradingPass");
 			DirectX11::BeginEvent(L"ColorGradingPass");
 			Benchmark banch;
 			m_pColorGradingPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("ColorGradingPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		{
@@ -582,33 +616,40 @@ void SceneRenderer::SceneRendering()
 
 		//[7] SpritePass
 		{
+			PROFILE_CPU_BEGIN("SpritePass");
 			DirectX11::BeginEvent(L"SpritePass");
 			Benchmark banch;
 			m_pSpritePass->SetGizmoRendering(false);
 			m_pSpritePass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("SpritePass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//[]  UIPass
 		{
+			PROFILE_CPU_BEGIN("UIPass");
 			DirectX11::BeginEvent(L"UIPass");
 			Benchmark banch;
 			m_pUIPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("UIPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		//[8] BlitPass
 		{
+			PROFILE_CPU_BEGIN("BlitPass");
 			DirectX11::BeginEvent(L"BlitPass");
 			Benchmark banch;
 			m_pBlitPass->Execute(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("BlitPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
+			PROFILE_CPU_END();
 		}
 
 		DirectX11::EndEvent();
+		PROFILE_CPU_END();
 	}
 }
 
@@ -624,22 +665,22 @@ void SceneRenderer::CreateCommandListPass()
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 
+	ProxyCommandQueue->Execute();
+
 	for (auto& camera : CameraManagement->m_cameras)
 	{
 		if (nullptr == camera) continue;
 
-		m_commandThreadPool->Enqueue([&]
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
 			PROFILE_CPU_BEGIN("ShadowPassCommandList");
-			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 			m_renderScene->CreateShadowCommandList(defferdContext , *camera);
 			PROFILE_CPU_END();
 		});
 
-		m_commandThreadPool->Enqueue([&]
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
 			PROFILE_CPU_BEGIN("TerrainPassCommandList");
-			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 			PROFILE_CPU_BEGIN("GBufferPassCommandList");
@@ -649,19 +690,17 @@ void SceneRenderer::CreateCommandListPass()
 
 		if (useTestLightmap)
 		{
-			m_commandThreadPool->Enqueue([&]
+			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 			{
 				PROFILE_CPU_BEGIN("LightMapPassCommandList");
-				auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 				m_pLightMapPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			});
 		}
 
-		m_commandThreadPool->Enqueue([&]
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
 			PROFILE_CPU_BEGIN("DeferredPassCommandList");
-			auto defferdContext = GetLocalDefferdContext(m_commandThreadPool);
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 			m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
@@ -738,10 +777,6 @@ void SceneRenderer::PrepareRender()
 
 		m_threadPool->Enqueue([camera, data, staticMeshes, skinnedMeshes, renderScene]
 		{
-			if (0 == staticMeshes.size())
-			{
-				std::cout << camera->m_cameraIndex << " Mesh Vector Size zero" << std::endl;
-			}
 			//std::vector<MeshRenderer*> culledMeshes;
 			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 			//camera->ClearRenderQueue();
@@ -778,6 +813,7 @@ void SceneRenderer::PrepareRender()
 	m_pGBufferPass->SwapQueue();
 	m_pLightMapPass->SwapQueue();
 	m_pDeferredPass->SwapQueue();
+	ProxyCommandQueue->AddFrame();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

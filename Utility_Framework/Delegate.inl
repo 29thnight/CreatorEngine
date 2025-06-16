@@ -67,7 +67,7 @@ namespace Core
 		for (auto& info : callbacks_)
 		{
 			try { info.callback(args...); }
-			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; }
+			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
 		}
 	}
 

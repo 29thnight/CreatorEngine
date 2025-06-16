@@ -8,7 +8,7 @@
 #include "LightController.h"
 #include "LightProperty.h"
 #include "Benchmark.hpp"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 
 ForwardPass::ForwardPass()
 {

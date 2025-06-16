@@ -28,7 +28,7 @@ public:
     void Clear();
 
 private:
-    ThreadPool* m_threadPool{ nullptr };
+    ThreadPool<std::function<void()>>* m_threadPool{ nullptr };
     OctreeNode* m_root{ nullptr };
     int m_maxDepth = 5;
     int m_maxMeshesPerNode = 10;

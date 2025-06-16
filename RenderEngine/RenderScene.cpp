@@ -10,12 +10,12 @@
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "ImageComponent.h"
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
-std::queue<HashedGuid> RenderScene::RegisteredDistroyProxyGUIDs;
+concurrent_queue<HashedGuid> RenderScene::RegisteredDistroyProxyGUIDs;
 
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
@@ -115,6 +115,12 @@ void RenderScene::RegisterAnimator(Animator* animatorPtr)
 	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
 
 	m_animatorMap[animatorGuid] = animatorPtr;
+
+	void* voidPtr = std::malloc(TRANSFORM_SIZE);
+	if(voidPtr)
+	{
+		m_palleteMap[animatorGuid].second = (Mathf::xMatrix*)voidPtr;
+	}
 }
 
 void RenderScene::UnregisterAnimator(Animator* animatorPtr)
@@ -126,8 +132,15 @@ void RenderScene::UnregisterAnimator(Animator* animatorPtr)
 	SpinLock lock(m_proxyMapFlag);
 
 	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
+	if (m_palleteMap.find(animatorGuid) != m_palleteMap.end()) return;
 
 	m_animatorMap.erase(animatorGuid);
+
+	if (m_palleteMap[animatorGuid].second)
+	{
+		free(m_palleteMap[animatorGuid].second);
+		m_palleteMap.erase(animatorGuid);
+	}
 }
 
 void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
@@ -143,6 +156,24 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 	m_proxyMap[meshRendererGuid] = managedCommand;
 }
 
+bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
+{
+	if (nullptr == meshRendererPtr || meshRendererPtr->IsDestroyMark()) return false;
+
+	auto owner = meshRendererPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+
+	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
+
+	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return false;
+
+	auto& proxyObject = m_proxyMap[meshRendererGuid];
+
+	if (nullptr == proxyObject) return false;
+
+	return true;
+}
+
 MeshRendererProxy* RenderScene::FindProxy(size_t guid)
 {
 	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
@@ -154,50 +185,36 @@ void RenderScene::OnProxyDistroy()
 {
 	while (!RenderScene::RegisteredDistroyProxyGUIDs.empty())
 	{
-		auto ID = RenderScene::RegisteredDistroyProxyGUIDs.back();
-		m_proxyMap.erase(ID);
-		RenderScene::RegisteredDistroyProxyGUIDs.pop();
+		HashedGuid ID;
+		if (RenderScene::RegisteredDistroyProxyGUIDs.try_pop(ID))
+		{
+			m_proxyMap.erase(ID);
+		}
+	}
+
+	for (auto& [guid, pair] : m_palleteMap)
+	{
+		auto& isUpdated = pair.first;
+
+		isUpdated = false;
 	}
 }
 
 void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
 {
-	if (nullptr == meshRendererPtr || meshRendererPtr->IsDestroyMark()) return;
+	ProxyCommand moveCommand = MakeProxyCommand(meshRendererPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
 
-	auto owner = meshRendererPtr->GetOwner();
-	if(nullptr == owner || owner->IsDestroyMark()) return;
-
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
-
-	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
-	
-	auto& proxyObject = m_proxyMap[meshRendererGuid];
-
-	if (nullptr == proxyObject) return;
-
-	HashedGuid aniGuid = proxyObject->m_animatorGuid;
-
-	if(m_animatorMap.find(aniGuid) != m_animatorMap.end() 
-		&& proxyObject->IsSkinnedMesh())
+ProxyCommand RenderScene::MakeProxyCommand(MeshRenderer* meshRendererPtr)
+{
+	if (!InvaildCheckMeshRenderer(meshRendererPtr)) 
 	{
-		auto* dstPalete = &proxyObject->m_finalTransforms;
-		auto* srcPalete = &m_animatorMap[aniGuid]->m_FinalTransforms;
-
-		memcpy(dstPalete, srcPalete, TRANSFORM_SIZE);
+		throw std::runtime_error("InvaildCheckMeshRenderer");
 	}
 
-	proxyObject->m_worldMatrix = worldMatrix;
-
-	constexpr int INVAILD_INDEX = -1;
-
-	int& lightMapIndex		= meshRendererPtr->m_LightMapping.lightmapIndex;
-	int& proxyLightMapIndex = proxyObject->m_LightMapping.lightmapIndex;
-
-	if(INVAILD_INDEX != lightMapIndex && proxyLightMapIndex != lightMapIndex)
-	{
-		proxyObject->m_LightMapping = meshRendererPtr->m_LightMapping;
-	}
+	ProxyCommand command(meshRendererPtr);
+	return command;
 }
 
 void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
@@ -209,7 +226,6 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
 	m_proxyMap[meshRendererGuid]->DistroyProxy();
-	//m_proxyMap.erase(meshRendererGuid);
 }
 
 void RenderScene::PushShadowRenderQueue(MeshRendererProxy* proxy)

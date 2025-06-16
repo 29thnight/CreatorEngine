@@ -8,7 +8,7 @@
 #include "LightController.h"
 #include "LightProperty.h"
 #include "Benchmark.hpp"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "Terrain.h"
 
 ID3D11ShaderResourceView* nullSRVs[5]{
@@ -126,11 +126,6 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
-
-	if (0 == data->m_deferredQueue.size())
-	{
-		std::cout << camera.m_cameraIndex << " queue Size Zero" << std::endl;
-	}
 	
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};

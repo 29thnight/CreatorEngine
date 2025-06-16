@@ -189,7 +189,7 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-	SpinLock lock(gameToRenderLock);
+	//SpinLock lock(gameToRenderLock);
 
     frameDeltaTime = m_timeSystem.GetElapsedSeconds();
 

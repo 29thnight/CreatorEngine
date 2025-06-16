@@ -249,6 +249,15 @@
     <ClInclude Include="FileDialog.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>
+    <ClInclude Include="Core.ThreadPool.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Thread.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.CountingSemaphore.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

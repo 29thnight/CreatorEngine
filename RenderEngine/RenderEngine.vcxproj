@@ -163,6 +163,7 @@
     <ClCompile Include="MovementModuleCS.cpp" />
     <ClCompile Include="ParticleModule.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
+    <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="SparkleEffect.cpp" />
     <ClCompile Include="SpawnModule.cpp" />
@@ -172,7 +173,7 @@
     <ClCompile Include="GizmoPass.cpp" />
     <ClCompile Include="GizmoRenderer.cpp" />
     <ClCompile Include="LightingPass.cpp" />
-    <ClCompile Include="RenderCommand.cpp" />
+    <ClCompile Include="MeshRendererProxy.cpp" />
     <ClCompile Include="RenderPassData.cpp" />
     <ClCompile Include="ScreenSpaceReflectionPass.cpp" />
     <ClCompile Include="ShaderSystem.cpp" />
@@ -235,6 +236,8 @@
     <ClInclude Include="MovementModuleCS.h" />
     <ClInclude Include="ParticleModule.h" />
     <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="ProxyCommand.h" />
+    <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="SparkleEffect.h" />
     <ClInclude Include="SpawnModule.h" />
@@ -247,7 +250,7 @@
     <ClInclude Include="MaterialInfomation.h" />
     <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
-    <ClInclude Include="RenderCommand.h" />
+    <ClInclude Include="MeshRendererProxy.h" />
     <ClInclude Include="RenderJob.h" />
     <ClInclude Include="RenderPassData.h" />
     <ClInclude Include="ResourceAllocator.h" />

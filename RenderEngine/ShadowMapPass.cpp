@@ -6,7 +6,7 @@
 #include "RenderableComponents.h"
 #include "LightController.h"
 #include "directxtk\SimpleMath.h"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "Skeleton.h"
 
 bool g_useCascade = true;

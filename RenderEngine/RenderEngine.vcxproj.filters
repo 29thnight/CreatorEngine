@@ -219,9 +219,6 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderTaskScheduler">
-      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
-	</Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -242,6 +239,12 @@
     </Filter>
     <Filter Include="RenderPass\EffectPass\3.Color">
       <UniqueIdentifier>{f45f55f2-237b-4f3c-a329-565776d89912}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ProxyCommandQueue">
+      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ProxyCommandQueue\ProxyCommand">
+      <UniqueIdentifier>{4c04f4d8-fc3e-4642-a0d6-14775e73de9e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -416,7 +419,7 @@
     <ClCompile Include="ParticleSystem.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
-    <ClCompile Include="RenderCommand.cpp">
+    <ClCompile Include="MeshRendererProxy.cpp">
       <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="Animation.cpp">
@@ -430,7 +433,7 @@
     </ClCompile>
     <ClCompile Include="ColorModuleCS.cpp">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
-	</ClCompile>
+    </ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem\Animation</Filter>
     </ClCompile>
@@ -439,6 +442,9 @@
     </ClCompile>
     <ClCompile Include="TerrainGizmoPass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
+    </ClCompile>
+    <ClCompile Include="ProxyCommand.cpp">
+      <Filter>ProxyCommandQueue\ProxyCommand</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -646,7 +652,7 @@
     <ClInclude Include="ParticleSystem.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
-    <ClInclude Include="RenderCommand.h">
+    <ClInclude Include="MeshRendererProxy.h">
       <Filter>Objects</Filter>
     </ClInclude>
     <ClInclude Include="Animation.h">
@@ -672,6 +678,12 @@
     </ClInclude>
     <ClInclude Include="TerrainGizmoPass.h">
       <Filter>RenderPass\GizmoPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ProxyCommandQueue.h">
+      <Filter>ProxyCommandQueue</Filter>
+    </ClInclude>
+    <ClInclude Include="ProxyCommand.h">
+      <Filter>ProxyCommandQueue\ProxyCommand</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -832,12 +844,6 @@
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
-	</FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
-      <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>

@@ -41,8 +41,6 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-	std::cout << "TestBehavior::Update" << std::endl;
-
 	Transform& transfrom = GetComponent<Transform>();
 
 	transfrom.AddPosition(Mathf::Vector3(0.0f, 2.0f, 0.0f) * tick);

@@ -4,6 +4,11 @@
 #include "LightMapping.h"
 #include "Animator.h"
 
+enum class ProxyType
+{
+
+};
+
 class Material;
 class Mesh;
 class OctreeNode;
@@ -39,7 +44,7 @@ public:
 	HashedGuid      m_instancedID{};
 
 public:
-	Mathf::xMatrix	  m_finalTransforms[MAX_BONES]{};
+	Mathf::xMatrix*	  m_finalTransforms{};
 	LightMapping	  m_LightMapping;
 	bool			  m_isSkinnedMesh{ false };
 	bool			  m_isAnimationEnabled{ false };

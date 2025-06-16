@@ -4,7 +4,7 @@
 #include "ImGuiRegister.h"
 #include "MeshRenderer.h"
 #include "Material.h"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "RenderScene.h"
 
 const static float pi = XM_PIDIV2 - 0.01f;

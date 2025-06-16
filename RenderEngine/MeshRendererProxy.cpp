@@ -1,4 +1,4 @@
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "MeshRenderer.h"
 #include "Mesh.h"
 #include "RenderScene.h"
@@ -49,9 +49,9 @@ MeshRendererProxy::MeshRendererProxy(const MeshRendererProxy& other) :
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(other.m_worldMatrix),
     m_animatorGuid(other.m_animatorGuid),
-    m_materialGuid(other.m_materialGuid)
+    m_materialGuid(other.m_materialGuid),
+    m_finalTransforms(other.m_finalTransforms)
 {
-    memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
 
 MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
@@ -61,9 +61,9 @@ MeshRendererProxy::MeshRendererProxy(MeshRendererProxy&& other) noexcept :
     m_isSkinnedMesh(other.m_isSkinnedMesh),
     m_worldMatrix(std::exchange(other.m_worldMatrix, {})),
     m_animatorGuid(std::exchange(other.m_animatorGuid, {})),
-    m_materialGuid(std::exchange(other.m_materialGuid, {}))
+    m_materialGuid(std::exchange(other.m_materialGuid, {})),
+    m_finalTransforms(std::exchange(other.m_finalTransforms, nullptr))
 {
-    memcpy(m_finalTransforms, other.m_finalTransforms, TRANSFORM_SIZE);
 }
 
 void MeshRendererProxy::Draw()

@@ -874,5 +874,5 @@ private:
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
 
 
-    ThreadPool m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
+    ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
 };
