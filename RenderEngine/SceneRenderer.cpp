@@ -707,6 +707,13 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_END();
 		});
 
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		{
+			PROFILE_CPU_BEGIN("SSGIPassCommandList");
+			m_pSSGIPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
 		m_commandThreadPool->NotifyAllAndWait();
 	}
 
@@ -813,6 +820,7 @@ void SceneRenderer::PrepareRender()
 	m_pGBufferPass->SwapQueue();
 	m_pLightMapPass->SwapQueue();
 	m_pDeferredPass->SwapQueue();
+	m_pSSGIPass->SwapQueue();
 	ProxyCommandQueue->AddFrame();
 }
 
