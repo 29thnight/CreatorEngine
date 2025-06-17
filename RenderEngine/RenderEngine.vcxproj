@@ -164,6 +164,7 @@
     <ClCompile Include="ParticleModule.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="Socket.cpp" />
     <ClCompile Include="SparkleEffect.cpp" />
     <ClCompile Include="SpawnModule.cpp" />
     <ClCompile Include="SpawnModuleCS.cpp" />
@@ -236,6 +237,7 @@
     <ClInclude Include="ParticleModule.h" />
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="Socket.h" />
     <ClInclude Include="SparkleEffect.h" />
     <ClInclude Include="SpawnModule.h" />
     <ClInclude Include="SpawnModuleCS.h" />

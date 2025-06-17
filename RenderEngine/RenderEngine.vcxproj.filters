@@ -221,7 +221,7 @@
     </Filter>
     <Filter Include="RenderTaskScheduler">
       <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
-	</Filter>
+    </Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -430,7 +430,7 @@
     </ClCompile>
     <ClCompile Include="ColorModuleCS.cpp">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
-	</ClCompile>
+    </ClCompile>
     <ClCompile Include="AnimationJob.cpp">
       <Filter>Asset\JobSystem\Animation</Filter>
     </ClCompile>
@@ -439,6 +439,9 @@
     </ClCompile>
     <ClCompile Include="TerrainGizmoPass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
+    </ClCompile>
+    <ClCompile Include="Socket.cpp">
+      <Filter>Resources\Skeleton</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -673,6 +676,9 @@
     <ClInclude Include="TerrainGizmoPass.h">
       <Filter>RenderPass\GizmoPass</Filter>
     </ClInclude>
+    <ClInclude Include="Socket.h">
+      <Filter>Resources\Skeleton</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -832,12 +838,6 @@
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
-	</FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.gs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\BillBoard.vs.hlsl">
-      <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>

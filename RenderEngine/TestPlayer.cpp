@@ -6,6 +6,8 @@
 #include "AnimationBehviourFatory.h"
 #include "InputActionManager.h"
 #include "TimeSystem.h"
+#include "Skeleton.h"
+#include "Socket.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
@@ -17,6 +19,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	AnimationFactorys->ReisterFactory("Punch", []() {return new RunAni(); });
 
 	auto animation = player->GetComponent<Animator>();
+	animation->m_Skeleton->MakeSocket("HeadSocket", "mixamorig:Hips");
 	animation->AddParameter("Speed", speed, ValueType::Float);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
@@ -67,9 +70,29 @@ void TestPlayer::Update(float deltaTime)
 {
 	deta = deltaTime;
 	auto _player = GameObject::Find("Punch");
+	if (!_player) return;
 	auto ani = _player->GetComponent<Animator>();
 	ani->SetParameter("Speed", speed);
 
+
+	auto sword = GameObject::Find("plane");
+	if (sword)
+	{
+		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
+		Mathf::xMatrix socketMatrix = headsocket->worldTransform;
+
+		XMVECTOR scale, rotationQuat, translation;
+		Mathf::Quaternion quat;
+		Mathf::Vector3 pos;
+		if (XMMatrixDecompose(&scale, &rotationQuat, &translation, socketMatrix))
+		{
+			XMStoreFloat4(&quat, rotationQuat);
+			XMStoreFloat3(&pos, translation);
+		}
+		sword->m_transform.SetPosition(pos);
+		sword->m_transform.SetRotation(quat);
+
+	}
 
 	if (InputManagement->IsKeyDown('L'))
 	{
@@ -110,14 +133,16 @@ void TestPlayer::Move(Mathf::Vector2 _dir)
 		speed = maxSpeed;
 	dir = _dir;
 	auto _player = GameObject::Find("Punch");
+	if (!_player) return;
 	_player->m_transform.AddPosition({ dir.x * speed * deta,0  ,dir.y * speed * deta });
-	Debug->Log(std::to_string(dir.x) + "     ");
-	Debug->Log(std::to_string(dir.y));
+	//Debug->Log(std::to_string(dir.x) + "     ");
+	//Debug->Log(std::to_string(dir.y));
 }
 
 void TestPlayer::Jump()
 {
 	auto _player = GameObject::Find("Punch");
+	if (!_player) return;
 	_player->m_transform.AddPosition({0,1,0 });
 
 }

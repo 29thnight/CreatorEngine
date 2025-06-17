@@ -66,6 +66,13 @@ public:
 	float m_nextTimeElapsed;
 	float m_isBlend;
 
+
+
+
+	//컨트롤러 바꿔치기용
+	[[Property]]
+	bool useController = false; 
+
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};
@@ -73,7 +80,7 @@ public:
 	AvatarMask* m_avatarMask{};
 	[[Property]]
 	bool useMask = false;
-	//&&&&& 아바타마스크 포인터로바꿈 수정필요
+	float curAnimationProgress = 0.f;
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;

@@ -1,6 +1,6 @@
 #include "Skeleton.h"
 #include "ResourceAllocator.h"
-
+#include "Socket.h"
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
@@ -71,6 +71,26 @@ std::string ToLower(std::string boneName)
 
 	return name;
 
+}
+
+void Skeleton::MakeSocket(const std::string_view& socketName, const std::string_view& boneName)
+{
+
+	Socket* newSocket = new Socket();
+	newSocket->m_name = socketName;
+	newSocket->m_boneName = boneName;
+	m_sockets.push_back(newSocket);
+}
+
+Socket* Skeleton::FindSocket(const std::string_view& socketName)
+{
+	for (auto& socket : m_sockets)
+	{
+		if (socket->m_name == socketName)
+			return socket;
+	}
+
+	return nullptr;
 }
 
 Bone* Skeleton::FindBone(const std::string_view& _name)

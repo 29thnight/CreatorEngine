@@ -781,7 +781,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							}
 							if (ImGui::BeginPopup("RightClickMenu"))
 							{
-								if (ImGui::MenuItem("Copy Contorller")) { /* 삭제 로직 */ }
+								if (ImGui::MenuItem("Copy Contorller")) { /* 카피 컨트롤러 함수 */ }
 								if (ImGui::MenuItem("Delete Controller")) 
 								{  
 									animator->DeleteController(selectedControllerIndex);
@@ -976,7 +976,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::SameLine();
 					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), true);
 					if(!animator->m_animationControllers.empty() && selectedControllerIndex != -1)
-						controller= animator->m_animationControllers[selectedControllerIndex];
+						controller= animator->m_animationControllers[selectedControllerIndex].get();
 					std::string controllerName;
 					if (controller)
 					{
@@ -990,7 +990,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::Separator();
 					if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 					{
-						controller = animator->m_animationControllers[selectedControllerIndex];
+						controller = animator->m_animationControllers[selectedControllerIndex].get();
 						nodeEdtior;
 						static bool isOpenPopUp;
 						static bool isOpenNodePopUp;
@@ -1027,10 +1027,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							{
 								auto states = controller->StateVec;
 								int curIndex = controller->m_nodeEditor->seletedCurNodeIndex;
-								if (states[targetNodeIndex]->m_isAny == true)
-								{
-
-								}
+								if (states[targetNodeIndex]->m_isAny == true) {}
 								else
 								{
 									controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
@@ -1134,11 +1131,15 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 							if (selectedTransitionIndex != -1)
 							{
+								auto& conditions = transition->conditions;
+								ImGui::Separator();
+								ImGui::Checkbox("HasExitTIme", &transition->hasExitTime);
+								ImGui::SliderFloat("ExitTime", &transition->exitTime, 0.1f, 1.0f);
+								ImGui::InputFloat("Transition Duration", &transition->blendTime);
 								ImGui::Separator();
 								ImGui::Separator();
 								ImGui::Text("Conditions");
 								ImGui::Separator();
-								auto& conditions = transition->conditions;
 								if (conditions.empty())
 								{
 									ImGui::Text("Empty Conditions");
@@ -1342,12 +1343,16 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						}
 						if (selectedTransitionIndex != -1)
 						{
+							auto& transition = state->Transitions[selectedTransitionIndex];
+							auto& conditions = transition->conditions;
+							ImGui::Separator();
+							ImGui::Checkbox("HasExitTIme", &transition->hasExitTime);
+							ImGui::SliderFloat("ExitTime", &transition->exitTime, 0.1f, 1.0f);
+							ImGui::InputFloat("BlendTime", &transition->blendTime);
 							ImGui::Separator();
 							ImGui::Separator();
 							ImGui::Text("Conditions");
 							ImGui::Separator();
-							auto& transition = state->Transitions[selectedTransitionIndex];
-							auto& conditions = transition->conditions;
 							if (conditions.empty())
 							{
 								ImGui::Text("Empty Conditions");

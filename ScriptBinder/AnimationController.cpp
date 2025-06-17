@@ -70,6 +70,11 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		{
 			for (auto& trans : aniState->Transitions)
 			{
+				if (trans->hasExitTime)
+				{
+					if (trans->GetExitTime() >= curAnimationProgress)
+						continue;
+				}
 				if (true == trans->CheckTransiton())
 				{
 					if (trans->nextState != nullptr && m_curState != trans->nextState);
@@ -81,6 +86,11 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	if (m_curState->Transitions.empty()) return nullptr;
 	for (auto& trans : m_curState->Transitions)
 	{
+		if (trans->hasExitTime)
+		{
+			if (trans->GetExitTime() >= curAnimationProgress)
+				continue;
+		}
 		if (true == trans->CheckTransiton())
 		{
 			return trans;
@@ -133,6 +143,7 @@ void AnimationController::UpdateState()
 
 		for (auto& othercontorller : m_owner->m_animationControllers)
 		{
+			if (!othercontorller->useController) continue;
 			if (othercontorller->name == name) continue;
 			if(othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
 				m_nextTimeElapsed = othercontorller->m_timeElapsed;
@@ -149,6 +160,7 @@ void AnimationController::UpdateState()
 }
 void AnimationController::Update(float tick)
 {
+	Debug->Log(std::to_string(curAnimationProgress).c_str());
 	UpdateState();
 	if (needBlend)
 	{

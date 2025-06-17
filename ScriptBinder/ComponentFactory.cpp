@@ -83,6 +83,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				if(guid != nullFileGuid)
 				{
 					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+
 				}
 			}
 
@@ -105,9 +106,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 				for (auto& layer : animationControllerNode)
 				{
-
-					AnimationController* animationController = new AnimationController();
-					Meta::Deserialize(animationController, layer);
+					std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+					//AnimationController* animationController = new AnimationController();
+					Meta::Deserialize(animationController.get(), layer);
 					animationController->m_owner = animator;
 					animationController->m_nodeEditor = new NodeEditor();
 
@@ -146,7 +147,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							Meta::Deserialize(sharedState.get(), state);
 							animationController->StateVec.push_back(sharedState);
 							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
-							sharedState->m_ownerController = animationController;
+							sharedState->m_ownerController = animationController.get();
 							sharedState->SetBehaviour(sharedState->m_name);
 							if (state["Transitions"])
 							{
@@ -157,7 +158,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 									Meta::Deserialize(sharedTransition.get(), transition);
 									sharedState->Transitions.push_back(sharedTransition);
-									sharedTransition->m_ownerController = animationController; 
+									sharedTransition->m_ownerController = animationController.get();
 								
 									if (transition["conditions"])
 									{
@@ -166,7 +167,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 										{
 											TransCondition newcondition;
 											Meta::Deserialize(&newcondition, condition);
-											newcondition.m_ownerController = animationController;
+											newcondition.m_ownerController = animationController.get();
 											sharedTransition->conditions.push_back(newcondition);
 											newcondition.SetValue(newcondition.valueName);
 				
