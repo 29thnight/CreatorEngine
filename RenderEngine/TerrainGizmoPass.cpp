@@ -54,47 +54,6 @@ TerrainGizmoPass::TerrainGizmoPass()
 
 void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
- //   if (!RenderPassData::VaildCheck(&camera)) return;
- //   auto renderData = RenderPassData::GetData(&camera);
-
- //   m_pso->Apply();
- //   
-	//DirectX11::CopyResource(m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
-
- //   auto& deviceContext = DeviceState::g_pDeviceContext;
- //   ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	//deviceContext->OMSetRenderTargets(1, &rtv, nullptr);
-
- //   camera.UpdateBuffer();
- //   scene.UseModel();
- //   for (auto& obj : scene.GetScene()->m_SceneObjects) {
- //       if (obj->IsDestroyMark()) continue;
- //       if (obj->HasComponent<TerrainComponent>()) {
-
- //           auto terrain = obj->GetComponent<TerrainComponent>();
- //           auto terrainMesh = terrain->GetMesh();
-
- //           if (terrainMesh)
- //           {
- //               TerrainGizmoBuffer terrainGizmoBuffer = {};
- //               auto terrainBrush = terrain->GetCurrentBrush();
- //               if (terrainBrush != nullptr) {
- //                   terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
- //                   terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
- //                   DirectX11::UpdateBuffer(m_Buffer.Get(), &terrainGizmoBuffer);
- //                   DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-	//				DirectX11::PSSetShaderResources(0, 1, &m_pTempTexture->m_pSRV);
-
- //                   scene.UpdateModel(obj->m_transform.GetWorldMatrix());
- //                   terrainMesh->Draw();
- //               }
- //           }
- //       }
- //       
- //   }
- //   ID3D11RenderTargetView* nullrtv = nullptr;
- //   deviceContext->OMSetRenderTargets(1, &nullrtv, nullptr);
-
     auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
 
     if (nullptr != cmdQueuePtr)

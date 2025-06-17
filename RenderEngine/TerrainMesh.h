@@ -12,7 +12,8 @@
 // TerrainMesh: 한 번 생성 후,
 // 내부에 UpdateVertexBufferPatch()를 추가해 “부분 업데이트”가 가능하도록 수정
 //-----------------------------------------------------------------------------
-class TerrainMesh {
+class TerrainMesh 
+{
 public:
     // meshWidth: 버텍스가 m_width × m_height로 들어왔다고 가정
     TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
@@ -64,7 +65,8 @@ public:
 
     ~TerrainMesh() = default;
 
-    void Draw() {
+    void Draw() 
+    {
         UINT offset = 0;
         DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
         DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
@@ -72,7 +74,8 @@ public:
         DirectX11::DrawIndexed((UINT)m_indices.size(), 0, 0);
     }
 
-    void Draw(ID3D11DeviceContext* _deferredContext) {
+    void Draw(ID3D11DeviceContext* _deferredContext) 
+    {
         UINT offset = 0;
         DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
         DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
@@ -131,7 +134,6 @@ public:
         context->Unmap(m_vertexBuffer.Get(), 0);
     }
 #endif !BUILD_FLAG
-
 
 private:
     std::string m_name;

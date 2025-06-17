@@ -414,10 +414,10 @@ public:
     bool Load(const std::wstring& filePath);
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
-	bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+	bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
 	void SaveEditorSplatMap(const std::wstring& pngPath);
-	bool LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
+	bool LoadEditorSplatMap(file::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
 
     void TestSaveLayerTexture(const std::wstring& saveDir);
 
@@ -549,7 +549,6 @@ public:
         layerBuffer.layerTilling2 = tilefector[2] / 4096;
         layerBuffer.layerTilling3 = tilefector[3] / 4096;
         DirectX11::UpdateBuffer(m_layerBuffer.Get(), &layerBuffer);
-
 
         DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 
@@ -709,25 +708,30 @@ public:
 	//ComPtr<ID3D11Buffer> m_gizmoBuffer; //editor용 gizmo 버퍼
 	ComPtr<ID3D11Buffer> m_AddLayerBuffer; // 레이어 추가용 버퍼
 private:
-    unsigned int m_terrainID{ 0 };
+    uint32 m_terrainID{ 0 };
     FileGuid m_trrainAssetGuid{};
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
 
 	//== 레이어 관련 변수들 ==
-	uint32_t m_nextLayerID{ 0 }; // 다음 레이어 ID
-	uint32_t m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
+    //== 에디터 전용
+    //== window 공용으로 사용가능
+    uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
+    //== window 공용으로 사용 불가능
+	std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    //== 에디터 전용
+    uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
 	std::vector<TerrainLayer>            m_layers; // 레이어 정보들
-	std::vector<const char*> m_layerNames; // 레이어 이름들 (디버깅용)
 	std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
-	ComPtr<ID3D11Texture2D> m_splatMapTexture; // 스플랫맵 텍스처
-	ComPtr<ID3D11ShaderResourceView> m_splatMapSRV; // 스플랫맵 SRV
-	ID3D11UnorderedAccessView* p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
+	ComPtr<ID3D11Texture2D>              m_splatMapTexture; // 스플랫맵 텍스처
+	ComPtr<ID3D11ShaderResourceView>     m_splatMapSRV; // 스플랫맵 SRV
+	ID3D11UnorderedAccessView*           p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
 
-	ID3D11Texture2D* m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
-	ID3D11ShaderResourceView* m_layerSRV = nullptr; // m_layerTextureArray에 대한 SRV
-	ShaderPtr<ComputeShader>	m_computeShader; // 터레인 각 텍스쳐를 -> m_layerTextureArray에 저장하는 컴퓨트 셰이더
+	ID3D11Texture2D*                     m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
+	ID3D11ShaderResourceView*            m_layerSRV = nullptr; // m_layerTextureArray에 대한 SRV
+    //== 통합으로 빠질거 -> 
+	ShaderPtr<ComputeShader>	         m_computeShader; // 터레인 각 텍스쳐를 -> m_layerTextureArray에 저장하는 컴퓨트 셰이더
     //========================
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
