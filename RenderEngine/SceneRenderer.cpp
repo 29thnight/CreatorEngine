@@ -533,9 +533,11 @@ void SceneRenderer::SceneRendering()
 			//SSR
 			PROFILE_CPU_BEGIN("ScreenSpaceReflectionPass");
 			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
-			Benchmark banch;
-			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
+			{
+				Benchmark banch;
+				m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
+				RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
+			}
 			DirectX11::EndEvent();
 			PROFILE_CPU_END();
 
@@ -684,16 +686,10 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_BEGIN("TerrainPassCommandList");
 			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
-			/*PROFILE_CPU_BEGIN("GBufferPassCommandList");
-			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
-			PROFILE_CPU_END();*/
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
-			//PROFILE_CPU_BEGIN("TerrainPassCommandList");
-			//m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
-			//PROFILE_CPU_END();
 			PROFILE_CPU_BEGIN("GBufferPassCommandList");
 			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
@@ -708,15 +704,17 @@ void SceneRenderer::CreateCommandListPass()
 				PROFILE_CPU_END();
 			});
 		}
-
-		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		else
 		{
-			PROFILE_CPU_BEGIN("DeferredPassCommandList");
-			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-			m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
-			m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
-			PROFILE_CPU_END();
-		});
+			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			{
+				PROFILE_CPU_BEGIN("DeferredPassCommandList");
+				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
+				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
+				m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			});
+		}
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
@@ -746,22 +744,28 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_END();
 		});
 
-		if (camera == m_pEditorCamera.get())
-		{
-			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
-			{
-				PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
-				m_pTerrainGizmoPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
-				PROFILE_CPU_END();
-			});
-		}
-
 		if (m_pEditorCamera.get() != camera)
 		{
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 			{
 				PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
 				m_pScreenSpaceReflectionPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			});
+
+			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			{
+				PROFILE_CPU_BEGIN("VolumetricFogPassCommandList");
+				m_pVolumetricFogPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			});
+		}
+		else
+		{
+			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			{
+				PROFILE_CPU_BEGIN("TerrainGizmoPassCommandList");
+				m_pTerrainGizmoPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			});
 		}
@@ -875,7 +879,10 @@ void SceneRenderer::PrepareRender()
 	m_pSSGIPass->SwapQueue();
 	m_pForwardPass->SwapQueue();
 	m_pSkyBoxPass->SwapQueue();
+	m_pTerrainGizmoPass->SwapQueue();
 	m_pSubsurfaceScatteringPass->SwapQueue();
+	m_pScreenSpaceReflectionPass->SwapQueue();
+	m_pVolumetricFogPass->SwapQueue();
 	ProxyCommandQueue->AddFrame();
 }
 

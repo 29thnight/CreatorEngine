@@ -275,7 +275,7 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			if (animatorGuid != currentAnimatorGuid)
+			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
 				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
 				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;

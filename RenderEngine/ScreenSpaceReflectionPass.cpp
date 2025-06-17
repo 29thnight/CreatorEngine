@@ -85,43 +85,6 @@ void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough
 
 void ScreenSpaceReflectionPass::Execute(RenderScene& scene, Camera& camera)
 {
-	//if (!isOn) return;
-
-	//if (!RenderPassData::VaildCheck(&camera)) return;
-	//auto renderData = RenderPassData::GetData(&camera);
-
-	//CBData cbData;
-	//cbData.m_InverseProjection = camera.CalculateInverseProjection();
-	//cbData.m_InverseView = camera.CalculateInverseView();
-	//cbData.m_viewProjection = camera.CalculateView() * camera.CalculateProjection();
-	//cbData.m_cameraPosition = camera.m_eyePosition;
-	//cbData.stepSize = stepSize;
-	//cbData.MaxThickness = MaxThickness;
-	//cbData.Time = (float)Time->GetTotalSeconds();
-	//cbData.maxRayCount = maxRayCount;
-
-	//m_pso->Apply();
-	//DirectX11::CopyResource(m_prevCopiedSSRTexture->m_pTexture, renderData->m_SSRPrevTexture->m_pTexture);
-	//ID3D11RenderTargetView* view[2] = { renderData->m_renderTarget->GetRTV(), renderData->m_SSRPrevTexture->GetRTV() };
-	//DirectX11::OMSetRenderTargets(2, view, nullptr);
-	//DirectX11::PSSetConstantBuffer(0, 1, m_Buffer.GetAddressOf());
-
-	//camera.UpdateBuffer();
-	//DirectX11::UpdateBuffer(m_Buffer.Get(), &cbData);
-
-	//DirectX11::CopyResource(m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
-
-	//ID3D11ShaderResourceView* srvs[5] = {
-	//	renderData->m_depthStencil->m_pSRV,
-	//	m_CopiedTexture->m_pSRV,//m_DiffuseTexture->m_pSRV,
-	//	m_MetalRoughTexture->m_pSRV,
-	//	m_NormalTexture->m_pSRV,
-	//	m_prevCopiedSSRTexture->m_pSRV
-	//};
-	//DirectX11::PSSetShaderResources(0, 5, srvs);
-	//DirectX11::Draw(4, 0);
-	//DirectX11::PSSetShaderResources(0, 4, nullSRV);
-
 	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
 
 	if (nullptr != cmdQueuePtr)

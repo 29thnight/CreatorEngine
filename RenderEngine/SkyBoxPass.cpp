@@ -378,29 +378,6 @@ Texture* SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 
 void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 {
-	//if (!m_abled || !RenderPassData::VaildCheck(&camera)) return;
-	//auto renderData = RenderPassData::GetData(&camera);
-
-	//m_pso->Apply();
-
-	//ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	//DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
-
-	//camera.UpdateBuffer();
-	//scene.UseModel();
-
-	//m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
-	////auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
-	//auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
-
-	//scene.UpdateModel(modelMatrix);
-	//DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
-	//m_skyBoxMesh->Draw();
-
-	//ID3D11ShaderResourceView* nullSRV = nullptr;
-	//DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	//DirectX11::UnbindRenderTargets();
-
 	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
 
 	if (nullptr != cmdQueuePtr)
