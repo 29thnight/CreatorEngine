@@ -361,6 +361,7 @@ namespace DirectX11
 		DeviceState::g_pDeviceContext->PSSetShader(pixelShader, classInstances, numClassInstances);
 	}
 
+	//[unsafe]
 	inline void CSSetShader(ID3D11ComputeShader* computeShader, ID3D11ClassInstance* const* classInstances, uint32 numClassInstances)
 	{
 		if (!DeviceState::g_pDeviceContext)
@@ -664,5 +665,82 @@ namespace DirectX11
 			return;
 		}
 		deferredContext->IASetPrimitiveTopology(topology);
+	}
+
+	//[safe]
+	inline void CSSetShaderResources(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->CSSetShaderResources(startSlot, numViews, shaderResourceViews);
+	}
+
+	//[safe]
+	inline void CSSetConstantBuffer(ID3D11DeviceContext* deferredContext, uint32 slot, uint32 numBuffers, ID3D11Buffer* const* buffer)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->CSSetConstantBuffers(slot, numBuffers, buffer);
+	}
+
+	//[safe]
+	inline void CSSetUnorderedAccessViews(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numUAVs, ID3D11UnorderedAccessView* const* unorderedAccessViews, const uint32* initialCounts)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->CSSetUnorderedAccessViews(startSlot, numUAVs, unorderedAccessViews, initialCounts);
+	}
+
+	//[safe]
+	inline void CSSetShader(ID3D11DeviceContext* deferredContext, ID3D11ComputeShader* computeShader, ID3D11ClassInstance* const* classInstances, uint32 numClassInstances)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->CSSetShader(computeShader, classInstances, numClassInstances);
+	}
+
+	//[safe]
+	inline void CSSetSamplers(ID3D11DeviceContext* deferredContext, UINT StartSlot, UINT NumSamplers, ID3D11SamplerState* const* ppSamplers)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->CSSetSamplers(StartSlot, NumSamplers, ppSamplers);
+	}
+
+	//[safe]
+	inline void OMSetDepthStencilState(ID3D11DeviceContext* deferredContext, ID3D11DepthStencilState* depthStencilState, uint32 stencilRef)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->OMSetDepthStencilState(depthStencilState, stencilRef);
+	}
+
+	//[safe]
+	inline void OMSetBlendState(ID3D11DeviceContext* deferredContext, ID3D11BlendState* blendState, const float blendFactor[4], uint32 sampleMask)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->OMSetBlendState(blendState, blendFactor, sampleMask);
 	}
 }

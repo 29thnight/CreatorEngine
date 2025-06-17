@@ -335,11 +335,11 @@ void MenuBarWindow::ShowLogWindow()
             ImVec4 color;
             switch (entry.level)
             {
-            case spdlog::level::info:  color = ImVec4(1, 1, 1, 1); break;
-            case spdlog::level::warn:  color = ImVec4(1, 1, 0, 1); break;
-            case spdlog::level::err:   color = ImVec4(1, 0.4f, 0.4f, 1); break;
-            case spdlog::level::critical: color = ImVec4(1, 0, 0, 1); break;
-            default:                   color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+            case spdlog::level::info:       color = ImVec4(1,    1,    1,    1); break;
+            case spdlog::level::warn:       color = ImVec4(1,    1,    0,    1); break;
+            case spdlog::level::err:        color = ImVec4(1,    0.4f, 0.4f, 1); break;
+            case spdlog::level::critical:   color = ImVec4(1,    0,    0,    1); break;
+            default:                        color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
             }
 
             if (is_selected)
@@ -352,7 +352,7 @@ void MenuBarWindow::ShowLogWindow()
             ImGui::PushID(i);
             if (ImGui::Selectable((ICON_FA_CIRCLE_INFO + std::string(" ") + wrapped).c_str(),
                 is_selected, ImGuiSelectableFlags_AllowDoubleClick,
-                ImVec2(sizeX, float(15 * stringLine))))
+                ImVec2(sizeX, float(35 * stringLine))))
             {
                 m_selectedLogIndex = i;
 

@@ -130,24 +130,24 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& MeshRendererProxy : data->m_deferredQueue)
+	for (auto& PrimitiveRenderProxy : data->m_deferredQueue)
 	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdPtr);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdPtr);
 
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
+		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
 			if (animatorGuid != currentAnimatorGuid)
 			{
-				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
+				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		HashedGuid materialGuid = MeshRendererProxy->m_materialGuid;
+		HashedGuid materialGuid = PrimitiveRenderProxy->m_materialGuid;
 		if (HashedGuid::INVAILD_ID != materialGuid && materialGuid != currentMaterialGuid)
 		{
-			Material* mat = MeshRendererProxy->m_Material;
+			Material* mat = PrimitiveRenderProxy->m_Material;
 			DirectX11::UpdateBuffer(defferdPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
 
 			if (mat->m_pBaseColor)
@@ -172,7 +172,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 			}
 		}
 
-		MeshRendererProxy->Draw(defferdPtr);
+		PrimitiveRenderProxy->Draw(defferdPtr);
 	}
 
 	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);

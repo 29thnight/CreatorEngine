@@ -152,7 +152,7 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 	if (m_proxyMap.find(meshRendererGuid) != m_proxyMap.end()) return;
 
 	// Create a new proxy for the mesh renderer and insert it into the map
-	auto managedCommand = std::make_shared<MeshRendererProxy>(meshRendererPtr);
+	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(meshRendererPtr);
 	m_proxyMap[meshRendererGuid] = managedCommand;
 }
 
@@ -174,7 +174,7 @@ bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 	return true;
 }
 
-MeshRendererProxy* RenderScene::FindProxy(size_t guid)
+PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
 {
 	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
 
@@ -228,7 +228,7 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	m_proxyMap[meshRendererGuid]->DistroyProxy();
 }
 
-void RenderScene::PushShadowRenderQueue(MeshRendererProxy* proxy)
+void RenderScene::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
 {
 	std::unique_lock lock(m_shadowRenderMutex);
 

@@ -40,7 +40,6 @@ void LightController::Initialize()
 
     DirectX::SetName(m_pLightCountBuffer, "Light Count Buffer");
 
-
 	m_shadowMapPass = std::make_unique<ShadowMapPass>();
 }
 

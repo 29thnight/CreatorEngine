@@ -132,7 +132,7 @@ void RenderPassData::ClearRenderTarget()
 	DirectX11::ClearDepthStencilView(m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
-void RenderPassData::PushRenderQueue(MeshRendererProxy* proxy)
+void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 {
 	Material* mat = proxy->m_Material;
 	if (nullptr == mat) return;

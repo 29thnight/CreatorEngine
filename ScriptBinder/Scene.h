@@ -11,6 +11,7 @@ class LightComponent;
 class MeshRenderer;
 struct ICollider;
 class Texture;
+class TerrainComponent;
 class Scene
 {
 public:
@@ -135,6 +136,11 @@ public:
 	std::vector<MeshRenderer*>& GetSkinnedMeshRenderers() { return m_skinnedMeshRenderers; }
 	std::vector<MeshRenderer*>& GetStaticMeshRenderers() { return m_staticMeshRenderers; }
 
+public:
+    void CollectTerrainComponent(TerrainComponent* ptr);
+    void UnCollectTerrainComponent(TerrainComponent* ptr);
+    std::vector<TerrainComponent*>& GetTerrainComponent() { return m_terrainComponents; }
+
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
@@ -149,6 +155,7 @@ private:
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
 	std::vector<Light>              m_lights;
+    std::vector<TerrainComponent*>  m_terrainComponents;
 
 public:
 	HashingString GetSceneName() const { return m_sceneName; }

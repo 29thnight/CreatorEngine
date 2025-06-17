@@ -273,18 +273,6 @@ void CullingManager::UpdateMesh(MeshRenderer* mesh)
 
 bool CullingManager::Remove(MeshRenderer* mesh)
 {
-    //if (!m_root)
-    //    return false;
-
-    //bool removed = false;
-    //for (OctreeNode* node : mesh->GetCullGroup())
-    //{
-    //    node->Remove(mesh);
-    //}
-
-    //mesh->CullGroupClear();
-    //return removed;
-
     if (!m_root)
         return false;
 

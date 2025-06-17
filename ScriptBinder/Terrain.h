@@ -5,195 +5,12 @@
 #include "ResourceAllocator.h"
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
-#include "DeviceState.h"
-#include "Mesh.h" // Vertex 정의 포함
-#include "Shader.h"
 #include "ShaderSystem.h"
-
+#include "IOnDistroy.h"
+#include "IAwakable.h"
+#include "TerrainMesh.h"
 //-----------------------------------------------------------------------------
-#include "DirectXHelper.h"
 
-//BUILD_FLAG ==> 차후에 constexpr build 플래그로 변경 예정
-
-
-struct alignas(16) TerrainAddLayerBuffer {
-    UINT slice;
-};
-
-////-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-// TerrainMesh: 한 번 생성 후,
-// 내부에 UpdateVertexBufferPatch()를 추가해 “부분 업데이트”가 가능하도록 수정
-//-----------------------------------------------------------------------------
-class TerrainMesh {
-public:
-    // meshWidth: 버텍스가 m_width × m_height로 들어왔다고 가정
-    TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
-        : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
-    {
-        D3D11_BUFFER_DESC vbDesc = {};
-        
-#ifndef BUILD_FLAG
-        // ★ 버텍스 버퍼는 DYNAMIC + WRITE_DISCARD로 생성
-        vbDesc.Usage = D3D11_USAGE_DYNAMIC;
-        vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
-        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        vbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        vbDesc.MiscFlags = 0;
-        vbDesc.StructureByteStride = 0;
-
-        D3D11_SUBRESOURCE_DATA vbInit = {};
-        vbInit.pSysMem = m_vertices.data();
-#else
-		//build 된 상태에서는 버텍스 버퍼를 IMMUTABLE로 생성
-        vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        vbDesc.ByteWidth = sizeof(Vertex) * (UINT)m_vertices.size();
-        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        vbDesc.CPUAccessFlags = 0;
-        vbDesc.MiscFlags = 0;
-        vbDesc.StructureByteStride = 0;
-        D3D11_SUBRESOURCE_DATA vbInit = {};
-        vbInit.pSysMem = m_vertices.data();
-#endif // !BUILD_FLAG
-
-
-        DirectX11::ThrowIfFailed(
-            DeviceState::g_pDevice->CreateBuffer(&vbDesc, &vbInit, m_vertexBuffer.GetAddressOf())
-        );
-        //DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
-
-        // 인덱스 버퍼는 변하지 않으므로 IMMUTABLE로 생성
-        D3D11_BUFFER_DESC ibDesc = {};
-        ibDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        ibDesc.ByteWidth = sizeof(uint32) * (UINT)m_indices.size();
-        ibDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-        ibDesc.CPUAccessFlags = 0;
-
-        D3D11_SUBRESOURCE_DATA ibInit = {};
-        ibInit.pSysMem = m_indices.data();
-
-        DeviceState::g_pDevice->CreateBuffer(&ibDesc, &ibInit, m_indexBuffer.GetAddressOf());
-        //DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
-    }
-
-    ~TerrainMesh() = default;
-
-    void Draw() {
-        UINT offset = 0;
-        DirectX11::IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-        DirectX11::IASetIndexBuffer(m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        DirectX11::IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        DirectX11::DrawIndexed((UINT)m_indices.size(), 0, 0);
-    }
-
-    void Draw(ID3D11DeviceContext* _deferredContext) {
-        UINT offset = 0;
-        DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-        DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-        DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
-    }
-
-    std::string GetName() const { return m_name; }
-    const std::vector<Vertex>& GetVertices() { return m_vertices; }
-    const std::vector<uint32>& GetIndices() { return m_indices; }
-
-#ifndef BUILD_FLAG
-	// 빌드 모드가 아닐 때만 사용
-    // 전체 버텍스 업데이트
-    void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
-    {
-        D3D11_MAPPED_SUBRESOURCE mapped = {};
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(
-            m_vertexBuffer.Get(),
-            0,
-            D3D11_MAP_WRITE_DISCARD,
-            0,
-            &mapped
-        );
-        if (SUCCEEDED(hr))
-        {
-            memcpy(mapped.pData, srcVertices, sizeof(Vertex) * vertexCount);
-            DeviceState::g_pDeviceContext->Unmap(m_vertexBuffer.Get(), 0);
-        }
-    }
-
-    // 패치(사각형 영역) 단위로 버퍼 업데이트
-    void UpdateVertexBufferPatch(const Vertex* src, uint32_t offsetX, uint32_t offsetY, uint32_t patchW, uint32_t patchH)
-    {
-        D3D11_MAPPED_SUBRESOURCE mapped = {};
-        auto context = DeviceState::g_pDeviceContext;
-
-        HRESULT hr = context->Map(m_vertexBuffer.Get(), 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &mapped);
-        if (FAILED(hr))
-        {
-            assert(false && "Map failed");
-            return;
-        }
-
-        // 전체 버퍼 포인터
-        Vertex* dst = reinterpret_cast<Vertex*>(mapped.pData);
-
-        for (uint32_t y = 0; y < patchH; ++y)
-        {
-            uint32_t dstIndex = (offsetY + y) * m_meshWidth + offsetX;
-            uint32_t srcIndex = y * patchW;
-
-            memcpy(&dst[dstIndex], &src[srcIndex], sizeof(Vertex) * patchW);
-        }
-
-        context->Unmap(m_vertexBuffer.Get(), 0);
-    }
-#endif !BUILD_FLAG
-    
-
-private:
-    std::string m_name;
-    std::vector<Vertex> m_vertices;
-    std::vector<uint32> m_indices;
-    uint32_t m_meshWidth;    // (m_width) × (m_height) 형태일 때, 가로 크기
-
-    DirectX::BoundingBox m_boundingBox;
-    DirectX::BoundingSphere m_boundingSphere;
-
-    ComPtr<ID3D11Buffer> m_vertexBuffer{};
-    ComPtr<ID3D11Buffer> m_indexBuffer{};
-    static constexpr uint32 m_stride = sizeof(Vertex);
-};
-
-//-----------------------------------------------------------------------------
-// TerrainBrush / TerrainLayer 정의 (변경 없음)
-//-----------------------------------------------------------------------------
-struct TerrainBrush
-{
-    enum class Mode { Raise, Lower, Flatten, PaintLayer } m_mode;
-    DirectX::XMFLOAT2 m_center;
-    float m_radius{ 1.0f };
-    float m_strength{ 1.0f };
-    float m_flatTargetHeight{ 0.0f };
-    uint32_t m_layerID{ 0 };
-
-    void SetBrushMode(Mode mode) { m_mode = mode; }
-};
-
-struct TerrainLayer
-{
-    uint32_t m_layerID{ 0 };
-    std::string layerName;
-    std::wstring diffuseTexturePath;
-    ID3D11Texture2D* diffuseTexture{ nullptr };
-    ID3D11ShaderResourceView* diffuseSRV{ nullptr };
-    float tilling;
-};
-
-cbuffer TerrainLayerBuffer
-{
-	bool32 useLayer{ false };
-    float layerTilling0;
-    float layerTilling1;
-    float layerTilling2;
-    float layerTilling3;
-};
 
 //cbuffer TerrainGizmoBuffer
 //{
@@ -205,7 +22,7 @@ cbuffer TerrainLayerBuffer
 //-----------------------------------------------------------------------------
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
-class TerrainComponent : public Component
+class TerrainComponent : public Component, public IAwakable, public IOnDistroy
 {
 public:
     ReflectTerrainComponent
@@ -589,23 +406,22 @@ public:
 		return m_layerNames;
 	}
 
-
+    virtual void Awake() override;
+    virtual void OnDistroy() override;
 
     void Save(const std::wstring& assetRoot, const std::wstring& name);
 
     bool Load(const std::wstring& filePath);
 
     void SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH);
-	bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+	bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
 	void SaveEditorSplatMap(const std::wstring& pngPath);
-	bool LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
+	bool LoadEditorSplatMap(file::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out);
 
     void TestSaveLayerTexture(const std::wstring& saveDir);
 
     void loatFromPng(const std::string& filepath, std::vector<std::vector<float>>& outLayerWeights, int& outWidth, int& outHeights);
-
-
 
     //layer 관련 함수
 	void AddLayer(const std::wstring& path,const std::wstring& diffuseFile,float tilling) {
@@ -642,8 +458,6 @@ public:
 		m_layers.push_back(newLayer);
 		m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
         
-		
-
 		TerrainLayerBuffer layerBuffer;
         if (m_layers.size() > 0)
         {
@@ -715,7 +529,8 @@ public:
 	}
 
 	//metadata load된 데이터로 레이어 초기화
-    void LoadLayers() {
+    void LoadLayers() 
+    {
         TerrainLayerBuffer layerBuffer;
         if (m_layers.size() > 0)
         {
@@ -734,7 +549,6 @@ public:
         layerBuffer.layerTilling2 = tilefector[2] / 4096;
         layerBuffer.layerTilling3 = tilefector[3] / 4096;
         DirectX11::UpdateBuffer(m_layerBuffer.Get(), &layerBuffer);
-
 
         DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
 
@@ -763,9 +577,6 @@ public:
             DirectX11::CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
             DirectX11::CSSetShaderResources(0, 1, nullSRVs);
         }
-
-
-        
     }
 
 	void InitSplatMapTexture(UINT width,UINT height)
@@ -773,7 +584,6 @@ public:
 
         m_splatMapTexture.Reset();
 		m_splatMapSRV.Reset();
-
 
 		// 스플랫맵 텍스처 초기화
 		D3D11_TEXTURE2D_DESC desc = {};
@@ -898,28 +708,31 @@ public:
 	//ComPtr<ID3D11Buffer> m_gizmoBuffer; //editor용 gizmo 버퍼
 	ComPtr<ID3D11Buffer> m_AddLayerBuffer; // 레이어 추가용 버퍼
 private:
-    unsigned int m_terrainID{ 0 };
+    uint32 m_terrainID{ 0 };
     FileGuid m_trrainAssetGuid{};
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
 
-
 	//== 레이어 관련 변수들 ==
-	uint32_t m_nextLayerID{ 0 }; // 다음 레이어 ID
-	uint32_t m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
+    //== 에디터 전용
+    //== window 공용으로 사용가능
+    uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
+    //== window 공용으로 사용 불가능
+	std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    //== 에디터 전용
+    uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
 	std::vector<TerrainLayer>            m_layers; // 레이어 정보들
-	std::vector<const char*> m_layerNames; // 레이어 이름들 (디버깅용)
 	std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
-	ComPtr<ID3D11Texture2D> m_splatMapTexture; // 스플랫맵 텍스처
-	ComPtr<ID3D11ShaderResourceView> m_splatMapSRV; // 스플랫맵 SRV
-	ID3D11UnorderedAccessView* p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
+	ComPtr<ID3D11Texture2D>              m_splatMapTexture; // 스플랫맵 텍스처
+	ComPtr<ID3D11ShaderResourceView>     m_splatMapSRV; // 스플랫맵 SRV
+	ID3D11UnorderedAccessView*           p_outTextureUAV = nullptr; // 스플랫맵 업데이트용 UAV
 
-	ID3D11Texture2D* m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
-	ID3D11ShaderResourceView* m_layerSRV = nullptr; // m_layerTextureArray에 대한 SRV
-	ShaderPtr<ComputeShader>	m_computeShader; // 터레인 각 텍스쳐를 -> m_layerTextureArray에 저장하는 컴퓨트 셰이더
+	ID3D11Texture2D*                     m_layerTextureArray = nullptr; // 최대 4개 레이어를 위한 텍스처 배열
+	ID3D11ShaderResourceView*            m_layerSRV = nullptr; // m_layerTextureArray에 대한 SRV
+    //== 통합으로 빠질거 -> 
+	ShaderPtr<ComputeShader>	         m_computeShader; // 터레인 각 텍스쳐를 -> m_layerTextureArray에 저장하는 컴퓨트 셰이더
     //========================
-
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
     TerrainMesh* m_pMesh{ nullptr };
@@ -928,7 +741,6 @@ private:
 	float m_minHeight{ -100.0f }; // 최소 높이 
 	float m_maxHeight{ 500.0f }; // 최대 높이
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
-
 
     ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
 };

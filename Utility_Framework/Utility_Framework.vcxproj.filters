@@ -40,9 +40,6 @@
     <Filter Include="Core.Memory\SpinLock">
       <UniqueIdentifier>{4584675b-2578-4d75-a537-a62df1b1dc49}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX11Common\DirectXHelper">
-      <UniqueIdentifier>{190416e9-a93a-4ee9-bd80-ab672916a61b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DirectX11Common\DeviceResources">
       <UniqueIdentifier>{2a34f36f-291f-4ad7-a8f2-591b7a0c90e8}</UniqueIdentifier>
     </Filter>
@@ -81,6 +78,9 @@
     </Filter>
     <Filter Include="Core.Memory\FenceFlag">
       <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Octree\newOctree">
+      <UniqueIdentifier>{041995e1-a769-49fb-ade3-10561593affe}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -257,6 +257,9 @@
     </ClInclude>
     <ClInclude Include="Core.CountingSemaphore.h">
       <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Octree.h">
+      <Filter>Core.Octree\newOctree</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

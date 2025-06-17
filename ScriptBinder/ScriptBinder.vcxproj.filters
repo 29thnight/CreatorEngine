@@ -109,8 +109,11 @@
     <Filter Include="Managers\Pool">
       <UniqueIdentifier>{c6f9af70-6c32-4634-b5fa-8fa78515e055}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\PhysicsComponent\Terrain">
+    <Filter Include="Classes\Components\TerrainComponent">
       <UniqueIdentifier>{cdb0c853-085c-4431-9734-95df997eda57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Resources\Terrain">
+      <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -217,7 +220,7 @@
       <Filter>Managers\TagManager</Filter>
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
-      <Filter>Classes\Components\PhysicsComponent\Terrain</Filter>
+      <Filter>Classes\Components\TerrainComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -381,7 +384,7 @@
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="Terrain.h">
-      <Filter>Classes\Components\PhysicsComponent\Terrain</Filter>
+      <Filter>Classes\Components\TerrainComponent</Filter>
     </ClInclude>
     <ClInclude Include="InputManager.h">
       <Filter>Managers\InputManager</Filter>
@@ -430,6 +433,9 @@
     </ClInclude>
     <ClInclude Include="BoneMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainBuffers.h">
+      <Filter>Classes\Resources\Terrain</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

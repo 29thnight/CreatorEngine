@@ -10,6 +10,7 @@ public:
 	~ForwardPass();
 
 	void Execute(RenderScene& scene, Camera& camera);
+	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 private:
 	ComPtr<ID3D11Buffer> m_materialBuffer;

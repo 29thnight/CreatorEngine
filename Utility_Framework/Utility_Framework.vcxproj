@@ -58,6 +58,7 @@
     <ClInclude Include="MetaAlias.h" />
     <ClInclude Include="MetaStateCommand.h" />
     <ClInclude Include="MetaUtility.h" />
+    <ClInclude Include="Core.Octree.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />

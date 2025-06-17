@@ -10,6 +10,7 @@ public:
 	
 	void Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive);
 	void Execute(RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize(uint32_t width, uint32_t height) override;
 
@@ -26,7 +27,7 @@ private:
 	Sampler* sample = nullptr;
 	Sampler* pointSample = nullptr;
 
-	float radius = 0.131f;
-	float thickness = 0.155f;
+	float radius = 4.f;//0.131f;
+	float thickness = 0.5f;//0.155f;
 };
 

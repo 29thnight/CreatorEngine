@@ -683,6 +683,16 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_BEGIN("TerrainPassCommandList");
 			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
+			/*PROFILE_CPU_BEGIN("GBufferPassCommandList");
+			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();*/
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		{
+			//PROFILE_CPU_BEGIN("TerrainPassCommandList");
+			//m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
+			//PROFILE_CPU_END();
 			PROFILE_CPU_BEGIN("GBufferPassCommandList");
 			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
@@ -704,6 +714,20 @@ void SceneRenderer::CreateCommandListPass()
 			m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 			m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 			m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		{
+			PROFILE_CPU_BEGIN("SSGIPassCommandList");
+			m_pSSGIPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		{
+			PROFILE_CPU_BEGIN("ForwardPassCommandList");
+			m_pForwardPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
 
@@ -813,6 +837,8 @@ void SceneRenderer::PrepareRender()
 	m_pGBufferPass->SwapQueue();
 	m_pLightMapPass->SwapQueue();
 	m_pDeferredPass->SwapQueue();
+	m_pSSGIPass->SwapQueue();
+	m_pForwardPass->SwapQueue();
 	ProxyCommandQueue->AddFrame();
 }
 

@@ -224,6 +224,7 @@
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="ColorGradingPass.h" />
     <ClInclude Include="ColorModuleCS.h" />
+    <ClInclude Include="CullingBox.h" />
     <ClInclude Include="CullingManager.h" />
     <ClInclude Include="BaseEffectStruct.h" />
     <ClInclude Include="BillboardModuleGPU.h" />
@@ -265,6 +266,8 @@
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
+    <ClInclude Include="TerrainMaterial.h" />
+    <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
