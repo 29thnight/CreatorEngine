@@ -312,7 +312,7 @@ void TerrainComponent::SaveEditorHeightMap(const std::wstring& pngPath, float mi
 	std::vector<uint16_t> buffer(w * h);
 
 	for (int i = 0; i < w * h; ++i) {
-		float n = (m_heightMap[i] - minH) / (maXH - minH);   //100+H / 600;
+		float n = (m_heightMap[i] - minH) / (maXH - minH);   //H-(-100) / 500-(-100);
 		buffer[i] = static_cast<uint16_t>(std::clamp(n, 0.0f, 1.0f) * 65535.0f);
 	}
 	//utf8 경로	변환
@@ -348,12 +348,13 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath,float 
     }  
 
 	size_t N = size_t(width) * height;
+	size_t DoubleN = N * 2;
 	//out.reserve(width * height); // Reserve space for output vector
-	out.resize(N); // Resize to fit the height map data
+	out.resize(DoubleN); // Resize to fit the height map data
 
-	for (int i = 0; i <  N; ++i) {
-		float n = data[i] / 65535.0f; // Normalize to [0, 1]
-		out[i] = n * (maXH - minH) + minH; // Scale to [minH, maXH]
+	for (int i = 0; i < DoubleN; ++i) {
+		float n = data[i] / 65535.0f; // Normalize to [0, 1] todo :체널 나눠라
+		out[i] = n; // Scale to [minH, maXH]
 	}
     
     stbi_image_free(data);  
