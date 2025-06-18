@@ -167,6 +167,7 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 	// Blur the downsampled texture
 	{
 		DirectX11::CSSetShader(m_pGaussianBlurCS->GetShader(), 0, 0);
+		DirectX11::CSSetConstantBuffer(0, 1, m_bloomBlurBuffer.GetAddressOf());
 
 		ID3D11ShaderResourceView* csSRVs[]{ m_BloomFilterSRV1->m_pSRV, m_BloomFilterSRV2->m_pSRV };
 		ID3D11UnorderedAccessView* csUAVs[]{ m_BloomFilterSRV2->m_pUAV, m_BloomFilterSRV1->m_pUAV };
@@ -178,8 +179,6 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 
 			DirectX11::CSSetShaderResources(0, 1, &csSRVs[direction]);
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &csUAVs[direction], offsets);
-
-			DirectX11::CSSetConstantBuffer(0, 1, m_bloomBlurBuffer.GetAddressOf());
 
 			DirectX11::Dispatch(DeviceState::g_ClientRect.width / 16, DeviceState::g_ClientRect.height / 16, 1);
 

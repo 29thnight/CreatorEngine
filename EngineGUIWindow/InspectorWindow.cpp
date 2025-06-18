@@ -354,7 +354,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 
 				{
-					selectedSceneObject->m_transform.GetLocalMatrix();
+					selectedSceneObject->m_transform.UpdateLocalMatrix();
 				}
 			}
 

@@ -15,14 +15,18 @@
 #include "CullingManager.h"
 #include "UIManager.h"
 #include "SpinLock.h"
+#include "Core.Fence.h"
 #include "Core.Barrier.h"
 #include "InputActionManager.h"
 #include "Profiler.h"
+//#include "SwapEvent.h"
 
 std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
 std::atomic<bool> isGameToRender = false;
 std::atomic<double> frameDeltaTime{};
 Barrier renderBarrier(3);
+Fence RenderCommandFence;
+Fence RHICommandFence;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -190,6 +194,7 @@ void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
 	//SpinLock lock(gameToRenderLock);
+    //RenderCommandFence.Begin();
 
     frameDeltaTime = m_timeSystem.GetElapsedSeconds();
 
@@ -251,6 +256,7 @@ void DirectX11::Dx11Main::Update()
     PROFILE_CPU_END();
 
     PROFILE_FRAME();
+    //RenderCommandFence.Wait();
     renderBarrier.ArriveAndWait();
 }
 
@@ -272,6 +278,7 @@ bool DirectX11::Dx11Main::RHIRender()
 #if defined(EDITOR)
 		SceneManagers->OnDrawGizmos();
         SceneManagers->GUIRendering();
+
 #endif // !EDITOR
 	}
 
@@ -306,7 +313,6 @@ void DirectX11::Dx11Main::OnGui()
 		m_sceneViewWindow->RenderSceneViewWindow();
 		m_gameViewWindow->RenderGameViewWindow();
         m_gizmoRenderer->EditorView();
-        DrawProfilerHUD();
         m_imguiRenderer->Render();
         m_imguiRenderer->EndRender();
     }
@@ -327,14 +333,17 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     if (m_timeSystem.GetFrameCount() == 0 || GameSceneStart || GameSceneEnd)
     {
         PROFILE_CPU_END();
+        //RenderCommandFence.Signal();
         renderBarrier.ArriveAndWait();
         renderBarrier.ArriveAndWait();
         return;
     }
 
+    //RHICommandFence.Begin();
     m_sceneRenderer->CreateCommandListPass();
     PROFILE_CPU_END();
-
+    //RHICommandFence.Wait();
+    //RenderCommandFence.Signal();
     renderBarrier.ArriveAndWait();
     renderBarrier.ArriveAndWait();
 }
@@ -347,6 +356,7 @@ void DirectX11::Dx11Main::RHIWorkerThread()
 		m_deviceResources->Present();
         PROFILE_CPU_END();
 	}
+    //RHICommandFence.Signal();
     renderBarrier.ArriveAndWait();
     renderBarrier.ArriveAndWait();
 }

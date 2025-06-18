@@ -488,11 +488,30 @@ void DrawProfilerHUD()
 {
 	HUDContext& context = Context();
 	StyleOptions& style = context.Style;
+	static const char* fmt = "Paused";
+	static const char* buttonFmt = ICON_FA_PAUSE;
+	static bool isPaused{ false };
+
+	ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
+	ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
 	if (gCPUProfiler.IsPaused())
-		ImGui::Text("Paused");
+	{
+		buttonFmt = ICON_FA_PAUSE;
+		fmt = "Paused";
+	}
 	else
-		ImGui::Text("Press Space to pause");
+	{
+		buttonFmt = ICON_FA_PLAY;
+		fmt = "Recording";
+	}
+	
+	if (ImGui::Button(buttonFmt))
+	{
+		context.IsPaused = !context.IsPaused;
+	}
+	ImGui::SameLine();
+	ImGui::Text(fmt);
 
 	ImGui::SameLine(ImGui::GetWindowWidth() - 620);
 
@@ -522,10 +541,10 @@ void DrawProfilerHUD()
 		ImGui::EndPopup();
 	}
 
-	if (ImGui::IsKeyPressed(ImGuiKey_Space))
-	{
-		context.IsPaused = !context.IsPaused;
-	}
+	//if (ImGui::IsKeyPressed(ImGuiKey_Space))
+	//{
+	//	context.IsPaused = !context.IsPaused;
+	//}
 
 	gCPUProfiler.SetPaused(context.IsPaused);
 

@@ -265,6 +265,7 @@
     <ClInclude Include="RenderState.h" />
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
+    <ClInclude Include="SwapEvent.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />

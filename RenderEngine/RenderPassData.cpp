@@ -138,8 +138,6 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 	if (nullptr == mat) return;
 
 	{
-		std::unique_lock lock(m_dataMutex);
-
 		switch (mat->m_renderingMode)
 		{
 		case MaterialRenderingMode::Opaque:
@@ -154,8 +152,6 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 
 void RenderPassData::SortRenderQueue()
 {
-	std::unique_lock lock(m_dataMutex);
-
 	if (!m_deferredQueue.empty())
 	{
 		std::sort(
@@ -177,9 +173,25 @@ void RenderPassData::SortRenderQueue()
 
 void RenderPassData::ClearRenderQueue()
 {
-	std::unique_lock lock(m_dataMutex);
-
 	m_deferredQueue.clear();
 	m_forwardQueue.clear();
+}
+
+void RenderPassData::PushCullData(const HashedGuid& instanceID)
+{
+	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+	m_findProxyVec[index].push_back(instanceID);
+}
+
+RenderPassData::FrameProxyFindInstanceIDs& RenderPassData::GetCullDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	return m_findProxyVec[prevIndex];
+}
+
+void RenderPassData::ClearCullDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	m_findProxyVec[prevIndex].clear();
 }
 

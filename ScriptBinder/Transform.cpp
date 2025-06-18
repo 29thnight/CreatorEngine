@@ -124,6 +124,17 @@ Mathf::xMatrix Transform::GetInverseMatrix() const
 	return m_inverseMatrix;
 }
 
+void Transform::UpdateLocalMatrix()
+{
+	if (m_dirty)
+	{
+		m_localMatrix = DirectX::XMMatrixScalingFromVector(scale);
+		m_localMatrix *= DirectX::XMMatrixRotationQuaternion(rotation);
+		m_localMatrix *= DirectX::XMMatrixTranslationFromVector(position);
+		m_dirty = false;
+	}
+}
+
 void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 {
 	Mathf::xVector _scale{}, _rotation{}, _position{};
@@ -140,6 +151,9 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 
 void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 {
+	Mathf::Matrix compareMat = matrix;
+	if (compareMat == m_worldMatrix) return;
+
 	m_worldMatrix = matrix;
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
 	
@@ -166,6 +180,11 @@ Mathf::xVector Transform::GetWorldQuaternion() const
 	return m_worldQuaternion;
 }
 
+void Transform::SetDirty()
+{
+	m_dirty = true;
+}
+
 bool Transform::IsDirty() const
 {
 	return m_dirty;
@@ -174,4 +193,12 @@ bool Transform::IsDirty() const
 void Transform::SetParentID(uint32 id)
 {
 	m_parentID = id;
+}
+
+void Transform::TransformReset()
+{
+	position = { Mathf::xVectorZero };
+	rotation = { Mathf::xVectorZero };
+	scale = { Mathf::xVectorOne };
+	m_dirty = true;
 }

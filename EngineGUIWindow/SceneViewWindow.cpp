@@ -299,7 +299,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::Text("LightMapPass: %.5f ms", RenderStatistics->GetRenderState("LightMapPass"));
 			ImGui::Text("WireFramePass: %.5f ms", RenderStatistics->GetRenderState("WireFramePass"));
 			ImGui::Text("SkyBoxPass: %.5f ms", RenderStatistics->GetRenderState("SkyBoxPass"));
-			ImGui::Text("PostProcessPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
+			ImGui::Text("BloomPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
 			ImGui::Text("AAPass: %.5f ms", RenderStatistics->GetRenderState("AAPass"));
 			ImGui::Text("ToneMapPass: %.5f ms", RenderStatistics->GetRenderState("ToneMapPass"));
 			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
@@ -344,7 +344,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
 		bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
-	
+		//Undo Redo 커멘드를 저장할 목적의 코드
 		if (wasDragging && mouseReleased && matrixChanged)
 		{
 			Meta::MakeCustomChangeCommand(
@@ -360,7 +360,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				}
 			);
 		}
-	
+		//실시간 변화
 		obj->m_transform.SetLocalMatrix(newLocalMatrix);
 		wasDragging = isDragging;
 	}
@@ -522,7 +522,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::EndDragDropTarget(); 
 	}
 	
-
 	//====================
 	// 선택 아이템 있을시 처리
 	if (sceneSelectedObj != nullptr) {

@@ -35,6 +35,7 @@ public:
 	Mathf::xMatrix GetWorldMatrix() const;
 	Mathf::xMatrix GetInverseMatrix() const;
 
+	void UpdateLocalMatrix();
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
 	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
 
@@ -42,9 +43,12 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
+	void SetDirty();
 	bool IsDirty() const;
 
 	void SetParentID(uint32 id);
+
+	void TransformReset();
 
 private:
 	friend class RenderScene;

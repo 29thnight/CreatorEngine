@@ -127,7 +127,8 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
     bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
 
-    ID3D11ShaderResourceView* srvs[10] = {
+    ID3D11ShaderResourceView* srvs[10] = 
+    {
         renderData->m_depthStencil->m_pSRV,
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,

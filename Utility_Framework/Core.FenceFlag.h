@@ -18,10 +18,6 @@ public:
 		{
 			_mm_pause();
 		}
-	}
-
-	void Reset()
-	{
 		m_signaled.store(false, std::memory_order_release);
 	}
 

@@ -5,84 +5,84 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
-void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY);
-
-void AdjustImGuiDockNodesOnResize(float ratioX, float ratioY)
-{
-	ImGuiContext* ctx = ImGui::GetCurrentContext();
-	if (!ctx) return;
-
-	ImGuiDockContext* dockCtx = &ctx->DockContext;
-
-	for (int i = 0; i < dockCtx->Nodes.Data.Size; i++)
-	{
-		ImGuiDockNode* node = (ImGuiDockNode*)dockCtx->Nodes.Data[i].val_p;
-		if (!node || !node->IsRootNode()) continue;
-
-		// 루트 노드는 Viewport에 자동 맞춰짐 (중앙 DockSpace)
-		// 자식 노드들을 비례 조정
-		ResizeDockNodeRecursive(node, ratioX, ratioY);
-	}
-}
-
-void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY)
-{
-	if (!node) return;
-
-	// 중앙 노드는 Viewport에 맞춰지므로 무시
-	if (!node->IsCentralNode())
-	{
-		ImVec2 oldPos = node->Pos;
-		ImVec2 oldSize = node->Size;
-
-		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
-		ImVec2 newSize = ImVec2(oldSize.x * ratioX, oldSize.y * ratioY);
-
-		if (newSize.x == 0 || newSize.y == 0)
-		{
-			return;
-		}
-
-		ImGui::DockBuilderSetNodePos(node->ID, newPos);
-		ImGui::DockBuilderSetNodeSize(node->ID, newSize);
-	}
-
-	// 자식 노드 재귀 호출
-	ResizeDockNodeRecursive(node->ChildNodes[0], ratioX, ratioY);
-	ResizeDockNodeRecursive(node->ChildNodes[1], ratioX, ratioY);
-}
-
-void AdjustAllImGuiWindowsOnResize(ImVec2 oldSize, ImVec2 newSize)
-{
-	ImGuiContext* ctx = ImGui::GetCurrentContext();
-	if (!ctx)
-		return;
-
-	float ratioX = newSize.x / oldSize.x;
-	float ratioY = newSize.y / oldSize.y;
-
-	ratioX = std::abs(ratioX);
-	ratioY = std::abs(ratioY);
-
-	for (int i = 0; i < ctx->Windows.Size; ++i)
-	{
-		ImGuiWindow* window = ctx->Windows[i];
-		if (!window)
-			continue;
-
-		// Docked 창은 DockBuilder에서 위치 설정
-		if (window->DockIsActive && window->DockNode)
-		{
-			continue;
-		}
-
-		ImVec2 oldPos = window->Pos;
-		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
-		ImGui::SetWindowPos(window->Name, newPos, ImGuiCond_Always);
-	}
-
-	AdjustImGuiDockNodesOnResize(ratioX, ratioY);
-}
+//void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY);
+//
+//void AdjustImGuiDockNodesOnResize(float ratioX, float ratioY)
+//{
+//	ImGuiContext* ctx = ImGui::GetCurrentContext();
+//	if (!ctx) return;
+//
+//	ImGuiDockContext* dockCtx = &ctx->DockContext;
+//
+//	for (int i = 0; i < dockCtx->Nodes.Data.Size; i++)
+//	{
+//		ImGuiDockNode* node = (ImGuiDockNode*)dockCtx->Nodes.Data[i].val_p;
+//		if (!node || !node->IsRootNode()) continue;
+//
+//		// 루트 노드는 Viewport에 자동 맞춰짐 (중앙 DockSpace)
+//		// 자식 노드들을 비례 조정
+//		ResizeDockNodeRecursive(node, ratioX, ratioY);
+//	}
+//}
+//
+//void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY)
+//{
+//	if (!node) return;
+//
+//	// 중앙 노드는 Viewport에 맞춰지므로 무시
+//	if (!node->IsCentralNode())
+//	{
+//		ImVec2 oldPos = node->Pos;
+//		ImVec2 oldSize = node->Size;
+//
+//		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
+//		ImVec2 newSize = ImVec2(oldSize.x * ratioX, oldSize.y * ratioY);
+//
+//		if (newSize.x == 0 || newSize.y == 0)
+//		{
+//			return;
+//		}
+//
+//		ImGui::DockBuilderSetNodePos(node->ID, newPos);
+//		ImGui::DockBuilderSetNodeSize(node->ID, newSize);
+//	}
+//
+//	// 자식 노드 재귀 호출
+//	ResizeDockNodeRecursive(node->ChildNodes[0], ratioX, ratioY);
+//	ResizeDockNodeRecursive(node->ChildNodes[1], ratioX, ratioY);
+//}
+//
+//void AdjustAllImGuiWindowsOnResize(ImVec2 oldSize, ImVec2 newSize)
+//{
+//	ImGuiContext* ctx = ImGui::GetCurrentContext();
+//	if (!ctx)
+//		return;
+//
+//	float ratioX = newSize.x / oldSize.x;
+//	float ratioY = newSize.y / oldSize.y;
+//
+//	ratioX = std::abs(ratioX);
+//	ratioY = std::abs(ratioY);
+//
+//	for (int i = 0; i < ctx->Windows.Size; ++i)
+//	{
+//		ImGuiWindow* window = ctx->Windows[i];
+//		if (!window)
+//			continue;
+//
+//		// Docked 창은 DockBuilder에서 위치 설정
+//		if (window->DockIsActive && window->DockNode)
+//		{
+//			continue;
+//		}
+//
+//		ImVec2 oldPos = window->Pos;
+//		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
+//		ImGui::SetWindowPos(window->Name, newPos, ImGuiCond_Always);
+//	}
+//
+//	AdjustImGuiDockNodesOnResize(ratioX, ratioY);
+//}
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -201,8 +201,8 @@ void ImGuiRenderer::BeginRender()
 		&& newSize			!= ImVec2(0, 0)
 		&& io.DisplaySize	!= ImVec2(0, 0))
 	{
-		AdjustAllImGuiWindowsOnResize(io.DisplaySize, newSize);
-		//forceResize = true;
+		//AdjustAllImGuiWindowsOnResize(io.DisplaySize, newSize);
+		forceResize = true;
 		io.DisplaySize = newSize;
 		io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
 	}
@@ -229,7 +229,9 @@ void ImGuiRenderer::BeginRender()
         ImGui::DockBuilderRemoveNode(id);
         ImGui::DockBuilderAddNode(id);
 
-        ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - 50.f };
+		float menuBarSize = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
+
+        ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - (menuBarSize * 2.f)};
         ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
 
         // Set the size and position:

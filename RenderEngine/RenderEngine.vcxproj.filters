@@ -261,6 +261,9 @@
     <Filter Include="Resources\TerrainMaterial">
       <UniqueIdentifier>{fd500c50-9230-4251-bbeb-fb03a9d7e57b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Event">
+      <UniqueIdentifier>{5ecc1c70-391b-4ac9-8bf7-dec5eeb92687}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -708,6 +711,9 @@
     </ClInclude>
     <ClInclude Include="TerrainMaterial.h">
       <Filter>Resources\TerrainMaterial</Filter>
+    </ClInclude>
+    <ClInclude Include="SwapEvent.h">
+      <Filter>Event</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
