@@ -10,6 +10,7 @@ ReflectionField(AnimationController) \
 		meta_property(StateVec) \
 		meta_property(m_nodeEditor) \
 		meta_property(m_anyState) \
+		meta_property(useController) \
 		meta_property(m_avatarMask) \
 		meta_property(useMask) \
 	}); \

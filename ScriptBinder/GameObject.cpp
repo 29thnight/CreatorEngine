@@ -203,6 +203,40 @@ GameObject* GameObject::FindIndex(GameObject::Index index)
 	return nullptr;
 }
 
+GameObject* GameObject::FindInstanceID(const HashedGuid& guid)
+{
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (scene)
+	{
+		auto& gameObjects = scene->m_SceneObjects;
+		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=] (std::shared_ptr<GameObject>& object)
+		{
+			return object->m_instanceID == guid;
+		});
+
+		return (*it).get();
+	}
+
+	return nullptr;
+}
+
+GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
+{
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (scene)
+	{
+		auto& gameObjects = scene->m_SceneObjects;
+		auto it = std::find_if(gameObjects.begin(), gameObjects.end(), [=](std::shared_ptr<GameObject>& object)
+		{
+			return object->m_attachedSoketID == guid;
+		});
+
+		return (*it).get();
+	}
+
+	return nullptr;
+}
+
 void GameObject::SetEnabled(bool able)
 {
 	if (m_isEnabled == able)

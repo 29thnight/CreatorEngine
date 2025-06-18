@@ -1,6 +1,7 @@
 #include "Skeleton.h"
 #include "ResourceAllocator.h"
 #include "Socket.h"
+#include "Scene.h"
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
@@ -73,12 +74,14 @@ std::string ToLower(std::string boneName)
 
 }
 
-void Skeleton::MakeSocket(const std::string_view& socketName, const std::string_view& boneName)
+void Skeleton::MakeSocket(const std::string_view& socketName, const std::string_view& objectName)
 {
-
+	GameObject* obj = GameObject::Find(objectName);
+	SceneManagers->GetActiveScene()->CreateGameObject("NewSocket",GameObjectType::Empty,obj->m_index);
 	Socket* newSocket = new Socket();
 	newSocket->m_name = socketName;
-	newSocket->m_boneName = boneName;
+	newSocket->GameObjectIndex = obj->m_index;
+	newSocket->m_ObjectName = objectName;
 	m_sockets.push_back(newSocket);
 }
 
@@ -91,6 +94,16 @@ Socket* Skeleton::FindSocket(const std::string_view& socketName)
 	}
 
 	return nullptr;
+}
+
+void Skeleton::DeleteSocket(const std::string_view& socketName)
+{
+	auto it = std::find_if(m_sockets.begin(), m_sockets.end(),
+		[&](const Socket* socket) 
+		{
+			return socket->m_name == socketName;
+		});
+	m_sockets.erase(it, m_sockets.end());
 }
 
 Bone* Skeleton::FindBone(const std::string_view& _name)

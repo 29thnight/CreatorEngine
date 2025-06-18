@@ -20,7 +20,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 
 	auto animation = player->GetComponent<Animator>();
 	animation->m_Skeleton->MakeSocket("HeadSocket", "mixamorig:Hips");
-	animation->AddParameter("Speed", speed, ValueType::Float);
+	/*animation->AddParameter("Speed", speed, ValueType::Float);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
 	auto controller = animation->GetController("upper");
@@ -34,7 +34,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 5.3f, ConditionType::Greater, ValueType::Float);
 	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 5.3f, ConditionType::Less, ValueType::Float);
 	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
-	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
+	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);*/
 	/*animation->CreateController("lower");
 	controller->GetAvatarMask()->UseOnlyUpper();
 	auto lowercontroller = animation->GetController("lower");
@@ -64,6 +64,14 @@ void TestPlayer::GetPlayer(GameObject* _player)
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow },
 		[this](Mathf::Vector2 dir) {Move(dir);});
+
+	auto ani = _player->GetComponent<Animator>();
+	auto sword = GameObject::Find("plane");
+	if (sword)
+	{
+		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
+		headsocket->AttachObject(sword);
+	}
 }
 
 void TestPlayer::Update(float deltaTime)
@@ -74,24 +82,20 @@ void TestPlayer::Update(float deltaTime)
 	auto ani = _player->GetComponent<Animator>();
 	ani->SetParameter("Speed", speed);
 
-
+	Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
 	auto sword = GameObject::Find("plane");
 	if (sword)
 	{
-		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
-		Mathf::xMatrix socketMatrix = headsocket->worldTransform;
+		//sword->m_transform.SetLocalMatrix(headsocket->transform.GetLocalMatrix());
+	}
+	if (InputManagement->IsKeyDown('6'))
+	{
+		headsocket->AttachObject(sword);
 
-		XMVECTOR scale, rotationQuat, translation;
-		Mathf::Quaternion quat;
-		Mathf::Vector3 pos;
-		if (XMMatrixDecompose(&scale, &rotationQuat, &translation, socketMatrix))
-		{
-			XMStoreFloat4(&quat, rotationQuat);
-			XMStoreFloat3(&pos, translation);
-		}
-		sword->m_transform.SetPosition(pos);
-		sword->m_transform.SetRotation(quat);
-
+	}
+	if (InputManagement->IsKeyDown('7'))
+	{
+		headsocket->DetachObject(sword);
 	}
 
 	if (InputManagement->IsKeyDown('L'))

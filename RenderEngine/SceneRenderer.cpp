@@ -346,6 +346,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	DataSystems->LoadModel("Punch.fbx");
 	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+
+	DataSystems->LoadModel("plane.fbx");
+	model[1] = DataSystems->LoadCashedModel("plane.fbx");
+	sword = Model::LoadModelToSceneObj(model[1], *scene);
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
 	player.GetPlayer(testt);
 

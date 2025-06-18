@@ -41,6 +41,8 @@ public:
 	double m_ticksPerSecond{};
 	[[Property]]
 	bool m_isLoop = true;
+
+	//frameEvent;
 };
 
 

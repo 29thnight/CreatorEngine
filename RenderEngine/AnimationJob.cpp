@@ -247,8 +247,16 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     {
         for (auto& socket : skeleton->m_sockets)
         {
-            if (bone->m_name == socket->m_boneName)
-                socket->worldTransform = bone->m_globalTransform * socket->m_offset;
+            if (bone->m_name == socket->m_ObjectName)
+            {
+                socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
+                //socket->transform.SetAndDecomposeMatrix(socket->m_boneMatrix);
+                socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
+                socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                socket->Update();
+               // auto matrix = socket->transform.GetLocalMatrix() * animator.GetOwner()->m_transform.GetWorldMatrix();
+               // socket->transform.SetAndDecomposeMatrix(matrix);
+            }
         }
     }
 

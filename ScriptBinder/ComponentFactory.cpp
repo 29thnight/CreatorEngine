@@ -83,6 +83,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				if(guid != nullFileGuid)
 				{
 					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+					animator->m_Skeleton->m_sockets;
 
 				}
 			}

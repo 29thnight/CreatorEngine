@@ -584,6 +584,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		}
 		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 		obj->m_transform.SetAndDecomposeMatrix(model);
+
 	}
 
 	for (auto& childIndex : obj->m_childrenIndices)
