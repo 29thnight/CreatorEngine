@@ -174,10 +174,19 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
 void DeferredPass::ControlPanel()
 {
+    ImGui::PushID(this);
 	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+
+    if (ImGui::Button("Reset")) {
+		m_UseAmbientOcclusion = true;
+		m_UseEnvironmentMap = true;
+		m_UseLightWithShadows = true;
+		m_envMapIntensity = 0.2f;
+    }
+    ImGui::PopID();
 }
 
 void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)

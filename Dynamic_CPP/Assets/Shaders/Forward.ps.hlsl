@@ -106,16 +106,16 @@ float4 main(PixelShaderInput IN) : SV_TARGET
 
         // cook-torrance brdf
         float NDF = DistributionGGX(max(0.0, li.NdotH), gRoughness);
-        float G = GeometrySmith(max(0.0, surf.NdotV), max(0.0, li.NdotL), gRoughness);
+        float G = GeometrySmith(saturate(surf.NdotV), saturate(li.NdotL), gRoughness);
         float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0);
         float3 kS = F;
         float3 kD = float3(1.0, 1.0, 1.0) - kS;
         kD *= 1.0 - gMetallic;
 
-        float NdotL = max(li.NdotL, 0.0); // clamped n dot l
+        float NdotL = saturate(li.NdotL); // clamped n dot l
 
         float3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(surf.NdotV, 0.0) * NdotL;
+        float denominator = 4.0 * saturate(surf.NdotV) * NdotL;
         float3 specular = numerator / max(denominator, 0.001);
 
         Lo += (kD * albedo.rgb / PI + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);

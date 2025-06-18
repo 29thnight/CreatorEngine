@@ -464,6 +464,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
     </ClCompile>
+    <ClCompile Include="TerrainMaterial.cpp">
+      <Filter>Resources\TerrainMaterial</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -896,6 +899,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TerrainDebugBrush.ps.hlsl">
       <Filter>Shaders\EditorUseShader\GizmoRender</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGIComposite.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

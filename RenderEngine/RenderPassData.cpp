@@ -77,6 +77,7 @@ void RenderPassData::Initalize(uint32 index)
 		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE,
 		cascadeCount
 	);
+	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 
 	auto ssrTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,

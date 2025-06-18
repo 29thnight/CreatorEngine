@@ -79,6 +79,12 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
+	auto& lightManager = scene.m_LightController;
+	if (lightManager->hasLightWithShadows) {
+		DirectX11::PSSetShaderResources(defferdPtr, 4, 1, &renderData->m_shadowMapTexture->m_pSRV);
+		DirectX11::PSSetConstantBuffer(defferdPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+	}
+
 	camera.UpdateBuffer(defferdPtr);
 	HashedGuid currentAnimatorGuid{};
 	//TODO : Change deferredContext Render
