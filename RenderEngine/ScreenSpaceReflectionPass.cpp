@@ -159,5 +159,11 @@ void ScreenSpaceReflectionPass::ControlPanel()
 	ImGui::SliderFloat("Max Thickness", &MaxThickness, 0.0f, 0.02f, "%.5f");
 	ImGui::SliderInt("Max Ray Count", &maxRayCount, 1, 100);
 	ImGui::Text("Time: %f", Time);
+
+	if (ImGui::Button("Reset")) {
+		stepSize = 0.114f;
+		MaxThickness = 0.00416f;
+		maxRayCount = 20;
+	}
 	ImGui::PopID();
 }

@@ -20,9 +20,14 @@ private:
 	Texture* m_pLightEmissiveTexture{ nullptr };
 
 	Texture* m_pTempTexture{ nullptr };
-	ComPtr<ID3D11Buffer> m_Buffer;
+	ComPtr<ID3D11Buffer> m_SSGIBuffer;
+	ComPtr<ID3D11Buffer> m_CompositeBuffer;
 
 	ComputeShader* m_pSSGIShader{};
+	ComputeShader* m_pCompositeShader{};
+
+	ComputeShader* m_pDownDualFilteringShader{};
+	ComputeShader* m_pUpDualFilteringShaeder{};
 
 	Sampler* sample = nullptr;
 	Sampler* pointSample = nullptr;
