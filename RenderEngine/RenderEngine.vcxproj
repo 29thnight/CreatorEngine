@@ -184,6 +184,7 @@
     <ClCompile Include="SSGIPass.cpp" />
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
+    <ClCompile Include="TerrainMaterial.cpp" />
     <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />

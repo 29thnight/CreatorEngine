@@ -217,11 +217,11 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
 			if (terrainMesh)
 			{
-				DirectX11::PSSetConstantBuffer(defferdPtr, 12, 1, terrain->m_layerBuffer.GetAddressOf());
+				DirectX11::PSSetConstantBuffer(defferdPtr, 12, 1, terrain->GetMaterial()->GetLayerBuffer());
 				scene.UpdateModel(obj->m_transform.GetWorldMatrix(), defferdPtr);
 
-				DirectX11::PSSetShaderResources(defferdPtr, 6, 1, terrain->GetLayerSRV());
-				DirectX11::PSSetShaderResources(defferdPtr, 7, 1, terrain->GetSplatMapSRV());
+				DirectX11::PSSetShaderResources(defferdPtr, 6, 1, terrain->GetMaterial()->GetLayerSRV());
+				DirectX11::PSSetShaderResources(defferdPtr, 7, 1, terrain->GetMaterial()->GetSplatMapSRV());
 				terrainMesh->Draw(defferdPtr);
 			}
 		}

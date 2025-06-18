@@ -1,17 +1,15 @@
 {
     "assetGuid": "{00000000-0000-0000-0000-000000000000}",
     "height": 100,
-    "heightmap": "ter2_HeightMap.png",
+    "heightmap": "t0_HeightMap.png",
     "layers": [],
     "maxHeight": 500.0,
     "minHeight": -100.0,
     "name": [
         116,
-        101,
-        114,
-        50
+        48
     ],
-    "splatmap": "ter2_SplatMap.png",
+    "splatmap": "t0_SplatMap.png",
     "terrainID": 0,
     "width": 100
 }

@@ -461,6 +461,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
     </ClCompile>
+    <ClCompile Include="TerrainMaterial.cpp">
+      <Filter>Resources\TerrainMaterial</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">

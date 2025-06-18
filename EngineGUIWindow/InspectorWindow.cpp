@@ -1458,7 +1458,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 		{
 			//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
-			ImGui::SliderFloat("Strength", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
+			ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 		}
 
 		// PaintLayer 옵션일 때만 레이어 선택
@@ -1489,7 +1489,13 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 
 			if (ImGui::Button("AddLayer")) {
-				ImGui::OpenPopup("AddLayerPopup");
+
+				file::path difuseFile = ShowOpenFileDialog(L"");
+				std::wstring difuseFileName = difuseFile.filename();
+				if (!difuseFile.empty())
+				{
+					terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
+				}
 			}
 		}
 
@@ -1515,22 +1521,6 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 		}
 
-	}
-
-	// 레이어 추가 팝업
-	if (ImGui::BeginPopup("AddLayerPopup"))
-	{
-		if (ImGui::Button("Add"))
-		{
-			file::path difuseFile = ShowOpenFileDialog(L"");
-			std::wstring difuseFileName = difuseFile.filename();
-			if (!difuseFile.empty())
-			{
-				terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
-			}
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
 	}
 }
 
