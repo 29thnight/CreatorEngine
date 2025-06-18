@@ -216,6 +216,32 @@ void ImGuiRenderer::BeginRender()
 
 	ImGui::NewFrame();
 
+	float menuBarSize = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
+	ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
+	ImGuiID id = ImGui::GetID("MainWindowGroup");
+	ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - (menuBarSize * 2.f) };
+	ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
+
+	ImGui::SetNextWindowPos(nodePos);
+	ImGui::SetNextWindowSize(size);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
+	ImGui::Begin("Main DockSpace Window", nullptr,
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoNavFocus);
+
+
+	ImGui::DockSpace(id, ImVec2(0, 0),
+		ImGuiDockNodeFlags_PassthruCentralNode);
+
+	ImGui::PopStyleVar(); // 반드시 Begin 이후에 Pop!
+
+	ImGui::End();
+
 	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
 	if (!forceResize && file::exists(iniPath))
 	{
@@ -224,15 +250,8 @@ void ImGuiRenderer::BeginRender()
 
     if (firstLoop || forceResize)
 	{
-        ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
-        ImGuiID id = ImGui::GetID("MainWindowGroup");
         ImGui::DockBuilderRemoveNode(id);
         ImGui::DockBuilderAddNode(id);
-
-		float menuBarSize = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
-
-        ImVec2 size{ ImGui::GetMainViewport()->Size.x, ImGui::GetMainViewport()->Size.y - (menuBarSize * 2.f)};
-        ImVec2 nodePos{ workCenter.x - size.x * 0.5f, workCenter.y - size.y * 0.5f };
 
         // Set the size and position:
         ImGui::DockBuilderSetNodeSize(id, size);

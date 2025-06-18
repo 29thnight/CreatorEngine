@@ -106,6 +106,7 @@ void RenderPassData::Initalize(uint32 index)
 				&m_shadowMapDSVarr[i]
 			)
 		);
+
 	}
 
 	//안에서 배열은 3으로 고정중 필요하면 수정

@@ -541,11 +541,6 @@ void DrawProfilerHUD()
 		ImGui::EndPopup();
 	}
 
-	//if (ImGui::IsKeyPressed(ImGuiKey_Space))
-	//{
-	//	context.IsPaused = !context.IsPaused;
-	//}
-
 	gCPUProfiler.SetPaused(context.IsPaused);
 
 	DrawProfilerTimeline(ImVec2(0, 0));

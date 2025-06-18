@@ -279,7 +279,11 @@ void MenuBarWindow::RenderMenuBar()
 
     if (m_bShowProfileWindow)
     {
-        DrawProfilerHUD();
+        ImGui::Begin("FrameProfiler", &m_bShowProfileWindow, ImGuiWindowFlags_NoDocking);
+        {
+            DrawProfilerHUD();
+        }
+        ImGui::End();
     }
 }
 
