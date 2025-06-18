@@ -27,7 +27,6 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
-	m_shadowRenderQueue.reserve(500);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -235,25 +234,4 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
 	m_proxyMap[meshRendererGuid]->DistroyProxy();
-}
-
-void RenderScene::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	m_shadowRenderQueue.push_back(proxy);
-}
-
-RenderScene::ProxyContainer RenderScene::GetShadowRenderQueue()
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	return m_shadowRenderQueue;
-}
-
-void RenderScene::ClearShadowRenderQueue()
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	m_shadowRenderQueue.clear();
 }

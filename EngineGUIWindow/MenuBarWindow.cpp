@@ -258,13 +258,13 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_CODE " Output Log "))
             {
-                m_bShowLogWindow = true;
+                m_bShowLogWindow = !m_bShowProfileWindow;
             }
 
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_BUG " ProfileFrame "))
             {
-                m_bShowProfileWindow = true;
+                m_bShowProfileWindow = !m_bShowProfileWindow;
             }
 
             ImGui::EndMenuBar();

@@ -458,13 +458,13 @@ void SceneRenderer::SceneRendering()
         {
 			//[4] DeferredPass
 			{
-				//PROFILE_CPU_BEGIN("DeferredPass");
+				PROFILE_CPU_BEGIN("DeferredPass");
 				DirectX11::BeginEvent(L"DeferredPass");
 				Benchmark banch;
 				m_pDeferredPass->Execute(*m_renderScene, *camera);
 				RenderStatistics->UpdateRenderState("DeferredPass", banch.GetElapsedTime());
 				DirectX11::EndEvent();
-				//PROFILE_CPU_END();
+				PROFILE_CPU_END();
 			}
 		}
 
@@ -676,6 +676,15 @@ void SceneRenderer::CreateCommandListPass()
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
+		for (auto& instanceID : data->GetShadowRenderDataBuffer())
+		{
+			auto proxy = renderScene->FindProxy(instanceID);
+			if (nullptr != proxy)
+			{
+				data->PushShadowRenderQueue(proxy);
+			}
+		}
+
 		for (auto& instanceID : data->GetCullDataBuffer())
 		{
 			auto proxy = renderScene->FindProxy(instanceID);
@@ -686,7 +695,9 @@ void SceneRenderer::CreateCommandListPass()
 		}
 
 		data->SortRenderQueue();
+		data->SortShadowRenderQueue();
 		data->ClearCullDataBuffer();
+		data->ClearShadowRenderDataBuffer();
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
@@ -700,35 +711,26 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_BEGIN("TerrainPassCommandList");
 			m_pGBufferPass->TerrainRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
-		});
 
-		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
-		{
 			PROFILE_CPU_BEGIN("GBufferPassCommandList");
 			m_pGBufferPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
-		});
 
-		if (useTestLightmap)
-		{
-			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			if (useTestLightmap)
 			{
 				PROFILE_CPU_BEGIN("LightMapPassCommandList");
 				m_pLightMapPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
-			});
-		}
-		else
-		{
-			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			}
+			else
 			{
 				PROFILE_CPU_BEGIN("DeferredPassCommandList");
 				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
 				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
 				m_pDeferredPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
-			});
-		}
+			}
+		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{
@@ -787,6 +789,7 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->NotifyAllAndWait();
 
 		data->ClearRenderQueue();
+		data->ClearShadowRenderQueue();
 	}
 }
 
@@ -800,24 +803,17 @@ void SceneRenderer::PrepareRender()
 	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
 	auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 	
-	m_renderScene->ClearShadowRenderQueue();
-
 	auto renderScene = m_renderScene;
 	auto m_currentScene = SceneManagers->GetActiveScene();
+	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 
-	m_threadPool->Enqueue([renderScene, m_currentScene]
+	m_threadPool->Enqueue([renderScene, allMeshes, m_currentScene]
 	{
-		std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 		for (auto& mesh : allMeshes)
 		{
-			auto shadowProxy = renderScene->FindProxy(mesh->GetInstanceID());
-			if (shadowProxy)
-			{
-				renderScene->UpdateCommand(mesh);
-				renderScene->PushShadowRenderQueue(shadowProxy);
-			}
+			renderScene->UpdateCommand(mesh);
 		}
 	});
 
@@ -836,19 +832,21 @@ void SceneRenderer::PrepareRender()
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
-		m_threadPool->Enqueue([camera, data, staticMeshes, skinnedMeshes, renderScene]
+		//std::vector<MeshRenderer*> culledMeshes;
+		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
+
+		m_threadPool->Enqueue([camera, allMeshes, data, staticMeshes, skinnedMeshes, renderScene]
 		{
-			//std::vector<MeshRenderer*> culledMeshes;
-			//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
-			//camera->ClearRenderQueue();
+			for (auto& mesh : allMeshes)
+			{
+				data->PushShadowRenderData(mesh->GetInstanceID());
+			}
+
 			for (auto& culledMesh : staticMeshes)
 			{
 				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(culledMesh->GetBoundingBox()))
 				{
-					//auto proxy = renderScene->FindProxy(culledMesh->GetInstanceID());
-					//data->PushRenderQueue(proxy);
-
 					data->PushCullData(culledMesh->GetInstanceID());
 				}
 			}

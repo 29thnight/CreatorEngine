@@ -21,8 +21,10 @@ public:
 	ID3D11DepthStencilView*   m_shadowMapDSVarr[cascadeCount]{};
 	ID3D11ShaderResourceView* sliceSRV[cascadeCount]{};
 	FrameProxyFindInstanceIDs m_findProxyVec[STORE_FRAME_COUNT];
+	FrameProxyFindInstanceIDs m_findShadowProxyVec[STORE_FRAME_COUNT];
 	ProxyContainer			  m_deferredQueue;
 	ProxyContainer			  m_forwardQueue;
+	ProxyContainer			  m_shadowRenderQueue;
 	Camera					  m_shadowCamera;
 	std::atomic_bool          m_isInitalized{ false };
 	std::atomic<uint32>       m_frame{};
@@ -42,9 +44,18 @@ public:
 	void SortRenderQueue();
 	void ClearRenderQueue();
 
+	void PushShadowRenderQueue(PrimitiveRenderProxy* proxy);
+	void SortShadowRenderQueue();
+	void ClearShadowRenderQueue();
+
 	void PushCullData(const HashedGuid& instanceID);
 	FrameProxyFindInstanceIDs& GetCullDataBuffer();
 	void ClearCullDataBuffer();
+
+	void PushShadowRenderData(const HashedGuid& instanceID);
+	FrameProxyFindInstanceIDs& GetShadowRenderDataBuffer();
+	void ClearShadowRenderDataBuffer();
+
 	void AddFrame()
 	{
 		m_frame.fetch_add(1, std::memory_order_relaxed);

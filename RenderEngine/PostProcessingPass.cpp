@@ -48,7 +48,6 @@ PostProcessingPass::PostProcessingPass()
 	m_bloomThresholdBuffer	= DirectX11::CreateBuffer(sizeof(ThresholdParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomThreshold);
 	m_bloomBlurBuffer		= DirectX11::CreateBuffer(sizeof(BlurParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomBlur);
 	m_bloomCompositeBuffer	= DirectX11::CreateBuffer(sizeof(CompositeParams), D3D11_BIND_CONSTANT_BUFFER, &m_bloomComposite);
-
 }
 
 PostProcessingPass::~PostProcessingPass()

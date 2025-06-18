@@ -266,9 +266,11 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 {
 	auto defferdContextPtr1 = defferdContext;
 
+	auto renderData = RenderPassData::GetData(&camera);
+
 	HashedGuid currentAnimatorGuid{};
 
-	for (auto& PrimitiveRenderProxy : scene.GetShadowRenderQueue())
+	for (auto& PrimitiveRenderProxy : renderData->m_shadowRenderQueue)
 	{
 		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdContextPtr1);
 

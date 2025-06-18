@@ -143,7 +143,6 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
     m_pso->Apply(defferdPtr);
     ID3D11RenderTargetView* emissiveRtv = m_LightEmissiveTexture->GetRTV();
-    DirectX11::ClearRenderTargetView(defferdPtr, emissiveRtv, Colors::Transparent);
 
     ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(defferdPtr, 2, rtv, nullptr);

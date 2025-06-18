@@ -175,7 +175,6 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					// 2. 새로운 부모에 추가
 					draggedObj->m_parentIndex = 0;
 					sceneGameObject->m_childrenIndices.push_back(draggedIndex);
-
 					draggedObj->m_transform.SetParentID(draggedObj->m_parentIndex);
 				}
 			}
