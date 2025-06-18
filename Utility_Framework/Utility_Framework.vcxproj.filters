@@ -76,11 +76,11 @@
     <Filter Include="Core.Octree">
       <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Memory\FenceFlag">
-      <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Octree\newOctree">
       <UniqueIdentifier>{041995e1-a769-49fb-ade3-10561593affe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Memory\SyncAPI">
+      <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -131,9 +131,6 @@
     </ClInclude>
     <ClInclude Include="DeviceResources.h">
       <Filter>DirectX11Common\DeviceResources</Filter>
-    </ClInclude>
-    <ClInclude Include="DirectXHelper.h">
-      <Filter>DirectX11Common\DirectXHelper</Filter>
     </ClInclude>
     <ClInclude Include="TimeSystem.h">
       <Filter>DirectX11Common\TimeSystem</Filter>
@@ -238,13 +235,10 @@
       <Filter>Utility</Filter>
     </ClInclude>
     <ClInclude Include="Core.FenceFlag.h">
-      <Filter>Core.Memory\FenceFlag</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.FenceFlagGroup.h">
-      <Filter>Core.Memory\FenceFlag</Filter>
+      <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
     <ClInclude Include="Core.Barrier.h">
-      <Filter>Core.Memory\FenceFlag</Filter>
+      <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
     <ClInclude Include="FileDialog.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
@@ -260,6 +254,10 @@
     </ClInclude>
     <ClInclude Include="Core.Octree.h">
       <Filter>Core.Octree\newOctree</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXHelper.h" />
+    <ClInclude Include="Core.Fence.h">
+      <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -12,7 +12,6 @@ else                  \
     newMax = mid;     \
 }
 
-
 template <class N>
 class Octree
 {

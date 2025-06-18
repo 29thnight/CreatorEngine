@@ -5,6 +5,7 @@
 #include "MeshRendererProxy.h"
 #include "RenderPassData.h"
 #include "ProxyCommandQueue.h"
+#include "concurrent_unordered_map.h"
 
 using namespace concurrency;
 
@@ -56,11 +57,6 @@ public:
 	ProxyCommand MakeProxyCommand(MeshRenderer* meshRendererPtr);
 	void UnregisterCommand(MeshRenderer* meshRendererPtr);
 
-	void PushShadowRenderQueue(PrimitiveRenderProxy* proxy);
-	ProxyContainer GetShadowRenderQueue();
-	void ClearShadowRenderQueue();
-
-
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
@@ -80,9 +76,7 @@ private:
 	AnimatorMap			m_animatorMap;
 	AnimationPalleteMap m_palleteMap;
 	RenderDataMap		m_renderDataMap;
-	ProxyContainer		m_shadowRenderQueue;
 	ID3D11Buffer*		m_ModelBuffer{};
-	std::mutex			m_shadowRenderMutex;
 	std::atomic_flag	m_proxyMapFlag{};
 	bool				m_isPlaying = false;
 };

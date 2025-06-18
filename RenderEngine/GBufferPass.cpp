@@ -137,7 +137,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			if (animatorGuid != currentAnimatorGuid)
+			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
 				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
 				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;

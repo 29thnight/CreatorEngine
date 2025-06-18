@@ -27,7 +27,6 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
-	m_shadowRenderQueue.reserve(500);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -129,8 +128,6 @@ void RenderScene::UnregisterAnimator(Animator* animatorPtr)
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
-	SpinLock lock(m_proxyMapFlag);
-
 	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
 	if (m_palleteMap.find(animatorGuid) != m_palleteMap.end()) return;
 
@@ -149,6 +146,8 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 
 	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
 
+	SpinLock lock(m_proxyMapFlag);
+
 	if (m_proxyMap.find(meshRendererGuid) != m_proxyMap.end()) return;
 
 	// Create a new proxy for the mesh renderer and insert it into the map
@@ -165,6 +164,8 @@ bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 
 	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
 
+	SpinLock lock(m_proxyMapFlag);
+
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return false;
 
 	auto& proxyObject = m_proxyMap[meshRendererGuid];
@@ -176,6 +177,8 @@ bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 
 PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
 {
+	SpinLock lock(m_proxyMapFlag);
+
 	if (m_proxyMap.find(guid) == m_proxyMap.end()) return nullptr;
 
 	return m_proxyMap[guid].get();
@@ -188,7 +191,10 @@ void RenderScene::OnProxyDistroy()
 		HashedGuid ID;
 		if (RenderScene::RegisteredDistroyProxyGUIDs.try_pop(ID))
 		{
-			m_proxyMap.erase(ID);
+			{
+				SpinLock lock(m_proxyMapFlag);
+				m_proxyMap.erase(ID);
+			}
 		}
 	}
 
@@ -223,28 +229,9 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 
 	HashedGuid meshRendererGuid = meshRendererPtr->GetInstanceID();
 
+	SpinLock lock(m_proxyMapFlag);
+	
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
 	m_proxyMap[meshRendererGuid]->DistroyProxy();
-}
-
-void RenderScene::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	m_shadowRenderQueue.push_back(proxy);
-}
-
-RenderScene::ProxyContainer RenderScene::GetShadowRenderQueue()
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	return m_shadowRenderQueue;
-}
-
-void RenderScene::ClearShadowRenderQueue()
-{
-	std::unique_lock lock(m_shadowRenderMutex);
-
-	m_shadowRenderQueue.clear();
 }

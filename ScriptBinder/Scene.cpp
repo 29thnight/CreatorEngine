@@ -361,7 +361,7 @@ std::pair<size_t, Light&> Scene::AddLight()
 
 Light& Scene::GetLight(size_t index)
 {
-	if(index > m_lights.size())
+	if(index > m_lights.size() || 0 == m_lights.size())
 	{
 		m_lights.resize(index + 1);
 	}

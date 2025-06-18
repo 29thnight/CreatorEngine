@@ -178,6 +178,7 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
 void ToneMapPass::ControlPanel()
 {
+    ImGui::PushID(this);
     ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap);
     ImGui::SetNextWindowFocus();
     ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
@@ -191,6 +192,7 @@ void ToneMapPass::ControlPanel()
     {
 		//ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
     }
+    ImGui::PopID();
 }
 
 void ToneMapPass::Resize(uint32_t width, uint32_t height)

@@ -17,5 +17,6 @@ private:
 	SceneRenderer* m_sceneRenderer{ nullptr };
     int  m_selectedLogIndex{};
     bool m_bShowLogWindow{ false };
+	bool m_bShowProfileWindow{ false };
 	bool m_bShowLightMapWindow{ false };
 };

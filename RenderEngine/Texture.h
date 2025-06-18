@@ -28,6 +28,17 @@ public:
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
+	static Texture* Create(
+		_In_ uint32 ratioX,
+		_In_ uint32 ratioY,
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ const std::string_view& name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
 	static Texture* CreateCube(
 		_In_ uint32 size,
 		_In_ const std::string_view& name,
@@ -115,16 +126,22 @@ public:
 
 	void ResizeRelease();
 
+	void SetSize(float2 size) {
+		m_size = size;
+		m_desc.Width = static_cast<uint32>(m_size.x / m_sizeRatio.x);
+		m_desc.Height = static_cast<uint32>(m_size.y / m_sizeRatio.y);
+	}
+
 	void SetSizeRatio(float2 ratio) 
 	{
-		sizeRatio = ratio;
-		m_desc.Width = static_cast<uint32>(size.x / ratio.x);
-		m_desc.Height = static_cast<uint32>(size.y / ratio.y);
+		m_sizeRatio = ratio;
+		m_desc.Width = static_cast<uint32>(m_size.x / m_sizeRatio.x);
+		m_desc.Height = static_cast<uint32>(m_size.y / m_sizeRatio.y);
 	}
 
 private:
-	float2 size{};
-	float2 sizeRatio{ 1.f, 1.f };
+	float2 m_size{};
+	float2 m_sizeRatio{ 1.f, 1.f };
 
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
 	std::vector<CD3D11_RENDER_TARGET_VIEW_DESC> m_rtvDescs;

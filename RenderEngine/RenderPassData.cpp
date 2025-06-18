@@ -14,6 +14,7 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 		}
 	}
 
+	std::cout << "Invaild data" << std::endl;
 	return false;
 }
 
@@ -63,8 +64,9 @@ void RenderPassData::Initalize(uint32 index)
 	);
 	m_depthStencil.swap(depthStencil);
 
-	m_deferredQueue.reserve(300);
-	m_forwardQueue.reserve(300);
+	m_deferredQueue.reserve(500);
+	m_forwardQueue.reserve(500);
+	m_shadowRenderQueue.reserve(800);
 
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
 	Texture* shadowMapTexture = Texture::CreateArray(
@@ -75,6 +77,7 @@ void RenderPassData::Initalize(uint32 index)
 		D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE,
 		cascadeCount
 	);
+	shadowMapTexture->m_textureType = TextureType::ImageTexture;
 
 	auto ssrTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
@@ -104,6 +107,7 @@ void RenderPassData::Initalize(uint32 index)
 				&m_shadowMapDSVarr[i]
 			)
 		);
+
 	}
 
 	//안에서 배열은 3으로 고정중 필요하면 수정
@@ -138,8 +142,6 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 	if (nullptr == mat) return;
 
 	{
-		std::unique_lock lock(m_dataMutex);
-
 		switch (mat->m_renderingMode)
 		{
 		case MaterialRenderingMode::Opaque:
@@ -154,8 +156,6 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 
 void RenderPassData::SortRenderQueue()
 {
-	std::unique_lock lock(m_dataMutex);
-
 	if (!m_deferredQueue.empty())
 	{
 		std::sort(
@@ -177,9 +177,65 @@ void RenderPassData::SortRenderQueue()
 
 void RenderPassData::ClearRenderQueue()
 {
-	std::unique_lock lock(m_dataMutex);
-
 	m_deferredQueue.clear();
 	m_forwardQueue.clear();
+}
+
+void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
+{
+	m_shadowRenderQueue.push_back(proxy);
+}
+
+void RenderPassData::SortShadowRenderQueue()
+{
+	if (!m_deferredQueue.empty())
+	{
+		std::sort(
+			m_shadowRenderQueue.begin(),
+			m_shadowRenderQueue.end(),
+			SortByAnimationAndMaterialGuid
+		);
+	}
+}
+
+void RenderPassData::ClearShadowRenderQueue()
+{
+	m_shadowRenderQueue.clear();
+}
+
+void RenderPassData::PushCullData(const HashedGuid& instanceID)
+{
+	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+	m_findProxyVec[index].push_back(instanceID);
+}
+
+RenderPassData::FrameProxyFindInstanceIDs& RenderPassData::GetCullDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	return m_findProxyVec[prevIndex];
+}
+
+void RenderPassData::ClearCullDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	m_findProxyVec[prevIndex].clear();
+}
+
+void RenderPassData::PushShadowRenderData(const HashedGuid& instanceID)
+{
+	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+	m_findShadowProxyVec[index].push_back(instanceID);
+}
+
+RenderPassData::FrameProxyFindInstanceIDs& RenderPassData::GetShadowRenderDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	return m_findShadowProxyVec[prevIndex];
+}
+
+void RenderPassData::ClearShadowRenderDataBuffer()
+{
+	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	m_findShadowProxyVec[prevIndex].clear();
 }
 

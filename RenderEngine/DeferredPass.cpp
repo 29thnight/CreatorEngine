@@ -127,7 +127,8 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
     bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
 
-    ID3D11ShaderResourceView* srvs[10] = {
+    ID3D11ShaderResourceView* srvs[10] = 
+    {
         renderData->m_depthStencil->m_pSRV,
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
@@ -142,7 +143,6 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
     m_pso->Apply(defferdPtr);
     ID3D11RenderTargetView* emissiveRtv = m_LightEmissiveTexture->GetRTV();
-    DirectX11::ClearRenderTargetView(defferdPtr, emissiveRtv, Colors::Transparent);
 
     ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(defferdPtr, 2, rtv, nullptr);
@@ -174,10 +174,19 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 
 void DeferredPass::ControlPanel()
 {
+    ImGui::PushID(this);
 	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+
+    if (ImGui::Button("Reset")) {
+		m_UseAmbientOcclusion = true;
+		m_UseEnvironmentMap = true;
+		m_UseLightWithShadows = true;
+		m_envMapIntensity = 0.2f;
+    }
+    ImGui::PopID();
 }
 
 void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)

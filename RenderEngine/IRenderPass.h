@@ -1,6 +1,7 @@
 #pragma once
 #include "RenderScene.h"
 #include "PSO.h"
+#include "SwapEvent.h"
 
 enum RTV_Type
 {
@@ -31,8 +32,14 @@ public:
 	using CommandQueueMap = std::unordered_map<size_t, std::array<CommandQueue, 10>>;
 	using FrameQueueArray = std::array<std::array<CommandQueue, 10>, 3>;
 public:
-	IRenderPass() = default;
-	virtual ~IRenderPass() = default;
+	IRenderPass()
+	{
+		m_swapEventHandle = SwapEvent.AddRaw(this, &IRenderPass::SwapQueue);
+	}
+	virtual ~IRenderPass()
+	{
+		SwapEvent -= m_swapEventHandle;
+	}
 
 	//virtual std::string ToString() abstract;
 	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
@@ -63,6 +70,7 @@ protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
 	CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
 	FrameQueueArray m_frameQueues;
+	Core::DelegateHandle m_swapEventHandle{};
 
 	bool m_abled{ true };
 	std::atomic_ullong m_frame{};

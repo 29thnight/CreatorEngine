@@ -3,6 +3,7 @@
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
+#include "Profiler.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -129,11 +130,6 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
 
         useTestLightmap.store(isLightMapSwitch);
     });
-
-
-
-
-    
 
     ImGui::GetContext("LightMap").Close();
 }
@@ -262,7 +258,13 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_CODE " Output Log "))
             {
-                m_bShowLogWindow = true;
+                m_bShowLogWindow = !m_bShowProfileWindow;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_FA_BUG " ProfileFrame "))
+            {
+                m_bShowProfileWindow = !m_bShowProfileWindow;
             }
 
             ImGui::EndMenuBar();
@@ -273,6 +275,15 @@ void MenuBarWindow::RenderMenuBar()
     if (m_bShowLogWindow)
     {
         ShowLogWindow();
+    }
+
+    if (m_bShowProfileWindow)
+    {
+        ImGui::Begin("FrameProfiler", &m_bShowProfileWindow, ImGuiWindowFlags_NoDocking);
+        {
+            DrawProfilerHUD();
+        }
+        ImGui::End();
     }
 }
 

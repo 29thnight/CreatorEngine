@@ -23,6 +23,11 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		&& proxyObject->IsSkinnedMesh())
 	{
 		palletePtr = renderScene->m_palleteMap[aniGuid].second;
+		if (!proxyObject->m_finalTransforms)
+		{
+			proxyObject->m_finalTransforms = palletePtr;
+		}
+
 		if (false == renderScene->m_palleteMap[aniGuid].first)
 		{
 			auto* srcPalete = &renderScene->m_animatorMap[aniGuid]->m_FinalTransforms;

@@ -52,6 +52,12 @@ public:
 			return;
 		}
 
+		//auto tempFlags = m_flags;
+		//if (ImGui::GetCurrentWindow()->DockIsActive)
+		//{
+		//	tempFlags |= ImGuiWindowFlags_NoMove;
+		//}
+
 		if (ImGui::Begin(m_name.data(), m_isPopup ? &m_opened : 0, m_flags))
 		{
 			ImGuiWindow* window = ImGui::GetCurrentWindow();
