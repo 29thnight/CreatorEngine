@@ -38,6 +38,7 @@ cbuffer SSGIParams : register(b0)
     float thickness; // µÎ²²
     uint frameIndex;
     int ratio;
+    float intensity;
 };
 float3 TangentSpacePos(float3 p, float3 np)
 {
@@ -298,7 +299,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     //gOutput[suv14] = float4((gColor.SampleLevel(PointSampler, float2(suv14) * invScreenSize, 0).rgb + lighting) * visibility, 1);
     //gOutput[suv15] = float4((gColor.SampleLevel(PointSampler, float2(suv15) * invScreenSize, 0).rgb + lighting) * visibility, 1);
     
-    gOutput[DTid.xy] = float4(lighting, visibility);
+    gOutput[DTid.xy] = float4(lighting * intensity, visibility);
     
     //gOutput[DTid.xy * 2 + uint2(0, 0)] = float4((col0 + lighting) * visibility, 1);
     //gOutput[DTid.xy * 2 + uint2(1,0)] = float4((col1 + lighting) * visibility, 1);

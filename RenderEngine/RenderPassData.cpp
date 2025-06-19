@@ -13,7 +13,6 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 			return true;
 		}
 	}
-
 	return false;
 }
 

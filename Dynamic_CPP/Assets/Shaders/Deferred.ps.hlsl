@@ -108,21 +108,21 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     
     float3 ambient = globalAmbient.rgb * albedo;
     
-    //[branch]
-    //if (useEnvMap)
-    //{
-    //    float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
-    //    float3 kD = 1.0 - kS;
-    //    kD *= 1.0 - metallic;
-    //    float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
-    //    float3 diffuse = irradiance * albedo;
-    //
-    //    float3 R = normalize(reflect(-surf.V, surf.N));
-    //    float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * 5.0).rgb;
-    //    float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(saturate(surf.NdotV), roughness)).rg;
-    //    float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
-    //    ambient = (kD * diffuse + specular) * envMapIntensity;
-    //}
+    [branch]
+    if (useEnvMap)
+    {
+        float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
+        float3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;
+        float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
+        float3 diffuse = irradiance * albedo;
+    
+        float3 R = normalize(reflect(-surf.V, surf.N));
+        float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * 5.0).rgb;
+        float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(saturate(surf.NdotV), roughness)).rg;
+        float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
+        ambient = (kD * diffuse + specular) * envMapIntensity;
+    }
 
     //float ao = useAO ? AO.Sample(PointSampler, IN.texCoord).a : 1.0;
     //float3 GI = useAO ? AO.Sample(PointSampler, IN.texCoord).rgb : float3(0, 0, 0);

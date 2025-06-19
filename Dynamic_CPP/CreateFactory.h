@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TTscript.h"
 #include "TestBehavior.h"
 
 class CreateFactory : public Singleton<CreateFactory>
