@@ -183,6 +183,12 @@ void HotLoadSystem::Shutdown()
 
 bool HotLoadSystem::IsScriptUpToDate()
 {
+	if (!m_isStartUp)
+	{
+		m_isStartUp = true;
+		return false; // 처음 시작할 때는 항상 빌드 필요
+	}
+
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
 	file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
 

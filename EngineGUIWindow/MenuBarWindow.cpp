@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "MenuBarWindow.h"
 #include "SceneRenderer.h"
 #include "SceneManager.h"
@@ -400,3 +401,4 @@ void MenuBarWindow::ShowLightMapWindow()
 {
     ImGui::GetContext("LightMap").Open();
 }
+#endif // DYNAMICCPP_EXPORTS

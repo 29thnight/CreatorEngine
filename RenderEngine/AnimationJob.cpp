@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "AnimationJob.h"
 #include "RenderScene.h"
 #include "Skeleton.h"
@@ -385,4 +386,4 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
     XMMATRIX nodeTransform = scale * rotation * translation;
     return nodeTransform;
 }
-
+#endif // !DYNAMICCPP_EXPORTS

@@ -1,5 +1,4 @@
 #include "DataSystem.h"
-#include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>

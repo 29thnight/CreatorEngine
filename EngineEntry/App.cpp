@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "App.h"
 #include "Camera.h"
 #include "InputManager.h"
@@ -244,3 +245,5 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 	return 0;
 }
+
+#endif // DYNAMICCPP_EXPORTS

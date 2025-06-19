@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "Dx11Main.h"
 #include "CoreWindow.h"
 #include "InputManager.h"
@@ -366,5 +367,5 @@ void DirectX11::Dx11Main::OnDeviceRestored()
 {
 	CreateWindowSizeDependentResources();
 }
-
+#endif // !DYNAMICCPP_EXPORTS
 

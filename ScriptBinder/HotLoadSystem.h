@@ -89,6 +89,7 @@ private:
 	SetSceneManagerFunc m_setSceneManagerFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
+	std::atomic_bool m_isStartUp{ false };
 
 #pragma region Script File String
 	std::string scriptIncludeString

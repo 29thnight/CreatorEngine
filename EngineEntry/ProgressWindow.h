@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include <wingdi.h>
 #include <commctrl.h>
@@ -253,3 +254,4 @@ private:
 };
 
 inline static auto& g_progressWindow = ProgressWindow::GetInstance();
+#endif // !DYNAMICCPP_EXPORTS
