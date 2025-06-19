@@ -110,11 +110,11 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 			{
 				Debug->LogDebug(line);
 			}
-			else
-			{
-				std::string strLine = AnsiToUtf8(line);
-				Debug->LogDebug(strLine);
-			}
+			//else
+			//{
+			//	std::string strLine = AnsiToUtf8(line);
+			//	Debug->LogDebug(strLine);
+			//}
 		}
     }
 

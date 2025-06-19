@@ -7,7 +7,7 @@ cbuffer params : register(b0)
     float2 inputTextureSize;
 };
 
-[numThread(16,16,1)]
+[numthreads(16,16,1)]
 void main(uint3 DTid : SV_DispathThreadID)
 {
     float2 invSize = 1.0 / inputTextureSize;
