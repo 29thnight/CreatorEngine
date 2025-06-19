@@ -181,7 +181,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					{
 						auto& curNode = layer["m_curState"];
 						std::string name = curNode["m_name"].as<std::string>();
-						animationController->m_curState = animationController->FindState(name);
+						//animationController->m_curState = animationController->FindState(name);
+						animationController->SetCurState(name);
 					}
 
 					for (auto& state : animationController->StateVec)

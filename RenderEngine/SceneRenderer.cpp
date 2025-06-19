@@ -210,6 +210,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
 
+
+
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
@@ -356,6 +358,16 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
+
+
+	DataSystems->LoadModel("Punch.fbx");
+	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+
+	DataSystems->LoadModel("plane.fbx");
+	model[1] = DataSystems->LoadCashedModel("plane.fbx");
+	sword = Model::LoadModelToSceneObj(model[1], *scene);
+	testt = Model::LoadModelToSceneObj(model[0], *scene);
+	player.GetPlayer(testt);
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)

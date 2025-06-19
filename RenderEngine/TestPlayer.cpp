@@ -72,6 +72,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
 		headsocket->AttachObject(sword);
 	}
+	ani->m_Skeleton->m_animations[3].SetEvent("Punch", 10, []() {Debug->Log("Punch! Punch!");});
 }
 
 void TestPlayer::Update(float deltaTime)

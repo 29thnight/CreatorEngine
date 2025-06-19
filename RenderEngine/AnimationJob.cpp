@@ -96,6 +96,8 @@ void AnimationJob::Update(float deltaTime)
                     {
                         UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
+
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent();
                 }
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
 
@@ -132,6 +134,7 @@ void AnimationJob::Update(float deltaTime)
                 {
                     UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
                 }
+                animation.InvokeEvent();
             }
         });
     }
@@ -194,8 +197,8 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
 
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
-    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime);
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
+    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime, &animation->curKey);
     XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
     animator.blendtransform = blendTransform;
     XMMATRIX globalTransform = blendTransform * parentTransform;
@@ -238,7 +241,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
         return;
     }
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
     XMMATRIX globalTransform = nodeTransform * parentTransform;
     
     bone->m_globalTransform = globalTransform;
@@ -250,12 +253,9 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
             if (bone->m_name == socket->m_ObjectName)
             {
                 socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
-                //socket->transform.SetAndDecomposeMatrix(socket->m_boneMatrix);
                 socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
                 socket->transform.SetLocalMatrix(socket->m_boneMatrix);
                 socket->Update();
-               // auto matrix = socket->transform.GetLocalMatrix() * animator.GetOwner()->m_transform.GetWorldMatrix();
-               // socket->transform.SetAndDecomposeMatrix(matrix);
             }
         }
     }
@@ -332,7 +332,7 @@ XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
     return blendedNodeTransform;
 }
 
-XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
+XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,float* _key)
 {
     float t = 0;
     // Translation
@@ -342,6 +342,8 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
         int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
         int nPosKeyIdx = posKeyIdx + 1;
 
+        if (_key)
+            *_key = posKeyIdx;
         NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
         NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
 
