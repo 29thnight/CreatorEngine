@@ -52,6 +52,7 @@ LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     {
         return it->second(hWnd, wParam, lParam);
     }
+    
 
     return DefWindowProc(hWnd, message, wParam, lParam);
 }

@@ -17,7 +17,7 @@ struct ShadowInfo
 };
 
 class MeshRenderer;
-class MeshRendererProxy;
+class PrimitiveRenderProxy;
 class Camera //TODO : shadowCamera 분리가 필요
 {
 public:

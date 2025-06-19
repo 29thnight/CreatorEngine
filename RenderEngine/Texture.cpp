@@ -31,7 +31,18 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::
 		)
 	);
 
-	return AllocateResource<Texture>(texture, name, TextureType::Texture2D, textureDesc);
+	auto* temp = AllocateResource<Texture>(texture, name, TextureType::Texture2D, textureDesc);
+	temp->SetSize({ float(width), float(height) });
+
+	return temp;
+}
+
+Texture* Texture::Create(uint32 ratioX, uint32 ratioY, uint32 width, uint32 height, const std::string_view& name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+{
+	auto* temp = Create(width / (float)ratioX, height / (float)ratioY, name, textureFormat, bindFlags, data);
+	temp->SetSize({ float(width), float(height) });
+	temp->SetSizeRatio({ float(ratioX), float(ratioY) });
+	return temp;
 }
 
 Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ uint32 mipLevels, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
@@ -57,8 +68,10 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name
 			&textureDesc, data, &texture
 		)
 	);
+	auto* temp = AllocateResource<Texture>(texture, name, TextureType::TextureCube, textureDesc);
+	temp->SetSize({ float(size), float(size) });
 
-    return AllocateResource<Texture>(texture, name, TextureType::TextureCube, textureDesc);
+	return temp;
 }
 
 
@@ -82,8 +95,10 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_vie
 			&textureDesc, data, &texture
 		)
 	);
+	auto* temp = AllocateResource<Texture>(texture, name, TextureType::TextureArray, textureDesc);
+	temp->SetSize({ float(width), float(height) });
 
-    return AllocateResource<Texture>(texture, name, TextureType::TextureArray, textureDesc);
+	return temp;
 }
 
 Texture* Texture::LoadFormPath(_In_ const file::path& path)
@@ -168,7 +183,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 	);
 
 	texture->m_textureType = TextureType::ImageTexture;
-	texture->size = { float(metadata.width),float(metadata.height) };
+	texture->m_size = { float(metadata.width),float(metadata.height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
 
 	return texture;
@@ -194,6 +209,8 @@ Texture::Texture(Texture&& texture) noexcept
 	m_name = std::move(texture.m_name);
 	m_textureType = texture.m_textureType;
 	m_desc = texture.m_desc;
+	m_size = texture.m_size;
+	m_sizeRatio = texture.m_sizeRatio;
 	if (texture.m_onReleaseHandle.IsValid())
 	{
 		OnResizeReleaseEvent -= texture.m_onReleaseHandle;
@@ -212,6 +229,8 @@ Texture::Texture(Texture&& texture) noexcept
 	texture.m_pRTVs.clear();
 	texture.m_textureType = TextureType::Unknown;
 	texture.m_desc = CD3D11_TEXTURE2D_DESC();
+	texture.m_size = { 0,0 };
+	texture.m_sizeRatio = { 0,0 };
 	texture.m_onReleaseHandle = Core::DelegateHandle();
 	texture.m_onResizeHandle = Core::DelegateHandle();
 }
@@ -416,7 +435,7 @@ ID3D11RenderTargetView* Texture::GetRTV(uint32 index)
 
 float2 Texture::GetImageSize() const
 {
-	return size;
+	return m_size;
 }
 
 void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
@@ -445,10 +464,10 @@ void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
 
 void Texture::Resize2DViews(_In_ uint32 width, _In_ uint32 height)
 {
+	//SetSize({ (float)width, (float)height });
+
 	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
-
-	size = { (float)width, (float)height };
 
 	if (m_hasSRV) ResizeSRV();
 	if (m_hasRTV)
@@ -466,6 +485,8 @@ void Texture::ResizeCubeViews(_In_ uint32 size)
 {
 	const uint32 mipLevels = 1;
 
+	//SetSize({ (float)size, (float)size });
+
 	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
 
@@ -477,10 +498,10 @@ void Texture::ResizeCubeViews(_In_ uint32 size)
 
 void Texture::ResizeArrayViews(_In_ uint32 width, _In_ uint32 height)
 {
+	//SetSize({ (float)width, (float)height });
+
 	DirectX11::ThrowIfFailed(DeviceState::g_pDevice->CreateTexture2D(&m_desc, nullptr, &m_pTexture));
 	DirectX::SetName(m_pTexture, m_name);
-
-	size = { (float)width, (float)height };
 
 	if (m_hasSRV) ResizeSRV();
 	if (m_hasRTV)

@@ -4,6 +4,7 @@
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
+#include "Terrain.h"
 #include "Animator.h"
 #include "Skeleton.h"
 
@@ -310,7 +311,18 @@ void Scene::CollectLightComponent(LightComponent* ptr)
 {
 	if (ptr)
 	{
-		m_lightComponents.push_back(ptr);
+		auto it = std::find_if(
+			m_lightComponents.begin(),
+			m_lightComponents.end(), 
+			[ptr](const auto& light)
+			{
+				return light == ptr;
+			});
+
+		if (it == m_lightComponents.end())
+		{
+			m_lightComponents.push_back(ptr);
+		}
 	}
 }
 
@@ -349,11 +361,12 @@ std::pair<size_t, Light&> Scene::AddLight()
 
 Light& Scene::GetLight(size_t index)
 {
-	if (index < m_lights.size())
+	if(index > m_lights.size() || 0 == m_lights.size())
 	{
-		return m_lights[index];
+		m_lights.resize(index + 1);
 	}
-	return m_lights[0];
+
+	return m_lights[index];
 }
 
 void Scene::RemoveLight(size_t index)
@@ -434,6 +447,22 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 			std::erase_if(m_staticMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
         }
 		std::erase_if(m_allMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
+	}
+}
+
+void Scene::CollectTerrainComponent(TerrainComponent* ptr)
+{
+	if (ptr)
+	{
+		m_terrainComponents.push_back(ptr);
+	}
+}
+
+void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
 	}
 }
 

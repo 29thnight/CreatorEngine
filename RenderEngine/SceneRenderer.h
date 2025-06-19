@@ -92,26 +92,26 @@ private:
 	Core::DelegateHandle m_resizeEventHandle{};
 
 	//pass
-	std::unique_ptr<ShadowMapPass>      m_pShadowMapPass{};
-	std::unique_ptr<GBufferPass>        m_pGBufferPass{};
-	std::unique_ptr<SSAOPass>           m_pSSAOPass{};
-	std::unique_ptr<DeferredPass>       m_pDeferredPass{};
-	std::unique_ptr<ForwardPass>        m_pForwardPass{};
-	std::unique_ptr<SkyBoxPass>         m_pSkyBoxPass{};
-	std::unique_ptr<ToneMapPass>        m_pToneMapPass{};
-	std::unique_ptr<SpritePass>         m_pSpritePass{};
-	std::unique_ptr<BlitPass>           m_pBlitPass{};
-	std::unique_ptr<AAPass>             m_pAAPass{};
-	std::unique_ptr<PostProcessingPass> m_pPostProcessingPass{};
-	std::unique_ptr<EffectManager>      m_pEffectPass{};
+	std::unique_ptr<ShadowMapPass>				m_pShadowMapPass{};
+	std::unique_ptr<GBufferPass>				m_pGBufferPass{};
+	std::unique_ptr<SSAOPass>					m_pSSAOPass{};
+	std::unique_ptr<DeferredPass>				m_pDeferredPass{};
+	std::unique_ptr<ForwardPass>				m_pForwardPass{};
+	std::unique_ptr<SkyBoxPass>					m_pSkyBoxPass{};
+	std::unique_ptr<ToneMapPass>				m_pToneMapPass{};
+	std::unique_ptr<SpritePass>					m_pSpritePass{};
+	std::unique_ptr<BlitPass>					m_pBlitPass{};
+	std::unique_ptr<AAPass>						m_pAAPass{};
+	std::unique_ptr<PostProcessingPass>			m_pPostProcessingPass{};
+	std::unique_ptr<EffectManager>				m_pEffectPass{};
 
-	std::unique_ptr<PositionMapPass>    m_pPositionMapPass{};
-	std::unique_ptr<LightMapPass>       m_pLightMapPass{};
-	std::unique_ptr<ScreenSpaceReflectionPass> m_pScreenSpaceReflectionPass{};
-	std::unique_ptr<SubsurfaceScatteringPass> m_pSubsurfaceScatteringPass{};
-	std::unique_ptr<VignettePass>		m_pVignettePass{};
-	std::unique_ptr<ColorGradingPass>	m_pColorGradingPass{};
-	std::unique_ptr<VolumetricFogPass>	m_pVolumetricFogPass{};
+	std::unique_ptr<PositionMapPass>			m_pPositionMapPass{};
+	std::unique_ptr<LightMapPass>				m_pLightMapPass{};
+	std::unique_ptr<ScreenSpaceReflectionPass>	m_pScreenSpaceReflectionPass{};
+	std::unique_ptr<SubsurfaceScatteringPass>	m_pSubsurfaceScatteringPass{};
+	std::unique_ptr<VignettePass>				m_pVignettePass{};
+	std::unique_ptr<ColorGradingPass>			m_pColorGradingPass{};
+	std::unique_ptr<VolumetricFogPass>			m_pVolumetricFogPass{};
 
 	std::unique_ptr<UIPass>             m_pUIPass{};
 
@@ -147,7 +147,7 @@ private:
 	lm::LightMap lightMap;
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
-	ThreadPool* m_threadPool = nullptr;
+	ThreadPool<std::function<void()>>* m_threadPool = nullptr;
 	RenderThreadPool* m_commandThreadPool = nullptr;
 //Debug
 public:
@@ -157,6 +157,6 @@ public:
 private:
     bool useWireFrame       { false };
 	bool m_bShowRenderState { false };
-	bool useTestLightmap    { false };
+	std::atomic_bool useTestLightmap{ false };
 	bool m_bShowGridSettings{ false };
 };

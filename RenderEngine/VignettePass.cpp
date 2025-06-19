@@ -83,5 +83,11 @@ void VignettePass::ControlPanel()
 	ImGui::Checkbox("Vignette", &isOn);
 	ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
 	ImGui::SliderFloat("Softness", &softness, 0.0f, 1.0f);
+
+	if (ImGui::Button("Reset")) {
+		radius = 0.75f;
+		softness = 0.5f;
+	}
+
 	ImGui::PopID();
 }

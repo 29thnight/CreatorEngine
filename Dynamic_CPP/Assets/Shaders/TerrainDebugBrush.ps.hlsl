@@ -30,14 +30,17 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float dist = length(IN.wPosition.xz - gBrushWorldPosition);
     float invBrushRadius = 1.0 / gBrushRadius;
     float clampRadius = dist * invBrushRadius;
+    
+    float3 tex= targetTexture.Sample(LinearSampler, uv);
+  
+    float3 color = tex;
+
     if (dist < gBrushRadius)
     {
         // If within brush radius, return a color (e.g., white)
-        return float4(0, clampRadius, 1.0 - clampRadius, 1);
+        
+        color = lerp(float3(0, clampRadius, 1.0 - clampRadius), tex, 0.8);
     }
-    else
-    {
-        return targetTexture.Sample(LinearSampler, uv);
-
-    }
+    
+    return float4(color, 1);
 }

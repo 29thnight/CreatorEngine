@@ -21,7 +21,7 @@ public:
 
 
 	void ReCreateMask(AvatarMask* _otherMask);
-	BoneMask* RootMask;
+	BoneMask* RootMask{ nullptr };
 	bool IsBoneEnabled(const std::string& name);
 	BoneMask* MakeBoneMask(Bone* Bone);
 	[[Property]]

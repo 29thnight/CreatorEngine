@@ -28,6 +28,17 @@ public:
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
+	static Texture* Create(
+		_In_ uint32 ratioX,
+		_In_ uint32 ratioY,
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ const std::string_view& name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
 	static Texture* CreateCube(
 		_In_ uint32 size,
 		_In_ const std::string_view& name,
@@ -115,8 +126,22 @@ public:
 
 	void ResizeRelease();
 
+	void SetSize(float2 size) {
+		m_size = size;
+		m_desc.Width = static_cast<uint32>(m_size.x / m_sizeRatio.x);
+		m_desc.Height = static_cast<uint32>(m_size.y / m_sizeRatio.y);
+	}
+
+	void SetSizeRatio(float2 ratio) 
+	{
+		m_sizeRatio = ratio;
+		m_desc.Width = static_cast<uint32>(m_size.x / m_sizeRatio.x);
+		m_desc.Height = static_cast<uint32>(m_size.y / m_sizeRatio.y);
+	}
+
 private:
-	float2 size{};
+	float2 m_size{};
+	float2 m_sizeRatio{ 1.f, 1.f };
 
 	std::vector<ID3D11RenderTargetView*> m_pRTVs;
 	std::vector<CD3D11_RENDER_TARGET_VIEW_DESC> m_rtvDescs;
@@ -156,10 +181,11 @@ namespace TextureHelper
 			height, 
 			name, 
 			format, 
-			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
+			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
 		);
 		tex->CreateRTV(format);
 		tex->CreateSRV(format);
+		tex->CreateUAV(format);
 
         return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
 	}

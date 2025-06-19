@@ -24,16 +24,19 @@
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Barrier.h" />
     <ClInclude Include="Core.Coroutine.h" />
+    <ClInclude Include="Core.CountingSemaphore.h" />
     <ClInclude Include="Core.Definition.h" />
+    <ClInclude Include="Core.Fence.h" />
     <ClInclude Include="Core.FenceFlag.h" />
-    <ClInclude Include="Core.FenceFlagGroup.h" />
     <ClInclude Include="Core.Mathf.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.OctreeNode.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
+    <ClInclude Include="Core.Thread.h" />
     <ClInclude Include="Core.Thread.hpp" />
+    <ClInclude Include="Core.ThreadPool.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
@@ -55,6 +58,7 @@
     <ClInclude Include="MetaAlias.h" />
     <ClInclude Include="MetaStateCommand.h" />
     <ClInclude Include="MetaUtility.h" />
+    <ClInclude Include="Core.Octree.h" />
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
@@ -114,6 +118,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>

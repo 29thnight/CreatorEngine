@@ -6,7 +6,7 @@
 #include "RenderableComponents.h"
 #include "LightController.h"
 #include "directxtk\SimpleMath.h"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "Skeleton.h"
 
 bool g_useCascade = true;
@@ -55,6 +55,24 @@ ShadowMapPass::ShadowMapPass()
 	//DeviceState::g_pDevice->CreateDeferredContext(0, &defferdContext1);
 }
 
+ShadowMapPass::~ShadowMapPass()
+{
+	for (auto& [frame, cmdArr] : m_commandQueueMap)
+	{
+		for (auto& queue : cmdArr)
+		{
+			while (!queue.empty())
+			{
+				ID3D11CommandList* CommandJob;
+				if (queue.try_pop(CommandJob))
+				{
+					Memory::SafeDelete(CommandJob);
+				}
+			}
+		}
+	}
+}
+
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
 {
 
@@ -74,9 +92,6 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 				Memory::SafeDelete(CommandJob);
 			}
 		}
-
-		ShadowMapConstant shadowMapConstant = scene.m_LightController->m_shadowMapConstant;
-		DirectX11::UpdateBuffer(scene.m_LightController->m_shadowMapBuffer, &shadowMapConstant);
 	}
 }
 
@@ -208,24 +223,24 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* defferdCo
 
 	auto  lightdir			= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc				= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constantCopy		= camera.m_shadowMapConstant;		//type = ShadowMapConstant
+	auto& constantCopy		= camera.m_shadowMapConstant;						//type = ShadowMapConstant
 
 	m_pso->Apply(defferdContextPtr1);
 
 	DevideCascadeEnd(camera);
 	DevideShadowInfo(camera, lightdir);
 
-	constantCopy.devideShadow				= m_settingConstant.devideShadow;
-	constantCopy._epsilon					= m_settingConstant._epsilon;
+	constantCopy.devideShadow							= m_settingConstant.devideShadow;
+	constantCopy._epsilon								= m_settingConstant._epsilon;
 	renderData->m_shadowCamera.m_eyePosition			= camera.m_cascadeinfo[2].m_eyePosition;
 	renderData->m_shadowCamera.m_lookAt					= camera.m_cascadeinfo[2].m_lookAt;
 	renderData->m_shadowCamera.m_viewHeight				= camera.m_cascadeinfo[2].m_viewHeight;
 	renderData->m_shadowCamera.m_viewWidth				= camera.m_cascadeinfo[2].m_viewWidth;
 	renderData->m_shadowCamera.m_nearPlane				= camera.m_cascadeinfo[2].m_nearPlane;
 	renderData->m_shadowCamera.m_farPlane				= camera.m_cascadeinfo[2].m_farPlane;
-	constantCopy.m_shadowMapWidth			= desc.m_textureWidth;
-	constantCopy.m_shadowMapHeight			= desc.m_textureHeight;
-	constantCopy.m_lightViewProjection[0]	= camera.m_cascadeinfo[2].m_lightViewProjection;
+	constantCopy.m_shadowMapWidth						= desc.m_textureWidth;
+	constantCopy.m_shadowMapHeight						= desc.m_textureHeight;
+	constantCopy.m_lightViewProjection[0]				= camera.m_cascadeinfo[2].m_lightViewProjection;
 
 	DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
 	DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[0]);
@@ -248,23 +263,25 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 {
 	auto defferdContextPtr1 = defferdContext;
 
+	auto renderData = RenderPassData::GetData(&camera);
+
 	HashedGuid currentAnimatorGuid{};
 
-	for (auto& MeshRendererProxy : scene.GetShadowRenderQueue())
+	for (auto& PrimitiveRenderProxy : renderData->m_shadowRenderQueue)
 	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdContextPtr1);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdContextPtr1);
 
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
+		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			if (animatorGuid != currentAnimatorGuid)
+			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
-				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
+				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		MeshRendererProxy->Draw(defferdContextPtr1);
+		PrimitiveRenderProxy->Draw(defferdContextPtr1);
 	}
 }
 
@@ -348,14 +365,14 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 			LightDir.Normalize();
 		}
 
-		Mathf::Vector3 shadowPos						= centerPos + LightDir * -radius;
+		Mathf::Vector3 shadowPos						= centerPos + LightDir * -250;
 		Mathf::Vector3 cascadeExtents					= maxExtents - minExtents;
 		Mathf::xMatrix lightView						= DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
-		Mathf::xMatrix lightProj						= DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, cascadeExtents.z);
+		Mathf::xMatrix lightProj						= DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, 500);
 		camera.m_cascadeinfo[i].m_eyePosition			= shadowPos;
 		camera.m_cascadeinfo[i].m_lookAt				= centerPos;
 		camera.m_cascadeinfo[i].m_nearPlane				= 0.1f; //*****
-		camera.m_cascadeinfo[i].m_farPlane				= cascadeExtents.z;
+		camera.m_cascadeinfo[i].m_farPlane				= 500;
 		camera.m_cascadeinfo[i].m_viewWidth				= maxExtents.x;
 		camera.m_cascadeinfo[i].m_viewHeight			= maxExtents.y;
 		camera.m_cascadeinfo[i].m_lightViewProjection	= lightView * lightProj;
@@ -365,6 +382,7 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
 	scene.m_LightController->m_shadowMapConstant.useCasCade = g_useCascade;
+	camera.m_shadowMapConstant.useCasCade = g_useCascade;
 	if (g_useCascade)
 	{
 		CreateCommandListCascadeShadow(defferdContext, scene, camera);

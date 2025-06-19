@@ -2,8 +2,12 @@
 #include "Camera.h"
 #include "../ScriptBinder/GameObject.h"
 #include "AnimationJob.h"
-#include "RenderCommand.h"
+#include "MeshRendererProxy.h"
 #include "RenderPassData.h"
+#include "ProxyCommandQueue.h"
+#include "concurrent_unordered_map.h"
+
+using namespace concurrency;
 
 class GameObject;
 class Scene;
@@ -11,13 +15,15 @@ class LightController;
 class HierarchyWindow;
 class InspectorWindow;
 class MeshRenderer;
+class ProxyCommand;
 class RenderScene
 {
 public:
-	using ProxyContainer = std::vector<MeshRendererProxy*>;
-	using ProxyMap		 = std::unordered_map<size_t, std::shared_ptr<MeshRendererProxy>>;
-	using AnimatorMap	 = std::unordered_map<size_t, Animator*>;
-	using RenderDataMap  = std::unordered_map<size_t, std::shared_ptr<RenderPassData>>;
+	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
+	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
+	using AnimatorMap			= std::unordered_map<size_t, Animator*>;
+	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
+	using RenderDataMap			= std::unordered_map<size_t, std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
 	~RenderScene();
@@ -46,29 +52,31 @@ public:
 	void UnregisterAnimator(Animator* animatorPtr);
 
 	void RegisterCommand(MeshRenderer* meshRendererPtr);
+	bool InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr);
 	void UpdateCommand(MeshRenderer* meshRendererPtr);
+	ProxyCommand MakeProxyCommand(MeshRenderer* meshRendererPtr);
 	void UnregisterCommand(MeshRenderer* meshRendererPtr);
 
-	void PushShadowRenderQueue(MeshRendererProxy* proxy);
-	ProxyContainer GetShadowRenderQueue();
-	void ClearShadowRenderQueue();
-
-
-	MeshRendererProxy* FindProxy(size_t guid);
+	PrimitiveRenderProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
+
+	void OnProxyDistroy();
+
+	static concurrent_queue<HashedGuid> RegisteredDistroyProxyGUIDs;
 
 private:
 	friend class HierarchyWindow;
 	friend class InspectorWindow;
 	friend class SceneViewWindow;
+	friend class ProxyCommand;
 
-	Scene*			m_currentScene{};
-	AnimationJob	m_animationJob{};
-	ProxyMap		m_proxyMap;
-	AnimatorMap		m_animatorMap;
-	RenderDataMap   m_renderDataMap;
-	ProxyContainer  m_shadowRenderQueue;
-	ID3D11Buffer*	m_ModelBuffer{};
-	std::mutex      m_shadowRenderMutex;
-	bool			m_isPlaying = false;
+	Scene*				m_currentScene{};
+	AnimationJob		m_animationJob{};
+	ProxyMap			m_proxyMap;
+	AnimatorMap			m_animatorMap;
+	AnimationPalleteMap m_palleteMap;
+	RenderDataMap		m_renderDataMap;
+	ID3D11Buffer*		m_ModelBuffer{};
+	std::atomic_flag	m_proxyMapFlag{};
+	bool				m_isPlaying = false;
 };

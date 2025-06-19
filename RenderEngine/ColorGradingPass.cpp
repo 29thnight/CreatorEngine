@@ -95,5 +95,11 @@ void ColorGradingPass::ControlPanel()
 	ImGui::SliderFloat("Lerp", &lerp, 0.0f, 1.0f);
 	if(ImGui::Button("Timer Zero"))
 		timer = 0.0f;
+
+	if (ImGui::Button("Reset")) {
+		lerp = 0.0f;
+		timer = 0.0f;
+	}
+
 	ImGui::PopID();
 }

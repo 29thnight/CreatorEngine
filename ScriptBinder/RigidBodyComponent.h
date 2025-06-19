@@ -52,11 +52,11 @@ private:
 	Mathf::Vector3 m_angularVelocity;
 
 
-	bool m_isLockLinearX;
-	bool m_isLockLinearY;
-	bool m_isLockLinearZ;
-	bool m_isLockAngularX;
-	bool m_isLockAngularY;
-	bool m_isLockAngularZ;
+	bool m_isLockLinearX = false;
+	bool m_isLockLinearY = false;
+	bool m_isLockLinearZ = false;
+	bool m_isLockAngularX = false;
+	bool m_isLockAngularY = false;
+	bool m_isLockAngularZ = false;
 };
 

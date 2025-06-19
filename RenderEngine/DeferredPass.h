@@ -13,6 +13,7 @@ public:
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
     void Execute(RenderScene& scene, Camera& camera) override;
+    void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 
     void UseLightAndEmissiveRTV(Texture* lightEmissive);

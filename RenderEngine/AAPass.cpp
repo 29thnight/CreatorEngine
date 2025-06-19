@@ -78,6 +78,7 @@ void AAPass::Execute(RenderScene& scene, Camera& camera)
 
 void AAPass::ControlPanel()
 {
+	ImGui::PushID(this);
 	ImGui::Checkbox("Apply AntiAliasing", &m_isApply);
 	if (m_isApply)
 	{
@@ -85,4 +86,10 @@ void AAPass::ControlPanel()
 		ImGui::SliderFloat("BiasMin", &m_FXAAParameters.BiasMin, 0.0f, 50.0f);
 		ImGui::SliderFloat("SpanMax", &m_FXAAParameters.SpanMax, 0.0f, 100.0f);
 	}
+	if (ImGui::Button("Reset")) {
+		m_FXAAParameters.Bias = 0.688f;
+		m_FXAAParameters.BiasMin = 0.021f;
+		m_FXAAParameters.SpanMax = 8.0f;
+	}
+	ImGui::PopID();
 }

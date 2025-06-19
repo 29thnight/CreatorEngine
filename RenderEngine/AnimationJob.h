@@ -28,7 +28,7 @@ private:
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;
-    ThreadPool m_UpdateThreadPool;
+    ThreadPool<std::function<void()>> m_UpdateThreadPool;
     std::vector<Animator*> m_currAnimator;
     uint32 m_objectSize{};
 };

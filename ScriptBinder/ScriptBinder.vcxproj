@@ -44,6 +44,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -251,6 +252,7 @@
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
+    <ClInclude Include="TerrainBuffers.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="TransCondition.h" />

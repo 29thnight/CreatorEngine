@@ -154,6 +154,7 @@ void GridPass::ControlPanel()
 
 void GridPass::GridSetting()
 {
+    ImGui::PushID(this);
     ImGui::ColorEdit4("Grid Color", &m_gridUniform.gridColor.x);
     ImGui::ColorEdit4("Checker Color", &m_gridUniform.checkerColor.x);
     ImGui::DragFloat("Unit Size", &m_gridUniform.unitSize, 1.f, 100.f);
@@ -162,6 +163,20 @@ void GridPass::GridSetting()
     ImGui::DragFloat("Minor Line Alpha", &m_gridUniform.minorLineAlpha, 0.f, 1.f);
     ImGui::DragFloat3("Center Offset", &m_gridUniform.centerOffset.x, -1000.f, 1000.f);
     ImGui::DragInt("Subdivisions", &m_gridUniform.subdivisions, 1, 100);
+
+    if (ImGui::Button("Reset")) {
+        m_gridUniform.gridColor = { XMFLOAT4(0.45f, 0.44f, 0.43f, 0.5f) };
+        m_gridUniform.checkerColor = { XMFLOAT4(0.41f, 0.38f, 0.36f, 0.f) };
+        m_gridUniform.fadeStart = { 300.f };
+        m_gridUniform.fadeEnd = { 1000.f };
+        m_gridUniform.unitSize = { 10.f };
+        m_gridUniform.subdivisions = { 10 };
+        m_gridUniform.centerOffset = { 0, 0, 0 };
+        m_gridUniform.majorLineThickness = { 2.f };
+        m_gridUniform.minorLineThickness = { 0.5f };
+        m_gridUniform.minorLineAlpha = { 1.f };
+    }
+    ImGui::PopID();
 }
 
 void GridPass::Resize(uint32_t width, uint32_t height)

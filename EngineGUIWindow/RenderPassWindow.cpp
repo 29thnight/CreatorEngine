@@ -23,6 +23,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pDeferredPass->ControlPanel();
 		}
 
+		if (ImGui::CollapsingHeader("SSGIPass"))
+		{
+			m_sceneRenderer->m_pSSGIPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("SkyBoxPass"))
 		{
 			m_sceneRenderer->m_pSkyBoxPass->ControlPanel();

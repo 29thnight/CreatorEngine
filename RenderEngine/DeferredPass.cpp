@@ -13,7 +13,7 @@ struct alignas(16) DeferredBuffer
 	float m_envMapIntensity{ 1.f };
 };
 
-ID3D11ShaderResourceView* nullSRV[10] = {
+ID3D11ShaderResourceView* nullSRV10[10] = {
     nullptr,
     nullptr,
     nullptr,
@@ -90,9 +90,28 @@ void DeferredPass::DisableAmbientOcclusion()
 
 void DeferredPass::Execute(RenderScene& scene, Camera& camera)
 {
-    m_pso->Apply();
+    auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
+
+    if (nullptr != cmdQueuePtr)
+    {
+        while (!cmdQueuePtr->empty())
+        {
+            ID3D11CommandList* CommandJob;
+            if (cmdQueuePtr->try_pop(CommandJob))
+            {
+                DirectX11::ExecuteCommandList(CommandJob, true);
+                Memory::SafeDelete(CommandJob);
+            }
+        }
+    }
+}
+
+void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+{
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
+
+    ID3D11DeviceContext* defferdPtr = defferdContext;
 
     auto& lightManager = scene.m_LightController;
 
@@ -100,57 +119,74 @@ void DeferredPass::Execute(RenderScene& scene, Camera& camera)
     cameraview.cameraView = camera.CalculateView();
 
     DeferredBuffer buffer{};
-    buffer.m_InverseProjection      = XMMatrixInverse(nullptr, camera.CalculateProjection());
-    buffer.m_InverseView            = XMMatrixInverse(nullptr, cameraview.cameraView);
-    buffer.m_useAmbientOcclusion    = m_UseAmbientOcclusion;
-    buffer.m_useEnvironmentMap      = m_UseEnvironmentMap;
-	buffer.m_envMapIntensity        = m_envMapIntensity;
-        
+    buffer.m_InverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
+    buffer.m_InverseView = XMMatrixInverse(nullptr, cameraview.cameraView);
+    buffer.m_useAmbientOcclusion = m_UseAmbientOcclusion;
+    buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
+    buffer.m_envMapIntensity = m_envMapIntensity;
+
     bool isShadowMapRender = lightManager->hasLightWithShadows && m_UseLightWithShadows;
 
-    ID3D11ShaderResourceView* srvs[10] = {
+    ID3D11ShaderResourceView* srvs[10] = 
+    {
         renderData->m_depthStencil->m_pSRV,
         m_DiffuseTexture->m_pSRV,
         m_MetalRoughTexture->m_pSRV,
         m_NormalTexture->m_pSRV,
-        (isShadowMapRender)     ? renderData->m_shadowMapTexture->m_pSRV : nullptr,
-        m_UseAmbientOcclusion   ? m_AmbientOcclusionTexture->m_pSRV      : nullptr,
-        m_UseEnvironmentMap     ? m_EnvironmentMap->m_pSRV               : nullptr,
-        m_UseEnvironmentMap     ? m_PreFilter->m_pSRV                    : nullptr,
-        m_UseEnvironmentMap     ? m_BrdfLut->m_pSRV                      : nullptr,
+        (isShadowMapRender) ? renderData->m_shadowMapTexture->m_pSRV : nullptr,
+        m_UseAmbientOcclusion ? m_AmbientOcclusionTexture->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr,
         m_EmissiveTexture->m_pSRV
     };
 
-    ID3D11RenderTargetView* nullRTV = nullptr;
-    ID3D11RenderTargetView* views[]{ renderData->m_renderTarget->GetRTV(), nullRTV };
+    m_pso->Apply(defferdPtr);
+    ID3D11RenderTargetView* emissiveRtv = m_LightEmissiveTexture->GetRTV();
 
-    DirectX11::OMSetRenderTargets(1, views, nullptr);
-    DirectX11::PSSetConstantBuffer(1, 1, &lightManager->m_pLightBuffer);
-    DirectX11::PSSetConstantBuffer(11, 1, &lightManager->m_pLightCountBuffer);
-    DirectX11::PSSetConstantBuffer(3, 1, m_Buffer.GetAddressOf());
-    DirectX11::PSSetConstantBuffer(10, 1, m_shadowcamBuffer.GetAddressOf());
-    DirectX11::PSSetShaderResources(0, 10, srvs);
+    ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
+    DirectX11::OMSetRenderTargets(defferdPtr, 2, rtv, nullptr);
+    DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+    DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &lightManager->m_pLightBuffer);
+    DirectX11::PSSetConstantBuffer(defferdPtr, 11, 1, &lightManager->m_pLightCountBuffer);
+    DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_Buffer.GetAddressOf());
+    DirectX11::PSSetConstantBuffer(defferdPtr, 10, 1, m_shadowcamBuffer.GetAddressOf());
+    DirectX11::PSSetShaderResources(defferdPtr, 0, 10, srvs);
 
     if (lightManager->hasLightWithShadows)
     {
-        DirectX11::PSSetConstantBuffer(2, 1, &lightManager->m_shadowMapBuffer);
+        DirectX11::PSSetConstantBuffer(defferdPtr, 2, 1, &lightManager->m_shadowMapBuffer);
     }
 
-    DirectX11::UpdateBuffer(m_Buffer.Get(), &buffer);
-    DirectX11::UpdateBuffer(m_shadowcamBuffer.Get(), &cameraview);
-    DirectX11::UpdateBuffer(lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
-    DirectX11::Draw(4, 0);
+    camera.UpdateBuffer(defferdPtr);
+    DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &buffer);
+    DirectX11::UpdateBuffer(defferdPtr, m_shadowcamBuffer.Get(), &cameraview);
+    DirectX11::UpdateBuffer(defferdPtr, lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
+    DirectX11::Draw(defferdPtr, 4, 0);
 
-    DirectX11::PSSetShaderResources(0, 10, nullSRV);
-    DirectX11::OMSetRenderTargets(1, nullRTVs, nullptr);
+    DirectX11::PSSetShaderResources(defferdPtr, 0, 10, nullSRV10);
+    DirectX11::OMSetRenderTargets(defferdPtr, 1, nullRTVs, nullptr);
+
+    ID3D11CommandList* commandList{};
+    defferdPtr->FinishCommandList(false, &commandList);
+    PushQueue(camera.m_cameraIndex, commandList);
 }
 
 void DeferredPass::ControlPanel()
 {
+    ImGui::PushID(this);
 	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
 	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
 	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
 	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+
+    if (ImGui::Button("Reset")) {
+		m_UseAmbientOcclusion = true;
+		m_UseEnvironmentMap = true;
+		m_UseLightWithShadows = true;
+		m_envMapIntensity = 0.2f;
+    }
+    ImGui::PopID();
 }
 
 void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)

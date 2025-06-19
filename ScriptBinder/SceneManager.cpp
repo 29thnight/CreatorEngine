@@ -6,6 +6,7 @@
 #include "ComponentFactory.h"
 #include "RegisterReflect.def"
 #include "CullingManager.h"
+#include "Profiler.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -15,6 +16,7 @@ void SceneManager::ManagerInitialize()
 
 void SceneManager::Editor()
 {
+    PROFILE_CPU_BEGIN("Editor");
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
@@ -32,31 +34,53 @@ void SceneManager::Editor()
         ScriptManager->ReloadDynamicLibrary();
 		m_activeScene.load()->Awake();
 	}
+    PROFILE_CPU_END();
 }
 
 void SceneManager::Initialization()
 {
+    PROFILE_CPU_BEGIN("Awake");
 	m_activeScene.load()->Awake();
+    PROFILE_CPU_END();
+    PROFILE_CPU_BEGIN("OnEnable");
     m_activeScene.load()->OnEnable();
+    PROFILE_CPU_END();
+    PROFILE_CPU_BEGIN("Start");
     m_activeScene.load()->Start();
+    PROFILE_CPU_END();
 }
 
 void SceneManager::Physics(float deltaSecond)
 {
+    PROFILE_CPU_BEGIN("FixedUpdate");
     m_activeScene.load()->FixedUpdate(deltaSecond);
+    PROFILE_CPU_END();
 }
 
 void SceneManager::InputEvents(float deltaSecond)
 {
+    PROFILE_CPU_BEGIN("InputEvents");
     InputEvent.Broadcast(deltaSecond);
+    PROFILE_CPU_END();
 }
 
 void SceneManager::GameLogic(float deltaSecond)
 {
+    PROFILE_CPU_BEGIN("Update");
     m_activeScene.load()->Update(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("YieldNull");
     m_activeScene.load()->YieldNull();
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("InternalAnimationUpdateEvent");
     InternalAnimationUpdateEvent.Broadcast(deltaSecond);
+    PROFILE_CPU_END();
+
+    PROFILE_CPU_BEGIN("LateUpdate");
     m_activeScene.load()->LateUpdate(deltaSecond);
+    PROFILE_CPU_END();
 }
 
 void SceneManager::SceneRendering(float deltaSecond)
@@ -116,8 +140,8 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
 Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 {
 	std::string fileStem = name.data();
-	std::string fileExtension = ".creator";
-    file::path saveSceneFileName = fileStem + fileExtension;
+	//std::string fileExtension = ".creator";
+    file::path saveSceneFileName = fileStem /*+ fileExtension*/;
 
 	std::ofstream sceneFileOut(saveSceneFileName);
     MetaYml::Node sceneNode{};

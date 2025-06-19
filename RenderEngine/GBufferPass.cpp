@@ -8,11 +8,16 @@
 #include "LightController.h"
 #include "LightProperty.h"
 #include "Benchmark.hpp"
-#include "RenderCommand.h"
-
-//==============
+#include "MeshRendererProxy.h"
 #include "Terrain.h"
 
+ID3D11ShaderResourceView* nullSRVs[5]{
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr,
+	nullptr
+};
 
 GBufferPass::GBufferPass()
 {
@@ -62,10 +67,9 @@ GBufferPass::GBufferPass()
 
 GBufferPass::~GBufferPass()
 {
-	//TODO: default 로 변경할 것
-	for (auto& commandMap : m_commandQueueMapArr)
+	for (auto& [frame, cmdArr] : m_commandQueueMap)
 	{
-		for (auto& [index, queue] : commandMap)
+		for (auto& queue : cmdArr)
 		{
 			while (!queue.empty())
 			{
@@ -90,6 +94,7 @@ void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetView
 void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 {
 	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
+
 	if (nullptr != cmdQueuePtr)
 	{
 		while (!cmdQueuePtr->empty())
@@ -106,24 +111,14 @@ void GBufferPass::Execute(RenderScene& scene, Camera& camera)
 
 void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto data = RenderPassData::GetData(&camera);
+
 	ID3D11DeviceContext* defferdPtr = defferdContext;
-	RenderPassData* data{ nullptr };
 
 	m_pso->Apply(defferdPtr);
 
-	if(!RenderPassData::VaildCheck(&camera))
-	{
-		return;
-	}
-
-	data = RenderPassData::GetData(&camera);
-
-	for (auto& RTV : m_renderTargetViews)
-	{
-		defferdPtr->ClearRenderTargetView(RTV, Colors::Transparent);
-	}
-
-	defferdPtr->OMSetRenderTargets(RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
+	DirectX11::OMSetRenderTargets(defferdPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
 
 	camera.UpdateBuffer(defferdPtr);
 	scene.UseModel(defferdPtr);
@@ -131,52 +126,28 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
-
-	for (auto& obj : scene.GetScene()->m_SceneObjects) {
-		if (obj->IsDestroyMark()) continue;
-		if (obj->HasComponent<TerrainComponent>()) {
-
-			auto terrain = obj->GetComponent<TerrainComponent>();
-			auto terrainMesh = terrain->GetMesh();
-
-			if (terrainMesh)
-			{
-				DirectX11::PSSetConstantBuffer(12, 1, terrain->m_layerBuffer.GetAddressOf());
-				scene.UpdateModel(obj->m_transform.GetWorldMatrix());
-
-				DirectX11::PSSetShaderResources(6, 1, terrain->GetLayerSRV());
-				DirectX11::PSSetShaderResources(7, 1, terrain->GetSplatMapSRV());
-				terrainMesh->Draw();
-				ID3D11ShaderResourceView* nullSRV = nullptr;
-				DirectX11::PSSetShaderResources(6, 1, &nullSRV);
-				DirectX11::PSSetShaderResources(7, 1, &nullSRV);
-			}
-		}
-	}
-	
-
 	
 	HashedGuid currentAnimatorGuid{};
 	HashedGuid currentMaterialGuid{};
 	//TODO : Change deferredContext Render
-	for (auto& MeshRendererProxy : data->m_deferredQueue)
+	for (auto& PrimitiveRenderProxy : data->m_deferredQueue)
 	{
-		scene.UpdateModel(MeshRendererProxy->m_worldMatrix, defferdPtr);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdPtr);
 
-		HashedGuid animatorGuid = MeshRendererProxy->m_animatorGuid;
-		if (MeshRendererProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
+		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
+		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
-			if (animatorGuid != currentAnimatorGuid)
+			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
-				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), MeshRendererProxy->m_finalTransforms);
-				currentAnimatorGuid = MeshRendererProxy->m_animatorGuid;
+				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		HashedGuid materialGuid = MeshRendererProxy->m_materialGuid;
+		HashedGuid materialGuid = PrimitiveRenderProxy->m_materialGuid;
 		if (HashedGuid::INVAILD_ID != materialGuid && materialGuid != currentMaterialGuid)
 		{
-			Material* mat = MeshRendererProxy->m_Material;
+			Material* mat = PrimitiveRenderProxy->m_Material;
 			DirectX11::UpdateBuffer(defferdPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
 
 			if (mat->m_pBaseColor)
@@ -201,14 +172,62 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 			}
 		}
 
-		MeshRendererProxy->Draw(defferdPtr);
+		PrimitiveRenderProxy->Draw(defferdPtr);
 	}
 
-	ID3D11ShaderResourceView* nullSRV = nullptr;
-	for (uint32 i = 0; i < 5; i++)
+	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);
+
+	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
+	ZeroMemory(nullRTV, sizeof(nullRTV));
+	defferdPtr->OMSetRenderTargets(RTV_TypeMax, nullRTV, nullptr);
+
+	ID3D11CommandList* commandList{};
+	defferdPtr->FinishCommandList(false, &commandList);
+	PushQueue(camera.m_cameraIndex, commandList);
+}
+
+void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+{
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto data = RenderPassData::GetData(&camera);
+
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+	m_pso->Apply(defferdPtr);
+
+	for (auto& RTV : m_renderTargetViews)
 	{
-		DirectX11::PSSetShaderResources(defferdPtr, i, 1, &nullSRV);
+		defferdPtr->ClearRenderTargetView(RTV, Colors::Transparent);
 	}
+
+	DirectX11::OMSetRenderTargets(defferdPtr, RTV_TypeMax, m_renderTargetViews, data->m_depthStencil->m_pDSV);
+
+	camera.UpdateBuffer(defferdPtr);
+	scene.UseModel(defferdPtr);
+	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
+	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
+
+	for (auto& obj : scene.GetScene()->m_SceneObjects) {
+		if (obj->IsDestroyMark()) continue;
+		if (obj->HasComponent<TerrainComponent>()) {
+
+			auto terrain = obj->GetComponent<TerrainComponent>();
+			auto terrainMesh = terrain->GetMesh();
+
+			if (terrainMesh)
+			{
+				DirectX11::PSSetConstantBuffer(defferdPtr, 12, 1, terrain->GetMaterial()->GetLayerBuffer());
+				scene.UpdateModel(obj->m_transform.GetWorldMatrix(), defferdPtr);
+
+				DirectX11::PSSetShaderResources(defferdPtr, 6, 1, terrain->GetMaterial()->GetLayerSRV());
+				DirectX11::PSSetShaderResources(defferdPtr, 7, 1, terrain->GetMaterial()->GetSplatMapSRV());
+				terrainMesh->Draw(defferdPtr);
+			}
+		}
+	}
+
+	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);
 
 	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
 	ZeroMemory(nullRTV, sizeof(nullRTV));

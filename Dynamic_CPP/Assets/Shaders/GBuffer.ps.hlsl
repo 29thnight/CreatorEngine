@@ -96,10 +96,10 @@ GBufferOutput main(PixelShaderInput IN)
         float2 uv = IN.texCoord;
         uv.y = -uv.y;
         
-        float2 uv0 = uv * gLayerTiling0 * 4096;
-        float2 uv1 = uv * gLayerTiling1 * 4096;
-        float2 uv2 = uv * gLayerTiling2 * 4096;
-        float2 uv3 = uv * gLayerTiling3 * 4096;
+        float2 uv0 = uv * gLayerTiling0;
+        float2 uv1 = uv * gLayerTiling1;
+        float2 uv2 = uv * gLayerTiling2;
+        float2 uv3 = uv * gLayerTiling3;
         
         float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0);
         float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0);

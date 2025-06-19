@@ -10,6 +10,7 @@ public:
 	
 	void Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive);
 	void Execute(RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize(uint32_t width, uint32_t height) override;
 
@@ -19,9 +20,19 @@ private:
 	Texture* m_pLightEmissiveTexture{ nullptr };
 
 	Texture* m_pTempTexture{ nullptr };
-	ComPtr<ID3D11Buffer> m_Buffer;
+	ComPtr<ID3D11Buffer> m_SSGIBuffer;
+	ComPtr<ID3D11Buffer> m_CompositeBuffer;
 
-	float radius = 0.5f;
-	float thickness = 0.2f;
+	ComputeShader* m_pSSGIShader{};
+	ComputeShader* m_pCompositeShader{};
+
+	ComputeShader* m_pDownDualFilteringShader{};
+	ComputeShader* m_pUpDualFilteringShaeder{};
+
+	Sampler* sample = nullptr;
+	Sampler* pointSample = nullptr;
+
+	float radius = 4.f;//0.131f;
+	float thickness = 0.5f;//0.155f;
 };
 

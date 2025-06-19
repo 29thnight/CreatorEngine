@@ -354,7 +354,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 
 				{
-					selectedSceneObject->m_transform.GetLocalMatrix();
+					selectedSceneObject->m_transform.UpdateLocalMatrix();
 				}
 			}
 
@@ -1535,7 +1535,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 		{
 			//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
-			ImGui::SliderFloat("Strength", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
+			ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 		}
 
 		// PaintLayer 옵션일 때만 레이어 선택
@@ -1553,7 +1553,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				g_CurrentBrush->m_layerID = selectedLayerIndex;
 			}
 
-			LayerDesc* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
+			TerrainLayer* layer = terrainComponent->GetLayerDesc((uint32_t)selectedLayerIndex);
 			if (layer != nullptr) {
 				float tiling = layer->tilling;
 				float tempTiling = tiling;
@@ -1566,45 +1566,38 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 
 			if (ImGui::Button("AddLayer")) {
-				ImGui::OpenPopup("AddLayerPopup");
+
+				file::path difuseFile = ShowOpenFileDialog(L"");
+				std::wstring difuseFileName = difuseFile.filename();
+				if (!difuseFile.empty())
+				{
+					terrainComponent->AddLayer(difuseFile, difuseFileName, 10.0f);
+				}
 			}
 		}
 
 		//save , load
 		if (ImGui::Button("Save Terrain"))
 		{
-			file::path savePath = ShowSaveFileDialog(L"");
-			std::wstring folderPath = savePath.parent_path().wstring();
-			std::wstring fileName = savePath.filename().wstring();
-			terrainComponent->Save(folderPath, fileName);
+			
+			file::path savePath = ShowSaveFileDialog(L"", L"Save File",PathFinder::Relative("Terrain"));
+			if (savePath != L"") {
+				std::wstring folderPath = savePath.parent_path().wstring();
+				std::wstring fileName = savePath.filename().wstring();
+				terrainComponent->Save(folderPath, fileName);
+			}
 		}
 
 		if (ImGui::Button("Load Terrain"))
 		{
 			//todo:
-			/*file::path loadPath = ShowOpenFileDialog(L"");
+			file::path loadPath = ShowOpenFileDialog(L"");
 			if (!loadPath.empty())
 			{
-				terrainComponent->Load();
-			}*/
-		}
-
-	}
-
-	// 레이어 추가 팝업
-	if (ImGui::BeginPopup("AddLayerPopup"))
-	{
-		if (ImGui::Button("Add"))
-		{
-			file::path difuseFile = ShowOpenFileDialog(L"");
-			std::wstring difuseFileName = difuseFile.filename().wstring();
-			if (!difuseFile.empty())
-			{
-				terrainComponent->AddLayer(difuseFileName, 4096.0f);
+				terrainComponent->Load(loadPath);
 			}
-			ImGui::CloseCurrentPopup();
 		}
-		ImGui::EndPopup();
+
 	}
 }
 

@@ -16,7 +16,7 @@ public:
 
 public:
 	ShadowMapPass();
-	~ShadowMapPass() {};
+	~ShadowMapPass();
 
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;

@@ -192,6 +192,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					// 2. 새로운 부모에 추가
 					draggedObj->m_parentIndex = 0;
 					sceneGameObject->m_childrenIndices.push_back(draggedIndex);
+					draggedObj->m_transform.SetParentID(draggedObj->m_parentIndex);
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -289,6 +290,9 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 				// 2. 새로운 부모에 추가
 				draggedObj->m_parentIndex = obj->m_index;
 				obj->m_childrenIndices.push_back(draggedIndex);
+
+				//Matrix처리
+				draggedObj->m_transform.SetParentID(obj->m_index);
 			}
 		}
 		ImGui::EndDragDropTarget();

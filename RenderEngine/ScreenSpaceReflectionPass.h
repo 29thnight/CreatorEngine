@@ -11,6 +11,7 @@ public:
 
 	void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
 	void Execute(RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 private:
 	Texture* m_DiffuseTexture{};
@@ -19,7 +20,6 @@ private:
 	Texture* m_EmissiveTexture{};
 
 	Texture* m_CopiedTexture{};
-	Texture* m_prevSSRTexture{};
 	Texture* m_prevCopiedSSRTexture{};
 
 	ComPtr<ID3D11Buffer> m_Buffer{};

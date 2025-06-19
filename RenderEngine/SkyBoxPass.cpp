@@ -178,12 +178,18 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
     viewport.MaxDepth = 1.0f;
     deviceContext->RSSetViewports(1, &viewport);
 
+	Camera ortho;
+	DirectX11::IASetInputLayout(m_pso->m_inputLayout);
+	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
+	DirectX11::PSSetShader(m_rectToCubeMapPS->GetShader(), nullptr, 0);
+	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxTexture->m_pSRV);
+	scene.UseModel();
+
     for (int i = 0; i < 6; ++i)
     {
 		ID3D11RenderTargetView* rtv = m_skyBoxCubeMap->GetRTV(i);
         DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-        Camera ortho;
         ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
         ortho.m_lookAt = forward[i];
         ortho.m_up = up[i];
@@ -193,13 +199,6 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
         ortho.m_viewWidth = 2.f;
 		ortho.m_isOrthographic = true;
 
-		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
-        DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
-		DirectX11::PSSetShader(m_rectToCubeMapPS->GetShader(), nullptr, 0);
-
-		DirectX11::PSSetShaderResources(0, 1, &m_skyBoxTexture->m_pSRV);
-
-        scene.UseModel();
 		ortho.UpdateBuffer();
         scene.UpdateModel(XMMatrixIdentity());
 
@@ -247,11 +246,18 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 	viewport.MaxDepth = 1.0f;
 	deviceContext->RSSetViewports(1, &viewport);
 
+	Camera ortho;
+	DirectX11::IASetInputLayout(m_pso->m_inputLayout);
+	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
+	DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
+	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
+	scene.UseModel();
+
 	for (int i = 0; i < 6; ++i)
 	{
 		ID3D11RenderTargetView* rtv = m_EnvironmentMap->GetRTV(i);
 		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-		Camera ortho;
+
 		ortho.m_eyePosition = XMVectorSet(0.f, 0.f, 0.f, 0.f);
 		ortho.m_lookAt = forward[i];
 		ortho.m_up = up[i];
@@ -261,12 +267,6 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 		ortho.m_viewWidth = 2.f;
 		ortho.m_isOrthographic = true;
 
-		DirectX11::IASetInputLayout(m_pso->m_inputLayout);
-		DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
-		DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
-		DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
-
-		scene.UseModel();
 		ortho.UpdateBuffer();
 		scene.UpdateModel(XMMatrixIdentity());
 		m_skyBoxMesh->Draw();
@@ -294,7 +294,14 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 	PrefilterCBuffer cBuffer;
 
 	auto deviceContext = DeviceState::g_pDeviceContext;
+	Camera ortho;
+
 	deviceContext->PSSetConstantBuffers(0, 1, &buffer);
+	DirectX11::IASetInputLayout(m_pso->m_inputLayout);
+	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
+	DirectX11::PSSetShader(m_prefilterPS->GetShader(), nullptr, 0);
+	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
+	scene.UseModel();
 
 	for (int i = 0; i < 6; ++i)
 	{
@@ -314,7 +321,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 		{
 			ID3D11RenderTargetView* rtv = m_SpecularMap->GetRTV(i * 6 + j);
 			DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
-			Camera ortho;
+
 			ortho.m_eyePosition = XMVectorSet(0, 0, 0, 0);
 			ortho.m_lookAt = forward[j];
 			ortho.m_up = up[j];
@@ -324,12 +331,6 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 			ortho.m_viewWidth = 2;
 			ortho.m_isOrthographic = true;
 
-			DirectX11::IASetInputLayout(m_pso->m_inputLayout);
-			DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
-			DirectX11::PSSetShader(m_prefilterPS->GetShader(), nullptr, 0);
-			DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
-
-			scene.UseModel();
 			ortho.UpdateBuffer();
 			scene.UpdateModel(XMMatrixIdentity());
 			m_skyBoxMesh->Draw();
@@ -377,28 +378,52 @@ Texture* SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 
 void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 {
+	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
+
+	if (nullptr != cmdQueuePtr)
+	{
+		while (!cmdQueuePtr->empty())
+		{
+			ID3D11CommandList* CommandJob;
+			if (cmdQueuePtr->try_pop(CommandJob))
+			{
+				DirectX11::ExecuteCommandList(CommandJob, true);
+				Memory::SafeDelete(CommandJob);
+			}
+		}
+	}
+}
+
+void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+{
 	if (!m_abled || !RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	m_pso->Apply();
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+
+	m_pso->Apply(defferdPtr);
 
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
-
-	camera.UpdateBuffer();
-	scene.UseModel();
+	DirectX11::OMSetRenderTargets(defferdPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
+	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+	camera.UpdateBuffer(defferdPtr);
+	scene.UseModel(defferdPtr);
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
 	//auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
 	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
 
-	scene.UpdateModel(modelMatrix);
-	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
-	m_skyBoxMesh->Draw();
+	scene.UpdateModel(modelMatrix, defferdPtr);
+	DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &m_skyBoxCubeMap->m_pSRV);
+	m_skyBoxMesh->Draw(defferdPtr);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets();
+	DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &nullSRV);
+	DirectX11::UnbindRenderTargets(defferdPtr);
+
+	ID3D11CommandList* commandList{};
+	defferdPtr->FinishCommandList(false, &commandList);
+	PushQueue(camera.m_cameraIndex, commandList);
 }
 
 void SkyBoxPass::ControlPanel()
