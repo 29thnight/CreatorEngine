@@ -6,6 +6,7 @@
 #include "Scene.h"
 #include "Benchmark.hpp"
 #include "AnimationController.h"
+#include "Socket.h"
 using namespace DirectX;
 
 inline float lerp(float a, float b, float f)
@@ -60,15 +61,18 @@ void AnimationJob::Update(float deltaTime)
 
     for(auto& animator : m_currAnimator)
     {
-        m_UpdateThreadPool.Enqueue([&]
+        std::vector<std::shared_ptr<AnimationController>> controllers = animator->m_animationControllers;
+        m_UpdateThreadPool.Enqueue([&, controllers]
         {
             Skeleton* skeleton = animator->m_Skeleton;
 
             //컨트롤러별로 상,하체 등등이 분리되있다면
             if (animator->UsesMultipleControllers() == true)
             {
-                for (auto& animationcontroller : animator->m_animationControllers)
+                for (auto& sharedanimationcontroller : animator->m_animationControllers)
                 {
+                    AnimationController* animationcontroller = sharedanimationcontroller.get();
+                    if (animationcontroller == nullptr || !animationcontroller->useController) continue;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
                     if(animation.m_isLoop == true)
@@ -77,18 +81,20 @@ void AnimationJob::Update(float deltaTime)
                     {
                         if (animationcontroller->m_timeElapsed >= animation.m_duration)
                             animationcontroller->m_timeElapsed = animation.m_duration;
+                        
                     }
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
                         Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
                         animationcontroller->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
                         animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
-                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
+                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
                     }
                     else
                     {
-                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);  
+                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
                 }
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
@@ -108,8 +114,12 @@ void AnimationJob::Update(float deltaTime)
                         animator->m_TimeElapsed = animation.m_duration;
                 }
                 AnimationController* animationcontroller = nullptr;
-                if(!animator->m_animationControllers.empty())
-                    animationcontroller = animator->m_animationControllers[0];
+                if (!animator->m_animationControllers.empty())
+                {
+                    animationcontroller = animator->m_animationControllers[0].get();
+                    animationcontroller->curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
+                    if (!animationcontroller->useController) animationcontroller = nullptr;
+                }
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
                 if (animator->m_isBlend)
                 {
@@ -233,7 +243,23 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     
     bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    
+    if (skeleton->HasSocket())
+    {
+        for (auto& socket : skeleton->m_sockets)
+        {
+            if (bone->m_name == socket->m_ObjectName)
+            {
+                socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
+                //socket->transform.SetAndDecomposeMatrix(socket->m_boneMatrix);
+                socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
+                socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                socket->Update();
+               // auto matrix = socket->transform.GetLocalMatrix() * animator.GetOwner()->m_transform.GetWorldMatrix();
+               // socket->transform.SetAndDecomposeMatrix(matrix);
+            }
+        }
+    }
+
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = nodeTransform;
@@ -258,10 +284,20 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         auto mask = controller->GetAvatarMask();
         if (mask != nullptr) //마스크 있으면
         {
-            
-            if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+
+            if(mask->isHumanoid)
             {
-                globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
+                {
+                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                }
+            }
+            else
+            {
+                if (mask->IsBoneEnabled(bone->m_name) == true)
+                {
+                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+                }
             }
         }
         else

@@ -23,7 +23,7 @@ public:
 	std::shared_ptr<GameObject> MakeText(const std::string_view& name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
 
-
+	void DeleteCanvas(std::string canvasName);
 	void CheckInput();
 
 	GameObject* FindCanvasName(std::string_view name);

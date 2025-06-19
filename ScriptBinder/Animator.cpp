@@ -64,40 +64,74 @@ void Animator::UpdateAnimation()
 void Animator::CreateController(std::string name)
 {
 	
-	
-	AnimationController* animationController = new AnimationController();
+	std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = name;
-	//animationController->CreateMask(); &&&&& 기본은 마스크없게 
 	animationController->m_nodeEditor = new NodeEditor();
+	animationController->CreateState("Ani State", -1, true);
 	m_animationControllers.push_back(animationController);
 }
 
 void Animator::CreateController_UI()
 {
-	AnimationController* animationController = new AnimationController();
+	std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
-	//animationController->CreateMask();
-	animationController->m_nodeEditor = new NodeEditor();
+;	animationController->m_nodeEditor = new NodeEditor();
+	animationController->CreateState("Ani State",-1,true);
 	m_animationControllers.push_back(animationController);
+}
+
+void Animator::DeleteController(int index)
+{	
+	m_animationControllers.erase(m_animationControllers.begin() + index);
+}
+
+void Animator::DeleteController(std::string controllerName)
+{
+	auto it = std::remove_if(m_animationControllers.begin(), m_animationControllers.end(),
+		[&](std::shared_ptr<AnimationController> controller)
+		{
+				return controller->name == controllerName;
+		});
+
+	m_animationControllers.erase(it, m_animationControllers.end()); 
+	
 }
 
 AnimationController* Animator::GetController(std::string name)
 {
-        for (auto& Controller : m_animationControllers)
-        {
-                if (Controller->name == name)
-                        return Controller;
-        }
-        // Return nullptr when no controller with the specified name exists
-        return nullptr;
+    for (auto& Controller : m_animationControllers)
+    {
+            if (Controller->name == name)
+                    return Controller.get();
+    }
+    return nullptr;
 }
 
 void Animator::DeleteParameter(int index)
 {
 	if (index >= 0 && index < Parameters.size())
 	{
+		for (auto& controller : m_animationControllers)
+		{
+			for (auto& state : controller->StateVec)
+			{
+				for (auto& transition : state->Transitions)
+				{
+					for (auto& condition : transition->conditions)
+					{
+						if (condition.valueParameter == Parameters[index])
+						{
+							condition.valueParameter = nullptr;
+						}
+					}
+				}
+
+			}
+		}
 		delete Parameters[index];
 		Parameters.erase(Parameters.begin() + index);
 	}

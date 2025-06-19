@@ -219,6 +219,9 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderTaskScheduler">
+      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -466,6 +469,9 @@
     </ClCompile>
     <ClCompile Include="TerrainMaterial.cpp">
       <Filter>Resources\TerrainMaterial</Filter>
+    </ClCompile>
+    <ClCompile Include="Socket.cpp">
+      <Filter>Resources\Skeleton</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -717,6 +723,9 @@
     </ClInclude>
     <ClInclude Include="SwapEvent.h">
       <Filter>Event</Filter>
+    </ClInclude>
+    <ClInclude Include="Socket.h">
+      <Filter>Resources\Skeleton</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

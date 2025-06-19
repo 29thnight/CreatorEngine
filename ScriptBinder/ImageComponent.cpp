@@ -47,6 +47,7 @@ void ImageComponent::Update(float tick)
 void ImageComponent::Draw(SpriteBatch* sBatch)
 {
 	if (_layerorder < 0) _layerorder = 0;
+	if(m_curtexture !=nullptr)
 	sBatch->Draw(m_curtexture->m_pSRV, { pos.x,pos.y }, nullptr, Colors::White, rotate, origin, scale,
 		SpriteEffects_None, _layerorder / MaxOreder);
 
@@ -57,7 +58,6 @@ void ImageComponent::UpdateTexture()
 {
 	if (curindex <= 0)
 		curindex = 0;
-
 	if (curindex >= textures.size())
 		curindex = textures.size() - 1;
 

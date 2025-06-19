@@ -63,14 +63,18 @@ public:
 	std::string curStateName{};
 	[[Property]]
 	std::string nextStateName{};
+	[[Property]]
+	bool hasExitTime = false;
+	[[Property]]
+	float exitTime = 0.1f;
+	[[Property]]
+	float blendTime = 0.2f;
 private:
 	
 	// 전이시간이자 블렌딩될 시간
-	[[Property]]
-	float blendTime =0.2f;
+	
 	// 애니메이션 탈출 최소시간
-	[[Property]]
-	float exitTime =0.f;
+	
 
 	
 	

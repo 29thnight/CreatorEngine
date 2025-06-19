@@ -10,6 +10,20 @@ Canvas::Canvas()
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<Canvas>();
 }
 
+void Canvas::OnDistroy()
+{
+	
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (scene != nullptr && m_pOwner->IsDestroyMark())
+	{
+		if (UIManagers->CurCanvas == m_pOwner)
+			UIManagers->CurCanvas = nullptr;
+		UIManagers->DeleteCanvas(m_pOwner->ToString());
+	}
+	
+
+}
+
 void Canvas::AddUIObject(GameObject* obj)
 {
 	

@@ -30,7 +30,14 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Te
 	}
 	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
 	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
-	newImage->AddComponent<ImageComponent>()->Load(texture);
+	if (texture == nullptr)
+	{
+		newImage->AddComponent<ImageComponent>();
+	}
+	else
+	{
+		newImage->AddComponent<ImageComponent>()->Load(texture);
+	}
 
 	canvasCom->AddUIObject(newImage.get());
 	
@@ -159,6 +166,18 @@ std::shared_ptr<GameObject> UIManager::MakeText(const std::string_view& name, Sp
 	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
 
 	return newText;
+}
+
+void UIManager::DeleteCanvas(std::string canvasName)
+{
+	auto it = std::find_if(Canvases.begin(), Canvases.end(),
+		[&](const GameObject* canvas)
+		{
+			return canvas->ToString() == canvasName;
+		});
+
+	Canvases.erase(it, Canvases.end());
+
 }
 
 void UIManager::CheckInput()

@@ -142,6 +142,7 @@ private:
 	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	GameObject* testt;
+	GameObject* sword;
 	TestPlayer player;
 	lm::LightMap lightMap;
 

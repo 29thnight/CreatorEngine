@@ -12,14 +12,15 @@ public:
 	void GetPlayer(GameObject* _player);
 	void Update(float deltaTime);
 
-
+	float deta = 0;
 	Mathf::Vector2 dir;
+	void TestDelete();
 	void Punch();
 	void Move(Mathf::Vector2 dir);
 	void Jump();
 	GameObject* player;
 	float speed = 0.1f;
-	float maxSpeed = 60.0f;
+	float maxSpeed = 10.0f;
 };
 
 class IdleAni : public AniBehaviour

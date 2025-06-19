@@ -6,12 +6,12 @@
 #include "AnimationController.generated.h"
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
-class aniState;
+#include "IOnDistroy.h"
 class AniTransition;
 class AvatarMask;
 class Animator;
 class NodeEditor;
-class AnimationController
+class AnimationController 
 {
 public:
    ReflectAnimationController
@@ -30,11 +30,12 @@ public:
 
 	std::set<std::string> StateNameSet;
 
+	
+
 	[[Property]]
 	NodeEditor* m_nodeEditor;
-	//어디에서든지 전이가능한 state모음
 	[[Property]]
-	std::vector<std::shared_ptr<AnimationState>> m_anyStateVec;
+	std::shared_ptr<AnimationState> m_anyState;
 	bool BlendingAnimation(float tick);
 	Animator* GetOwner() { return m_owner; };
 	void SetCurState(std::string stateName);
@@ -45,6 +46,7 @@ public:
 	int GetAnimatonIndexformState(std::string stateName);
 	int GetAnimationIndex() { return m_AnimationIndex; }
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
+	std::shared_ptr<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
 	[[Method]]
 	void CreateState_UI();
@@ -64,6 +66,13 @@ public:
 	float m_nextTimeElapsed;
 	float m_isBlend;
 
+
+
+
+	//컨트롤러 바꿔치기용
+	[[Property]]
+	bool useController = false; 
+
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
 	DirectX::XMMATRIX m_LocalTransforms[512]{};
@@ -71,7 +80,7 @@ public:
 	AvatarMask* m_avatarMask{};
 	[[Property]]
 	bool useMask = false;
-	//&&&&& 아바타마스크 포인터로바꿈 수정필요
+	float curAnimationProgress = 0.f;
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;

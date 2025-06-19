@@ -9,8 +9,9 @@ ReflectionField(AniTransition) \
 		meta_property(m_name) \
 		meta_property(curStateName) \
 		meta_property(nextStateName) \
-		meta_property(blendTime) \
+		meta_property(hasExitTime) \
 		meta_property(exitTime) \
+		meta_property(blendTime) \
 	}); \
 	FieldEnd(AniTransition, PropertyOnly) \
 };
