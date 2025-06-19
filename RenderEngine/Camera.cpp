@@ -10,8 +10,6 @@
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
-
-
 Camera::Camera()
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;

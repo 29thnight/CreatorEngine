@@ -110,10 +110,11 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 			{
 				Debug->LogDebug(line);
 			}
-			//else
-			//{
-			//	Debug->LogDebug(line);
-			//}
+			else
+			{
+				std::string strLine = AnsiToUtf8(line);
+				Debug->LogDebug(strLine);
+			}
 		}
     }
 
@@ -126,7 +127,13 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 void HotLoadSystem::Initialize()
 {
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
-    
+	msbuildPath = EngineSettingInstance->GetMsbuildPath();
+	if (msbuildPath.empty())
+	{
+		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
+		return;
+	}
+
 #if defined(_DEBUG)
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "

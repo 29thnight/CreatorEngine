@@ -14,19 +14,9 @@
 #include "EngineSetting.h"
 #include "CullingManager.h"
 #include "UIManager.h"
-#include "SpinLock.h"
-#include "Core.Fence.h"
-#include "Core.Barrier.h"
 #include "InputActionManager.h"
 #include "Profiler.h"
 //#include "SwapEvent.h"
-
-std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
-std::atomic<bool> isGameToRender = false;
-std::atomic<double> frameDeltaTime{};
-Barrier renderBarrier(3);
-Fence RenderCommandFence;
-Fence RHICommandFence;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -93,7 +83,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
     {
-        m_sceneRenderer->OnWillRenderObject(frameDeltaTime);
+        m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
         m_sceneRenderer->SceneRendering();
     });
     g_progressWindow->SetProgress(82);
@@ -109,7 +99,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
     m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]() 
     {
-        m_sceneRenderer->EndOfFrame(frameDeltaTime);
+        m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
     });
 
     g_progressWindow->SetProgress(85);
@@ -117,14 +107,14 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
 
-	isGameToRender = true;
+    EngineSettingInstance->isGameToRender = true;
 
     PROFILE_FRAME();
 
     m_renderThread = std::thread([&] 
 	{
         PROFILE_REGISTER_THREAD("RenderThread");
-		while (isGameToRender)
+		while (EngineSettingInstance->isGameToRender)
 		{
             if (!m_isInvokeResize)
             {
@@ -136,7 +126,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_RHI_Thread = std::thread([&]
     {
         PROFILE_REGISTER_THREAD("RHI-Thread");
-        while (isGameToRender)
+        while (EngineSettingInstance->isGameToRender)
         {
             if (m_isInvokeResize)
             {
@@ -158,7 +148,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 DirectX11::Dx11Main::~Dx11Main()
 {
 	m_deviceResources->RegisterDeviceNotify(nullptr);
-	isGameToRender = false;
+	EngineSettingInstance->isGameToRender = false;
     SceneManagers->Decommissioning();
     gCPUProfiler.Shutdown();
 }
@@ -196,7 +186,7 @@ void DirectX11::Dx11Main::Update()
 	//SpinLock lock(gameToRenderLock);
     //RenderCommandFence.Begin();
 
-    frameDeltaTime = m_timeSystem.GetElapsedSeconds();
+    EngineSettingInstance->frameDeltaTime = m_timeSystem.GetElapsedSeconds();
 
     PROFILE_CPU_BEGIN("MainThread");
     m_timeSystem.Tick([&]
@@ -206,16 +196,16 @@ void DirectX11::Dx11Main::Update()
         if(!SceneManagers->m_isGameStart)
         {
             SceneManagers->Editor();
-            SceneManagers->InputEvents(frameDeltaTime);
+            SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
             SceneManagers->GameLogic();
         }
         else
         {
 			SceneManagers->Editor();
             SceneManagers->Initialization();
-			SceneManagers->Physics(frameDeltaTime);
-            SceneManagers->InputEvents(frameDeltaTime);
-            SceneManagers->GameLogic(frameDeltaTime);
+			SceneManagers->Physics(EngineSettingInstance->frameDeltaTime);
+            SceneManagers->InputEvents(EngineSettingInstance->frameDeltaTime);
+            SceneManagers->GameLogic(EngineSettingInstance->frameDeltaTime);
         }
 #endif // !EDITOR
     });
@@ -248,7 +238,7 @@ void DirectX11::Dx11Main::Update()
     PROFILE_CPU_END();
 #endif // !EDITOR
 
-    renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
 
     PROFILE_CPU_BEGIN("EndOfFrame");
     DisableOrEnable();
@@ -257,7 +247,7 @@ void DirectX11::Dx11Main::Update()
 
     PROFILE_FRAME();
     //RenderCommandFence.Wait();
-    renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
 }
 
 bool DirectX11::Dx11Main::RHIRender()
@@ -274,11 +264,10 @@ bool DirectX11::Dx11Main::RHIRender()
     }
 
 	{
-        SceneManagers->SceneRendering(frameDeltaTime);
+        SceneManagers->SceneRendering(EngineSettingInstance->frameDeltaTime);
 #if defined(EDITOR)
 		SceneManagers->OnDrawGizmos();
         SceneManagers->GUIRendering();
-
 #endif // !EDITOR
 	}
 
@@ -334,8 +323,8 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     {
         PROFILE_CPU_END();
         //RenderCommandFence.Signal();
-        renderBarrier.ArriveAndWait();
-        renderBarrier.ArriveAndWait();
+        EngineSettingInstance->renderBarrier.ArriveAndWait();
+        EngineSettingInstance->renderBarrier.ArriveAndWait();
         return;
     }
 
@@ -344,8 +333,8 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     PROFILE_CPU_END();
     //RHICommandFence.Wait();
     //RenderCommandFence.Signal();
-    renderBarrier.ArriveAndWait();
-    renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
 }
 
 void DirectX11::Dx11Main::RHIWorkerThread()
@@ -357,8 +346,8 @@ void DirectX11::Dx11Main::RHIWorkerThread()
         PROFILE_CPU_END();
 	}
     //RHICommandFence.Signal();
-    renderBarrier.ArriveAndWait();
-    renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
+    EngineSettingInstance->renderBarrier.ArriveAndWait();
 }
 
 void DirectX11::Dx11Main::InvokeResizeFlag()

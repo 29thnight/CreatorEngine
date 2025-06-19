@@ -391,6 +391,75 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 	return nullptr;
 }
 
+void DataSystem::CopyHDRTexture(const std::string_view& filePath)
+{
+	file::path source = filePath;
+	file::path destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
+	if (source != destination && file::exists(source) && !file::exists(destination))
+	{
+		file::copy_file(source, destination, file::copy_options::update_existing);
+	}
+}
+
+void DataSystem::CopyTexture(const std::string_view& filePath, const file::path& destination)
+{
+	if (filePath != destination && file::exists(filePath) && !file::exists(destination))
+	{
+		file::copy_file(filePath, destination, file::copy_options::update_existing);
+	}
+}
+
+void DataSystem::SelectTextureType(bool* open, const std::string_view& filePath)
+{
+	if (!EngineSettingInstance->IsImGuiInitialized())
+	{
+		Debug->LogError("DataSystem::SelectTextureType : ImGui is not initialized");
+		return;
+	}
+
+	ImGui::Begin("Select Texture Type", open, ImGuiWindowFlags_AlwaysAutoResize);
+	
+	static int selectedTextureType{};
+	const char* textureTypeNames[] = {
+		"Texture",
+		"Material Texture",
+		"Terrain Texture",
+		"HDR"
+	};
+
+	ImGui::Combo("Texture Type", &selectedTextureType, textureTypeNames, IM_ARRAYSIZE(textureTypeNames));
+
+	if (ImGui::Button("Select"))
+	{
+		CopyTextureSelectType(filePath, static_cast<TextureFileType>(selectedTextureType));
+	}
+
+	ImGui::End();
+}
+
+void DataSystem::CopyTextureSelectType(const std::string_view& filePath, TextureFileType type)
+{
+	file::path destination{};
+	if (type == TextureFileType::Texture)
+	{
+		destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::MaterialTexture)
+	{
+		destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::TerrainTexture)
+	{
+		destination = PathFinder::Relative("Terrain\\Texture\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::HDR)
+	{
+		destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
+	}
+
+	CopyTexture(filePath, destination);
+}
+
 Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
 {
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();

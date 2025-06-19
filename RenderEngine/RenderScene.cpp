@@ -79,7 +79,7 @@ RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 	auto it = m_renderDataMap.find(cameraIndex);
 	if (it != m_renderDataMap.end())
 	{
-		return m_renderDataMap[cameraIndex].get();
+		return it->second.get();
 	}
 
 	auto newRenderData = std::make_shared<RenderPassData>();
@@ -97,12 +97,27 @@ RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
 		return nullptr;
 	}
 
-	return m_renderDataMap[cameraIndex].get();
+	return it->second.get();
 }
 
 void RenderScene::RemoveRenderPassData(size_t cameraIndex)
 {
-	m_renderDataMap.erase(cameraIndex);
+	auto it = m_renderDataMap.find(cameraIndex);
+	if (it != m_renderDataMap.end())
+	{
+		it->second->m_isDestroy = true;
+	}
+}
+
+void RenderScene::EraseRenderPassData()
+{
+	for(auto it = m_renderDataMap.begin(); it != m_renderDataMap.end(); ++it)
+	{
+		if (it->second->m_isDestroy)
+		{
+			it = m_renderDataMap.unsafe_erase(it);
+		}
+	}
 }
 
 void RenderScene::RegisterAnimator(Animator* animatorPtr)

@@ -2,6 +2,55 @@
 #include <filesystem>
 #include <Windows.h>
 
+inline const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
+
+inline std::string ExecuteVsWhere()
+{
+	std::string result;
+	SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+	HANDLE hReadPipe, hWritePipe;
+
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
+	{
+		std::cerr << "Failed to create pipe\n";
+		return "";
+	}
+
+	PROCESS_INFORMATION pi{};
+	STARTUPINFOA si{};
+	si.cb = sizeof(si);
+	si.hStdOutput = hWritePipe;
+	si.hStdError = hWritePipe;
+	si.dwFlags |= STARTF_USESTDHANDLES;
+
+	std::string cmd = std::string("\"") + VSWHERE_PATH + "\" -latest -products * -property installationPath";
+
+	if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+	{
+		std::cerr << "Failed to execute vswhere\n";
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+		return "";
+	}
+
+	CloseHandle(hWritePipe); // parent doesn't write
+
+	char buffer[512];
+	DWORD bytesRead;
+	while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr))
+	{
+		buffer[bytesRead] = '\0';
+		result += buffer;
+	}
+
+	CloseHandle(hReadPipe);
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	return result;
+}
+
 namespace file = std::filesystem;
 
 namespace InternalPath
@@ -44,7 +93,7 @@ namespace InternalPath
         ShaderSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
 
 		DynamicSolutionDir		= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-		ProjectSettingsPath = file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
+		ProjectSettingsPath		= file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
 
 		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();

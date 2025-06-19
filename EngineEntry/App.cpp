@@ -127,8 +127,12 @@ LRESULT Core::App::ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	ImGuiIO& io = ImGui::GetIO();
+	ImGuiKey key = ImGuiKey(wParam);
 
-	io.AddKeyEvent(ImGuiKey(wParam), true);
+	if (key >= 0 && key < ImGuiKey_COUNT)
+	{
+		io.AddKeyEvent(key, true);
+	}
 
 	return 0;
 }
@@ -136,8 +140,13 @@ LRESULT Core::App::ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	ImGuiIO& io = ImGui::GetIO();
+	ImGuiKey key = ImGuiKey(wParam);
 
-	io.AddKeyEvent(ImGuiKey(wParam), false);
+	if (key >= 0 && key < ImGuiKey_COUNT)
+	{
+		io.AddKeyEvent(key, false);
+	}
+
 
 	return 0;
 }
@@ -193,6 +202,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	// 드래그 앤 드롭 이벤트 처리
 	HDROP hDrop = (HDROP)wParam;
 	UINT nFiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+
 	if (nFiles > 0)
 	{
 		std::vector<wchar_t> fileName(MAX_PATH);
@@ -205,11 +215,16 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			{
 				DataSystems->LoadModel(filePath.string());
 			}
-			else if (".png" == filePath.extension() || ".dds" == filePath.extension() || ".jpg" == filePath.extension())
+			else if (
+				".png" == filePath.extension() || 
+				".dds" == filePath.extension() || 
+				".jpg" == filePath.extension() ||
+				".hdr" == filePath.extension()
+			)
 			{
-				DataSystems->LoadTexture(filePath.string());
+				DataSystems->m_TargetTexturePath = filePath;
 			}
-            else if (".dmp")
+            else if (".dmp" == filePath.extension())
             {
                file::path dumpGitHash = GetDumpGitHashADS(filePath);
                if (!dumpGitHash.empty())

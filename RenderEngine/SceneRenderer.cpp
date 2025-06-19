@@ -373,6 +373,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//player.Update(deltaTime);
+	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();
 	PrepareRender();

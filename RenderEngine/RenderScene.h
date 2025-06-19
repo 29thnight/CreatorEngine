@@ -23,7 +23,7 @@ public:
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, Animator*>;
 	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
-	using RenderDataMap			= std::unordered_map<size_t, std::shared_ptr<RenderPassData>>;
+	using RenderDataMap			= concurrent_unordered_map<size_t, std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
 	~RenderScene();
@@ -47,6 +47,7 @@ public:
 	RenderPassData* AddRenderPassData(size_t cameraIndex);
 	RenderPassData* GetRenderPassData(size_t cameraIndex);
 	void RemoveRenderPassData(size_t cameraIndex);
+	void EraseRenderPassData();
 
 	void RegisterAnimator(Animator* animatorPtr);
 	void UnregisterAnimator(Animator* animatorPtr);

@@ -14,7 +14,6 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 		}
 	}
 
-	std::cout << "Invaild data" << std::endl;
 	return false;
 }
 
