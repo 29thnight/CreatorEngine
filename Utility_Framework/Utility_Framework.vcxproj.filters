@@ -73,14 +73,20 @@
     <Filter Include="Core.Coroutine">
       <UniqueIdentifier>{762822fa-b780-4fa8-9113-9a9c4d4751ae}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.Octree">
-      <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Octree\newOctree">
-      <UniqueIdentifier>{041995e1-a769-49fb-ade3-10561593affe}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Memory\SyncAPI">
       <UniqueIdentifier>{88bca47e-3ed7-499d-b95d-ad626d9da8cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Container">
+      <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Container\QuadTree">
+      <UniqueIdentifier>{eb38e51c-cf32-4e58-a4a7-f7e93c77d957}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Container\PointOctree">
+      <UniqueIdentifier>{041995e1-a769-49fb-ade3-10561593affe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.Container\MeshCullingOctree[WIP]">
+      <UniqueIdentifier>{d3e75a40-9227-4535-bca0-1f9574f2a71b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -219,9 +225,6 @@
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="Core.OctreeNode.h">
-      <Filter>Core.Octree</Filter>
-    </ClInclude>
     <ClInclude Include="ReflectionVectorFactory.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
@@ -253,11 +256,17 @@
       <Filter>Core.Thread</Filter>
     </ClInclude>
     <ClInclude Include="Core.Octree.h">
-      <Filter>Core.Octree\newOctree</Filter>
+      <Filter>Core.Container\PointOctree</Filter>
     </ClInclude>
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="Core.Fence.h">
       <Filter>Core.Memory\SyncAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="QuadTree.h">
+      <Filter>Core.Container\QuadTree</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.OctreeNode.h">
+      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -279,8 +288,11 @@
     <ClCompile Include="Core.Coroutine.cpp">
       <Filter>Core.Coroutine</Filter>
     </ClCompile>
+    <ClCompile Include="QuadTree.cpp">
+      <Filter>Core.Container\QuadTree</Filter>
+    </ClCompile>
     <ClCompile Include="Core.OctreeNode.cpp">
-      <Filter>Core.Octree</Filter>
+      <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

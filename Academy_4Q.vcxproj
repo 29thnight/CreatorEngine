@@ -178,23 +178,23 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
+    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
     <ClInclude Include="EngineGUIWindow\RenderPassWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
-    <ClInclude Include="ProjectSettingWindow.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
     <ClCompile Include="EngineEntry\BehaviorTree.cpp" />
     <ClCompile Include="EngineEntry\BT_Editor.cpp" />
     <ClCompile Include="EngineEntry\Dx11Main.cpp" />
+    <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
-    <ClCompile Include="ProjectSetting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">

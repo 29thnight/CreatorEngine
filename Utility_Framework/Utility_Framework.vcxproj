@@ -60,6 +60,7 @@
     <ClInclude Include="MetaUtility.h" />
     <ClInclude Include="Core.Octree.h" />
     <ClInclude Include="PathFinder.h" />
+    <ClInclude Include="QuadTree.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
     <ClInclude Include="ReflectionImGuiHelper.h" />
@@ -86,6 +87,7 @@
     <ClCompile Include="DeviceResources.cpp" />
     <ClCompile Include="HLSLCompiler.cpp" />
     <ClCompile Include="LogSystem.cpp" />
+    <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="TimeSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
