@@ -96,7 +96,6 @@ namespace Meta
         friend Singleton;
         friend class ::ComponentFactory;
     public:
-
         void Register(const std::string& name, const Type& type)
         {
             if (map.find(name) == map.end())
@@ -108,6 +107,21 @@ namespace Meta
 			{
 				hashMap[type.typeID] = type;
 			}
+        }
+
+        //[warning] 스크립트에서 타입을 등록할 때 사용
+        void ScriptRegister(const std::string& name, const Type& type)
+        {
+            // 스크립트가 리로드되면 기존 타입을 덮어쓰지 않음
+            auto it = map.find(name);
+            if (it != map.end())
+            {
+                it->second = type; // 기존 타입 업데이트
+            }
+            else
+            {
+                map[name] = type; // 새 타입 등록
+            }
         }
 
         const Type* Find(const std::string& name)
@@ -288,7 +302,6 @@ namespace Meta
 
         std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeUndoStack;
         std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
-
 	};
 
 	static inline auto& UndoCommandManager = UndoManager::GetInstance();

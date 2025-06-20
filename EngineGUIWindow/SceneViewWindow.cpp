@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "SceneViewWindow.h"
 #include "SceneRenderer.h"
 #include "GizmoRenderer.h"
@@ -735,3 +736,4 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 
 	return hits;
 }
+#endif // !DYNAMICCPP_EXPORTS

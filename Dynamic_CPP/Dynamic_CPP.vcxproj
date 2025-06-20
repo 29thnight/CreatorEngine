@@ -150,7 +150,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

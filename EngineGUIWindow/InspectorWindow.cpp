@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "InspectorWindow.h"
 #include "SceneRenderer.h"
 #include "RenderScene.h"
@@ -1601,4 +1602,4 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 
 	}
 }
-
+#endif // !DYNAMICCPP_EXPORTS

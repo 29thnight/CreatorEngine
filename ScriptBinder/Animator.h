@@ -22,7 +22,6 @@ public:
     }
     virtual ~Animator()
     {
-       
         m_animationControllers.clear();
         for (auto& param : Parameters)
         {

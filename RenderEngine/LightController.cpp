@@ -125,14 +125,14 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 
 	light.m_lightStatus = LightStatus::StaticShadows;
 
-	Camera shadowCamera;
-	shadowCamera.m_eyePosition = desc.m_eyePosition;
-	shadowCamera.m_lookAt = desc.m_lookAt;
-	shadowCamera.m_nearPlane = desc.m_nearPlane;
-	shadowCamera.m_farPlane = desc.m_farPlane;
-	shadowCamera.m_viewWidth = desc.m_viewWidth;
-	shadowCamera.m_viewHeight = desc.m_viewHeight;
-	shadowCamera.m_isOrthographic = true;
+	Camera shadowCamera(true);
+	shadowCamera.m_eyePosition		= desc.m_eyePosition;
+	shadowCamera.m_lookAt			= desc.m_lookAt;
+	shadowCamera.m_nearPlane		= desc.m_nearPlane;
+	shadowCamera.m_farPlane			= desc.m_farPlane;
+	shadowCamera.m_viewWidth		= desc.m_viewWidth;
+	shadowCamera.m_viewHeight		= desc.m_viewHeight;
+	shadowCamera.m_isOrthographic	= true;
 	
 	m_shadowMapConstant = {
 		desc.m_textureWidth,

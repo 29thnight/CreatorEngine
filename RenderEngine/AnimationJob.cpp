@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "AnimationJob.h"
 #include "RenderScene.h"
 #include "Skeleton.h"
@@ -65,6 +66,7 @@ void AnimationJob::Update(float deltaTime)
         m_UpdateThreadPool.Enqueue([&, controllers]
         {
             Skeleton* skeleton = animator->m_Skeleton;
+            if (!skeleton) return;
             //컨트롤러별로 상,하체 등등이 분리되있다면
             if (animator->UsesMultipleControllers() == true)
             {
@@ -399,4 +401,4 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
     XMMATRIX nodeTransform = scale * rotation * translation;
     return nodeTransform;
 }
-
+#endif // !DYNAMICCPP_EXPORTS

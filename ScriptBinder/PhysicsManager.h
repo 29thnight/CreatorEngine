@@ -39,7 +39,7 @@ struct RayEvent {
 	bool bUseDebugDraw = false;
 };
 
-class ICollider;
+struct ICollider;
 class Component;
 class GameObject;
 class PhysicsManager : public Singleton<PhysicsManager>

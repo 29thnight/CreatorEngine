@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "HLSLCompiler.h"
 #include "FileIO.h"
 
@@ -155,3 +156,4 @@ bool HLSLCompiler::CheckExtension(const std::string_view& shaderExtension)
 	return false;
 
 }
+#endif // !DYNAMICCPP_EXPORTS

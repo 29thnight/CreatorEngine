@@ -157,6 +157,13 @@ void DirectX11::DeviceResources::Present()
     // 다음 VSync까지 대기하도록 합니다. 이를 통해 화면에 표시되지 않는 프레임을
     // 렌더링하는 주기를 낭비하지 않을 수 있습니다.
     DXGI_PRESENT_PARAMETERS parameters = { 0 };
+    if(m_swapChain == nullptr)
+    {
+        // 스왑 체인이 없으면 창 크기 조정이 필요합니다.
+        HandleDeviceLost();
+        return;
+	}
+
     HRESULT hr = m_swapChain->Present1(0, 0, &parameters);
 
     // 렌더링 대상의 콘텐츠를 삭제합니다.

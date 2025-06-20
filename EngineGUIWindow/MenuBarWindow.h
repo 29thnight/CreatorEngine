@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 
 
@@ -20,3 +21,4 @@ private:
 	bool m_bShowProfileWindow{ false };
 	bool m_bShowLightMapWindow{ false };
 };
+#endif // !DYNAMICCPP_EXPORTS

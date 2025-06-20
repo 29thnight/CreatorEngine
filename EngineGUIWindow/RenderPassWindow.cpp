@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "RenderPassWindow.h"
 #include "SceneRenderer.h"
 #include "GizmoRenderer.h"
@@ -105,3 +106,4 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 
 	ImGui::GetContext("RenderPass").Close();
 }
+#endif // !DYNAMICCPP_EXPORTS

@@ -86,8 +86,8 @@ GBufferOutput main(PixelShaderInput IN)
     {
 
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
-        if (gConvertToLinear)
-            albedo = SRGBtoLINEAR(albedo);
+        //if (gConvertToLinear)
+           // albedo = SRGBtoLINEAR(albedo);
     }
     
     [branch]
@@ -131,7 +131,7 @@ GBufferOutput main(PixelShaderInput IN)
 
     float occlusion = 1;
 
-    float metallic = gMetallic;
+    float metallic = 1 - gMetallic;
     float roughness = gRoughness;
     [branch]
     if (gUseOccMetalRough)
@@ -139,7 +139,7 @@ GBufferOutput main(PixelShaderInput IN)
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
         occlusion = occRoughMetal.r;
         roughness = occRoughMetal.g;
-        metallic = occRoughMetal.b;
+        metallic = 1 - occRoughMetal.b;
     }
 
     [branch]

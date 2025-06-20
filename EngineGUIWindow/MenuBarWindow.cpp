@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "MenuBarWindow.h"
 #include "SceneRenderer.h"
 #include "SceneManager.h"
@@ -279,7 +280,7 @@ void MenuBarWindow::RenderMenuBar()
 
     if (m_bShowProfileWindow)
     {
-        ImGui::Begin("FrameProfiler", &m_bShowProfileWindow, ImGuiWindowFlags_NoDocking);
+        ImGui::Begin("FrameProfiler", &m_bShowProfileWindow);
         {
             DrawProfilerHUD();
         }
@@ -400,3 +401,4 @@ void MenuBarWindow::ShowLightMapWindow()
 {
     ImGui::GetContext("LightMap").Open();
 }
+#endif // DYNAMICCPP_EXPORTS

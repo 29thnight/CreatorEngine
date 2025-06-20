@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
 #include <ppltasks.h>
 
@@ -305,3 +306,4 @@ namespace DirectX
         }
     }
 }
+#endif // !DYNAMICCPP_EXPORTS

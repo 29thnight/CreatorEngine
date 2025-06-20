@@ -27,6 +27,7 @@ public:
 	ProxyContainer			  m_shadowRenderQueue;
 	Camera					  m_shadowCamera;
 	std::atomic_bool          m_isInitalized{ false };
+	std::atomic_bool          m_isDestroy{ false };
 	std::atomic<uint32>       m_frame{};
 
 	Mathf::xMatrix            m_frameCalculatedView{};

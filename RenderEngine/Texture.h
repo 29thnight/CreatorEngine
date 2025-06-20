@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/Core.Minimal.h"
 
 enum class TextureType
@@ -216,3 +217,4 @@ inline UniqueTexturePtr MakeUniqueTexturePtr(Texture* texture)
 {
     return UniqueTexturePtr(texture, TextureHelper::deleter);
 }
+#endif // !DYNAMICCPP_EXPORTS

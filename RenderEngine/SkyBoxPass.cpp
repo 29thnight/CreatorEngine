@@ -178,7 +178,7 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
     viewport.MaxDepth = 1.0f;
     deviceContext->RSSetViewports(1, &viewport);
 
-	Camera ortho;
+	//Camera ortho(true, true);
 	DirectX11::IASetInputLayout(m_pso->m_inputLayout);
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_rectToCubeMapPS->GetShader(), nullptr, 0);
@@ -246,7 +246,7 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 	viewport.MaxDepth = 1.0f;
 	deviceContext->RSSetViewports(1, &viewport);
 
-	Camera ortho;
+	//Camera ortho(true, false);
 	DirectX11::IASetInputLayout(m_pso->m_inputLayout);
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
@@ -294,7 +294,7 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 	PrefilterCBuffer cBuffer;
 
 	auto deviceContext = DeviceState::g_pDeviceContext;
-	Camera ortho;
+	//Camera ortho(true, false);
 
 	deviceContext->PSSetConstantBuffers(0, 1, &buffer);
 	DirectX11::IASetInputLayout(m_pso->m_inputLayout);

@@ -112,7 +112,8 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 			}
 			//else
 			//{
-			//	Debug->LogDebug(line);
+			//	std::string strLine = AnsiToUtf8(line);
+			//	Debug->LogDebug(strLine);
 			//}
 		}
     }
@@ -126,7 +127,13 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 void HotLoadSystem::Initialize()
 {
     std::wstring slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln").wstring();
-    
+	msbuildPath = EngineSettingInstance->GetMsbuildPath();
+	if (msbuildPath.empty())
+	{
+		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
+		return;
+	}
+
 #if defined(_DEBUG)
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
@@ -176,6 +183,12 @@ void HotLoadSystem::Shutdown()
 
 bool HotLoadSystem::IsScriptUpToDate()
 {
+	if (!m_isStartUp)
+	{
+		m_isStartUp = true;
+		return false; // 처음 시작할 때는 항상 빌드 필요
+	}
+
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
 	file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
 
@@ -216,6 +229,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		catch (const std::exception& e)
 		{
 			Debug->LogError("Failed to compile script: " + std::string(e.what()));
+			m_isCompileEventInvoked = false;
 			return;
 		}
 

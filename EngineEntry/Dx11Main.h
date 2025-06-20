@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "DeviceResources.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
@@ -80,3 +81,4 @@ namespace DirectX11
 
 	};
 }
+#endif // !DYNAMICCPP_EXPORTS
