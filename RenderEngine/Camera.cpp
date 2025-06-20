@@ -34,7 +34,7 @@ Camera::Camera()
 
 Camera::~Camera()
 {
-	if (m_cameraIndex != -1 && !m_isShadowCamera)
+	if (m_cameraIndex != -1 && !m_isNotLinkRenderData)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
 		auto renderScene = SceneManagers->m_ActiveRenderScene;
@@ -42,7 +42,7 @@ Camera::~Camera()
 	}
 }
 
-Camera::Camera(bool isShadow, bool isTemperary) : m_isShadowCamera(isShadow)
+Camera::Camera(bool isShadow, bool isTemperary) : m_isNotLinkRenderData(isShadow)
 {
 	if(!isTemperary)
 	{
