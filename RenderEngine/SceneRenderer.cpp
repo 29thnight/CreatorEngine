@@ -360,14 +360,14 @@ void SceneRenderer::NewCreateSceneInitialize()
 	lightMap.envMap = envMap;
 
 
-	DataSystems->LoadModel("Punch.fbx");
+	/*DataSystems->LoadModel("Punch.fbx");
 	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
 
 	DataSystems->LoadModel("plane.fbx");
 	model[1] = DataSystems->LoadCashedModel("plane.fbx");
 	sword = Model::LoadModelToSceneObj(model[1], *scene);
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);
+	player.GetPlayer(testt);*/
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)

@@ -808,7 +808,8 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								if (ImGui::InputText("##Controller Name", buffer, sizeof(buffer)))
 								{
 									controller->name = buffer;
-									controller->m_nodeEditor->ReNameJson(buffer);
+									std::string filename = controller->name + ".json";
+									controller->m_nodeEditor->ReNameJson(filename);
 								}
 
 								ImGui::Text("Avatar Mask"); 
@@ -1003,7 +1004,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							isOpenPopUp = false;
 							isOpenNodePopUp = false;
 						}
-						std::string fileName = controller->name + ".node_editor.json";
+						std::string fileName = controller->name + ".json";
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
 

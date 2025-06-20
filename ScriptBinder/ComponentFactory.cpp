@@ -111,7 +111,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					Meta::Deserialize(animationController.get(), layer);
 					animationController->m_owner = animator;
 					animationController->m_nodeEditor = new NodeEditor();
-
+					//animator->m_Skeleton->m_animations[3].SetEvent("Punch", 10, []() {Debug->Log("Punch! Punch!");});
 					if (animationController->useMask == true)
 					{
 						if (layer["m_avatarMask"])
@@ -180,9 +180,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					if (layer["m_curState"])
 					{
 						auto& curNode = layer["m_curState"];
-						std::string name = curNode["m_name"].as<std::string>();
+						if (curNode.IsNull() == false)
+						{
+							std::string name = curNode["m_name"].as<std::string>();
+							animationController->SetCurState(name);
+						}
 						//animationController->m_curState = animationController->FindState(name);
-						animationController->SetCurState(name);
 					}
 
 					for (auto& state : animationController->StateVec)

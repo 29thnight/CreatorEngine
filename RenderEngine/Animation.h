@@ -50,9 +50,15 @@ public:
 	[[Property]]
 	bool m_isLoop = true;
 
-	float curKey = 0;
+	float preAnimationProgress =0;
+	float curAnimationProgress =0;
+	int preKey = 0;
+	int curKey = 0;
 	void InvokeEvent();
 	void SetEvent(const std::string& _funName, float _key, std::function<void()> _func);
+	bool EnterFrame = false;
+
+
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };
 

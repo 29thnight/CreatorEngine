@@ -20,7 +20,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 
 	auto animation = player->GetComponent<Animator>();
 	animation->m_Skeleton->MakeSocket("HeadSocket", "mixamorig:Hips");
-	/*animation->AddParameter("Speed", speed, ValueType::Float);
+	animation->AddParameter("Speed", speed, ValueType::Float);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
 	auto controller = animation->GetController("upper");
@@ -29,12 +29,12 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	controller->CreateState("Walk",2);
 	controller->CreateState("Run",1); 
 	controller->CreateState("Punch",3);
-	controller->SetCurState("Idle");
+	controller->SetCurState("Punch");
 	controller->CreateTransition("Idle", "Punch")->AddCondition("OnPunch", false, ConditionType::None, ValueType::Trigger);
 	controller->CreateTransition("Idle", "Walk")->AddCondition("Speed", 5.3f, ConditionType::Greater, ValueType::Float);
 	controller->CreateTransition("Walk", "Idle")->AddCondition("Speed", 5.3f, ConditionType::Less, ValueType::Float);
 	controller->CreateTransition("Walk", "Run")->AddCondition("Speed", 35.3f, ConditionType::Greater, ValueType::Float);
-	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);*/
+	controller->CreateTransition("Run", "Walk")->AddCondition("Speed", 35.3f, ConditionType::Less, ValueType::Float);
 	/*animation->CreateController("lower");
 	controller->GetAvatarMask()->UseOnlyUpper();
 	auto lowercontroller = animation->GetController("lower");
@@ -72,7 +72,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
 		headsocket->AttachObject(sword);
 	}
-	ani->m_Skeleton->m_animations[3].SetEvent("Punch", 10, []() {Debug->Log("Punch! Punch!");});
+	ani->m_Skeleton->m_animations[3].SetEvent("Punch", 0.353, []() {Debug->Log("Punch! Punch!");});
 }
 
 void TestPlayer::Update(float deltaTime)
