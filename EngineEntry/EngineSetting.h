@@ -174,7 +174,6 @@ public:
 	std::atomic<bool> m_isRenderPaused{ false };
 
 	std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
-	std::atomic<bool> isGameToRender = false;
 	std::atomic<double> frameDeltaTime{};
 	Barrier renderBarrier;
 	Fence RenderCommandFence;

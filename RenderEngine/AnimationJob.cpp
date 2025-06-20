@@ -66,7 +66,7 @@ void AnimationJob::Update(float deltaTime)
         m_UpdateThreadPool.Enqueue([&, controllers]
         {
             Skeleton* skeleton = animator->m_Skeleton;
-
+            if (!skeleton) return;
             //컨트롤러별로 상,하체 등등이 분리되있다면
             if (animator->UsesMultipleControllers() == true)
             {

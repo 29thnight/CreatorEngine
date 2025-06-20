@@ -19,9 +19,11 @@
 #include "Profiler.h"
 //#include "SwapEvent.h"
 
+std::atomic<bool> isGameToRender = false;
+
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
-    gCPUProfiler.Initialize(5, 1024);
+    PROFILER_INITIALIZE(5, 1024);
     PROFILE_REGISTER_THREAD("GameThread");
 
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
@@ -108,14 +110,14 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
 
-    EngineSettingInstance->isGameToRender = true;
+    isGameToRender = true;
 
     PROFILE_FRAME();
 
     m_renderThread = std::thread([&] 
 	{
         PROFILE_REGISTER_THREAD("RenderThread");
-		while (EngineSettingInstance->isGameToRender)
+		while (isGameToRender)
 		{
             if (!m_isInvokeResize)
             {
@@ -127,7 +129,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_RHI_Thread = std::thread([&]
     {
         PROFILE_REGISTER_THREAD("RHI-Thread");
-        while (EngineSettingInstance->isGameToRender)
+        while (isGameToRender)
         {
             if (m_isInvokeResize)
             {
@@ -135,10 +137,8 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
                 m_isInvokeResize = false;
             }
 
-            //
             CoroutineManagers->yield_OnRender();
             RHIWorkerThread();
-            //PROFILE_CPU_END();
         }
     });
     
@@ -148,10 +148,10 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
 DirectX11::Dx11Main::~Dx11Main()
 {
+    isGameToRender = false;
 	m_deviceResources->RegisterDeviceNotify(nullptr);
-	EngineSettingInstance->isGameToRender = false;
     SceneManagers->Decommissioning();
-    gCPUProfiler.Shutdown();
+    PROFILER_SHUTDOWN();
 }
 //test code
 void DirectX11::Dx11Main::SceneInitialize()
