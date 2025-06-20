@@ -1,7 +1,7 @@
 #pragma once
 #define WIN32_LEAN_AND_MEAN 
 // header
-#include <comdef.h>
+#ifndef DYNAMICCPP_EXPORTS
 #include <dxgi1_4.h>
 #include <d3d11.h>
 #include <d3d11_3.h>
@@ -17,11 +17,13 @@
 #include <DirectXTK/SpriteBatch.h>
 #include <DirectXTex.h>
 #include <DirectXMath.h>
-#include <directxtk/simplemath.h>
 #include <windows.h>
 #include <wincodec.h>
-#include <wrl/client.h>
 #include <Xinput.h>
+#endif // !DYNAMICCPP_EXPORTS
+#include <comdef.h>
+#include <wrl/client.h>
+#include <directxtk/simplemath.h>
 
 using namespace Microsoft::WRL;
 //STL
@@ -50,7 +52,9 @@ constexpr inline auto& foreach = std::ranges::for_each;
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"
+#ifndef DYNAMICCPP_EXPORTS
 #include "DirectXHelper.h"
+#endif // !DYNAMICCPP_EXPORTS
 #include "LinkedListLib.hpp"
 //#include "flatbuffers/flatbuffers.h"
 

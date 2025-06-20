@@ -16,7 +16,8 @@ std::filesystem::path GetExecutablePath()
 
 namespace fs = std::filesystem;
 
-struct MethodEntry {
+struct MethodEntry 
+{
     std::string name;
     std::vector<std::string> args;
 };
@@ -196,7 +197,6 @@ void ProcessHeaderToMacroFile(const fs::path& filepath)
         for (const auto& l : lines) hout << l << "\n";
     }
 }
-
 
 int main()
 {

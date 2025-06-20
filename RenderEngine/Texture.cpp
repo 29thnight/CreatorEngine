@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "Texture.h"
 #include "DeviceState.h"
 #include "ResourceAllocator.h"
@@ -533,5 +534,5 @@ void Texture::ResizeRelease()
 	}
 	m_pRTVs.clear();
 }
-
+#endif // !DYNAMICCPP_EXPORTS
 

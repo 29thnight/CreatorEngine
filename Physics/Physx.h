@@ -18,7 +18,7 @@
 
 
 class PhysicsEventCallback;
-class ColliderInfo;
+struct ColliderInfo;
  
 class PhysicX : public Singleton<PhysicX>
 {

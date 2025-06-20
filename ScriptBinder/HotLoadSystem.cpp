@@ -229,6 +229,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		catch (const std::exception& e)
 		{
 			Debug->LogError("Failed to compile script: " + std::string(e.what()));
+			m_isCompileEventInvoked = false;
 			return;
 		}
 
