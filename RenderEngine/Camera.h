@@ -26,7 +26,7 @@ public:
 	Camera();
 	~Camera();
 
-	Camera(bool isShadow);
+	Camera(bool isShadow, bool isTemperary = false);
 
 	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
@@ -76,6 +76,8 @@ public:
 
 	int m_monitorIndex{ 0 };
 	int m_cameraIndex{ -1 };
+
+	bool m_isShadowCamera{ false };
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 

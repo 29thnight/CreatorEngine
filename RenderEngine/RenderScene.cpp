@@ -115,7 +115,7 @@ void RenderScene::EraseRenderPassData()
 	{
 		if (it->second->m_isDestroy)
 		{
-			m_renderDataMap.unsafe_erase(it);
+			m_renderDataMap.unsafe_erase(it->first);
 		}
 	}
 }

@@ -125,7 +125,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 
 	light.m_lightStatus = LightStatus::StaticShadows;
 
-	Camera shadowCamera;
+	Camera shadowCamera(true, true);
 	shadowCamera.m_eyePosition = desc.m_eyePosition;
 	shadowCamera.m_lookAt = desc.m_lookAt;
 	shadowCamera.m_nearPlane = desc.m_nearPlane;

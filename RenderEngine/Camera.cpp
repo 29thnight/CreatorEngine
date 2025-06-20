@@ -34,7 +34,7 @@ Camera::Camera()
 
 Camera::~Camera()
 {
-	if (m_cameraIndex != -1)
+	if (m_cameraIndex != -1 && !m_isShadowCamera)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
 		auto renderScene = SceneManagers->m_ActiveRenderScene;
@@ -42,9 +42,9 @@ Camera::~Camera()
 	}
 }
 
-Camera::Camera(bool isShadow)
+Camera::Camera(bool isShadow, bool isTemperary) : m_isShadowCamera(isShadow)
 {
-	if(isShadow)
+	if(!isTemperary)
 	{
 		m_aspectRatio = DeviceState::g_aspectRatio;
 
