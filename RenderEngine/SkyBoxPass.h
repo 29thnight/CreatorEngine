@@ -45,7 +45,7 @@ private:
 	UniqueTexturePtr m_skyBoxTexture{ TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_skyBoxCubeMap{ TEXTURE_NULL_INITIALIZER };
 
-	Camera ortho{ true, false };
+	Camera ortho{ false };
 	Mathf::xMatrix m_scaleMatrix{};
 	Texture* m_RenderTarget{};
 	file::path m_fileName{};

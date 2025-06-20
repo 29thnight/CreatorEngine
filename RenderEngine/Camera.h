@@ -26,7 +26,7 @@ public:
 	Camera();
 	~Camera();
 
-	Camera(bool isNotLinkRenderData, bool isTemperary = false);
+	Camera(bool isTemperary);
 
 	Mathf::xMatrix CalculateProjection(bool shadow = false);
 	Mathf::Vector4 ConvertScreenToWorld(Mathf::Vector2 screenPosition, float depth);
@@ -77,7 +77,7 @@ public:
 	int m_monitorIndex{ 0 };
 	int m_cameraIndex{ -1 };
 
-	bool m_isNotLinkRenderData{ false };
+	bool m_isLinkRenderData;
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 

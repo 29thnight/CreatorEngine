@@ -10,14 +10,17 @@
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
-Camera::Camera()
+Camera::Camera() : m_isLinkRenderData(true)
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
 
 	m_cameraIndex = CameraManagement->GetCameraCount();
 	auto renderScene = SceneManagers->m_ActiveRenderScene;
 
-	renderScene->AddRenderPassData(m_cameraIndex);
+	if(m_isLinkRenderData)
+	{
+		renderScene->AddRenderPassData(m_cameraIndex);
+	}
 
 	XMMATRIX identity = XMMatrixIdentity();
 
@@ -34,7 +37,7 @@ Camera::Camera()
 
 Camera::~Camera()
 {
-	if (m_cameraIndex != -1 && !m_isNotLinkRenderData)
+	if (m_cameraIndex != -1 && m_isLinkRenderData)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
 		auto renderScene = SceneManagers->m_ActiveRenderScene;
@@ -42,7 +45,7 @@ Camera::~Camera()
 	}
 }
 
-Camera::Camera(bool isShadow, bool isTemperary) : m_isNotLinkRenderData(isShadow)
+Camera::Camera(bool isTemperary) : m_isLinkRenderData(false)
 {
 	if(!isTemperary)
 	{
@@ -52,8 +55,8 @@ Camera::Camera(bool isShadow, bool isTemperary) : m_isNotLinkRenderData(isShadow
 
 		XMMATRIX identity = XMMatrixIdentity();
 
-		std::string viewBufferName = "ShadowCamera_ViewBuffer";
-		std::string projBufferName = "ShadowCamera_ProjBuffer";
+		std::string viewBufferName = "Camera_ViewBuffer";
+		std::string projBufferName = "Camera_ProjBuffer";
 
 		m_ViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &identity);
 		DirectX::SetName(m_ViewBuffer.Get(), viewBufferName.c_str());

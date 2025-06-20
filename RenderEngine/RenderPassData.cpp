@@ -31,7 +31,7 @@ RenderPassData* RenderPassData::GetData(Camera* pCamera)
 	return nullptr;
 }
 
-RenderPassData::RenderPassData() : m_shadowCamera(true)
+RenderPassData::RenderPassData() : m_shadowCamera(false)
 {
 }
 
