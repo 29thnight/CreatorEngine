@@ -7,7 +7,7 @@
 #include "assimp/Gltfmaterial.h"
 #include "ReflectionYml.h"
 #include "SceneManager.h"
-
+#include "meshoptimizer.h"
 //
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
@@ -132,7 +132,7 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 		}
-		ParseModel();
+		//ParseModel(); //not used in current implementation
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;

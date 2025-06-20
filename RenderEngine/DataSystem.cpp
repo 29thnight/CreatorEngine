@@ -176,6 +176,9 @@ void DataSystem::RenderForEditer()
 			ShaderSystem->SetReloading(true);
 		}
 
+		ImGui::SameLine();
+		filter.Draw(ICON_FA_MAGNIFYING_GLASS " Search", ImGui::GetContentRegionAvail().x);
+
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), true);
 		ImGuiTreeNodeFlags rootFlags = 
@@ -566,6 +569,9 @@ void DataSystem::ShowCurrentDirectoryFiles()
 	{
 		if (entry.is_regular_file())
 		{
+			if (filter.IsActive() && !filter.PassFilter(entry.path().filename().string().c_str()))
+				continue;
+
 			std::string extension = entry.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
             if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb" ||

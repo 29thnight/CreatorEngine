@@ -24,7 +24,7 @@ std::atomic<bool> isGameToRender = false;
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
     PROFILER_INITIALIZE(5, 1024);
-    PROFILE_REGISTER_THREAD("GameThread");
+    PROFILE_REGISTER_THREAD("[GameThread]");
 
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
 	m_deviceResources->RegisterDeviceNotify(this);
@@ -114,21 +114,21 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
     PROFILE_FRAME();
 
-    m_renderThread = std::thread([&] 
+    m_CB_Thread = std::thread([&] 
 	{
-        PROFILE_REGISTER_THREAD("RenderThread");
+        PROFILE_REGISTER_THREAD("[CB-Thread]");
 		while (isGameToRender)
 		{
             if (!m_isInvokeResize)
             {
-                RenderWorkerThread();
+                CommandBuildThread();
             }
 		}
 	});
     
-    m_RHI_Thread = std::thread([&]
+    m_CE_Thread = std::thread([&]
     {
-        PROFILE_REGISTER_THREAD("RHI-Thread");
+        PROFILE_REGISTER_THREAD("[CE-Thread]");
         while (isGameToRender)
         {
             if (m_isInvokeResize)
@@ -138,12 +138,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
             }
 
             CoroutineManagers->yield_OnRender();
-            RHIWorkerThread();
+            CommandExecuteThread();
         }
     });
     
-    m_renderThread.detach();
-    m_RHI_Thread.detach();
+    m_CB_Thread.detach();
+    m_CE_Thread.detach();
 }
 
 DirectX11::Dx11Main::~Dx11Main()
@@ -184,12 +184,10 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-	//SpinLock lock(gameToRenderLock);
-    //RenderCommandFence.Begin();
 
     EngineSettingInstance->frameDeltaTime = m_timeSystem.GetElapsedSeconds();
 
-    PROFILE_CPU_BEGIN("MainThread");
+    PROFILE_CPU_BEGIN("GameLogic");
     m_timeSystem.Tick([&]
     {
         InfoWindow();
@@ -247,13 +245,14 @@ void DirectX11::Dx11Main::Update()
     PROFILE_CPU_END();
 
     PROFILE_FRAME();
+    //RenderCommandFence.Begin();
     //RenderCommandFence.Wait();
     EngineSettingInstance->renderBarrier.ArriveAndWait();
 }
 
-bool DirectX11::Dx11Main::RHIRender()
+bool DirectX11::Dx11Main::ExecuteRenderPass()
 {
-    PROFILE_CPU_BEGIN("RHIWorkerThread");
+    PROFILE_CPU_BEGIN("CommandExecute");
     auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
@@ -299,10 +298,18 @@ void DirectX11::Dx11Main::OnGui()
     if (!EngineSettingInstance->IsGameView())
     {
         m_imguiRenderer->BeginRender();
+        PROFILE_CPU_BEGIN("ImGuiRenderMenuBar");
 		m_menuBarWindow->RenderMenuBar();
+        PROFILE_CPU_END();
+        PROFILE_CPU_BEGIN("ImGuiRenderSceneViewWindow");
 		m_sceneViewWindow->RenderSceneViewWindow();
+        PROFILE_CPU_END();
+		PROFILE_CPU_BEGIN("ImGuiRenderGameViewWindow");
 		m_gameViewWindow->RenderGameViewWindow();
+        PROFILE_CPU_END();
+		PROFILE_CPU_BEGIN("ImGuiEditorView");
         m_gizmoRenderer->EditorView();
+        PROFILE_CPU_END();
         m_imguiRenderer->Render();
         m_imguiRenderer->EndRender();
     }
@@ -313,9 +320,9 @@ void DirectX11::Dx11Main::DisableOrEnable()
 	SceneManagers->DisableOrEnable();
 }
 
-void DirectX11::Dx11Main::RenderWorkerThread()
+void DirectX11::Dx11Main::CommandBuildThread()
 {
-    PROFILE_CPU_BEGIN("RenderWorkerThread");
+    PROFILE_CPU_BEGIN("CommandBuild");
     auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
     auto GameSceneEnd = !SceneManagers->m_isGameStart && SceneManagers->m_isEditorSceneLoaded;
 
@@ -338,9 +345,9 @@ void DirectX11::Dx11Main::RenderWorkerThread()
     EngineSettingInstance->renderBarrier.ArriveAndWait();
 }
 
-void DirectX11::Dx11Main::RHIWorkerThread()
+void DirectX11::Dx11Main::CommandExecuteThread()
 {
-	if (RHIRender())
+	if (ExecuteRenderPass())
 	{
         PROFILE_CPU_BEGIN("Present");
 		m_deviceResources->Present();

@@ -131,7 +131,7 @@ GBufferOutput main(PixelShaderInput IN)
 
     float occlusion = 1;
 
-    float metallic = 1 - gMetallic;
+    float metallic = gMetallic;
     float roughness = gRoughness;
     [branch]
     if (gUseOccMetalRough)
@@ -139,7 +139,7 @@ GBufferOutput main(PixelShaderInput IN)
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
         occlusion = occRoughMetal.r;
         roughness = occRoughMetal.g;
-        metallic = 1 - occRoughMetal.b;
+        metallic = occRoughMetal.b;
     }
 
     [branch]
