@@ -4,7 +4,7 @@
 
 //#define SSGI_Ratio 1
 //#define SSGI_NumThreads SSGI_Ratio * 16
-int ssratio = 4;
+int ssratio = 2;
 int ssthreads = 16;
 
 
@@ -41,8 +41,8 @@ SSGIPass::SSGIPass()
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
     m_pTempTexture = Texture::Create(
-        4u,
-        4u,
+        ssratio,
+        ssratio,
         DeviceState::g_ClientRect.width,
         DeviceState::g_ClientRect.height,
         "SSGICopiedTexture",
@@ -53,8 +53,8 @@ SSGIPass::SSGIPass()
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     m_pTempTexture2 = Texture::Create(
-        8u,
-        8u,
+        ssratio * 2,
+        ssratio * 2,
         DeviceState::g_ClientRect.width,
         DeviceState::g_ClientRect.height,
         "SSGICopiedTexture2",
@@ -96,6 +96,8 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 
 void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
+    if (!isOn) return;
+
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
@@ -210,6 +212,7 @@ void SSGIPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSGI");
+    ImGui::Checkbox("Enable SSGI", &isOn);
     ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
     ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
 	ImGui::SliderFloat("Intensity", &intensity, 0.0f, 10.0f, "Intensity: %.2f");
