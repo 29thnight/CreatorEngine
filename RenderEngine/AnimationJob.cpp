@@ -76,6 +76,7 @@ void AnimationJob::Update(float deltaTime)
                     if (animationcontroller == nullptr || !animationcontroller->useController) continue;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     if (animation.m_isLoop == true)
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
@@ -85,11 +86,11 @@ void AnimationJob::Update(float deltaTime)
                         if (animationcontroller->m_timeElapsed >= animation.m_duration)
                         {
                             animationcontroller->m_timeElapsed = animation.m_duration;
+                            if (animationcontroller->curAnimationProgress >= 0.95)
+                                animationcontroller->endAnimation = true;
                         }
                         
                     }
-                    
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     skeleton->m_animations[animationcontroller->GetAnimationIndex()].preAnimationProgress = skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress;
                     skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress = animationcontroller->curAnimationProgress;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
@@ -116,6 +117,13 @@ void AnimationJob::Update(float deltaTime)
             {
                 Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
                 animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+                AnimationController* animationcontroller = nullptr;
+                if (!animator->m_animationControllers.empty())
+                {
+                    animationcontroller = animator->m_animationControllers[0].get();
+                    animationcontroller->curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
+                    if (!animationcontroller->useController) animationcontroller = nullptr;
+                }
                 if (animation.m_isLoop == true)
                 {
                     animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
@@ -125,20 +133,24 @@ void AnimationJob::Update(float deltaTime)
                     if (animator->m_TimeElapsed >= animation.m_duration)
                     {
                         animator->m_TimeElapsed = animation.m_duration;
+                        if (animationcontroller)
+                        {
+                            if (animationcontroller->curAnimationProgress >= 0.95)
+                                animationcontroller->endAnimation = true;
+                        }
                     }
-                }
-                AnimationController* animationcontroller = nullptr;
-                if (!animator->m_animationControllers.empty())
-                {
-                    animationcontroller = animator->m_animationControllers[0].get();
-                    animationcontroller->curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
-                    if (!animationcontroller->useController) animationcontroller = nullptr;
                 }
                 animation.preAnimationProgress = animation.curAnimationProgress;
                 animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
                 if (animator->m_isBlend)
                 {
+                    if (animator->nextAnimIndex == -1)
+                    {
+                        //Debug->Log("다음애니메이션인덱스를확인해주세요");
+                        return;
+                    }
+                        
                     Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
                     animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
                     animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);

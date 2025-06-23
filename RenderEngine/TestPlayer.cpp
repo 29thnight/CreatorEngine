@@ -101,9 +101,13 @@ void TestPlayer::Update(float deltaTime)
 
 	if (InputManagement->IsKeyDown('L'))
 	{
-		ani->SetParameter("StopPunch", true);
+		ani->SetParameter("off", true);
 	}
 
+	if (InputManagement->IsKeyDown(KeyBoard::LeftControl))
+	{
+		ani->SetParameter("on", true);
+	}
 }
 
 void TestPlayer::TestDelete()
