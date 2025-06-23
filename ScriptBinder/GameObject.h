@@ -79,6 +79,8 @@ public:
 
     static GameObject* Find(const std::string_view& name);
 	static GameObject* FindIndex(GameObject::Index index);
+	static GameObject* FindInstanceID(const HashedGuid& guid);
+	static GameObject* FindAttachedID(const HashedGuid& guid);
 
 	static inline bool IsValidIndex(Index index)
 	{
@@ -103,6 +105,8 @@ public:
 	GameObject::Index m_rootIndex{ 0 };
     [[Property]]
 	std::vector<GameObject::Index> m_childrenIndices;
+	[[Property]]
+	HashedGuid m_attachedSoketID{};
 
 public:
 	[[Property]]

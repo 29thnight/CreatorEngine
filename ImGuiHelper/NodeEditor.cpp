@@ -194,21 +194,36 @@ void NodeEditor::Update()
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
 
-        for (size_t i = 0; i < Nodes.size(); ++i)
+     
+        if(ImGui::IsMouseClicked(0))
         {
-            auto& node = Nodes[i];
-            ed::NodeId nodeID = node->id;
-            if (ed::GetHoveredNode() == nodeID && ImGui::IsMouseClicked(0))
+            ed::NodeId hovered = ed::GetHoveredNode();
+
+            if (hovered)
             {
-                if (i != seletedCurNodeIndex)
+                for (size_t i = 0; i < Nodes.size(); ++i)
                 {
-                    if(m_retrunIndex)
+                    auto& node = Nodes[i];
+                    ed::NodeId nodeID = node->id;
+                    if (nodeID == hovered)
+                    {
+                        if (i != seletedCurNodeIndex)
+                        {
+                            if (m_retrunIndex)
+                                *m_retrunIndex = i;
 
-                     *m_retrunIndex = i;
-
-                    needMakeLink = false;
-                    m_retrunIndex = nullptr;
+                            needMakeLink = false;
+                            m_retrunIndex = nullptr;
+                        }
+                        break;
+                    }
                 }
+            }
+            else
+            {
+                // 어떤 노드에도 마우스가 올라가 있지 않음
+                needMakeLink = false;
+                m_retrunIndex = nullptr;
             }
         }
 

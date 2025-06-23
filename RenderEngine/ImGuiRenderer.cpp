@@ -1,88 +1,11 @@
 #include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
+#include "DataSystem.h"
+#include "Profiler.h"
 #include "imgui_internal.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-
-//void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY);
-//
-//void AdjustImGuiDockNodesOnResize(float ratioX, float ratioY)
-//{
-//	ImGuiContext* ctx = ImGui::GetCurrentContext();
-//	if (!ctx) return;
-//
-//	ImGuiDockContext* dockCtx = &ctx->DockContext;
-//
-//	for (int i = 0; i < dockCtx->Nodes.Data.Size; i++)
-//	{
-//		ImGuiDockNode* node = (ImGuiDockNode*)dockCtx->Nodes.Data[i].val_p;
-//		if (!node || !node->IsRootNode()) continue;
-//
-//		// 루트 노드는 Viewport에 자동 맞춰짐 (중앙 DockSpace)
-//		// 자식 노드들을 비례 조정
-//		ResizeDockNodeRecursive(node, ratioX, ratioY);
-//	}
-//}
-//
-//void ResizeDockNodeRecursive(ImGuiDockNode* node, float ratioX, float ratioY)
-//{
-//	if (!node) return;
-//
-//	// 중앙 노드는 Viewport에 맞춰지므로 무시
-//	if (!node->IsCentralNode())
-//	{
-//		ImVec2 oldPos = node->Pos;
-//		ImVec2 oldSize = node->Size;
-//
-//		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
-//		ImVec2 newSize = ImVec2(oldSize.x * ratioX, oldSize.y * ratioY);
-//
-//		if (newSize.x == 0 || newSize.y == 0)
-//		{
-//			return;
-//		}
-//
-//		ImGui::DockBuilderSetNodePos(node->ID, newPos);
-//		ImGui::DockBuilderSetNodeSize(node->ID, newSize);
-//	}
-//
-//	// 자식 노드 재귀 호출
-//	ResizeDockNodeRecursive(node->ChildNodes[0], ratioX, ratioY);
-//	ResizeDockNodeRecursive(node->ChildNodes[1], ratioX, ratioY);
-//}
-//
-//void AdjustAllImGuiWindowsOnResize(ImVec2 oldSize, ImVec2 newSize)
-//{
-//	ImGuiContext* ctx = ImGui::GetCurrentContext();
-//	if (!ctx)
-//		return;
-//
-//	float ratioX = newSize.x / oldSize.x;
-//	float ratioY = newSize.y / oldSize.y;
-//
-//	ratioX = std::abs(ratioX);
-//	ratioY = std::abs(ratioY);
-//
-//	for (int i = 0; i < ctx->Windows.Size; ++i)
-//	{
-//		ImGuiWindow* window = ctx->Windows[i];
-//		if (!window)
-//			continue;
-//
-//		// Docked 창은 DockBuilder에서 위치 설정
-//		if (window->DockIsActive && window->DockNode)
-//		{
-//			continue;
-//		}
-//
-//		ImVec2 oldPos = window->Pos;
-//		ImVec2 newPos = ImVec2(oldPos.x * ratioX, oldPos.y * ratioY);
-//		ImGui::SetWindowPos(window->Name, newPos, ImGuiCond_Always);
-//	}
-//
-//	AdjustImGuiDockNodesOnResize(ratioX, ratioY);
-//}
 
 ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
     m_deviceResources(deviceResources)
@@ -133,7 +56,6 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.80f, 0.80f, 0.83f, 0.31f);
 	style->Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.56f, 0.56f, 0.58f, 1.00f);
 	style->Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.06f, 0.05f, 0.07f, 1.00f);
-	//style->Colors[ImGuiCol_ComboBg] = ImVec4(0.19f, 0.18f, 0.21f, 1.00f);
 	style->Colors[ImGuiCol_CheckMark] = ImVec4(0.80f, 0.80f, 0.83f, 0.31f);
 	style->Colors[ImGuiCol_SliderGrab] = ImVec4(0.80f, 0.80f, 0.83f, 0.31f);
 	style->Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.06f, 0.05f, 0.07f, 1.00f);
@@ -143,9 +65,6 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_Header] = ImVec4(0.1569f, 0.1569f, 0.1569f, 1.00f);
 	style->Colors[ImGuiCol_HeaderHovered] = ImVec4(0.56f, 0.56f, 0.58f, 1.00f);
 	style->Colors[ImGuiCol_HeaderActive] = ImVec4(0.06f, 0.05f, 0.07f, 1.00f);
-	//style->Colors[ImGuiCol_Column] = ImVec4(0.56f, 0.56f, 0.58f, 1.00f);
-	//style->Colors[ImGuiCol_ColumnHovered] = ImVec4(0.24f, 0.23f, 0.29f, 1.00f);
-	//style->Colors[ImGuiCol_ColumnActive] = ImVec4(0.56f, 0.56f, 0.58f, 1.00f);
 	style->Colors[ImGuiCol_ResizeGrip] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
 	style->Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.56f, 0.56f, 0.58f, 1.00f);
 	style->Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.06f, 0.05f, 0.07f, 1.00f);
@@ -154,7 +73,6 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_PlotHistogram] = ImVec4(0.40f, 0.39f, 0.38f, 0.63f);
 	style->Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.25f, 0.00f, 0.00f, 1.00f);
 	style->Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.25f, 1.00f, 0.00f, 0.43f);
-	//style->Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(1.00f, 0.98f, 0.95f, 0.73f);
 #pragma endregion
     // Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(m_deviceResources->GetWindow()->GetHandle());
@@ -173,19 +91,10 @@ ImGuiRenderer::~ImGuiRenderer()
 
 void ImGuiRenderer::BeginRender()
 {
+	PROFILE_CPU_BEGIN("ImGuiBeginRender");
     static bool firstLoop = true;
 	static bool forceResize = false;
 	ImGuiIO& io = ImGui::GetIO();
-
-	//if(firstLoop)
-	//{
-	//	auto lastWindowSize = EngineSettingInstance->GetWindowSize();
-	//	auto windowSize2D = Mathf::Vector2(io.DisplaySize.x, io.DisplaySize.y);
-	//	if (windowSize2D != lastWindowSize)
-	//	{
-	//		forceResize = true;
-	//	}
-	//}
 
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
 	
@@ -201,7 +110,6 @@ void ImGuiRenderer::BeginRender()
 		&& newSize			!= ImVec2(0, 0)
 		&& io.DisplaySize	!= ImVec2(0, 0))
 	{
-		//AdjustAllImGuiWindowsOnResize(io.DisplaySize, newSize);
 		forceResize = true;
 		io.DisplaySize = newSize;
 		io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
@@ -245,6 +153,7 @@ void ImGuiRenderer::BeginRender()
 	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
 	if (!forceResize && file::exists(iniPath))
 	{
+		PROFILE_CPU_END();
 		return;
 	}
 
@@ -267,24 +176,40 @@ void ImGuiRenderer::BeginRender()
         ImGui::DockBuilderDockWindow("Hierarchy", dock2);
         ImGui::DockBuilderDockWindow("Inspector", dock3);
         ImGui::DockBuilderFinish(id);
+
+		EngineSettingInstance->SetImGuiInitialized(true);
     }
 
     if (firstLoop) firstLoop = false;
 	if (forceResize) forceResize = false;
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::Render()
 {
+	PROFILE_CPU_BEGIN("ImGuiRender");
+	static bool isOpened = false;
+
+	static file::path directory{ DataSystems->m_TargetTexturePath };
+	if(!directory.empty() || !directory.filename().empty())
+	{
+		isOpened = true;
+		DataSystems->SelectTextureType(&isOpened, directory.string());
+		DataSystems->m_TargetTexturePath.clear();
+	}
+
     auto& container = ImGuiRegister::GetInstance()->m_contexts;
 
     for (auto& [name, context] : container)
     {
         context.Render();
     }
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::EndRender()
 {
+	PROFILE_CPU_BEGIN("ImGuiEndRender");
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -295,7 +220,7 @@ void ImGuiRenderer::EndRender()
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault();
 	}
-
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::Shutdown()

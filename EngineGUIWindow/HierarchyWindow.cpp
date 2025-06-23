@@ -103,6 +103,23 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					auto comp = obj->AddComponent<CameraComponent>();
 				}
 
+
+				if (ImGui::BeginMenu("		UI"))
+				{
+					if (ImGui::MenuItem("		Image"))
+					{
+						UIManagers->MakeImage("NoneImage",nullptr );
+					}
+					if (ImGui::MenuItem("		Text"))
+					{
+						
+					}
+					if (ImGui::MenuItem("		Button"))
+					{
+						
+					}
+					ImGui::EndMenu();
+				}
 				ImGui::EndPopup();
 			}
 			ImGui::PopStyleVar();

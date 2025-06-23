@@ -28,14 +28,14 @@ public:
 			m_pCamera = CameraManagement->GetCamera(m_cameraIndex);
 			if (m_pCamera == nullptr)
 			{
-				m_pCamera = new Camera();
+				m_pCamera = new Camera;
 				m_pCamera->RegisterContainer();
 				m_cameraIndex = m_pCamera->m_cameraIndex;
 			}
 		}
 		else
 		{
-			m_pCamera = new Camera();
+			m_pCamera = new Camera;
 			m_pCamera->RegisterContainer();
 			m_cameraIndex = m_pCamera->m_cameraIndex;
 		}		

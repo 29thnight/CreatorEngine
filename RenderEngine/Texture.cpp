@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "Texture.h"
 #include "DeviceState.h"
 #include "ResourceAllocator.h"
@@ -435,7 +436,7 @@ ID3D11RenderTargetView* Texture::GetRTV(uint32 index)
 
 float2 Texture::GetImageSize() const
 {
-	return m_size;
+	return float2(m_size.x / m_sizeRatio.x, m_size.y / m_sizeRatio.y);
 }
 
 void Texture::ResizeViews(_In_ uint32 width, _In_ uint32 height)
@@ -533,5 +534,5 @@ void Texture::ResizeRelease()
 	}
 	m_pRTVs.clear();
 }
-
+#endif // !DYNAMICCPP_EXPORTS
 

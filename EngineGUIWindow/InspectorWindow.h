@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -27,7 +28,7 @@ private:
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);
 
-	void DrawMyLink(std::string linkName, std::string from, std::string to);
+	//void DrawMyLink(std::string linkName, std::string from, std::string to);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 
 
@@ -36,4 +37,6 @@ private:
 
 
 	void ImGuiDrawHelperFSMComponent(StateMachineComponent* fsmComponent);
+
 };
+#endif // !DYNAMICCPP_EXPORTS

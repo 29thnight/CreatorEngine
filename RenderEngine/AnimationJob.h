@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/Core.Minimal.h"
 #include "../Utility_Framework/Core.Thread.hpp"
 
@@ -33,3 +34,4 @@ private:
     uint32 m_objectSize{};
 };
 
+#endif // !DYNAMICCPP_EXPORTS

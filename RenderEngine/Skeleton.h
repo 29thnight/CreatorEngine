@@ -16,6 +16,7 @@ AUTO_REGISTER_ENUM(BoneRegion)
 
 class Bone;
 class Animation;
+class Socket;
 class Skeleton
 {
 public:
@@ -32,8 +33,14 @@ public:
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;
 
+
+	std::vector<Socket*> m_sockets;
 	static constexpr uint32 MAX_BONES{ 512 };
 
+	bool HasSocket() { return !m_sockets.empty(); }
+	void MakeSocket(const std::string_view& socketName, const std::string_view& objectName);
+	Socket* FindSocket(const std::string_view& socketName);
+	void DeleteSocket(const std::string_view& socketName);
 	Bone* FindBone(const std::string_view& _name);
 
 	void MarkRegionSkeleton();

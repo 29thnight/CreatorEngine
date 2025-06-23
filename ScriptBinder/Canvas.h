@@ -4,14 +4,16 @@
 #include "IRenderable.h"
 #include "IUpdatable.h"
 #include "Canvas.generated.h"
-
-class Canvas : public Component, public IUpdatable
+#include "IOnDistroy.h"
+class Canvas : public Component, public IUpdatable, public IOnDistroy
 {
 public:
    ReflectCanvas
     [[Serializable(Inheritance:Component)]]
 	Canvas();
 	~Canvas() = default;
+
+	void OnDistroy() override;
 
 	void AddUIObject(GameObject* obj);
 	virtual void Update(float tick) override;

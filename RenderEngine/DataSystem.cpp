@@ -1,5 +1,4 @@
 #include "DataSystem.h"
-#include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
 #include <future>
@@ -176,6 +175,9 @@ void DataSystem::RenderForEditer()
 		{
 			ShaderSystem->SetReloading(true);
 		}
+
+		ImGui::SameLine();
+		filter.Draw(ICON_FA_MAGNIFYING_GLASS " Search", ImGui::GetContentRegionAvail().x);
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), true);
@@ -391,6 +393,75 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 	return nullptr;
 }
 
+void DataSystem::CopyHDRTexture(const std::string_view& filePath)
+{
+	file::path source = filePath;
+	file::path destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
+	if (source != destination && file::exists(source) && !file::exists(destination))
+	{
+		file::copy_file(source, destination, file::copy_options::update_existing);
+	}
+}
+
+void DataSystem::CopyTexture(const std::string_view& filePath, const file::path& destination)
+{
+	if (filePath != destination && file::exists(filePath) && !file::exists(destination))
+	{
+		file::copy_file(filePath, destination, file::copy_options::update_existing);
+	}
+}
+
+void DataSystem::SelectTextureType(bool* open, const std::string_view& filePath)
+{
+	if (!EngineSettingInstance->IsImGuiInitialized())
+	{
+		Debug->LogError("DataSystem::SelectTextureType : ImGui is not initialized");
+		return;
+	}
+
+	ImGui::Begin("Select Texture Type", open, ImGuiWindowFlags_AlwaysAutoResize);
+	
+	static int selectedTextureType{};
+	const char* textureTypeNames[] = {
+		"Texture",
+		"Material Texture",
+		"Terrain Texture",
+		"HDR"
+	};
+
+	ImGui::Combo("Texture Type", &selectedTextureType, textureTypeNames, IM_ARRAYSIZE(textureTypeNames));
+
+	if (ImGui::Button("Select"))
+	{
+		CopyTextureSelectType(filePath, static_cast<TextureFileType>(selectedTextureType));
+	}
+
+	ImGui::End();
+}
+
+void DataSystem::CopyTextureSelectType(const std::string_view& filePath, TextureFileType type)
+{
+	file::path destination{};
+	if (type == TextureFileType::Texture)
+	{
+		destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::MaterialTexture)
+	{
+		destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::TerrainTexture)
+	{
+		destination = PathFinder::Relative("Terrain\\Texture\\") / file::path(filePath).filename();
+	}
+	else if (type == TextureFileType::HDR)
+	{
+		destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
+	}
+
+	CopyTexture(filePath, destination);
+}
+
 Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
 {
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
@@ -498,6 +569,9 @@ void DataSystem::ShowCurrentDirectoryFiles()
 	{
 		if (entry.is_regular_file())
 		{
+			if (filter.IsActive() && !filter.PassFilter(entry.path().filename().string().c_str()))
+				continue;
+
 			std::string extension = entry.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
             if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb" ||

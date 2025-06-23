@@ -498,15 +498,15 @@ void DrawProfilerHUD()
 	if (gCPUProfiler.IsPaused())
 	{
 		buttonFmt = ICON_FA_PAUSE;
-		fmt = "Paused";
+		fmt = "Paused - [Press Space to record]";
 	}
 	else
 	{
 		buttonFmt = ICON_FA_PLAY;
-		fmt = "Recording";
+		fmt = "Recording - [Press Space to pause]";
 	}
 	
-	if (ImGui::Button(buttonFmt))
+	if (ImGui::Button(buttonFmt) || ImGui::IsKeyPressed(ImGuiKey_Space))
 	{
 		context.IsPaused = !context.IsPaused;
 	}

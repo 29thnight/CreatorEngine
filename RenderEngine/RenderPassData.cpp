@@ -13,8 +13,6 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 			return true;
 		}
 	}
-
-	std::cout << "Invaild data" << std::endl;
 	return false;
 }
 
@@ -33,7 +31,7 @@ RenderPassData* RenderPassData::GetData(Camera* pCamera)
 	return nullptr;
 }
 
-RenderPassData::RenderPassData() : m_shadowCamera(true)
+RenderPassData::RenderPassData() : m_shadowCamera(false)
 {
 }
 

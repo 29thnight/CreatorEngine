@@ -116,9 +116,6 @@
     <ClInclude Include="EngineEntry\ProgressWindow.h">
       <Filter>Window\ProgressWindow</Filter>
     </ClInclude>
-    <ClInclude Include="ProjectSettingWindow.h">
-      <Filter>Window\ProjectSettingWindow</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\EngineSetting.h">
       <Filter>Settings\EngineSetting</Filter>
     </ClInclude>
@@ -127,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\EngineVersion.h">
       <Filter>Settings\EngineSetting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
+      <Filter>Window\ProjectSettingWindow</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -160,7 +160,7 @@
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
       <Filter>Window\InspectorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="ProjectSetting.cpp">
+    <ClCompile Include="EngineEntry\ProjectSetting.cpp">
       <Filter>Settings\ProjectSetting</Filter>
     </ClCompile>
   </ItemGroup>

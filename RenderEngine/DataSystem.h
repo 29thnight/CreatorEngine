@@ -1,13 +1,11 @@
 #pragma once
 #include "../Utility_Framework/HLSLCompiler.h"
-//#include "ModelLoader.h"
 #include "Texture.h"
-//#include "Billboards.h"
 #include "ImGuiRegister.h"
 #include "AssetMetaWather.h"
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
-//#include "Model.h"
+#include "concurrent_queue.h"
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
@@ -20,13 +18,23 @@ public:
 		Unknown,
 		Model,
 		Texture,
+		MaterialTexture,
+		TerrainTexture,
 		Shader,
 		CppScript,
 		CSharpScript,
 		Sound,
 		HDR,
 	};
-	//일단 이대로 진행
+
+	enum class TextureFileType
+	{
+		Texture,
+		MaterialTexture,
+		TerrainTexture,
+		HDR,
+	};
+
 	enum class AssetType
 	{
 		Model,
@@ -38,10 +46,21 @@ public:
 	{
 		{ FileType::Model, "Model" },
 		{ FileType::Texture, "Texture" },
+		{ FileType::MaterialTexture, "MaterialTexture" },
+		{ FileType::TerrainTexture, "TerrainTexture" },
 		{ FileType::Shader, "Shader" },
 		{ FileType::CppScript, "CppScript" },
 		{ FileType::CSharpScript, "CSharpScript" },
 		{ FileType::Sound, "Sound" },
+		{ FileType::HDR, "HDR" }
+	};
+
+	std::unordered_map<FileType, std::string> TextureTypeToString =
+	{
+		{ FileType::Model ,"Model" },
+		{ FileType::Texture, "Texture" },
+		{ FileType::MaterialTexture, "MaterialTexture" },
+		{ FileType::TerrainTexture, "TerrainTexture" },
 		{ FileType::HDR, "HDR" }
 	};
 
@@ -64,6 +83,10 @@ public:
 	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(const std::string_view& filePath);
+	void CopyHDRTexture(const std::string_view& filePath);
+	void CopyTexture(const std::string_view& filePath, const file::path& destination);
+	void SelectTextureType(bool* open, const std::string_view& filePath);
+	void CopyTextureSelectType(const std::string_view& filePath, TextureFileType type);
 	//Resource Material
 	void LoadMaterials();
 	Material* LoadMaterialGUID(FileGuid guid);
@@ -78,6 +101,7 @@ public:
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
 
+	file::path m_TargetTexturePath;
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();

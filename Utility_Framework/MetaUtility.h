@@ -29,7 +29,7 @@ namespace Meta
         else if (name.find(enum_prefix) == 0)
             name = name.substr(enum_prefix.size());
 
-        uint32_t pointerPos{};
+        size_t pointerPos{};
 
         pointerPos = name.find(" *");
         if (pointerPos != std::string::npos)

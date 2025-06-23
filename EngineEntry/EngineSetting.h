@@ -3,6 +3,9 @@
 #include "Core.Minimal.h"
 #include "EngineVersion.h"
 #include "Core.Mathf.h"
+#include "SpinLock.h"
+#include "Core.Fence.h"
+#include "Core.Barrier.h"
 #include <yaml-cpp/yaml.h>
 
 namespace MetaYml = YAML;
@@ -18,7 +21,7 @@ class EngineSetting : public Singleton<EngineSetting>
 {
 private:
 	friend class Singleton;
-	EngineSetting() = default;
+	EngineSetting() : renderBarrier(3) {}
 	~EngineSetting() = default;
 
 public:
@@ -28,19 +31,33 @@ public:
 		char* vcInstallDir = nullptr;
 		size_t len = 0;
 
-		if (_dupenv_s(&vcInstallDir, &len, "VSINSTALLDIR") != 0 || vcInstallDir == nullptr)
+		std::string output = ExecuteVsWhere();
+
+		if (output.empty())
 		{
-			m_msvcVersion = MSVCVersion::None;
+			std::cout << "Visual Studio not found.\n";
 			return false;
 		}
 
-		if (std::string(vcInstallDir).find("Preview") != std::string::npos)
+		// ÁÙ¹Ù²Þ Á¦°Å
+		output.erase(std::remove(output.begin(), output.end(), '\r'), output.end());
+		output.erase(std::remove(output.begin(), output.end(), '\n'), output.end());
+
+		std::cout << "VS Install Path: " << output << std::endl;
+
+		if (output.find("Preview") != std::string::npos)
 		{
 			m_msvcVersion = MSVCVersion::Comunity2022Preview;
 		}
-		else
+		else if (output.find("2022") != std::string::npos)
 		{
 			m_msvcVersion = MSVCVersion::Comunity2022;
+		}
+		else
+		{
+			m_msvcVersion = MSVCVersion::None;
+			std::cout << "Unsupported Visual Studio version.\n";
+			return false;
 		}
 
 		return isSuccess;
@@ -101,6 +118,16 @@ public:
 		return m_lastWindowSize;
 	}
 
+	void SetImGuiInitialized(bool isInitialized)
+	{
+		m_isImGuiInitialized = isInitialized;
+	}
+
+	bool IsImGuiInitialized() const
+	{
+		return m_isImGuiInitialized;
+	}
+
 	bool SaveSettings()
 	{
 		// Implement saving logic here
@@ -146,8 +173,15 @@ public:
 
 	std::atomic<bool> m_isRenderPaused{ false };
 
+	std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
+	std::atomic<double> frameDeltaTime{};
+	Barrier renderBarrier;
+	Fence RenderCommandFence;
+	Fence RHICommandFence;
+
 private:
     std::atomic_bool m_isGameView{ false };
+	std::atomic_bool m_isImGuiInitialized{ false };
     std::string m_currentEngineGitHash{ ENGINE_VERSION };
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };

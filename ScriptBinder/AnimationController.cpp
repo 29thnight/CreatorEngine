@@ -6,7 +6,7 @@
 #include "AvatarMask.h"
 void AnimationController::SetNextState(std::string stateName)
 {
-	
+
 	m_nextState = FindState(stateName);
 }
 
@@ -16,6 +16,8 @@ AnimationController::~AnimationController()
 		delete m_nodeEditor;
 	DeleteAvatarMask();
 }
+
+
 
 bool AnimationController::BlendingAnimation(float tick)
 {
@@ -42,7 +44,7 @@ bool AnimationController::BlendingAnimation(float tick)
 void AnimationController::SetCurState(std::string stateName)
 {
 	m_curState = FindState(stateName);
-	
+
 	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
 	m_AnimationIndex = m_curState->AnimationIndex;
 }
@@ -51,31 +53,44 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
 	if (!m_curState)
 	{
-		if (!StateVec.empty())
-			m_curState = StateVec[0].get();
+		if (!StateVec.size() >= 2)   //0번은 anystate라없음
+			m_curState = StateVec[1].get();
 		else
 			return nullptr;
 		//return nullptr;//*****
 	}
 
-	if (!m_anyStateVec.empty()) //***** 우선순위 정해두기
+	if (m_curState == nullptr) return nullptr;
+
+
+	AnimationState* aniState = GetAniState().get();
+	if (aniState)
 	{
-		for (auto& state : m_anyStateVec)
+		if (!aniState->Transitions.empty())
 		{
-			for (auto& trans : state->Transitions)
+			for (auto& trans : aniState->Transitions)
 			{
+				if (trans->hasExitTime)
+				{
+					if (trans->GetExitTime() >= curAnimationProgress)
+						continue;
+				}
 				if (true == trans->CheckTransiton())
 				{
+					if (trans->nextState != nullptr && m_curState != trans->nextState);
 					return trans;
 				}
 			}
 		}
 	}
-
-
 	if (m_curState->Transitions.empty()) return nullptr;
 	for (auto& trans : m_curState->Transitions)
 	{
+		if (trans->hasExitTime)
+		{
+			if (trans->GetExitTime() >= curAnimationProgress)
+				continue;
+		}
 		if (true == trans->CheckTransiton())
 		{
 			return trans;
@@ -128,6 +143,7 @@ void AnimationController::UpdateState()
 
 		for (auto& othercontorller : m_owner->m_animationControllers)
 		{
+			if (!othercontorller->useController) continue;
 			if (othercontorller->name == name) continue;
 			if(othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
 				m_nextTimeElapsed = othercontorller->m_timeElapsed;
@@ -144,6 +160,7 @@ void AnimationController::UpdateState()
 }
 void AnimationController::Update(float tick)
 {
+	Debug->Log(std::to_string(curAnimationProgress).c_str());
 	UpdateState();
 	if (needBlend)
 	{
@@ -164,6 +181,16 @@ int AnimationController::GetAnimatonIndexformState(std::string stateName)
 		if (state->m_name == stateName)
 			return state->AnimationIndex;
 	}
+}
+
+std::shared_ptr<AnimationState> AnimationController::GetAniState()
+{
+	for (auto& state : StateVec)
+	{
+		if (state->m_isAny == true)
+			return state;
+	}
+	return nullptr;
 }
 
 AnimationState* AnimationController::CreateState(const std::string& stateName, int animationIndex, bool isAny)
@@ -289,12 +316,13 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 
 
 void AnimationController::CreateMask()
+
 {
 	if (!m_avatarMask)
 	{
 		useMask = true;
 		m_owner->m_Skeleton->MarkRegionSkeleton();
-		m_avatarMask = new AvatarMask();
+		m_avatarMask = new AvatarMask;
 		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
 	}
 	
@@ -302,20 +330,22 @@ void AnimationController::CreateMask()
 
 void AnimationController::ReCreateMask(AvatarMask* mask)
 {
+	if (m_avatarMask)
+	{
+		delete m_avatarMask;
+		m_avatarMask = nullptr;
+	}
 	CreateMask();
-	m_avatarMask->isHumanoid = mask->isHumanoid;
-	m_avatarMask->useAll = mask->useAll;
-	m_avatarMask->useUpper = mask->useUpper;
-	m_avatarMask->useLower = mask->useLower;
+	m_avatarMask->ReCreateMask(mask);
 }
 
 void AnimationController::DeleteAvatarMask()
 {
-	if (m_avatarMask)
-	{
-		useMask = false;
+    if (m_avatarMask)
+    {
+        useMask = false;
 		delete m_avatarMask;
 		m_avatarMask = nullptr;
-	}
+    }
 }
 

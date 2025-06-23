@@ -41,15 +41,17 @@ struct URange
 /*
 	General
 */
+#define PROFILER_INITIALIZE(size_T, size)			gCPUProfiler.Initialize(size_T, size)
+#define PROFILER_SHUTDOWN()							gCPUProfiler.Shutdown()
 
 // Usage:
 //		PROFILE_REGISTER_THREAD(const char* pName)
 //		PROFILE_REGISTER_THREAD()
-#define PROFILE_REGISTER_THREAD(...) gCPUProfiler.RegisterThread(__VA_ARGS__)
+#define PROFILE_REGISTER_THREAD(...)				gCPUProfiler.RegisterThread(__VA_ARGS__)
 
 /// Usage:
 //		PROFILE_FRAME()
-#define PROFILE_FRAME() gCPUProfiler.Tick()
+#define PROFILE_FRAME()								gCPUProfiler.Tick()
 
 /*
 	CPU Profiling
@@ -58,17 +60,20 @@ struct URange
 // Usage:
 //		PROFILE_CPU_SCOPE(const char* pName)
 //		PROFILE_CPU_SCOPE()
-#define PROFILE_CPU_SCOPE(...)							CPUProfileScope MACRO_CONCAT(profiler, __COUNTER__)(__FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
+#define PROFILE_CPU_SCOPE(...)						CPUProfileScope MACRO_CONCAT(profiler, __COUNTER__)(__FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
 
 // Usage:
 //		PROFILE_CPU_BEGIN(const char* pName)
 //		PROFILE_CPU_BEGIN()
-#define PROFILE_CPU_BEGIN(...)							gCPUProfiler.BeginEvent(__VA_ARGS__)
+#define PROFILE_CPU_BEGIN(...)						gCPUProfiler.BeginEvent(__VA_ARGS__)
 // Usage:
 //		PROFILE_CPU_END()
-#define PROFILE_CPU_END()								gCPUProfiler.EndEvent()
+#define PROFILE_CPU_END()							gCPUProfiler.EndEvent()
 
 #else
+
+#define PROFILER_INITIALIZE(size_T, size)
+#define PROFILER_SHUTDOWN()
 
 #define PROFILE_REGISTER_THREAD(...)
 #define PROFILE_FRAME()

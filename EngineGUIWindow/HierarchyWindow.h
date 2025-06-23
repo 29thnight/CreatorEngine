@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 
 class SceneRenderer;
@@ -13,3 +14,4 @@ public:
 
 	SceneRenderer* m_sceneRenderer{ nullptr };
 };
+#endif // !DYNAMICCPP_EXPORTS

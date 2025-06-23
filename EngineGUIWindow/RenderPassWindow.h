@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRegister.h"
 
 class SceneRenderer;
@@ -12,3 +13,4 @@ public:
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 };
+#endif // !DYNAMICCPP_EXPORTS

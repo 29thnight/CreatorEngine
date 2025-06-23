@@ -22,11 +22,7 @@ public:
     }
     virtual ~Animator()
     {
-        for (auto Controller : m_animationControllers)
-        {
-            delete Controller;
-        }
-
+        m_animationControllers.clear();
         for (auto& param : Parameters)
         {
             delete param; // 하나씩 해제
@@ -43,6 +39,8 @@ public:
     void CreateController(std::string name);
     [[Method]]
     void CreateController_UI();
+    void DeleteController(int index);
+    void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
     [[Property]]
@@ -62,7 +60,8 @@ public:
     XMMATRIX blendtransform;
 
     [[Property]]
-    std::vector<AnimationController*> m_animationControllers{};
+    std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; //&&&&& shared로 고치면 erase는 그냥가능
+    //std::vector<AnimationController*> m_animationControllers{};
     [[Property]]
     std::vector<ConditionParameter*> Parameters;
 

@@ -462,4 +462,14 @@ FodyWeavers.xsd
 /imgui.ini
 EngineVersion.h
 /TestScene.yml
-/Dynamic_CPP/Assets/
+/NodeEditor/
+/Dynamic_CPP/Assets/ColorGrading/
+/Dynamic_CPP/Assets/Font/
+/Dynamic_CPP/Assets/HDR/
+/Dynamic_CPP/Assets/Materials/
+/Dynamic_CPP/Assets/Models/
+/Dynamic_CPP/Assets/Scenes/
+/Dynamic_CPP/Assets/Terrain/
+/Dynamic_CPP/Assets/Textures/
+/Dynamic_CPP/Assets/UI/
+/Dynamic_CPP/Assets/VolumeticFog/

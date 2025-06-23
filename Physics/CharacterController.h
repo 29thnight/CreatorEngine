@@ -27,12 +27,12 @@ public:
 	inline const unsigned int& GetLayerNumber() const { return m_layerNumber; }
 	inline CharacterMovement* GetCharacterMovement() { return m_characterMovement; }
 	inline void GetPosition(DirectX::SimpleMath::Vector3& position) const {
-		position.x = m_controller->getPosition().x;
-		position.y = m_controller->getPosition().y;
-		position.z = m_controller->getPosition().z;
+		position.x = static_cast<float>(m_controller->getPosition().x);
+		position.y = static_cast<float>(m_controller->getPosition().y);
+		position.z = static_cast<float>(m_controller->getPosition().z);
 	}
 	inline void SetPosition(const DirectX::SimpleMath::Vector3& position) {
-		m_controller->setPosition(physx::PxExtendedVec3(position.x, position.y, position.z));
+		m_controller->setPosition(physx::PxExtendedVec3(static_cast<double>(position.x), static_cast<double>(position.y), static_cast<double>(position.z)));
 	}
 
 

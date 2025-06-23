@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
 class IncludeHandler : public ID3DInclude
@@ -78,3 +79,4 @@ private:
 
 	static std::unordered_map<std::string, ComPtr<ID3DBlob>> m_shaderCache;
 };
+#endif // !DYNAMICCPP_EXPORTS

@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "GameViewWindow.h"
 #include "SceneRenderer.h"
 #include "CameraComponent.h"
@@ -35,3 +36,4 @@ void GameViewWindow::RenderGameViewWindow()
 	ImGui::End();
 	ImGui::PopStyleVar();
 }
+#endif // !DYNAMICCPP_EXPORTS

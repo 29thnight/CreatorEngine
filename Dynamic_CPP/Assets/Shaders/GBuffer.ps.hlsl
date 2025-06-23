@@ -86,8 +86,8 @@ GBufferOutput main(PixelShaderInput IN)
     {
 
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
-        if (gConvertToLinear)
-            albedo = SRGBtoLINEAR(albedo);
+        //if (gConvertToLinear)
+           // albedo = SRGBtoLINEAR(albedo);
     }
     
     [branch]
