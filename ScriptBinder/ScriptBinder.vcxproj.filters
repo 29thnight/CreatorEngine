@@ -115,6 +115,21 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\GameAI">
+      <UniqueIdentifier>{975413bb-9354-407c-9f76-c6e5a824e530}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core">
+      <UniqueIdentifier>{97d91471-e814-4f9f-b5d7-81c618d8f42d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\FSMModule">
+      <UniqueIdentifier>{d425a046-1209-4ee1-a904-128c19d253ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\BehaviorTreeModule">
+      <UniqueIdentifier>{518950cd-f6e3-4260-82a4-3cbff53e9820}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\GOAPModule%28사용 미정%29">
+      <UniqueIdentifier>{8962109e-abeb-42cc-9626-642c142446b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -221,6 +236,21 @@
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="IAIComponent.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Blackboard.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Blackboard.cpp">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="BTHeader.cpp">
+      <Filter>Classes\GameAI\BehaviorTreeModule</Filter>
+    </ClCompile>
+    <ClCompile Include="StateMachineComponent.cpp">
+      <Filter>Classes\GameAI\FSMModule</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -436,6 +466,24 @@
     </ClInclude>
     <ClInclude Include="TerrainBuffers.h">
       <Filter>Classes\Resources\Terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="WorldState.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="FSMState.h">
+      <Filter>Classes\GameAI\FSMModule</Filter>
+    </ClInclude>
+    <ClInclude Include="Transition.h">
+      <Filter>Classes\GameAI\FSMModule</Filter>
+    </ClInclude>
+    <ClInclude Include="StateMachineComponent.h">
+      <Filter>Classes\GameAI\FSMModule</Filter>
+    </ClInclude>
+    <ClInclude Include="BTHeader.h">
+      <Filter>Classes\GameAI\BehaviorTreeModule</Filter>
+    </ClInclude>
+    <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Classes\GameAI\BehaviorTreeModule</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

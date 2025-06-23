@@ -10,6 +10,9 @@ class ModuleBehavior;
 class Animator;
 
 class TerrainComponent;
+class StateMachineComponent;
+
+
 class InspectorWindow
 {
 public:
@@ -26,4 +29,11 @@ private:
 
 	void DrawMyLink(std::string linkName, std::string from, std::string to);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
+
+
+
+	bool m_openFSMEditorPopup{ false };
+
+
+	void ImGuiDrawHelperFSMComponent(StateMachineComponent* fsmComponent);
 };

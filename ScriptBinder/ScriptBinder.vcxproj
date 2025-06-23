@@ -159,7 +159,10 @@
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
+    <ClCompile Include="Blackboard.cpp" />
+    <ClCompile Include="Blackboard.h" />
     <ClCompile Include="BoxColliderComponent.cpp" />
+    <ClCompile Include="BTHeader.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
     <ClCompile Include="Component.cpp" />
@@ -167,6 +170,7 @@
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
+    <ClCompile Include="IAIComponent.h" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
@@ -179,6 +183,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
+    <ClCompile Include="StateMachineComponent.cpp" />
     <ClCompile Include="TagManager.cpp" />
     <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
@@ -199,7 +204,9 @@
     <ClInclude Include="ArticulationData.h" />
     <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
+    <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BoneMask.h" />
+    <ClInclude Include="BTHeader.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
     <ClInclude Include="BoxColliderComponent.h" />
@@ -250,18 +257,22 @@
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="FSMState.h" />
+    <ClInclude Include="StateMachineComponent.h" />
     <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
     <ClInclude Include="TerrainBuffers.h" />
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="TransCondition.h" />
+    <ClInclude Include="Transition.h" />
     <ClInclude Include="UIButton.h" />
     <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="IUpdatable.h" />
     <ClInclude Include="UIComponent.h" />
     <ClInclude Include="UIManager.h" />
+    <ClInclude Include="WorldState.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />

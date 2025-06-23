@@ -16,6 +16,10 @@
 #include "CustomCollapsingHeader.h"
 #include "Terrain.h"
 #include "FileDialog.h"
+//----------------------------
+#include "StateMachineComponent.h"
+
+//----------------------------
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -26,6 +30,14 @@ static const std::unordered_set<std::string> ignoredKeys = {
 	"guid",
 	"importSettings"
 };
+
+
+ed::EditorContext* m_fsmEditorContext{ nullptr };
+bool			   s_CreatingLink = false;
+ed::PinId		   s_LinkStartPin = 0;
+ed::LinkId		   s_EditLinkId = 0;
+bool			   s_RenameNodePopup{ false };
+
 
 void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
 {
@@ -1521,6 +1533,259 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 		}
 
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperFSMComponent(StateMachineComponent* fsmComponent)
+{
+	if (fsmComponent != nullptr) {
+
+		if (!m_fsmEditorContext) {
+			m_fsmEditorContext = ed::CreateEditor();
+		}
+
+
+		ImGui::Text("StateMachineComponent");
+		if (ImGui::Button("Open FSM Edit")) {
+			m_openFSMEditorPopup = true;
+			ImGui::OpenPopup("FSMEditorPopup");
+		}
+
+		//ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
+
+		//ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정 
+		if (ImGui::BeginPopupModal("FSMEditorPopup",nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+			//toolbar Addstate / AddTransition
+			if (ImGui::Button("Add State"))
+			{
+				auto newState = fsmComponent->AddState("NewState");
+				newState->SetPosition(ImVec2(100, 100)); // Set initial position for the new state
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Add Transition"))
+			{
+				//hook : fsmComponent->AddTransition();
+			}
+
+			ImGui::Separator();
+		
+			ImGui::BeginChild("FSMEditorCanvas", ImVec2(600, 400), true);
+			// Draw the FSM editor canvas here
+
+			//NodeEditor Setup
+			ed::SetCurrentEditor(m_fsmEditorContext);
+			ed::Begin("FSMEditor");
+
+			// Draw States as Nodes
+			for (auto& statePtr : fsmComponent->GetStates()) {
+				ed::NodeId nodeId = (ed::NodeId)statePtr->GetID();
+				ImVec2 origPos = statePtr->GetPosition();
+				ed::BeginNode(nodeId);
+
+				// Title directly
+				ImGui::TextUnformatted(statePtr->GetName().c_str());
+
+				// Input Pin
+				ed::PinId inputPinId = nodeId.Get() * 2;
+				ed::BeginPin(inputPinId, ed::PinKind::Input);
+				ImGui::Text("in");
+				ed::EndPin();
+
+				// Output Pin
+				ed::PinId outputPinId = nodeId.Get() * 2 + 1;
+				ed::BeginPin(outputPinId, ed::PinKind::Output);
+				ImGui::Text("out");
+				ed::EndPin();
+
+				ed::EndNode();
+				// 사용자가 드래그하여 위치를 옮겼다면
+				ImVec2 newPos = ed::GetNodePosition(nodeId);
+				if (newPos.x != origPos.x || newPos.y != origPos.y) {
+					statePtr->SetPosition(newPos);
+				}
+			}
+
+			// Handle new link creation (0.9.1 API)
+			if (s_CreatingLink) {
+				ed::BeginCreate();
+				ed::PinId startPin = 0, endPin = 0;
+				
+				if (ed::QueryNewLink(&startPin, &endPin)) {
+					// determine direction based on pin id: even=input, odd=output
+					ed::PinId outPin = (startPin.Get() % 2 == 1) ? startPin : endPin;
+					ed::PinId inPin = (startPin.Get() % 2 == 1) ? endPin : startPin;
+					int fromStateId = static_cast<int>(outPin.Get()) / 2;
+					int toStateId = static_cast<int>(inPin.Get()) / 2;
+					auto* from = fsmComponent->FindStateByID(fromStateId);
+					auto* to = fsmComponent->FindStateByID(toStateId);
+					if (from && to) {
+						fsmComponent->AddTransition(from, to, [](const Blackboard&) { return false; }); // placeholder cond
+					}
+					s_CreatingLink = false;
+				}
+				ed::EndCreate();
+			}
+
+			//Draw Transitions Links
+			for (auto& transPtr : fsmComponent->GetTransitions()) {
+				auto linkId = (ed::LinkId)transPtr->GetID();
+				auto fromPinId = (ed::PinId)(transPtr->GetFrom()->GetID() * 2 + 1);
+				auto toPinId = (ed::PinId)(transPtr->GetTo()->GetID() * 2);
+				ed::Link(linkId, fromPinId, toPinId);
+			}
+						
+			ed::End();
+			ed::SetCurrentEditor(nullptr);
+			//end draw
+
+			//begin node move
+			ed::SetCurrentEditor(m_fsmEditorContext);
+			ed::Begin("FSMEditor");
+		
+
+			ed::NodeId clickedNode = 0;
+			if (ed::ShowNodeContextMenu(&clickedNode)) {
+				// 우클릭된 노드 ID가 clickedNode에 담깁니다.
+				if (ImGui::MenuItem("Rename State")) {
+					// 여기에 Rename 팝업 오픈 또는 메뉴 처리 로직 추가
+					s_RenameNodePopup = true;
+					ImGui::OpenPopup("Rename State");
+					// 팝업 로직에서 clickedNode 활용
+				}
+				if (ImGui::MenuItem("Delete State")) {
+					if (auto* st = fsmComponent->FindStateByID((int)clickedNode.Get())) {
+						fsmComponent->RemoveState(st);
+					}
+				}
+				
+			}
+
+			// --- 2) 이름 변경용 팝업 ---
+			if (s_RenameNodePopup) {
+				if (ImGui::BeginPopupModal("Rename State", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+					static char buf[64];
+					if (auto* st = fsmComponent->FindStateByID((int)clickedNode.Get())) {
+						strcpy(buf, st->GetName().c_str());
+					}
+					else {
+						buf[0] = '\0';
+					}
+
+					ImGui::InputText("##newname", buf, sizeof(buf));
+					if (ImGui::Button("OK")) {
+						if (auto* st = fsmComponent->FindStateByID((int)clickedNode.Get())) {
+							st->SetName(buf);
+						}
+						ImGui::CloseCurrentPopup();
+						s_RenameNodePopup = false;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Cancel")) {
+						ImGui::CloseCurrentPopup();
+						s_RenameNodePopup = false;
+					}
+					ImGui::EndPopup();
+				}
+			}
+
+			ed::End();
+			ed::SetCurrentEditor(nullptr);
+			// end node move
+
+			//begin transition edit
+			ed::SetCurrentEditor(m_fsmEditorContext);
+			ed::Begin("FSMEditor");
+
+			// --- 3) 링크(Transition) 클릭 & 조건 편집 ---
+			ed::LinkId clickedLink = 0;
+			if (ed::ShowLinkContextMenu(&clickedLink)) {
+					// 클릭된 링크 ID가 clickedLink에 담깁니다.
+				if (ImGui::MenuItem("Edit Transition Condition")) {
+					// Open condition edit popup
+					ImGui::OpenPopup("Edit Transition Condition");
+					s_EditLinkId = clickedLink;
+				}
+				if (ImGui::MenuItem("Delete Transition")) {
+					// Delete the transition
+					if (auto* tr = fsmComponent->FindTransitionByID((int)clickedLink.Get())) {
+						fsmComponent->RemoveTransition(tr);
+					}
+				}
+			}
+
+			// --- 4) Transition 조건 편집 팝업 ---
+			if (ImGui::BeginPopupModal("Edit Transition Condition", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+				static char condBuf[128] = "";
+				// Load existing condition text if first time open
+				static bool initialized = false;
+				if (!initialized) 
+				{
+					if (auto* tr = fsmComponent->FindTransitionByID((int)s_EditLinkId.Get())) {
+						//strncpy(condBuf, tr->GetConditionScript().c_str(), sizeof(condBuf));
+					}
+					initialized = true;
+				}
+
+				ImGui::InputTextMultiline("Condition (as script)", condBuf, sizeof(condBuf), ImVec2(400, 100));
+				if (ImGui::Button("OK")) 
+				{
+					if (auto* tr = fsmComponent->FindTransitionByID((int)s_EditLinkId.Get())) {
+						//tr->SetConditionScript(condBuf);
+						// TODO: parse/compile script into actual Condition lambda
+					}
+					initialized = false;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) 
+				{
+					initialized = false;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+
+
+
+			ed::End();
+			ed::SetCurrentEditor(nullptr);
+			// end transition edit
+
+			//delete phase
+			ed::SetCurrentEditor(m_fsmEditorContext);
+			ed::BeginDelete();
+			ed::Begin("FSM Editor Del");
+
+			ed::End();
+			ed::EndDelete();
+
+			ed::LinkId linkToDelete;
+			ed::NodeId nodeToDelete;
+			if (ed::QueryDeletedLink(&linkToDelete)) {
+				fsmComponent->RemoveTransition(fsmComponent->FindTransitionByID((int)linkToDelete.Get()));
+			}
+			if (ed::QueryDeletedNode(&nodeToDelete))
+			{
+				fsmComponent->RemoveState(fsmComponent->FindStateByID((int)nodeToDelete.Get()));
+			}
+			ed::AcceptDeletedItem();
+			ed::SetCurrentEditor(nullptr);
+
+
+			ImGui::EndChild();
+
+			if (ImGui::Button("Close"))
+			{
+				ImGui::CloseCurrentPopup();
+				m_openFSMEditorPopup = false;
+				if (m_fsmEditorContext) {
+					ed::DestroyEditor(m_fsmEditorContext);
+					m_fsmEditorContext = nullptr;
+				}
+			}
+
+			ImGui::EndPopup();
+		}
 	}
 }
 
