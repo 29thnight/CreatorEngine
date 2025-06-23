@@ -10,10 +10,10 @@ namespace BT
 	public:
 		BehaviorTreeComponent() = default;
 		~BehaviorTreeComponent() = default;
-		
+
 
 		// IAIComponent 인터페이스 구현
-		void Initialize() override;
+		void Initialize() override {}
 		void Tick(float deltaTime) override {
 			if (m_root) {
 				m_root->Tick(m_blackboard);
@@ -30,4 +30,4 @@ namespace BT
 		BTNode::Ptr m_root; // 루트 노드
 	};
 
-}
+}// namespace BT

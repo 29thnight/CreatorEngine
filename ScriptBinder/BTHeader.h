@@ -198,4 +198,4 @@ namespace BT
 		ActionFunc m_action; // 행동 함수
 	};
 	
-}
+}// namespace BT
