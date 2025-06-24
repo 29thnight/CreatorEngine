@@ -30,7 +30,7 @@ public:
 	}
 	void UpdateCollider();
 	bool CheckClick(Mathf::Vector2 _mousePos);
-	void SetFunction(std::function<void()> func) { m_clickFunction = func;}
+	void SetFunction(std::string& funName,float key,std::function<void()> func) { m_clickFunction = func;}
     [[Method]]
 	void Click() { m_clickFunction(); }
 

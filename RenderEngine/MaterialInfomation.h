@@ -19,6 +19,8 @@ cbuffer MaterialInfomation
     bool32		  m_useEmissive{};
     bool32		  m_useNormalMap{};
     bool32		  m_convertToLinearSpace{};
+    [[Property]]
+    UINT          m_bitflag{};
 
    ReflectMaterialInfomation
     [[Serializable]]

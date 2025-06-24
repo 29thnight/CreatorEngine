@@ -8,7 +8,7 @@ class DeferredPass final : public IRenderPass
 public:
     DeferredPass();
     ~DeferredPass();
-    void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
+    void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitmask);
     void UseAmbientOcclusion(Texture* aoMap);
     void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
     void DisableAmbientOcclusion();
@@ -22,6 +22,7 @@ private:
     Texture* m_MetalRoughTexture{};
     Texture* m_NormalTexture{};
     Texture* m_EmissiveTexture{};
+    Texture* m_BitmaskTexture{};
     Texture* m_AmbientOcclusionTexture{};
     Texture* m_EnvironmentMap{};
     Texture* m_PreFilter{};

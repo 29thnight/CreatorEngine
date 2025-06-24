@@ -71,7 +71,7 @@ public:
 
 	//컨트롤러 바꿔치기용
 	[[Property]]
-	bool useController = false; 
+	bool useController = true; 
 
 	DirectX::XMMATRIX m_FinalTransforms[512]{};
 
@@ -81,6 +81,7 @@ public:
 	[[Property]]
 	bool useMask = false;
 	float curAnimationProgress = 0.f;
+	bool endAnimation = false;
 private:
 	float blendingTime = 0;
 	int m_AnimationIndex = 0;

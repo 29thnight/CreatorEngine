@@ -3,13 +3,22 @@
 namespace ed = ax::NodeEditor;
 void NodeEditor::MakeEdit(std::string filePath)
 {
-	if (!m_nodeContext)
-	{
-		ed::Config config;
-        m_filePath = "NodeEditor\\" + filePath;
+    std::string _filepath = "NodeEditor\\" + filePath;
+    if (!m_nodeContext || m_filePath != _filepath)
+    {
+        if (m_nodeContext)
+        {
+            ed::DestroyEditor(m_nodeContext);
+            m_nodeContext = nullptr;
+        }
+
+        ed::Config config;
+        m_filePath = _filepath;
         config.SettingsFile = m_filePath.c_str();
-		m_nodeContext = ed::CreateEditor(&config);
-	}
+
+        m_nodeContext = ed::CreateEditor(&config);
+    }
+
     for (auto node : Nodes)
     {
         delete node;
@@ -249,24 +258,24 @@ void NodeEditor::MakeNewLink(int* returnIndex)
 
 void NodeEditor::ReNameJson(std::string filepath)
 {
-
-    std::string newFilePath = "NodeEditor\\" + filepath + ".json";
+    std::string _filepath = "NodeEditor\\" + filepath;
 
     // 이전 파일이 존재하면 새 경로로 복사 or 이동
     if (std::filesystem::exists(m_filePath))
     {
-        std::filesystem::rename(m_filePath, newFilePath);
+        std::filesystem::rename(m_filePath, _filepath);
+        m_filePath = _filepath;
     }
 
     // 파일 경로 업데이트
-    m_filePath = newFilePath;
+    //m_filePath = newFilePath;
 
     // NodeEditor가 이미 열려있다면 새 파일 경로로 저장 설정 변경
-    if (m_nodeContext)
+   /* if (m_nodeContext)
     {
         ed::Config config = ed::GetConfig(m_nodeContext);
         config.SettingsFile = m_filePath.c_str();
-    }
+    }*/
 }
 
 bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold)

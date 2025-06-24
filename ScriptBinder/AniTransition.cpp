@@ -18,7 +18,10 @@ AniTransition::~AniTransition()
 
 bool AniTransition::CheckTransiton()
 {
-
+	if (conditions.empty() && m_ownerController->endAnimation == true)
+	{
+		return true;
+	}
 	for (auto& condition : conditions)
 	{
 		if (true == condition.CheckTrans())

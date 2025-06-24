@@ -45,9 +45,9 @@ bool TransCondition::CheckTrans()
 				switch (cType)
 				{
 				case ConditionType::True:
-					return CompareParameter.bValue;
+					return parameter->bValue == true;
 				case ConditionType::False:
-					return !CompareParameter.bValue;
+					return parameter->bValue == false;
 				}
 			}
 			else if (parameter->vType == ValueType::Trigger)

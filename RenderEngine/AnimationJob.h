@@ -25,7 +25,7 @@ private:
     void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const DirectX::XMMATRIX& Transform, float time);
     void UpdateBoneLayer(Bone* bone, Animator& animator,  const DirectX::XMMATRIX& Transform);
     XMMATRIX BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t);
-    XMMATRIX calculAni(NodeAnimation& nodeAnim, float time);
+    XMMATRIX calculAni(NodeAnimation& nodeAnim, float time, int* _key = nullptr);
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;

@@ -167,6 +167,8 @@
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
+    <ClCompile Include="InputAction.cpp" />
+    <ClCompile Include="InputActionComponent.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
@@ -227,6 +229,8 @@
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="ActionMap.h" />
+    <ClInclude Include="InputAction.h" />
+    <ClInclude Include="InputActionComponent.h" />
     <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />

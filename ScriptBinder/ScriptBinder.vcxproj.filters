@@ -115,6 +115,12 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\PostProcessingManager">
+      <UniqueIdentifier>{7ea8156f-f2bf-4249-8956-67f849e68b6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\InputAction">
+      <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Classes\GameAI">
       <UniqueIdentifier>{9f18c3ff-b84c-493f-95c2-5c4168131d95}</UniqueIdentifier>
     </Filter>
@@ -236,6 +242,12 @@
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="InputActionComponent.cpp">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClCompile>
+    <ClCompile Include="InputAction.cpp">
+      <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
     <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
@@ -454,6 +466,12 @@
     </ClInclude>
     <ClInclude Include="TerrainBuffers.h">
       <Filter>Classes\Resources\Terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="InputActionComponent.h">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClInclude>
+    <ClInclude Include="InputAction.h">
+      <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
     <ClInclude Include="BlackBoard.h">
       <Filter>Classes\GameAI\Core</Filter>

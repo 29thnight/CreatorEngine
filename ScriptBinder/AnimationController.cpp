@@ -83,6 +83,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 			}
 		}
 	}
+
 	if (m_curState->Transitions.empty()) return nullptr;
 	for (auto& trans : m_curState->Transitions)
 	{
@@ -107,6 +108,7 @@ void AnimationController::UpdateState()
 	//전이가있으면 애니메이션 블렌딩시작 //블렌딩없는 강제변화있을경우 추가필요*****
 	if (nullptr != trans)
 	{
+		endAnimation = false;
 		//새전이가있는대 이전 전이가 진행중이었음
 		if (m_nextAnimationIndex != -1)
 		{
@@ -160,7 +162,7 @@ void AnimationController::UpdateState()
 }
 void AnimationController::Update(float tick)
 {
-	Debug->Log(std::to_string(curAnimationProgress).c_str());
+	//Debug->Log(std::to_string(curAnimationProgress).c_str()); &&&&&
 	UpdateState();
 	if (needBlend)
 	{

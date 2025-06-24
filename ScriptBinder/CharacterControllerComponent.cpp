@@ -17,33 +17,33 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	}
 	
 	////todo : input 값 받아오기
-	//bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
-	//bool backward = InputManagement->IsKeyPressed(KeyBoard::DownArrow);
-	//bool left = InputManagement->IsKeyPressed(KeyBoard::LeftArrow);
-	//bool right = InputManagement->IsKeyPressed(KeyBoard::RightArrow);
+	/*bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
+	bool backward = InputManagement->IsKeyPressed(KeyBoard::DownArrow);
+	bool left = InputManagement->IsKeyPressed(KeyBoard::LeftArrow);
+	bool right = InputManagement->IsKeyPressed(KeyBoard::RightArrow);
 
-	//float x = 0.0f;
-	//float z = 0.0f;
-	//if (foward) {
-	//	z = 1.0f;
-	//}
-	//else if (backward) {
-	//	z = -1.0f;
-	//}
-	//else {
-	//	z = 0.0f;
-	//}
+	float x = 0.0f;
+	float z = 0.0f;
+	if (foward) {
+		z = 1.0f;
+	}
+	else if (backward) {
+		z = -1.0f;
+	}
+	else {
+		z = 0.0f;
+	}
 
-	//if (left) {
-	//	x = -1.0f;
-	//}
-	//else if (right) {
-	//	x = 1.0f;
-	//}
-	//else
-	//{
-	//	x = 0.0f;
-	//}
+	if (left) {
+		x = -1.0f;
+	}
+	else if (right) {
+		x = 1.0f;
+	}
+	else
+	{
+		x = 0.0f;
+	}*/
 
 	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 	input.x = m_moveInput.x;
@@ -54,11 +54,9 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	//케릭터 컨트롤러
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
 
-	
-
 	m_bOnMove = input != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
 
-	//input.Normalize();
+	input.Normalize();
 
 	CharactorControllerInputInfo inputInfo;
 	inputInfo.id = m_controllerInfo.id;
@@ -66,7 +64,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	inputInfo.isDynamic = GetOwner()->GetComponent<RigidBodyComponent>()->GetBodyType() == EBodyType::DYNAMIC;
 	Physics->AddInputMove(inputInfo);
 
-	Debug->Log(std::to_string(input.x));
+
 	constexpr float rotationOffsetSquare = 0.5f * 0.5f;
 
 	float inputSquare = input.LengthSquared();

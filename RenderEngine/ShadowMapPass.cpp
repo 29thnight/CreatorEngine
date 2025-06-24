@@ -281,7 +281,7 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 			}
 		}
 
-		PrimitiveRenderProxy->Draw(defferdContextPtr1);
+		PrimitiveRenderProxy->DrawShadow(defferdContextPtr1);
 	}
 }
 

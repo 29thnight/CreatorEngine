@@ -219,9 +219,6 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderTaskScheduler">
-      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -236,9 +233,6 @@
     </Filter>
     <Filter Include="RenderPass\SSGIPass">
       <UniqueIdentifier>{f3445376-0cf9-47a8-96d0-3b26a554257d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RenderPass\LighingPass">
-      <UniqueIdentifier>{a359d5c3-6d5e-401a-b22d-5da78f89f927}</UniqueIdentifier>
     </Filter>
     <Filter Include="RenderPass\EffectPass\3.Color">
       <UniqueIdentifier>{f45f55f2-237b-4f3c-a329-565776d89912}</UniqueIdentifier>
@@ -266,6 +260,15 @@
     </Filter>
     <Filter Include="Event">
       <UniqueIdentifier>{5ecc1c70-391b-4ac9-8bf7-dec5eeb92687}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\MeshOptimizer">
+      <UniqueIdentifier>{d01a14c8-5ec3-42f4-bb5f-e016969280fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\LODGroup">
+      <UniqueIdentifier>{e03aa640-8677-4501-a3ff-7da7616864cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\BitMaskPass">
+      <UniqueIdentifier>{ea303887-bdf2-47c6-badb-d339bdb76275}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -443,9 +446,6 @@
     <ClCompile Include="SSGIPass.cpp">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClCompile>
-    <ClCompile Include="LightingPass.cpp">
-      <Filter>RenderPass\LighingPass</Filter>
-    </ClCompile>
     <ClCompile Include="ColorModuleCS.cpp">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClCompile>
@@ -472,6 +472,18 @@
     </ClCompile>
     <ClCompile Include="Socket.cpp">
       <Filter>Resources\Skeleton</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshOptimizer.cpp">
+      <Filter>Asset\MeshOptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="LODSetting.cpp">
+      <Filter>Asset\LODGroup</Filter>
+    </ClCompile>
+    <ClCompile Include="LODGroup.cpp">
+      <Filter>Asset\LODGroup</Filter>
+    </ClCompile>
+    <ClCompile Include="BitMaskPass.cpp">
+      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -691,9 +703,6 @@
     <ClInclude Include="SSGIPass.h">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClInclude>
-    <ClInclude Include="LightingPass.h">
-      <Filter>RenderPass\LighingPass</Filter>
-    </ClInclude>
     <ClInclude Include="ColorModuleCS.h">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClInclude>
@@ -727,8 +736,20 @@
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
+    <ClInclude Include="AssetBundle.h">
+      <Filter>Asset\ManagerSystem\AssetBundle</Filter>
+    </ClInclude>
+    <ClInclude Include="BitMaskPass.h">
+      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
+    </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
-      <Filter>Asset\Loader</Filter>
+      <Filter>Asset\MeshOptimizer</Filter>
+    </ClInclude>
+    <ClInclude Include="LODGroup.h">
+      <Filter>Asset\LODGroup</Filter>
+    </ClInclude>
+    <ClInclude Include="LODSetting.h">
+      <Filter>Asset\LODGroup</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -919,6 +940,9 @@
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\UpDualFiltering.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Edgefilter.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>

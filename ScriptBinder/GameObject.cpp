@@ -230,8 +230,8 @@ GameObject* GameObject::FindAttachedID(const HashedGuid& guid)
 		{
 			return object->m_attachedSoketID == guid;
 		});
-
-		return (*it).get();
+		if (it != gameObjects.end())
+			return (*it).get();
 	}
 
 	return nullptr;

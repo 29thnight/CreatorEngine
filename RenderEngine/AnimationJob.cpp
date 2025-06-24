@@ -76,15 +76,23 @@ void AnimationJob::Update(float deltaTime)
                     if (animationcontroller == nullptr || !animationcontroller->useController) continue;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
-                    if(animation.m_isLoop == true)
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
+                    if (animation.m_isLoop == true)
+                    {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
+                    }
                     else
                     {
                         if (animationcontroller->m_timeElapsed >= animation.m_duration)
+                        {
                             animationcontroller->m_timeElapsed = animation.m_duration;
+                            if (animationcontroller->curAnimationProgress >= 0.95)
+                                animationcontroller->endAnimation = true;
+                        }
                         
                     }
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].preAnimationProgress = skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress;
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress = animationcontroller->curAnimationProgress;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
@@ -97,6 +105,8 @@ void AnimationJob::Update(float deltaTime)
                     {
                         UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
+
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent();
                 }
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
 
@@ -107,13 +117,6 @@ void AnimationJob::Update(float deltaTime)
             {
                 Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
                 animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
-                if(animation.m_isLoop == true)
-                    animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-                else
-                {
-                    if (animator->m_TimeElapsed >= animation.m_duration)
-                        animator->m_TimeElapsed = animation.m_duration;
-                }
                 AnimationController* animationcontroller = nullptr;
                 if (!animator->m_animationControllers.empty())
                 {
@@ -121,9 +124,33 @@ void AnimationJob::Update(float deltaTime)
                     animationcontroller->curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
                     if (!animationcontroller->useController) animationcontroller = nullptr;
                 }
+                if (animation.m_isLoop == true)
+                {
+                    animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+                }
+                else
+                {
+                    if (animator->m_TimeElapsed >= animation.m_duration)
+                    {
+                        animator->m_TimeElapsed = animation.m_duration;
+                        if (animationcontroller)
+                        {
+                            if (animationcontroller->curAnimationProgress >= 0.95)
+                                animationcontroller->endAnimation = true;
+                        }
+                    }
+                }
+                animation.preAnimationProgress = animation.curAnimationProgress;
+                animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
                 if (animator->m_isBlend)
                 {
+                    if (animator->nextAnimIndex == -1)
+                    {
+                        //Debug->Log("다음애니메이션인덱스를확인해주세요");
+                        return;
+                    }
+                        
                     Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
                     animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
                     animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
@@ -133,6 +160,7 @@ void AnimationJob::Update(float deltaTime)
                 {
                     UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
                 }
+                animation.InvokeEvent();
             }
         });
     }
@@ -195,8 +223,8 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
 
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
     NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
-    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime);
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
+    XMMATRIX nextnodeTransform = calculAni(nextnodeAnim, nextanitime, &nextanimation->curKey);
     XMMATRIX blendTransform = BlendAni(nodeTransform, nextnodeTransform, animator.blendT);
     animator.blendtransform = blendTransform;
     XMMATRIX globalTransform = blendTransform * parentTransform;
@@ -239,7 +267,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
         return;
     }
     NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
-    XMMATRIX nodeTransform = calculAni(nodeAnim, time);
+    XMMATRIX nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
     XMMATRIX globalTransform = nodeTransform * parentTransform;
     
     bone->m_globalTransform = globalTransform;
@@ -251,12 +279,9 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
             if (bone->m_name == socket->m_ObjectName)
             {
                 socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
-                //socket->transform.SetAndDecomposeMatrix(socket->m_boneMatrix);
                 socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
                 socket->transform.SetLocalMatrix(socket->m_boneMatrix);
                 socket->Update();
-               // auto matrix = socket->transform.GetLocalMatrix() * animator.GetOwner()->m_transform.GetWorldMatrix();
-               // socket->transform.SetAndDecomposeMatrix(matrix);
             }
         }
     }
@@ -333,7 +358,7 @@ XMMATRIX AnimationJob::BlendAni(XMMATRIX curAni, XMMATRIX nextAni, float t)
     return blendedNodeTransform;
 }
 
-XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
+XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time ,int* _key)
 {
     float t = 0;
     // Translation
@@ -343,6 +368,8 @@ XMMATRIX AnimationJob::calculAni(NodeAnimation& nodeAnim, float time)
         int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
         int nPosKeyIdx = posKeyIdx + 1;
 
+        if (_key)
+            *_key = posKeyIdx;
         NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
         NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
 

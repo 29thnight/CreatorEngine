@@ -8,6 +8,7 @@ cbuffer CompositeParams : register(b0)
 {
     float2 inputTextureSize;
     int ratio;
+    bool useOnlySSGI;
 }
 
 [numthreads(16,16,1)]
@@ -27,9 +28,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
     SSGI /= 9.0;
     
-    float3 destColor = resultTexture.Load(int3(DTid.xy, 0)).rgb;
+    float3 destColor = useOnlySSGI ? resultTexture.Load(int3(DTid.xy, 0)).rgb : float3(0, 0, 0);
     
     float3 color = ColorTexture.Load(int3(DTid.xy, 0)).rgb;
     
     resultTexture[DTid.xy] = float4(((destColor + (color * SSGI.rgb)) * SSGI.a), 1.0f);
+    
+    //resultTexture[DTid.xy] = float4(SSGI.rgb * SSGI.a, 1.0);
 }

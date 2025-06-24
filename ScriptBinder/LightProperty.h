@@ -81,7 +81,7 @@ cbuffer ShadowMapConstant
     float m_casCadeEnd1{};
     float m_casCadeEnd2{};
     float m_casCadeEnd3{};
-    float _epsilon = 0.01;
+    float _epsilon = 0.001;
     int devideShadow = 9; //max = 9 
     bool32 useCasCade;
 };
