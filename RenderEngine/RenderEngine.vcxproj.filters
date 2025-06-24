@@ -234,9 +234,6 @@
     <Filter Include="RenderPass\SSGIPass">
       <UniqueIdentifier>{f3445376-0cf9-47a8-96d0-3b26a554257d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\LighingPass">
-      <UniqueIdentifier>{a359d5c3-6d5e-401a-b22d-5da78f89f927}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\3.Color">
       <UniqueIdentifier>{f45f55f2-237b-4f3c-a329-565776d89912}</UniqueIdentifier>
     </Filter>
@@ -269,6 +266,9 @@
     </Filter>
     <Filter Include="Asset\LODGroup">
       <UniqueIdentifier>{e03aa640-8677-4501-a3ff-7da7616864cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\PostProcessingPass\BitMaskPass">
+      <UniqueIdentifier>{ea303887-bdf2-47c6-badb-d339bdb76275}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -446,9 +446,6 @@
     <ClCompile Include="SSGIPass.cpp">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClCompile>
-    <ClCompile Include="LightingPass.cpp">
-      <Filter>RenderPass\LighingPass</Filter>
-    </ClCompile>
     <ClCompile Include="ColorModuleCS.cpp">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClCompile>
@@ -484,6 +481,9 @@
     </ClCompile>
     <ClCompile Include="LODGroup.cpp">
       <Filter>Asset\LODGroup</Filter>
+    </ClCompile>
+    <ClCompile Include="BitMaskPass.cpp">
+      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -703,9 +703,6 @@
     <ClInclude Include="SSGIPass.h">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClInclude>
-    <ClInclude Include="LightingPass.h">
-      <Filter>RenderPass\LighingPass</Filter>
-    </ClInclude>
     <ClInclude Include="ColorModuleCS.h">
       <Filter>RenderPass\EffectPass\3.Color</Filter>
     </ClInclude>
@@ -741,6 +738,9 @@
     </ClInclude>
     <ClInclude Include="AssetBundle.h">
       <Filter>Asset\ManagerSystem\AssetBundle</Filter>
+    </ClInclude>
+    <ClInclude Include="BitMaskPass.h">
+      <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
       <Filter>Asset\MeshOptimizer</Filter>
@@ -940,6 +940,9 @@
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\UpDualFiltering.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Edgefilter.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
   </ItemGroup>

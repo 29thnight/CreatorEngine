@@ -82,7 +82,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_diffuseTexture->GetRTV(),
 		m_metalRoughTexture->GetRTV(),
 		m_normalTexture->GetRTV(),
-		m_emissiveTexture->GetRTV()
+		m_emissiveTexture->GetRTV(),
+		m_bitmaskTexture->GetRTV()
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 
@@ -101,7 +102,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
         m_diffuseTexture.get(),
         m_metalRoughTexture.get(),
         m_normalTexture.get(),
-        m_emissiveTexture.get()
+        m_emissiveTexture.get(),
+		m_bitmaskTexture.get()
     );
 
 	//forwardPass
@@ -172,9 +174,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pSSGIPass = std::make_unique<SSGIPass>();
 	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get());
 
-	//LighingPass
-	m_pLightingPass = std::make_unique<LightingPass>();
-	m_pLightingPass->Initialize(m_lightingTexture.get());
+	//BitmaskPass
+	m_pBitMaskPass = std::make_unique<BitMaskPass>();
+	m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
 
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
@@ -311,6 +313,14 @@ void SceneRenderer::InitializeTextures()
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
     m_emissiveTexture.swap(emissiveTexture);
+
+	auto bitmaskTexture = TextureHelper::CreateRenderTexture(
+		DeviceState::g_ClientRect.width,
+		DeviceState::g_ClientRect.height,
+		"BitmaskRTV",
+		DXGI_FORMAT_R32_UINT
+	);
+	m_bitmaskTexture.swap(bitmaskTexture);
 
 	auto toneMappedColourTexture = TextureHelper::CreateRenderTexture(
 		DeviceState::g_ClientRect.width,
@@ -484,13 +494,13 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
-		//{
-		//	DirectX11::BeginEvent(L"SSGIPass");
-		//	Benchmark banch;
-		//	m_pSSGIPass->Execute(*m_renderScene, *camera);
-		//	RenderStatistics->UpdateRenderState("SSGIPass", banch.GetElapsedTime());
-		//	DirectX11::EndEvent();
-		//}
+		{
+			DirectX11::BeginEvent(L"BitMaskPass");
+			Benchmark banch;
+			m_pBitMaskPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("BitMaskPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 
 		{
 			PROFILE_CPU_BEGIN("ForwardPass");
@@ -660,7 +670,8 @@ void SceneRenderer::CreateCommandListPass()
 		m_diffuseTexture->GetRTV(),
 		m_metalRoughTexture->GetRTV(),
 		m_normalTexture->GetRTV(),
-		m_emissiveTexture->GetRTV()
+		m_emissiveTexture->GetRTV(),
+		m_bitmaskTexture->GetRTV()
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
 	PROFILE_CPU_BEGIN("ProxyCommandExecute");
@@ -760,6 +771,13 @@ void SceneRenderer::CreateCommandListPass()
 			PROFILE_CPU_BEGIN("SkyBoxPassCommandList");
 			m_pSkyBoxPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+			{
+				PROFILE_CPU_BEGIN("BitMaskPassCommandList");
+				m_pBitMaskPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
 		});
 
 		if (m_pEditorCamera.get() != camera)

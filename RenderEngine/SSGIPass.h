@@ -37,6 +37,8 @@ private:
 	float thickness = 0.5f;//0.155f;
 
 	float intensity = 1.f;
+	bool useOnlySSGI = true;
+	bool useDualFiltering = true;
 
 	bool isOn = true;
 };
