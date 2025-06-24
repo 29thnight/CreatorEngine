@@ -143,44 +143,42 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 {
 	std::vector<Vertex> vertices;
 	std::vector<uint32> indices;
-	bool hasTexCoords = mesh->mTextureCoords[0];
+	m_numUVChannel = mesh->GetNumUVChannels(); //테스트 해보고 어떻게 되는지 확인해보기
+	bool hasTexCoords = mesh->mTextureCoords[0] != nullptr;
+	bool hasTexCoords1 = mesh->mTextureCoords[1] != nullptr;
     vertices.reserve(mesh->mNumVertices);
     indices.reserve(mesh->mNumFaces * 3);
 
 	for (uint32 i = 0; i < mesh->mNumVertices; i++)
 	{
-		Vertex vertex;
-		vertex.position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-		vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-		vertex.tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
-		vertex.bitangent = { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z };
-		if (hasTexCoords)
-		{
-			vertex.uv0 = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
-
-			if (mesh->mTextureCoords[1]) {
-				vertex.uv1 = { mesh->mTextureCoords[1][i].x, mesh->mTextureCoords[1][i].y };
-			}
-			else {
-				vertex.uv1 = vertex.uv0;
-			}
-		} 
-
+		Vertex vertex = Vertex::ConvertToAiMesh(mesh, i);
 		vertices.push_back(vertex);
 	}
 
 	for (uint32 i = 0; i < mesh->mNumFaces; i++)
 	{
-		aiFace face = mesh->mFaces[i];
+		const aiFace& face = mesh->mFaces[i];
 		for (uint32 j = 0; j < face.mNumIndices; j++)
 		{
 			indices.push_back((uint32)face.mIndices[j]);
 		}
 	}
 
-	ProcessBones(mesh, vertices);
+	if(mesh->mNumBones > 0)
+	{
+		m_model->m_hasBones = true;
+		ProcessBones(mesh, vertices);
+	}
+
 	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
+
+	if(!m_isSkinnedMesh)
+	{
+		MeshOptimizer::Optimize(*meshObj, 1.05f);
+		MeshOptimizer::GenerateShadowMesh(*meshObj);
+	}
+
 	m_model->m_Meshes.push_back(meshObj);
 
 	return meshObj;
@@ -447,7 +445,6 @@ void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
 {
 	for (uint32 i = 0; i < mesh->mNumBones; ++i)
 	{
-		m_model->m_hasBones = true;
 		aiBone* bone = mesh->mBones[i];
 		int boneIndex = m_skeletonLoader.AddBone(bone);
 		for (uint32 j = 0; j < bone->mNumWeights; ++j)
@@ -519,7 +516,6 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
 			
-
 			return;
 		}
 	}

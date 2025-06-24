@@ -20,8 +20,8 @@ public:
    MeshRenderer();
    virtual ~MeshRenderer() override;
 
-   bool IsNeedUpdateCulling() const { return m_isNeedUptateCulling; }
-   void SetNeedUpdateCulling(bool able) { m_isNeedUptateCulling = able; }
+   bool IsNeedUpdateCulling() const { return m_isNeedUpdateCulling; }
+   void SetNeedUpdateCulling(bool able) { m_isNeedUpdateCulling = able; }
 
    virtual void Awake() override;
    virtual void OnDistroy() override;
@@ -46,6 +46,6 @@ public:
 	bool m_isSkinnedMesh{ false };
 
 private:
-	bool m_isNeedUptateCulling{ false };
+	bool m_isNeedUpdateCulling{ false };
 	std::unordered_set<OctreeNode*> m_OctreeNodes;
 };

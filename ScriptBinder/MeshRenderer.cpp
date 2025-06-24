@@ -31,7 +31,7 @@ void MeshRenderer::Awake()
     {
         CullingManagers->Insert(this);
 
-		m_isNeedUptateCulling = true;
+		m_isNeedUpdateCulling = true;
     }
 }
 

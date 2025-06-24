@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "DirectXHelper.h"
 #include "DeviceResources.h"
 #include "CoreWindow.h"
@@ -567,3 +568,4 @@ void DirectX11::DeviceResources::UpdateRenderTargetSize()
 	m_d3dRenderTargetSize.width = m_outputSize.width;
 	m_d3dRenderTargetSize.height = m_outputSize.height;
 }
+#endif // !DYNAMICCPP_EXPORTS

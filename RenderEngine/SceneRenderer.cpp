@@ -663,19 +663,23 @@ void SceneRenderer::CreateCommandListPass()
 		m_emissiveTexture->GetRTV()
 	};
 	m_pGBufferPass->SetRenderTargetViews(views, ARRAYSIZE(views));
-
+	PROFILE_CPU_BEGIN("ProxyCommandExecute");
 	ProxyCommandQueue->Execute();
+	PROFILE_CPU_END();
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
+		PROFILE_CPU_BEGIN("PrepareCommandBuilding");
 		for (auto& instanceID : data->GetShadowRenderDataBuffer())
 		{
 			auto proxy = renderScene->FindProxy(instanceID);
 			if (nullptr != proxy)
 			{
+				proxy->GenerateLODGroup();
+				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushShadowRenderQueue(proxy);
 			}
 		}
@@ -685,6 +689,8 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if(nullptr != proxy)
 			{
+				proxy->GenerateLODGroup();
+				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushRenderQueue(proxy);
 			}
 		}
@@ -693,6 +699,7 @@ void SceneRenderer::CreateCommandListPass()
 		data->SortShadowRenderQueue();
 		data->ClearCullDataBuffer();
 		data->ClearShadowRenderDataBuffer();
+		PROFILE_CPU_END();
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 		{

@@ -160,6 +160,9 @@
     <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="LODGroup.cpp" />
+    <ClCompile Include="LODSetting.cpp" />
+    <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="MovementModule.cpp" />
     <ClCompile Include="MovementModuleCS.cpp" />
     <ClCompile Include="ParticleModule.cpp" />
@@ -223,6 +226,7 @@
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
+    <ClInclude Include="AssetBundle.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="ColorGradingPass.h" />
@@ -236,6 +240,8 @@
     <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="LODGroup.h" />
+    <ClInclude Include="LODSetting.h" />
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="MovementModule.h" />
     <ClInclude Include="MovementModuleCS.h" />

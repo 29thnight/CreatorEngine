@@ -219,9 +219,6 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderTaskScheduler">
-      <UniqueIdentifier>{25e49c93-ca2b-4a5c-9820-2a206796f6cc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\ColorModule">
       <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
     </Filter>
@@ -266,6 +263,12 @@
     </Filter>
     <Filter Include="Event">
       <UniqueIdentifier>{5ecc1c70-391b-4ac9-8bf7-dec5eeb92687}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\MeshOptimizer">
+      <UniqueIdentifier>{d01a14c8-5ec3-42f4-bb5f-e016969280fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\LODGroup">
+      <UniqueIdentifier>{e03aa640-8677-4501-a3ff-7da7616864cf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -472,6 +475,15 @@
     </ClCompile>
     <ClCompile Include="Socket.cpp">
       <Filter>Resources\Skeleton</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshOptimizer.cpp">
+      <Filter>Asset\MeshOptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="LODSetting.cpp">
+      <Filter>Asset\LODGroup</Filter>
+    </ClCompile>
+    <ClCompile Include="LODGroup.cpp">
+      <Filter>Asset\LODGroup</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -727,8 +739,17 @@
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
+    <ClInclude Include="AssetBundle.h">
+      <Filter>Asset\ManagerSystem\AssetBundle</Filter>
+    </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
-      <Filter>Asset\Loader</Filter>
+      <Filter>Asset\MeshOptimizer</Filter>
+    </ClInclude>
+    <ClInclude Include="LODGroup.h">
+      <Filter>Asset\LODGroup</Filter>
+    </ClInclude>
+    <ClInclude Include="LODSetting.h">
+      <Filter>Asset\LODGroup</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

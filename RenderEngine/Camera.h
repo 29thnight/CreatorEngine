@@ -45,6 +45,8 @@ public:
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 
+	float CalculateLODDistance(const Mathf::Vector3& position) const;
+
 	[[Property]]
 	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
 
