@@ -77,6 +77,20 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			auto animator = static_cast<Animator*>(component);
 			Model* model = nullptr;
+			std::vector<bool> animationBools;
+			if (itNode["m_Skeleton"])
+			{
+				auto& skel = itNode["m_Skeleton"];
+				if (skel["m_animations"])
+				{
+					auto& animations = skel["m_animations"];
+					for (auto& animation : animations)
+					{
+						bool _aniBool = animation["m_isLoop"].as<bool>();
+						animationBools.push_back(_aniBool);
+					}
+				}
+			}
 
 			if (itNode["m_Motion"])
 			{
@@ -85,6 +99,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				{
 					animator->m_Motion = guid;
 					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+
+					for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
+					{
+						animator->m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
+					}
+
 				}
 			}
 
