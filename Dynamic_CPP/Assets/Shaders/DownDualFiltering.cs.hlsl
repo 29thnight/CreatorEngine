@@ -13,6 +13,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
     float2 invSize = 1.0 / inputTextureSize;   // ex) 480, 270
     float2 uv = DTid.xy * 2 * invSize;
+    float visibility = DownDualFilteringTexture.SampleLevel(LinearSampler, uv, 0).a;
     float3 color = (4.0
     * DownDualFilteringTexture.SampleLevel(LinearSampler, uv, 0).rgb
     + DownDualFilteringTexture.SampleLevel(LinearSampler, ((DTid.xy * 2 + float2(1.0,  0.0)) * invSize), 0).rgb
@@ -20,5 +21,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
     + DownDualFilteringTexture.SampleLevel(LinearSampler, ((DTid.xy * 2 + float2(0.0,  1.0)) * invSize), 0).rgb
     + DownDualFilteringTexture.SampleLevel(LinearSampler, ((DTid.xy * 2 + float2(0.0, -1.0)) * invSize), 0).rgb) / 8.0;
     
-    targetTexture[DTid.xy] = float4(color, 1);
+    targetTexture[DTid.xy] = float4(color, visibility);
 }

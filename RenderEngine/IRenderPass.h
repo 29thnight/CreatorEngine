@@ -9,6 +9,7 @@ enum RTV_Type
 	OccRoughMetal,
 	Normal,
 	Emissive,
+	BitMask,
 	RTV_TypeMax
 };
 

@@ -42,7 +42,7 @@ namespace Meta
                 }
 				ImGui::PopID();
             }
-            else if (hash == GUIDCreator::GetTypeID<unsigned int>())
+            else if (hash == GUIDCreator::GetTypeID<unsigned int>() || prop.typeName == "UINT")
             {
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
 				ImGui::PushID(prop.name);

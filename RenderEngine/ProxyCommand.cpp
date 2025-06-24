@@ -12,6 +12,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	auto componentPtr = pComponent;
 	auto owner = componentPtr->GetOwner();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	HashedGuid aniGuid = proxyObject->m_animatorGuid;
@@ -60,6 +61,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		}
 
 		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_worldPosition = worldPosition;
 
 		if(isLightMappingUpdatable)
 		{

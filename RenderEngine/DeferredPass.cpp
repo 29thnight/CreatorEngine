@@ -60,12 +60,13 @@ DeferredPass::~DeferredPass()
 {
 }
 
-void DeferredPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
+void DeferredPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitmask)
 {
     m_DiffuseTexture = diffuse;
     m_MetalRoughTexture = metalRough;
     m_NormalTexture = normals;
     m_EmissiveTexture = emissive;
+    m_BitmaskTexture = bitmask; 
 }
 
 void DeferredPass::UseAmbientOcclusion(Texture* aoMap)

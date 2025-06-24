@@ -51,11 +51,49 @@ struct Vertex
 
 	Vertex(const Mathf::Vector3& _position, const Mathf::Vector3& _normal, const Mathf::Vector2& _uv) :
 		position(_position), normal(_normal), uv0(_uv) {}
+
+	static Vertex ConvertToAiMesh(aiMesh* mesh, uint32 i)
+	{
+		if (!mesh->HasPositions() || !mesh->HasNormals() || !mesh->HasTangentsAndBitangents())
+		{
+			throw std::runtime_error("Mesh does not have required vertex attributes.");
+		}
+
+		if (mesh->mVertices == nullptr || mesh->mNormals == nullptr || mesh->mTangents == nullptr || mesh->mBitangents == nullptr)
+		{
+			throw std::runtime_error("Mesh vertex data is null.");
+		}
+
+		bool hasTexCoords = mesh->mTextureCoords[0] != nullptr;
+		bool hasTexCoords1 = mesh->mTextureCoords[1] != nullptr;
+
+		Vertex vertex;
+		vertex.position		= { mesh->mVertices[i].x,	mesh->mVertices[i].y,	mesh->mVertices[i].z	};
+		vertex.normal		= { mesh->mNormals[i].x,	mesh->mNormals[i].y,	mesh->mNormals[i].z		};
+		vertex.tangent		= { mesh->mTangents[i].x,	mesh->mTangents[i].y,	mesh->mTangents[i].z	};
+		vertex.bitangent	= { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z	};
+		if (hasTexCoords)
+		{
+			vertex.uv0 = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+
+			if (hasTexCoords1)
+			{
+				vertex.uv1 = { mesh->mTextureCoords[1][i].x, mesh->mTextureCoords[1][i].y };
+			}
+			else
+			{
+				vertex.uv1 = vertex.uv0;
+			}
+		}
+
+		return vertex;
+	}
 };
 
 class Texture;
 class Material;
 class ModelLoader;
+class MeshOptimizer;
 class Mesh
 {
 public:
@@ -63,11 +101,15 @@ public:
     [[Serializable]]
 	Mesh() = default;
 	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
+	Mesh(const std::string_view& _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
 	void Draw();
 	void Draw(ID3D11DeviceContext* _defferedContext);
+
+	void DrawShadow();
+	void DrawShadow(ID3D11DeviceContext* _defferedContext);
 
 	std::string GetName() const { return m_name; }
 
@@ -83,8 +125,16 @@ public:
 	ComPtr<ID3D11Buffer> GetIndexBuffer()  { return m_indexBuffer; }
 	uint32 GetStride()  { return m_stride; }
 
+	bool IsShadowOptimized() const { return m_isShadowOptimized; }
+	void SetShadowOptimized(bool isOptimized) { m_isShadowOptimized = isOptimized; }
+
+	void MakeShadowOptimizedBuffer();
+	ComPtr<ID3D11Buffer> GetShadowVertexBuffer() { return m_shadowVertexBuffer; }
+	ComPtr<ID3D11Buffer> GetShadowIndexBuffer() { return m_shadowIndexBuffer; }
+
 private:
 	friend class ModelLoader;
+	friend class MeshOptimizer;
 
     [[Property]]
 	std::string m_name;
@@ -92,14 +142,22 @@ private:
     [[Property]]
 	uint32 m_materialIndex{};
 
+	bool m_isShadowOptimized{ false };
+
 	std::vector<Vertex> m_vertices;
 	std::vector<uint32> m_indices;
+
+	std::vector<Vertex> m_shadowVertices;
+	std::vector<uint32> m_shadowIndices;
 
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
 
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
+
+	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
+	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
 	static constexpr uint32 m_stride = sizeof(Vertex);
 };
 
@@ -187,7 +245,7 @@ public:
 	~UIMesh();
 
 	void Draw();
-	//ID3D11CommandList* Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _defferedContext);
 
 	const std::string& GetName() { return m_name; }
 private:

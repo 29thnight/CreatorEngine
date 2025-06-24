@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
 #include "Delegate.h"
 
@@ -97,3 +98,4 @@ namespace DirectX11
 		IDeviceNotify* m_deviceNotify;
 	};
 }
+#endif // !DYNAMICCPP_EXPORTS

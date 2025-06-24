@@ -29,6 +29,11 @@ RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr)
 			m_sceneRenderer->m_pSSGIPass->ControlPanel();
 		}
 
+		if (ImGui::CollapsingHeader("BitMaskPass"))
+		{
+			m_sceneRenderer->m_pBitMaskPass->ControlPanel();
+		}
+
 		if (ImGui::CollapsingHeader("SkyBoxPass"))
 		{
 			m_sceneRenderer->m_pSkyBoxPass->ControlPanel();

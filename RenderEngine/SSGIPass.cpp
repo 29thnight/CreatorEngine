@@ -4,7 +4,7 @@
 
 //#define SSGI_Ratio 1
 //#define SSGI_NumThreads SSGI_Ratio * 16
-int ssratio = 4;
+int ssratio = 2;
 int ssthreads = 16;
 
 
@@ -24,6 +24,7 @@ cbuffer SSGIParams
 cbuffer CompositeParams{
     float2 inputTextureSize;
     int ratio;
+	bool32 useOnlySSGI;
 };
 
 SSGIPass::SSGIPass()
@@ -41,8 +42,8 @@ SSGIPass::SSGIPass()
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
     m_pTempTexture = Texture::Create(
-        4u,
-        4u,
+        ssratio,
+        ssratio,
         DeviceState::g_ClientRect.width,
         DeviceState::g_ClientRect.height,
         "SSGICopiedTexture",
@@ -53,8 +54,8 @@ SSGIPass::SSGIPass()
     m_pTempTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     m_pTempTexture2 = Texture::Create(
-        8u,
-        8u,
+        ssratio * 2,
+        ssratio * 2,
         DeviceState::g_ClientRect.width,
         DeviceState::g_ClientRect.height,
         "SSGICopiedTexture2",
@@ -96,6 +97,8 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
 
 void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
+    if (!isOn) return;
+
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
@@ -142,39 +145,39 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
 
 
 
-
-	// Down Dual Filtering
-	DirectX11::CSSetShader(defferdPtr, m_pDownDualFilteringShader->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-
     CompositeParams compositeParams;
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
     compositeParams.ratio = ssratio;
-    DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+    compositeParams.useOnlySSGI = useOnlySSGI;
+    if (useDualFiltering == true) {
+        // Down Dual Filtering
+        DirectX11::CSSetShader(defferdPtr, m_pDownDualFilteringShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
 
-	float tempThread = ssratio * ssthreads;
-    float temp2NumThread = tempThread * 2;
-    DirectX11::Dispatch(defferdPtr, 
-        (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
-        (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+        float tempThread = ssratio * ssthreads;
+        float temp2NumThread = tempThread * 2;
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
+            (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
 
-	// Up Dual Filtering
-	DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
-    compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
-    DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-    DirectX11::Dispatch(defferdPtr,
-        (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
-        (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
+        // Up Dual Filtering
+        DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
+        compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
+        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
+            (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+    }
 
     //DirectX11::CopyResource(defferdPtr, renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
     // Composite
@@ -210,12 +213,16 @@ void SSGIPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSGI");
+    ImGui::Checkbox("Enable SSGI", &isOn);
+	ImGui::Checkbox("Use Dual Filtering", &useDualFiltering);
+	ImGui::Checkbox("Use Only SSGI", &useOnlySSGI);
     ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
     ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
 	ImGui::SliderFloat("Intensity", &intensity, 0.0f, 10.0f, "Intensity: %.2f");
 
     if (ImGui::SliderInt("SSGI Ratio", &ssratio, 1, 4, "SSGI Ratio: %d")) {
         m_pTempTexture->SetSizeRatio({ float(ssratio), float(ssratio)});
+		m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
     }
 
 	if (ImGui::Button("Reset")) {

@@ -2,6 +2,7 @@
 #include "CoreWindow.h"
 #include "DeviceState.h"
 #include "DataSystem.h"
+#include "Profiler.h"
 #include "imgui_internal.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -90,6 +91,7 @@ ImGuiRenderer::~ImGuiRenderer()
 
 void ImGuiRenderer::BeginRender()
 {
+	PROFILE_CPU_BEGIN("ImGuiBeginRender");
     static bool firstLoop = true;
 	static bool forceResize = false;
 	ImGuiIO& io = ImGui::GetIO();
@@ -151,6 +153,7 @@ void ImGuiRenderer::BeginRender()
 	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
 	if (!forceResize && file::exists(iniPath))
 	{
+		PROFILE_CPU_END();
 		return;
 	}
 
@@ -179,10 +182,12 @@ void ImGuiRenderer::BeginRender()
 
     if (firstLoop) firstLoop = false;
 	if (forceResize) forceResize = false;
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::Render()
 {
+	PROFILE_CPU_BEGIN("ImGuiRender");
 	static bool isOpened = false;
 
 	static file::path directory{ DataSystems->m_TargetTexturePath };
@@ -199,10 +204,12 @@ void ImGuiRenderer::Render()
     {
         context.Render();
     }
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::EndRender()
 {
+	PROFILE_CPU_BEGIN("ImGuiEndRender");
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -213,7 +220,7 @@ void ImGuiRenderer::EndRender()
 		ImGui::UpdatePlatformWindows();
 		ImGui::RenderPlatformWindowsDefault();
 	}
-
+	PROFILE_CPU_END();
 }
 
 void ImGuiRenderer::Shutdown()

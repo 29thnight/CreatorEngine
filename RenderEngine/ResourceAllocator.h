@@ -89,7 +89,7 @@ public:
 
 private:
     MemoryPool<ModelNode, 4096> m_nodePool;
-    MemoryPool<Mesh, 4096> m_meshPool;
+    MemoryPool<Mesh, 8192> m_meshPool;
     MemoryPool<Material, 4096> m_materialPool;
     MemoryPool<Texture, 4096> m_texturePool;
     MemoryPool<Bone, 4096> m_bonePool;

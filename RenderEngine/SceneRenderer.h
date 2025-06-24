@@ -33,7 +33,7 @@
 #include "EffectManager.h"
 
 #include "SSGIPass.h"
-#include "LightingPass.h"
+#include "BitMaskPass.h"
 
 #include "TestPlayer.h"
 #include "TerrainGizmoPass.h"
@@ -116,7 +116,7 @@ private:
 	std::unique_ptr<UIPass>             m_pUIPass{};
 
 	std::unique_ptr<SSGIPass>			m_pSSGIPass{};
-	std::unique_ptr<LightingPass>       m_pLightingPass{};
+	std::unique_ptr<BitMaskPass>		m_pBitMaskPass{};
 
 	std::unique_ptr<TerrainGizmoPass>   m_pTerrainGizmoPass{};
 	//buffers
@@ -127,6 +127,7 @@ private:
 	UniqueTexturePtr m_metalRoughTexture       { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_normalTexture           { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
+	UniqueTexturePtr m_bitmaskTexture		   { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
 

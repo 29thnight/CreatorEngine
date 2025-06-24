@@ -247,3 +247,8 @@ void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)
 	deferredContext->VSSetConstantBuffers(1, 1, m_ViewBuffer.GetAddressOf());
 	deferredContext->VSSetConstantBuffers(2, 1, m_ProjBuffer.GetAddressOf());
 }
+
+float Camera::CalculateLODDistance(const Mathf::Vector3& position) const
+{
+	return Mathf::Vector3::Distance(m_eyePosition, position);
+}
