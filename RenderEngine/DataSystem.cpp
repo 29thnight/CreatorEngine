@@ -206,6 +206,65 @@ void DataSystem::RenderForEditer()
 
 	}, ImGuiWindowFlags_None);
 
+	ImGui::ContextRegister("TextureType Selector", true, [&]()
+	{
+		static std::vector<file::path> texturePaths;
+
+		while (!m_LoadTextureAssetQueue.empty())
+		{
+			if(m_LoadTextureAssetQueue.try_pop(m_TargetTexturePath))
+			{
+				if (!m_TargetTexturePath.empty())
+				{
+					texturePaths.push_back(m_TargetTexturePath);
+				}
+			}
+		}
+
+		if (!texturePaths.empty())
+		{
+			for(const auto& path : texturePaths)
+			{
+				ImGui::Text("Selected Texture: %s", path.filename().string().c_str());
+			}
+		}
+
+		static int selectedTextureType{};
+		const char* textureTypeNames[] = {
+			"Texture",
+			"Material Texture",
+			"Terrain Texture",
+			"HDR"
+		};
+
+		if (ImGui::BeginCombo("Texture Type", textureTypeNames[selectedTextureType]))
+		{
+			for (int i = 0; i < IM_ARRAYSIZE(textureTypeNames); ++i)
+			{
+				const bool isSelected = (selectedTextureType == i);
+				if (ImGui::Selectable(textureTypeNames[i], isSelected))
+					selectedTextureType = i;
+
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
+		if (ImGui::Button("Select"))
+		{
+			for(const auto& path : texturePaths)
+			{
+				CopyTextureSelectType(path.string(), static_cast<TextureFileType>(selectedTextureType));
+			}
+
+			texturePaths.clear();
+			ImGui::GetContext("TextureType Selector").Close();
+		}
+
+	}, ImGuiWindowFlags_AlwaysAutoResize);
+
+	ImGui::GetContext("TextureType Selector").Close();
 	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Close();
 }
 
@@ -411,7 +470,7 @@ void DataSystem::CopyTexture(const std::string_view& filePath, const file::path&
 	}
 }
 
-void DataSystem::SelectTextureType(bool* open, const std::string_view& filePath)
+void DataSystem::SelectTextureType()
 {
 	if (!EngineSettingInstance->IsImGuiInitialized())
 	{
@@ -419,24 +478,12 @@ void DataSystem::SelectTextureType(bool* open, const std::string_view& filePath)
 		return;
 	}
 
-	ImGui::Begin("Select Texture Type", open, ImGuiWindowFlags_AlwaysAutoResize);
-	
-	static int selectedTextureType{};
-	const char* textureTypeNames[] = {
-		"Texture",
-		"Material Texture",
-		"Terrain Texture",
-		"HDR"
-	};
+	auto context = ImGui::GetContext("TextureType Selector");
 
-	ImGui::Combo("Texture Type", &selectedTextureType, textureTypeNames, IM_ARRAYSIZE(textureTypeNames));
-
-	if (ImGui::Button("Select"))
+	if(!context.IsOpened())
 	{
-		CopyTextureSelectType(filePath, static_cast<TextureFileType>(selectedTextureType));
+		ImGui::GetContext("TextureType Selector").Open();
 	}
-
-	ImGui::End();
 }
 
 void DataSystem::CopyTextureSelectType(const std::string_view& filePath, TextureFileType type)
@@ -653,6 +700,23 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	{
 		OpenFile(directory);
 	}
+	else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+	{
+		ImGui::OpenPopup("Context Menu");
+	}
+
+	if (ImGui::BeginPopup("Context Menu"))
+	{
+		if (ImGui::MenuItem("Delete"))
+		{
+			file::remove(directory);
+		}
+		if (ImGui::MenuItem("Open Save Directory"))
+		{
+			OpenExplorerSelectFile(directory);
+		}
+		ImGui::EndPopup();
+	}
 
 	ImVec2 pos = ImGui::GetCursorScreenPos();
 	std::string typeID{};
@@ -717,6 +781,26 @@ void DataSystem::OpenFile(const file::path& filepath)
 	if ((int)result <= 32)
 	{
 		MessageBox(NULL, L"Failed Open File", L"Error", MB_OK | MB_ICONERROR);
+	}
+}
+
+void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
+{
+	std::wstring args = L"/select,\"" + filePath.wstring() + L"\"";
+
+	HINSTANCE result = ShellExecuteW(
+		nullptr,         // HWND hwnd
+		L"open",         // LPCWSTR lpOperation
+		L"explorer.exe", // LPCWSTR lpFile
+		args.c_str(),    // LPCWSTR lpParameters
+		nullptr,         // LPCWSTR lpDirectory
+		SW_SHOWNORMAL   // nShowCmd
+	);
+
+	// ShellExecute 실패 시 오류 코드 (0 ~ 32)
+	if ((INT_PTR)result <= 32)
+	{
+		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
 	}
 }
 

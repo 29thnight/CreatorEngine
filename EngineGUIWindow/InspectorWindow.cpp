@@ -1495,18 +1495,18 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 	if (ImGui::InputInt("Width", &editWidth)) {
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if(editWidth < 1)
+			if(editWidth < 2)
 			{
-				editWidth = 1;
+				editWidth = 2;
 			}
 		}
 	}
 	if (ImGui::InputInt("Height", &editHeight)) {
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (editHeight < 1)
+			if (editHeight < 2)
 			{
-				editHeight = 1;
+				editHeight = 2;
 			}
 		}
 	}	

@@ -223,7 +223,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 				".hdr" == filePath.extension()
 			)
 			{
-				DataSystems->m_TargetTexturePath = filePath;
+				DataSystems->m_LoadTextureAssetQueue.push(filePath);
 			}
             else if (".dmp" == filePath.extension())
             {

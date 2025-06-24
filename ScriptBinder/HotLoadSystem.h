@@ -46,11 +46,13 @@ public:
 
 	void CollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
 	{
+		std::unique_lock lock(m_scriptFileMutex);
 		m_scriptComponentIndexs.emplace_back(gameObject, index, name);
 	}
 
 	void UnCollectScriptComponent(GameObject* gameObject, size_t index, const std::string& name)
 	{
+		std::unique_lock lock(m_scriptFileMutex);
 		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
 		{
 			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
@@ -196,6 +198,7 @@ private:
 	std::vector<std::string> m_scriptNames{};
 	std::vector<std::tuple<GameObject*, size_t, std::string>> m_scriptComponentIndexs{};
 	std::thread m_scriptFileThread{};
+	std::mutex m_scriptFileMutex{};
 	std::atomic_bool m_isReloading{ false };
 	std::atomic_bool m_isCompileEventInvoked{ false };
 	file::file_time_type m_lastWriteFileTime{};

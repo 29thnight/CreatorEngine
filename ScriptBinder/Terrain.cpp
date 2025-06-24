@@ -109,6 +109,16 @@ void TerrainComponent::Initialize()
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
+	if (2 > newWidth)
+	{
+		newWidth = 2; // 최소 크기 제한
+	}
+
+	if (2 > newHeight)
+	{
+		newHeight = 2; // 최소 크기 제한
+	}
+
 	// 1) 새 크기로 내부 벡터 재할당
 	m_width = newWidth;
 	m_height = newHeight;

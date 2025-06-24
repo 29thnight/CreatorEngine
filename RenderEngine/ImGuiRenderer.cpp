@@ -190,12 +190,11 @@ void ImGuiRenderer::Render()
 	PROFILE_CPU_BEGIN("ImGuiRender");
 	static bool isOpened = false;
 
-	static file::path directory{ DataSystems->m_TargetTexturePath };
-	if(!directory.empty() || !directory.filename().empty())
+	auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
+
+	if(!directoryQueue.empty())
 	{
-		isOpened = true;
-		DataSystems->SelectTextureType(&isOpened, directory.string());
-		DataSystems->m_TargetTexturePath.clear();
+		DataSystems->SelectTextureType();
 	}
 
     auto& container = ImGuiRegister::GetInstance()->m_contexts;

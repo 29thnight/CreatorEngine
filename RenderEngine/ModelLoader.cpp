@@ -173,7 +173,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
 
-	if(!m_isSkinnedMesh)
+	if(!m_model->m_hasBones)
 	{
 		MeshOptimizer::Optimize(*meshObj, 1.05f);
 		MeshOptimizer::GenerateShadowMesh(*meshObj);

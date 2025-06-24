@@ -555,6 +555,12 @@ void Scene::DestroyComponents()
 
 			std::erase_if(obj->m_components, [](const auto& component)
 			{
+				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
+				if (!behavior)
+				{
+					int a = 0;
+				}
+
 				return component == nullptr;
 			});
 		}
