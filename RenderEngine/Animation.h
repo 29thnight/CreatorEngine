@@ -28,6 +28,14 @@ struct NodeAnimation
 };
 
 
+class KeyFrameEvent
+{
+public:
+	std::string funName;
+	float key = 0;
+	std::function<void()> m_event;
+};
+
 class Animation
 {
 public:
@@ -42,7 +50,16 @@ public:
 	[[Property]]
 	bool m_isLoop = true;
 
-	//frameEvent;
+	float preAnimationProgress =0;
+	float curAnimationProgress =0;
+	int preKey = 0;
+	int curKey = 0;
+	void InvokeEvent();
+	void SetEvent(const std::string& _funName, float _key, std::function<void()> _func);
+	bool EnterFrame = false;
+
+
+	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };
 
 

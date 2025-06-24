@@ -118,6 +118,24 @@
     <Filter Include="Managers\PostProcessingManager">
       <UniqueIdentifier>{7ea8156f-f2bf-4249-8956-67f849e68b6d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\InputAction">
+      <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI">
+      <UniqueIdentifier>{9f18c3ff-b84c-493f-95c2-5c4168131d95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core">
+      <UniqueIdentifier>{74bc0006-e168-4ee3-b89a-dfc04d2b2b15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework">
+      <UniqueIdentifier>{45e3ddb8-f6df-4450-a0b9-e7213a78d3e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework\FSM">
+      <UniqueIdentifier>{a3c3cd60-236f-449a-8e24-d1a48523be5a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework\BT">
+      <UniqueIdentifier>{23404554-a029-4e9c-bced-46e99feb929d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -224,6 +242,15 @@
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="InputActionComponent.cpp">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClCompile>
+    <ClCompile Include="InputAction.cpp">
+      <Filter>Managers\InputActionManager</Filter>
+    </ClCompile>
+    <ClCompile Include="StateMachineComponent.cpp">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -440,6 +467,39 @@
     <ClInclude Include="TerrainBuffers.h">
       <Filter>Classes\Resources\Terrain</Filter>
     </ClInclude>
+    <ClInclude Include="InputActionComponent.h">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClInclude>
+    <ClInclude Include="InputAction.h">
+      <Filter>Managers\InputActionManager</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoard.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="IAIComponent.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="AIManager.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="IScriptedFSM.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="FSMState.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="Transition.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="StateMachineComponent.h">
+      <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="BTHeader.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">
@@ -448,5 +508,10 @@
     <None Include="Component.inl">
       <Filter>Classes\Components\ComponentBase</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="GameAi.txt">
+      <Filter>Classes\GameAI</Filter>
+    </Text>
   </ItemGroup>
 </Project>

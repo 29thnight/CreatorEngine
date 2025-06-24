@@ -8,6 +8,7 @@
 #include "CharacterControllerComponent.h"
 #include "Model.h"
 #include "NodeEditor.h"
+#include "InputActionComponent.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -76,6 +77,20 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			auto animator = static_cast<Animator*>(component);
 			Model* model = nullptr;
+			std::vector<bool> animationBools;
+			if (itNode["m_Skeleton"])
+			{
+				auto& skel = itNode["m_Skeleton"];
+				if (skel["m_animations"])
+				{
+					auto& animations = skel["m_animations"];
+					for (auto& animation : animations)
+					{
+						bool _aniBool = animation["m_isLoop"].as<bool>();
+						animationBools.push_back(_aniBool);
+					}
+				}
+			}
 
 			if (itNode["m_Motion"])
 			{
@@ -84,6 +99,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				{
 					animator->m_Motion = guid;
 					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+
+					for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
+					{
+						animator->m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
+					}
+
 				}
 			}
 
@@ -111,7 +132,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					Meta::Deserialize(animationController.get(), layer);
 					animationController->m_owner = animator;
 					animationController->m_nodeEditor = new NodeEditor();
-
+					//animator->m_Skeleton->m_animations[3].SetEvent("Punch", 10, []() {Debug->Log("Punch! Punch!");});
 					if (animationController->useMask == true)
 					{
 						if (layer["m_avatarMask"])
@@ -180,8 +201,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					if (layer["m_curState"])
 					{
 						auto& curNode = layer["m_curState"];
-						std::string name = curNode["m_name"].as<std::string>();
-						animationController->m_curState = animationController->FindState(name);
+						if (curNode.IsNull() == false)
+						{
+							std::string name = curNode["m_name"].as<std::string>();
+							animationController->SetCurState(name);
+						}
+						//animationController->m_curState = animationController->FindState(name);
 					}
 
 					for (auto& state : animationController->StateVec)
@@ -236,6 +261,35 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
 			Meta::Deserialize(characterController, itNode);
 			characterController->SetOwner(obj);
+		}
+		else if (componentType->typeID == type_guid(InputActionComponent))
+		{
+			auto inputActionComponent = static_cast<InputActionComponent*>(component);
+			Meta::Deserialize(inputActionComponent, itNode);
+			inputActionComponent->SetOwner(obj);
+			if (itNode["m_actionMaps"])
+			{
+				auto& actionMaps = itNode["m_actionMaps"];
+
+				for (auto& actionMap : actionMaps)
+				{
+					ActionMap* _actionMap = new ActionMap();
+					Meta::Deserialize(_actionMap, actionMap);
+					inputActionComponent->m_actionMaps.push_back(_actionMap);
+
+					if (itNode["m_actions"])
+					{
+						auto& acitons = itNode["m_actions"];
+						for (auto& aciton : acitons)
+						{
+							InputAction* _action = new InputAction();
+							Meta::Deserialize(_action, aciton);
+							_actionMap->m_actions.push_back(_action);
+						}
+					}
+
+				}
+			}
 		}
 		else
 		{

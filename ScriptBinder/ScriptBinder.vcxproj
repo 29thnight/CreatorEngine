@@ -167,6 +167,8 @@
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
+    <ClCompile Include="InputAction.cpp" />
+    <ClCompile Include="InputActionComponent.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
@@ -179,6 +181,12 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
+    <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="BehaviorTreeComponent.h" />
+    <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="StateMachineComponent.h">
+      <FileType>CppCode</FileType>
+    </ClInclude>
     <ClCompile Include="TagManager.cpp" />
     <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="TerrainCollider.cpp" />
@@ -191,6 +199,7 @@
     <ClCompile Include="UIManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AIManager.h" />
     <ClInclude Include="AnimationBehviourFatory.h" />
     <ClInclude Include="AniBehaviour.h" />
     <ClInclude Include="AnimationController.h" />
@@ -199,6 +208,7 @@
     <ClInclude Include="ArticulationData.h" />
     <ClInclude Include="ArticulationLoader.h" />
     <ClInclude Include="AvatarMask.h" />
+    <ClInclude Include="BlackBoard.h" />
     <ClInclude Include="BoneMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
@@ -210,13 +220,17 @@
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
     <ClInclude Include="CSharpScriptComponent.h" />
+    <ClInclude Include="FSMState.h" />
     <ClInclude Include="GameObjectType.h" />
+    <ClInclude Include="IAIComponent.h" />
     <ClInclude Include="IAwakable.h" />
     <ClInclude Include="IFixedUpdatable.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="ActionMap.h" />
+    <ClInclude Include="InputAction.h" />
+    <ClInclude Include="InputActionComponent.h" />
     <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
@@ -225,6 +239,7 @@
     <ClInclude Include="IOnEnable.h" />
     <ClInclude Include="IProjectSetting.h" />
     <ClInclude Include="IRenderable.h" />
+    <ClInclude Include="IScriptedFSM.h" />
     <ClInclude Include="KeyState.h" />
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightMapping.h" />
@@ -256,6 +271,7 @@
     <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="TransCondition.h" />
+    <ClInclude Include="Transition.h" />
     <ClInclude Include="UIButton.h" />
     <ClInclude Include="ImageComponent.h" />
     <ClInclude Include="Transform.h" />
@@ -266,6 +282,9 @@
   <ItemGroup>
     <None Include="Component.inl" />
     <None Include="GameObejct.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="GameAi.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

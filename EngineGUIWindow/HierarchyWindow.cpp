@@ -112,7 +112,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					}
 					if (ImGui::MenuItem("		Text"))
 					{
-						
+						//UIManagers->MakeText("Text");
 					}
 					if (ImGui::MenuItem("		Button"))
 					{

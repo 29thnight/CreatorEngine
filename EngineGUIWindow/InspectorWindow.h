@@ -11,6 +11,10 @@ class ModuleBehavior;
 class Animator;
 
 class TerrainComponent;
+
+class StateMachineComponent;
+class BehaviorTreeComponent;
+
 class InspectorWindow
 {
 public:
@@ -27,5 +31,10 @@ private:
 
 	//void DrawMyLink(std::string linkName, std::string from, std::string to);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
+
+	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
+
+	bool m_openBTPopup{ false };
+	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
 };
 #endif // !DYNAMICCPP_EXPORTS

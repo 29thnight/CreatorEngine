@@ -212,6 +212,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
 
+
+
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	//m_pEffectPass = std::make_unique<EffectManager>();
@@ -366,6 +368,11 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
+
+	//TODO : 시연용 Player주석 코드
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -377,6 +384,8 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
+	//TODO : 시연용 Player주석 코드
+	/*player.Update(deltaTime);*/
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();

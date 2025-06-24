@@ -17,6 +17,10 @@
 #include "CustomCollapsingHeader.h"
 #include "Terrain.h"
 #include "FileDialog.h"
+//----------------------------
+#include "StateMachineComponent.h"
+#include "BehaviorTreeComponent.h"
+//----------------------------
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -27,6 +31,17 @@ static const std::unordered_set<std::string> ignoredKeys = {
 	"guid",
 	"importSettings"
 };
+
+
+ed::EditorContext* m_fsmEditorContext{ nullptr };
+bool			   s_CreatingLink = false;
+ed::PinId		   s_LinkStartPin = 0;
+ed::LinkId		   s_EditLinkId = 0;
+bool			   s_RenameNodePopup{ false };
+
+
+ed::EditorContext* s_BTEditorContext{ nullptr };
+
 
 void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
 {
@@ -809,7 +824,8 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								if (ImGui::InputText("##Controller Name", buffer, sizeof(buffer)))
 								{
 									controller->name = buffer;
-									controller->m_nodeEditor->ReNameJson(buffer);
+									std::string filename = controller->name + ".json";
+									controller->m_nodeEditor->ReNameJson(filename);
 								}
 
 								ImGui::Text("Avatar Mask"); 
@@ -1004,7 +1020,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							isOpenPopUp = false;
 							isOpenNodePopUp = false;
 						}
-						std::string fileName = controller->name + ".node_editor.json";
+						std::string fileName = controller->name + ".json";
 						{
 							controller->m_nodeEditor->MakeEdit(fileName);
 
@@ -1601,4 +1617,34 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 
 	}
 }
+
+void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
+{
+}
+
+void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
+{
+	if (BTComponent) 
+	{
+		if (!s_BTEditorContext) {
+			s_BTEditorContext = ed::CreateEditor();
+		}
+
+		ImGui::Text("Behavior Tree Editor");
+		ImGui::Separator();
+		if (ImGui::Button("Edit Behavior Tree")) {
+			m_openBTPopup = true;
+			ImGui::OpenPopup("BTEditorPopup");
+		}
+
+		if (ImGui::BeginPopupModal("BTEditorPopup"),nullptr,ImGuiWindowFlags_AlwaysAutoResize)
+		{
+			if(ImGui::Button("Add Node"));
+		
+
+			ImGui::EndPopup();
+		}
+	}
+}
+
 #endif // !DYNAMICCPP_EXPORTS
