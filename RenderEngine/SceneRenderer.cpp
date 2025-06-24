@@ -359,15 +359,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
-
-	/*DataSystems->LoadModel("Punch.fbx");
-	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-
-	DataSystems->LoadModel("plane.fbx");
-	model[1] = DataSystems->LoadCashedModel("plane.fbx");
-	sword = Model::LoadModelToSceneObj(model[1], *scene);
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/
+	//TODO : 시연용 Player주석 코드
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -379,7 +374,8 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	player.Update(deltaTime);
+	//TODO : 시연용 Player주석 코드
+	//player.Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();

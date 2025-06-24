@@ -115,6 +115,9 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\InputAction">
+      <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -221,6 +224,12 @@
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="InputActionComponent.cpp">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClCompile>
+    <ClCompile Include="InputAction.cpp">
+      <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -436,6 +445,12 @@
     </ClInclude>
     <ClInclude Include="TerrainBuffers.h">
       <Filter>Classes\Resources\Terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="InputActionComponent.h">
+      <Filter>Classes\Components\InputAction</Filter>
+    </ClInclude>
+    <ClInclude Include="InputAction.h">
+      <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

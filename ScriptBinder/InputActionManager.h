@@ -15,5 +15,5 @@ public:
 private:
 	std::vector<ActionMap*> m_actionMaps;
 };
-
+ 
 static auto& InputActionManagers = InputActionManager::GetInstance();

@@ -14,7 +14,7 @@ public:
 
 	float deta = 0;
 	Mathf::Vector2 dir;
-	void TestDelete();
+	bool OnMove = false;
 	void Punch();
 	void Move(Mathf::Vector2 dir);
 	void Jump();
