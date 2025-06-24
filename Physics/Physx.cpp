@@ -169,7 +169,7 @@ bool PhysicX::Initialize()
 	//======================================================================
 	//debug용 plane 생성 --> triangle mesh로 대체 예정
 	
-	/*physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
+	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
 	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *m_defaultMaterial);
 	planeShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 	planeShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
@@ -181,7 +181,7 @@ bool PhysicX::Initialize()
 	plane->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
 	plane->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 	m_scene->addActor(*plane);
-	planeShape->release();*/
+	planeShape->release();
 
 	//======================================================================
 

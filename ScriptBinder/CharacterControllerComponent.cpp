@@ -17,7 +17,7 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	}
 	
 	////todo : input 값 받아오기
-	bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
+	/*bool foward = InputManagement->IsKeyPressed(KeyBoard::UpArrow);
 	bool backward = InputManagement->IsKeyPressed(KeyBoard::DownArrow);
 	bool left = InputManagement->IsKeyPressed(KeyBoard::LeftArrow);
 	bool right = InputManagement->IsKeyPressed(KeyBoard::RightArrow);
@@ -43,13 +43,13 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	else
 	{
 		x = 0.0f;
-	}
+	}*/
 
 	DirectX::SimpleMath::Vector3 input = DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f };
-	/*input.x = m_moveInput.x;
-	input.z = m_moveInput.y;*/
-	input.x = x;
-	input.z = z;
+	input.x = m_moveInput.x;
+	input.z = m_moveInput.y;
+	//input.x = x;
+	//input.z = z;
 
 	//케릭터 컨트롤러
 	//todo : 이동 불가한 스턴 상태 체크 필요 --> 필요시 추가
