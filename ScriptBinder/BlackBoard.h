@@ -17,7 +17,7 @@ public:
 	}
 
 	template<typename T>
-	T& getc(const std::string& key)
+	T& get(const std::string& key)
 	{
 		auto it = m_blackBoard.find(key);
 		if (it != m_blackBoard.end())
@@ -43,9 +43,11 @@ public:
 		return m_blackBoard.find(key) != m_blackBoard.end();
 	}
 
+	
 
 private :
 	std::unordered_map<std::string, BBValue> m_blackBoard;
 };
+
 
 using ConditionFunc = std::function<bool(const BlackBoard&)>;

@@ -179,8 +179,10 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
-    <ClCompile Include="StateMachingComponent.cpp" />
-    <ClInclude Include="StateMachingComponent.h">
+    <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="BehaviorTreeComponent.h" />
+    <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>
     </ClInclude>
     <ClCompile Include="TagManager.cpp" />

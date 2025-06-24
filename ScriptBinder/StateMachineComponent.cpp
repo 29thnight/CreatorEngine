@@ -1,52 +1,94 @@
+#include "FSMState.h"
+#include "Transition.h"
 #include "StateMachineComponent.h"
 
 void StateMachineComponent::Initialize()
 {
 	if (m_currentState)
 	{
-		m_currentState->Enter(m_blackboard);
+		m_currentState->Enter(m_localBB);
 	}
 }
 
 void StateMachineComponent::Tick(float deltaTime)
 {
-	if (!m_currentState) {
-		return;
+	if (!m_currentState && !m_states.empty())
+	{
+		m_currentState = m_states.front().get();
 	}
-	// 현재 상태 업데이트
-	m_currentState->Update(m_blackboard, deltaTime);
 
-	// 전이 검사
-	for (const auto& transition : m_transitions) {
-
-		if (transition->IsTriggered(m_blackboard)&&transition->GetTo()!=m_currentState) {
-			// 현재 상태 종료
-			m_currentState->Exit(m_blackboard);
-			// 다음 상태로 전이
-			m_currentState = transition->GetTo();
-			m_currentState->Enter(m_blackboard);
-			break; // 한 번의 Tick에서 하나의 전이만 처리
+	if (m_currentState)
+	{
+		m_currentState->Update(m_localBB, deltaTime);
+		// Check transitions
+		for (const auto& transition : m_transitions)
+		{
+			if (transition->GetFrom() == m_currentState && (*transition)(m_localBB))
+			{
+				m_currentState->Exit(m_localBB);
+				m_currentState = transition->GetTo();
+				m_currentState->Enter(m_localBB);
+				break; // Exit after a successful transition
+			}
 		}
 	}
-
 }
 
-FSMState* StateMachineComponent::AddState(const std::string& name, FSMState::FSMStateCallback onEnter, FSMState::FSMStateCallback onUpdate, FSMState::FSMStateCallback onExit)
+FSM::FSMState* StateMachineComponent::AddState(const std::string& name)
 {
-	auto state = std::make_unique<FSMState>(name, onEnter, onUpdate, onExit);
-	state->SetID(m_nextStateID++);
-	m_states.push_back(std::move(state));
-	return m_states.back().get();
+	m_states.emplace_back(std::make_shared<FSM::FSMState>(name));
+	return m_states.back().get(); // Return the raw pointer to the state
 }
 
-void StateMachineComponent::AddTransition(FSMState* from, FSMState* to, Transition::Condition condition)
+void StateMachineComponent::RemoveState(FSM::FSMState* state)
 {
-	auto transition = std::make_unique<Transition>(from, to, condition);
-	transition->SetID(m_nextTransitionID++);
-	m_transitions.push_back(std::move(transition));
+	m_transitions.erase(
+		std::remove_if(m_transitions.begin(), m_transitions.end(),
+			[state](const std::shared_ptr<FSM::Transition>& transition) {
+				return transition->GetFrom() == state || transition->GetTo() == state;
+			}),
+		m_transitions.end());
+	m_states.erase(
+		std::remove_if(m_states.begin(), m_states.end(),
+			[state](const std::shared_ptr<FSM::FSMState>& s) {
+				return s.get() == state;
+			}),
+		m_states.end());
+	if (m_currentState == state)
+	{
+		m_currentState = nullptr; // Reset current state if it was removed
+	}
+
 }
 
-void StateMachineComponent::SetInitialState(FSMState* state)
+
+FSM::Transition* StateMachineComponent::AddTransition(FSM::FSMState* from, FSM::FSMState* to, ConditionFunc condition)
 {
-	m_currentState = state;
+	m_transitions.push_back(std::make_shared<FSM::Transition>(from, to, condition));
+	return m_transitions.back().get(); // Return the raw pointer to the transition
 }
+
+void StateMachineComponent::RemoveTransition(FSM::Transition* transition)
+{
+	m_transitions.erase(
+		std::remove_if(m_transitions.begin(), m_transitions.end(),
+			[transition](const std::shared_ptr<FSM::Transition>& t) {
+				return t.get() == transition;
+			}),
+		m_transitions.end());
+}
+
+
+FSM::FSMState* StateMachineComponent::FindStateByName(const std::string& name) const
+{
+	for (const auto& state : m_states)
+	{
+		if (state->GetName() == name)
+		{
+			return state.get();
+		}
+	}
+	return nullptr; // Return nullptr if no state with the given name is found
+}
+
+

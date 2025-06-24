@@ -7,7 +7,6 @@ namespace FSM
 	class FSMState;  // Forward declaration of FSMState class
 	class Transition  
 	{  
-		using ConditionFunc = std::function<bool(const BlackBoard&)>;
 	public:  
 		Transition(FSMState* from, FSMState* to, ::ConditionFunc condition)  
 			: m_from(from), m_to(to), m_condition(condition) {}  

@@ -8,18 +8,21 @@
 #include "TimeSystem.h"
 #include "Skeleton.h"
 #include "Socket.h"
+#include "RigidBodyComponent.h"
+#include "CharacterControllerComponent.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
 
-
+	player->AddComponent<RigidBodyComponent>();
+	player->AddComponent<CharacterControllerComponent>();
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
 	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });
 	AnimationFactorys->ReisterFactory("Punch", []() {return new RunAni(); });
 
-	auto animation = player->GetComponent<Animator>();
-	animation->m_Skeleton->MakeSocket("HeadSocket", "mixamorig:Hips");
+	//auto animation = player->GetComponent<Animator>();
+	//animation->m_Skeleton->MakeSocket("HeadSocket", "mixamorig:Hips");
 	/*animation->AddParameter("Speed", speed, ValueType::Float);
 	animation->AddParameter("OnPunch", false, ValueType::Trigger);
 	animation->CreateController("upper");
@@ -65,13 +68,13 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow },
 		[this](Mathf::Vector2 dir) {Move(dir);});
 
-	auto ani = _player->GetComponent<Animator>();
-	auto sword = GameObject::Find("plane");
-	if (sword)
+	//auto ani = _player->GetComponent<Animator>();
+	//auto sword = GameObject::Find("plane");
+	/*if (sword)
 	{
 		Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
 		headsocket->AttachObject(sword);
-	}
+	}*/
 }
 
 void TestPlayer::Update(float deltaTime)
@@ -79,10 +82,10 @@ void TestPlayer::Update(float deltaTime)
 	deta = deltaTime;
 	auto _player = GameObject::Find("Punch");
 	if (!_player) return;
-	auto ani = _player->GetComponent<Animator>();
-	ani->SetParameter("Speed", speed);
+	//auto ani = _player->GetComponent<Animator>();
+	//ani->SetParameter("Speed", speed);
 
-	Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
+	////Socket* headsocket = ani->m_Skeleton->FindSocket("HeadSocket");
 	auto sword = GameObject::Find("plane");
 	if (sword)
 	{
@@ -90,17 +93,17 @@ void TestPlayer::Update(float deltaTime)
 	}
 	if (InputManagement->IsKeyDown('6'))
 	{
-		headsocket->AttachObject(sword);
+		//headsocket->AttachObject(sword);
 
 	}
 	if (InputManagement->IsKeyDown('7'))
 	{
-		headsocket->DetachObject(sword);
+		//headsocket->DetachObject(sword);
 	}
 
 	if (InputManagement->IsKeyDown('L'))
 	{
-		ani->SetParameter("StopPunch", true);
+		//ani->SetParameter("StopPunch", true);
 	}
 
 }
@@ -113,8 +116,8 @@ void TestPlayer::TestDelete()
 void TestPlayer::Punch()
 {
 	auto _player = GameObject::Find("Punch");
-	auto ani = _player->GetComponent<Animator>();
-	ani->SetParameter("OnPunch" ,true);
+	//auto ani = _player->GetComponent<Animator>();
+	//ani->SetParameter("OnPunch" ,true);
 }
 
 void TestPlayer::Move(Mathf::Vector2 _dir)
@@ -135,17 +138,19 @@ void TestPlayer::Move(Mathf::Vector2 _dir)
 
 	if (speed >= maxSpeed)
 		speed = maxSpeed;
-	dir = _dir;
-	auto _player = GameObject::Find("Punch");
+
+	auto _player = GameObject::Find("TestPlayer");
+	auto controller = _player->GetComponent<CharacterControllerComponent>();
+	controller->Move(dir);
 	if (!_player) return;
-	_player->m_transform.AddPosition({ dir.x * speed * deta,0  ,dir.y * speed * deta });
+	//_player->m_transform.AddPosition({ dir.x * speed * deta,0  ,dir.y * speed * deta });
 	//Debug->Log(std::to_string(dir.x) + "     ");
 	//Debug->Log(std::to_string(dir.y));
 }
 
 void TestPlayer::Jump()
 {
-	auto _player = GameObject::Find("Punch");
+	auto _player = GameObject::Find("TestPlayer");
 	if (!_player) return;
 	_player->m_transform.AddPosition({0,1,0 });
 

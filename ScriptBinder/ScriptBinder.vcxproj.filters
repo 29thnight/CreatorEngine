@@ -237,7 +237,7 @@
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
     </ClCompile>
-    <ClCompile Include="StateMachingComponent.cpp">
+    <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClCompile>
   </ItemGroup>
@@ -473,8 +473,14 @@
     <ClInclude Include="Transition.h">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClInclude>
-    <ClInclude Include="StateMachingComponent.h">
+    <ClInclude Include="StateMachineComponent.h">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
+    </ClInclude>
+    <ClInclude Include="BTHeader.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

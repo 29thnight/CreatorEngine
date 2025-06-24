@@ -356,6 +356,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
+
+	testt = scene->CreateGameObject("TestPlayer", GameObjectType::Empty).get();
+	player.GetPlayer(testt);
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)

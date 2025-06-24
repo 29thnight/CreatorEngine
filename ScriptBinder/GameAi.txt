@@ -32,7 +32,7 @@ Game AI
 │   ├── ScriptEngine.h/cpp          ← 스크립트 파일(소스) 컴파일·실행 (DLL 핫리로드, Lua, C# 호스트)
 │   └── HotReloadManager.h/cpp      ← C++ DLL 핫 리로드 지원
 │
-└── Editor/                         ← 전체 에디터 레이어
+└── Editor/                         ← 전체 에디터 레이어                       ===================> inspectorWindow
     ├── CoreUI/                     ← Object Inspector, Dependency Panel 등 공통
     ├── FSMUI/                      ← FSMInspectorUI, NodeEditor 통합
     ├── BTUI/                       ← Behavior Tree Inspector

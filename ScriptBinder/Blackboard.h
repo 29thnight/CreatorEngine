@@ -1,37 +1,53 @@
 #pragma once
-#include "../Utility_Framework/LogSystem.h"
-#include <string>
 #include <unordered_map>
+#include <functional>
+#include <stdexcept>
+#include <string>
 #include <any>
 
-//using BBValue = std::variant<bool, int, float, std::string>;
-using BBValue = std::any;
-
-class Blackboard
+class BlackBoard
 {
 public:
-	void Set(const std::string& key, const BBValue& value);
-	//BBValue Get(const std::string& key) const;
-	bool Has(const std::string& key) const;
+	using BBValue = std::any;
 
 	template<typename T>
-	T& Get(const std::string& name) const
+	void Set(const std::string& key, const T& value)
 	{
-		BBValue any = m_data[name];
-		try
-		{
-			T& value = std::any_cast<T&>(any);
-			return value;
-		}
-		catch (const std::exception& e)
-		{
-			//fuxk
-			throw std::runtime_error("Blackboard: Key '" + name + "' not found or type mismatch. " + e.what());
-		}
-		
+		m_blackBoard[key] = value;
 	}
 
-private:
-	// 데이터 저장을 위한 맵
-	std::unordered_map<std::string, BBValue> m_data;
+	template<typename T>
+	T& get(const std::string& key)
+	{
+		auto it = m_blackBoard.find(key);
+		if (it != m_blackBoard.end())
+		{
+			return std::any_cast<T&>(it->second);
+		}
+		throw std::runtime_error("Key not found in BlackBoard");
+	}
+
+	template<typename T>
+	bool HasType(const std::string& key) const
+	{
+		auto it = m_blackBoard.find(key);
+		if (it != m_blackBoard.end())
+		{
+			return it->second.type() == typeid(T);
+		}
+		return false;
+	}
+
+	bool Has(const std::string& key) const
+	{
+		return m_blackBoard.find(key) != m_blackBoard.end();
+	}
+
+	
+
+private :
+	std::unordered_map<std::string, BBValue> m_blackBoard;
 };
+
+
+using ConditionFunc = std::function<bool(const BlackBoard&)>;

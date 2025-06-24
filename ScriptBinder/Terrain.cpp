@@ -239,15 +239,13 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 
 	// 레이어 페인트 splet 맵 업데이트
 	
-	std::vector<BYTE> materialpatchData(patchW * patchH * 4, 0); // RGBA 4채널
-	for (int y = 0; y < patchH; ++y)
+	std::vector<BYTE> materialpatchData(m_width * m_height * 4, 0); // RGBA 4채널
+	for (int y = 0; y < m_height; ++y)
 	{
-		for (int x = 0; x < patchW; ++x)
+		for (int x = 0; x < m_width; ++x)
 		{
-			int gridX = minX + x;
-			int gridY = minY + y;
-			int idx = gridY * m_width + gridX;
-			int dstOffset = (y * patchW + x) * 4; // RGBA 4채널
+			int idx = y * m_width + x;
+			int dstOffset = (y * m_width + x) * 4; // RGBA 4채널
 
 			// 레이어 가중치 계산
 			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // 최대 4개 레이어만 사용
@@ -257,7 +255,8 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 			}
 		}
 	}
-	m_pMaterial->UpdateSplatMapPatch(minX, minY, patchW, patchH, materialpatchData);
+
+	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, materialpatchData); // layer 추가 후 스플랫맵 업데이트
 }
 
 void TerrainComponent::RecalculateNormalsPatch(int minX, int minY, int maxX, int maxY)
