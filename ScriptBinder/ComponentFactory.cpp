@@ -6,6 +6,7 @@
 #include "DataSystem.h"
 #include "AnimationController.h"
 #include "CharacterControllerComponent.h"
+#include "Terrain.h"
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
@@ -289,6 +290,26 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					}
 
 				}
+			}
+		}
+		else if(componentType->typeID == type_guid(TerrainComponent))
+		{
+			auto terrain = static_cast<TerrainComponent*>(component);
+			Meta::Deserialize(terrain, itNode);
+			terrain->SetOwner(obj);
+			if (itNode["m_trrainAssetGuid"])
+			{
+				FileGuid guid = itNode["m_trrainAssetGuid"].as<std::string>();
+				if (guid != nullFileGuid)
+				{
+					terrain->m_trrainAssetGuid = guid;
+					auto path = DataSystems->GetFilePath(guid);
+					terrain->Load(path);
+				}
+			}
+			else
+			{
+				Debug->LogError("Terrain component is missing m_trrainAssetGuid");
 			}
 		}
 		else

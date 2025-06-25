@@ -56,6 +56,12 @@ inline T* GameObject::GetComponent()
     return nullptr;
 }
 
+template<>
+inline Transform* GameObject::GetComponent()
+{
+    return &m_transform;
+}
+
 template<typename T>
 inline bool GameObject::HasComponent()
 {

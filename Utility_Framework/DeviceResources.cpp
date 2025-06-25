@@ -161,7 +161,7 @@ void DirectX11::DeviceResources::Present()
     if(m_swapChain == nullptr)
     {
         // 스왑 체인이 없으면 창 크기 조정이 필요합니다.
-        HandleDeviceLost();
+        CreateDeviceResources();
         return;
 	}
 
@@ -404,6 +404,11 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         DirectX11::ThrowIfFailed(
             dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
         );
+
+        dxgiFactory->MakeWindowAssociation(
+            m_window->GetHandle(),
+            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+		);
 
         ComPtr<IDXGISwapChain1> swapChain;
         DirectX11::ThrowIfFailed(

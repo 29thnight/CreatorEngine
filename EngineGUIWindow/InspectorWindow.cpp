@@ -1500,11 +1500,19 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 {
 	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
 
+	if (!g_CurrentBrush) return;
+
 	int prewidth = terrainComponent->m_width;
 	int preheight = terrainComponent->m_height;
 	int editWidth = terrainComponent->m_width;
 	int editHeight = terrainComponent->m_height;
+	file::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
+	FileGuid& terrainAssetGuid = terrainComponent->m_trrainAssetGuid;
 
+	if (terrainAssetGuid == nullFileGuid && !terrainAssetPath.empty())
+	{
+		terrainAssetGuid = DataSystems->GetFileGuid(terrainAssetPath);
+	}
 	
 	//bool change_edit = ImGui::IsItemDeactivatedAfterEdit();
 	
@@ -1596,7 +1604,6 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		//save , load
 		if (ImGui::Button("Save Terrain"))
 		{
-			
 			file::path savePath = ShowSaveFileDialog(L"", L"Save File",PathFinder::Relative("Terrain"));
 			if (savePath != L"") {
 				std::wstring folderPath = savePath.parent_path().wstring();

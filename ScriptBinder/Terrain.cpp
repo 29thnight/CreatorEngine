@@ -343,7 +343,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::wcout << L"Saving dir: " << assetRoot << std::endl;
 	std::wcout << L"Saving terrain: " << name << std::endl;
 
-
 	namespace fs = std::filesystem;
 	fs::path assetPath = fs::path(assetRoot);
 	fs::path terrainDir = PathFinder::Relative("Terrain");
@@ -366,7 +365,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	std::wstring heightMapPath = (terrainPath / (name + L"_HeightMap.png")).wstring();
 	std::wstring splatMapPath = (terrainPath / (name + L"_SplatMap.png")).wstring();
-	std::wstring metaPath = (terrainPath / (name + L".terrain")).wstring();
+	m_terrainTargetPath = (terrainPath / (name + L".terrain")).wstring();
 
 	
 	//SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
@@ -418,13 +417,10 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);
 	fs::path relsplatMap = fs::relative(splatMapPath, terrainDir);
 
-
-
 	//메타데이터 저장 .meta 인대 json 쓸거임
 	json metaData;
 	metaData["name"] = name;
 	metaData["terrainID"] = m_terrainID;
-	metaData["assetGuid"] = m_trrainAssetGuid.ToString();
 	metaData["width"] = m_width;
 	metaData["height"] = m_height;
 	metaData["minHeight"] = m_minHeight;
@@ -434,7 +430,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	metaData["heightmap"] = Utf8Encode(relheightMap);
 	//metaData["splatmap"] = fs::path(splatMapPath).u8string(); //ASCII경로이면 한글 쓰려면 utf8 변환 해야할듯
 	metaData["splatmap"] = Utf8Encode(relsplatMap);
-
 
 	metaData["layers"] = json::array();
 	int index = 0;
@@ -449,12 +444,12 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		metaData["layers"].push_back(layerData);
 		index++;
 	}
-	std::ofstream ofs(metaPath);
+	std::ofstream ofs(m_terrainTargetPath);
 	ofs << metaData.dump(4); // 4칸 들여쓰기
 
 
-	std::wcout << L"Terrain saved to: " << metaPath << std::endl;
-	Debug->LogDebug("Terrain saved to: " + Utf8Encode(metaPath));
+	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
+	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
 }
 
 bool TerrainComponent::Load(const std::wstring& filePath)
@@ -483,8 +478,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		//상대경로로 사용
 		isRelative = true;
 	}
-
-
 
 	//.meta -> json 읽기
 	std::ifstream ifs(metaPath);

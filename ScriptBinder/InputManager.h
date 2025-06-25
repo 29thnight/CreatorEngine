@@ -59,8 +59,6 @@ public:
 	void Update(float deltaTime);
 	//void ImGuiUpdate();
 
-
-
 	ComPtr<IGameInput> gameInput;
 
 	//키보드 마우스 ***** Down Pressed hold인거 Down 첫틱도받게 수정필요 이름 통일필요
@@ -98,7 +96,7 @@ public:
 	KeyboardState keyboardstate{};
 	std::vector<GameInputKeyState> GkeyStates = {};
 	GameInputMouseState GmouseState{};
-	bool  curkeyStates[KEYBOARD_COUNT] = {};
+	bool curkeyStates[KEYBOARD_COUNT] = {};
 
 	bool curmouseState[mouseCount] = {};
 

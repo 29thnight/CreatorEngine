@@ -30,11 +30,9 @@ void InputManager::Update(float deltaTime)
  
 }
 
-
 void InputManager::KeyBoardUpdate()
 {
     ComPtr<IGameInputReading> reading;
-
 
     //현재 키입력 초기화
     memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);

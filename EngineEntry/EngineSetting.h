@@ -63,6 +63,11 @@ public:
 		return isSuccess;
 	}
 
+	MSVCVersion GetMSVCVersion() const
+	{
+		return m_msvcVersion;
+	}
+
 	std::wstring GetMsbuildPath()
 	{
 		switch (m_msvcVersion)

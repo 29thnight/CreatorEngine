@@ -179,10 +179,11 @@ private:
             return false;
         }
         
-        return  extension == ".fbx" || extension == ".gltf" || extension == ".obj" || 
+        return  extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
                 extension == ".png" || extension == ".dds" || extension == ".hdr" ||
                 extension == ".hlsl" || extension == ".cpp" || extension == ".glb" ||
-                extension == ".cs" || extension == ".wav" || extension == ".mp3";
+                extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
+                extension == ".terrain";
     }
 
     void HandleMoved(const std::filesystem::path& dir, const std::string& oldName, const std::string& newName) 
@@ -274,7 +275,7 @@ private:
         }
 
         if (!root["guid"])
-            root["guid"] = GUIDCreator::MakeFileGUID(targetFile.string()).ToString();
+            root["guid"] = GUIDCreator::MakeFileGUID(targetFile.filename().string()).ToString();
 
         root["importSettings"]["extension"] = targetFile.extension().string();
         root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();

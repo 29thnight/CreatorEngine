@@ -148,14 +148,16 @@ void HotLoadSystem::Initialize()
 		+ L"\"";
 #endif
 
-	try
 	{
-		Compile();
-	}
-	catch (const std::exception& e)
-	{
-		Debug->LogError("Failed to compile script: " + std::string(e.what()));
-		return;
+		try
+		{
+			Compile();
+		}
+		catch (const std::exception& e)
+		{
+			Debug->LogError("Failed to compile script: " + std::string(e.what()));
+			return;
+		}
 	}
 
 	m_initModuleFunc();
@@ -586,16 +588,23 @@ void HotLoadSystem::Compile()
 		hDll = nullptr;
 	}
 
-    try
-    {
-		if (!IsScriptUpToDate()) RunMsbuildWithLiveLog(command);
-    }
-    catch (const std::exception& e)
-    {
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Build failed...");
-        throw std::runtime_error("Build failed");
-    }
+	if (EngineSettingInstance->GetMSVCVersion() != MSVCVersion::None)
+	{
+		try
+		{
+			if (!IsScriptUpToDate()) RunMsbuildWithLiveLog(command);
+		}
+		catch (const std::exception& e)
+		{
+			m_isReloading = false;
+			g_progressWindow->SetStatusText(L"Build failed...");
+			throw std::runtime_error("Build failed");
+		}
+	}
+	else
+	{
+		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
+	}
 
 	hDll = LoadLibraryA(PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string().c_str());
 	if (!hDll)
