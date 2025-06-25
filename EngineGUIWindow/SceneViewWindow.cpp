@@ -560,19 +560,19 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 							// 4) 충돌 지점(P)의 XZ → HeightMap 인덱스(격자) 변환
 							//    TerrainComponent의 m_width, m_height, m_gridSize가 필요
 							float gridSize = 1.0f; // 예: 1.0f, 2.0f 등
-							int   tileX = static_cast<int>(floorf(hitPos.x / gridSize));
+							int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
 							int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
 
-							// 경계 검사
-							if (!(tileX < 0 || tileX >= terrainComponent->m_width ||
-								tileY < 0 || tileY >= terrainComponent->m_height))
-							{
+							//// 경계 검사
+							//if (!(tileX < 0 || tileX >= terrainComponent->m_width ||
+							//	tileY < 0 || tileY >= terrainComponent->m_height))
+							//{
 								terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
 								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
 									terrainComponent->ApplyBrush(*terrainBrush);
 								}
-							}
+							//}
 						}
 					}
 				}
