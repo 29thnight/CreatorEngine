@@ -429,6 +429,22 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 							ImGuiDrawHelperAnimator(animator);
 						}
 					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<StateMachineComponent>())
+					{
+						StateMachineComponent* fsm = dynamic_cast<StateMachineComponent*>(component.get());
+						if (nullptr != fsm)
+						{
+							ImGuiDrawHelperFSM(fsm);
+						}
+					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<BehaviorTreeComponent>())
+					{
+						BehaviorTreeComponent* bt = dynamic_cast<BehaviorTreeComponent*>(component.get());
+						if (nullptr != bt)
+						{
+							ImGuiDrawHelperBT(bt);
+						}
+					}
 					else if (type)
 					{
 						Meta::DrawObject(component.get(), *type);
@@ -1620,6 +1636,24 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 
 void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 {
+	if (FSMComponent)
+	{
+		ImGui::Text("State Machine Editor");
+		ImGui::Separator();
+		if (ImGui::Button("Edit State Machine"))
+		{
+			m_openFSMPopup = true;
+			ImGui::OpenPopup("FSMEditorPopup");
+		}
+		if (ImGui::BeginPopupModal("FSMEditorPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			if (ImGui::Button("Add State"))
+			{
+				// Add state logic here
+			}
+			ImGui::EndPopup();
+		}
+	}
 }
 
 void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
@@ -1637,10 +1671,38 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			ImGui::OpenPopup("BTEditorPopup");
 		}
 
-		if (ImGui::BeginPopupModal("BTEditorPopup"),nullptr,ImGuiWindowFlags_AlwaysAutoResize)
+		if (ImGui::BeginPopupModal("BTEditorPopup", nullptr, ImGuiWindowFlags_None))
 		{
-			if(ImGui::Button("Add Node"));
+			if (ImGui::Button("Add Node")) {
+				// Add node logic here
+			}
 		
+			ImGui::Separator();
+			ImGui::BeginChild("BTEditorChild", ImVec2(0, 400), true);
+
+			ed::SetCurrentEditor(s_BTEditorContext);
+			ed::Begin("BehaviorTreeEditor");
+
+			struct NodeData { BT::BTNode::NodePtr node; ed::NodeId id; ed::PinId inputPin, outputPin; };
+			std::vector<NodeData> nodes;
+			std::vector<std::tuple<ed::LinkId, ed::PinId>> links;
+			
+
+
+			ed::End();
+			ed::SetCurrentEditor(nullptr);
+
+			ImGui::EndChild();
+
+			if (ImGui::Button("Close")) {
+				m_openBTPopup = false;
+				ImGui::CloseCurrentPopup();
+				if (s_BTEditorContext)
+				{
+					ed::DestroyEditor(s_BTEditorContext);
+					s_BTEditorContext = nullptr;
+				}
+			}
 
 			ImGui::EndPopup();
 		}

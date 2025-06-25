@@ -2,14 +2,19 @@
 #include "Component.h"
 #include "IAIComponent.h"
 #include "BTHeader.h"
+#include "BehaviorTreeComponent.generated.h"
 
 using namespace BT;
 
 class BehaviorTreeComponent : public Component, public IAIComponent
 {
 public:
-	BehaviorTreeComponent() = default;
-	~BehaviorTreeComponent() = default;
+   ReflectBehaviorTreeComponent
+		[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(BehaviorTreeComponent)
+
+	[[Property]]
+	std::string name; // 이름 속성
 
 
 	// IAIComponent 인터페이스 구현
