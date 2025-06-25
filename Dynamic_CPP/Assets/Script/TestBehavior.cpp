@@ -1,4 +1,6 @@
 #include "TestBehavior.h"
+#include "SceneManager.h"
+#include "RenderScene.h"
 #include "InputManager.h"
 #include "pch.h"
 #include <cmath>
@@ -43,6 +45,8 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
+	SceneManagers->IsEditorSceneLoaded();
+
 	auto Player = GameObject::Find("Punch");
 	if (Player)
 	{

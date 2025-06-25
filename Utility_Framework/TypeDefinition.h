@@ -153,3 +153,12 @@ private:
     Getter m_getter;
     Setter m_setter;
 };
+
+namespace DirectX11
+{
+    struct Sizef
+    {
+        float width;
+        float height;
+    };
+};

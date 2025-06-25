@@ -9,12 +9,6 @@ class CoreWindow;
 
 namespace DirectX11
 {
-	struct Sizef
-	{
-		float width;
-		float height;
-	};
-
 	interface IDeviceNotify
 	{
 		virtual void OnDeviceLost() abstract;

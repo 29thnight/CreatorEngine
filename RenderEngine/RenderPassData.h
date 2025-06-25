@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Camera.h"
 #include "Texture.h"
 #include "concurrent_vector.h"
@@ -67,3 +68,4 @@ public:
 	static bool VaildCheck(Camera* pCamera);
 	static RenderPassData* GetData(Camera* pCamera);
 };
+#endif // !DYNAMICCPP_EXPORTS
