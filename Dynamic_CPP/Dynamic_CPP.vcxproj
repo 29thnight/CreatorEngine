@@ -72,7 +72,7 @@
     <OutDir>../$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>../$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>../Bin\Editor\</OutDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnabled>true</VcpkgEnabled>
@@ -150,7 +150,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../Bin\Editor\ScriptBinder.lib;../Bin\Editor\Utility_Framework.lib;../Bin\Editor\ImGuiHelper.lib;../Bin\Editor\RenderEngine.lib;../Bin\Editor\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

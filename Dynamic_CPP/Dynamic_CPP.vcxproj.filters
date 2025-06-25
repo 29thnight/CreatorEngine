@@ -45,9 +45,6 @@
     <ClInclude Include="Assets\Script\NewBehaviourScript.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -57,12 +54,6 @@
       <Filter>Common\SourceFile</Filter>
     </ClCompile>
     <ClCompile Include="Assets\Script\TestBehavior.cpp">
-      <Filter>Script\ScriptClass</Filter>
-    </ClCompile>
-    <ClCompile Include="\Assets\Script\NewBehaviourScript.cpp">
-      <Filter>Script\ScriptClass</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Script\NewBehaviourScript.cpp">
       <Filter>Script\ScriptClass</Filter>
     </ClCompile>
   </ItemGroup>
