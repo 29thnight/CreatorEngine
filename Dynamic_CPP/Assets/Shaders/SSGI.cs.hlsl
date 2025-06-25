@@ -101,11 +101,11 @@ uint updateSectors(float minHorizon, float maxHorizon, uint outBitfield)
 [numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    uint2 twobytwo = twobytwoSample[frameIndex % (ratio * ratio)];
+    //uint2 twobytwo = twobytwoSample[frameIndex % (ratio * ratio)];
     float2 invScreenSize = 1.0 / screenSize;
     
     // DTid.xy = screenSize / 2 = (960, 540)
-    float2 uv = float2(DTid.xy * ratio + twobytwo) * invScreenSize;
+    float2 uv = float2(DTid.xy * ratio ) * invScreenSize;
     //float2 uv = float2(DTid.xy) / screenSize;
     //uv *= 2.0;
     float depth = gDepthTex.SampleLevel(PointSampler, uv, 0);

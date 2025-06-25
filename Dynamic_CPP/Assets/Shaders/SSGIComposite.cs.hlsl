@@ -28,7 +28,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
     SSGI /= 9.0;
     
-    float3 destColor = useOnlySSGI ? resultTexture.Load(int3(DTid.xy, 0)).rgb : float3(0, 0, 0);
+    float3 destColor = useOnlySSGI ? float3(0, 0, 0) : resultTexture.Load(int3(DTid.xy, 0)).rgb;
     
     float3 color = ColorTexture.Load(int3(DTid.xy, 0)).rgb;
     

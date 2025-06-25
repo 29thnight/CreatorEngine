@@ -68,7 +68,7 @@ inline void CalcCommonLightInfo(SurfaceInfo surf, inout LightingInfo li)
 
 inline void EvalDirectionalLight(SurfaceInfo surf, Light light, inout LightingInfo li)
 {
-    li.L = normalize(-light.direction);
+    li.L = normalize(-light.direction.xyz);
     li.distance = -1; // infinity
     li.attenuation = 1;
 

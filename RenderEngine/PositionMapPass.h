@@ -21,8 +21,8 @@ public:
 public:
 	void CreateTempTexture();
 
-	int posNormMapSize = 400;
-	int posNormDilateCount = 2;
+	int posNormMapSize = 2048;
+	int posNormDilateCount = 8;
 	bool isDilateOn{ true };
 
 	ComputeShader* m_edgeComputeShader{};

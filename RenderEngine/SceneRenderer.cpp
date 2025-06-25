@@ -542,19 +542,19 @@ void SceneRenderer::SceneRendering()
 			DirectX11::EndEvent();
 			PROFILE_CPU_END();
 		}
+		//SSR
+		PROFILE_CPU_BEGIN("ScreenSpaceReflectionPass");
+		DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
+		{
+			Benchmark banch;
+			m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
+		}
+		DirectX11::EndEvent();
+		PROFILE_CPU_END();
 		
 		if (m_pEditorCamera.get() != camera)
 		{
-			//SSR
-			PROFILE_CPU_BEGIN("ScreenSpaceReflectionPass");
-			DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
-			{
-				Benchmark banch;
-				m_pScreenSpaceReflectionPass->Execute(*m_renderScene, *camera);
-				RenderStatistics->UpdateRenderState("ScreenSpaceReflectionPass", banch.GetElapsedTime());
-			}
-			DirectX11::EndEvent();
-			PROFILE_CPU_END();
 
 			//VolumetricFog or VolumetricLight
 			PROFILE_CPU_BEGIN("VolumetricFogPass");
@@ -788,15 +788,15 @@ void SceneRenderer::CreateCommandListPass()
 				m_pBitMaskPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 		});
-
-		if (m_pEditorCamera.get() != camera)
-		{
-			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 			{
 				PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
 				m_pScreenSpaceReflectionPass->CreateRenderCommandList(defferdContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			});
+
+		if (m_pEditorCamera.get() != camera)
+		{
 
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* defferdContext)
 			{

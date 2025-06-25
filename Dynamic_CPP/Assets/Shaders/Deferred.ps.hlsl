@@ -85,19 +85,20 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
         if (light.status == LIGHT_DISABLED)
             continue;
         LightingInfo li = EvalLightingInfo(surf, light);
-
+        float NdotL = saturate(li.NdotL); // clamped n dot l
+        float NdotV = saturate(surf.NdotV);
+        
         // cook-torrance brdf
         float NDF = DistributionGGX(saturate(li.NdotH), roughness);
-        float G = GeometrySmith(saturate(surf.NdotV), saturate(li.NdotL), roughness);
+        float G = GeometrySmith(NdotV, NdotL, roughness);
         float3 F = fresnelSchlick(saturate(dot(li.H, surf.V)), F0);
         float3 kS = F;
         float3 kD = float3(1.0, 1.0, 1.0) - kS;
         kD *= 1.0 - metallic;
 
-        float NdotL = saturate(li.NdotL); // clamped n dot l
 
         float3 numerator = NDF * G * F;
-        float denominator = 4.0 * saturate(surf.NdotV) * NdotL;
+        float denominator = 4.0 * NdotV * NdotL;
         float3 specular = numerator / max(denominator, 0.001);
         
         //light.color.rgb *= light.intencity;
@@ -128,6 +129,8 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     //float3 GI = useAO ? AO.Sample(PointSampler, IN.texCoord).rgb : float3(0, 0, 0);
     ambient *= occlusion;
     float3 colour = ambient + Lo + emissive; //(ambient + Lo) * ao + emissive;// + GI * ao; //(albedo * GI * ao);
+    
+    float3 debugCascade = overlayCascadeDebug(surf.posW);
     
     gOutput output;
     output.Default = float4(colour, 1.0);

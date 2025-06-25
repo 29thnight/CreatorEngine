@@ -21,6 +21,9 @@ private:
 
 	Texture* m_pTempTexture{ nullptr };
 	Texture* m_pTempTexture2{ nullptr };
+
+	Texture* m_pTempTexture3{ nullptr };
+
 	ComPtr<ID3D11Buffer> m_SSGIBuffer;
 	ComPtr<ID3D11Buffer> m_CompositeBuffer;
 
@@ -37,7 +40,7 @@ private:
 	float thickness = 0.5f;//0.155f;
 
 	float intensity = 1.f;
-	bool useOnlySSGI = true;
+	bool useOnlySSGI = false;
 	bool useDualFiltering = true;
 
 	bool isOn = true;

@@ -148,6 +148,14 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
     ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(defferdPtr, 2, rtv, nullptr);
     DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+
+    
+
+    camera.UpdateBuffer(defferdPtr);
+    DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &buffer);
+    DirectX11::UpdateBuffer(defferdPtr, m_shadowcamBuffer.Get(), &cameraview);
+    DirectX11::UpdateBuffer(defferdPtr, lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
+
     DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(defferdPtr, 11, 1, &lightManager->m_pLightCountBuffer);
     DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_Buffer.GetAddressOf());
@@ -158,11 +166,6 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
     {
         DirectX11::PSSetConstantBuffer(defferdPtr, 2, 1, &lightManager->m_shadowMapBuffer);
     }
-
-    camera.UpdateBuffer(defferdPtr);
-    DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &buffer);
-    DirectX11::UpdateBuffer(defferdPtr, m_shadowcamBuffer.Get(), &cameraview);
-    DirectX11::UpdateBuffer(defferdPtr, lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
     DirectX11::Draw(defferdPtr, 4, 0);
 
     DirectX11::PSSetShaderResources(defferdPtr, 0, 10, nullSRV10);
