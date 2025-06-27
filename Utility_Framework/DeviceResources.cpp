@@ -305,21 +305,21 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->Release();
     }
 
-    DirectX11::ThrowIfFailed(DXGIGetDebugInterface(IID_PPV_ARGS(&m_dxgiDebug)));
-    {
-        DirectX11::ThrowIfFailed(m_dxgiDebug->QueryInterface(IID_PPV_ARGS(&m_dxgiInfoQueue)));
-        
-        // WARNING 메시지에 Breakpoint
-		m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, FALSE);
-        
-        // ERROR 메시지에 Breakpoint
-        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
-        
-        // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
-        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-		
-        m_dxgiInfoQueue->Release();
-    }
+  //  DirectX11::ThrowIfFailed(DXGIGetDebugInterface(IID_PPV_ARGS(&m_dxgiDebug)));
+  //  {
+  //      DirectX11::ThrowIfFailed(DXGIGetDebugInterface(IID_PPV_ARGS(&m_dxgiInfoQueue)));
+  //      
+  //      // WARNING 메시지에 Breakpoint
+		//m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, FALSE);
+  //      
+  //      // ERROR 메시지에 Breakpoint
+  //      m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
+  //      
+  //      // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
+  //      m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+		//
+  //      m_dxgiInfoQueue->Release();
+  //  }
 #endif
 
     if (FAILED(hr))
