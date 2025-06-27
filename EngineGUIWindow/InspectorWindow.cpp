@@ -1660,51 +1660,246 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
 	if (BTComponent) 
 	{
+
+		static bool showControllersWindow = false;
+
 		if (!s_BTEditorContext) {
+			
 			s_BTEditorContext = ed::CreateEditor();
+			auto settings = ed::GetConfig(s_BTEditorContext);
+			settings.CanvasSizeMode = ed::CanvasSizeMode::CenterOnly;
 		}
 
-		ImGui::Text("Behavior Tree Editor");
-		ImGui::Separator();
-		if (ImGui::Button("Edit Behavior Tree")) {
-			m_openBTPopup = true;
-			ImGui::OpenPopup("BTEditorPopup");
-		}
 
-		if (ImGui::BeginPopupModal("BTEditorPopup", nullptr, ImGuiWindowFlags_None))
+		ImGui::Text("Behavior Tree");
+		ImGui::SameLine();
+		if (ImGui::Button("Edit Behavior Tree"))
 		{
+			showControllersWindow = !showControllersWindow;
+		}
+		if (showControllersWindow)
+		{
+			ImGui::Begin("Behavior Tree Editor", &showControllersWindow);
+			//int i = 0;
+			//static int selectedControllerIndex = 0;
+			//static int preSelectIndex = 0;
+			//static int linkIndex = -1;
+			//static int ClickNodeIndex = -1;
+			//static int targetNodeIndex = -1;
+			//static int selectedTransitionIndex = -1;
+			//static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
+			//static int AvatarControllerIndex = -1;
+			//static bool showAvatarMaskWindow = false;
+			//auto& controllers = animator->m_animationControllers;
 			if (ImGui::Button("Add Node")) {
 				// Add node logic here
 			}
-		
 			ImGui::Separator();
-			ImGui::BeginChild("BTEditorChild", ImVec2(0, 400), true);
-
+			ImGui::BeginChild("BTEditorChild", ImVec2(1200, 500), true);
+			
 			ed::SetCurrentEditor(s_BTEditorContext);
 			ed::Begin("BehaviorTreeEditor");
 
-			struct NodeData { BT::BTNode::NodePtr node; ed::NodeId id; ed::PinId inputPin, outputPin; };
-			std::vector<NodeData> nodes;
-			std::vector<std::tuple<ed::LinkId, ed::PinId>> links;
-			
+			BT::DFS(BTComponent->GetRoot(), [&](const BT::BTNode::NodePtr& node) {
+				// NodeId: 포인터를 정수로 재해석
+				ed::NodeId nid{ node.get() };
 
+				// 노드 위치 유지
+				ImVec2 pos = BTComponent->GetNodePosition(node);
+
+				uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
+				ed::PinId  inPin{ base };     // e.g. 0,2,4...
+				ed::PinId outPin{ base | 1 };  // e.g. 1,3,5...
+
+				// 3) 노드 그리기
+				ed::BeginNode(nid);
+
+
+
+
+
+
+				ed::GetStyle().PivotScale = ImVec2(2.0f, 2.0f); // 노드 중심을 기준으로 스케일 조정
+				if (!std::dynamic_pointer_cast<RootNode>(node))
+				{
+					// 입력 핀
+					ed::BeginPin(inPin, ed::PinKind::Input);
+					ImGui::Text("I");
+					ed::EndPin();
+				}
+
+				ImGui::TextUnformatted(node->GetName().c_str());
+
+				// 출력 핀
+				ed::BeginPin(outPin, ed::PinKind::Output);
+				ImGui::Text("O");
+				ed::EndPin();
+
+
+
+
+
+
+				ed::EndNode();
+
+
+				if (ed::ShowNodeContextMenu(&nid))
+				{
+
+
+					//// 노드 컨텍스트 메뉴를 여는 로직
+
+					ImGui::MenuItem(node->GetName().c_str(), nullptr, false, false);
+					ImGui::Separator();
+
+					// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
+					bool isComposite = std::dynamic_pointer_cast<BT::CompositeNode>(node) != nullptr;
+					bool isDecorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node) != nullptr;
+					if (isComposite || isDecorator)
+					{
+						if (ImGui::BeginMenu("Add Child"))
+						{
+							if (ImGui::MenuItem("Sequence"))
+							{
+								//auto child = BTComponent->CreateNode(BT::NodeType::Sequence);
+								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
+							}
+							if (ImGui::MenuItem("Selector"))
+							{
+								//auto child = BTComponent->CreateNode(BT::NodeType::Selector);
+								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
+							}
+							if (ImGui::MenuItem("Action"))
+							{
+								//auto child = BTComponent->CreateNode(BT::NodeType::Action);
+								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
+							}
+							ImGui::EndMenu();
+						}
+					}
+
+					// 3) Delete Node: 루트 노드는 삭제 불가
+					bool isRoot = (node == BTComponent->GetRoot());
+					if (!isRoot)
+					{
+						if (ImGui::MenuItem("Delete Node"))
+						{
+							//BTComponent->DeleteNode(node);
+						}
+					}
+					else
+					{
+						// 루트면 비활성화된 메뉴 아이템으로 안내
+						ImGui::MenuItem("Delete Node", nullptr, false, false);
+					}
+
+
+					//ImGui::EndPopup();
+				}
+
+
+
+				// 5) 노드 위치 설정
+				ImVec2 nodePose = ed::GetNodePosition(nid);
+
+				if (pos.x != nodePose.x || pos.y != nodePose.y) {
+					BTComponent->SetNodePosition(node, pos);
+				}
+
+				// 6) 노드 위치 업데이트
+				BTComponent->SetNodePosition(node, pos);
+
+
+
+				// 4) 링크 그리기: 자식 노드의 입력 핀 ← 이 노드의 출력 핀
+				if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+				{
+					for (auto& child : comp->GetChildren())
+					{
+						// 자식의 Input Pin
+						uintptr_t cb = reinterpret_cast<uintptr_t>(child.get()) << 1;
+						ed::PinId childInPin{ cb };  // childInPin = even id
+
+						// LinkId: NodePtr xor ChildPtr 으로 고유 생성
+						ed::LinkId lid{ (reinterpret_cast<uintptr_t>(node.get())
+									   ^ reinterpret_cast<uintptr_t>(child.get())) };
+
+						// **여기** nid 가 아니라 outPin 을 쓰고, childInPin 을 endPin 으로 넘깁니다
+						ed::Link(lid, outPin, childInPin);
+					}
+				}
+				else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+				{
+					auto child = dec->GetChild();
+					uintptr_t cb = reinterpret_cast<uintptr_t>(child.get()) << 1;
+					ed::PinId childInPin{ cb };
+
+					ed::LinkId lid{ (reinterpret_cast<uintptr_t>(node.get())
+								   ^ reinterpret_cast<uintptr_t>(child.get())) };
+					ed::Link(lid, outPin, childInPin);
+				}
+
+
+
+			});
+
+
+			if (ed::ShowBackgroundContextMenu()) {
+				ImGui::OpenPopup("BackgroundMenu", 1);
+
+			}
+
+			{
+				ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Always);
+				if (ImGui::BeginPopup("BackgroundMenu", ImGuiWindowFlags_ChildMenu)) {
+					ImGui::Text("Background Menu");
+					ImGui::Separator();
+					//// 1) 노드 이름 표시: 노드 이름은 이미 ImGui::TextUnformatted 에서 표시됨
+					ImGui::Text("Node Name: %s", "New Node");
+
+					//// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
+					ImGui::EndPopup();
+
+				}
+
+			}
 
 			ed::End();
+
 			ed::SetCurrentEditor(nullptr);
+
+
+			//if (m_openBTNodePopup)
+			//{
+			//	ImGui::OpenPopup("NodeContextMenu");
+			//	m_openBTNodePopup = false;
+			//}
+
+			//ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Always);
+			//if (ImGui::BeginPopup("NodeContextMenu", ImGuiWindowFlags_ChildMenu)) {
+			//	ImGui::Text("Node Context Menu");
+			//	ImGui::Separator();
+			//	//// 1) 노드 이름 표시: 노드 이름은 이미 ImGui::TextUnformatted 에서 표시됨
+			//	//ImGui::Text("Node Name: %s", clickedNode.get()->GetName().c_str());
+
+			//	//// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
+
+			//	if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
+			//		ImGui::IsMouseClicked(0)) // 왼쪽 클릭
+			//	{
+			//		ImGui::CloseCurrentPopup();
+			//	}
+
+			//	ImGui::EndPopup();
+			//}
+
+
+
 
 			ImGui::EndChild();
 
-			if (ImGui::Button("Close")) {
-				m_openBTPopup = false;
-				ImGui::CloseCurrentPopup();
-				if (s_BTEditorContext)
-				{
-					ed::DestroyEditor(s_BTEditorContext);
-					s_BTEditorContext = nullptr;
-				}
-			}
+			ImGui::End();
 
-			ImGui::EndPopup();
 		}
 	}
 }
