@@ -547,6 +547,7 @@ void Scene::DestroyComponents()
 						component.reset();
 					}
 				}
+
 			}
 
 			std::erase_if(obj->m_components, [](const auto& component)

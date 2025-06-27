@@ -115,9 +115,9 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 
     auto componentPtr = std::reinterpret_pointer_cast<Component>(component);
     m_components.push_back(componentPtr);
-    m_componentIds[component->m_scriptTypeID] = m_components.size() - 1;
-
-    size_t index = m_componentIds[component->m_scriptTypeID];
+    
+	size_t index = m_components.size() - 1;
+	m_componentIds[component->m_scriptTypeID] = index;
 
     ScriptManager->CollectScriptComponent(this, index, scriptName.data());
 
@@ -172,9 +172,9 @@ void GameObject::RemoveScriptComponent(const std::string_view& scriptName)
 		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(*iter);
 		if (scriptComponent && scriptComponent->m_name == scriptName)
 		{
-			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
 			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
 			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->GetTypeID()], scriptComponent->m_name.ToString());
+			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
 		}
 	}
 }

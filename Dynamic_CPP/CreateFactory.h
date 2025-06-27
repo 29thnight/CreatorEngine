@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "Temp.h"
+#include "Entity.h"
 #include "TestBehavior.h"
 #include "AsisMove.h"
 

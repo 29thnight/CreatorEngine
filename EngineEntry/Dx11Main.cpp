@@ -237,7 +237,7 @@ void DirectX11::Dx11Main::Update()
 		ScriptManager->CompileEvent();
 	}
 
-	if (InputManagement->IsKeyPressed(VK_CONTROL) && InputManagement->IsKeyDown('W'))
+	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))
 	{
         m_gizmoRenderer->SetWireFrame();
 	}
