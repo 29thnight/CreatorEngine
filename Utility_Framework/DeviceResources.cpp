@@ -5,7 +5,7 @@
 #include "DirectXMath.h"
 #include "Core.Memory.hpp"
 #include "DirectXColors.h"
-
+#include "DeviceState.h"
 using namespace DirectX;
 
 namespace DisplayMetrics
@@ -156,7 +156,114 @@ void DirectX11::DeviceResources::Present()
     if(m_swapChain == nullptr)
     {
         // 스왑 체인이 없으면 창 크기 조정이 필요합니다.
-        CreateDeviceResources();
+        bool a = m_d3dDevice.Get();
+        bool b = m_deviceAdapter.Get();
+        bool c = m_d3dContext.Get();
+        bool d = m_swapChain.Get();
+        bool e = m_dxgiDebug.Get();
+        bool f = m_annotation.Get();
+        bool g = m_debugDevice.Get();
+        bool h = m_infoQueue.Get();
+        bool i = m_dxgiInfoQueue.Get();
+        bool j = m_d3dRenderTargetView.Get();
+        bool k = m_backBuffer.Get();
+        bool l = m_backBufferSRV.Get();
+        bool m = m_d3dDepthStencilView.Get();
+        bool n = m_DepthStencilViewSRV.Get();
+        bool o = m_rasterizerState.Get();
+        bool p = m_depthStencilState.Get();
+        bool q = m_blendState.Get();
+
+        ComPtr<IDXGIDevice3> dxgiDevice;
+        DirectX11::ThrowIfFailed(m_d3dDevice.As(&dxgiDevice));
+
+        ComPtr<IDXGIFactory2> dxgiFactory;
+        DirectX11::ThrowIfFailed(
+            m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
+        );
+
+        DXGI_SCALING scaling = DisplayMetrics::SupportHighResolutions ? DXGI_SCALING_NONE : DXGI_SCALING_STRETCH;
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
+
+        m_d3dRenderTargetSize.width = m_logicalSize.width;
+        m_d3dRenderTargetSize.height = m_logicalSize.height;
+
+        swapChainDesc.Width = lround(m_d3dRenderTargetSize.width);		// 창의 크기를 맞춥니다.
+        swapChainDesc.Height = lround(m_d3dRenderTargetSize.height);
+        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
+        swapChainDesc.Stereo = false;
+        swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
+        swapChainDesc.SampleDesc.Quality = 0;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
+        swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.Flags = 0;
+        swapChainDesc.Scaling = scaling;
+        swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+
+        DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
+
+        swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+        swapChainFullscreenDesc.RefreshRate.Denominator = 1;
+        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+        swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+        swapChainFullscreenDesc.Windowed = TRUE;
+
+        ComPtr<IDXGISwapChain1> swapChain;
+        DirectX11::ThrowIfFailed(
+            dxgiFactory->CreateSwapChainForHwnd(
+                m_d3dDevice.Get(),
+                m_window->GetHandle(),
+                &swapChainDesc,
+                &swapChainFullscreenDesc,
+                nullptr,
+                &swapChain
+            )
+        );
+
+        dxgiFactory->MakeWindowAssociation(
+            m_window->GetHandle(),
+            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+        );
+
+        DirectX11::ThrowIfFailed(
+            swapChain.As(&m_swapChain)
+        );
+
+        DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
+
+        DirectX11::ThrowIfFailed(
+            dxgiDevice->SetMaximumFrameLatency(1)
+        );
+
+        ComPtr<ID3D11Texture2D1> backBuffer;
+        DirectX11::ThrowIfFailed(
+            m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))
+        );
+
+        D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
+        renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+        DirectX11::ThrowIfFailed(
+            m_d3dDevice->CreateRenderTargetView1(
+                backBuffer.Get(),
+                &renderTargetViewDesc,
+                &m_d3dRenderTargetView
+            )
+        );
+
+        m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), Colors::SlateGray);
+
+        DirectX::SetName(backBuffer.Get(), "BackBuffer");
+        //백버퍼 텍스쳐 받아오기
+        ID3D11Resource* pResource = nullptr;
+        m_d3dRenderTargetView->GetResource(&pResource);
+        DirectX11::ThrowIfFailed(
+            pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
+        );
+		DeviceState::g_backBufferRTV = m_d3dRenderTargetView.Get();
         return;
 	}
 
