@@ -96,11 +96,6 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
 ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptName)
 {
-    if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); }) != m_components.end())
-    {
-        return nullptr;
-    }
-
     std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(ScriptManager->CreateMonoBehavior(scriptName.data()));
 	if (!component)
 	{
@@ -182,13 +177,11 @@ void GameObject::RemoveScriptComponent(const std::string_view& scriptName)
 
 void GameObject::RemoveScriptComponent(ModuleBehavior* ptr)
 {
-	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
-	if (iter != m_components.end())
+	auto iter = m_componentIds.find(ptr->m_scriptTypeID);
+	if (iter != m_componentIds.end())
 	{
 		auto scriptComponent = ptr;
 		auto scriptName = scriptComponent->m_name.ToString();
-		auto iter = m_componentIds.find(scriptComponent->m_scriptTypeID);
-
 		if (scriptComponent && iter != m_componentIds.end())
 		{
 			size_t index = iter->second;

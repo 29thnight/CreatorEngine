@@ -62,6 +62,7 @@ namespace DirectX11
 		void CreateDeviceResources();
 		void CreateWindowSizeDependentResources();
 		void UpdateRenderTargetSize();
+		void HandleLostSwapChain();
 
 	private:
 		ComPtr<IDXGIDevice3> m_dxgiDevice;
