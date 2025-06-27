@@ -6,6 +6,8 @@
 
 namespace ed = ax::NodeEditor;
 
+EffectManager* EffectManager::s_currentInstance = nullptr;
+
 void EffectManager::Initialize()
 {
 
@@ -25,21 +27,7 @@ void EffectManager::Update(float delta)
 	}
 }
 
-void EffectManager::MakeEffects(Effect type, std::string_view name, Mathf::Vector3 pos, int maxParticle)
-{
-	switch (type)
-	{
-	case Effect::Test:
-		//effects[name.data()] = std::make_unique<TestEffect>(pos, maxParticle);
-		break;
-	case Effect::Sparkle:
-		effects[name.data()] = std::make_unique<SparkleEffect>(pos, maxParticle);
-		break;
-
-	}
-}
-
-ParticleSystem* EffectManager::GetEffect(std::string_view name)
+EffectBase* EffectManager::GetEffect(std::string_view name)
 {
 	auto it = effects.find(name.data());
 	if (it != effects.end()) {
@@ -53,7 +41,18 @@ bool EffectManager::RemoveEffect(std::string_view name)
 	return effects.erase(name.data()) > 0;
 }
 
-void EffectManager::InitializeImgui()
+void EffectManager::RegisterCustomEffect(const std::string& name, const std::vector<std::shared_ptr<ParticleSystem>>& emitters)
 {
+	if (!emitters.empty()) {
+		// EffectBase 직접 생성
+		auto effect = std::make_unique<EffectBase>();
+		effect->SetName(name);
 
+		// 각 에미터 추가
+		for (auto& emitter : emitters) {
+			effect->AddParticleSystem(emitter);
+		}
+
+		effects[name] = std::move(effect);
+	}
 }

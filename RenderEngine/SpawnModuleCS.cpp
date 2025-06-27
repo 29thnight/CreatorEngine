@@ -8,7 +8,6 @@ SpawnModuleCS::SpawnModuleCS()
     , m_templateBuffer(nullptr)
     , m_randomStateBuffer(nullptr)
     , m_randomStateUAV(nullptr)
-    // m_spawnTimerBuffer, m_spawnTimerUAV 제거
     , m_spawnParamsDirty(true)
     , m_templateDirty(true)
     , m_isInitialized(false)
@@ -68,9 +67,9 @@ void SpawnModuleCS::Initialize()
     m_isInitialized = true;
 }
 
-void SpawnModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles)
+void SpawnModuleCS::Update(float deltaTime)
 {
-    if (!m_isInitialized)
+    if (m_isInitialized == 0)
     {
         OutputDebugStringA("ERROR: SpawnModule not initialized!\n");
         return;
@@ -87,7 +86,6 @@ void SpawnModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
     currentTime = fmod(currentTime, maxCycleTime);
 
     // 파티클 용량 업데이트
-    m_particleCapacity = static_cast<UINT>(particles.size());
     m_spawnParams.maxParticles = m_particleCapacity;
     m_spawnParams.deltaTime = deltaTime;
     m_spawnParams.currentTime = currentTime;  // TimeSystem에서 가져온 시간
@@ -127,7 +125,7 @@ void SpawnModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
 
     // 디스패치 실행
-    UINT numThreadGroups = (m_particleCapacity + 63) / 64;  // 64는 셰이더의 THREAD_GROUP_SIZE
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE; 
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
@@ -264,7 +262,6 @@ void SpawnModuleCS::ReleaseResources()
     if (m_templateBuffer) { m_templateBuffer->Release(); m_templateBuffer = nullptr; }
     if (m_randomStateBuffer) { m_randomStateBuffer->Release(); m_randomStateBuffer = nullptr; }
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
-    // m_spawnTimerBuffer, m_spawnTimerUAV 제거
 }
 
 // 설정 메서드들

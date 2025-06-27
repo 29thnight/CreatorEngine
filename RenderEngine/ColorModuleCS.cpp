@@ -49,63 +49,30 @@ void ColorModuleCS::Initialize()
         return;
 
     if (!InitializeComputeShader())
-    {
-        OutputDebugStringA("ColorModule: Failed to initialize compute shader\n");
         return;
-    }
 
     if (!CreateConstantBuffers())
-    {
-        OutputDebugStringA("ColorModule: Failed to create constant buffers\n");
         return;
-    }
 
     if (!CreateResourceBuffers())
-    {
-        OutputDebugStringA("ColorModule: Failed to create resource buffers\n");
         return;
-    }
 
     m_isInitialized = true;
-    OutputDebugStringA("ColorModule: Initialized successfully\n");
 }
 
-void ColorModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles)
+void ColorModuleCS::Update(float deltaTime)
 {
     if (!m_isInitialized)
-    {
-        OutputDebugStringA("ERROR: ColorModule not initialized!\n");
         return;
-    }
 
     DirectX11::BeginEvent(L"ColorModule Update");
 
-#ifdef _DEBUG
-    // 디버깅: 입력 유효성 검사
-    if (!m_inputSRV) {
-        OutputDebugStringA("[ColorModule] ERROR: m_inputSRV is nullptr!\n");
+    if (!m_inputSRV || !m_outputUAV) {
         DirectX11::EndEvent();
         return;
     }
-    if (!m_outputUAV) {
-        OutputDebugStringA("[ColorModule] ERROR: m_outputUAV is nullptr!\n");
-        DirectX11::EndEvent();
-        return;
-    }
-
-    static int debugCount = 0;
-    if (debugCount < 3)
-    {
-        char debugMsg[256];
-        sprintf_s(debugMsg, "[ColorModule] Processing %zu particles, mode=%d\n",
-            particles.size(), m_colorParams.transitionMode);
-        OutputDebugStringA(debugMsg);
-        debugCount++;
-    }
-#endif
 
     // 파티클 용량 업데이트
-    m_particleCapacity = static_cast<UINT>(particles.size());
     m_colorParams.maxParticles = m_particleCapacity;
 
     // 이징 처리
@@ -138,9 +105,6 @@ void ColorModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
     // t1: GradientBuffer (Gradient 모드일 때만)
     if (m_gradientSRV && m_colorParams.transitionMode == static_cast<int>(ColorTransitionMode::Gradient)) {
         srvs[1] = m_gradientSRV;
-#ifdef _DEBUG
-        OutputDebugStringA("[ColorModule] Binding gradient buffer to t1\n");
-#endif
     }
 
     // t2: DiscreteColors (Discrete 또는 Custom 모드일 때)
@@ -148,9 +112,6 @@ void ColorModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
         (m_colorParams.transitionMode == static_cast<int>(ColorTransitionMode::Discrete) ||
             m_colorParams.transitionMode == static_cast<int>(ColorTransitionMode::Custom))) {
         srvs[2] = m_discreteColorsSRV;
-#ifdef _DEBUG
-        OutputDebugStringA("[ColorModule] Binding discrete colors buffer to t2\n");
-#endif
     }
 
     DeviceState::g_pDeviceContext->CSSetShaderResources(0, 3, srvs);
@@ -161,15 +122,7 @@ void ColorModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
 
     // 디스패치 실행
-    UINT numThreadGroups = (m_particleCapacity + THREAD_GROUP_SIZE) / THREAD_GROUP_SIZE;
-
-#ifdef _DEBUG
-    char dispatchMsg[256];
-    sprintf_s(dispatchMsg, "[ColorModule] Dispatching %u thread groups for %u particles\n",
-        numThreadGroups, m_particleCapacity);
-    OutputDebugStringA(dispatchMsg);
-#endif
-
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
@@ -183,10 +136,6 @@ void ColorModuleCS::Update(float deltaTime, std::vector<ParticleData>& particles
     DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
 
     DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
-
-#ifdef _DEBUG
-    OutputDebugStringA("[ColorModule] Update completed\n");
-#endif
 
     DirectX11::EndEvent();
 }
@@ -223,13 +172,7 @@ bool ColorModuleCS::CreateConstantBuffers()
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_colorParamsBuffer);
-    if (FAILED(hr))
-    {
-        OutputDebugStringA("ColorModule: Failed to create color params buffer\n");
-        return false;
-    }
-
-    return true;
+    return SUCCEEDED(hr);
 }
 
 bool ColorModuleCS::CreateResourceBuffers()
@@ -245,10 +188,7 @@ bool ColorModuleCS::CreateResourceBuffers()
 
     HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&gradientDesc, nullptr, &m_gradientBuffer);
     if (FAILED(hr))
-    {
-        OutputDebugStringA("ColorModule: Failed to create gradient buffer\n");
         return false;
-    }
 
     // 그라데이션 SRV 생성
     D3D11_SHADER_RESOURCE_VIEW_DESC gradientSRVDesc = {};
@@ -258,10 +198,7 @@ bool ColorModuleCS::CreateResourceBuffers()
 
     hr = DeviceState::g_pDevice->CreateShaderResourceView(m_gradientBuffer, &gradientSRVDesc, &m_gradientSRV);
     if (FAILED(hr))
-    {
-        OutputDebugStringA("ColorModule: Failed to create gradient SRV\n");
         return false;
-    }
 
     // 이산 색상 버퍼 생성
     D3D11_BUFFER_DESC discreteDesc = {};
@@ -274,10 +211,7 @@ bool ColorModuleCS::CreateResourceBuffers()
 
     hr = DeviceState::g_pDevice->CreateBuffer(&discreteDesc, nullptr, &m_discreteColorsBuffer);
     if (FAILED(hr))
-    {
-        OutputDebugStringA("ColorModule: Failed to create discrete colors buffer\n");
         return false;
-    }
 
     // 이산 색상 SRV 생성
     D3D11_SHADER_RESOURCE_VIEW_DESC discreteSRVDesc = {};
@@ -286,14 +220,7 @@ bool ColorModuleCS::CreateResourceBuffers()
     discreteSRVDesc.Buffer.NumElements = 32;
 
     hr = DeviceState::g_pDevice->CreateShaderResourceView(m_discreteColorsBuffer, &discreteSRVDesc, &m_discreteColorsSRV);
-    if (FAILED(hr))
-    {
-        OutputDebugStringA("ColorModule: Failed to create discrete colors SRV\n");
-        return false;
-    }
-
-    OutputDebugStringA("ColorModule: Resource buffers created successfully\n");
-    return true;
+    return SUCCEEDED(hr);
 }
 
 void ColorModuleCS::UpdateConstantBuffers()

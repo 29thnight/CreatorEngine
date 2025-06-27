@@ -1,26 +1,37 @@
-// SpawnModule.hlsl - 파티클 스폰 컴퓨트 셰이더
+// MeshSpawnModule.hlsl - 3D 메시 파티클 스폰 컴퓨트 셰이더
 
-// 파티클 데이터 구조체
-struct ParticleData
+struct MeshParticleData
 {
-    float3 position;
-    float pad1;
-    float3 velocity;
-    float pad2;
-    float3 acceleration;
-    float pad3;
-    float2 size;
-    float age;
-    float lifeTime;
-    float rotation;
-    float rotateSpeed;
-    float2 pad4;
-    float4 color;
-    uint isActive;
-    float3 pad5;
+    float3 position; // 12 bytes
+    float pad1; // 4 bytes -> 16 bytes total
+    
+    float3 velocity; // 12 bytes  
+    float pad2; // 4 bytes -> 32 bytes total
+    
+    float3 acceleration; // 12 bytes
+    float pad3; // 4 bytes -> 48 bytes total
+    
+    float3 rotation; // 12 bytes
+    float pad4; // 4 bytes -> 64 bytes total
+    
+    float3 rotationSpeed; // 12 bytes
+    float pad5; // 4 bytes -> 80 bytes total
+    
+    float3 scale; // 12 bytes
+    float pad6; // 4 bytes -> 96 bytes total
+    
+    float age; // 4 bytes
+    float lifeTime; // 4 bytes
+    uint isActive; // 4 bytes
+    float pad7; // 4 bytes -> 112 bytes total
+    
+    float4 color; // 16 bytes -> 128 bytes total
+    
+    uint textureIndex; // 4 bytes
+    float3 pad8; // 12 bytes -> 144 bytes total
 };
 
-// 스폰 파라미터
+// 스폰 파라미터 (동일)
 cbuffer SpawnParameters : register(b0)
 {
     float gSpawnRate; // 초당 생성할 파티클 수
@@ -28,17 +39,32 @@ cbuffer SpawnParameters : register(b0)
     float gCurrentTime; // 누적된 총 시간
     int gEmitterType; // 이미터 타입 (0:Point, 1:Sphere, 2:Box, 3:Cone, 4:Circle)
     
-    float gEmitterRadius; // 구/원/콘 이미터 반지름
     float3 gEmitterSize; // 박스/콘 이미터 크기
+    float gEmitterRadius; // 구/원/콘 이미터 반지름
+    
     uint gMaxParticles; // 최대 파티클 수
 }
 
-// 파티클 템플릿
-cbuffer ParticleTemplate : register(b1)
+//  3D 메시 파티클 템플릿
+cbuffer MeshParticleTemplate : register(b1)
 {
     float gLifeTime; // 파티클 수명
-    float gRotateSpeed; // 회전 속도
-    float2 gSize; // 파티클 크기
+    float3 pad1;
+    
+    float3 gMinScale; // 최소 스케일
+    float pad2;
+    float3 gMaxScale; // 최대 스케일
+    float pad3;
+    
+    float3 gMinRotationSpeed; // 최소 회전 속도
+    float pad4;
+    float3 gMaxRotationSpeed; // 최대 회전 속도
+    float pad5;
+    
+    float3 gMinInitialRotation; // 최소 초기 회전
+    float pad6;
+    float3 gMaxInitialRotation; // 최대 초기 회전
+    float pad7;
     
     float4 gColor; // 파티클 색상
     
@@ -49,15 +75,16 @@ cbuffer ParticleTemplate : register(b1)
     float gMaxVerticalVelocity;
     
     float gHorizontalVelocityRange; // 수평 속도 범위
-    float3 pad;
+    uint gTextureIndex; // 텍스처 인덱스
+    float2 pad8;
 }
 
 // 버퍼 바인딩
-StructuredBuffer<ParticleData> gParticlesInput : register(t0);
-RWStructuredBuffer<ParticleData> gParticlesOutput : register(u0);
+StructuredBuffer<MeshParticleData> gParticlesInput : register(t0);
+RWStructuredBuffer<MeshParticleData> gParticlesOutput : register(u0);
 RWStructuredBuffer<uint> gRandomSeed : register(u1);
 
-// Wang Hash 기반 고품질 난수 생성
+// Wang Hash 기반 고품질 난수 생성 (동일)
 uint WangHash(uint seed)
 {
     seed = (seed ^ 61) ^ (seed >> 16);
@@ -78,7 +105,20 @@ float RandomRange(uint seed, float minVal, float maxVal)
     return lerp(minVal, maxVal, RandomFloat01(seed));
 }
 
-// 이미터별 위치 생성
+float3 RandomRange3D(uint seed, float3 minVal, float3 maxVal)
+{
+    uint seed1 = WangHash(seed);
+    uint seed2 = WangHash(seed1);
+    uint seed3 = WangHash(seed2);
+    
+    return float3(
+        RandomRange(seed1, minVal.x, maxVal.x),
+        RandomRange(seed2, minVal.y, maxVal.y),
+        RandomRange(seed3, minVal.z, maxVal.z)
+    );
+}
+
+// 이미터별 위치 생성 (동일)
 float3 GenerateEmitterPosition(uint seed)
 {
     switch (gEmitterType)
@@ -88,11 +128,10 @@ float3 GenerateEmitterPosition(uint seed)
             
         case 1: // Sphere Emitter
         {
-            // 구 내부 균등분포
                 float theta = RandomFloat01(seed) * 6.28318530718;
                 float phi = RandomFloat01(seed + 1) * 3.14159265359;
                 float r = gEmitterRadius * pow(RandomFloat01(seed + 2), 0.33333);
-            
+        
                 return float3(
                 r * sin(phi) * cos(theta),
                 r * sin(phi) * sin(theta),
@@ -115,7 +154,7 @@ float3 GenerateEmitterPosition(uint seed)
                 float angle = RandomFloat01(seed + 1) * 6.28318530718;
                 float radiusAtHeight = gEmitterRadius * (1.0 - height / gEmitterSize.y);
                 float r = sqrt(RandomFloat01(seed + 2)) * radiusAtHeight;
-            
+        
                 return float3(
                 r * cos(angle),
                 height,
@@ -127,7 +166,7 @@ float3 GenerateEmitterPosition(uint seed)
         {
                 float angle = RandomFloat01(seed) * 6.28318530718;
                 float r = sqrt(RandomFloat01(seed + 1)) * gEmitterRadius;
-            
+        
                 return float3(
                 r * cos(angle),
                 0.0,
@@ -140,12 +179,11 @@ float3 GenerateEmitterPosition(uint seed)
     }
 }
 
-// 초기 속도 생성
+// 초기 속도 생성 (동일)
 float3 GenerateInitialVelocity(uint seed)
 {
     float3 velocity = gVelocity;
     
-    // 랜덤 속도 추가
     if (gHorizontalVelocityRange > 0.0 || gMaxVerticalVelocity != gMinVerticalVelocity)
     {
         float verticalVel = RandomRange(seed, gMinVerticalVelocity, gMaxVerticalVelocity);
@@ -161,19 +199,22 @@ float3 GenerateInitialVelocity(uint seed)
     
     return velocity;
 }
-
-// 파티클 초기화 (완전한 버전)
-void InitializeParticle(inout ParticleData particle, uint seed)
+void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
 {
     particle.position = GenerateEmitterPosition(seed);
     particle.velocity = GenerateInitialVelocity(seed + 100);
     particle.acceleration = gAcceleration;
-    particle.size = gSize;
+    
+    particle.scale = RandomRange3D(seed + 200, gMinScale, gMaxScale);
+
+    particle.rotationSpeed = RandomRange3D(seed + 300, gMinRotationSpeed, gMaxRotationSpeed);
+
+    particle.rotation = RandomRange3D(seed + 400, gMinInitialRotation, gMaxInitialRotation);
+    
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
-    particle.rotation = 0.0;
-    particle.rotateSpeed = gRotateSpeed;
     particle.color = gColor;
+    particle.textureIndex = gTextureIndex;
     particle.isActive = 1;
 }
 
@@ -189,7 +230,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         return;
     
     // 파티클 데이터 복사
-    ParticleData particle = gParticlesInput[particleIndex];
+    MeshParticleData particle = gParticlesInput[particleIndex];
     
     // 기존 활성 파티클 업데이트
     if (particle.isActive == 1)
@@ -206,14 +247,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 비활성 파티클 - 스폰 체크
     else
     {
-        // 각 파티클의 스폰 시간 계산 (순환적)
+        // 각 파티클의 스폰 시간 계산 (동일한 로직)
         float particleSpawnTime = float(particleIndex) / gSpawnRate;
+        float spawnCycle = float(gMaxParticles) / gSpawnRate;
+        float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
         
-        // 순환 스폰: 파티클이 죽은 후 다시 스폰되도록
-        float spawnCycle = float(gMaxParticles) / gSpawnRate; // 전체 사이클 시간
-        float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0); // 2배 여유
-        
-        // 현재 사이클에서 이 파티클의 스폰 시간이 되었는지 체크
         bool shouldSpawn = false;
         
         // 첫 번째 사이클에서 스폰 체크
@@ -232,9 +270,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             // 고품질 랜덤 시드 생성
             uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
-            
-            // 파티클 초기화 (이제 모든 이미터 타입 지원)
-            InitializeParticle(particle, seed);
+
+            InitializeMeshParticle(particle, seed);
         }
     }
     
