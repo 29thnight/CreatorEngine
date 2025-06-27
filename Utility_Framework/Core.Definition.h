@@ -20,6 +20,7 @@
 #include <windows.h>
 #include <wincodec.h>
 #include <Xinput.h>
+#include <dxgidebug.h>
 #endif // !DYNAMICCPP_EXPORTS
 #include <comdef.h>
 #include <wrl/client.h>

@@ -81,11 +81,10 @@ void DirectX11::DeviceResources::ValidateDevice()
     ComPtr<IDXGIDevice3> dxgiDevice;
     DirectX11::ThrowIfFailed(m_d3dDevice.As(&dxgiDevice));
 
-    ComPtr<IDXGIAdapter> deviceAdapter;
-    DirectX11::ThrowIfFailed(dxgiDevice->GetAdapter(&deviceAdapter));
+    DirectX11::ThrowIfFailed(dxgiDevice->GetAdapter(&m_deviceAdapter));
 
     ComPtr<IDXGIFactory4> deviceFactory;
-    DirectX11::ThrowIfFailed(deviceAdapter->GetParent(IID_PPV_ARGS(&deviceFactory)));
+    DirectX11::ThrowIfFailed(m_deviceAdapter->GetParent(IID_PPV_ARGS(&deviceFactory)));
 
     ComPtr<IDXGIAdapter1> previousDefaultAdapter;
     DirectX11::ThrowIfFailed(deviceFactory->EnumAdapters1(0, &previousDefaultAdapter));
@@ -112,7 +111,7 @@ void DirectX11::DeviceResources::ValidateDevice()
     {
         // 이전 디바이스와 관련된 리소스에 대한 참조를 해제합니다.
         dxgiDevice = nullptr;
-        deviceAdapter = nullptr;
+        m_deviceAdapter = nullptr;
         deviceFactory = nullptr;
         previousDefaultAdapter = nullptr;
 
@@ -215,6 +214,18 @@ void DirectX11::DeviceResources::ResizeResources()
 	CreateWindowSizeDependentResources();
 }
 
+DXGI_QUERY_VIDEO_MEMORY_INFO DirectX11::DeviceResources::GetVideoMemoryInfo() const
+{
+    DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo = {};
+    if (m_deviceAdapter)
+    {
+        ComPtr<IDXGIAdapter3> dxgiAdapter;
+        DirectX11::ThrowIfFailed(m_deviceAdapter.As(&dxgiAdapter));
+        DirectX11::ThrowIfFailed(dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
+    }
+    return memoryInfo;
+}
+
 void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 {
 #if defined(_DEBUG)
@@ -227,6 +238,7 @@ void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 
 void DirectX11::DeviceResources::CreateDeviceIndependentResources()
 {
+
 }
 
 void DirectX11::DeviceResources::CreateDeviceResources()
@@ -291,6 +303,22 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
 
         m_infoQueue->Release();
+    }
+
+    DirectX11::ThrowIfFailed(DXGIGetDebugInterface(IID_PPV_ARGS(&m_dxgiDebug)));
+    {
+        DirectX11::ThrowIfFailed(m_dxgiDebug->QueryInterface(IID_PPV_ARGS(&m_dxgiInfoQueue)));
+        
+        // WARNING 메시지에 Breakpoint
+		m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, FALSE);
+        
+        // ERROR 메시지에 Breakpoint
+        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
+        
+        // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
+        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+		
+        m_dxgiInfoQueue->Release();
     }
 #endif
 
@@ -395,14 +423,13 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             m_d3dDevice.As(&dxgiDevice)
         );
 
-        ComPtr<IDXGIAdapter> dxgiAdapter;
         DirectX11::ThrowIfFailed(
-            dxgiDevice->GetAdapter(&dxgiAdapter)
+            dxgiDevice->GetAdapter(&m_deviceAdapter)
         );
 
         ComPtr<IDXGIFactory2> dxgiFactory;
         DirectX11::ThrowIfFailed(
-            dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
+            m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
         );
 
         dxgiFactory->MakeWindowAssociation(

@@ -15,6 +15,8 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
 	static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 	ImFontConfig icons_config;
 	ImFontConfig font_config;

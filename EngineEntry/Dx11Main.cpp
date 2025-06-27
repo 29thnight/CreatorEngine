@@ -141,6 +141,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
             while (!WinProcProxy::GetInstance()->IsEmpty())
             {
 				auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
+
                 if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
                 {
                     continue;

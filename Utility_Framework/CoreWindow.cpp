@@ -16,8 +16,20 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     //    return true;
     //}
 
-	// 메시지 큐에 메시지를 추가
-	WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
+    if (message == WM_SETCURSOR)
+    {
+        // 커서 설정
+        if (LOWORD(lParam) == HTCLIENT)
+        {
+            SetCursor(LoadCursor(nullptr, IDC_ARROW));
+            return TRUE; // 커서 변경을 완료했음을 알림
+        }
+		return FALSE; // 기본 커서 처리를 계속함
+    }
+    else
+    {
+        WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
+    }
 
     if (message == WM_NCCREATE)
     {
