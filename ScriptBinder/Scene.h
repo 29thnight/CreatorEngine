@@ -147,6 +147,8 @@ private:
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
     void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
+public:
+    void AllUpdateWorldMatrix();
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};

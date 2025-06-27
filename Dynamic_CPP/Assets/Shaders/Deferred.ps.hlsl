@@ -133,7 +133,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     float3 debugCascade = overlayCascadeDebug(surf.posW);
     
     gOutput output;
-    output.Default = float4(colour, 1.0);
+    output.Default = float4(colour.rgb, 1.0);
     output.LightEmissive = float4(Lo + emissive, 1.0);
     return output;
     //return float4(colour, 1.0);

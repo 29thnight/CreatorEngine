@@ -577,15 +577,21 @@ void HotLoadSystem::Compile()
 	{
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
-			auto* script = static_cast<ModuleBehavior*>(gameObject->m_components[index].get());
+			auto* script = dynamic_cast<ModuleBehavior*>(gameObject->m_components[index].get());
 			if (script)
 			{
 				UnbindScriptEvents(script, name);
+				gameObject->m_components[index].reset();
 			}
-			gameObject->m_components[index].reset();
 		}
 		FreeLibrary(hDll);
 		hDll = nullptr;
+	}
+
+	auto dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string();
+	if (file::exists(dllPath))
+	{
+		file::remove(dllPath);
 	}
 
 	if (EngineSettingInstance->GetMSVCVersion() != MSVCVersion::None)

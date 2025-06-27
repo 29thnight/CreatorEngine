@@ -365,6 +365,10 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 			LightDir.Normalize();
 		}
 
+		centerPos.x = (int)centerPos.x;
+		centerPos.y = (int)centerPos.y;
+		centerPos.z = (int)centerPos.z;
+
 		Mathf::Vector3 shadowPos						= centerPos + LightDir * -250;
 		Mathf::Vector3 cascadeExtents					= maxExtents - minExtents;
 		Mathf::xMatrix lightView						= DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });

@@ -85,6 +85,7 @@ extern "C"
 	{
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
+		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
 	}
 }
 

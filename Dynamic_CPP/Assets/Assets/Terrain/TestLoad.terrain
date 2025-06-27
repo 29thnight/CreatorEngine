@@ -1,0 +1,39 @@
+{
+    "height": 200,
+    "heightmap": "TestLoad_HeightMap.png",
+    "layers": [
+        {
+            "diffuseTexturePath": "Texture\\T_ground_DefaultMaterial_BaseColor.PNG",
+            "layerID": 0,
+            "layerName": "T_ground_DefaultMaterial_BaseColor.PNG",
+            "tilling": 10.0
+        },
+        {
+            "diffuseTexturePath": "Texture\\T_Grass_graph_basecolor.PNG",
+            "layerID": 1,
+            "layerName": "T_Grass_graph_basecolor.PNG",
+            "tilling": 10.0
+        },
+        {
+            "diffuseTexturePath": "Texture\\T_Mix_DefaultMaterial_BaseColor.PNG",
+            "layerID": 2,
+            "layerName": "T_Mix_DefaultMaterial_BaseColor.PNG",
+            "tilling": 10.0
+        }
+    ],
+    "maxHeight": 500.0,
+    "minHeight": -100.0,
+    "name": [
+        84,
+        101,
+        115,
+        116,
+        76,
+        111,
+        97,
+        100
+    ],
+    "splatmap": "TestLoad_SplatMap.png",
+    "terrainID": 0,
+    "width": 70
+}
