@@ -78,10 +78,9 @@ void DirectX11::DeviceResources::ValidateDevice()
     // D3D 디바이스는 더 이상 유효하지 않습니다.
     // 먼저, 디바이스를 만들었을 때의 기본 어댑터에 대한 정보를 가져옵니다.
 
-    ComPtr<IDXGIDevice3> dxgiDevice;
-    DirectX11::ThrowIfFailed(m_d3dDevice.As(&dxgiDevice));
+    DirectX11::ThrowIfFailed(m_d3dDevice.As(&m_dxgiDevice));
 
-    DirectX11::ThrowIfFailed(dxgiDevice->GetAdapter(&m_deviceAdapter));
+    DirectX11::ThrowIfFailed(m_dxgiDevice->GetAdapter(&m_deviceAdapter));
 
     ComPtr<IDXGIFactory4> deviceFactory;
     DirectX11::ThrowIfFailed(m_deviceAdapter->GetParent(IID_PPV_ARGS(&deviceFactory)));
@@ -110,7 +109,7 @@ void DirectX11::DeviceResources::ValidateDevice()
         FAILED(m_d3dDevice->GetDeviceRemovedReason()))
     {
         // 이전 디바이스와 관련된 리소스에 대한 참조를 해제합니다.
-        dxgiDevice = nullptr;
+        m_dxgiDevice = nullptr;
         m_deviceAdapter = nullptr;
         deviceFactory = nullptr;
         previousDefaultAdapter = nullptr;
@@ -145,10 +144,7 @@ void DirectX11::DeviceResources::RegisterDeviceNotify(IDeviceNotify* deviceNotif
 
 void DirectX11::DeviceResources::Trim()
 {
-    ComPtr<IDXGIDevice3> dxgiDevice;
-    m_d3dDevice.As(&dxgiDevice);
-
-    dxgiDevice->Trim();
+    m_dxgiDevice->Trim();
 }
 
 void DirectX11::DeviceResources::Present()
@@ -418,13 +414,12 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		swapChainFullscreenDesc.Windowed = TRUE;
 
-        ComPtr<IDXGIDevice3> dxgiDevice;
         DirectX11::ThrowIfFailed(
-            m_d3dDevice.As(&dxgiDevice)
+            m_d3dDevice.As(&m_dxgiDevice)
         );
 
         DirectX11::ThrowIfFailed(
-            dxgiDevice->GetAdapter(&m_deviceAdapter)
+            m_dxgiDevice->GetAdapter(&m_deviceAdapter)
         );
 
         ComPtr<IDXGIFactory2> dxgiFactory;
@@ -456,7 +451,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
         DirectX11::ThrowIfFailed(
-            dxgiDevice->SetMaximumFrameLatency(1)
+            m_dxgiDevice->SetMaximumFrameLatency(1)
         );
 
         ComPtr<ID3D11Texture2D1> backBuffer;

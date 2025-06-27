@@ -538,16 +538,22 @@ void Scene::DestroyComponents()
 		{
 			for (auto& component : obj->m_components)
 			{
+				if (!component || !component->IsDestroyMark() || component->IsDontDestroyOnLoad())
+				{
+					continue;
+				}
+
 				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
 				if (behavior)
 				{
-					if (component && component->IsDestroyMark() && !component->IsDontDestroyOnLoad())
-					{
-						ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->m_scriptTypeID], behavior->m_name.ToString());
-						component.reset();
-					}
+					obj->RemoveScriptComponent(behavior.get());
+				}
+				else
+				{
+					obj->RemoveComponentTypeID(component->GetTypeID());
 				}
 
+				component.reset();
 			}
 
 			std::erase_if(obj->m_components, [](const auto& component)

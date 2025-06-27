@@ -12,6 +12,7 @@ void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
 	ComponentFactorys->Initialize();
+	m_threadPool = new ThreadPool;
 }
 
 void SceneManager::Editor()

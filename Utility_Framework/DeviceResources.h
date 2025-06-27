@@ -52,6 +52,7 @@ namespace DirectX11
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
 		ID3DUserDefinedAnnotation* GetAnnotation() const { return m_annotation.Get(); }
 		DXGI_QUERY_VIDEO_MEMORY_INFO GetVideoMemoryInfo() const;
+		//PROCESS_MEMORY_COUNTERS_EX _GetProcessMemoryInfo() const;
 		void ReportLiveDeviceObjects();
 
 		CoreWindow* GetWindow() const { return m_window; }
@@ -63,6 +64,7 @@ namespace DirectX11
 		void UpdateRenderTargetSize();
 
 	private:
+		ComPtr<IDXGIDevice3> m_dxgiDevice;
 		ComPtr<ID3D11Device3> m_d3dDevice;
 		ComPtr<IDXGIAdapter> m_deviceAdapter;
 		ComPtr<ID3D11DeviceContext3> m_d3dContext;

@@ -25,6 +25,7 @@
 #include <comdef.h>
 #include <wrl/client.h>
 #include <directxtk/simplemath.h>
+#include <Psapi.h>
 
 using namespace Microsoft::WRL;
 //STL

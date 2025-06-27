@@ -173,7 +173,28 @@ void GameObject::RemoveScriptComponent(const std::string_view& scriptName)
 		if (scriptComponent && scriptComponent->m_name == scriptName)
 		{
 			ScriptManager->UnbindScriptEvents(scriptComponent.get(), scriptName);
-			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->GetTypeID()], scriptComponent->m_name.ToString());
+			ScriptManager->UnCollectScriptComponent(this, m_componentIds[scriptComponent->m_scriptTypeID], scriptComponent->m_name.ToString());
+			scriptComponent->Destroy();
+			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
+		}
+	}
+}
+
+void GameObject::RemoveScriptComponent(ModuleBehavior* ptr)
+{
+	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
+	if (iter != m_components.end())
+	{
+		auto scriptComponent = ptr;
+		auto scriptName = scriptComponent->m_name.ToString();
+		auto iter = m_componentIds.find(scriptComponent->m_scriptTypeID);
+
+		if (scriptComponent && iter != m_componentIds.end())
+		{
+			size_t index = iter->second;
+			ScriptManager->UnbindScriptEvents(scriptComponent, scriptName);
+			ScriptManager->UnCollectScriptComponent(this, index, scriptName);
+			scriptComponent->Destroy();
 			RemoveComponentTypeID(scriptComponent->m_scriptTypeID);
 		}
 	}

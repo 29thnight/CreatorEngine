@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
+#include "Core.ThreadPool.h"
 
 class Scene;
 class Object;
@@ -74,6 +75,7 @@ public:
 	std::atomic_bool			m_isEditorSceneLoaded{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
 
+    ThreadPool<std::function<void()>>* m_threadPool{ nullptr };
 
 private:
     void CreateEditorOnlyPlayScene();
