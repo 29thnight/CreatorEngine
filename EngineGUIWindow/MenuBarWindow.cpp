@@ -166,9 +166,14 @@ void MenuBarWindow::RenderMenuBar()
         {
             if (ImGui::BeginMenu("File"))
             {
+                if (ImGui::MenuItem("New Scene"))
+                {
+                    m_bShowNewScenePopup = true;
+				}
                 if (ImGui::MenuItem("Save Current Scene"))
                 {
                     //Test
+                    SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
 						L"Save Scene",
@@ -309,6 +314,41 @@ void MenuBarWindow::RenderMenuBar()
 		auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
         ShowVRAMBarGraph(info.CurrentUsage, info.Budget);
         ImGui::End();
+    }
+
+    if (m_bShowNewScenePopup)
+    {
+        ImGui::OpenPopup("NewScenePopup");
+        m_bShowNewScenePopup = false;
+	}
+
+    if (ImGui::BeginPopup("NewScenePopup"))
+    {
+        static char newSceneName[256];
+        ImGui::InputText("Scene Name", newSceneName, 256);
+        ImGui::Separator();
+        if (ImGui::Button("Create"))
+        {
+            SceneManagers->resetSelectedObjectEvent.Broadcast();
+            std::string sceneName = newSceneName;
+            if (sceneName.empty())
+            {
+                SceneManagers->CreateScene();
+            }
+            else
+            {
+                SceneManagers->CreateScene(sceneName);
+            }
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }
 

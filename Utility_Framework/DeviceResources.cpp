@@ -432,11 +432,6 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
         );
 
-        dxgiFactory->MakeWindowAssociation(
-            m_window->GetHandle(),
-            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
-		);
-
         ComPtr<IDXGISwapChain1> swapChain;
         DirectX11::ThrowIfFailed(
             dxgiFactory->CreateSwapChainForHwnd(
@@ -447,6 +442,11 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
                 nullptr,
                 &swapChain
             )
+        );
+
+        dxgiFactory->MakeWindowAssociation(
+            m_window->GetHandle(),
+            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
         );
 
         DirectX11::ThrowIfFailed(

@@ -79,6 +79,7 @@ private:
 	void ApplyNewCubeMap(const std::string_view& filename);
 	void UnbindRenderTargets();
 	void ReloadShaders();
+	void ResourceTrim();
 
 	std::shared_ptr<DirectX11::DeviceResources> m_deviceResources{};
 
@@ -90,6 +91,7 @@ private:
     Core::DelegateHandle m_newSceneCreatedEventHandle{};
 	Core::DelegateHandle m_activeSceneChangedEventHandle{};
 	Core::DelegateHandle m_resizeEventHandle{};
+	Core::DelegateHandle m_trimEventHandle{};
 
 	//pass
 	std::unique_ptr<ShadowMapPass>				m_pShadowMapPass{};

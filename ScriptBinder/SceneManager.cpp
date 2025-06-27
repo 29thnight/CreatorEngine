@@ -123,6 +123,18 @@ void SceneManager::Decommissioning()
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
 {
+    if (m_activeScene)
+    {
+        std::erase_if(m_scenes,
+            [&](const auto& scene) { return scene == m_activeScene.load(); });
+
+        m_activeScene.load()->AllDestroyMark();
+        m_activeScene.load()->OnDisable();
+        m_activeScene.load()->OnDestroy();
+        m_activeScene = nullptr;
+    }
+
+    resourceTrimEvent.Broadcast();
     Scene* allocScene = Scene::CreateNewScene(name);
     if (allocScene)
     {
@@ -184,6 +196,7 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 			delete swapScene;
         }
 		file::path sceneName = name.data();
+        resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
@@ -233,6 +246,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
     {
         //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene.load());
+		resourceTrimEvent.Broadcast();
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;

@@ -8,7 +8,7 @@ constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	m_proxyGUID(pComponent->GetInstanceID())
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	auto componentPtr = pComponent;
 	auto owner = componentPtr->GetOwner();
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();

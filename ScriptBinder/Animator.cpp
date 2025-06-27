@@ -6,7 +6,7 @@
 
 void Animator::Awake()
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
 	{
 		renderScene->RegisterAnimator(this);
@@ -34,7 +34,7 @@ void Animator::Update(float tick)
 void Animator::OnDistroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
 	{
 		renderScene->UnregisterAnimator(this);

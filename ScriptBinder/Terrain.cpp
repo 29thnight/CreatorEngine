@@ -750,7 +750,7 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 void TerrainComponent::Awake()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
@@ -760,7 +760,7 @@ void TerrainComponent::Awake()
 void TerrainComponent::OnDistroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);

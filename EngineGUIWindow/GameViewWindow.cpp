@@ -27,7 +27,7 @@ void GameViewWindow::RenderGameViewWindow()
 		ImVec2 currentPos = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x, currentPos.y + offset.y));
 
-		auto scene = SceneManagers->m_ActiveRenderScene;
+		auto scene = SceneManagers->GetRenderScene();
 		auto camera = CameraManagement->GetLastCamera();
 		auto renderData = RenderPassData::GetData(camera);
 

@@ -40,7 +40,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_threadPool = new ThreadPool;
 	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
 	m_renderScene = new RenderScene();
-	SceneManagers->m_ActiveRenderScene = m_renderScene;
+	SceneManagers->SetRenderScene(m_renderScene);
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -218,6 +218,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
     m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_trimEventHandle				= resourceTrimEvent.AddRaw(this, &SceneRenderer::ResourceTrim);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
@@ -944,5 +945,10 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::ReloadShaders()
 {
 	ShaderSystem->ReloadShaders();
+}
+
+void SceneRenderer::ResourceTrim()
+{
+	m_deviceResources->Trim();
 }
 

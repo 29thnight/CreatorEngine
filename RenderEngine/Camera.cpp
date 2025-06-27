@@ -15,7 +15,7 @@ Camera::Camera() : m_isLinkRenderData(true)
 	m_aspectRatio = DeviceState::g_aspectRatio;
 
 	m_cameraIndex = CameraManagement->GetCameraCount();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 
 	if(m_isLinkRenderData)
 	{
@@ -40,7 +40,7 @@ Camera::~Camera()
 	if (m_cameraIndex != -1 && m_isLinkRenderData)
 	{
 		CameraManagement->DeleteCamera(m_cameraIndex);
-		auto renderScene = SceneManagers->m_ActiveRenderScene;
+		auto renderScene = SceneManagers->GetRenderScene();
 		renderScene->RemoveRenderPassData(m_cameraIndex);
 	}
 }

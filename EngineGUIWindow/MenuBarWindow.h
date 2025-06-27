@@ -19,6 +19,7 @@ private:
     int  m_selectedLogIndex{};
     bool m_bShowLogWindow{ false };
 	bool m_bShowProfileWindow{ false };
+	bool m_bShowNewScenePopup{ false };
 	bool m_bShowLightMapWindow{ false };
 };
 #endif // !DYNAMICCPP_EXPORTS

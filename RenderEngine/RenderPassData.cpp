@@ -5,7 +5,7 @@
 
 bool RenderPassData::VaildCheck(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		if (nullptr != renderScene->GetRenderPassData(pCamera->m_cameraIndex))
@@ -18,7 +18,7 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 
 RenderPassData* RenderPassData::GetData(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		auto renderPassData = renderScene->GetRenderPassData(pCamera->m_cameraIndex);

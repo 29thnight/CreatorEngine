@@ -24,7 +24,7 @@ public:
 
 	RenderScene* m_renderScene{};
 	Camera* m_pEditorCamera{};
-    bool m_bShowGridSettings{ true };
+    bool m_bShowGridSettings{ false };
 
 private:
     void ShowGridSettings();
