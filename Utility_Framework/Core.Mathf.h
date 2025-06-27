@@ -218,4 +218,16 @@ namespace Mathf
             roll = atan2f(-rotationMatrix.r[0].m128_f32[2], rotationMatrix.r[0].m128_f32[0]); // -m13, m11
         }
 	}
+
+	inline float Distance(const Mathf::Vector3& a, const Mathf::Vector3& b)
+	{
+		return sqrtf(powf(b.x - a.x, 2) + powf(b.y - a.y, 2) + powf(b.z - a.z, 2));
+	}
+
+	inline Mathf::Vector3 Normalize(const Mathf::Vector3& vector)
+	{
+		float length = vector.Length();
+		if (length == 0.0f) return Mathf::Vector3::Zero;
+		return vector / length;
+	}
 }

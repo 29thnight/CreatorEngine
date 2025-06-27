@@ -154,6 +154,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Assets\Script\AsisMove.h" />
     <ClInclude Include="Assets\Script\TestBehavior.h" />
     <ClInclude Include="CreateFactory.h" />
     <ClInclude Include="Export.h" />
@@ -161,6 +162,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Assets\Script\AsisMove.cpp" />
     <ClCompile Include="Assets\Script\TestBehavior.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">

@@ -88,7 +88,7 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
     {
         m_components.push_back(component);
         component->SetOwner(this);
-        m_componentIds[component->GetTypeID()] = m_components.size();
+        m_componentIds[component->GetTypeID()] = m_components.size() - 1;
     }
 
 	return component;

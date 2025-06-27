@@ -4,6 +4,7 @@
 
 // Automation include ScriptClass header
 #include "TestBehavior.h"
+#include "AsisMove.h"
 
 class CreateFactory : public Singleton<CreateFactory>
 {

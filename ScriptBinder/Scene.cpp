@@ -259,10 +259,7 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
-	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
-	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
-	}
+	AllUpdateWorldMatrix();
 
     UpdateEvent.Broadcast(deltaSecond);
 }
@@ -544,12 +541,11 @@ void Scene::DestroyComponents()
 				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
 				if (behavior)
 				{
-					ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->m_scriptTypeID], behavior->m_name.ToString());
-				}
-
-				if (component && component->IsDestroyMark() && !component->IsDontDestroyOnLoad())
-				{
-					component.reset();
+					if (component && component->IsDestroyMark() && !component->IsDontDestroyOnLoad())
+					{
+						ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->m_scriptTypeID], behavior->m_name.ToString());
+						component.reset();
+					}
 				}
 			}
 
@@ -625,6 +621,14 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
 		UpdateModelRecursive(childIndex, model);
+	}
+}
+
+void Scene::AllUpdateWorldMatrix()
+{
+	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
+	{
+		UpdateModelRecursive(objIndex, XMMatrixIdentity());
 	}
 }
 

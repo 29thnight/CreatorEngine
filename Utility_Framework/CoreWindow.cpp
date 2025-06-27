@@ -58,6 +58,7 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+
     auto it = m_handlers.find(message);
     if (it != m_handlers.end())
     {
