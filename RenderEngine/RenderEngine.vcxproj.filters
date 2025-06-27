@@ -482,9 +482,6 @@
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
-    <ClCompile Include="EffectComponent.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
     <ClCompile Include="MeshSpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -493,6 +490,12 @@
     </ClCompile>
     <ClCompile Include="SizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectEditor.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -757,9 +760,6 @@
     <ClInclude Include="EffectBase.h">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClInclude>
-    <ClInclude Include="EffectComponent.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
     <ClInclude Include="MeshSpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
@@ -768,6 +768,12 @@
     </ClInclude>
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectEditor.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

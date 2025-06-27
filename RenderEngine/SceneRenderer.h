@@ -37,6 +37,9 @@
 
 #include "TestPlayer.h"
 #include "TerrainGizmoPass.h"
+
+#include "EffectEditor.h"
+
 const static float pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
@@ -121,6 +124,9 @@ private:
 	std::unique_ptr<TerrainGizmoPass>   m_pTerrainGizmoPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;
+
+	// 어디다 넣을지 모르겠다
+	std::unique_ptr<EffectEditor> m_EffectEditor;
 
 	//Textures
 	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };
