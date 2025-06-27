@@ -370,9 +370,9 @@ void SceneRenderer::NewCreateSceneInitialize()
 	lightMap.envMap = envMap;
 
 	//TODO : 시연용 Player주석 코드
-/*	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+    model[0] = DataSystems->LoadCashedModel("Punch.fbx");
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/ //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
+	player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -385,7 +385,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//TODO : 시연용 Player주석 코드
-	//player.Update(deltaTime);
+	player.Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();

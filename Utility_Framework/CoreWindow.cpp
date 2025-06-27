@@ -1,4 +1,5 @@
 #include "CoreWindow.h"
+#include "WinProcProxy.h"
 
 CoreWindow* CoreWindow::s_instance = nullptr;
 CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
@@ -10,10 +11,13 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 {
     CoreWindow* self = nullptr;
 
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-    {
-        return true;
-    }
+    //if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+    //{
+    //    return true;
+    //}
+
+	// 메시지 큐에 메시지를 추가
+	WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
 
     if (message == WM_NCCREATE)
     {
@@ -42,17 +46,11 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-    {
-        return true;
-    }
-
     auto it = m_handlers.find(message);
     if (it != m_handlers.end())
     {
         return it->second(hWnd, wParam, lParam);
     }
     
-
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
