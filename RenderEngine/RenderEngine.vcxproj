@@ -160,22 +160,25 @@
     <ClCompile Include="CullingManager.cpp" />
     <ClCompile Include="BillboardModuleGPU.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
+    <ClCompile Include="EffectBase.cpp" />
+    <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="LODGroup.cpp" />
     <ClCompile Include="LODSetting.cpp" />
+    <ClCompile Include="MeshModuleGPU.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
-    <ClCompile Include="MovementModule.cpp" />
+    <ClCompile Include="MeshSpawnModuleCS.cpp" />
     <ClCompile Include="MovementModuleCS.cpp" />
     <ClCompile Include="ParticleModule.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="SparkleEffect.cpp" />
-    <ClCompile Include="SpawnModule.cpp" />
     <ClCompile Include="SpawnModuleCS.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
     <ClCompile Include="GizmoLinePass.cpp" />
@@ -240,23 +243,26 @@
     <ClInclude Include="BaseEffectStruct.h" />
     <ClInclude Include="BillboardModuleGPU.h" />
     <ClInclude Include="EaseInOut.h" />
+    <ClInclude Include="EffectBase.h" />
+    <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="LODGroup.h" />
     <ClInclude Include="LODSetting.h" />
+    <ClInclude Include="MeshModuleGPU.h" />
     <ClInclude Include="MeshOptimizer.h" />
-    <ClInclude Include="MovementModule.h" />
+    <ClInclude Include="MeshSpawnModuleCS.h" />
     <ClInclude Include="MovementModuleCS.h" />
     <ClInclude Include="ParticleModule.h" />
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="SizeModuleCS.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="SparkleEffect.h" />
-    <ClInclude Include="SpawnModule.h" />
     <ClInclude Include="SpawnModuleCS.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoLinePass.h" />

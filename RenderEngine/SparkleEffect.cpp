@@ -32,12 +32,10 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
 
                         if (ImGui::Button("Resume"))
                         {
-                            Resume();
                         }
 
                         if (ImGui::Button("Pause"))
                         {
-                            Pause();
                         }
                         
                         if (ImGui::Button("Show Module List"))

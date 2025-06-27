@@ -19,14 +19,19 @@ public:
 
     // ParticleModule methods
     void Initialize() override;
-    void Update(float delta, std::vector<ParticleData>& particles) override;
+    void Update(float delta) override;
     void OnSystemResized(UINT max) override;
 
     // Movement settings
     void SetUseGravity(bool use) { m_gravity = use; m_paramsDirty = true;  std::cout << "asd"; }
+
+    bool GetUseGravity() { return m_gravity; }
+
     void SetGravityStrength(float strength) { m_gravityStrength = strength; m_paramsDirty = true; }
     void SetEasingEnabled(bool enabled) { m_easingEnabled = enabled; m_paramsDirty = true; }
     void SetEasingType(int type) { m_easingType = type; m_paramsDirty = true; }
+
+
 
     // Compute shader methods
     bool InitializeCompute();
@@ -41,9 +46,7 @@ private:
         float deltaTime;
         float gravityStrength;
         int useGravity;
-        int easingEnabled;
-        int easingType;
-        float3 pad;
+        float pad;
     };
 
 private:
@@ -60,5 +63,5 @@ private:
     // State tracking
     bool m_isInitialized;
     bool m_paramsDirty;
-    UINT m_particlesCapacity = 0;
+    UINT m_particleCapacity = 0;
 };

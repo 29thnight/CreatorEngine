@@ -27,9 +27,7 @@ cbuffer MovementParams : register(b0)
     float deltaTime; // 프레임 시간
     float gravityStrength; // 중력 강도
     int useGravity; // 중력 사용 여부
-    int easingEnabled; // 이징 사용 여부
-    int easingType; // 이징 타입
-    float3 padding; // 패딩
+    float padding; // 패딩
 };
 
 // 파티클 버퍼 (읽기)
@@ -37,39 +35,6 @@ StructuredBuffer<ParticleData> ParticlesInput : register(t0);
 // 파티클 버퍼 (쓰기)
 RWStructuredBuffer<ParticleData> ParticlesOutput : register(u0);
 
-// 이징 함수 구현
-float ApplyEasing(float t, int easingType)
-{
-    // 기본 선형 이징
-    if (easingType == 0) 
-        return t;
-    
-    // EaseInQuad
-    else if (easingType == 1) 
-        return t * t;
-    
-    // EaseOutQuad
-    else if (easingType == 2) 
-        return t * (2 - t);
-    
-    // EaseInOutQuad
-    else if (easingType == 3)
-        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-    
-    // EaseInCubic
-    else if (easingType == 4)
-        return t * t * t;
-    
-    // EaseOutCubic
-    else if (easingType == 5)
-    {
-        t -= 1;
-        return t * t * t + 1;
-    }
-    
-    // 기본값
-    return t; 
-}
 // 스레드 그룹 크기 정의
 #define THREAD_GROUP_SIZE 1024
 
@@ -89,23 +54,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 정규화된 나이 계산 (이징 적용을 위해)
         float normalizedAge = particle.age / particle.lifeTime;
         
-        // 이징 계수 계산
-        float easingFactor = 1.0f;
-        if (easingEnabled)
-        {
-            easingFactor = ApplyEasing(normalizedAge, easingType);
-        }
-        
         // 중력 적용 (설정된 경우)
         if (useGravity != 0)
         {
             // 가속도에 중력 강도 적용    
-            particle.velocity += particle.acceleration * gravityStrength * deltaTime * easingFactor;
+            particle.velocity += particle.acceleration * gravityStrength * deltaTime;
             //particle.color = float4(1, 0, 0, 1);
         }
         // 위치 및 회전 업데이트
-        particle.position += particle.velocity * deltaTime * easingFactor;
-        particle.rotation += particle.rotatespeed * deltaTime * easingFactor;
+        particle.position += particle.velocity * deltaTime;
+        particle.rotation += particle.rotatespeed * deltaTime;
         
     }
     

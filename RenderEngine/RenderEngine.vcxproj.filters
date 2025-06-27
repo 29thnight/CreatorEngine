@@ -219,9 +219,6 @@
     <Filter Include="RenderPass\EffectPass\Old.">
       <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\EffectPass\ColorModule">
-      <UniqueIdentifier>{581beb05-b305-41fc-9f5c-6ebedb778315}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\JobSystem\Animation">
       <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
     </Filter>
@@ -269,6 +266,9 @@
     </Filter>
     <Filter Include="RenderPass\PostProcessingPass\BitMaskPass">
       <UniqueIdentifier>{ea303887-bdf2-47c6-badb-d339bdb76275}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\EffectPass\5.Size">
+      <UniqueIdentifier>{cdb96e48-44af-4e2f-b1c0-4152bd9984db}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -416,14 +416,8 @@
     <ClCompile Include="SparkleEffect.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
-    <ClCompile Include="SpawnModule.cpp">
-      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClCompile>
-    <ClCompile Include="MovementModule.cpp">
-      <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClCompile>
     <ClCompile Include="MovementModuleCS.cpp">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
@@ -484,6 +478,21 @@
     </ClCompile>
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshSpawnModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshModuleGPU.cpp">
+      <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
+    </ClCompile>
+    <ClCompile Include="SizeModuleCS.cpp">
+      <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -664,14 +673,8 @@
     <ClInclude Include="BaseEffectStruct.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="SpawnModule.h">
-      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClInclude>
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClInclude>
-    <ClInclude Include="MovementModule.h">
-      <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClInclude>
     <ClInclude Include="MovementModuleCS.h">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
@@ -750,6 +753,21 @@
     </ClInclude>
     <ClInclude Include="LODSetting.h">
       <Filter>Asset\LODGroup</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectBase.h">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshSpawnModuleCS.h">
+      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshModuleGPU.h">
+      <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
+    </ClInclude>
+    <ClInclude Include="SizeModuleCS.h">
+      <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

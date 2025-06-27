@@ -1,8 +1,8 @@
-#include "SpawnModuleCS.h"
+ï»¿// MeshSpawnModuleCS.cpp - ì£¼ìš” ë³€ê²½ ë¶€ë¶„ë“¤
+#include "MeshSpawnModuleCS.h"
 #include "ShaderSystem.h"
-#include "DeviceState.h"
 
-SpawnModuleCS::SpawnModuleCS()
+MeshSpawnModuleCS::MeshSpawnModuleCS()
     : m_computeShader(nullptr)
     , m_spawnParamsBuffer(nullptr)
     , m_templateBuffer(nullptr)
@@ -15,33 +15,45 @@ SpawnModuleCS::SpawnModuleCS()
     , m_randomGenerator(m_randomDevice())
     , m_uniform(0.0f, 1.0f)
 {
-    // ±âº»°ª ¼³Á¤
+    // ìŠ¤í° íŒŒë¼ë¯¸í„° ê¸°ë³¸ê°’ (ë™ì¼)
     m_spawnParams.spawnRate = 1.0f;
     m_spawnParams.deltaTime = 0.0f;
-    m_spawnParams.currentTime = 0.0f;      // »õ·Î Ãß°¡
+    m_spawnParams.currentTime = 0.0f;
     m_spawnParams.emitterType = static_cast<int>(EmitterType::point);
-    m_spawnParams.emitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_spawnParams.emitterSize = XMFLOAT3(0.5f, 0.5f, 0.5f);
     m_spawnParams.emitterRadius = 1.0f;
     m_spawnParams.maxParticles = 0;
 
-    // ÆÄÆ¼Å¬ ÅÛÇÃ¸´ ±âº»°ª
-    m_particleTemplate.lifeTime = 10.0f;
-    m_particleTemplate.rotateSpeed = 0.0f;
-    m_particleTemplate.size = XMFLOAT2(0.1f, 0.1f);
-    m_particleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    m_particleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
-    m_particleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
-    m_particleTemplate.minVerticalVelocity = 0.0f;
-    m_particleTemplate.maxVerticalVelocity = 0.0f;
-    m_particleTemplate.horizontalVelocityRange = 0.0f;
+    // ğŸ”¥ 3D ë©”ì‹œ íŒŒí‹°í´ í…œí”Œë¦¿ ê¸°ë³¸ê°’
+    m_meshParticleTemplate.lifeTime = 10.0f;
+
+    // 3D ìŠ¤ì¼€ì¼ ë²”ìœ„
+    m_meshParticleTemplate.minScale = XMFLOAT3(0.5f, 0.5f, 0.5f);
+    m_meshParticleTemplate.maxScale = XMFLOAT3(1.5f, 1.5f, 1.5f);
+
+    // 3D íšŒì „ ì†ë„ ë²”ìœ„
+    m_meshParticleTemplate.minRotationSpeed = XMFLOAT3(-1.0f, -1.0f, -1.0f);
+    m_meshParticleTemplate.maxRotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
+
+    // 3D ì´ˆê¸° íšŒì „ ë²”ìœ„
+    m_meshParticleTemplate.minInitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_meshParticleTemplate.maxInitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+    // ê¸°ì¡´ê³¼ ë™ì¼í•œ ì†ì„±ë“¤
+    m_meshParticleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    m_meshParticleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_meshParticleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
+    m_meshParticleTemplate.minVerticalVelocity = 0.0f;
+    m_meshParticleTemplate.maxVerticalVelocity = 0.0f;
+    m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
 }
 
-SpawnModuleCS::~SpawnModuleCS()
+MeshSpawnModuleCS::~MeshSpawnModuleCS()
 {
     Release();
 }
 
-void SpawnModuleCS::Initialize()
+void MeshSpawnModuleCS::Initialize()
 {
     if (m_isInitialized)
         return;
@@ -67,31 +79,31 @@ void SpawnModuleCS::Initialize()
     m_isInitialized = true;
 }
 
-void SpawnModuleCS::Update(float deltaTime)
+void MeshSpawnModuleCS::Update(float deltaTime)
 {
     if (m_isInitialized == 0)
     {
-        OutputDebugStringA("ERROR: SpawnModule not initialized!\n");
+        OutputDebugStringA("ERROR: MeshSpawnModule not initialized!\n");
         return;
     }
 
-    DirectX11::BeginEvent(L"SpawnModule Update");
+    DirectX11::BeginEvent(L"MeshSpawnModule Update");
 
-    // TimeSystem¿¡¼­ ÃÑ °æ°ú ½Ã°£ °¡Á®¿À±â
+    // TimeSystemì—ì„œ ì´ ê²½ê³¼ ì‹œê°„ ê°€ì ¸ì˜¤ê¸°
     double totalSeconds = Time->GetTotalSeconds();
     float currentTime = static_cast<float>(totalSeconds);
 
-    // ¸ğµâ·Î ¿¬»êÀ¸·Î ½Ã°£ ¼øÈ¯ (Á¤¹Ğµµ À¯Áö)
+    // ëª¨ë“ˆë¡œ ì—°ì‚°ìœ¼ë¡œ ì‹œê°„ ìˆœí™˜ (ì •ë°€ë„ ìœ ì§€)
     float maxCycleTime = std::max(60.0f, m_particleCapacity / m_spawnParams.spawnRate * 2.0f);
     currentTime = fmod(currentTime, maxCycleTime);
 
-    // ÆÄÆ¼Å¬ ¿ë·® ¾÷µ¥ÀÌÆ®
+    // íŒŒí‹°í´ ìš©ëŸ‰ ì—…ë°ì´íŠ¸
     m_spawnParams.maxParticles = m_particleCapacity;
     m_spawnParams.deltaTime = deltaTime;
-    m_spawnParams.currentTime = currentTime;  // TimeSystem¿¡¼­ °¡Á®¿Â ½Ã°£
+    m_spawnParams.currentTime = currentTime;  // TimeSystemì—ì„œ ê°€ì ¸ì˜¨ ì‹œê°„
     m_spawnParamsDirty = true;
 
-    // µğ¹ö±ë: ½Ã°£ Á¤º¸ Ãâ·Â
+    // ë””ë²„ê¹…: ì‹œê°„ ì •ë³´ ì¶œë ¥
     static int debugCount = 0;
     if (debugCount < 5)
     {
@@ -102,33 +114,33 @@ void SpawnModuleCS::Update(float deltaTime)
         debugCount++;
     }
 
-    // »ó¼ö ¹öÆÛ ¾÷µ¥ÀÌÆ®
+    // ìƒìˆ˜ ë²„í¼ ì—…ë°ì´íŠ¸
     UpdateConstantBuffers(deltaTime);
 
-    // ÄÄÇ»Æ® ¼ÎÀÌ´õ ¹ÙÀÎµù
+    // ì»´í“¨íŠ¸ ì…°ì´ë” ë°”ì¸ë”©
     DeviceState::g_pDeviceContext->CSSetShader(m_computeShader, nullptr, 0);
 
-    // »ó¼ö ¹öÆÛ ¹ÙÀÎµù
+    // ìƒìˆ˜ ë²„í¼ ë°”ì¸ë”©
     ID3D11Buffer* constantBuffers[] = { m_spawnParamsBuffer, m_templateBuffer };
     DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 2, constantBuffers);
 
-    // ÀÔ·Â ¸®¼Ò½º ¹ÙÀÎµù
+    // ì…ë ¥ ë¦¬ì†ŒìŠ¤ ë°”ì¸ë”©
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
     DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
-    // Ãâ·Â ¸®¼Ò½º ¹ÙÀÎµù (½ºÆù Å¸ÀÌ¸Ó ¹öÆÛ Á¦°Å)
+    // ì¶œë ¥ ë¦¬ì†ŒìŠ¤ ë°”ì¸ë”© (ìŠ¤í° íƒ€ì´ë¨¸ ë²„í¼ ì œê±°)
     ID3D11UnorderedAccessView* uavs[] = {
-        m_outputUAV,        // u0: ÆÄÆ¼Å¬ Ãâ·Â
-        m_randomStateUAV    // u1: ³­¼ö »óÅÂ
+        m_outputUAV,        // u0: íŒŒí‹°í´ ì¶œë ¥
+        m_randomStateUAV    // u1: ë‚œìˆ˜ ìƒíƒœ
     };
     UINT initCounts[] = { 0, 0 };
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
 
-    // µğ½ºÆĞÄ¡ ½ÇÇà
-    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE; 
+    // ë””ìŠ¤íŒ¨ì¹˜ ì‹¤í–‰
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;  // 64ëŠ” ì…°ì´ë”ì˜ THREAD_GROUP_SIZE
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
-    // ¸®¼Ò½º Á¤¸®
+    // ë¦¬ì†ŒìŠ¤ ì •ë¦¬
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
 
@@ -143,13 +155,13 @@ void SpawnModuleCS::Update(float deltaTime)
     DirectX11::EndEvent();
 }
 
-void SpawnModuleCS::Release()
+void MeshSpawnModuleCS::Release()
 {
     ReleaseResources();
     m_isInitialized = false;
 }
 
-void SpawnModuleCS::OnSystemResized(UINT maxParticles)
+void MeshSpawnModuleCS::OnSystemResized(UINT maxParticles)
 {
     if (maxParticles != m_particleCapacity)
     {
@@ -159,15 +171,17 @@ void SpawnModuleCS::OnSystemResized(UINT maxParticles)
     }
 }
 
-bool SpawnModuleCS::InitializeComputeShader()
+
+bool MeshSpawnModuleCS::InitializeComputeShader()
 {
-    m_computeShader = ShaderSystem->ComputeShaders["SpawnModule"].GetShader();
+    m_computeShader = ShaderSystem->ComputeShaders["MeshSpawnModule"].GetShader();
     return m_computeShader != nullptr;
 }
 
-bool SpawnModuleCS::CreateConstantBuffers()
+// ìƒìˆ˜ ë²„í¼ ìƒì„±: í¬ê¸°ë§Œ ë³€ê²½
+bool MeshSpawnModuleCS::CreateConstantBuffers()
 {
-    // ½ºÆù ÆÄ¶ó¹ÌÅÍ »ó¼ö ¹öÆÛ
+    // ìŠ¤í° íŒŒë¼ë¯¸í„° ìƒìˆ˜ ë²„í¼ (ë™ì¼)
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(SpawnParams);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -178,8 +192,8 @@ bool SpawnModuleCS::CreateConstantBuffers()
     if (FAILED(hr))
         return false;
 
-    // ÆÄÆ¼Å¬ ÅÛÇÃ¸´ »ó¼ö ¹öÆÛ
-    bufferDesc.ByteWidth = sizeof(ParticleTemplateParams);
+    // ğŸ”¥ ë©”ì‹œ íŒŒí‹°í´ í…œí”Œë¦¿ ìƒìˆ˜ ë²„í¼: í¬ê¸° ë³€ê²½
+    bufferDesc.ByteWidth = sizeof(MeshParticleTemplateParams);
     hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_templateBuffer);
     if (FAILED(hr))
         return false;
@@ -187,9 +201,9 @@ bool SpawnModuleCS::CreateConstantBuffers()
     return true;
 }
 
-bool SpawnModuleCS::CreateUtilityBuffers()
+bool MeshSpawnModuleCS::CreateUtilityBuffers()
 {
-    // ³­¼ö »óÅÂ ¹öÆÛ¸¸ »ı¼º (½ºÆù Å¸ÀÌ¸Ó ¹öÆÛ Á¦°Å)
+    // ë‚œìˆ˜ ìƒíƒœ ë²„í¼ë§Œ ìƒì„± (ìŠ¤í° íƒ€ì´ë¨¸ ë²„í¼ ì œê±°)
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(UINT);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -197,7 +211,7 @@ bool SpawnModuleCS::CreateUtilityBuffers()
     bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     bufferDesc.StructureByteStride = sizeof(UINT);
 
-    // ÃÊ±â ³­¼ö ½Ãµå
+    // ì´ˆê¸° ë‚œìˆ˜ ì‹œë“œ
     UINT initialSeed = m_randomGenerator();
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = &initialSeed;
@@ -206,7 +220,7 @@ bool SpawnModuleCS::CreateUtilityBuffers()
     if (FAILED(hr))
         return false;
 
-    // ³­¼ö »óÅÂ UAV
+    // ë‚œìˆ˜ ìƒíƒœ UAV
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = DXGI_FORMAT_UNKNOWN;
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
@@ -218,15 +232,16 @@ bool SpawnModuleCS::CreateUtilityBuffers()
     if (FAILED(hr))
         return false;
 
-    // µğ¹ö±× Ãâ·Â
-    OutputDebugStringA("SpawnModule: Utility buffers created successfully\n");
+    // ë””ë²„ê·¸ ì¶œë ¥
+    //OutputDebugStringA("SpawnModule: Utility buffers created successfully\n");
 
     return true;
 }
 
-void SpawnModuleCS::UpdateConstantBuffers(float deltaTime)
+// ìƒìˆ˜ ë²„í¼ ì—…ë°ì´íŠ¸: êµ¬ì¡°ì²´ ì´ë¦„ë§Œ ë³€ê²½
+void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 {
-    // ½ºÆù ÆÄ¶ó¹ÌÅÍ ¾÷µ¥ÀÌÆ®
+    // ìŠ¤í° íŒŒë¼ë¯¸í„° ì—…ë°ì´íŠ¸ (ë™ì¼)
     if (m_spawnParamsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -240,7 +255,7 @@ void SpawnModuleCS::UpdateConstantBuffers(float deltaTime)
         }
     }
 
-    // ÆÄÆ¼Å¬ ÅÛÇÃ¸´ ¾÷µ¥ÀÌÆ®
+    // ë©”ì‹œ íŒŒí‹°í´ í…œí”Œë¦¿ ì—…ë°ì´íŠ¸: êµ¬ì¡°ì²´ ë³€ê²½
     if (m_templateDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -248,14 +263,14 @@ void SpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 
         if (SUCCEEDED(hr))
         {
-            memcpy(mappedResource.pData, &m_particleTemplate, sizeof(ParticleTemplateParams));
+            memcpy(mappedResource.pData, &m_meshParticleTemplate, sizeof(MeshParticleTemplateParams));
             DeviceState::g_pDeviceContext->Unmap(m_templateBuffer, 0);
             m_templateDirty = false;
         }
     }
 }
 
-void SpawnModuleCS::ReleaseResources()
+void MeshSpawnModuleCS::ReleaseResources()
 {
     if (m_computeShader) { m_computeShader->Release(); m_computeShader = nullptr; }
     if (m_spawnParamsBuffer) { m_spawnParamsBuffer->Release(); m_spawnParamsBuffer = nullptr; }
@@ -264,8 +279,7 @@ void SpawnModuleCS::ReleaseResources()
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
 }
 
-// ¼³Á¤ ¸Ş¼­µåµé
-void SpawnModuleCS::SetSpawnRate(float rate)
+void MeshSpawnModuleCS::SetSpawnRate(float rate)
 {
     if (m_spawnParams.spawnRate != rate)
     {
@@ -274,7 +288,7 @@ void SpawnModuleCS::SetSpawnRate(float rate)
     }
 }
 
-void SpawnModuleCS::SetEmitterType(EmitterType type)
+void MeshSpawnModuleCS::SetEmitterType(EmitterType type)
 {
     int typeInt = static_cast<int>(type);
     if (m_spawnParams.emitterType != typeInt)
@@ -284,13 +298,13 @@ void SpawnModuleCS::SetEmitterType(EmitterType type)
     }
 }
 
-void SpawnModuleCS::SetEmitterSize(const XMFLOAT3& size)
+void MeshSpawnModuleCS::SetEmitterSize(const XMFLOAT3& size)
 {
     m_spawnParams.emitterSize = size;
     m_spawnParamsDirty = true;
 }
 
-void SpawnModuleCS::SetEmitterRadius(float radius)
+void MeshSpawnModuleCS::SetEmitterRadius(float radius)
 {
     if (m_spawnParams.emitterRadius != radius)
     {
@@ -299,52 +313,71 @@ void SpawnModuleCS::SetEmitterRadius(float radius)
     }
 }
 
-void SpawnModuleCS::SetParticleLifeTime(float lifeTime)
+// 3D ì„¤ì • ë©”ì„œë“œë“¤
+void MeshSpawnModuleCS::SetParticleScaleRange(const XMFLOAT3& minScale, const XMFLOAT3& maxScale)
 {
-    if (m_particleTemplate.lifeTime != lifeTime)
+    m_meshParticleTemplate.minScale = minScale;
+    m_meshParticleTemplate.maxScale = maxScale;
+    m_templateDirty = true;
+}
+
+void MeshSpawnModuleCS::SetParticleRotationSpeedRange(const XMFLOAT3& minSpeed, const XMFLOAT3& maxSpeed)
+{
+    m_meshParticleTemplate.minRotationSpeed = minSpeed;
+    m_meshParticleTemplate.maxRotationSpeed = maxSpeed;
+    m_templateDirty = true;
+}
+
+void MeshSpawnModuleCS::SetParticleInitialRotationRange(const XMFLOAT3& minRot, const XMFLOAT3& maxRot)
+{
+    m_meshParticleTemplate.minInitialRotation = minRot;
+    m_meshParticleTemplate.maxInitialRotation = maxRot;
+    m_templateDirty = true;
+}
+
+// ğŸ”¥ ê¸°ì¡´ ë©”ì„œë“œë“¤: ë©¤ë²„ ë³€ìˆ˜ ì´ë¦„ë§Œ ë³€ê²½
+void MeshSpawnModuleCS::SetParticleLifeTime(float lifeTime)
+{
+    if (m_meshParticleTemplate.lifeTime != lifeTime)
     {
-        m_particleTemplate.lifeTime = lifeTime;
+        m_meshParticleTemplate.lifeTime = lifeTime;
         m_templateDirty = true;
     }
 }
 
-void SpawnModuleCS::SetParticleSize(const XMFLOAT2& size)
+void MeshSpawnModuleCS::SetParticleColor(const XMFLOAT4& color)
 {
-    m_particleTemplate.size = size;
+    m_meshParticleTemplate.color = color;
     m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetParticleColor(const XMFLOAT4& color)
+void MeshSpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity)
 {
-    m_particleTemplate.color = color;
+    m_meshParticleTemplate.velocity = velocity;
     m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetParticleVelocity(const XMFLOAT3& velocity)
+void MeshSpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
 {
-    m_particleTemplate.velocity = velocity;
+    m_meshParticleTemplate.acceleration = acceleration;
     m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
+void MeshSpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, float horizontalRange)
 {
-    m_particleTemplate.acceleration = acceleration;
+    m_meshParticleTemplate.minVerticalVelocity = minVertical;
+    m_meshParticleTemplate.maxVerticalVelocity = maxVertical;
+    m_meshParticleTemplate.horizontalVelocityRange = horizontalRange;
     m_templateDirty = true;
 }
 
-void SpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, float horizontalRange)
-{
-    m_particleTemplate.minVerticalVelocity = minVertical;
-    m_particleTemplate.maxVerticalVelocity = maxVertical;
-    m_particleTemplate.horizontalVelocityRange = horizontalRange;
-    m_templateDirty = true;
-}
 
-void SpawnModuleCS::SetRotateSpeed(float speed)
-{
-    if (m_particleTemplate.rotateSpeed != speed)
-    {
-        m_particleTemplate.rotateSpeed = speed;
-        m_templateDirty = true;
-    }
-}
+// ... ê¸°íƒ€ Set ë©”ì„œë“œë“¤ë„ m_particleTemplate â†’ m_meshParticleTemplate ë¡œ ë³€ê²½
+
+// ğŸ”¥ í•µì‹¬ ë³€ê²½ì‚¬í•­ ìš”ì•½:
+// 1. ë©¤ë²„ ë³€ìˆ˜: m_particleTemplate â†’ m_meshParticleTemplate
+// 2. êµ¬ì¡°ì²´ íƒ€ì…: ParticleTemplateParams â†’ MeshParticleTemplateParams  
+// 3. ìƒìˆ˜ ë²„í¼ í¬ê¸°: sizeof(MeshParticleTemplateParams)
+// 4. ì»´í“¨íŠ¸ ì…°ì´ë”: "SpawnModule" â†’ "MeshSpawnModule"
+// 5. Update í•¨ìˆ˜ì˜ íŒŒë¼ë¯¸í„° íƒ€ì…: ParticleData â†’ MeshParticleData
+// 6. 3D ê´€ë ¨ ìƒˆë¡œìš´ ì„¤ì • ë©”ì„œë“œë“¤ ì¶”ê°€
