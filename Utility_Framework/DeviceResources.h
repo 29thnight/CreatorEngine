@@ -63,24 +63,24 @@ namespace DirectX11
 		void UpdateRenderTargetSize();
 
 	private:
-		ComPtr<ID3D11Device3> m_d3dDevice;
-		ComPtr<IDXGIAdapter> m_deviceAdapter;
-		ComPtr<ID3D11DeviceContext3> m_d3dContext;
-		ComPtr<IDXGISwapChain3> m_swapChain;
-		ComPtr<IDXGIDebug> m_dxgiDebug;
-        ComPtr<ID3DUserDefinedAnnotation> m_annotation;
-		ComPtr<ID3D11Debug> m_debugDevice;
-		ComPtr<ID3D11InfoQueue> m_infoQueue;
-		ComPtr<IDXGIInfoQueue> m_dxgiInfoQueue;
+		ComPtr<ID3D11Device3>				m_d3dDevice;
+		ComPtr<IDXGIAdapter>				m_deviceAdapter;
+		ComPtr<ID3D11DeviceContext3>		m_d3dContext;
+		ComPtr<IDXGISwapChain3>				m_swapChain;
+		ComPtr<IDXGIDebug>					m_dxgiDebug;
+        ComPtr<ID3DUserDefinedAnnotation>	m_annotation;
+		ComPtr<ID3D11Debug>					m_debugDevice;
+		ComPtr<ID3D11InfoQueue>				m_infoQueue;
+		ComPtr<IDXGIInfoQueue>				m_dxgiInfoQueue;
 
-		ComPtr<ID3D11RenderTargetView1> m_d3dRenderTargetView;
-		ComPtr<ID3D11Texture2D1> m_backBuffer;
-		ComPtr<ID3D11ShaderResourceView> m_backBufferSRV;
-		ComPtr<ID3D11DepthStencilView> m_d3dDepthStencilView;
-		ComPtr<ID3D11ShaderResourceView> m_DepthStencilViewSRV;
-		ComPtr<ID3D11RasterizerState> m_rasterizerState;
-		ComPtr<ID3D11DepthStencilState> m_depthStencilState;
-		ComPtr<ID3D11BlendState> m_blendState;
+		ComPtr<ID3D11RenderTargetView1>		m_d3dRenderTargetView;
+		ComPtr<ID3D11Texture2D1>			m_backBuffer;
+		ComPtr<ID3D11ShaderResourceView>	m_backBufferSRV;
+		ComPtr<ID3D11DepthStencilView>		m_d3dDepthStencilView;
+		ComPtr<ID3D11ShaderResourceView>	m_DepthStencilViewSRV;
+		ComPtr<ID3D11RasterizerState>		m_rasterizerState;
+		ComPtr<ID3D11DepthStencilState>		m_depthStencilState;
+		ComPtr<ID3D11BlendState>			m_blendState;
 		D3D11_VIEWPORT m_screenViewport;
 
 		CoreWindow* m_window;
