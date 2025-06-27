@@ -6,6 +6,7 @@ class Scene;
 class Object;
 class MeshRenderer;
 class RenderScene;
+class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
@@ -46,6 +47,8 @@ public:
 	void SetGameStart(bool isStart) { m_isGameStart = isStart; }
 
 	bool IsEditorSceneLoaded() const { return m_isEditorSceneLoaded; }
+    InputActionManager* GetInputActionManager() { return m_inputActionManager; }
+    void SetInputActionManager(InputActionManager* inputActionManager) { m_inputActionManager = inputActionManager;}
 
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
 
@@ -73,6 +76,7 @@ public:
 
     RenderScene*                m_ActiveRenderScene{ nullptr };
 
+    InputActionManager*         m_inputActionManager;  //TODO: 삭제처리 없음 필요시 추가해야함 //sehwan&&&&&
 private:
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();

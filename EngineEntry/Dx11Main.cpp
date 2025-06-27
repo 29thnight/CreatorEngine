@@ -68,7 +68,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
-        InputActionManagers->Update(deltaSecond);
+        if (InputActionManagers == nullptr)
+        {
+            Debug->LogDebug("null입니다ㅏㅏ");
+        }
+        else
+         InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
         if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
         {

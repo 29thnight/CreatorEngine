@@ -7,11 +7,13 @@
 #include "RegisterReflect.def"
 #include "CullingManager.h"
 #include "Profiler.h"
-
+#include "InputActionManager.h"
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
 	ComponentFactorys->Initialize();
+    m_inputActionManager = new InputActionManager();
+    InputActionManagers = m_inputActionManager;
 }
 
 void SceneManager::Editor()

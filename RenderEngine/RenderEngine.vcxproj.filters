@@ -485,6 +485,9 @@
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
+    <ClCompile Include="TestAniScprit.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -750,6 +753,9 @@
     </ClInclude>
     <ClInclude Include="LODSetting.h">
       <Filter>Asset\LODGroup</Filter>
+    </ClInclude>
+    <ClInclude Include="TestAniScprit.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

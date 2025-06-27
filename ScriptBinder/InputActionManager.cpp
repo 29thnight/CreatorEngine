@@ -1,5 +1,6 @@
 #include "InputActionManager.h"
 
+InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
 	if (!m_actionMaps.empty())

@@ -1,60 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemGroup>
-    <Filter Include="Common">
-      <UniqueIdentifier>{6c135c64-11ba-4567-bb91-1959a29ec409}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Script">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="Script\CreateFactory">
-      <UniqueIdentifier>{096b2d56-0948-478a-8db2-9b30a0d8f72c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Script\ScriptClass">
-      <UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Common\SourceFile">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Common\HeaderFile">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>Common\HeaderFile</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Common\HeaderFile</Filter>
-    </ClInclude>
-    <ClInclude Include="Export.h">
-      <Filter>Common\HeaderFile</Filter>
-    </ClInclude>
-    <ClInclude Include="CreateFactory.h">
-      <Filter>Script\CreateFactory</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Script\TestBehavior.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="dllmain.cpp">
-      <Filter>Common\SourceFile</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>Common\SourceFile</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Script\TestBehavior.cpp">
-      <Filter>Script\ScriptClass</Filter>
-    </ClCompile>
-  </ItemGroup>
+	<ItemGroup>
+		<Filter Include="Common">
+			<UniqueIdentifier>{6c135c64-11ba-4567-bb91-1959a29ec409}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Script">
+			<UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+			<Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+		</Filter>
+		<Filter Include="Script\CreateFactory">
+			<UniqueIdentifier>{096b2d56-0948-478a-8db2-9b30a0d8f72c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Script\ScriptClass">
+			<UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Common\SourceFile">
+			<UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+			<Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+		</Filter>
+		<Filter Include="Common\HeaderFile">
+			<UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+			<Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+		</Filter>
+	</ItemGroup>
+	<ItemGroup>
+		<ClInclude Include="framework.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="pch.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Export.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="CreateFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestBehavior.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewBehaviourScript.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewBehaviourScript.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Player.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+	</ItemGroup>
+	<ItemGroup>
+		<ClCompile Include="dllmain.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="pch.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestBehavior.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Player.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+	</ItemGroup>
 </Project>

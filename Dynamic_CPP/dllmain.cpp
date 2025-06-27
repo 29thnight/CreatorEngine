@@ -78,12 +78,14 @@ extern "C"
 		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
 		SceneManagers->SetActiveScene(ptr->GetActiveScene());
 		SceneManagers->SetGameStart(ptr->IsGameStart());
+		SceneManagers->SetInputActionManager(ptr->GetInputActionManager());
 	}
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+	CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 	}
 }

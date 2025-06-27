@@ -10,6 +10,7 @@
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
+#include "TestAniScprit.h"
 #include "Mesh.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
@@ -86,6 +87,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(StateMachineComponent);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);
+    AUTO_REGISTER_CLASS(TestAniScprit);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);
