@@ -12,13 +12,13 @@ void Player::Start()
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
 
-	/*playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
-		[this](Mathf::Vector2 _vector2) {Move(_vector2);});*/
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
-		{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
-			KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
-		},
-		[this](Mathf::Vector2 dir) { Move(dir);});
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
+		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
+	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
+	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
+	//	},
+	//	[this](Mathf::Vector2 dir) { Move(dir);});
 
 }
 
@@ -40,11 +40,11 @@ void Player::Update(float tick)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	auto _player = player;
-	if (!_player) return;
-	auto controller = _player->GetComponent<CharacterControllerComponent>();
+	//실행끝나도 Move함수에 대한 bind는 남아서 지울껀지 플래그처리할껀지 &&&&&
+	auto controller = player->GetComponent<CharacterControllerComponent>();
+	if (!controller) return;
 	controller->Move(dir);
-	auto animator = _player->GetComponent<Animator>();
+	auto animator = player->GetComponent<Animator>();
 	if (controller->IsOnMove())
 	{
 		animator->SetParameter("OnMove", true);
