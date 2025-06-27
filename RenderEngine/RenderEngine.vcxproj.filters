@@ -416,14 +416,8 @@
     <ClCompile Include="SparkleEffect.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
-    <ClCompile Include="SpawnModule.cpp">
-      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClCompile>
-    <ClCompile Include="MovementModule.cpp">
-      <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClCompile>
     <ClCompile Include="MovementModuleCS.cpp">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
@@ -484,6 +478,12 @@
     </ClCompile>
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -664,14 +664,8 @@
     <ClInclude Include="BaseEffectStruct.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="SpawnModule.h">
-      <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClInclude>
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClInclude>
-    <ClInclude Include="MovementModule.h">
-      <Filter>RenderPass\EffectPass\4.Movement</Filter>
     </ClInclude>
     <ClInclude Include="MovementModuleCS.h">
       <Filter>RenderPass\EffectPass\4.Movement</Filter>
@@ -750,6 +744,12 @@
     </ClInclude>
     <ClInclude Include="LODSetting.h">
       <Filter>Asset\LODGroup</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectBase.h">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
