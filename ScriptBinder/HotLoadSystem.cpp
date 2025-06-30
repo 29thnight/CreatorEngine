@@ -12,34 +12,6 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-#pragma region Script Event Binding Helper
-#define START_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_startEventHandle = SceneManagers->GetActiveScene()->StartEvent.AddLambda([=]() \
-	{ \
-		if (false == ScriptPtr->m_isCallStart) \
-		{ \
-			ScriptPtr->Start(); \
-			ScriptPtr->m_isCallStart = true; \
-		} \
-	})
-
-#define FIXED_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_fixedUpdateEventHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::FixedUpdate)
-
-#define UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_updateEventHandle = SceneManagers->GetActiveScene()->UpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::Update)
-
-#define LATE_UPDATE_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_lateUpdateEventHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(ScriptPtr, &ModuleBehavior::LateUpdate)
-
-#define ON_ENABLE_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_onEnableEventHandle = SceneManagers->GetActiveScene()->OnEnableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnEnable)
-
-#define ON_DISABLE_EVENT_BIND_HELPER(ScriptPtr) \
-	ScriptPtr->m_onDisableEventHandle = SceneManagers->GetActiveScene()->OnDisableEvent.AddRaw(ScriptPtr, &ModuleBehavior::OnDisable)
-
-#pragma endregion
-
 std::string AnsiToUtf8(const std::string& ansiStr)
 {
     // ANSI → Wide
