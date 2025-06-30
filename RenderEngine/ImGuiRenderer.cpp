@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
@@ -14,6 +15,8 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
 	static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 	ImFontConfig icons_config;
@@ -190,12 +193,11 @@ void ImGuiRenderer::Render()
 	PROFILE_CPU_BEGIN("ImGuiRender");
 	static bool isOpened = false;
 
-	static file::path directory{ DataSystems->m_TargetTexturePath };
-	if(!directory.empty() || !directory.filename().empty())
+	auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
+
+	if(!directoryQueue.empty())
 	{
-		isOpened = true;
-		DataSystems->SelectTextureType(&isOpened, directory.string());
-		DataSystems->m_TargetTexturePath.clear();
+		DataSystems->SelectTextureType();
 	}
 
     auto& container = ImGuiRegister::GetInstance()->m_contexts;
@@ -229,3 +231,4 @@ void ImGuiRenderer::Shutdown()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+#endif // !DYNAMICCPP_EXPORTS

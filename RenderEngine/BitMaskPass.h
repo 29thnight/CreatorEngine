@@ -32,6 +32,7 @@ private:
 
 	//Outline
 	bool isOn = true;
+	bool blurOutline = true;
 	float outlineVelocity = 1.f;
 	float4 m_colors[8] = {
 		{ 1.f, 0.f, 0.f, 1.f }, // Red

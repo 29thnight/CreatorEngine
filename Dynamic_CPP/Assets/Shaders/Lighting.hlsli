@@ -65,6 +65,19 @@ cbuffer CameraView : register(b10)
     matrix cameraview;
 }
 
+float3 overlayCascadeDebug(float4 worldPosition)
+{
+    float4 viewPos = mul(cameraview, float4(worldPosition.xyz, 1.0f));
+    float cascadeIndex = (viewPos.z <= m_casCadeEnd1) ? 0 :
+              (viewPos.z <= m_casCadeEnd2) ? 1 :
+              (viewPos.z <= m_casCadeEnd3) ? 2 : 2;
+    float3 color = (cascadeIndex == 0) ? float3(1, 0, 0)
+              : (cascadeIndex == 1) ? float3(0, 1, 0)
+              : (cascadeIndex == 2) ? float3(0, 0, 1)
+              : float3(1, 1, 0);
+    return color;
+}
+
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
 {
     

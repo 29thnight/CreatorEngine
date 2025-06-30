@@ -1,7 +1,9 @@
 ﻿#include "ParticleSystem.h"
 
-ParticleSystem::ParticleSystem(int maxParticles) : m_maxParticles(maxParticles), m_isRunning(false)
+ParticleSystem::ParticleSystem(int maxParticles, ParticleDataType dataType) : m_maxParticles(maxParticles), m_isRunning(false)
 {
+	SetParticleDatatype(dataType);
+
 	m_particleData.resize(maxParticles);
 	for (auto& particle : m_particleData)
 	{
@@ -11,6 +13,7 @@ ParticleSystem::ParticleSystem(int maxParticles) : m_maxParticles(maxParticles),
 	m_instanceData.resize(maxParticles);
 
 	CreateParticleBuffer(maxParticles);
+	
 	InitializeParticleIndices();
 }
 
@@ -39,7 +42,7 @@ void ParticleSystem::Play()
 
 void ParticleSystem::Update(float delta)
 {
-	if (!m_isRunning || m_isPaused)
+	if (!m_isRunning)
 		return;
 
 	// 현재 읽기/쓰기 버퍼 결정
@@ -55,7 +58,7 @@ void ParticleSystem::Update(float delta)
 
 		// 버퍼 설정 및 실행
 		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
-		module.Update(delta, m_particleData);
+		module.Update(delta);
 
 		// 다음 모듈을 위해 입력↔출력 스왑
 		std::swap(inputUAV, outputUAV);
@@ -70,10 +73,10 @@ void ParticleSystem::Update(float delta)
 	DeviceState::g_pDeviceContext->Flush();
 
 #ifdef _DEBUG
-	static int frameCount = 0;
-	if (++frameCount % 60 == 0) {
-		std::cout << "Particle system running..." << std::endl;
-	}
+	//static int frameCount = 0;
+	//if (++frameCount % 60 == 0) {
+	//	std::cout << "Particle system running..." << std::endl;
+	//}
 #endif
 }
 
@@ -82,16 +85,29 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 	if (!m_isRunning)
 		return;
 
-	auto& deviceContext = DeviceState::g_pDeviceContext;
+	if (!RenderPassData::VaildCheck(&camera)) return;
+	auto renderData = RenderPassData::GetData(&camera);
 
 	Mathf::Matrix world = XMMatrixIdentity();
 	Mathf::Matrix view = XMMatrixTranspose(camera.CalculateView());
 	Mathf::Matrix projection = XMMatrixTranspose(camera.CalculateProjection());
 
+	// 최종 처리된 파티클 SRV와 인스턴스 수 가져오기
+	ID3D11ShaderResourceView* finalParticleSRV = GetCurrentRenderingSRV();
+	UINT instanceCount = m_maxParticles;
+
 	for (auto* renderModule : m_renderModules)
 	{
+		renderModule->SaveRenderState();
+		renderModule->SetupRenderTarget(renderData);
+
+		// 모든 렌더링 모듈에 파티클 데이터 설정
+		renderModule->SetParticleData(finalParticleSRV, instanceCount);
+
 		renderModule->GetPSO()->Apply();
 		renderModule->Render(world, view, projection);
+		renderModule->CleanupRenderState();
+		renderModule->RestoreRenderState();
 	}
 }
 
@@ -107,31 +123,89 @@ void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 	}
 }
 
-// ParticleSystem::CreateParticleBuffer 수정버전
 void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 {
-	// 기본 D3D11_USAGE_DEFAULT로 충분 (GPU만 사용)
 	D3D11_BUFFER_DESC bufferDesc = {};
-	bufferDesc.ByteWidth = sizeof(ParticleData) * numParticles;
+	bufferDesc.ByteWidth = m_particleStructSize * numParticles;
 	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 	bufferDesc.CPUAccessFlags = 0;
 	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	bufferDesc.StructureByteStride = sizeof(ParticleData);
-
-	std::vector<ParticleData> initialData(numParticles);
+	bufferDesc.StructureByteStride = m_particleStructSize;
 
 	D3D11_SUBRESOURCE_DATA initData = {};
-	initData.pSysMem = initialData.data();
-	initData.SysMemPitch = 0;
-	initData.SysMemSlicePitch = 0;
 
-	// 초기화된 데이터로 버퍼 생성
-	HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
-	if (FAILED(hr)) return;
+	if (m_particleDataType == ParticleDataType::Mesh)
+	{
+		// MeshParticleData로 초기화
+		std::vector<MeshParticleData> meshInitialData(numParticles);
+		for (UINT i = 0; i < numParticles; ++i)
+		{
+			meshInitialData[i].isActive = 0;
+			meshInitialData[i].age = 0.0f;
+			meshInitialData[i].lifeTime = 0.0f;
+			meshInitialData[i].position = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			meshInitialData[i].velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			meshInitialData[i].acceleration = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			meshInitialData[i].rotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			meshInitialData[i].rotationSpeed = XMFLOAT3(0.0f, 0.0f, 0.0f);
+			meshInitialData[i].scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+			meshInitialData[i].color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+			meshInitialData[i].textureIndex = 0;
+		}
 
-	hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
-	if (FAILED(hr)) return;
+		initData.pSysMem = meshInitialData.data();
+		initData.SysMemPitch = 0;
+		initData.SysMemSlicePitch = 0;
+
+		// 버퍼 생성
+		HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
+		if (FAILED(hr)) {
+			OutputDebugStringA("Failed to create mesh particle buffer A\n");
+			return;
+		}
+
+		hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
+		if (FAILED(hr)) {
+			OutputDebugStringA("Failed to create mesh particle buffer B\n");
+			return;
+		}
+	}
+	else
+	{
+		// ParticleData로 초기화
+		std::vector<ParticleData> standardInitialData(numParticles);
+		for (UINT i = 0; i < numParticles; ++i)
+		{
+			standardInitialData[i].isActive = 0;
+			standardInitialData[i].age = 0.0f;
+			standardInitialData[i].lifeTime = 0.0f;
+			standardInitialData[i].position = Mathf::Vector3(0.0f, 0.0f, 0.0f);
+			standardInitialData[i].velocity = Mathf::Vector3(0.0f, 0.0f, 0.0f);
+			standardInitialData[i].acceleration = Mathf::Vector3(0.0f, 0.0f, 0.0f);
+			standardInitialData[i].rotation = 0.0f;
+			standardInitialData[i].rotatespeed = 0.0f;
+			standardInitialData[i].size = Mathf::Vector2(1.0f, 1.0f);
+			standardInitialData[i].color = Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+
+		initData.pSysMem = standardInitialData.data();
+		initData.SysMemPitch = 0;
+		initData.SysMemSlicePitch = 0;
+
+		// 버퍼 생성
+		HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferA);
+		if (FAILED(hr)) {
+			OutputDebugStringA("Failed to create standard particle buffer A\n");
+			return;
+		}
+
+		hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_particleBufferB);
+		if (FAILED(hr)) {
+			OutputDebugStringA("Failed to create standard particle buffer B\n");
+			return;
+		}
+	}
 
 	// UAV 생성
 	D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -141,11 +215,17 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 	uavDesc.Buffer.NumElements = numParticles;
 	uavDesc.Buffer.Flags = 0;
 
-	hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_particleBufferA, &uavDesc, &m_particleUAV_A);
-	if (FAILED(hr)) return;
+	HRESULT hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_particleBufferA, &uavDesc, &m_particleUAV_A);
+	if (FAILED(hr)) {
+		OutputDebugStringA("Failed to create particle UAV A\n");
+		return;
+	}
 
 	hr = DeviceState::g_pDevice->CreateUnorderedAccessView(m_particleBufferB, &uavDesc, &m_particleUAV_B);
-	if (FAILED(hr)) return;
+	if (FAILED(hr)) {
+		OutputDebugStringA("Failed to create particle UAV B\n");
+		return;
+	}
 
 	// SRV 생성
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -155,12 +235,25 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 	srvDesc.Buffer.NumElements = numParticles;
 
 	hr = DeviceState::g_pDevice->CreateShaderResourceView(m_particleBufferA, &srvDesc, &m_particleSRV_A);
-	if (FAILED(hr)) return;
+	if (FAILED(hr)) {
+		OutputDebugStringA("Failed to create particle SRV A\n");
+		return;
+	}
 
 	hr = DeviceState::g_pDevice->CreateShaderResourceView(m_particleBufferB, &srvDesc, &m_particleSRV_B);
-	if (FAILED(hr)) return;
+	if (FAILED(hr)) {
+		OutputDebugStringA("Failed to create particle SRV B\n");
+		return;
+	}
 
 	m_usingBufferA = true;
+
+	// 디버그 출력
+	char debugMsg[256];
+	sprintf_s(debugMsg, "ParticleSystem: Created buffers with struct size: %zu bytes (Type: %s)\n",
+		m_particleStructSize,
+		m_particleDataType == ParticleDataType::Mesh ? "Mesh" : "Standard");
+	OutputDebugStringA(debugMsg);
 }
 
 void ParticleSystem::InitializeParticleIndices()
@@ -176,6 +269,44 @@ void ParticleSystem::InitializeParticleIndices()
 
 	// 초기화 완료 후 GPU 동기화
 	DeviceState::g_pDeviceContext->Flush();
+}
+
+void ParticleSystem::SetParticleDatatype(ParticleDataType type)
+{
+	if (m_particleDataType == type)
+		return;
+
+	m_particleDataType = type;
+
+	switch (type)
+	{
+	case ParticleDataType::Standard:
+		m_particleStructSize = sizeof(ParticleData);
+		break;
+	case ParticleDataType::Mesh:
+		m_particleStructSize = sizeof(MeshParticleData);
+		break;
+	}
+
+	if (m_particleBufferA || m_particleBufferB)
+	{
+		// 기존 버퍼 해제
+		ReleaseParticleBuffers();
+		// 새로운 크기로 버퍼 재생성
+		CreateParticleBuffer(m_maxParticles);
+
+		// 모든 모듈에게 크기 변경 알림
+		for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+			ParticleModule& module = *it;
+			module.OnSystemResized(m_maxParticles);
+		}
+	}
+
+}
+
+size_t ParticleSystem::GetParticleStructSize() const
+{
+	return m_particleStructSize;
 }
 
 void ParticleSystem::ResizeParticleSystem(UINT newMaxParticles)

@@ -14,6 +14,7 @@
 //-----------------------------------------------------------------------------
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
+class ComponentFactory;
 class TerrainComponent : public Component, public IAwakable, public IOnDistroy
 {
 public:
@@ -61,7 +62,6 @@ public:
     void RemoveLayer(uint32_t layerID);
 	void ClearLayers();
 
-
     std::vector<TerrainLayer> GetLayerCount() const { return m_layers; }
 	TerrainLayer* GetLayerDesc(uint32_t layerID)
 	{
@@ -75,6 +75,7 @@ public:
 		return nullptr; // 해당 레이어 ID가 없을 경우 nullptr 반환
 		//throw std::runtime_error("Layer ID not found");
 	}
+
 	std::vector<const char*> GetLayerNames()
 	{
 		m_layerNames.clear(); // 이전 이름들 초기화
@@ -84,8 +85,7 @@ public:
 		}
 		return m_layerNames;
 	}
-
-	
+    	
     // 현재 브러시 정보 저장/반환
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
@@ -99,9 +99,12 @@ public:
     TerrainMesh* GetMesh() const { return m_pMesh; }
 	TerrainMaterial* GetMaterial() const { return m_pMaterial; }
 
+    [[Property]]
+	FileGuid m_trrainAssetGuid{};// 에셋 가이드
+    std::wstring m_terrainTargetPath{};
+
 private:
 	uint32 m_terrainID{ 0 }; // 지형 ID
-	FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;
     std::vector<TerrainLayer>            m_layers; // 레이어 정보들
@@ -117,7 +120,6 @@ private:
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
 
     ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
-
 
     //== 에디터 전용
     //== window 공용으로 사용가능

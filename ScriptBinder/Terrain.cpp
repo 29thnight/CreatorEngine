@@ -5,7 +5,6 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-
 #pragma pack(push, 1) // 1 byte alignment for DirectX structures
 struct TerrainBinHeader {
 	uint32_t magic; // 'TRBN'
@@ -19,23 +18,27 @@ struct TerrainBinHeader {
 };
 #pragma pack(pop) // Restore previous alignment
 
-
 //utill :wsting->utf8 string 나중에 utill쪽으로 빼는거 생각중
-static std::string Utf8Encode(const std::wstring& wstr) {
+static std::string Utf8Encode(const std::wstring& wstr) 
+{
+	int size = static_cast<int>(wstr.size());
+	const wchar_t* wstrPtr = wstr.c_str();
+
 	int size_needed = WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		nullptr, 0, nullptr, nullptr);
+
 	std::string str(size_needed, 0);
+
 	WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		&str[0], size_needed,
 		nullptr, nullptr);
+
 	return str;
 }
-
-
 
 TerrainComponent::TerrainComponent() : m_threadPool(4) 
 {
@@ -110,6 +113,16 @@ void TerrainComponent::Initialize()
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
+	if (2 > newWidth)
+	{
+		newWidth = 2; // 최소 크기 제한
+	}
+
+	if (2 > newHeight)
+	{
+		newHeight = 2; // 최소 크기 제한
+	}
+
 	// 1) 새 크기로 내부 벡터 재할당
 	m_width = newWidth;
 	m_height = newHeight;
@@ -350,7 +363,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::wcout << L"Saving dir: " << assetRoot << std::endl;
 	std::wcout << L"Saving terrain: " << name << std::endl;
 
-
 	namespace fs = std::filesystem;
 	fs::path assetPath = fs::path(assetRoot);
 	fs::path terrainDir = PathFinder::Relative("Terrain");
@@ -373,7 +385,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	std::wstring heightMapPath = (terrainPath / (name + L"_HeightMap.png")).wstring();
 	std::wstring splatMapPath = (terrainPath / (name + L"_SplatMap.png")).wstring();
-	std::wstring metaPath = (terrainPath / (name + L".terrain")).wstring();
+	m_terrainTargetPath = (terrainPath / (name + L".terrain")).wstring();
 
 	
 	//SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
@@ -425,13 +437,10 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);
 	fs::path relsplatMap = fs::relative(splatMapPath, terrainDir);
 
-
-
 	//메타데이터 저장 .meta 인대 json 쓸거임
 	json metaData;
 	metaData["name"] = name;
 	metaData["terrainID"] = m_terrainID;
-	metaData["assetGuid"] = m_trrainAssetGuid.ToString();
 	metaData["width"] = m_width;
 	metaData["height"] = m_height;
 	metaData["minHeight"] = m_minHeight;
@@ -441,7 +450,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	metaData["heightmap"] = Utf8Encode(relheightMap);
 	//metaData["splatmap"] = fs::path(splatMapPath).u8string(); //ASCII경로이면 한글 쓰려면 utf8 변환 해야할듯
 	metaData["splatmap"] = Utf8Encode(relsplatMap);
-
 
 	metaData["layers"] = json::array();
 	int index = 0;
@@ -456,12 +464,12 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		metaData["layers"].push_back(layerData);
 		index++;
 	}
-	std::ofstream ofs(metaPath);
+	std::ofstream ofs(m_terrainTargetPath);
 	ofs << metaData.dump(4); // 4칸 들여쓰기
 
 
-	std::wcout << L"Terrain saved to: " << metaPath << std::endl;
-	Debug->LogDebug("Terrain saved to: " + Utf8Encode(metaPath));
+	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
+	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
 }
 
 bool TerrainComponent::Load(const std::wstring& filePath)
@@ -490,8 +498,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		//상대경로로 사용
 		isRelative = true;
 	}
-
-
 
 	//.meta -> json 읽기
 	std::ifstream ifs(metaPath);
@@ -764,7 +770,7 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 void TerrainComponent::Awake()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
@@ -774,7 +780,7 @@ void TerrainComponent::Awake()
 void TerrainComponent::OnDistroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);

@@ -10,12 +10,14 @@
 #include "RigidBodyComponent.h"
 #include "CharacterControllerComponent.h"
 #include "InputActionComponent.h"
+#include "TestAniScprit.h"
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
 
 	player->AddComponent<RigidBodyComponent>();
 	player->AddComponent<CharacterControllerComponent>();
+	player->AddComponent<TestAniScprit>();
 	//auto input = player->AddComponent<InputActionComponent>();
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
@@ -55,15 +57,20 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	lowercontroller->GetAvatarMask()->UseOnlyLower();
 
 
-	auto playerMap = InputActionManagers->AddActionMap("Player");
-	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
+	//auto playerMap = InputActionManagers->AddActionMap("Player");
+	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
 
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick)},
-		//[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow },
-		[this](Mathf::Vector2 dir) {Move(dir);});
+	//	[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, 
+	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
+	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
+	//	},
+	//	[this](Mathf::Vector2 dir) { Move(dir);});
 
-	//ani->m_Skeleton->m_animations[3].SetEvent("Punch", 0.353, []() {Debug->Log("Punch! Punch!");});
+	//animation->m_Skeleton->m_animations[3].SetEvent("Punch", 0.353, []() {Debug->Log("Punch! Punch!");});
+	animation->m_Skeleton->m_animations[3].SetEvent("TestAniScprit", "OnPunch", 0.353);
+	animation->m_Skeleton->m_animations[2].SetEvent("TestAniScprit","Moving", 0.353);
 }
 
 void TestPlayer::Update(float deltaTime)

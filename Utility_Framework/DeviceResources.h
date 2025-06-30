@@ -9,12 +9,6 @@ class CoreWindow;
 
 namespace DirectX11
 {
-	struct Sizef
-	{
-		float width;
-		float height;
-	};
-
 	interface IDeviceNotify
 	{
 		virtual void OnDeviceLost() abstract;
@@ -57,7 +51,8 @@ namespace DirectX11
 		ID3D11BlendState* GetBlendState() const { return m_blendState.Get(); }
 		D3D11_VIEWPORT GetScreenViewport() const { return m_screenViewport; }
 		ID3DUserDefinedAnnotation* GetAnnotation() const { return m_annotation.Get(); }
-
+		DXGI_QUERY_VIDEO_MEMORY_INFO GetVideoMemoryInfo() const;
+		//PROCESS_MEMORY_COUNTERS_EX _GetProcessMemoryInfo() const;
 		void ReportLiveDeviceObjects();
 
 		CoreWindow* GetWindow() const { return m_window; }
@@ -67,23 +62,28 @@ namespace DirectX11
 		void CreateDeviceResources();
 		void CreateWindowSizeDependentResources();
 		void UpdateRenderTargetSize();
+		void HandleLostSwapChain();
 
 	private:
+		ComPtr<IDXGIDevice3> m_dxgiDevice;
 		ComPtr<ID3D11Device3> m_d3dDevice;
+		ComPtr<IDXGIAdapter> m_deviceAdapter;
 		ComPtr<ID3D11DeviceContext3> m_d3dContext;
 		ComPtr<IDXGISwapChain3> m_swapChain;
+		ComPtr<IDXGIDebug> m_dxgiDebug;
         ComPtr<ID3DUserDefinedAnnotation> m_annotation;
 		ComPtr<ID3D11Debug> m_debugDevice;
 		ComPtr<ID3D11InfoQueue> m_infoQueue;
+		ComPtr<IDXGIInfoQueue> m_dxgiInfoQueue;
 
-		ComPtr<ID3D11RenderTargetView1> m_d3dRenderTargetView;
-		ComPtr<ID3D11Texture2D1> m_backBuffer;
-		ComPtr<ID3D11ShaderResourceView> m_backBufferSRV;
-		ComPtr<ID3D11DepthStencilView> m_d3dDepthStencilView;
-		ComPtr<ID3D11ShaderResourceView> m_DepthStencilViewSRV;
-		ComPtr<ID3D11RasterizerState> m_rasterizerState;
-		ComPtr<ID3D11DepthStencilState> m_depthStencilState;
-		ComPtr<ID3D11BlendState> m_blendState;
+		ComPtr<ID3D11RenderTargetView1>		m_d3dRenderTargetView;
+		ComPtr<ID3D11Texture2D1>			m_backBuffer;
+		ComPtr<ID3D11ShaderResourceView>	m_backBufferSRV;
+		ComPtr<ID3D11DepthStencilView>		m_d3dDepthStencilView;
+		ComPtr<ID3D11ShaderResourceView>	m_DepthStencilViewSRV;
+		ComPtr<ID3D11RasterizerState>		m_rasterizerState;
+		ComPtr<ID3D11DepthStencilState>		m_depthStencilState;
+		ComPtr<ID3D11BlendState>			m_blendState;
 		D3D11_VIEWPORT m_screenViewport;
 
 		CoreWindow* m_window;

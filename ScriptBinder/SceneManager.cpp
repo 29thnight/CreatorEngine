@@ -7,11 +7,14 @@
 #include "RegisterReflect.def"
 #include "CullingManager.h"
 #include "Profiler.h"
-
+#include "InputActionManager.h"
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
 	ComponentFactorys->Initialize();
+	m_threadPool = new ThreadPool;
+    m_inputActionManager = new InputActionManager();
+    InputActionManagers = m_inputActionManager;
 }
 
 void SceneManager::Editor()
@@ -123,6 +126,18 @@ void SceneManager::Decommissioning()
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
 {
+    if (m_activeScene)
+    {
+        std::erase_if(m_scenes,
+            [&](const auto& scene) { return scene == m_activeScene.load(); });
+
+        m_activeScene.load()->AllDestroyMark();
+        m_activeScene.load()->OnDisable();
+        m_activeScene.load()->OnDestroy();
+        m_activeScene = nullptr;
+    }
+
+    resourceTrimEvent.Broadcast();
     Scene* allocScene = Scene::CreateNewScene(name);
     if (allocScene)
     {
@@ -184,6 +199,7 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 			delete swapScene;
         }
 		file::path sceneName = name.data();
+        resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
@@ -195,8 +211,9 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 				continue;
 			}
 
-			DesirealizeGameObject(type, objNode);
+            DesirealizeGameObject(type, objNode);
         }
+        m_activeScene.load()->AllUpdateWorldMatrix();
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
@@ -233,6 +250,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
     {
         //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene.load());
+		resourceTrimEvent.Broadcast();
 		Scene* playScene = Scene::LoadScene("PlayScene");
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
@@ -250,6 +268,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
             DesirealizeGameObject(type, objNode);
         }
+        m_activeScene.load()->AllUpdateWorldMatrix();
 
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();

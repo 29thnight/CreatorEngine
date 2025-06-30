@@ -56,6 +56,12 @@ inline T* GameObject::GetComponent()
     return nullptr;
 }
 
+template<>
+inline Transform* GameObject::GetComponent()
+{
+    return &m_transform;
+}
+
 template<typename T>
 inline bool GameObject::HasComponent()
 {
@@ -91,7 +97,7 @@ inline void GameObject::RemoveComponent(T* component)
 	{
 		if (ModuleBehavior* script = dynamic_cast<ModuleBehavior*>(component))
 		{
-            m_componentIds.erase(script->m_scriptTypeID);
+			RemoveScriptComponent(script);
 		}
         else
         {

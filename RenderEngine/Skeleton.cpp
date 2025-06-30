@@ -74,15 +74,21 @@ std::string ToLower(std::string boneName)
 
 }
 
-void Skeleton::MakeSocket(const std::string_view& socketName, const std::string_view& objectName)
+void Skeleton::MakeSocket(const std::string_view& socketName)
 {
+	//animator·Î¿Å±è
+	/*Socket* socket = FindSocket(socketName);
+	if (socket) return;
 	GameObject* obj = GameObject::Find(objectName);
-	SceneManagers->GetActiveScene()->CreateGameObject("NewSocket",GameObjectType::Empty,obj->m_index);
+	SceneManagers->GetActiveScene()->CreateGameObject(socketName, GameObjectType::Empty, obj->m_index);
+
+	Socket* socket = FindSocket(socketName);
+	if (socket) return;
 	Socket* newSocket = new Socket();
 	newSocket->m_name = socketName;
 	newSocket->GameObjectIndex = obj->m_index;
 	newSocket->m_ObjectName = objectName;
-	m_sockets.push_back(newSocket);
+	m_sockets.push_back(newSocket);*/
 }
 
 Socket* Skeleton::FindSocket(const std::string_view& socketName)

@@ -177,7 +177,7 @@ void InitializeParticle(inout ParticleData particle, uint seed)
     particle.isActive = 1;
 }
 
-#define THREAD_GROUP_SIZE 64
+#define THREAD_GROUP_SIZE 1024
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)

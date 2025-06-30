@@ -8,17 +8,26 @@ constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	m_proxyGUID(pComponent->GetInstanceID())
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
-	auto componentPtr = pComponent;
-	auto owner = componentPtr->GetOwner();
-	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+	auto renderScene				= SceneManagers->GetRenderScene();
+	auto componentPtr				= pComponent;
+	auto owner						= componentPtr->GetOwner();
+	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
+	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
 
-	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
-	HashedGuid aniGuid = proxyObject->m_animatorGuid;
+	auto& proxyObject				= renderScene->m_proxyMap[m_proxyGUID];
+	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
+	HashedGuid matGuid				= proxyObject->m_materialGuid;
+	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
+	Material* originMat				= pComponent->m_Material;
 
 	Mathf::xMatrix* palletePtr{ nullptr };
 	bool isAnimationUpdate{ false };
+	bool isMatChange{ false };
+
+	if (matGuid != originMatGuid && originMat)
+	{
+		isMatChange = true;
+	}
 
 	if (renderScene->m_animatorMap.find(aniGuid) != renderScene->m_animatorMap.end()
 		&& proxyObject->IsSkinnedMesh())
@@ -66,6 +75,12 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		if(isLightMappingUpdatable)
 		{
 			proxyObject->m_LightMapping = copyLightMapping;
+		}
+
+		if (isMatChange)
+		{
+			proxyObject->m_Material = originMat;
+			proxyObject->m_materialGuid = originMatGuid;
 		}
 	};
 }

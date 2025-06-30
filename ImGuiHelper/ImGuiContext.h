@@ -67,11 +67,11 @@ public:
 				return;
 			}
 
-			if (m_isPopup)
-			{
-				ImGui::BringWindowToFocusFront(window);
-				ImGui::BringWindowToDisplayFront(window);
-			}
+			//if (m_isPopup)
+			//{
+			//	ImGui::BringWindowToFocusFront(window);
+			//	ImGui::BringWindowToDisplayFront(window);
+			//}
 
 			for (auto& context : m_contexts)
 			{

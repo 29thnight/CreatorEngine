@@ -221,7 +221,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			isSelectedNode = false;
 			wasMetaSelectedLastFrame = false;
 		}
-		else if (metaNodeJustSelected)
+
+		if (metaNodeJustSelected)
 		{
 			// 메타 파일 선택 시 게임 오브젝트 해제
 			selectedSceneObject = nullptr;
@@ -1517,29 +1518,37 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 {
 	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
 
+	if (!g_CurrentBrush) return;
+
 	int prewidth = terrainComponent->m_width;
 	int preheight = terrainComponent->m_height;
 	int editWidth = terrainComponent->m_width;
 	int editHeight = terrainComponent->m_height;
+	file::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
+	FileGuid& terrainAssetGuid = terrainComponent->m_trrainAssetGuid;
 
+	if (terrainAssetGuid == nullFileGuid && !terrainAssetPath.empty())
+	{
+		terrainAssetGuid = DataSystems->GetFileGuid(terrainAssetPath);
+	}
 	
 	//bool change_edit = ImGui::IsItemDeactivatedAfterEdit();
 	
 	if (ImGui::InputInt("Width", &editWidth)) {
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if(editWidth < 1)
+			if(editWidth < 2)
 			{
-				editWidth = 1;
+				editWidth = 2;
 			}
 		}
 	}
 	if (ImGui::InputInt("Height", &editHeight)) {
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (editHeight < 1)
+			if (editHeight < 2)
 			{
-				editHeight = 1;
+				editHeight = 2;
 			}
 		}
 	}	
@@ -1613,7 +1622,6 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		//save , load
 		if (ImGui::Button("Save Terrain"))
 		{
-			
 			file::path savePath = ShowSaveFileDialog(L"", L"Save File",PathFinder::Relative("Terrain"));
 			if (savePath != L"") {
 				std::wstring folderPath = savePath.parent_path().wstring();

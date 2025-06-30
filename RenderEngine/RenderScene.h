@@ -1,7 +1,21 @@
 #pragma once
 #include "Camera.h"
 #include "../ScriptBinder/GameObject.h"
+#ifndef DYNAMICCPP_EXPORTS
 #include "AnimationJob.h"
+#else
+class AnimationJob
+{
+};
+
+class RenderPassData
+{
+};
+
+struct ID3D11Buffer;
+struct ID3D11DeviceContext;
+#endif // !DYNAMICCPP_EXPORTS
+
 #include "MeshRendererProxy.h"
 #include "RenderPassData.h"
 #include "ProxyCommandQueue.h"

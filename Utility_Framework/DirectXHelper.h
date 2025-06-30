@@ -54,7 +54,8 @@ namespace DirectX11
             }
 
             std::streamsize fileSize = file.tellg();
-            if (fileSize <= 0) {
+            if (fileSize <= 0) 
+            {
                 throw std::runtime_error("File is empty or size is invalid.");
             }
             file.seekg(0, std::ios::beg);

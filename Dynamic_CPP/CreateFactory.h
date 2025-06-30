@@ -3,7 +3,12 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "Player.h"
+#include "Temp.h"
+#include "Entity.h"
+#include "Player.h"
 #include "TestBehavior.h"
+#include "AsisMove.h"
 
 class CreateFactory : public Singleton<CreateFactory>
 {

@@ -15,7 +15,7 @@ public:
 	ParticleModule() : LinkProperty<ParticleModule>(this) {}
 	virtual ~ParticleModule() = default;
 	virtual void Initialize() {}
-	virtual void Update(float delta, std::vector<ParticleData>& particles) {}
+	virtual void Update(float delta) {}
 	virtual void Release() {}
 	void SetEasingType(EasingEffect type)
 	{
@@ -73,8 +73,6 @@ public:
 	// *****파이프라인을 스테이지 별로 해서 하기*****
 	ModuleStage GetStage() const { return m_stage; }
 	void SetStage(ModuleStage stage) { m_stage = stage; }
-
-	virtual bool NeedsBufferSwap() const { return true; }
 
 protected:
 	// 이징 변수

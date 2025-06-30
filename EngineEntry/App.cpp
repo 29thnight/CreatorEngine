@@ -48,7 +48,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
     g_progressWindow->SetStatusText(L"Initializing Core...");
 
 	CoreWindow coreWindow(hInstance, title, width, height);
-	CoreWindow::SetDumpType(DUMP_TYPE::DUNP_TYPE_MINI);
+	CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
     m_hWnd = coreWindow.GetHandle();
 
     g_progressWindow->SetProgress(10);
@@ -223,7 +223,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 				".hdr" == filePath.extension()
 			)
 			{
-				DataSystems->m_TargetTexturePath = filePath;
+				DataSystems->m_LoadTextureAssetQueue.push(filePath);
 			}
             else if (".dmp" == filePath.extension())
             {

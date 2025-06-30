@@ -175,7 +175,9 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 		PrimitiveRenderProxy->Draw(defferdPtr);
 	}
 
+	ID3D11Buffer* nullBuffer = { nullptr };
 	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);
+	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, &nullBuffer);
 
 	ID3D11RenderTargetView* nullRTV[RTV_TypeMax]{};
 	ZeroMemory(nullRTV, sizeof(nullRTV));
@@ -204,9 +206,9 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* defferdContext, 
 	camera.UpdateBuffer(defferdPtr);
 	scene.UseModel(defferdPtr);
 	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
-	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
+	//DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
-	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
+	//DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
 	for (auto& obj : scene.GetScene()->m_SceneObjects) {
 		if (obj->IsDestroyMark()) continue;
@@ -226,6 +228,9 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* defferdContext, 
 			}
 		}
 	}
+
+	ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
+	DirectX11::PSSetShaderResources(defferdPtr, 6, 2, nullSRV);
 
 	DirectX11::PSSetShaderResources(defferdPtr, 0, 5, nullSRVs);
 

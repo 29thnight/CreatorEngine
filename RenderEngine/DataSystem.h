@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/HLSLCompiler.h"
 #include "Texture.h"
 #include "ImGuiRegister.h"
@@ -85,7 +86,7 @@ public:
 	Texture* LoadTexture(const std::string_view& filePath);
 	void CopyHDRTexture(const std::string_view& filePath);
 	void CopyTexture(const std::string_view& filePath, const file::path& destination);
-	void SelectTextureType(bool* open, const std::string_view& filePath);
+	void SelectTextureType();
 	void CopyTextureSelectType(const std::string_view& filePath, TextureFileType type);
 	//Resource Material
 	void LoadMaterials();
@@ -94,6 +95,7 @@ public:
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	void OpenFile(const file::path& filepath);
+	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
 	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
 
 	FileGuid GetFileGuid(const file::path& filepath) const;
@@ -102,6 +104,7 @@ public:
 	file::path GetFilePath(FileGuid fileguid) const;
 
 	file::path m_TargetTexturePath;
+	concurrency::concurrent_queue<file::path> m_LoadTextureAssetQueue;
 
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
@@ -164,3 +167,4 @@ private:
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();
+#endif // !DYNAMICCPP_EXPORTS

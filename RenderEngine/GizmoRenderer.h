@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "DeviceResources.h"
 #include "GridPass.h"
@@ -24,7 +25,7 @@ public:
 
 	RenderScene* m_renderScene{};
 	Camera* m_pEditorCamera{};
-    bool m_bShowGridSettings{ true };
+    bool m_bShowGridSettings{ false };
 
 private:
     void ShowGridSettings();
@@ -38,3 +39,4 @@ private:
 
 	bool m_buseWireFrame{ false };
 };
+#endif // !DYNAMICCPP_EXPORTS

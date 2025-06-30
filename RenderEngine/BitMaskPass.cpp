@@ -110,37 +110,37 @@ void BitMaskPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
     DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &nullsrv);
     DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
 
+    if (blurOutline) {
+        // Down Dual Filtering
+        DirectX11::CSSetShader(defferdPtr, m_pEdgefilterDownSamplingShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
-    // Down Dual Filtering
-    DirectX11::CSSetShader(defferdPtr, m_pEdgefilterDownSamplingShader->GetShader(), nullptr, 0);
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
+        UownUpSamplingParams DPparams;
+        DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width, (float)DeviceState::g_Viewport.Height };
+        DPparams.ratio = 2;
+        DirectX11::UpdateBuffer(defferdPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
 
-    UownUpSamplingParams DPparams;
-    DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width, (float)DeviceState::g_Viewport.Height };
-    DPparams.ratio = 2;
-    DirectX11::UpdateBuffer(defferdPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + 32 - 1) / 32,
+            (DeviceState::g_Viewport.Height + 32 - 1) / 32, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
 
-    DirectX11::Dispatch(defferdPtr,
-        (DeviceState::g_Viewport.Width + 32 - 1) / 32,
-        (DeviceState::g_Viewport.Height + 32 - 1) / 32, 1);
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
-    // Up Dual Filtering
-    DirectX11::CSSetShader(defferdPtr, m_pEdgefilterUpSamplingShader->GetShader(), nullptr, 0);
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-    DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / 2, (float)DeviceState::g_Viewport.Height / 2 };
-    DirectX11::UpdateBuffer(defferdPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
-    DirectX11::Dispatch(defferdPtr,
-        (DeviceState::g_Viewport.Width + 16 - 1) / 16,
-        (DeviceState::g_Viewport.Height + 16 - 1) / 16, 1);
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
+        // Up Dual Filtering
+        DirectX11::CSSetShader(defferdPtr, m_pEdgefilterUpSamplingShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+        DPparams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / 2, (float)DeviceState::g_Viewport.Height / 2 };
+        DirectX11::UpdateBuffer(defferdPtr, m_EdgefilterSamplingBuffer.Get(), &DPparams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_EdgefilterSamplingBuffer.GetAddressOf());
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + 16 - 1) / 16,
+            (DeviceState::g_Viewport.Height + 16 - 1) / 16, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+    }
 
 	//Add Color
 	DirectX11::CSSetShader(defferdPtr, m_pAddColorShader->GetShader(), nullptr, 0);
@@ -163,6 +163,7 @@ void BitMaskPass::ControlPanel()
     ImGui::PushID(this);
 	ImGui::Text("BitMask Pass");
     ImGui::Checkbox("Enable Outline", &isOn);
+    ImGui::Checkbox("Enable Outline blur", &blurOutline);
     ImGui::DragFloat("Outline Velocity", &outlineVelocity);
     for (int i = 0; i < 8; i++) {
         ImGui::DragFloat4(("Color" + std::to_string(i)).c_str(), &m_colors[i].x, 0.01f, 0.f, 1.f, "%.2f");

@@ -167,8 +167,8 @@ float3 FilmToneMap(float3 LinearColor)
 
     ToneColor = mul(AP1_2_sRGB, ToneColor);
 
-	//return saturate( ToneColor );
-    return max(0, ToneColor);
+	return saturate( ToneColor );
+    //return max(0, ToneColor);
 }
 
 struct PixelShaderInput // see Fullscreen.vs.hlsl

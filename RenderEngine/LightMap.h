@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "IRenderPass.h"
 #include "DeviceResources.h"
 #include "Texture.h"
@@ -56,10 +57,6 @@ namespace lm {
 		bool32 isLeaf = false;
 		int3 pad = { 0,0,0 };
 	};
-
-
-	
-
 
 	class LightMap final : public IRenderPass
 	{
@@ -257,6 +254,5 @@ namespace lm {
 			return nodeIndex;
 		}
 	};
-
-
 }
+#endif // !DYNAMICCPP_EXPORTS

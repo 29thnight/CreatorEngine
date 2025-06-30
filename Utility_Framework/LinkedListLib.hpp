@@ -1,7 +1,5 @@
-#ifndef _LINKEDLIST_HPP
+癤�#ifndef _LINKEDLIST_HPP
 #define _LINKEDLIST_HPP
-//https://github.com/29thnight/LinkedListLib/blob/master/LinkedList.hpp(내껔ㅋㅋ)
-//사용법은 리스트에 담고 싶은 객체에 LinkProperty를 상속받아서 사용하면 됩니다.
 template <typename _Type>
 class LinkedList;
 
@@ -27,7 +25,7 @@ private:
 		_pNext = nullptr;
 	}
 };
-//링크드 리스트 클래스입니다. 해당 클래스로 링크, 언링크 가능하고, Iterator로 순회작업을 할 수 있습니다.
+
 template <typename _Type>
 class LinkedList
 {

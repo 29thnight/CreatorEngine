@@ -4,7 +4,7 @@
 
 //#define SSGI_Ratio 1
 //#define SSGI_NumThreads SSGI_Ratio * 16
-int ssratio = 2;
+int ssratio = 4;
 int ssthreads = 16;
 
 
@@ -64,6 +64,18 @@ SSGIPass::SSGIPass()
     );
     m_pTempTexture2->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture2->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    m_pTempTexture3 = Texture::Create(
+        ssratio * 4,
+        ssratio * 4,
+        DeviceState::g_ClientRect.width,
+        DeviceState::g_ClientRect.height,
+        "SSGICopiedTexture2",
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+    );
+    m_pTempTexture3->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+    m_pTempTexture3->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 
 SSGIPass::~SSGIPass()
@@ -164,6 +176,34 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
             (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
         DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
         DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+
+		// Down Dual Filtering +
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture3->m_pUAV, nullptr);
+        compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
+        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+
+        float temp3NumThread = tempThread * 4;
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
+            (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+
+        // Up Dual Filtering +
+        DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture3->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+        compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 4), (float)DeviceState::g_Viewport.Height / (ssratio * 4) };
+        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+        DirectX11::Dispatch(defferdPtr,
+            (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
+            (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+
 
         // Up Dual Filtering
         DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);

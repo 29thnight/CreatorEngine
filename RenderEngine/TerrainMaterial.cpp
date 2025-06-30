@@ -177,6 +177,7 @@ void TerrainMaterial::InitSplatMapTexture(UINT width, UINT height)
 	if (FAILED(hr)) {
 		throw std::runtime_error("Failed to create splat map texture");
 	}
+	DirectX::SetName(m_splatMapTexture.Get(), "Splat_Map_Texture");
 
 	// SRV 생성
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -188,6 +189,7 @@ void TerrainMaterial::InitSplatMapTexture(UINT width, UINT height)
 	if (FAILED(hr)) {
 		throw std::runtime_error("Failed to create splat map SRV");
 	}
+	DirectX::SetName(m_splatMapTexture.Get(), "Splat_Map_SRV");
 
 	// 초기 스플랫맵 데이터 설정
 	D3D11_MAPPED_SUBRESOURCE mapped = {};

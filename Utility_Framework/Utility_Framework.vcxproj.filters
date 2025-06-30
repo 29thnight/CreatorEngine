@@ -88,6 +88,9 @@
     <Filter Include="Core.Container\MeshCullingOctree[WIP]">
       <UniqueIdentifier>{d3e75a40-9227-4535-bca0-1f9574f2a71b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="WindowsApplication\WinProcProxy">
+      <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -268,6 +271,9 @@
     <ClInclude Include="Core.OctreeNode.h">
       <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
     </ClInclude>
+    <ClInclude Include="WinProcProxy.h">
+      <Filter>WindowsApplication\WinProcProxy</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">
@@ -293,6 +299,9 @@
     </ClCompile>
     <ClCompile Include="Core.OctreeNode.cpp">
       <Filter>Core.Container\MeshCullingOctree[WIP]</Filter>
+    </ClCompile>
+    <ClCompile Include="WinProcProxy.cpp">
+      <Filter>WindowsApplication\WinProcProxy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

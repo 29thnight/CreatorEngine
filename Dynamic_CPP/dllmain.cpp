@@ -37,7 +37,7 @@ extern "C"
 		nameVector.clear();
 		cstrs.clear();
 
-		for (const auto& [name, func] : ModuleFactory->factoryMap)
+		for (const auto& [name, func] : CreateFactory::GetInstance()->factoryMap)
 		{
 			nameVector.push_back(name);
 		}
@@ -78,13 +78,19 @@ extern "C"
 		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
 		SceneManagers->SetActiveScene(ptr->GetActiveScene());
 		SceneManagers->SetGameStart(ptr->IsGameStart());
+		SceneManagers->SetInputActionManager(ptr->GetInputActionManager());
 	}
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
+		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });
+		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
+	CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
+		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
 	}
 }
 

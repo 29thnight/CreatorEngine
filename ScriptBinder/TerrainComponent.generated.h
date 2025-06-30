@@ -7,6 +7,7 @@ ReflectionFieldInheritance(TerrainComponent, Component) \
 	({ \
 		meta_property(m_width) \
 		meta_property(m_height) \
+		meta_property(m_trrainAssetGuid) \
 	}); \
 	FieldEnd(TerrainComponent, PropertyOnlyInheritance) \
 };

@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "LightMapping.h"
 #include "Animator.h"
+#ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
 #include "LODGroup.h"
 
@@ -17,6 +18,7 @@ class Mesh;
 class OctreeNode;
 class MeshRenderer;
 class TerrainMesh;
+class TerrainMaterial;
 class TerrainComponent;
 class PrimitiveRenderProxy
 {
@@ -77,6 +79,7 @@ public:
 public:
 	//terrain type
 	TerrainMesh*				m_terrainMesh{ nullptr };
+	TerrainMaterial*			m_terrainMaterial{ nullptr };
 	TerrainGizmoBuffer			m_terrainGizmoBuffer{};
 	TerrainLayerBuffer			m_terrainlayerBuffer{};
 	
@@ -92,3 +95,4 @@ inline bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRen
 	}
 	return a->m_animatorGuid < b->m_animatorGuid;
 }
+#endif // !DYNAMICCPP_EXPORTS
