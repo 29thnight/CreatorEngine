@@ -21,5 +21,9 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void Move(Mathf::Vector2 dir);
+	void CatchOrThorw();
+	void Catch();
+	void Throw();
 	GameObject* player;
+	GameObject* catchedObject;
 };

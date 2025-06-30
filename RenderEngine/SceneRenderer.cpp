@@ -369,10 +369,10 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
-	//TODO : 시연용 Player주석 코드
-	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
+	////TODO : 시연용 Player주석 코드
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)

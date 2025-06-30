@@ -3,7 +3,7 @@
 #include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
 #include "NodeEditor.h"
-
+#include "Socket.h"
 void Animator::Awake()
 {
 	auto renderScene = SceneManagers->m_ActiveRenderScene;
@@ -109,6 +109,26 @@ AnimationController* Animator::GetController(std::string name)
                     return Controller.get();
     }
     return nullptr;
+}
+
+Socket* Animator::MakeSocket(const std::string_view& socketName, const std::string_view& boneName)
+{
+	Socket* socket = m_Skeleton->FindSocket(socketName);
+	if (socket) return socket;
+	GameObject* obj = GameObject::Find(boneName);
+	SceneManagers->GetActiveScene()->CreateGameObject(socketName, GameObjectType::Empty, obj->m_index);
+
+	Socket* newSocket = new Socket();
+	newSocket->m_name = socketName;
+	newSocket->GameObjectIndex = obj->m_index;
+	newSocket->m_ObjectName = boneName;
+	m_Skeleton->m_sockets.push_back(newSocket);
+	return newSocket;
+}
+
+Socket* Animator::FindSocket(const std::string_view& socketName)
+{
+	return m_Skeleton->FindSocket(socketName);
 }
 
 void Animator::DeleteParameter(int index)

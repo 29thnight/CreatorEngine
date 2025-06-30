@@ -4,6 +4,7 @@
 #include "InputManager.h"
 #include "CharacterControllerComponent.h"
 #include "Animator.h"
+#include "Socket.h"
 #include "pch.h"
 void Player::Start()
 {
@@ -14,6 +15,10 @@ void Player::Start()
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+
+	playerMap->AddButtonAction("Catch", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down,[this]() {CatchOrThorw();});
+	auto animator = player->GetComponent<Animator>();
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
@@ -24,14 +29,13 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-	player->m_transform.AddPosition({ 1,0,0 });
 	
 	static float elasepdTime = 0.f;
 	elasepdTime += tick;
 
 	if (elasepdTime >= 4.f)
 	{
-		SceneManagers->GetActiveScene()->CreateGameObject("newenwenw");
+		//SceneManagers->GetActiveScene()->CreateGameObject("newenwenw");
 		elasepdTime = 0;
 	}
 
@@ -53,5 +57,34 @@ void Player::Move(Mathf::Vector2 dir)
 	{
 		animator->SetParameter("OnMove", false);
 	}
+}
+
+void Player::CatchOrThorw()
+{
+	if (catchedObject)
+	{
+		Throw();
+	}
+	else
+	{
+		Catch();
+	}
+}
+
+void Player::Catch()
+{
+	auto animator = player->GetComponent<Animator>();
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+	auto nearObject = GameObject::Find("plane");
+	righthand->AttachObject(nearObject);
+	catchedObject = nearObject;
+}
+
+void Player::Throw()
+{
+	auto animator = player->GetComponent<Animator>();
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+	righthand->DetachObject(catchedObject);
+	catchedObject = nullptr;
 }
 

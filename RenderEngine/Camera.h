@@ -67,7 +67,7 @@ public:
 	[[Property]]
 	float m_farPlane{ 500.f };
 	[[Property]]
-	float m_speed{ 10.f };
+	float m_speed{ 10.f }; //&&&&&camera
 
 	float m_aspectRatio{};
 	[[Property]]
