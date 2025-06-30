@@ -2,19 +2,7 @@
 #include "ParticleModule.h"
 
 // 스폰 파라미터 구조체 (상수 버퍼)
-struct alignas(16) SpawnParams
-{
-    float spawnRate;
-    float deltaTime;
-    float currentTime;
-    int emitterType;
 
-    float3 emitterSize;
-    float emitterRadius;
-
-    UINT maxParticles;
-    float3 pad1;
-};
 
 // 파티클 템플릿 구조체 (상수 버퍼)
 struct alignas(16) ParticleTemplateParams
@@ -75,7 +63,7 @@ public:
 
     // ParticleModule 인터페이스 구현
     virtual void Initialize() override;
-    virtual void Update(float deltaTime, std::vector<ParticleData>& particles) override;
+    virtual void Update(float deltaTime) override;
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
 

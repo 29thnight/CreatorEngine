@@ -1,4 +1,5 @@
 #include "CoreWindow.h"
+#include "WinProcProxy.h"
 
 CoreWindow* CoreWindow::s_instance = nullptr;
 CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
@@ -10,9 +11,24 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 {
     CoreWindow* self = nullptr;
 
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+    //if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+    //{
+    //    return true;
+    //}
+
+    if (message == WM_SETCURSOR)
     {
-        return true;
+        // 커서 설정
+        if (LOWORD(lParam) == HTCLIENT)
+        {
+            SetCursor(LoadCursor(nullptr, IDC_ARROW));
+            return TRUE; // 커서 변경을 완료했음을 알림
+        }
+		return FALSE; // 기본 커서 처리를 계속함
+    }
+    else
+    {
+        WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
     }
 
     if (message == WM_NCCREATE)
@@ -42,10 +58,6 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-    {
-        return true;
-    }
 
     auto it = m_handlers.find(message);
     if (it != m_handlers.end())
@@ -53,6 +65,5 @@ LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         return it->second(hWnd, wParam, lParam);
     }
     
-
     return DefWindowProc(hWnd, message, wParam, lParam);
 }

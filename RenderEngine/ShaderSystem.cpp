@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "ShaderSystem.h"
 #include "HLSLCompiler.h"
 #include "Benchmark.hpp"
@@ -331,3 +332,4 @@ void ShaderResourceSystem::RemoveShaders()
 	PixelShaders.clear();
 	ComputeShaders.clear();
 }
+#endif // !DYNAMICCPP_EXPORTS

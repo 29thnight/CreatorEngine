@@ -29,7 +29,6 @@
 #include <regex>
 
 #include "Animator.h"
-
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -41,7 +40,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_threadPool = new ThreadPool;
 	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
 	m_renderScene = new RenderScene();
-	SceneManagers->m_ActiveRenderScene = m_renderScene;
+	SceneManagers->SetRenderScene(m_renderScene);
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -216,9 +215,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
-	//m_pEffectPass = std::make_unique<EffectManager>();
+	m_pEffectPass = std::make_unique<EffectManager>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
     m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_trimEventHandle				= resourceTrimEvent.AddRaw(this, &SceneRenderer::ResourceTrim);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
@@ -379,13 +379,14 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-	//m_pEffectPass->Update(deltaTime);
+
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//TODO : 시연용 Player주석 코드
-	player.Update(deltaTime);
+	//player.Update(deltaTime);
+	m_pEffectPass->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();
@@ -625,11 +626,11 @@ void SceneRenderer::SceneRendering()
 		}
 
 		{
-			//DirectX11::BeginEvent(L"EffectPass");
-			//Benchmark banch;
-			//m_pEffectPass->Execute(*m_renderScene, *camera);
-			//RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
-			//DirectX11::EndEvent();
+			DirectX11::BeginEvent(L"EffectPass");
+			Benchmark banch;
+			m_pEffectPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		//[7] SpritePass
@@ -944,5 +945,10 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::ReloadShaders()
 {
 	ShaderSystem->ReloadShaders();
+}
+
+void SceneRenderer::ResourceTrim()
+{
+	m_deviceResources->Trim();
 }
 

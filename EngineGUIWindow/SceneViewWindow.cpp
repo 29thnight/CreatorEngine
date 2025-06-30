@@ -163,7 +163,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		float x = windowWidth;
 		float y = windowHeight;
 
-		auto scene = SceneManagers->m_ActiveRenderScene;
+		auto scene = SceneManagers->GetRenderScene();
 
 		auto renderData = RenderPassData::GetData(cam);
 

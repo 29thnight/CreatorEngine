@@ -5,6 +5,16 @@
 #include "Texture.h"
 #include "Camera.generated.h"
 
+#ifdef DYNAMICCPP_EXPORTS
+struct ID3D11Buffer
+{
+};
+
+struct ID3D11DeviceContext
+{
+};
+#endif // !DYNAMICCPP_EXPORTS
+
 struct ShadowInfo
 {
 	Mathf::xVector m_eyePosition{};

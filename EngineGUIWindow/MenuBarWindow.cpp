@@ -8,6 +8,25 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
+{
+    float usagePercent = (float)usedVRAM / (float)budgetVRAM;
+    ImGui::Text("VRAM Usage: %.2f MB / %.2f MB", usedVRAM / (1024.0f * 1024.0f), budgetVRAM / (1024.0f * 1024.0f));
+
+    // 바 높이와 너비 정의
+    ImVec2 barSize = ImVec2(300, 20);
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 배경 바
+    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + barSize.x, cursorPos.y + barSize.y), IM_COL32(100, 100, 100, 255));
+
+    // 사용량 바
+    float fillWidth = barSize.x * usagePercent;
+    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + fillWidth, cursorPos.y + barSize.y), IM_COL32(50, 200, 50, 255));
+
+    ImGui::Dummy(barSize); // 레이아웃 공간 확보
+}
 
 std::string WordWrapText(const std::string& input, size_t maxLineLength)
 {
@@ -147,9 +166,14 @@ void MenuBarWindow::RenderMenuBar()
         {
             if (ImGui::BeginMenu("File"))
             {
+                if (ImGui::MenuItem("New Scene"))
+                {
+                    m_bShowNewScenePopup = true;
+				}
                 if (ImGui::MenuItem("Save Current Scene"))
                 {
                     //Test
+                    SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
 						L"Save Scene",
@@ -285,6 +309,46 @@ void MenuBarWindow::RenderMenuBar()
             DrawProfilerHUD();
         }
         ImGui::End();
+
+        ImGui::Begin("VRAM", &m_bShowProfileWindow);
+		auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
+        ShowVRAMBarGraph(info.CurrentUsage, info.Budget);
+        ImGui::End();
+    }
+
+    if (m_bShowNewScenePopup)
+    {
+        ImGui::OpenPopup("NewScenePopup");
+        m_bShowNewScenePopup = false;
+	}
+
+    if (ImGui::BeginPopup("NewScenePopup"))
+    {
+        static char newSceneName[256];
+        ImGui::InputText("Scene Name", newSceneName, 256);
+        ImGui::Separator();
+        if (ImGui::Button("Create"))
+        {
+            SceneManagers->resetSelectedObjectEvent.Broadcast();
+            std::string sceneName = newSceneName;
+            if (sceneName.empty())
+            {
+                SceneManagers->CreateScene();
+            }
+            else
+            {
+                SceneManagers->CreateScene(sceneName);
+            }
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }
 

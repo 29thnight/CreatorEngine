@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "DeviceState.h"
 
 class IShader
@@ -272,3 +273,4 @@ public:
 private:
 	ComPtr<ID3D11DomainShader> m_domainShader;
 };
+#endif // !DYNAMICCPP_EXPORTS

@@ -166,6 +166,21 @@ void Scene::DestroyGameObject(GameObject::Index index)
 	}
 }
 
+std::vector<std::shared_ptr<GameObject>> Scene::CreateGameObjects(size_t createSize, GameObject::Index parentIndex)
+{
+	std::vector<std::shared_ptr<GameObject>> createObjects{ createSize };
+	for (int i = 0; i < createSize; ++i)
+	{
+		auto newObject = CreateGameObject("default", GameObjectType::Empty, parentIndex);
+		if (newObject)
+		{
+			createObjects.push_back(newObject);
+		}
+	}
+
+	return createObjects;
+}
+
 void Scene::Reset()
 {
     ScriptManager->SetReload(true);
@@ -259,10 +274,7 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
-	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
-	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
-	}
+	AllUpdateWorldMatrix();
 
     UpdateEvent.Broadcast(deltaSecond);
 }
@@ -541,16 +553,22 @@ void Scene::DestroyComponents()
 		{
 			for (auto& component : obj->m_components)
 			{
+				if (!component || !component->IsDestroyMark() || component->IsDontDestroyOnLoad())
+				{
+					continue;
+				}
+
 				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
 				if (behavior)
 				{
-					ScriptManager->UnCollectScriptComponent(obj.get(), obj->m_componentIds[behavior->m_scriptTypeID], behavior->m_name.ToString());
+					obj->RemoveScriptComponent(behavior.get());
+				}
+				else
+				{
+					obj->RemoveComponentTypeID(component->GetTypeID());
 				}
 
-				if (component && component->IsDestroyMark() && !component->IsDontDestroyOnLoad())
-				{
-					component.reset();
-				}
+				component.reset();
 			}
 
 			std::erase_if(obj->m_components, [](const auto& component)
@@ -625,6 +643,14 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
 		UpdateModelRecursive(childIndex, model);
+	}
+}
+
+void Scene::AllUpdateWorldMatrix()
+{
+	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
+	{
+		UpdateModelRecursive(objIndex, XMMatrixIdentity());
 	}
 }
 

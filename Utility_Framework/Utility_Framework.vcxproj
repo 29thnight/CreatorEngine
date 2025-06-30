@@ -79,6 +79,7 @@
     <ClInclude Include="Trim.h" />
     <ClInclude Include="TypeDefinition.h" />
     <ClInclude Include="TypeTrait.h" />
+    <ClInclude Include="WinProcProxy.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Core.Coroutine.cpp" />
@@ -89,6 +90,7 @@
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="TimeSystem.cpp" />
+    <ClCompile Include="WinProcProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Delegate.inl" />

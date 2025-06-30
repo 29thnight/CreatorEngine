@@ -19,6 +19,8 @@ namespace Core
 		bool IsValid() const { return id_ != 0; }
 		std::size_t GetID() const { return id_; }
 		bool operator==(const DelegateHandle& other) const { return id_ == other.id_; }
+
+		void Reset() { id_ = 0; }
 	private:
 		std::size_t id_;
 	};
@@ -61,7 +63,7 @@ namespace Core
 		DelegateHandle AddShared(const std::shared_ptr<T>& instance, Ret(T::* member)(Args...), int priority = 0);
 		template <typename T>
 		DelegateHandle AddRaw(T* instance, Ret(T::* member)(Args...), int priority = 0);
-		void Remove(const DelegateHandle& handle);
+		void Remove(DelegateHandle& handle);
 		void Clear();
 		void Broadcast(Args... args);
 		void TargetInvoke(DelegateHandle& DelegateHandle, Args... args);
@@ -74,7 +76,7 @@ namespace Core
 			return *this;
 		}
 
-		Delegate& operator-=(const DelegateHandle& handle)
+		Delegate& operator-=(DelegateHandle& handle)
 		{
 			Remove(handle);
 			return *this;

@@ -75,7 +75,7 @@ public:
 
     // ParticleModuleBase 인터페이스 구현
     virtual void Initialize() override;
-    virtual void Update(float deltaTime, std::vector<ParticleData>& particles) override;
+    virtual void Update(float deltaTime) override;
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
 

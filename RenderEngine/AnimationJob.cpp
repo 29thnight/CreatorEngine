@@ -53,7 +53,8 @@ void AnimationJob::Update(float deltaTime)
 	int counter = 0;
     for (auto& sceneObj : scene->m_SceneObjects)
     {
-        Animator* animator = sceneObj->GetComponent<Animator>();
+		auto type = Meta::Find("Animator");
+        Animator* animator = dynamic_cast<Animator*>(sceneObj->GetComponent(*type).get());
         if (nullptr == animator || !animator->IsEnabled()) continue;
 
         m_currAnimator.push_back(animator);

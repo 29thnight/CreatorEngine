@@ -43,6 +43,7 @@ void BillboardModuleGPU::Initialize()
 	m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
 	m_pso->m_vertexShader = &ShaderSystem->VertexShaders["BillBoard"];
+	m_pso->m_pixelShader = &ShaderSystem->PixelShaders["BillBoard"];
 
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
@@ -102,6 +103,32 @@ void BillboardModuleGPU::CreateBillboard()
 	);
 }
 
+void BillboardModuleGPU::SetTexture(Texture* texture)
+{
+	m_assignedTexture = texture;
+}
+
+void BillboardModuleGPU::SetupRenderTarget(RenderPassData* renderData)
+{
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+	deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
+}
+
+void BillboardModuleGPU::BindResource()
+{
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+
+	// 텍스처 바인딩
+	if (m_assignedTexture) {
+		ID3D11ShaderResourceView* srv = m_assignedTexture->m_pSRV;
+		DirectX11::PSSetShaderResources(0, 1, &srv);
+	}
+
+	// 파티클 SRV 바인딩
+	deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
+}
+
 void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
 {
 	auto& deviceContext = DeviceState::g_pDeviceContext;
@@ -113,8 +140,7 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	deviceContext->VSSetConstantBuffers(0, 1, m_ModelBuffer.GetAddressOf());
 	DirectX11::UpdateBuffer(m_ModelBuffer.Get(), &m_ModelConstantBuffer);
 
-	// 파티클 SRV 셰이더에 바인딩
-	deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
+	BindResource();
 
 	// 버텍스 및 인덱스 버퍼 설정
 	UINT stride = sizeof(BillboardVertex);
@@ -131,3 +157,11 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 
 	DirectX11::UnbindRenderTargets();
 }
+
+void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
+{
+	m_particleSRV = particleSRV;
+	m_instanceCount = instanceCount;
+}
+
+

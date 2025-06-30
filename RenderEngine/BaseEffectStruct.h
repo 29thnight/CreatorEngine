@@ -56,3 +56,49 @@ enum class ModuleStage {
 	MODIFICATION,   // 파티클 속성 변경
 	RENDERING       // 렌더링 준비
 };
+
+// 3D 메시 파티클 데이터
+struct alignas(16) MeshParticleData
+{
+	Mathf::Vector3 position;
+	float pad1;
+
+	Mathf::Vector3 velocity;
+	float pad2;
+
+	Mathf::Vector3 acceleration;
+	float pad3;
+
+	Mathf::Vector3 rotation;      // 3D 회전 (Euler angles)
+	float pad4;
+
+	Mathf::Vector3 rotationSpeed; // 3D 회전 속도
+	float pad5;
+
+	Mathf::Vector3 scale;         // 3D 스케일
+	float pad6;
+
+	float age;
+	float lifeTime;
+	uint32_t isActive;
+	float pad7;
+
+	Mathf::Vector4 color;
+
+	uint32_t textureIndex;
+	Mathf::Vector3 pad8;
+};
+
+struct alignas(16) SpawnParams
+{
+	float spawnRate;
+	float deltaTime;
+	float currentTime;
+	int emitterType;
+
+	float3 emitterSize;
+	float emitterRadius;
+
+	UINT maxParticles;
+	float3 pad1;
+};

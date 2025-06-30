@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/Core.Minimal.h"
 #include "../Utility_Framework/DeviceResources.h"
 
@@ -744,3 +745,4 @@ namespace DirectX11
 		deferredContext->OMSetBlendState(blendState, blendFactor, sampleMask);
 	}
 }
+#endif // !DYNAMICCPP_EXPORTS

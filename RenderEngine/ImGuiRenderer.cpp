@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
@@ -14,6 +15,8 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
 	static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 	ImFontConfig icons_config;
@@ -228,3 +231,4 @@ void ImGuiRenderer::Shutdown()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+#endif // !DYNAMICCPP_EXPORTS

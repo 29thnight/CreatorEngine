@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
+#include "Core.ThreadPool.h"
 
 class Scene;
 class Object;
@@ -36,6 +37,8 @@ public:
 	Scene* SaveScene(const std::string_view& name = "SampleScene", bool isAsync = false);
     Scene* LoadScene(const std::string_view& name = "SampleScene", bool isAsync = false);
 
+    RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
+    void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
     void AddDontDestroyOnLoad(Object* objPtr);
     
 	std::vector<Scene*>& GetScenes() { return m_scenes; }
@@ -69,12 +72,13 @@ public:
     Core::Delegate<void>        newSceneCreatedEvent{};
 	Core::Delegate<void>        resetSelectedObjectEvent{};
     Core::Delegate<void>        endOfFrameEvent{};
+	Core::Delegate<void>        resourceTrimEvent{};
 
     std::atomic_bool            m_isGameStart{ false };
 	std::atomic_bool			m_isEditorSceneLoaded{ false };
 	size_t 					    m_EditorSceneIndex{ 0 };
 
-    RenderScene*                m_ActiveRenderScene{ nullptr };
+    ThreadPool<std::function<void()>>* m_threadPool{ nullptr };
 
     InputActionManager*         m_inputActionManager;  //TODO: 삭제처리 없음 필요시 추가해야함 //sehwan&&&&&
 private:
@@ -86,6 +90,7 @@ private:
     std::vector<Scene*>         m_scenes{};
     std::vector<Object*>        m_dontDestroyOnLoadObjects{};
     std::atomic<Scene*>         m_activeScene{};
+    std::atomic<RenderScene*>   m_ActiveRenderScene{ nullptr };
 	std::string                 m_LoadSceneName{};
     std::atomic_size_t          m_activeSceneIndex{};
 };
@@ -104,4 +109,5 @@ static auto& sceneUnloadedEvent = SceneManagers->sceneUnloadedEvent;
 static auto& newSceneCreatedEvent = SceneManagers->newSceneCreatedEvent;
 static auto& resetSelectedObjectEvent = SceneManagers->resetSelectedObjectEvent;
 static auto& endOfFrameEvent = SceneManagers->endOfFrameEvent;
+static auto& resourceTrimEvent = SceneManagers->resourceTrimEvent;
 #pragma endregion

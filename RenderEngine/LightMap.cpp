@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "LightMap.h"
 #include "ShaderSystem.h"
 #include "Scene.h"
@@ -1082,7 +1083,7 @@ namespace lm {
 		StartCoroutine(GenerateLightmapCoroutine(scene, m_pPositionMapPass, m_pLightMapPass));
 	}
 }
-
+#endif // !DYNAMICCPP_EXPORTS
 /*
  - ±Ç¿ë¿ì
 

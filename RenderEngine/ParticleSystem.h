@@ -1,17 +1,27 @@
 #pragma once
 #include "Texture.h"
-#include "RenderModules.h"
 #include "IRenderPass.h"
 #include "SpawnModuleCS.h"
 #include "MovementModuleCS.h"
 //#include "LifeModuleCS.h"
 #include "ColorModuleCS.h"
+#include "SizeModuleCS.h"
+#include "MeshSpawnModuleCS.h"
+#include "BillboardModuleGPU.h"
+#include "MeshModuleGPU.h"
+
+enum class ParticleDataType
+{
+	None,
+	Standard,    // 기존 ParticleData (112바이트)
+	Mesh        // MeshParticleData (144바이트)
+};
 
 // maxparticles
 class ParticleSystem
 {
 public:
-	ParticleSystem(int maxParticles = 1000);
+	ParticleSystem(int maxParticles = 1000, ParticleDataType dataType = ParticleDataType::Standard);
 	~ParticleSystem();
 
 	template<typename T, typename... Args>
@@ -21,6 +31,7 @@ public:
 
 		T* module = new T(std::forward<Args>(args)...);
 		module->Initialize();
+		module->OnSystemResized(m_maxParticles);
 		m_moduleList.Link(module);
 		return module;
 	}
@@ -42,7 +53,8 @@ public:
 	}
 
 	template<typename T, typename... Args>
-	T* AddRenderModule(Args&&... args) {
+	T* AddRenderModule(Args&&... args) 
+	{
 		static_assert(std::is_base_of<RenderModules, T>::value,
 			"T must be derived from RenderModules");
 
@@ -71,15 +83,13 @@ public:
 
 	void Stop() { m_isRunning = false; }
 
-	void Pause() { m_isPaused = true; }
-
-	void Resume() { m_isPaused = false; }
-
 	virtual void Update(float delta);
 
 	virtual void Render(RenderScene& scene, Camera& camera);
 
 	void SetPosition(const Mathf::Vector3& position);
+
+	Mathf::Vector3 GetPosition() { return m_position; }
 
 	void ResizeParticleSystem(UINT newMaxParticles);
 
@@ -88,6 +98,12 @@ public:
 	void ReleaseParticleBuffers();
 
 	ID3D11ShaderResourceView* GetCurrentRenderingSRV() const;
+
+	LinkedList<ParticleModule>& GetModuleList() { return m_moduleList; }
+	const LinkedList<ParticleModule>& GetModuleList() const { return m_moduleList; }
+
+	std::vector<RenderModules*>& GetRenderModules() { return m_renderModules; }
+	const std::vector<RenderModules*>& GetRenderModules() const { return m_renderModules; }
 
 private:
 
@@ -99,11 +115,17 @@ private:
 
 	void InitializeParticleIndices();
 
+	void SetParticleDatatype(ParticleDataType type);
+
+	size_t GetParticleStructSize() const;
+
+	ParticleDataType m_particleDataType = ParticleDataType::None;
+	size_t m_particleStructSize;
+
 protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
 
 	bool m_isRunning;
-	bool m_isPaused;
 	std::vector<ParticleData> m_particleData;
 	LinkedList<ParticleModule> m_moduleList;
 	int m_activeParticleCount = 0;

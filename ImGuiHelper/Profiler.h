@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include <algorithm>
 #include <atomic>
 #include <vector>
@@ -345,3 +346,14 @@ struct CPUProfileScope
 	CPUProfileScope(const CPUProfileScope&) = delete;
 	CPUProfileScope& operator=(const CPUProfileScope&) = delete;
 };
+#else
+#define PROFILER_INITIALIZE(size_T, size)
+#define PROFILER_SHUTDOWN()
+
+#define PROFILE_REGISTER_THREAD(...)
+#define PROFILE_FRAME()
+
+#define PROFILE_CPU_SCOPE(...)
+#define PROFILE_CPU_BEGIN(...)
+#define PROFILE_CPU_END()
+#endif // !DYNAMICCPP_EXPORTS

@@ -72,6 +72,7 @@ public:
 	void RemoveComponentTypeID(uint32 typeID);
 
 	void RemoveScriptComponent(const std::string_view& scriptName);
+	void RemoveScriptComponent(ModuleBehavior* ptr);
 
 	void RemoveComponent(Meta::Type& type);
 

@@ -7,11 +7,9 @@ void MovementModuleCS::Initialize()
     InitializeCompute();
 }
 
-void MovementModuleCS::Update(float delta, std::vector<ParticleData>& particles)
+void MovementModuleCS::Update(float delta)
 {
     DirectX11::BeginEvent(L"MovementModuleCS");
-    // 파티클 배열 크기 저장
-    m_particlesCapacity = particles.size();
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffers(delta);
@@ -33,8 +31,7 @@ void MovementModuleCS::Update(float delta, std::vector<ParticleData>& particles)
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavs, initCounts);
 
     // 컴퓨트 셰이더 실행
-    // 각 스레드 그룹은 최대 256개 스레드를 포함 (일반적인 DirectX 구현)
-    UINT numThreadGroups = (std::max<UINT>)(1, (static_cast<UINT>(particles.size()) + THREAD_GROUP_SIZE - 1) / THREAD_GROUP_SIZE);
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 해제
@@ -54,9 +51,9 @@ void MovementModuleCS::Update(float delta, std::vector<ParticleData>& particles)
 
 void MovementModuleCS::OnSystemResized(UINT max)
 {
-    if (max != m_particlesCapacity)
+    if (max != m_particleCapacity)
     {
-        m_particlesCapacity = max;
+        m_particleCapacity = max;
         m_paramsDirty = true;
     }
 }
@@ -92,8 +89,6 @@ void MovementModuleCS::UpdateConstantBuffers(float delta)
             params->deltaTime = delta;
             params->gravityStrength = m_gravityStrength;
             params->useGravity = m_gravity ? 1 : 0;
-            params->easingEnabled = m_easingEnabled ? 1 : 0;
-            params->easingType = m_easingType;
 
             DeviceState::g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
             m_paramsDirty = false;
