@@ -161,6 +161,7 @@
     <ClInclude Include="CreateFactory.h" />
     <ClInclude Include="Export.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="funcMain.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Assets\Script\Entity.h" />
     <ClInclude Include="Assets\Script\Temp.h" />
@@ -191,9 +192,9 @@
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="Assets\Script\Player.cpp">
-	  <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-	  <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-	</ClCompile>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

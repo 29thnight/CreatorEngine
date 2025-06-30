@@ -42,9 +42,6 @@
     <ClInclude Include="Assets\Script\AsisMove.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
-      <Filter>Script\ScriptClass</Filter>
-    </ClInclude>
     <ClInclude Include="Assets\Script\Entity.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
@@ -58,8 +55,11 @@
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
     <ClInclude Include="Assets\Script\Player.h">
-	  <Filter>Script\ScriptClass</Filter>
-	</ClInclude>
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="funcMain.h">
+      <Filter>Script\CreateFactory</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -84,7 +84,7 @@
       <Filter>Script\ScriptClass</Filter>
     </ClCompile>
     <ClCompile Include="Assets\Script\Player.cpp">
-	  <Filter>Script\ScriptClass</Filter>
-	</ClCompile>
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
