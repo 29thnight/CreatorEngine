@@ -158,11 +158,11 @@ void HotLoadSystem::Shutdown()
 
 bool HotLoadSystem::IsScriptUpToDate()
 {
-	if (!m_isStartUp)
-	{
-		m_isStartUp = true;
-		return false; // 처음 시작할 때는 항상 빌드 필요
-	}
+	//if (!m_isStartUp)
+	//{
+	//	m_isStartUp = true;
+	//	return false; // 처음 시작할 때는 항상 빌드 필요
+	//}
 
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
 	file::path dllMainPath = PathFinder::DynamicSolutionPath("dllmain.cpp");
@@ -311,7 +311,6 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 
 					script->m_fixedUpdateEventHandle = activeScene->FixedUpdateEvent.AddRaw(script, &ModuleBehavior::FixedUpdateInvoke);
 				}
-				//TODO : Physics System 완료되면 추가할 것
 				else if (event == "OnTriggerEnter")
 				{
 					if (script->m_onTriggerEnterEventHandle.IsValid()) continue;

@@ -31,6 +31,8 @@ public:
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 
+    std::vector<std::shared_ptr<GameObject>> CreateGameObjects(size_t createSize, GameObject::Index parentIndex = 0);
+
 	inline void InsertGameObjects(std::vector<std::shared_ptr<GameObject>>& gameObjects)
 	{
 		m_SceneObjects.insert(m_SceneObjects.end(), gameObjects.begin(), gameObjects.end());

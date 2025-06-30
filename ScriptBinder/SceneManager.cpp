@@ -209,7 +209,7 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 				continue;
 			}
 
-			DesirealizeGameObject(type, objNode);
+            DesirealizeGameObject(type, objNode);
         }
         m_activeScene.load()->AllUpdateWorldMatrix();
 

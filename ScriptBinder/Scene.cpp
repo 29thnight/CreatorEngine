@@ -166,6 +166,21 @@ void Scene::DestroyGameObject(GameObject::Index index)
 	}
 }
 
+std::vector<std::shared_ptr<GameObject>> Scene::CreateGameObjects(size_t createSize, GameObject::Index parentIndex)
+{
+	std::vector<std::shared_ptr<GameObject>> createObjects{ createSize };
+	for (int i = 0; i < createSize; ++i)
+	{
+		auto newObject = CreateGameObject("default", GameObjectType::Empty, parentIndex);
+		if (newObject)
+		{
+			createObjects.push_back(newObject);
+		}
+	}
+
+	return createObjects;
+}
+
 void Scene::Reset()
 {
     ScriptManager->SetReload(true);
