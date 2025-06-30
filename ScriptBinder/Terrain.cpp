@@ -18,12 +18,12 @@ struct TerrainBinHeader {
 };
 #pragma pack(pop) // Restore previous alignment
 
-//utill :wsting->utf8 string 나중에 utill쪽으로 빼는거 생각중
+
+//utill :wsting->utf8 string ���߿� utill������ ���°� ������
 static std::string Utf8Encode(const std::wstring& wstr) 
 {
 	int size = static_cast<int>(wstr.size());
 	const wchar_t* wstrPtr = wstr.c_str();
-
 	int size_needed = WideCharToMultiByte(
 		CP_UTF8, 0,
 		wstrPtr, size,
@@ -113,17 +113,7 @@ void TerrainComponent::Initialize()
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
-	if (2 > newWidth)
-	{
-		newWidth = 2; // 최소 크기 제한
-	}
 
-	if (2 > newHeight)
-	{
-		newHeight = 2; // 최소 크기 제한
-	}
-
-	// 1) 새 크기로 내부 벡터 재할당
 	m_width = newWidth;
 	m_height = newHeight;
 	m_heightMap.assign(m_width * m_height, 0.0f);
@@ -437,6 +427,9 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);
 	fs::path relsplatMap = fs::relative(splatMapPath, terrainDir);
 
+
+
+
 	//메타데이터 저장 .meta 인대 json 쓸거임
 	json metaData;
 	metaData["name"] = name;
@@ -464,8 +457,10 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		metaData["layers"].push_back(layerData);
 		index++;
 	}
+
 	std::ofstream ofs(m_terrainTargetPath);
-	ofs << metaData.dump(4); // 4칸 들여쓰기
+	ofs << metaData.dump(4); // 4ĭ �鿩����
+
 
 
 	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
@@ -499,7 +494,11 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		isRelative = true;
 	}
 
+
+
+
 	//.meta -> json 읽기
+
 	std::ifstream ifs(metaPath);
 	json metaData;
 	try {
