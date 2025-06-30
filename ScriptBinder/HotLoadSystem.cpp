@@ -205,6 +205,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		{
 			Debug->LogError("Failed to compile script: " + std::string(e.what()));
 			m_isCompileEventInvoked = false;
+			g_progressWindow->Close();
 			return;
 		}
 
