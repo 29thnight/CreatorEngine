@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 
 class ImplSwapEvent : public Singleton<ImplSwapEvent>
@@ -15,3 +16,4 @@ public:
 };
 
 static inline auto& SwapEvent = ImplSwapEvent::GetInstance()->m_swapEvent;
+#endif // !DYNAMICCPP_EXPORTS

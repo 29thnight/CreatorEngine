@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiContext.h"
 #include "DeviceResources.h"
 #include "ClassProperty.h"
@@ -17,3 +18,4 @@ public:
 private:
     std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
 };
+#endif // !DYNAMICCPP_EXPORTS

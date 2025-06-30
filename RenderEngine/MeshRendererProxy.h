@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "LightMapping.h"
 #include "Animator.h"
+#ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
 #include "LODGroup.h"
 
@@ -94,3 +95,4 @@ inline bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRen
 	}
 	return a->m_animatorGuid < b->m_animatorGuid;
 }
+#endif // !DYNAMICCPP_EXPORTS

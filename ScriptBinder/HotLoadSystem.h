@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "GameObject.h"
 #include "EngineSetting.h"
@@ -171,7 +172,7 @@ private:
 
 	std::string scriptFactoryFunctionString
 	{
-		"	CreateFactory::GetInstance()->RegisterFactory(\""
+		"		CreateFactory::GetInstance()->RegisterFactory(\""
 	};
 
 	std::string scriptFactoryFunctionLambdaString
@@ -205,3 +206,4 @@ private:
 };
 
 static auto& ScriptManager = HotLoadSystem::GetInstance();
+#endif // !DYNAMICCPP_EXPORTS

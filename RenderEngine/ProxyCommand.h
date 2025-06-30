@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "MeshRendererProxy.h"
 
 using Invokable = std::function<void()>;
@@ -24,3 +25,4 @@ private:
 	HashedGuid	m_proxyGUID{};
 	Invokable	m_updateFunction{};
 };
+#endif // !DYNAMICCPP_EXPORTS

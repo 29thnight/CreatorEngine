@@ -4,7 +4,6 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-
 #pragma pack(push, 1) // 1 byte alignment for DirectX structures
 struct TerrainBinHeader {
 	uint32_t magic; // 'TRBN'
@@ -18,23 +17,27 @@ struct TerrainBinHeader {
 };
 #pragma pack(pop) // Restore previous alignment
 
-
 //utill :wsting->utf8 string 나중에 utill쪽으로 빼는거 생각중
-static std::string Utf8Encode(const std::wstring& wstr) {
+static std::string Utf8Encode(const std::wstring& wstr) 
+{
+	int size = static_cast<int>(wstr.size());
+	const wchar_t* wstrPtr = wstr.c_str();
+
 	int size_needed = WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		nullptr, 0, nullptr, nullptr);
+
 	std::string str(size_needed, 0);
+
 	WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		&str[0], size_needed,
 		nullptr, nullptr);
+
 	return str;
 }
-
-
 
 TerrainComponent::TerrainComponent() : m_threadPool(4) 
 {

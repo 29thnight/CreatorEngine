@@ -42,6 +42,7 @@ public:
 	virtual void OnDestroy() {};
 
 public:
+	Core::DelegateHandle m_awakeEventHandle{};
     Core::DelegateHandle m_onEnableEventHandle{};
 	Core::DelegateHandle m_startEventHandle{};
 	Core::DelegateHandle m_fixedUpdateEventHandle{};
@@ -58,6 +59,124 @@ public:
 	[[Property]]
 	FileGuid m_scriptGuid{};
 	HashedGuid m_scriptTypeID{ type_guid(ModuleBehavior) };
+
 public:
+	void AwakeInvoke()
+	{
+		if (m_isCallAwake == false)
+		{
+			Awake();
+			m_isCallAwake = true;
+		}
+	}
+
+	void OnEnableInvoke()
+	{
+		if(false == IsEnabled()) return;
+
+		if (false == m_isCallOnEnable)
+		{
+			OnEnable();
+			m_isCallOnEnable = true;
+		}
+	}
+
+	void StartInvoke()
+	{
+		if (m_isCallStart == false)
+		{
+			Start();
+			m_isCallStart = true;
+		}
+	}
+
+	void FixedUpdateInvoke(float fixedTick)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		FixedUpdate(fixedTick);
+	}
+
+	void OnTriggerEnterInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnTriggerEnter(collider);
+	}
+
+	void OnTriggerStayInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnTriggerStay(collider);
+	}
+
+	void OnTriggerExitInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnTriggerExit(collider);
+	}
+
+	void OnCollisionEnterInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnCollisionEnter(collider);
+	}
+
+	void OnCollisionStayInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnCollisionStay(collider);
+	}
+
+	void OnCollisionExitInvoke(const Collision& collider)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		OnCollisionExit(collider);
+	}
+
+	void UpdateInvoke(float tick)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		Update(tick);
+	}
+
+	void LateUpdateInvoke(float tick)
+	{
+		if (true == IsDestroyMark() || false == IsEnabled()) return;
+
+		LateUpdate(tick);
+	}
+
+	void OnDisableInvoke()
+	{
+		if (true == IsEnabled()) return;
+
+		if (true == m_isCallOnEnable)
+		{
+			OnDisable();
+			m_isCallOnEnable = false;
+		}
+	}
+
+	void OnDestroyInvoke()
+	{
+		if (true != IsDestroyMark()) return;
+
+		if (true == m_isCallAwake)
+		{
+			OnDestroy();
+			m_isCallAwake = false;
+		}
+	}
+
+public:
+	bool m_isCallAwake{ false };
 	bool m_isCallStart{ false };
+	bool m_isCallOnEnable{ false };
 };

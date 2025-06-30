@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "ImGuiRenderer.h"
 #include "CoreWindow.h"
 #include "DeviceState.h"
@@ -230,3 +231,4 @@ void ImGuiRenderer::Shutdown()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+#endif // !DYNAMICCPP_EXPORTS

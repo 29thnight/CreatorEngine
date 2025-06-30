@@ -44,6 +44,8 @@ void RenderPassData::Initalize(uint32 index)
 {
 	if (m_isInitalized) return;
 
+	m_index = index;
+
 	std::string cameraRTVName = "RenderPassData(" + std::to_string(index) + ") RTV";
 
 	auto renderTexture = TextureHelper::CreateRenderTexture(
@@ -243,4 +245,3 @@ void RenderPassData::ClearShadowRenderDataBuffer()
 	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
 	m_findShadowProxyVec[prevIndex].clear();
 }
-

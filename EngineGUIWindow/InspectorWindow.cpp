@@ -220,7 +220,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			isSelectedNode = false;
 			wasMetaSelectedLastFrame = false;
 		}
-		else if (metaNodeJustSelected)
+
+		if (metaNodeJustSelected)
 		{
 			// 메타 파일 선택 시 게임 오브젝트 해제
 			selectedSceneObject = nullptr;

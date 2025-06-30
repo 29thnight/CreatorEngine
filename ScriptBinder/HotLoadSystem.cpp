@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "HotLoadSystem.h"
 #include "LogSystem.h"
 #include "GameObject.h"
@@ -138,13 +139,13 @@ void HotLoadSystem::Initialize()
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
-        + L"/m /t:Clean;Build /p:Configuration=Debug /p:Platform=x64 /nologo"
+        + L"/m /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
 #else
 	command = std::wstring(L"cmd /c \"")
 		+ L"\"" + msbuildPath + L"\" "
 		+ L"\"" + slnPath + L"\" "
-		+ L"/m /t:Clean;Build /p:Configuration=Release /p:Platform=x64 /nologo"
+		+ L"/m /t:Rebuild /p:Configuration=Release /p:Platform=x64 /nologo"
 		+ L"\"";
 #endif
 
@@ -192,12 +193,16 @@ bool HotLoadSystem::IsScriptUpToDate()
 	}
 
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
+	file::path dllMainPath = PathFinder::DynamicSolutionPath("dllmain.cpp");
 	file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
 
 	if (!file::exists(dllPath))
-		return false;
+		return false; // DLL 파일이 존재하지 않으면 빌드 필요
 
 	auto dllTimeStamp = file::last_write_time(dllPath);
+	auto dllMainTimeStamp = file::last_write_time(dllMainPath);
+
+	if (dllTimeStamp > dllMainTimeStamp) return false; // 빌드 필요함 (DLL이 dllmain.cpp보다 최신임)
 
 	for (const auto& scriptName : m_scriptNames)
 	{
@@ -206,11 +211,7 @@ bool HotLoadSystem::IsScriptUpToDate()
 		if (file::exists(scriptPath))
 		{
 			auto scriptTimeStamp = file::last_write_time(scriptPath);
-
-			if (scriptTimeStamp > dllTimeStamp)
-			{
-				return false; // 빌드 필요함 (스크립트가 더 최신임)
-			}
+			if (scriptTimeStamp > dllTimeStamp) return false; // 빌드 필요함 (스크립트가 더 최신임)
 		}
 	}
 
@@ -257,8 +258,17 @@ void HotLoadSystem::ReplaceScriptComponent()
 {
 	if (true == m_isReloading && false == m_isCompileEventInvoked)
 	{
+		auto activeScene = SceneManagers->GetActiveScene();
+		auto& gameObjects = activeScene->m_SceneObjects;
+		std::unordered_set<GameObject*> gameObjectSet;
+
+		for(auto& gameObject : gameObjects)
+			gameObjectSet.insert(gameObject.get());
+
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
+			if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
+
 			auto* newScript = CreateMonoBehavior(name.c_str());
 			if (nullptr == newScript)
 			{
@@ -272,7 +282,6 @@ void HotLoadSystem::ReplaceScriptComponent()
 			}
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
-			//gameObject->m_components[index].reset();
 			gameObject->m_components[index].swap(sharedScript);
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
@@ -287,6 +296,7 @@ void HotLoadSystem::CompileEvent()
 
 void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_view& name)
 {
+	auto activeScene = SceneManagers->GetActiveScene();
 	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
 	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
 	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
@@ -304,46 +314,90 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 
 			for (const auto& event : events)
 			{
-				if (event == "Start")
+				if (event == "Awake")
 				{
-					START_EVENT_BIND_HELPER(script);
+					if (script->m_startEventHandle.IsValid()) continue;
+
+					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::StartInvoke);
+				}
+				else if (event == "OnEnable")
+				{
+					if (script->m_startEventHandle.IsValid()) continue;
+
+					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
+				}
+				else if (event == "Start")
+				{
+					if (script->m_startEventHandle.IsValid()) continue;
+
+					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::StartInvoke);
 				}
 				else if (event == "FixedUpdate")
 				{
-					FIXED_UPDATE_EVENT_BIND_HELPER(script);
+					if (script->m_fixedUpdateEventHandle.IsValid()) continue;
+
+					script->m_fixedUpdateEventHandle = activeScene->FixedUpdateEvent.AddRaw(script, &ModuleBehavior::FixedUpdateInvoke);
 				}
 				//TODO : Physics System 완료되면 추가할 것
-				//else if (event == "OnTriggerEnter")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnter);
-				//}
-				//else if (event == "OnTriggerStay")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStay);
-				//}
-				//else if (event == "OnTriggerExit")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExit);
-				//}
-				//else if (event == "OnCollisionEnter")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnter);
-				//}
-				//else if (event == "OnCollisionStay")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStay);
-				//}
-				//else if (event == "OnCollisionExit")
-				//{
-				//	//SceneManagers->GetActiveScene()->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExit);
-				//}
+				else if (event == "OnTriggerEnter")
+				{
+					if (script->m_onTriggerEnterEventHandle.IsValid()) continue;
+
+					script->m_onTriggerEnterEventHandle = activeScene->OnTriggerEnterEvent.AddRaw(script, &ModuleBehavior::OnTriggerEnterInvoke);
+				}
+				else if (event == "OnTriggerStay")
+				{
+					if (script->m_onTriggerStayEventHandle.IsValid()) continue;
+
+					script->m_onTriggerStayEventHandle = activeScene->OnTriggerStayEvent.AddRaw(script, &ModuleBehavior::OnTriggerStayInvoke);
+				}
+				else if (event == "OnTriggerExit")
+				{
+					if (script->m_onTriggerExitEventHandle.IsValid()) continue;
+
+					script->m_onTriggerExitEventHandle = activeScene->OnTriggerExitEvent.AddRaw(script, &ModuleBehavior::OnTriggerExitInvoke);
+				}
+				else if (event == "OnCollisionEnter")
+				{
+					if (script->m_onCollisionEnterEventHandle.IsValid()) continue;
+
+					script->m_onCollisionEnterEventHandle = activeScene->OnCollisionEnterEvent.AddRaw(script, &ModuleBehavior::OnCollisionEnterInvoke);
+				}
+				else if (event == "OnCollisionStay")
+				{
+					if (script->m_onCollisionStayEventHandle.IsValid()) continue;
+
+					script->m_onCollisionStayEventHandle = activeScene->OnCollisionStayEvent.AddRaw(script, &ModuleBehavior::OnCollisionStayInvoke);
+				}
+				else if (event == "OnCollisionExit")
+				{
+					if (script->m_onCollisionExitEventHandle.IsValid()) continue;
+
+					script->m_onCollisionExitEventHandle = activeScene->OnCollisionExitEvent.AddRaw(script, &ModuleBehavior::OnCollisionExitInvoke);
+				}
 				else if (event == "Update")
 				{
-					UPDATE_EVENT_BIND_HELPER(script);
+					if (script->m_updateEventHandle.IsValid()) continue;
+
+					script->m_updateEventHandle = activeScene->UpdateEvent.AddRaw(script, &ModuleBehavior::UpdateInvoke);
 				}
 				else if (event == "LateUpdate")
 				{
-					LATE_UPDATE_EVENT_BIND_HELPER(script);
+					if (script->m_lateUpdateEventHandle.IsValid()) continue;
+
+					script->m_lateUpdateEventHandle = activeScene->LateUpdateEvent.AddRaw(script, &ModuleBehavior::LateUpdateInvoke);
+				}
+				else if (event == "OnDisable")
+				{
+					if (script->m_onDisableEventHandle.IsValid()) continue;
+
+					script->m_onDisableEventHandle = activeScene->OnDisableEvent.AddRaw(script, &ModuleBehavior::OnDisableInvoke);
+				}
+				else if (event == "OnDestroy")
+				{
+					if (script->m_onDestroyEventHandle.IsValid()) continue;
+
+					script->m_onDestroyEventHandle = activeScene->OnDestroyEvent.AddRaw(script, &ModuleBehavior::OnDestroyInvoke);
 				}
 			}
 			
@@ -353,25 +407,78 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 
 void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name)
 {
-	if (0 != script->m_startEventHandle.GetID())
+	auto activeScene = SceneManagers->GetActiveScene();
+
+	if (script->m_awakeEventHandle.IsValid())
 	{
-		SceneManagers->GetActiveScene()->StartEvent.Remove(script->m_startEventHandle);
+		activeScene->AwakeEvent -= script->m_awakeEventHandle;
 	}
 
-	if (0 != script->m_fixedUpdateEventHandle.GetID())
+	if (script->m_onEnableEventHandle.IsValid())
 	{
-		SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(script->m_fixedUpdateEventHandle);
+		activeScene->OnEnableEvent -= script->m_onEnableEventHandle;
 	}
 
-	if (0 != script->m_updateEventHandle.GetID())
+	if (script->m_startEventHandle.IsValid())
 	{
-		SceneManagers->GetActiveScene()->UpdateEvent.Remove(script->m_updateEventHandle);
+		activeScene->StartEvent -= script->m_startEventHandle;
 	}
 
-	if (0 != script->m_lateUpdateEventHandle.GetID())
+	if (script->m_fixedUpdateEventHandle.IsValid())
 	{
-		SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(script->m_lateUpdateEventHandle);
+		activeScene->FixedUpdateEvent -= script->m_fixedUpdateEventHandle;
 	}
+
+	if (script->m_onTriggerEnterEventHandle.IsValid())
+	{
+		activeScene->OnTriggerEnterEvent -= script->m_onTriggerEnterEventHandle;
+	}
+
+	if (script->m_onTriggerStayEventHandle.IsValid())
+	{
+		activeScene->OnTriggerStayEvent -= script->m_onTriggerStayEventHandle;
+	}
+
+	if (script->m_onTriggerExitEventHandle.IsValid())
+	{
+		activeScene->OnTriggerExitEvent -= script->m_onTriggerExitEventHandle;
+	}
+
+	if (script->m_onCollisionEnterEventHandle.IsValid())
+	{
+		activeScene->OnCollisionEnterEvent -= script->m_onCollisionEnterEventHandle;
+	}
+
+	if (script->m_onCollisionStayEventHandle.IsValid())
+	{
+		activeScene->OnCollisionStayEvent -= script->m_onCollisionStayEventHandle;
+	}
+
+	if (script->m_onCollisionExitEventHandle.IsValid())
+	{
+		activeScene->OnCollisionExitEvent -= script->m_onCollisionExitEventHandle;
+	}
+
+	if (script->m_updateEventHandle.IsValid())
+	{
+		activeScene->UpdateEvent -= script->m_updateEventHandle;
+	}
+
+	if (script->m_lateUpdateEventHandle.IsValid())
+	{
+		activeScene->LateUpdateEvent -= script->m_lateUpdateEventHandle;
+	}
+
+	if (script->m_onDisableEventHandle.IsValid())
+	{
+		activeScene->OnDisableEvent -= script->m_onDisableEventHandle;
+	}
+
+	if (script->m_onDestroyEventHandle.IsValid())
+	{
+		activeScene->OnDestroyEvent -= script->m_onDestroyEventHandle;
+	}
+
 }
 
 void HotLoadSystem::CreateScriptFile(const std::string_view& name)
@@ -585,13 +692,11 @@ void HotLoadSystem::Compile()
 			}
 		}
 		FreeLibrary(hDll);
-		hDll = nullptr;
-	}
-
-	auto dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string();
-	if (file::exists(dllPath))
-	{
-		file::remove(dllPath);
+		m_scriptFactoryFunc		= nullptr;
+		m_initModuleFunc		= nullptr;
+		m_scriptNamesFunc		= nullptr;
+		m_setSceneManagerFunc	= nullptr;
+		hDll					= nullptr;
 	}
 
 	if (EngineSettingInstance->GetMSVCVersion() != MSVCVersion::None)
@@ -656,3 +761,4 @@ void HotLoadSystem::Compile()
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
 }
+#endif // !DYNAMICCPP_EXPORTS

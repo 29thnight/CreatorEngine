@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Shader.h"
 #include "Delegate.h"
 
@@ -42,3 +43,4 @@ private:
 };
 
 static inline auto& ShaderSystem = ShaderResourceSystem::GetInstance();
+#endif // !DYNAMICCPP_EXPORTS

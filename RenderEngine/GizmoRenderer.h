@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "Core.Minimal.h"
 #include "DeviceResources.h"
 #include "GridPass.h"
@@ -38,3 +39,4 @@ private:
 
 	bool m_buseWireFrame{ false };
 };
+#endif // !DYNAMICCPP_EXPORTS
