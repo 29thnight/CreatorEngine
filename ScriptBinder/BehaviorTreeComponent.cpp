@@ -13,3 +13,10 @@ void BehaviorTreeComponent::SetNodePosition(const BT::BTNode::NodePtr& node, con
 {
 	_nodePositions[node.get()] = pos; // Store the position for the node
 }
+
+BTNode::NodePtr BehaviorTreeComponent::FindNodeByPin(ax::NodeEditor::PinId pin)
+{
+	auto ptr = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(pin)>>1);
+
+	return std::shared_ptr<BTNode>(ptr, [](BTNode*) {});
+}

@@ -177,6 +177,7 @@
     <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
+    <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -185,6 +186,7 @@
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>
     </ClInclude>

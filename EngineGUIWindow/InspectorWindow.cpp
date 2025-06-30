@@ -18,6 +18,7 @@
 #include "Terrain.h"
 #include "FileDialog.h"
 //----------------------------
+#include "NodeFactory.h"
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
 //----------------------------
@@ -1658,250 +1659,201 @@ void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 
 void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
-	if (BTComponent) 
+	if (!BTComponent)
+		return;
+
+	// NodeEditor 컨텍스트 설정
+	if (!s_BTEditorContext)
 	{
 
-		static bool showControllersWindow = false;
+		////config
+		ed::Config config;
+		ImVector<float> zoomLevels;
+		zoomLevels.push_back(0.5f);
+		zoomLevels.push_back(1.0f);
+		zoomLevels.push_back(2.0f);
+		zoomLevels.push_back(4.0f);
 
-		if (!s_BTEditorContext) {
-			
-			s_BTEditorContext = ed::CreateEditor();
-			auto settings = ed::GetConfig(s_BTEditorContext);
-			settings.CanvasSizeMode = ed::CanvasSizeMode::CenterOnly;
+		//todo : 에디터 설정
+		config.CustomZoomLevels = zoomLevels;
+		config.CanvasSizeMode = ed::CanvasSizeMode::CenterOnly;
+		config.DragButtonIndex = 2;  // 휠 버튼으로 패닝
+
+
+		// NodeEditor 컨텍스트가 없으면 생성
+		s_BTEditorContext = ed::CreateEditor(&config);
+	}
+
+	static bool showEditor = false;
+	if (ImGui::Button("Edit Behavior Tree"))
+		showEditor = !showEditor;
+
+	if (!showEditor)
+		return;
+
+	// 에디터 창 열기
+	ImGui::Begin("Behavior Tree Editor", &showEditor, ImGuiWindowFlags_AlwaysAutoResize);
+
+	// === 툴바: 노드 생성 콤보박스 & 버튼 ===
+	static std::string newNodeKey = "Sequence";
+	if (ImGui::BeginCombo("New Node Type", newNodeKey.c_str()))
+	{
+		for (auto& key : BTNodeFactory.GetReisteredKeys())
+			if (ImGui::Selectable(key.c_str(), key == newNodeKey))
+				newNodeKey = key;
+		ImGui::EndCombo();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Create Node"))
+	{
+		// 루트가 없으면 새 루트로, 있으면 트리 최상위에 붙이기
+		json p;
+		p["type"] = newNodeKey; // 노드 타입 설정
+		p["name"] = newNodeKey + " Node"; // 노드 이름 설정
+		auto node = BTComponent->CreateNode(newNodeKey, p);
+		//if (!BTComponent->GetRoot())
+		//	BTComponent->SetRoot(node);
+		//else
+			std::dynamic_pointer_cast<BT::CompositeNode>(BTComponent->GetRoot())->AddChild(node);
+	}
+
+	ImGui::Separator();
+
+	// === 캔버스 ===
+	ImGui::BeginChild("BTEditorCanvas", ImVec2(0, 400), true /*border*/);
+	// 1) NodeEditor 시작
+	ed::SetCurrentEditor(s_BTEditorContext);
+	ed::Begin("BTEditor");
+
+	// 2) 모든 노드 DFS 순회 · 그리기 · 드래그 이동 · 컨텍스트 메뉴
+	BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
+		ed::NodeId nid{ node.get() };
+		// 이전 위치
+		ImVec2 prev = BTComponent->GetNodePosition(node);
+
+		// PinId 계산 (짝수=input, 홀수=output)
+		uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
+		ed::PinId inPin{ base };
+		ed::PinId outPin{ base | 1 };
+
+		// --- BeginNode ---
+		ed::BeginNode(nid);
+
+		// 입력 핀 (루트 제외)
+		if (!std::dynamic_pointer_cast<BT::RootNode>(node))
+		{
+			ed::BeginPin(inPin, ed::PinKind::Input);
+			ImGui::Text("I");
+			ed::EndPin();
 		}
 
+		// 노드 이름
+		ImGui::TextUnformatted(node->GetName().c_str());
 
-		ImGui::Text("Behavior Tree");
-		ImGui::SameLine();
-		if (ImGui::Button("Edit Behavior Tree"))
+		// 출력 핀
+		ed::BeginPin(outPin, ed::PinKind::Output);
+		ImGui::Text("O");
+		ed::EndPin();
+
+		// --- 컨텍스트 메뉴 (노드 우클릭) ---
+		if (ed::ShowNodeContextMenu(&nid))
 		{
-			showControllersWindow = !showControllersWindow;
-		}
-		if (showControllersWindow)
-		{
-			ImGui::Begin("Behavior Tree Editor", &showControllersWindow);
-			//int i = 0;
-			//static int selectedControllerIndex = 0;
-			//static int preSelectIndex = 0;
-			//static int linkIndex = -1;
-			//static int ClickNodeIndex = -1;
-			//static int targetNodeIndex = -1;
-			//static int selectedTransitionIndex = -1;
-			//static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
-			//static int AvatarControllerIndex = -1;
-			//static bool showAvatarMaskWindow = false;
-			//auto& controllers = animator->m_animationControllers;
-			if (ImGui::Button("Add Node")) {
-				// Add node logic here
-			}
+			// 헤더
+			ImGui::MenuItem(node->GetName().c_str(), nullptr, false, false);
 			ImGui::Separator();
-			ImGui::BeginChild("BTEditorChild", ImVec2(1200, 500), true);
-			
-			ed::SetCurrentEditor(s_BTEditorContext);
-			ed::Begin("BehaviorTreeEditor");
-
-			BT::DFS(BTComponent->GetRoot(), [&](const BT::BTNode::NodePtr& node) {
-				// NodeId: 포인터를 정수로 재해석
-				ed::NodeId nid{ node.get() };
-
-				// 노드 위치 유지
-				ImVec2 pos = BTComponent->GetNodePosition(node);
-
-				uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
-				ed::PinId  inPin{ base };     // e.g. 0,2,4...
-				ed::PinId outPin{ base | 1 };  // e.g. 1,3,5...
-
-				// 3) 노드 그리기
-				ed::BeginNode(nid);
-
-
-
-
-
-
-				ed::GetStyle().PivotScale = ImVec2(2.0f, 2.0f); // 노드 중심을 기준으로 스케일 조정
-				if (!std::dynamic_pointer_cast<RootNode>(node))
-				{
-					// 입력 핀
-					ed::BeginPin(inPin, ed::PinKind::Input);
-					ImGui::Text("I");
-					ed::EndPin();
-				}
-
-				ImGui::TextUnformatted(node->GetName().c_str());
-
-				// 출력 핀
-				ed::BeginPin(outPin, ed::PinKind::Output);
-				ImGui::Text("O");
-				ed::EndPin();
-
-
-
-
-
-
-				ed::EndNode();
-
-
-				if (ed::ShowNodeContextMenu(&nid))
-				{
-
-
-					//// 노드 컨텍스트 메뉴를 여는 로직
-
-					ImGui::MenuItem(node->GetName().c_str(), nullptr, false, false);
-					ImGui::Separator();
-
-					// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
-					bool isComposite = std::dynamic_pointer_cast<BT::CompositeNode>(node) != nullptr;
-					bool isDecorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node) != nullptr;
-					if (isComposite || isDecorator)
-					{
-						if (ImGui::BeginMenu("Add Child"))
-						{
-							if (ImGui::MenuItem("Sequence"))
-							{
-								//auto child = BTComponent->CreateNode(BT::NodeType::Sequence);
-								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
-							}
-							if (ImGui::MenuItem("Selector"))
-							{
-								//auto child = BTComponent->CreateNode(BT::NodeType::Selector);
-								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
-							}
-							if (ImGui::MenuItem("Action"))
-							{
-								//auto child = BTComponent->CreateNode(BT::NodeType::Action);
-								//std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
-							}
-							ImGui::EndMenu();
-						}
-					}
-
-					// 3) Delete Node: 루트 노드는 삭제 불가
-					bool isRoot = (node == BTComponent->GetRoot());
-					if (!isRoot)
-					{
-						if (ImGui::MenuItem("Delete Node"))
-						{
-							//BTComponent->DeleteNode(node);
-						}
-					}
-					else
-					{
-						// 루트면 비활성화된 메뉴 아이템으로 안내
-						ImGui::MenuItem("Delete Node", nullptr, false, false);
-					}
-
-
-					//ImGui::EndPopup();
-				}
-
-
-
-				// 5) 노드 위치 설정
-				ImVec2 nodePose = ed::GetNodePosition(nid);
-
-				if (pos.x != nodePose.x || pos.y != nodePose.y) {
-					BTComponent->SetNodePosition(node, pos);
-				}
-
-				// 6) 노드 위치 업데이트
-				BTComponent->SetNodePosition(node, pos);
-
-
-
-				// 4) 링크 그리기: 자식 노드의 입력 핀 ← 이 노드의 출력 핀
-				if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
-				{
-					for (auto& child : comp->GetChildren())
-					{
-						// 자식의 Input Pin
-						uintptr_t cb = reinterpret_cast<uintptr_t>(child.get()) << 1;
-						ed::PinId childInPin{ cb };  // childInPin = even id
-
-						// LinkId: NodePtr xor ChildPtr 으로 고유 생성
-						ed::LinkId lid{ (reinterpret_cast<uintptr_t>(node.get())
-									   ^ reinterpret_cast<uintptr_t>(child.get())) };
-
-						// **여기** nid 가 아니라 outPin 을 쓰고, childInPin 을 endPin 으로 넘깁니다
-						ed::Link(lid, outPin, childInPin);
-					}
-				}
-				else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-				{
-					auto child = dec->GetChild();
-					uintptr_t cb = reinterpret_cast<uintptr_t>(child.get()) << 1;
-					ed::PinId childInPin{ cb };
-
-					ed::LinkId lid{ (reinterpret_cast<uintptr_t>(node.get())
-								   ^ reinterpret_cast<uintptr_t>(child.get())) };
-					ed::Link(lid, outPin, childInPin);
-				}
-
-
-
-			});
-
-
-			if (ed::ShowBackgroundContextMenu()) {
-				ImGui::OpenPopup("BackgroundMenu", 1);
-
-			}
-
+			// Add Child (Composite/Decorator 만)
+			bool isComp = std::dynamic_pointer_cast<BT::CompositeNode>(node)!=nullptr ? true : false;
+			bool isDec = std::dynamic_pointer_cast<BT::DecoratorNode>(node) != nullptr ? true : false;
+			if (isComp || isDec)
 			{
-				ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Always);
-				if (ImGui::BeginPopup("BackgroundMenu", ImGuiWindowFlags_ChildMenu)) {
-					ImGui::Text("Background Menu");
-					ImGui::Separator();
-					//// 1) 노드 이름 표시: 노드 이름은 이미 ImGui::TextUnformatted 에서 표시됨
-					ImGui::Text("Node Name: %s", "New Node");
-
-					//// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
-					ImGui::EndPopup();
-
+				if (ImGui::BeginMenu("Add Child"))
+				{
+					for (auto& key : BTNodeFactory.GetReisteredKeys())
+					{
+						if (ImGui::MenuItem(key.c_str()))
+						{
+							json p; p["key"] = key;
+							auto child = BTComponent->CreateNode(key, p);
+							if (isComp)
+								std::dynamic_pointer_cast<BT::CompositeNode>(node)->AddChild(child);
+							else
+								std::dynamic_pointer_cast<BT::DecoratorNode>(node)->SetChild(child);
+						}
+					}
+					ImGui::EndMenu();
 				}
-
 			}
+			// Delete Node (루트 제외)
+			bool isRoot = node == BTComponent->GetRoot();
+			if (!isRoot && ImGui::MenuItem("Delete Node"))
+			{
+				BTComponent->DeleteNode(node);
+			}
+			else if (isRoot)
+			{
+				ImGui::MenuItem("Delete Node", nullptr, false, false);
+			}
+			// *절대* ImGui::OpenPopup/BeginPopup 사용 금지
+		}
 
-			ed::End();
+		ed::EndNode();
+		// --- EndNode ---
 
-			ed::SetCurrentEditor(nullptr);
+		// 3) 드래그로 이동된 노드 위치 저장
+		ImVec2 now = ed::GetNodePosition(nid);
+		if (now.x != prev.x || now.y != prev.y)
+			BTComponent->SetNodePosition(node, now);
+		});
 
+	// 4) 기존 부모→자식 링크 렌더링
+	BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
+		uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
+		ed::PinId outPin{ base | 1 };
+		if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+		{
+			for (auto& c : comp->GetChildren())
+			{
+				ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+				ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+							  ^ reinterpret_cast<uintptr_t>(c.get()) };
+				ed::Link(lid, outPin, inPin);
+			}
+		}
+		else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+		{
+			auto c = dec->GetChild();
+			ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+			ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+						  ^ reinterpret_cast<uintptr_t>(c.get()) };
+			ed::Link(lid, outPin, inPin);
+		}
+		});
 
-			//if (m_openBTNodePopup)
-			//{
-			//	ImGui::OpenPopup("NodeContextMenu");
-			//	m_openBTNodePopup = false;
-			//}
-
-			//ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Always);
-			//if (ImGui::BeginPopup("NodeContextMenu", ImGuiWindowFlags_ChildMenu)) {
-			//	ImGui::Text("Node Context Menu");
-			//	ImGui::Separator();
-			//	//// 1) 노드 이름 표시: 노드 이름은 이미 ImGui::TextUnformatted 에서 표시됨
-			//	//ImGui::Text("Node Name: %s", clickedNode.get()->GetName().c_str());
-
-			//	//// 2) Add Child: CompositeNode, DecoratorNode 에서만 가능
-
-			//	if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
-			//		ImGui::IsMouseClicked(0)) // 왼쪽 클릭
-			//	{
-			//		ImGui::CloseCurrentPopup();
-			//	}
-
-			//	ImGui::EndPopup();
-			//}
-
-
-
-
-			ImGui::EndChild();
-
-			ImGui::End();
-
+	// 5) 배경 우클릭 메뉴 (노드 생성)
+	if (ed::ShowBackgroundContextMenu())
+	{
+		for (auto& key : BTNodeFactory.GetReisteredKeys())
+		{
+			if (ImGui::MenuItem(key.c_str()))
+			{
+				json p; p["name"] = key;
+				auto node = BTComponent->CreateNode(key, p);
+				// Background 에서 생성하면 루트에 붙이거나 선택된 노드에 붙이도록
+				/*if (auto sel = BTComponent->GetSelectedNode())
+					std::dynamic_pointer_cast<BT::CompositeNode>(sel)->AddChild(node);
+				else
+					BTComponent->GetRoot()
+					? std::dynamic_pointer_cast<BT::CompositeNode>(BTComponent->GetRoot())->AddChild(node)
+					: BTComponent->SetRoot(node);*/
+			}
 		}
 	}
+
+	ed::End();
+	ed::SetCurrentEditor(nullptr);
+	ImGui::EndChild();
+
+	ImGui::End(); // Behavior Tree Editor
 }
 
 #endif // !DYNAMICCPP_EXPORTS

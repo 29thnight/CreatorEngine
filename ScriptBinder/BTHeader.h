@@ -1,5 +1,6 @@
 #pragma once
-#include"BlackBoard.h"
+#include "Core.Minimal.h"
+#include "BlackBoard.h"
 #include <memory>
 
 namespace BT
@@ -47,7 +48,7 @@ namespace BT
 		CompositeNode(const std::string& name) : BTNode(name) {}
 		void AddChild(NodePtr child) { m_children.push_back(child); }
 
-		const std::vector<NodePtr>& GetChildren() const { return m_children; } 
+		std::vector<NodePtr>& GetChildren() { return m_children; } 
 	protected:
 		std::vector<NodePtr> m_children;
 	};
@@ -116,6 +117,7 @@ namespace BT
 			: BTNode(name), m_child(child) {}
 
 		NodePtr GetChild() const { return m_child; }
+		void SetChild(NodePtr child) { m_child = child; }
 	protected:
 		NodePtr m_child;
 	};
@@ -281,4 +283,6 @@ namespace BT
 			DFS(child, visit);
 		}
 	}
+
+	
 }

@@ -255,6 +255,9 @@
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClCompile>
+    <ClCompile Include="NodeFactory.cpp">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -501,6 +504,9 @@
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
     <ClInclude Include="BehaviorTreeComponent.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeFactory.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
   </ItemGroup>
