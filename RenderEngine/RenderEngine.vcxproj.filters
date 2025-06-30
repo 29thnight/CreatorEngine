@@ -270,6 +270,9 @@
     <Filter Include="RenderPass\EffectPass\5.Size">
       <UniqueIdentifier>{cdb96e48-44af-4e2f-b1c0-4152bd9984db}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset\JobSystem\Asset">
+      <UniqueIdentifier>{8fd7ed60-c364-4d51-988d-8434ef51db2c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -493,6 +496,9 @@
     </ClCompile>
     <ClCompile Include="SizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetJob.cpp">
+      <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -768,6 +774,9 @@
     </ClInclude>
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetJob.h">
+      <Filter>Asset\JobSystem\Asset</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

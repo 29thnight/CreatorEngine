@@ -195,8 +195,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
 
-	ModelLoader::ModelLoadPool.NotifyAllAndWait();
-
 	return model;
 }
 
@@ -216,8 +214,6 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 	{
 		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
-
-	ModelLoader::ModelLoadPool.NotifyAllAndWait();
 
 	return rootObj;
 }

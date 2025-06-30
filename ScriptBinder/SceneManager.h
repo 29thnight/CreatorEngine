@@ -70,6 +70,8 @@ public:
 	Core::Delegate<void>        resetSelectedObjectEvent{};
     Core::Delegate<void>        endOfFrameEvent{};
 	Core::Delegate<void>        resourceTrimEvent{};
+    
+	Core::Delegate<void>        AssetLoadEvent{};
 
     std::atomic_bool            m_isGameStart{ false };
 	std::atomic_bool			m_isEditorSceneLoaded{ false };
