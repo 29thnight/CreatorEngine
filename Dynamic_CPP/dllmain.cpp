@@ -85,6 +85,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
 	CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });

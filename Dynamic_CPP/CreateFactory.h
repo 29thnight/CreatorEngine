@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "Player.h"
 #include "Temp.h"
 #include "Entity.h"
 #include "Player.h"
