@@ -12,11 +12,17 @@ void Player::Start()
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
+	
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-
-	playerMap->AddButtonAction("Catch", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {CatchOrThorw();});
+	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {  });
+	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Pressed, [this]() {});
+	playerMap->AddButtonAction("ChargeAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Released, [this]() {});
+	playerMap->AddButtonAction("Dash", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() {  });
+	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
@@ -60,7 +66,7 @@ void Player::Move(Mathf::Vector2 dir)
 	}
 }
 
-void Player::CatchOrThorw()
+void Player::CatchAndThrow()
 {
 	if (catchedObject)
 	{
@@ -74,12 +80,14 @@ void Player::CatchOrThorw()
 
 void Player::Catch()
 {
-	player = GameObject::Find("Punch");
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
-	auto nearObject = GameObject::Find("plane");
-	righthand->AttachObject(nearObject);
-	catchedObject = nearObject;
+	if (m_nearObject != nullptr)
+	{ 
+		player = GameObject::Find("Punch");
+		auto animator = player->GetComponent<Animator>();
+		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+		righthand->AttachObject(m_nearObject);
+		catchedObject = m_nearObject;
+	}
 }
 
 void Player::Throw()
@@ -91,3 +99,36 @@ void Player::Throw()
 	catchedObject = nullptr;
 }
 
+void Player::SwapWeaponLeft()
+{
+	m_weaponIndex--;
+}
+
+void Player::SwapWeaponRight()
+{
+	m_weaponIndex++;
+}
+
+void Player::OnCollisionEnter(const Collision& collision)
+{
+	if (collision.thisObj == collision.otherObj)
+		return;
+
+	
+
+}
+
+void Player::OnCollisionStay(const Collision& collision)
+{
+	if (collision.thisObj == collision.otherObj)
+		return;
+
+	if (collision.otherObj->ToString() == "plane")
+	{
+		m_nearObject = collision.otherObj;
+	}
+	else
+	{
+		m_nearObject = nullptr;
+	}
+}
