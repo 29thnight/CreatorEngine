@@ -31,11 +31,16 @@ struct NodeAnimation
 class KeyFrameEvent
 {
 public:
-	std::string funName;
+	std::string m_scriptName;
+	std::string m_funName;
 	float key = 0;
 	std::function<void()> m_event;
+
+
 };
 
+
+class Animator;
 class Animation
 {
 public:
@@ -55,9 +60,9 @@ public:
 	int preKey = 0;
 	int curKey = 0;
 	void InvokeEvent();
-	void SetEvent(const std::string& _funName, float _key, std::function<void()> _func);
-	bool EnterFrame = false;
-
+	void InvokeEvent(Animator* _ownerAnimator);
+	void SetEvent(const std::string& _funName, float progressPercent, std::function<void()> _func);
+	void SetEvent(const std::string& _scriptName, const std::string& _funName, float progressPercent);
 
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };

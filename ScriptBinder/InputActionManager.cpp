@@ -1,7 +1,9 @@
 #include "InputActionManager.h"
-
+#include "SceneManager.h"
+InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
+	if (SceneManagers->m_isGameStart == false) return;
 	if (!m_actionMaps.empty())
 	{
 		for (auto& actionMap : m_actionMaps)

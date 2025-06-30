@@ -2,12 +2,12 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-class Entity : public ModuleBehavior
+class Player : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(Entity)
-	virtual void Awake() override {}
-	virtual void Start() override {}
+	MODULE_BEHAVIOR_BODY(Player)
+		virtual void Awake() override {}
+	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 	virtual void OnTriggerEnter(const Collision& collision) override {}
 	virtual void OnTriggerStay(const Collision& collision) override {}
@@ -15,10 +15,15 @@ public:
 	virtual void OnCollisionEnter(const Collision& collision) override {}
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
-	virtual void Update(float tick) override {}
+	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
-	virtual void OnDisable() override  {}
-	virtual void OnDestroy() override  {}
-public:
-	virtual void Interact() {}
+	virtual void OnDisable() override {}
+	virtual void OnDestroy() override {}
+
+	void Move(Mathf::Vector2 dir);
+	void CatchOrThorw();
+	void Catch();
+	void Throw();
+	GameObject* player;
+	GameObject* catchedObject;
 };

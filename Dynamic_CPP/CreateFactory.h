@@ -3,11 +3,11 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
-#include "NewBehaviourScript1.h"
-#include "NewBehaviourScript2.h"
-#include "NewBehaviourScript.h"
+#include "EntityItem.h"
+#include "EntityAsis.h"
 #include "Temp.h"
 #include "Entity.h"
+#include "Player.h"
 #include "TestBehavior.h"
 #include "AsisMove.h"
 

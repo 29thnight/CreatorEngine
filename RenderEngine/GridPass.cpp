@@ -112,7 +112,7 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
 	m_gridConstant.view = camera.CalculateView();
 	m_gridConstant.projection = camera.CalculateProjection();
 
-    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f }; // 블렌드 팩터 (사용되지 않음)
+    float blendFactor[4] = { 0.5f, 0.5f, 0.5f, 0.5f }; // 블렌드 팩터 (사용되지 않음)
     UINT sampleMask = 0xffffffff; // 샘플 마스크 (모든 샘플 활성화)
 	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, blendFactor, sampleMask);
 

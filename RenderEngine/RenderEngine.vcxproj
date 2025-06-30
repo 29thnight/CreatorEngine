@@ -197,6 +197,7 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
+    <ClCompile Include="TestAniScprit.cpp" />
     <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
@@ -291,6 +292,7 @@
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
+    <ClInclude Include="TestAniScprit.h" />
     <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />

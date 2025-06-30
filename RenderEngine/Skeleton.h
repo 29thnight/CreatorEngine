@@ -38,7 +38,7 @@ public:
 	static constexpr uint32 MAX_BONES{ 512 };
 
 	bool HasSocket() { return !m_sockets.empty(); }
-	void MakeSocket(const std::string_view& socketName, const std::string_view& objectName);
+	void MakeSocket(const std::string_view& socketName);
 	Socket* FindSocket(const std::string_view& socketName);
 	void DeleteSocket(const std::string_view& socketName);
 	Bone* FindBone(const std::string_view& _name);

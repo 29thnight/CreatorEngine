@@ -482,6 +482,9 @@
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
+    <ClCompile Include="TestAniScprit.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClCompile>
@@ -774,6 +777,9 @@
     </ClInclude>
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
+    </ClInclude>
+    <ClInclude Include="TestAniScprit.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="AssetJob.h">
       <Filter>Asset\JobSystem\Asset</Filter>
