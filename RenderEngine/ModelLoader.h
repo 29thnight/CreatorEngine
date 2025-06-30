@@ -75,7 +75,7 @@ private:
 	Mathf::Vector3 min{};
 	Mathf::Vector3 max{};
 
-	static ThreadPool<std::function<void()>> ModelLoadPool;
+	//static ThreadPool<std::function<void()>> ModelLoadPool;
 
 	bool m_hasBones{ false };
 	bool m_isInitialized{ false };

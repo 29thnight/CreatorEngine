@@ -6,10 +6,10 @@
 #include "LightMapping.h"
 #include "IOnDistroy.h"
 #include "IAwakable.h"
-#include "../RenderEngine/Mesh.h"
-#include "../RenderEngine/Material.h"
 #include "MeshRenderer.generated.h"
 
+class Mesh;
+class Material;
 class Animator;
 class OctreeNode;
 class MeshRenderer : public Component, public IOnDistroy, public IAwakable

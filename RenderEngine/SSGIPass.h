@@ -41,7 +41,7 @@ private:
 
 	float intensity = 1.f;
 	bool useOnlySSGI = false;
-	bool useDualFiltering = true;
+	int useDualFilteringStep = 2;
 
 	bool isOn = true;
 };

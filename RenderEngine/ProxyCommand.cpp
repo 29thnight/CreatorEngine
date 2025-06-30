@@ -2,6 +2,7 @@
 #include "MeshRenderer.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
+#include "Material.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
