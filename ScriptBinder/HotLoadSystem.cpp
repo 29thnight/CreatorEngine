@@ -12,6 +12,104 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
+#include <winternl.h>                   //PROCESS_BASIC_INFORMATION
+
+
+// warning C4996: 'GetVersionExW': was declared deprecated
+#pragma warning (disable : 4996)
+bool IsWindows8OrGreater()
+{
+	OSVERSIONINFO ovi = { 0 };
+	ovi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+
+	GetVersionEx(&ovi);
+	if ((ovi.dwMajorVersion == 6 && ovi.dwMinorVersion >= 2) || ovi.dwMajorVersion > 6)
+		return true;
+
+	return false;
+} //IsWindows8OrGreater
+#pragma warning (default : 4996)
+
+
+
+bool ReadMem(void* addr, void* buf, int size)
+{
+	BOOL b = ReadProcessMemory(GetCurrentProcess(), addr, buf, size, nullptr);
+	return b != FALSE;
+}
+
+#ifdef _WIN64
+#define BITNESS 1
+#else
+#define BITNESS 0
+#endif
+
+typedef NTSTATUS(NTAPI* pfuncNtQueryInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+
+
+int GetModuleLoadCount(HMODULE hDll)
+{
+	// Not supported by earlier versions of windows.
+	if (!IsWindows8OrGreater())
+		return 0;
+
+	PROCESS_BASIC_INFORMATION pbi = { 0 };
+
+	HMODULE hNtDll = LoadLibraryA("ntdll.dll");
+	if (!hNtDll)
+		return 0;
+
+	pfuncNtQueryInformationProcess pNtQueryInformationProcess = (pfuncNtQueryInformationProcess)GetProcAddress(hNtDll, "NtQueryInformationProcess");
+	bool b = pNtQueryInformationProcess != nullptr;
+	if (b) b = NT_SUCCESS(pNtQueryInformationProcess(GetCurrentProcess(), ProcessBasicInformation, &pbi, sizeof(pbi), nullptr));
+	FreeLibrary(hNtDll);
+
+	if (!b)
+		return 0;
+
+	char* LdrDataOffset = (char*)(pbi.PebBaseAddress) + offsetof(PEB, Ldr);
+	char* addr;
+	PEB_LDR_DATA LdrData;
+
+	if (!ReadMem(LdrDataOffset, &addr, sizeof(void*)) || !ReadMem(addr, &LdrData, sizeof(LdrData)))
+		return 0;
+
+	LIST_ENTRY* head = LdrData.InMemoryOrderModuleList.Flink;
+	LIST_ENTRY* next = head;
+
+	do {
+		LDR_DATA_TABLE_ENTRY LdrEntry;
+		LDR_DATA_TABLE_ENTRY* pLdrEntry = CONTAINING_RECORD(head, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+
+		if (!ReadMem(pLdrEntry, &LdrEntry, sizeof(LdrEntry)))
+			return 0;
+
+		if (LdrEntry.DllBase == (void*)hDll)
+		{
+			//  
+			//  http://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm
+			//
+			int offDdagNode = (0x14 - BITNESS) * sizeof(void*);   // See offset on LDR_DDAG_NODE *DdagNode;
+
+			ULONG count = 0;
+			char* addrDdagNode = ((char*)pLdrEntry) + offDdagNode;
+
+			//
+			//  http://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_ddag_node.htm
+			//  See offset on ULONG LoadCount;
+			//
+			if (!ReadMem(addrDdagNode, &addr, sizeof(void*)) || !ReadMem(addr + 3 * sizeof(void*), &count, sizeof(count)))
+				return 0;
+
+			return (int)count;
+		} //if
+
+		head = LdrEntry.InMemoryOrderLinks.Flink;
+	} while (head != next);
+
+	return 0;
+} //GetModuleLoadCount
+
 std::string AnsiToUtf8(const std::string& ansiStr)
 {
     // ANSI → Wide
@@ -111,13 +209,13 @@ void HotLoadSystem::Initialize()
 	command = std::wstring(L"cmd /c \"")
         + L"\"" + msbuildPath + L"\" "
         + L"\"" + slnPath + L"\" "
-        + L"/m /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /nologo"
+        + L"/m /t:Build /p:Configuration=Debug /p:Platform=x64 /nologo"
         + L"\"";
 #else
 	command = std::wstring(L"cmd /c \"")
 		+ L"\"" + msbuildPath + L"\" "
 		+ L"\"" + slnPath + L"\" "
-		+ L"/m /t:Rebuild /p:Configuration=Release /p:Platform=x64 /nologo"
+		+ L"/m /t:Build /p:Configuration=Release /p:Platform=x64 /nologo"
 		+ L"\"";
 #endif
 
@@ -158,23 +256,22 @@ void HotLoadSystem::Shutdown()
 
 bool HotLoadSystem::IsScriptUpToDate()
 {
-	//if (!m_isStartUp)
-	//{
-	//	m_isStartUp = true;
-	//	return false; // 처음 시작할 때는 항상 빌드 필요
-	//}
+	if (!m_isStartUp)
+	{
+		m_isStartUp = true;
+	}
 
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
-	file::path dllMainPath = PathFinder::DynamicSolutionPath("dllmain.cpp");
+	file::path funcMainPath = PathFinder::DynamicSolutionPath("funcMain.h");
 	file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
 
 	if (!file::exists(dllPath))
 		return false; // DLL 파일이 존재하지 않으면 빌드 필요
 
 	auto dllTimeStamp = file::last_write_time(dllPath);
-	auto dllMainTimeStamp = file::last_write_time(dllMainPath);
+	auto funcMainTimeStamp = file::last_write_time(funcMainPath);
 
-	if (dllTimeStamp > dllMainTimeStamp) return false; // 빌드 필요함 (DLL이 dllmain.cpp보다 최신임)
+	if (funcMainTimeStamp > dllTimeStamp) return false; // 빌드 필요함
 
 	for (const auto& scriptName : m_scriptNames)
 	{
@@ -460,7 +557,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 	std::string scriptHeaderFilePath = PathFinder::Relative("Script\\" + scriptHeaderFileName).string();
 	std::string scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptBodyFileName).string();
 	std::string scriptFactoryPath = PathFinder::DynamicSolutionPath("CreateFactory.h").string();
-	std::string scriptFactoryFuncPath = PathFinder::DynamicSolutionPath("dllmain.cpp").string();
+	std::string scriptFactoryFuncPath = PathFinder::DynamicSolutionPath("funcMain.h").string();
 	std::string scriptProjPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj").string();
 	std::string scriptFilterPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj.filters").string();
 	//Create Script File
@@ -663,7 +760,11 @@ void HotLoadSystem::Compile()
 				gameObject->m_components[index].reset();
 			}
 		}
-		FreeLibrary(hDll);
+
+		while(GetModuleLoadCount(hDll) > 0)
+		{
+			FreeLibrary(hDll);
+		}
 		m_scriptFactoryFunc		= nullptr;
 		m_initModuleFunc		= nullptr;
 		m_scriptNamesFunc		= nullptr;
@@ -675,7 +776,7 @@ void HotLoadSystem::Compile()
 	{
 		try
 		{
-			if (!IsScriptUpToDate()) RunMsbuildWithLiveLog(command);
+			RunMsbuildWithLiveLog(command);
 		}
 		catch (const std::exception& e)
 		{
@@ -689,7 +790,8 @@ void HotLoadSystem::Compile()
 		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
 	}
 
-	hDll = LoadLibraryA(PathFinder::RelativeToExecutable("Dynamic_CPP.dll").string().c_str());
+	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
+	hDll = LoadLibraryA(dllPath.string().c_str());
 	if (!hDll)
 	{
 		m_isReloading = false;

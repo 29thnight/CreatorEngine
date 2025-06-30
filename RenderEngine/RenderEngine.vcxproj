@@ -154,6 +154,7 @@
     <ClCompile Include="Animation.cpp" />
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
+    <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="BitMaskPass.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
     <ClCompile Include="ColorModuleCS.cpp" />
@@ -234,6 +235,7 @@
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetBundle.h" />
+    <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BitMaskPass.h" />
