@@ -42,6 +42,13 @@ public:
 	virtual void OnDestroy() {};
 
 public:
+	[[Property]]
+	FileGuid	m_scriptGuid{};
+	HashedGuid	m_scriptTypeID{ type_guid(ModuleBehavior) };
+
+public:
+#pragma region ScriptBinder
+	// 스크립트 바인딩을 위한 함수 및 델리게이트 핸들러
 	Core::DelegateHandle m_awakeEventHandle{};
     Core::DelegateHandle m_onEnableEventHandle{};
 	Core::DelegateHandle m_startEventHandle{};
@@ -56,11 +63,7 @@ public:
 	Core::DelegateHandle m_lateUpdateEventHandle{};
     Core::DelegateHandle m_onDisableEventHandle{};
     Core::DelegateHandle m_onDestroyEventHandle{};
-	[[Property]]
-	FileGuid m_scriptGuid{};
-	HashedGuid m_scriptTypeID{ type_guid(ModuleBehavior) };
 
-public:
 	void AwakeInvoke()
 	{
 		if (m_isCallAwake == false)
@@ -174,6 +177,8 @@ public:
 			m_isCallAwake = false;
 		}
 	}
+
+#pragma endregion
 
 public:
 	bool m_isCallAwake{ false };
