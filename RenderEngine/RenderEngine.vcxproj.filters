@@ -491,11 +491,11 @@
     <ClCompile Include="SizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClCompile>
-    <ClCompile Include="EffectComponent.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
     <ClCompile Include="EffectEditor.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectManagerProxy.cpp">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -769,11 +769,11 @@
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClInclude>
-    <ClInclude Include="EffectComponent.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
     <ClInclude Include="EffectEditor.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectManagerProxy.h">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

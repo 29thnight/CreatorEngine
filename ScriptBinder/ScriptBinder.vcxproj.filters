@@ -252,6 +252,9 @@
     <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -499,6 +502,9 @@
     </ClInclude>
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

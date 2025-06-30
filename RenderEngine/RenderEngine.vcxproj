@@ -161,9 +161,9 @@
     <ClCompile Include="BillboardModuleGPU.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="EffectBase.cpp" />
-    <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="EffectEditor.cpp" />
     <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="EffectManagerProxy.cpp" />
     <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -245,9 +245,9 @@
     <ClInclude Include="BillboardModuleGPU.h" />
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="EffectBase.h" />
-    <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EffectEditor.h" />
     <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="EffectManagerProxy.h" />
     <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>

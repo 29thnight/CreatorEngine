@@ -107,6 +107,7 @@ private:
 	std::unique_ptr<AAPass>						m_pAAPass{};
 	std::unique_ptr<PostProcessingPass>			m_pPostProcessingPass{};
 	std::unique_ptr<EffectManager>				m_pEffectPass{};
+	std::unique_ptr<EffectEditor>				m_EffectEditor;
 
 	std::unique_ptr<PositionMapPass>			m_pPositionMapPass{};
 	std::unique_ptr<LightMapPass>				m_pLightMapPass{};
@@ -124,9 +125,6 @@ private:
 	std::unique_ptr<TerrainGizmoPass>   m_pTerrainGizmoPass{};
 	//buffers
 	ComPtr<ID3D11Buffer>				m_ModelBuffer;
-
-	// 어디다 넣을지 모르겠다
-	std::unique_ptr<EffectEditor> m_EffectEditor;
 
 	//Textures
 	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };

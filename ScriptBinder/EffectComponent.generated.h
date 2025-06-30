@@ -9,6 +9,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(Apply) \
 		meta_method(PlayPreview) \
 	}); \
 	FieldEnd(EffectComponent, PropertyAndMethodInheritance) \

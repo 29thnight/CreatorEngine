@@ -202,99 +202,131 @@ void EffectEditor::RenderModuleDetailEditor()
 void EffectEditor::RenderMainEditor()
 {
     if (!m_isEditingEmitter && !m_isModifyingEmitter) {
-        if (ImGui::Button("Create New Emitter")) {
-            StartCreateEmitter();
-        }
+        // 창을 상하로 분할
+        ImVec2 windowSize = ImGui::GetContentRegionAvail();
 
-        RenderPreviewControls();
+        // 상단 영역: 에미터 생성 및 내보내기
+        if (ImGui::BeginChild("CreateSection", ImVec2(0, windowSize.y * 0.3f), true)) {
+            // 드래그 드롭 타겟 추가
+            RenderTextureDragDropTarget();
 
-        if (!m_tempEmitters.empty()) {
-            ImGui::Separator();
-            ImGui::Text("Export to Game");
+            if (ImGui::Button("Create New Emitter")) {
+                StartCreateEmitter();
+            }
 
-            static char effectName[256] = "MyCustomEffect";
-            ImGui::InputText("Effect Name", effectName, sizeof(effectName));
+            if (!m_tempEmitters.empty()) {
+                ImGui::Separator();
+                ImGui::Text("Export to Game");
 
-            if (ImGui::Button("Export to Game")) {
-                ExportToManager(std::string(effectName));
+                static char effectName[256] = "MyCustomEffect";
+                ImGui::InputText("Effect Name", effectName, sizeof(effectName));
+
+                if (ImGui::Button("Export to Game")) {
+                    ExportToManager(std::string(effectName));
+                }
             }
         }
+        ImGui::EndChild();
 
-        // 임시 에미터들 표시 (수정된 부분)
-        if (!m_tempEmitters.empty()) {
-            ImGui::Separator();
-            ImGui::Text("Preview Emitters (%zu)", m_tempEmitters.size());
+        // 하단 영역: 에미터 관리 및 미리보기
+        if (ImGui::BeginChild("ManageSection", ImVec2(0, 0), true)) {
+            // 드래그 드롭 타겟 추가
+            RenderTextureDragDropTarget();
 
-            for (int i = 0; i < m_tempEmitters.size(); ++i) {
-                ImGui::PushID(i);
+            RenderPreviewControls();
 
-                ImGui::Text("Emitter %d: %s", i, m_tempEmitters[i].name.c_str());
+            if (!m_tempEmitters.empty()) {
+                ImGui::Text("Preview Emitters (%zu)", m_tempEmitters.size());
+                ImGui::Separator();
 
-                // 위치 설정
-                if (m_tempEmitters[i].particleSystem) {
-                    Mathf::Vector3 currentPos = m_tempEmitters[i].particleSystem->GetPosition();
-                    float pos[3] = { currentPos.x, currentPos.y, currentPos.z };
-                    if (ImGui::DragFloat3("Position", pos, 0.1f)) {
-                        m_tempEmitters[i].particleSystem->SetPosition(Mathf::Vector3(pos[0], pos[1], pos[2]));
-                    }
-                }
+                for (int i = 0; i < m_tempEmitters.size(); ++i) {
+                    ImGui::PushID(i);
 
-                // 텍스처 할당 UI
-                ImGui::Text("Assign Texture:");
-                ImGui::SameLine();
+                    ImGui::Text("Emitter %d: %s", i, m_tempEmitters[i].name.c_str());
 
-                if (!m_textures.empty()) {
-                    static int selectedTextureIndex = 0;
-                    std::string comboLabel = "Texture##" + std::to_string(i);
-
-                    if (ImGui::BeginCombo(comboLabel.c_str(), ("Texture " + std::to_string(selectedTextureIndex)).c_str())) {
-                        for (int t = 0; t < m_textures.size(); ++t) {
-                            bool isSelected = (selectedTextureIndex == t);
-                            std::string textureLabel = "Texture " + std::to_string(t);
-                            if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-                                selectedTextureIndex = t;
-                            }
-                            if (isSelected) {
-                                ImGui::SetItemDefaultFocus();
-                            }
+                    // 위치 설정
+                    if (m_tempEmitters[i].particleSystem) {
+                        Mathf::Vector3 currentPos = m_tempEmitters[i].particleSystem->GetPosition();
+                        float pos[3] = { currentPos.x, currentPos.y, currentPos.z };
+                        if (ImGui::DragFloat3("Position", pos, 0.1f)) {
+                            m_tempEmitters[i].particleSystem->SetPosition(Mathf::Vector3(pos[0], pos[1], pos[2]));
                         }
-                        ImGui::EndCombo();
                     }
 
+                    // 텍스처 할당 UI
+                    ImGui::Text("Assign Texture:");
                     ImGui::SameLine();
-                    if (ImGui::Button(("Assign##" + std::to_string(i)).c_str())) {
-                        AssignTextureToEmitter(i, selectedTextureIndex);
+
+                    if (!m_textures.empty()) {
+                        static int selectedTextureIndex = 0;
+                        std::string comboLabel = "Texture##" + std::to_string(i);
+
+                        // 현재 선택된 텍스처의 이름 표시
+                        std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
+                            ? m_textures[selectedTextureIndex]->m_name
+                            : "None";
+
+                        if (ImGui::BeginCombo(comboLabel.c_str(), currentTextureName.c_str())) {
+                            for (int t = 0; t < m_textures.size(); ++t) {
+                                bool isSelected = (selectedTextureIndex == t);
+                                std::string textureLabel = m_textures[t]->m_name;
+
+                                // 텍스처 이름이 비어있으면 기본 이름 사용
+                                if (textureLabel.empty()) {
+                                    textureLabel = "Texture " + std::to_string(t);
+                                }
+
+                                if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
+                                    selectedTextureIndex = t;
+                                }
+                                if (isSelected) {
+                                    ImGui::SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui::EndCombo();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Button(("Assign##" + std::to_string(i)).c_str())) {
+                            AssignTextureToEmitter(i, selectedTextureIndex);
+                        }
                     }
-                }
-                else {
-                    ImGui::Text("No textures loaded");
-                }
+                    else {
+                        ImGui::Text("No textures loaded");
+                    }
 
-                // 컨트롤 버튼들 (Play, Stop, Modify, Remove)
-                if (ImGui::Button("Play")) {
-                    PlayEmitterPreview(i);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Stop")) {
-                    StopEmitterPreview(i);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Modify")) {
-                    StartModifyEmitter(i);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Remove")) {
-                    RemoveEmitter(i);
-                }
+                    // 컨트롤 버튼들
+                    if (ImGui::Button("Play")) {
+                        PlayEmitterPreview(i);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Stop")) {
+                        StopEmitterPreview(i);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Modify")) {
+                        StartModifyEmitter(i);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        RemoveEmitter(i);
+                    }
 
-                ImGui::PopID();
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
             }
         }
+        ImGui::EndChild();
     }
     else if (m_isEditingEmitter) {
+        // 에미터 편집 모드에서도 드래그 드롭 적용
+        RenderTextureDragDropTarget();
         RenderEmitterEditor();
     }
     else if (m_isModifyingEmitter) {
+        // 에미터 수정 모드에서도 드래그 드롭 적용
+        RenderTextureDragDropTarget();
         RenderModifyEmitterEditor();
     }
 }
@@ -321,6 +353,14 @@ void EffectEditor::RenderModifyEmitterEditor()
     if (!m_modifyingSystem) return;
 
     ImGui::Text("Modifying Emitter: %s", m_tempEmitters[m_modifyingEmitterIndex].name.c_str());
+
+    // 이름 변경 입력 필드 추가
+    if (!m_emitterNameInitialized) {
+        strcpy_s(m_newEmitterName, sizeof(m_newEmitterName), m_tempEmitters[m_modifyingEmitterIndex].name.c_str());
+        m_emitterNameInitialized = true;
+    }
+
+    ImGui::InputText("Emitter Name", m_newEmitterName, sizeof(m_newEmitterName));
     ImGui::Separator();
 
     // 모듈 리스트 표시
@@ -354,7 +394,7 @@ void EffectEditor::RenderModifyEmitterEditor()
         bool isSelected = (m_selectedModuleForEdit == moduleIndex);
         if (ImGui::Selectable((moduleName + "##" + std::to_string(moduleIndex)).c_str(), isSelected)) {
             m_selectedModuleForEdit = isSelected ? -1 : moduleIndex;
-            m_selectedRenderForEdit = -1; // 모듈 선택시 렌더 선택 해제
+            m_selectedRenderForEdit = -1;
         }
 
         ImGui::PopID();
@@ -371,7 +411,7 @@ void EffectEditor::RenderModifyEmitterEditor()
     for (auto it = renderList.begin(); it != renderList.end(); ++it) {
         RenderModules& render = **it;
 
-        ImGui::PushID(renderIndex + 1000); // ID 충돌 방지
+        ImGui::PushID(renderIndex + 1000);
 
         std::string renderName = "Unknown Render";
         if (dynamic_cast<BillboardModuleGPU*>(&render)) {
@@ -384,7 +424,7 @@ void EffectEditor::RenderModifyEmitterEditor()
         bool isSelected = (m_selectedRenderForEdit == renderIndex);
         if (ImGui::Selectable((renderName + "##" + std::to_string(renderIndex)).c_str(), isSelected)) {
             m_selectedRenderForEdit = isSelected ? -1 : renderIndex;
-            m_selectedModuleForEdit = -1; // 렌더 선택시 모듈 선택 해제
+            m_selectedModuleForEdit = -1;
         }
 
         ImGui::PopID();
@@ -400,15 +440,72 @@ void EffectEditor::RenderModifyEmitterEditor()
 
     ImGui::Separator();
 
-    // 저장/취소 버튼
+    // 저장/취소 버튼 - 이름을 매개변수로 전달
     if (ImGui::Button("Save Changes")) {
-        SaveModifiedEmitter();
+        SaveModifiedEmitter(std::string(m_newEmitterName));
+        m_emitterNameInitialized = false; // 다음번을 위해 초기화 플래그 리셋
     }
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
         CancelModifyEmitter();
+        m_emitterNameInitialized = false; // 취소시에도 플래그 리셋
     }
 }
+
+void EffectEditor::RenderTextureDragDropTarget()
+{
+    // 현재 창의 전체 영역을 드래그 드롭 타겟으로 설정
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 windowPos = ImGui::GetCursorScreenPos();
+    ImRect dropRect(windowPos, ImVec2(windowPos.x + availSize.x, windowPos.y + availSize.y));
+
+    if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("EffectEditorDropTarget")))
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+        {
+            const char* droppedFilePath = (const char*)payload->Data;
+            file::path filename = droppedFilePath;
+            file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
+
+            // 텍스처 로드
+            Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
+
+            if (texture)
+            {
+                // 텍스처에 파일명 설정 (확장자 제거)
+                std::string textureName = filename.stem().string();
+                texture->m_name = textureName;
+
+                // 이름으로 중복 체크
+                bool isDuplicate = false;
+                for (const auto& existingTexture : m_textures)
+                {
+                    if (existingTexture->m_name == textureName)
+                    {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+
+                if (!isDuplicate)
+                {
+                    m_textures.push_back(texture);
+                    std::cout << "Texture added to EffectEditor: " << textureName << std::endl;
+                }
+                else
+                {
+                    std::cout << "Texture already exists in list: " << textureName << std::endl;
+                }
+            }
+            else
+            {
+                std::cout << "Failed to load texture: " << filepath.string() << std::endl;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+}
+
 
 void EffectEditor::StartModifyEmitter(int index)
 {
@@ -418,11 +515,17 @@ void EffectEditor::StartModifyEmitter(int index)
         m_modifyingSystem = m_tempEmitters[index].particleSystem;
         m_selectedModuleForEdit = -1;
         m_selectedRenderForEdit = -1;
+        m_emitterNameInitialized = false;
     }
 }
 
-void EffectEditor::SaveModifiedEmitter()
+void EffectEditor::SaveModifiedEmitter(const std::string& name)
 {
+    // 이름이 비어있지 않다면 새 이름으로 업데이트
+    if (!name.empty()) {
+        m_tempEmitters[m_modifyingEmitterIndex].name = name;
+    }
+
     // 수정사항은 이미 실시간으로 적용되므로 상태만 초기화
     m_isModifyingEmitter = false;
     m_modifyingEmitterIndex = -1;
@@ -446,6 +549,15 @@ void EffectEditor::RenderEmitterEditor()
     if (!m_editingEmitter) return;
 
     ImGui::Text("Creating New Emitter");
+    ImGui::Separator();
+
+    // 에미터 이름 입력 필드 추가
+    if (!m_emitterNameInitialized) {
+        strcpy_s(m_newEmitterName, sizeof(m_newEmitterName), "NewEmitter");
+        m_emitterNameInitialized = true;
+    }
+
+    ImGui::InputText("Emitter Name", m_newEmitterName, sizeof(m_newEmitterName));
     ImGui::Separator();
 
     // 모듈 선택 및 추가
@@ -501,9 +613,9 @@ void EffectEditor::RenderEmitterEditor()
 
     ImGui::Separator();
 
-    // 저장/취소 버튼
+    // 저장/취소 버튼 - 이름을 매개변수로 전달
     if (ImGui::Button("Save Emitter")) {
-        SaveCurrentEmitter();
+        SaveCurrentEmitter(std::string(m_newEmitterName));
     }
 
     ImGui::SameLine();
@@ -518,17 +630,18 @@ void EffectEditor::StartCreateEmitter()
     m_isEditingEmitter = true;
 }
 
-void EffectEditor::SaveCurrentEmitter()
+void EffectEditor::SaveCurrentEmitter(const std::string& name)
 {
     if (m_editingEmitter) {
         TempEmitterInfo newEmitter;
         newEmitter.particleSystem = m_editingEmitter;
-        newEmitter.name = "Emitter_" + std::to_string(m_tempEmitters.size() + 1);
+        newEmitter.name = name.empty() ? ("Emitter_" + std::to_string(m_tempEmitters.size() + 1)) : name;
         newEmitter.isPlaying = false;
 
         m_tempEmitters.push_back(newEmitter);
         m_editingEmitter = nullptr;
         m_isEditingEmitter = false;
+        m_emitterNameInitialized = false;
     }
 }
 

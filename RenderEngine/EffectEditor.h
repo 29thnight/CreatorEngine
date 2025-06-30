@@ -32,8 +32,8 @@ public:
     void Render(RenderScene& scene, Camera& camera);
     void ExportToManager(const std::string& effectName);
     void Update(float delta);
-    // 미리보기 전용 메서드들
 
+    // 미리보기 전용 메서드들
     void PlayPreview();
     void StopPreview();
     void PlayEmitterPreview(int index);
@@ -43,7 +43,7 @@ public:
 
     // spawn module용 설정 메서드
     void StartModifyEmitter(int index);
-    void SaveModifiedEmitter();
+    void SaveModifiedEmitter(const std::string& name = "");
     void CancelModifyEmitter();
     void RenderModuleDetailEditor();
     void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
@@ -54,6 +54,8 @@ public:
 private:
     // 미리보기용 임시 에미터들
     std::vector<TempEmitterInfo> m_tempEmitters;
+    char m_newEmitterName[256];
+    bool m_emitterNameInitialized;
 
     // 현재 편집 중인 에미터
     std::shared_ptr<ParticleSystem> m_editingEmitter = nullptr;
@@ -97,19 +99,24 @@ private:
     int m_selectedRenderForEdit = -1;
 
 
+
+private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
     void RenderEmitterEditor();
     void RenderExistingModules();
     void RenderPreviewControls();
     void RenderModifyEmitterEditor();
+    void RenderTextureDragDropTarget();
+
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();
-    void SaveCurrentEmitter();
+    void SaveCurrentEmitter(const std::string& name);
     void CancelEditing();
 
     // 모듈 추가
     void AddSelectedModule();
     void AddSelectedRender();
+
 };
