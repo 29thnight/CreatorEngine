@@ -6,8 +6,6 @@
 
 namespace ed = ax::NodeEditor;
 
-EffectManager* EffectManager::s_currentInstance = nullptr;
-
 void EffectManager::Initialize()
 {
 

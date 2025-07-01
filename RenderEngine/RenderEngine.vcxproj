@@ -167,6 +167,7 @@
     <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="EffectProxyController.cpp" />
     <ClCompile Include="LODGroup.cpp" />
     <ClCompile Include="LODSetting.cpp" />
     <ClCompile Include="MeshModuleGPU.cpp" />
@@ -251,6 +252,7 @@
     <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="EffectProxyController.h" />
     <ClInclude Include="LODGroup.h" />
     <ClInclude Include="LODSetting.h" />
     <ClInclude Include="MeshModuleGPU.h" />

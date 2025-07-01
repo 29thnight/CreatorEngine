@@ -129,7 +129,7 @@ void EffectEditor::ExportToManager(const std::string& effectName)
     }
 
     // EffectManager에 등록
-    if (auto* manager = EffectManager::GetCurrent()) {
+    if (auto* manager = efm.get()) {
         manager->RegisterCustomEffect(effectName, emittersToExport);
 
         // 등록된 Effect를 바로 재생

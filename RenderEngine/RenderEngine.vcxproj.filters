@@ -497,6 +497,9 @@
     <ClCompile Include="EffectManagerProxy.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
+    <ClCompile Include="EffectProxyController.cpp">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -773,6 +776,9 @@
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
     <ClInclude Include="EffectManagerProxy.h">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectProxyController.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
   </ItemGroup>
