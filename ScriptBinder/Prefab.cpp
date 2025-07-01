@@ -33,7 +33,7 @@ GameObject* Prefab::Instantiate(const std::string_view& newName) const
     if (!scene)
         return nullptr;
 
-    GameObjectType type = m_prefabData["m_gameObjectType"].as<GameObjectType>();
+    GameObjectType type = (GameObjectType)m_prefabData["m_gameObjectType"].as<int>();
     GameObject::Index parent = m_prefabData["m_parentIndex"].as<GameObject::Index>();
 
     auto objPtr = scene->LoadGameObject(make_guid(), newName.empty() ? m_prefabData["m_name"].as<std::string>() : std::string(newName), type, parent);

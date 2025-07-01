@@ -3,6 +3,8 @@ Dynamic_CPP/Assets/Shaders\AutoExposureHistogram.cs.hlsl: LuminanceHistogramData
 Dynamic_CPP/Assets/Shaders\AutoExposureHistogram.cs.hlsl: HDRTexture -> t0
 Dynamic_CPP/Assets/Shaders\AutoExposureShared.hlsli: ExposureCB -> b0
 Dynamic_CPP/Assets/Shaders\BillBoard.cs.hlsl: CameraConstants -> b0
+Dynamic_CPP/Assets/Shaders\BillBoard.ps.hlsl: sparkleTexture -> t0
+Dynamic_CPP/Assets/Shaders\BillBoard.ps.hlsl: linearSampler -> s0
 Dynamic_CPP/Assets/Shaders\BillBoard.vs.hlsl: ModelConstantBuffer -> b0
 Dynamic_CPP/Assets/Shaders\Blit.ps.hlsl: src -> t0
 Dynamic_CPP/Assets/Shaders\BloomComposite.ps.hlsl: tex0 -> t0
@@ -77,6 +79,12 @@ Dynamic_CPP/Assets/Shaders\Material.hlsli: Diffuse -> t0
 Dynamic_CPP/Assets/Shaders\Material.hlsli: NormalMap -> t1
 Dynamic_CPP/Assets/Shaders\Material.hlsli: Specular -> t2
 Dynamic_CPP/Assets/Shaders\Material.hlsli: Material -> b0
+Dynamic_CPP/Assets/Shaders\MeshParticle.ps.hlsl: gDiffuseTexture -> t0
+Dynamic_CPP/Assets/Shaders\MeshParticle.ps.hlsl: gLinearSampler -> s0
+Dynamic_CPP/Assets/Shaders\MeshParticle.ps.hlsl: gPointSampler -> s1
+Dynamic_CPP/Assets/Shaders\MeshParticle.vs.hlsl: MeshConstantBuffer -> b0
+Dynamic_CPP/Assets/Shaders\MeshSpawnModule.cs.hlsl: SpawnParameters -> b0
+Dynamic_CPP/Assets/Shaders\MeshSpawnModule.cs.hlsl: MeshParticleTemplate -> b1
 Dynamic_CPP/Assets/Shaders\MovementModule.cs.hlsl: MovementParams -> b0
 Dynamic_CPP/Assets/Shaders\PixelShader.ps.hlsl: Diffuse -> t0
 Dynamic_CPP/Assets/Shaders\PixelShader.ps.hlsl: NormalMap -> t1
@@ -87,6 +95,7 @@ Dynamic_CPP/Assets/Shaders\RectToCubeMap.ps.hlsl: SkyboxTexture -> t0
 Dynamic_CPP/Assets/Shaders\Sampler.hlsli: LinearSampler -> s0
 Dynamic_CPP/Assets/Shaders\Sampler.hlsli: PointSampler -> s1
 Dynamic_CPP/Assets/Shaders\Sampler.hlsli: ClampSampler -> s2
+Dynamic_CPP/Assets/Shaders\SizeModule.cs.hlsl: SizeParams -> b0
 Dynamic_CPP/Assets/Shaders\Skybox.ps.hlsl: SkyboxTexture -> t0
 Dynamic_CPP/Assets/Shaders\Skybox.vs.hlsl: PerObject -> b0
 Dynamic_CPP/Assets/Shaders\Skybox.vs.hlsl: PerFrame -> b1

@@ -270,8 +270,8 @@
     <Filter Include="Asset\JobSystem\Asset">
       <UniqueIdentifier>{8fd7ed60-c364-4d51-988d-8434ef51db2c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ManagerSystem\ReferenceAssets">
-      <UniqueIdentifier>{2b0dcc16-18b4-487b-957c-42ced7d3cc45}</UniqueIdentifier>
+    <Filter Include="Resources\AssetBundle">
+      <UniqueIdentifier>{fe7e6475-d490-4ac1-a741-7548758437e4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -748,9 +748,6 @@
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
-    <ClInclude Include="ReferenceAssets.h">
-      <Filter>Asset\ManagerSystem\ReferenceAssets</Filter>
-    </ClInclude>
     <ClInclude Include="BitMaskPass.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClInclude>
@@ -783,6 +780,12 @@
     </ClInclude>
     <ClInclude Include="AssetJob.h">
       <Filter>Asset\JobSystem\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetBundle.h">
+      <Filter>Resources\AssetBundle</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetEntry.h">
+      <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

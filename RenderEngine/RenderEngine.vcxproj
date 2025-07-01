@@ -234,7 +234,8 @@
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
-    <ClInclude Include="ReferenceAssets.h" />
+    <ClInclude Include="AssetBundle.h" />
+    <ClInclude Include="AssetEntry.h" />
     <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />

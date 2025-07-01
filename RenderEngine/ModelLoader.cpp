@@ -173,7 +173,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
-
+	meshObj->m_modelName = m_model->name;
 	//if(!m_model->m_hasBones)
 	//{
 	//	MeshOptimizer::Optimize(*meshObj, 1.05f);
@@ -698,6 +698,8 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
 
+	SceneManagers->m_threadPool->NotifyAllAndWait();
+
 	return rootObject.get();
 }
 
@@ -730,8 +732,6 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 	{
 		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
 	}
-
-	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return rootObject.get();
 }

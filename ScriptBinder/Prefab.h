@@ -4,10 +4,12 @@
 #include "ReflectionYml.h"
 #include "SceneManager.h"
 #include "ComponentFactory.h"
+#include "Prefab.generated.h"
 
 class Prefab : public Object
 {
 public:
+   ReflectPrefab
     [[Serializable(Inheritance:Object)]]
     Prefab() = default;
     Prefab(const std::string_view& name, const GameObject* source);
@@ -19,5 +21,8 @@ public:
 
 private:
     MetaYml::Node m_prefabData{};
+
+    [[Property]]
+	FileGuid m_fileGuid{};
 };
 

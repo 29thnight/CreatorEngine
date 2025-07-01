@@ -8,6 +8,7 @@
 #include <DirectXTK/SpriteBatch.h>
 #include "concurrent_queue.h"
 #include "AssetJob.h"
+
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
