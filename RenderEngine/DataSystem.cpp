@@ -284,7 +284,8 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	if (Models.find(name) != Models.end())
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		return Models[name].get();
+		auto model = Models[name].get();
+		return model;
 	}
 
 	Model* model = Model::LoadModel(modelPath.string());
@@ -297,7 +298,9 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 				DeallocateResource<Model>(model);
 			}
 		};
+
 		Models[name] = std::shared_ptr<Model>(model, deleter);
+
 		return model;
 	}
 	else
@@ -333,6 +336,7 @@ void DataSystem::LoadModel(const std::string_view& filePath)
         };
 
 		Models[name] = std::shared_ptr<Model>(model, deleter);
+
 	}
 	else
 	{

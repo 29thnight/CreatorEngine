@@ -1,8 +1,23 @@
 #include "Material.h"
 
+Material::Material()
+{
+}
+
+Material::Material(const Material& material) :
+	m_name(material.m_name),
+	m_pBaseColor(material.m_pBaseColor),
+	m_pNormal(material.m_pNormal),
+	m_pOccRoughMetal(material.m_pOccRoughMetal),
+	m_AOMap(material.m_AOMap),
+	m_pEmissive(material.m_pEmissive),
+	m_materialInfo(material.m_materialInfo)
+{
+}
 
 Material::Material(Material&& material) noexcept
 {
+	std::exchange(m_name, material.m_name);
 	std::exchange(m_pBaseColor, material.m_pBaseColor);
 	std::exchange(m_pNormal, material.m_pNormal);
 	std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
@@ -10,6 +25,10 @@ Material::Material(Material&& material) noexcept
 	std::exchange(m_pEmissive, material.m_pEmissive);
 
 	m_materialInfo = material.m_materialInfo;
+}
+
+Material::~Material()
+{
 }
 
 Material& Material::SetBaseColor(Mathf::Color3 color)

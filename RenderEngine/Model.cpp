@@ -37,13 +37,23 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	Model* model{};
 	try
 	{
-		if (path_.extension() == ".asset")
+		//file::path assetPath = filePath.data();
+		//assetPath = assetPath.replace_extension(".asset");
+		//if (file::exists(assetPath))
+		//{
+		//	Benchmark asset;
+		//	ModelLoader loader = ModelLoader(nullptr, assetPath.string());
+		//	model = loader.LoadModel();
+		//	model->path = path_;
+
+		//	std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
+
+		//	return model;
+		//}
+		//else
 		{
-			ModelLoader loader = ModelLoader(nullptr, path_.string());
-			model = loader.LoadModel();
-		}
-		else
-		{
+			Benchmark assimp;
+
 			flag settings = aiProcess_LimitBoneWeights
 				| aiProcessPreset_TargetRealtime_Fast
 				| aiProcess_ConvertToLeftHanded
@@ -105,6 +115,8 @@ Model* Model::LoadModel(const std::string_view& filePath)
 
 			model = loader.LoadModel(isCreateMeshCollider);
 			model->path = path_;
+
+			std::cout << assimp.GetElapsedTime() << " ms to load model from assimp file: " << path_.string() << std::endl;
 
 			return model;
 		}
@@ -195,8 +207,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
 
-	ModelLoader::ModelLoadPool.NotifyAllAndWait();
-
 	return model;
 }
 
@@ -216,8 +226,6 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 	{
 		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
-
-	ModelLoader::ModelLoadPool.NotifyAllAndWait();
 
 	return rootObj;
 }

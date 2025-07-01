@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
+class Entity;
 class Temp : public ModuleBehavior
 {
 public:
@@ -18,5 +19,12 @@ public:
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
-	virtual void OnDestroy() override  {}
+	virtual void OnDestroy() override;
+
+public:
+	void AddEntity(Entity* entity);
+	void RemoveEntity(Entity* entity);
+	std::vector<Entity*>& arrayEntities() { return m_Entities; }
+private:
+	std::vector<Entity*> m_Entities;
 };

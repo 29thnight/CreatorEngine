@@ -10,7 +10,7 @@ int ssthreads = 16;
 
 cbuffer SSGIParams
 {
-    XMMATRIX invVP;
+    XMMATRIX view;
     XMMATRIX proj;
     XMMATRIX inverseProjection;
     float2 screenSize; // 화면 크기
@@ -131,7 +131,7 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
     SSGIParams params;
-    params.invVP = camera.CalculateInverseView() * camera.CalculateInverseProjection();
+    params.view = camera.CalculateView();
     params.proj = camera.CalculateProjection();
     params.inverseProjection = XMMatrixInverse(nullptr, camera.CalculateProjection());
     params.screenSize = { DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height };
@@ -161,7 +161,7 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
     compositeParams.ratio = ssratio;
     compositeParams.useOnlySSGI = useOnlySSGI;
-    if (useDualFiltering == true) {
+    if (useDualFilteringStep > 0) {
         // Down Dual Filtering
         DirectX11::CSSetShader(defferdPtr, m_pDownDualFilteringShader->GetShader(), nullptr, 0);
         DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
@@ -177,33 +177,34 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
         DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
         DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
 
-		// Down Dual Filtering +
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture3->m_pUAV, nullptr);
-        compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
-        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+        if (useDualFilteringStep > 1) {
+            // Down Dual Filtering +
+            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture3->m_pUAV, nullptr);
+            compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
+            DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+            DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
 
-        float temp3NumThread = tempThread * 4;
-        DirectX11::Dispatch(defferdPtr,
-            (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
-            (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+            float temp3NumThread = tempThread * 4;
+            DirectX11::Dispatch(defferdPtr,
+                (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
+                (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
+            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
 
-        // Up Dual Filtering +
-        DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture3->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-        compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 4), (float)DeviceState::g_Viewport.Height / (ssratio * 4) };
-        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-        DirectX11::Dispatch(defferdPtr,
-            (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
-            (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
+            // Up Dual Filtering +
+            DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
+            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture3->m_pSRV);
+            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+            compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 4), (float)DeviceState::g_Viewport.Height / (ssratio * 4) };
+            DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
+            DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+            DirectX11::Dispatch(defferdPtr,
+                (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
+                (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
+            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
+            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+        }
 
         // Up Dual Filtering
         DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
@@ -254,8 +255,8 @@ void SSGIPass::ControlPanel()
     ImGui::PushID(this);
     ImGui::Text("SSGI");
     ImGui::Checkbox("Enable SSGI", &isOn);
-	ImGui::Checkbox("Use Dual Filtering", &useDualFiltering);
 	ImGui::Checkbox("Use Only SSGI", &useOnlySSGI);
+	ImGui::SliderInt("Use Dual Filtering", &useDualFilteringStep, 0, 2, "Step: %d");
     ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
     ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
 	ImGui::SliderFloat("Intensity", &intensity, 0.0f, 10.0f, "Intensity: %.2f");

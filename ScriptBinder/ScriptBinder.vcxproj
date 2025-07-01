@@ -183,12 +183,15 @@
     <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
+    <ClCompile Include="Prefab.cpp" />
+    <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>

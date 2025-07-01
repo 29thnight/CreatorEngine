@@ -105,6 +105,8 @@ public:
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
+	void AssetInit();
+
 	void Draw();
 	void Draw(ID3D11DeviceContext* _defferedContext);
 
@@ -112,6 +114,7 @@ public:
 	void DrawShadow(ID3D11DeviceContext* _defferedContext);
 
 	std::string GetName() const { return m_name; }
+	std::string GetModelName() const { return m_modelName; }
 
 	const std::vector<Vertex>& GetVertices() { return m_vertices; }
 	const std::vector<uint32>& GetIndices() { return m_indices; }
@@ -141,6 +144,8 @@ private:
 
     [[Property]]
 	uint32 m_materialIndex{};
+
+	std::string m_modelName;
 
 	bool m_isShadowOptimized{ false };
 

@@ -16,9 +16,10 @@ class Material
 public:
    ReflectMaterial
     [[Serializable]]
-	Material() = default;
-	Material(const Material& material) = default;
+	Material();
+	Material(const Material& material);
 	Material(Material&& material) noexcept;
+	~Material();
 
 //initialize material chainable functions
 public:
