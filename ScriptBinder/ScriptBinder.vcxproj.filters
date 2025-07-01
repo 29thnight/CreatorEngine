@@ -249,6 +249,12 @@
     <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClCompile>
+    <ClCompile Include="BehaviorTreeComponent.cpp">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeFactory.cpp">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -499,6 +505,9 @@
     </ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeFactory.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

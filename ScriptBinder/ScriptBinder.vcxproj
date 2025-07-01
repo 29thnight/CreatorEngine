@@ -162,6 +162,7 @@
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
+    <ClCompile Include="BehaviorTreeComponent.cpp" />
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
+    <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -188,6 +190,7 @@
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="Prefab.h" />
+    <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>
     </ClInclude>
