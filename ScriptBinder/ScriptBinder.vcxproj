@@ -183,6 +183,8 @@
     <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
+    <ClCompile Include="Prefab.cpp" />
+    <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
