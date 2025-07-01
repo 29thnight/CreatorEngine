@@ -75,9 +75,9 @@ public:
 	[[Property]]
 	float m_nearPlane{ 0.1f };
 	[[Property]]
-	float m_farPlane{ 500.f };
+	float m_farPlane{ 5000.f };
 	[[Property]]
-	float m_speed{ 10.f }; //&&&&&camera
+	float m_speed{ 200.f }; //&&&&&camera
 
 	float m_aspectRatio{};
 	[[Property]]

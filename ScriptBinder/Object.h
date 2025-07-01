@@ -46,7 +46,6 @@ public:
     HashingString m_name{ "Object" };
     [[Property]]
 	bool m_isEnabled{ true };
-
 protected:
     friend class SceneManager;
     friend class RenderScene;

@@ -11,7 +11,7 @@ public:
 	virtual void FixedUpdate(float fixedTick) override {}
 
 	virtual void OnTriggerEnter(const Collision& collision) override {}
-	virtual void OnTriggerStay(const Collision& collision) override {}
+	virtual void OnTriggerStay(const Collision& collision) override;
 	virtual void OnTriggerExit(const Collision& collision) override {}
 
 
@@ -28,10 +28,14 @@ public:
 	void CatchAndThrow();
 	void Catch();
 	void Throw();
+	void Attack();
 	void SwapWeaponLeft();
 	void SwapWeaponRight();
-	int m_weaponIndex = 4;
-	GameObject* player;
-	GameObject* catchedObject;
-	GameObject* m_nearObject;
+	int m_weaponIndex = 0;
+
+	std::vector<GameObject*> m_weaponInventory;
+	GameObject* m_curWeapon;
+	GameObject* player = nullptr;
+	GameObject* catchedObject = nullptr;
+	GameObject* m_nearObject = nullptr;
 };

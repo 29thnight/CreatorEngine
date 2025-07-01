@@ -95,6 +95,10 @@ public:
 
 	void SetEnabled(bool able) override final;
 
+	void SetCollisionType(unsigned int uint) { m_collisionType = uint; }
+	unsigned int GetCollisionType() { return m_collisionType; }
+	unsigned int m_collisionType = 0;
+
     [[Property]]
 	Transform m_transform{};
     [[Property]]

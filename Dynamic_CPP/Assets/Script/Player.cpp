@@ -6,25 +6,28 @@
 #include "Animator.h"
 #include "Socket.h"
 #include "pch.h"
+#include "RigidBodyComponent.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
-	
+	player->GetComponent<RigidBodyComponent>();
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {  });
-	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Pressed, [this]() {});
-	playerMap->AddButtonAction("ChargeAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Released, [this]() {});
+	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  Attack();});
+	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() {});
+	playerMap->AddButtonAction("ChargeAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() {});
 	playerMap->AddButtonAction("Dash", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() {  });
-	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	//righthand->m_offset= DirectX::SimpleMath::Matrix::CreateTranslation(50.0f, 0.0f, 0.0f);
+	
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
@@ -80,33 +83,54 @@ void Player::CatchAndThrow()
 
 void Player::Catch()
 {
-	if (m_nearObject != nullptr)
+	/*if (m_nearObject != nullptr)
 	{ 
 		player = GameObject::Find("Punch");
 		auto animator = player->GetComponent<Animator>();
 		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+		m_nearObject = GameObject::Find("plane");
 		righthand->AttachObject(m_nearObject);
 		catchedObject = m_nearObject;
-	}
+	}*/
+
+	player = GameObject::Find("Punch");
+	auto animator = player->GetComponent<Animator>();
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	m_nearObject = GameObject::Find("Sting-Sword lowpoly");
+	righthand->AttachObject(m_nearObject);
+	catchedObject = m_nearObject;
 }
 
 void Player::Throw()
 {
 	player = GameObject::Find("Punch");
 	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
 	catchedObject = nullptr;
+}
+
+void Player::Attack()
+{
+	player = GameObject::Find("Punch");
+	auto animator = player->GetComponent<Animator>();
+	animator->SetParameter("Attack", true);
 }
 
 void Player::SwapWeaponLeft()
 {
 	m_weaponIndex--;
+	m_curWeapon->SetEnabled(false);
+	m_curWeapon = m_weaponInventory[m_weaponIndex];
+	m_curWeapon->SetEnabled(true);
 }
 
 void Player::SwapWeaponRight()
 {
 	m_weaponIndex++;
+	m_curWeapon->SetEnabled(false);
+	m_curWeapon = m_weaponInventory[m_weaponIndex];
+	m_curWeapon->SetEnabled(true);
 }
 
 void Player::OnCollisionEnter(const Collision& collision)
@@ -123,12 +147,30 @@ void Player::OnCollisionStay(const Collision& collision)
 	if (collision.thisObj == collision.otherObj)
 		return;
 
-	if (collision.otherObj->ToString() == "plane")
+	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
 	{
 		m_nearObject = collision.otherObj;
+		std::cout << "Sting-Sword lowpoly ºÎµúÈû";
 	}
 	else
 	{
 		m_nearObject = nullptr;
 	}
+}
+
+void Player::OnTriggerStay(const Collision& collision)
+{
+	if (collision.thisObj == collision.otherObj)
+		return;
+
+	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
+	{
+		m_nearObject = collision.otherObj;
+		std::cout << "Sting-Sword lowpoly ºÎµúÈû";
+	}
+	else
+	{
+		m_nearObject = nullptr;
+	}
+
 }
