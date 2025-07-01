@@ -89,7 +89,7 @@ void PhysicsManager::OnLoadScene()
 			auto rotationOffset = box->GetRotationOffset();
 			
 			boxInfo.colliderInfo.id = colliderID;
-			boxInfo.colliderInfo.layerNumber = obj->GetTypeID();
+			boxInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 			boxInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 			boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 			boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
@@ -150,7 +150,7 @@ void PhysicsManager::OnLoadScene()
 			unsigned int colliderID = ++m_lastColliderID;
 
 			sphereInfo.colliderInfo.id = colliderID;
-			sphereInfo.colliderInfo.layerNumber = obj->GetTypeID();
+			sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 			sphereInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 			sphereInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 			sphereInfo.colliderInfo.collsionTransform.localMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.localScale, sphereInfo.colliderInfo.collsionTransform.localRotation, sphereInfo.colliderInfo.collsionTransform.localPosition);
@@ -209,7 +209,7 @@ void PhysicsManager::OnLoadScene()
 			auto rotOffset = capsule->GetRotationOffset();
 			unsigned int colliderID = ++m_lastColliderID;
 			capsuleInfo.colliderInfo.id = colliderID;
-			capsuleInfo.colliderInfo.layerNumber = obj->GetTypeID();
+			capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 			capsuleInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 			capsuleInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 			capsuleInfo.colliderInfo.collsionTransform.localMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.localScale, capsuleInfo.colliderInfo.collsionTransform.localRotation, capsuleInfo.colliderInfo.collsionTransform.localPosition);
@@ -265,8 +265,8 @@ void PhysicsManager::OnLoadScene()
 
 			unsigned int colliderID = ++m_lastColliderID;
 			convexMeshInfo.colliderInfo.id = colliderID;
-			//convexMeshInfo.colliderInfo.layerNumber = obj->GetTypeID();
-			convexMeshInfo.colliderInfo.layerNumber = 0xffffff;
+			convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
+			//convexMeshInfo.colliderInfo.layerNumber = 0xffffff;
 
 			convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
@@ -335,7 +335,7 @@ void PhysicsManager::OnLoadScene()
 
 			ColliderID colliderID = ++m_lastColliderID;
 			controllerInfo.id = colliderID;
-			controllerInfo.layerNumber = 0;
+			controllerInfo.layerNumber = obj->GetCollisionType();
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 			controllerInfo.position = position+controller->GetPositionOffset();
 
@@ -514,7 +514,7 @@ void PhysicsManager::AddTerrainCollider(GameObject* object)
 
 	collider->SetColliderID(colliderID);
 	heightFieldInfo.colliderInfo.id = colliderID;
-	heightFieldInfo.colliderInfo.layerNumber = static_cast<unsigned int>(object->GetType());
+	heightFieldInfo.colliderInfo.layerNumber = object->GetCollisionType();
 	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 
@@ -560,7 +560,7 @@ void PhysicsManager::AddCollider(GameObject* object)
 		
 		unsigned int colliderId = ++m_lastColliderID;
 		boxInfo.colliderInfo.id = colliderId;
-		boxInfo.colliderInfo.layerNumber = 0;
+		boxInfo.colliderInfo.layerNumber = object->GetCollisionType();
 		boxInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 		boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 		boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
@@ -661,7 +661,7 @@ void PhysicsManager::SetPhysicData()
 
 			auto controllerInfo = controller->GetControllerInfo();
 			auto prevlayer = controllerInfo.layerNumber;
-			auto currentLayer = static_cast<unsigned int>(colliderInfo.gameObject->GetType());
+			auto currentLayer = static_cast<unsigned int>(colliderInfo.gameObject->GetCollisionType());
 			
 			if (prevlayer != currentLayer) {
 				data.LayerNumber = currentLayer;
@@ -787,3 +787,8 @@ void PhysicsManager::GetPhysicData()
 		}
 	}
 }
+
+//void PhysicsManager::SetCollisionMatrix(unsigned int layer, unsigned int other, bool isCollision)
+//{
+//	Physics->SetCollisionMatrix(layer, other, isCollision);
+//}
