@@ -158,9 +158,9 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         ImGui::Text("Collision Matrix");
         ImGui::Separator();
         //todo::grid matrix
-        std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
-        collisionMatrix = PhysicsManagers->GetCollisionMatrix();
-
+        if(collisionMatrix.empty()){
+            collisionMatrix = PhysicsManagers->GetCollisionMatrix();
+        }
         int flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
 
         if (ImGui::BeginChild("Matrix", ImVec2(0, 0), flags))
@@ -239,6 +239,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
             //적용된 충돌 매스릭스 저장
             PhysicsManagers->SetCollisionMatrix(collisionMatrix);
             m_bCollisionMatrixWindow = false;
+            ImGui::GetContext("CollisionMatrixPopup").Close();
         }
         
     }, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar);
