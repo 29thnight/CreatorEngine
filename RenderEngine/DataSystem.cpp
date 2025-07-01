@@ -284,7 +284,7 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	if (Models.find(name) != Models.end())
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		return Models[name].get();
+		return Models[name].lock().get();
 	}
 
 	Model* model = Model::LoadModel(modelPath.string());
@@ -352,7 +352,7 @@ Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
 	if (Models.find(name) != Models.end())
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
-		return Models[name].get();
+		return Models[name].lock().get();
 	}
 
     Model* model{};

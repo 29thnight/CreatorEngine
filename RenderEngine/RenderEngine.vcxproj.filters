@@ -195,9 +195,6 @@
     <Filter Include="RenderPass\PostProcessingPass\VolumetricFogPass">
       <UniqueIdentifier>{58f16791-412c-4cde-8140-c46c487171c6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ManagerSystem\AssetBundle">
-      <UniqueIdentifier>{2b0dcc16-18b4-487b-957c-42ced7d3cc45}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\0.Example">
       <UniqueIdentifier>{108adae5-f5fb-4472-bbce-788658390ee4}</UniqueIdentifier>
     </Filter>
@@ -272,6 +269,9 @@
     </Filter>
     <Filter Include="Asset\JobSystem\Asset">
       <UniqueIdentifier>{8fd7ed60-c364-4d51-988d-8434ef51db2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\ManagerSystem\ReferenceAssets">
+      <UniqueIdentifier>{2b0dcc16-18b4-487b-957c-42ced7d3cc45}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -748,8 +748,8 @@
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
-    <ClInclude Include="AssetBundle.h">
-      <Filter>Asset\ManagerSystem\AssetBundle</Filter>
+    <ClInclude Include="ReferenceAssets.h">
+      <Filter>Asset\ManagerSystem\ReferenceAssets</Filter>
     </ClInclude>
     <ClInclude Include="BitMaskPass.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>

@@ -187,6 +187,7 @@
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
+    <ClInclude Include="Prefab.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>
     </ClInclude>

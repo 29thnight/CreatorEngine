@@ -115,9 +115,6 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\PostProcessingManager">
-      <UniqueIdentifier>{7ea8156f-f2bf-4249-8956-67f849e68b6d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\InputAction">
       <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
     </Filter>
@@ -499,6 +496,9 @@
     </ClInclude>
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="Prefab.h">
+      <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -530,23 +530,26 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
 		Mathf::Matrix transform = node->m_transform;
 
-		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
-
-		if (m_model->m_isMakeMeshCollider)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
-			MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
-			convexMesh->SetDensity(0);
-			convexMesh->SetDynamicFriction(0);
-			convexMesh->SetStaticFriction(0);
-			convexMesh->SetRestitution(0);
-		}
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-		meshRenderer->SetEnabled(true);
-		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(transform);
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
 
 		nextIndex = object->m_index;
 		m_gameObjects.push_back(object);
@@ -643,6 +646,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+
 			nextIndex = rootObject->m_index;
 			return rootObject.get();
 		}
@@ -657,23 +661,26 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		Material* material = m_model->m_Materials[mesh->m_materialIndex];
 		Mathf::Matrix transform = node->m_transform;
 
-		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
-
-		if (m_model->m_isMakeMeshCollider)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
-			MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
-			convexMesh->SetDensity(0);
-			convexMesh->SetDynamicFriction(0);
-			convexMesh->SetStaticFriction(0);
-			convexMesh->SetRestitution(0);
-		}
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-		meshRenderer->SetEnabled(true);
-		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(transform);
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
 
 		nextIndex = object->m_index;
 		m_gameObjects.push_back(object);
@@ -724,7 +731,7 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 		GenerateSkeletonToSceneObjectHierarchy(node, bone->m_children[i], false, nextIndex);
 	}
 
-	//ModelLoadPool.NotifyAllAndWait();
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return rootObject.get();
 }

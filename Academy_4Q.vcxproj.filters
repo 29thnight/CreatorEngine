@@ -60,14 +60,14 @@
     <Filter Include="Window\NodeEditorWindow%28작성예정%29\BluePrint">
       <UniqueIdentifier>{a3693c80-6976-44ff-ab63-9f0d5d91b87e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\AssetBundleWindow%28작성예정%29">
-      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Settings\EngineSetting">
       <UniqueIdentifier>{b298e48b-fdbc-428f-ac7f-495645492ba9}</UniqueIdentifier>
     </Filter>
     <Filter Include="Settings\ProjectSetting">
       <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Window\ReferenceAssetsWindow%28작성%3f%29">
+      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
