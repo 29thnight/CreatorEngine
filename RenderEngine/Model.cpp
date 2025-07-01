@@ -37,20 +37,20 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	Model* model{};
 	try
 	{
-		//file::path assetPath = filePath.data();
-		//assetPath = assetPath.replace_extension(".asset");
-		//if (file::exists(assetPath))
-		//{
-		//	Benchmark asset;
-		//	ModelLoader loader = ModelLoader(nullptr, assetPath.string());
-		//	model = loader.LoadModel();
-		//	model->path = path_;
+		file::path assetPath = filePath.data();
+		assetPath = assetPath.replace_extension(".asset");
+		if (file::exists(assetPath))
+		{
+			Benchmark asset;
+			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
+			model = loader.LoadModel();
+			model->path = path_;
 
-		//	std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
+			std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
 
-		//	return model;
-		//}
-		//else
+			return model;
+		}
+		else
 		{
 			Benchmark assimp;
 
