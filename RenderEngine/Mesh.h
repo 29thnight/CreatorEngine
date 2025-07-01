@@ -105,6 +105,8 @@ public:
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
+	void AssetInit();
+
 	void Draw();
 	void Draw(ID3D11DeviceContext* _defferedContext);
 

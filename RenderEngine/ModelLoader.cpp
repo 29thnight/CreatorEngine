@@ -56,10 +56,13 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	}
 	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-    if(0 < m_AIScene->mNumAnimations)
-    {
-        m_model->m_animator = new Animator();
-    }
+	if(m_AIScene)
+	{
+		if (0 < m_AIScene->mNumAnimations)
+		{
+			m_model->m_animator = new Animator();
+		}
+	}
 }
 
 void ModelLoader::ProcessNodes()
@@ -133,7 +136,7 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 		}
-		//ParseModel(); //not used in current implementation
+		ParseModel(); //not used in current implementation
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;
@@ -486,6 +489,8 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 
         infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
         infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+
+		mesh->AssetInit();
 
         m_model->m_Meshes.push_back(mesh);
     }
