@@ -96,10 +96,8 @@ public:
 	void SetEnabled(bool able) override final;
 
 
-	void SetCollisionType(unsigned int type) { m_collisionType = type; }
-	unsigned int GetCollisionType() const { return m_collisionType; }
-	unsigned int m_collisionType = 0;
-
+	void SetCollisionType(uint32 type) { m_collisionType = type; }
+	uint32 GetCollisionType() const { return m_collisionType; }
 
 
     [[Property]]
@@ -115,6 +113,8 @@ public:
 	std::vector<GameObject::Index> m_childrenIndices;
 	[[Property]]
 	HashedGuid m_attachedSoketID{};
+	[[Property]]
+	uint32 m_collisionType = 0;
 
 public:
 	[[Property]]
