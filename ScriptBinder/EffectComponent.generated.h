@@ -7,10 +7,5 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 	({ \
 		meta_property(num) \
 	}); \
-	MethodField \
-	({ \
-		meta_method(Apply) \
-		meta_method(PlayPreview) \
-	}); \
-	FieldEnd(EffectComponent, PropertyAndMethodInheritance) \
+	FieldEnd(EffectComponent, PropertyOnlyInheritance) \
 };

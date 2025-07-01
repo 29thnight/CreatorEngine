@@ -15,12 +15,6 @@ public:
     void Update(float tick) override;
     void OnDistroy() override;
 
-    [[Method]]
-    void Apply();
-
-    [[Method]]
-    void PlayPreview();
-
     [[Property]]
     int num = 0;
 
