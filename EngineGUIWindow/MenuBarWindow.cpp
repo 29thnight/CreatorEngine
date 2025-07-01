@@ -390,10 +390,12 @@ void MenuBarWindow::RenderMenuBar()
         }
 
         // 그리드 행
-        for (int row = 0; row < 32; ++row) {
+        for (int row = 0; row < 32; ++row) 
+        {
             ImGui::Text("%2d |", row);
             ImGui::SameLine();
-            for (int col = 0; col < 32; ++col) {
+            for (int col = 0; col < 32; ++col) 
+            {
 				//각 셀의 아이디를 생성합니다.
 				// 대각선 아래쪽은 빈칸으로 표시합니다.
 				// 대각선 위쪽은 체크박스로 표시합니다.
@@ -414,6 +416,7 @@ void MenuBarWindow::RenderMenuBar()
                     ImGui::Text("      "); // 대각 아래는 빈칸
                 }
 
+				ImGui::PopID(); // ID 스택에서 제거합니다.
 
                 if (col != 31) ImGui::SameLine();
             }
