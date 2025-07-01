@@ -162,6 +162,31 @@ public:
 	void CreateCollisionData(const unsigned int& id, CollisionData* data);
 	void RemoveCollisionData(const unsigned int& id);
 
+	void SetCollisionMatrix(int* collisionMatrix) {
+		for (int i = 0; i < 32; ++i) {
+			m_collisionMatrix[i] = collisionMatrix[i];
+		}
+	}
+	int* GetCollisionMatrix() { return m_collisionMatrix; } //충돌 매트릭스 반환
+	void SetCollisionMatrix(unsigned int layer, unsigned int other, bool isCollision)
+	{
+		if (layer >= 32 || other >= 32) return; // out-of-range 방지
+
+		uint32_t bit = (1u << other);
+		if (isCollision)
+			m_collisionMatrix[layer] |= bit;   // 켜기
+		else
+			m_collisionMatrix[layer] &= ~bit;  // 끄기
+
+		// 대칭 관계 유지 (layer↔other)
+		uint32_t bit2 = (1u << layer);
+		if (isCollision)
+			m_collisionMatrix[other] |= bit2;
+		else
+			m_collisionMatrix[other] &= ~bit2;
+	}
+
+
 	//===========================================================================================
 	//debug data 대응
 

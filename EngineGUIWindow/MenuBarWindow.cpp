@@ -241,6 +241,17 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Option")) {
+
+                if (ImGui::MenuItem("Collision Matrix")) {
+
+                    m_bCollisionMatrixWindow = true;
+                }
+                ImGui::EndMenu();
+            }
+
+
+
             float availRegion = ImGui::GetContentRegionAvail().x;
 
             ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
@@ -322,6 +333,12 @@ void MenuBarWindow::RenderMenuBar()
         m_bShowNewScenePopup = false;
 	}
 
+
+    if (m_bCollisionMatrixWindow) {
+		ImGui::OpenPopup("CollisionMatrixPopup");
+    }
+
+
     if (ImGui::BeginPopup("NewScenePopup"))
     {
         static char newSceneName[256];
@@ -350,6 +367,71 @@ void MenuBarWindow::RenderMenuBar()
         }
         ImGui::EndPopup();
     }
+
+	
+	if (ImGui::BeginPopup("CollisionMatrixPopup"))
+	{
+		ImGui::Text("Collision Matrix");
+		ImGui::Separator();
+		//todo::grid matrix
+		std::vector<std::vector<bool>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
+		collisionMatrix = PhysicsManagers->GetCollisionMatrix();
+        
+        //int flags = ImGuiChildFlags_Borders| ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
+
+        ImGui::BeginChild("Matrix", ImVec2(0, 0),0);
+		
+        // 헤더
+        ImGui::Text("     "); // 좌상단 빈칸
+        ImGui::SameLine();
+        for (int col = 0; col < 32; ++col) {
+            ImGui::Text("%2d", col);
+            if (col != 31) ImGui::SameLine();
+        }
+
+        // 그리드 행
+        for (int row = 0; row < 32; ++row) {
+            ImGui::Text("%2d |", row);
+            ImGui::SameLine();
+            for (int col = 0; col < 32; ++col) {
+				//각 셀의 아이디를 생성합니다.
+				// 대각선 아래쪽은 빈칸으로 표시합니다.
+				// 대각선 위쪽은 체크박스로 표시합니다.
+				//아이디는 "b" + 행 + "_" + 열 형식으로 생성합니다.
+				ImGui::PushID(row * 32 + col); // 각 셀에 고유한 ID를 부여합니다.
+                bool cell = collisionMatrix[row][col];
+                char label[32];
+                snprintf(label, sizeof(label), "##b%d_%d", row, col); // Label 숨김
+
+                if (row <= col)
+                {
+                    if (ImGui::Checkbox(label, &cell)) {
+                        // 값 변경됨 (필요시 로직 추가)
+						collisionMatrix[row][col] = cell;
+                    }
+                }
+                else {
+                    ImGui::Text("      "); // 대각 아래는 빈칸
+                }
+
+
+                if (col != 31) ImGui::SameLine();
+            }
+        }
+
+        ImGui::EndChild();
+
+
+        ImGui::Separator();
+		if (ImGui::Button("Close"))
+		{
+            //적용된 충돌 매스릭스 저장
+			PhysicsManagers->SetCollisionMatrix(collisionMatrix);
+			m_bCollisionMatrixWindow = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void MenuBarWindow::ShowLogWindow()

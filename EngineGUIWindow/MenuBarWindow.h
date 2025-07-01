@@ -21,5 +21,6 @@ private:
 	bool m_bShowProfileWindow{ false };
 	bool m_bShowNewScenePopup{ false };
 	bool m_bShowLightMapWindow{ false };
+	bool m_bCollisionMatrixWindow{ false };
 };
 #endif // !DYNAMICCPP_EXPORTS
