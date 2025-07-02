@@ -436,7 +436,8 @@ void SetParentIndexRecursive(Bone* bone, int parent)
 void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 {
     Skeleton* skeleton = m_model->m_Skeleton;
-    if (!skeleton)
+	Animator* animator = m_model->m_animator;
+    if (!skeleton || !animator)
         return;
 
     SetParentIndexRecursive(skeleton->m_rootBone, -1);
@@ -509,6 +510,9 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
             }
         }
     }
+
+	boost::uuids::uuid guid = animator->m_Motion.m_guid;
+	outfile.write(reinterpret_cast<const char*>(&guid), sizeof(boost::uuids::uuid));
 }
 
 void ModelLoader::LoadModelFromAsset()
@@ -789,13 +793,16 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         skeleton->m_animations.push_back(std::move(anim));
     }
 
+	boost::uuids::uuid guid;
+	infile.read(reinterpret_cast<char*>(&guid), sizeof(boost::uuids::uuid));
+
     m_model->m_Skeleton = skeleton;
     m_model->m_hasBones = true;
-    if (m_model->m_animator)
-    {
-        m_model->m_animator->m_Skeleton = skeleton;
-        m_model->m_animator->SetEnabled(true);
-    }
+	
+	m_model->m_animator = new Animator();
+	m_model->m_animator->m_Skeleton = skeleton;
+	m_model->m_animator->m_Motion.m_guid = guid;
+	m_model->m_animator->SetEnabled(true);
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)

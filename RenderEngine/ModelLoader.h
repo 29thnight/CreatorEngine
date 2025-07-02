@@ -39,16 +39,16 @@ private:
 	void ParseModel();
 	void ParseNodes(std::ofstream& outfile);
 	void ParseNode(std::ofstream& outfile, const ModelNode* node);
-        void ParseMeshes(std::ofstream& outfile);
-        void ParseMaterials(std::ofstream& outfile);
-        void ParseSkeleton(std::ofstream& outfile);
+    void ParseMeshes(std::ofstream& outfile);
+    void ParseMaterials(std::ofstream& outfile);
+    void ParseSkeleton(std::ofstream& outfile);
 
-        void LoadModelFromAsset();
-        void LoadNodes(std::ifstream& infile, uint32_t size);
-        void LoadNode(std::ifstream& infile, ModelNode*& node);
-        void LoadMesh(std::ifstream& infile, uint32_t size);
-        void LoadMaterial(std::ifstream& infile, uint32_t size);
-        void LoadSkeleton(std::ifstream& infile);
+    void LoadModelFromAsset();
+    void LoadNodes(std::ifstream& infile, uint32_t size);
+    void LoadNode(std::ifstream& infile, ModelNode*& node);
+    void LoadMesh(std::ifstream& infile, uint32_t size);
+    void LoadMaterial(std::ifstream& infile, uint32_t size);
+    void LoadSkeleton(std::ifstream& infile);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
@@ -56,10 +56,9 @@ private:
 
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
-        Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
-        Texture* GenerateTexture(const std::string& textureName);
-	//¿©±â Á» Á¤¸®°¡ ÇÊ¿äÇÒ µí
-	//std::shared_ptr<Assimp::Importer> m_importer{};
+    Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
+    Texture* GenerateTexture(const std::string& textureName);
+
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory{};
