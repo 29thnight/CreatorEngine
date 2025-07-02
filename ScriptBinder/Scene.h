@@ -2,6 +2,7 @@
 #include "GameObject.h"
 #include "LightProperty.h"
 #include "PhysicsManager.h"
+#include "AssetBundle.h"
 #include "Scene.generated.h"
 
 class GameObject;
@@ -12,6 +13,7 @@ class MeshRenderer;
 struct ICollider;
 class Texture;
 class TerrainComponent;
+class ReferenceAssets;
 class Scene
 {
 public:
@@ -118,6 +120,9 @@ public:
     size_t m_buildIndex{ 0 };
     [[Property]]
 	HashingString m_sceneName;
+
+	AssetBundle m_requiredLoadAssetsBundle{};
+
 public:
     GameObject* GetSelectSceneObject() { return m_selectedSceneObject; }
     void ResetSelectedSceneObject();

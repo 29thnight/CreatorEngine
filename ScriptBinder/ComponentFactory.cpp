@@ -99,7 +99,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				if(guid != nullFileGuid)
 				{
 					animator->m_Motion = guid;
-					animator->m_Skeleton = DataSystems->LoadModelGUID(guid)->m_Skeleton;
+					auto model = DataSystems->LoadModelGUID(guid);
+					if(model)
+					{
+						animator->m_Skeleton = model->m_Skeleton;
+					}
 
 					for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
 					{

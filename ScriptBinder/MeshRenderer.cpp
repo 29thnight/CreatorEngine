@@ -6,6 +6,9 @@
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
+#include "../RenderEngine/Material.h"
+#include "../RenderEngine/Mesh.h"
+#include "ResourceAllocator.h"
 
 MeshRenderer::MeshRenderer()
 {

@@ -8,6 +8,7 @@
 #include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
+#include "TagManager.h"
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
@@ -15,6 +16,7 @@ void SceneManager::ManagerInitialize()
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
+	TagManager::GetInstance()->Initialize();
 }
 
 void SceneManager::Editor()
@@ -160,6 +162,7 @@ Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
 
 	std::ofstream sceneFileOut(saveSceneFileName);
     MetaYml::Node sceneNode{};
+	MetaYml::Node assetsBundleNode{};
 
     m_activeScene.load()->m_SceneObjects[0]->m_name = saveSceneFileName.stem().string();
 
@@ -185,22 +188,29 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 	try
 	{
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
+        Scene* swapScene{};
         if (m_activeScene)
         {
-            m_activeScene.load()->AllDestroyMark();
-            m_activeScene.load()->OnDisable();
-            m_activeScene.load()->OnDestroy();
-			Scene* swapScene = m_activeScene;
+			swapScene = m_activeScene.load();
 			m_activeScene = nullptr;
-
-			std::erase_if(m_scenes, 
-                [&](const auto& scene) { return scene == swapScene; });
-
-			delete swapScene;
         }
 		file::path sceneName = name.data();
         resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
+
+        //if(sceneNode["AssetsBundle"])
+        //{
+        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
+        //    if (assetsBundleNode.IsNull())
+        //    {
+        //        Debug->LogError("AssetsBundle node is null.");
+        //    }
+        //    else
+        //    {
+        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
+        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
+        //    }
+        //}
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
@@ -214,6 +224,18 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
             DesirealizeGameObject(type, objNode);
         }
         m_activeScene.load()->AllUpdateWorldMatrix();
+
+        if (swapScene)
+        {
+            swapScene->AllDestroyMark();
+            swapScene->OnDisable();
+            swapScene->OnDestroy();
+
+            std::erase_if(m_scenes,
+                [&](const auto& scene) { return scene == swapScene; });
+
+            delete swapScene;
+        }
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;

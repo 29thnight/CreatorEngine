@@ -3,7 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
-#include "Player.h"
+#include "EntityItem.h"
+#include "EntityAsis.h"
 #include "Temp.h"
 #include "Entity.h"
 #include "Player.h"
@@ -20,6 +21,12 @@ public:
 	// Register a factory function for creating ModuleBehavior instances
 	void RegisterFactory(const std::string& className, std::function<ModuleBehavior*()> factoryFunction)
 	{
+		if (factoryMap.find(className) != factoryMap.end())
+		{
+			std::cout << "Factory for class " << className << " is already registered." << std::endl;
+			return; // or throw an exception
+		}
+
 		factoryMap[className] = factoryFunction;
 	}
 	// Create a ModuleBehavior instance using the registered factory function

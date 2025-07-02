@@ -101,6 +101,21 @@ public:
 
 	void RayCast(RayEvent& rayEvent);
 	
+	//충돌 메트릭스 변경
+	void SetCollisionMatrix(std::vector<std::vector<uint8_t>> collisionGrid) {
+		m_collisionMatrix = std::move(collisionGrid);
+		int collisionMatrix[32] = { 0 };
+		for (int i = 0; i < 32; ++i) {
+			collisionMatrix[i] = 0; // 초기화
+			for (int j = 0; j < 32; ++j) {
+				if (m_collisionMatrix[i][j] != 0) {
+					collisionMatrix[i] |= (1 << j);
+				}
+			}
+		}
+		Physics->SetCollisionMatrix(collisionMatrix);
+	}
+	std::vector<std::vector<uint8_t>> GetCollisionMatrix() const { return m_collisionMatrix; }
 
 private:
 	// 초기화 여부
@@ -139,6 +154,11 @@ private:
 	void GetPhysicData();
 
 	unsigned int m_lastColliderID{ 0 };
+
+
+
+	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //기본 값은 모든 레이어가 충돌하는 것으로 설정
+	
 
 
 	

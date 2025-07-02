@@ -32,8 +32,8 @@ private:
 	//void DrawMyLink(std::string linkName, std::string from, std::string to);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 
+	bool m_openFSMPopup{ false };
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
-
 	bool m_openBTPopup{ false };
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
 };

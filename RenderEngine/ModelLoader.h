@@ -37,16 +37,16 @@ private:
 
 	//Save To InHouse Format
 	void ParseModel();
-	void ParseNodes(std::fstream& outfile);
-	void ParseNode(std::fstream& outfile, ModelNode* node);
-	void ParseMeshes(std::fstream& outfile);
-	void ParseMaterials(std::fstream& outfile);
+	void ParseNodes(std::ofstream& outfile);
+	void ParseNode(std::ofstream& outfile, const ModelNode* node);
+	void ParseMeshes(std::ofstream& outfile);
+	void ParseMaterials(std::ofstream& outfile);
 
 	void LoadModelFromAsset();
-	void LoadNodes(std::fstream& infile, uint32 size);
-	void LoadNode(std::fstream& infile, ModelNode* node);
-	void LoadMesh(std::fstream& infile);
-	void LoadMaterial(std::fstream& infile);
+	void LoadNodes(std::ifstream& infile, uint32_t size);
+	void LoadNode(std::ifstream& infile, ModelNode*& node);
+	void LoadMesh(std::ifstream& infile, uint32_t size);
+	void LoadMaterial(std::ifstream& infile, uint32_t size);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
@@ -54,8 +54,9 @@ private:
 
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
-	Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
-	//¿©±â Á» Á¤¸®°¡ ÇÊ¿äÇÒ µí
+        Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
+        Texture* GenerateTexture(const std::string& textureName);
+	//Â¿Â©Â±Ã¢ ÃÂ» ÃÂ¤Â¸Â®Â°Â¡ Ã‡ÃŠÂ¿Ã¤Ã‡Ã’ ÂµÃ­
 	//std::shared_ptr<Assimp::Importer> m_importer{};
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
@@ -74,8 +75,6 @@ private:
 
 	Mathf::Vector3 min{};
 	Mathf::Vector3 max{};
-
-	static ThreadPool<std::function<void()>> ModelLoadPool;
 
 	bool m_hasBones{ false };
 	bool m_isInitialized{ false };

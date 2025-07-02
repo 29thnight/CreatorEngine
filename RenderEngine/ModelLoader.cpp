@@ -11,7 +11,7 @@
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
 
-ThreadPool<std::function<void()>> ModelLoader::ModelLoadPool{};
+//ThreadPool<std::function<void()>> ModelLoadPool{};
 
 ModelLoader::ModelLoader()
 {
@@ -56,10 +56,13 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	}
 	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-    if(0 < m_AIScene->mNumAnimations)
-    {
-        m_model->m_animator = new Animator();
-    }
+	if(m_AIScene)
+	{
+		if (0 < m_AIScene->mNumAnimations)
+		{
+			m_model->m_animator = new Animator();
+		}
+	}
 }
 
 void ModelLoader::ProcessNodes()
@@ -121,22 +124,6 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 	}
 	else
 	{
-		//ModelLoadPool.Enqueue([&] 
-		//{
-		//	ProcessNodes();
-		//});
-
-		//ModelLoadPool.Enqueue([&]
-		//{
-		//	ProcessFlatMeshes();
-		//});
-
-		//ModelLoadPool.Enqueue([&]
-		//{
-		//	ProcessMaterials();
-		//});
-
-		//ModelLoadPool.NotifyAllAndWait();
 		ProcessNodes();
 		ProcessFlatMeshes();
 		ProcessMaterials();
@@ -149,7 +136,7 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 		}
-		//ParseModel(); //not used in current implementation
+		ParseModel(); //not used in current implementation
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;
@@ -189,7 +176,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
-
+	meshObj->m_modelName = m_model->name;
 	//if(!m_model->m_hasBones)
 	//{
 	//	MeshOptimizer::Optimize(*meshObj, 1.05f);
@@ -337,125 +324,257 @@ Material* ModelLoader::GenerateMaterial(int index)
 
 void ModelLoader::ParseModel()
 {
-	std::fstream file;
-	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
-	file.open(filepath, std::ios::out | std::ios::binary);
-	if (file.is_open())
-	{
-		uint32 size = m_model->m_nodes.size();
-		file.write(reinterpret_cast<char*>(&size), sizeof(uint32));
-		ParseNodes(file);
-		ParseMeshes(file);
-		ParseMaterials(file);
-		file.close();
-	}
+    file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
+    std::ofstream file(filepath, std::ios::binary);
+    if (!file)
+        return;
+
+    uint32_t nodeCount   = static_cast<uint32_t>(m_model->m_nodes.size());
+    uint32_t meshCount   = static_cast<uint32_t>(m_model->m_Meshes.size());
+    uint32_t materialCnt = static_cast<uint32_t>(m_model->m_Materials.size());
+
+    file.write(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
+    file.write(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
+    file.write(reinterpret_cast<char*>(&materialCnt), sizeof(materialCnt));
+
+    ParseNodes(file);
+    ParseMeshes(file);
+    ParseMaterials(file);
 }
 
-void ModelLoader::ParseNodes(std::fstream& outfile)
+void ModelLoader::ParseNodes(std::ofstream& outfile)
 {
-	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
-	{
-		ModelNode* node = m_model->m_nodes[i];
-		ParseNode(outfile, node);
-	}
+    for (const ModelNode* node : m_model->m_nodes)
+    {
+        ParseNode(outfile, node);
+    }
 }
 
-void ModelLoader::ParseNode(std::fstream& outfile, ModelNode* node)
+void ModelLoader::ParseNode(std::ofstream& outfile, const ModelNode* node)
 {
-	size_t strSize = node->m_name.size();
-	outfile.write(reinterpret_cast<char*>(&strSize), sizeof(size_t));
-	outfile.write(reinterpret_cast<char*>(node->m_name.data()), strSize);
-	outfile.write(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
-	outfile.write(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_meshes.size());
-	outfile.write(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_childrenIndex.size());
+    uint32_t nameSize = static_cast<uint32_t>(node->m_name.size());
+    outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+    outfile.write(node->m_name.data(), nameSize);
+
+    outfile.write(reinterpret_cast<const char*>(&node->m_index), sizeof(node->m_index));
+    outfile.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
+    outfile.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
+    outfile.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
+    outfile.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(Mathf::Matrix));
+
+    if (!node->m_meshes.empty())
+        outfile.write(reinterpret_cast<const char*>(node->m_meshes.data()), node->m_meshes.size() * sizeof(uint32_t));
+    if (!node->m_childrenIndex.empty())
+        outfile.write(reinterpret_cast<const char*>(node->m_childrenIndex.data()), node->m_childrenIndex.size() * sizeof(uint32_t));
 }
 
-void ModelLoader::ParseMeshes(std::fstream& outfile)
+void ModelLoader::ParseMeshes(std::ofstream& outfile)
 {
-	for (uint32 i = 0; i < m_model->m_Meshes.size(); i++)
-	{
-		Mesh* mesh = m_model->m_Meshes[i];
-		outfile.write(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
-		outfile.write(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
-		outfile.write(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
-		//outfile.write(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
-		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
-	}
+    for (const Mesh* mesh : m_model->m_Meshes)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(mesh->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(mesh->m_name.data(), nameSize);
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
+
+        uint32_t vertexCount = static_cast<uint32_t>(mesh->m_vertices.size());
+        outfile.write(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
+        if (vertexCount)
+            outfile.write(reinterpret_cast<const char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
+
+        uint32_t indexCount = static_cast<uint32_t>(mesh->m_indices.size());
+        outfile.write(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
+        if (indexCount)
+            outfile.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
+
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+    }
 }
 
-void ModelLoader::ParseMaterials(std::fstream& outfile)
+void ModelLoader::ParseMaterials(std::ofstream& outfile)
 {
+    for (const Material* mat : m_model->m_Materials)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(mat->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(mat->m_name.data(), nameSize);
+        outfile.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
+        outfile.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
+        outfile.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto writeTexName = [&](Texture* tex)
+        {
+            std::string tname = tex ? tex->m_name : std::string();
+            uint32_t len = static_cast<uint32_t>(tname.size());
+            outfile.write(reinterpret_cast<char*>(&len), sizeof(len));
+            if(len) outfile.write(tname.data(), len);
+        };
+
+        writeTexName(mat->m_pBaseColor);
+        writeTexName(mat->m_pNormal);
+        writeTexName(mat->m_pOccRoughMetal);
+        writeTexName(mat->m_AOMap);
+        writeTexName(mat->m_pEmissive);
+    }
 }
 
 void ModelLoader::LoadModelFromAsset()
 {
-	std::fstream file;
-	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
-	file.open(filepath, std::ios::in | std::ios::binary);
-	if (file.is_open())
-	{
-        uint32 size{};
-		file.read(reinterpret_cast<char*>(&size), sizeof(uint32));
-		m_model->m_nodes.resize(size);
-		LoadNodes(file, size);
-		LoadMesh(file);
-		LoadMaterial(file);
-		file.close();
-	}
+    file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file)
+        return;
+
+    uint32_t nodeCount{};
+    uint32_t meshCount{};
+    uint32_t materialCount{};
+
+    file.read(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
+    file.read(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
+    file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
+
+    LoadNodes(file, nodeCount);
+    LoadMesh(file, meshCount);
+    LoadMaterial(file, materialCount);
 }
 
-void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
+void ModelLoader::LoadNodes(std::ifstream& infile, uint32_t size)
 {
-	for (uint32 i = 0; i < size; i++)
-	{
-		LoadNode(infile, m_model->m_nodes[i]);
-	}
+    m_model->m_nodes.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        ModelNode* node{};
+        LoadNode(infile, node);
+        m_model->m_nodes.push_back(node);
+    }
 }
 
-void ModelLoader::LoadNode(std::fstream& infile, ModelNode* node)
+void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
 {
-    size_t size{};
-	std::string name;
-	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
-	infile.read(reinterpret_cast<char*>(name.data()), size);
-	node = new ModelNode(name);
+    uint32_t nameSize{};
+    infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+    std::string name;
+    name.resize(nameSize);
+    infile.read(name.data(), nameSize);
 
-	infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
-	infile.read(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_numMeshes);
-	infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_numChildren);
+    node = AllocateResource<ModelNode>(name);
+
+    infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(node->m_index));
+    infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
+    infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
+    infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(node->m_numChildren));
+    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+
+    node->m_meshes.resize(node->m_numMeshes);
+    node->m_childrenIndex.resize(node->m_numChildren);
+    if (node->m_numMeshes)
+        infile.read(reinterpret_cast<char*>(node->m_meshes.data()), node->m_numMeshes * sizeof(uint32_t));
+    if (node->m_numChildren)
+        infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), node->m_numChildren * sizeof(uint32_t));
 }
 
-void ModelLoader::LoadMesh(std::fstream& infile)
+void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 {
-	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
-	{
-		ModelNode* node = m_model->m_nodes[i];
-		for (uint32 j = 0; j < node->m_numMeshes; j++)
-		{
-			Mesh* mesh = new Mesh();
-			infile.read(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
-			infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
-			infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
-			//infile.read(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
-			infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-			infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
-			m_model->m_Meshes.push_back(mesh);
-			//m_model->m_Materials.push_back(new Material());
-		}
-	}
+    m_model->m_Meshes.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        auto* mesh = AllocateResource<Mesh>();
+        mesh->m_name = name;
+        infile.read(reinterpret_cast<char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
+
+        uint32_t vertexCount{};
+        infile.read(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
+        mesh->m_vertices.resize(vertexCount);
+        if (vertexCount)
+            infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
+
+        uint32_t indexCount{};
+        infile.read(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
+        mesh->m_indices.resize(indexCount);
+        if (indexCount)
+            infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
+
+        infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+        infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+
+		mesh->AssetInit();
+
+        m_model->m_Meshes.push_back(mesh);
+    }
 }
 
-void ModelLoader::LoadMaterial(std::fstream& infile)
+void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 {
+    m_model->m_Materials.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        Material* mat = AllocateResource<Material>();
+        mat->m_name = name;
+        infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
+        infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
+        infile.read(reinterpret_cast<char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto readString = [&](std::string& outStr)
+        {
+            uint32_t len{};
+            infile.read(reinterpret_cast<char*>(&len), sizeof(len));
+            outStr.resize(len);
+            if (len) infile.read(outStr.data(), len);
+        };
+
+        std::string baseColorName;
+        std::string normalName;
+        std::string ormName;
+        std::string aoName;
+        std::string emissiveName;
+
+        readString(baseColorName);
+        readString(normalName);
+        readString(ormName);
+        readString(aoName);
+        readString(emissiveName);
+
+        if (mat->m_materialInfo.m_useBaseColor)
+        {
+            if (Texture* tex = GenerateTexture(baseColorName))
+                mat->UseBaseColorMap(tex);
+        }
+        if (mat->m_materialInfo.m_useNormalMap)
+        {
+            if (Texture* tex = GenerateTexture(normalName))
+                mat->UseNormalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useOccRoughMetal)
+        {
+            if (Texture* tex = GenerateTexture(ormName))
+                mat->UseOccRoughMetalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useAOMap)
+        {
+            if (Texture* tex = GenerateTexture(aoName))
+                mat->UseAOMap(tex);
+        }
+        if (mat->m_materialInfo.m_useEmissive)
+        {
+            if (Texture* tex = GenerateTexture(emissiveName))
+                mat->UseEmissiveMap(tex);
+        }
+
+        m_model->m_Materials.push_back(mat);
+    }
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
@@ -546,7 +665,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
 		Mathf::Matrix transform = node->m_transform;
 
-		ModelLoadPool.Enqueue([=]
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
 			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
@@ -662,6 +781,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+
 			nextIndex = rootObject->m_index;
 			return rootObject.get();
 		}
@@ -676,7 +796,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		Material* material = m_model->m_Materials[mesh->m_materialIndex];
 		Mathf::Matrix transform = node->m_transform;
 
-		ModelLoadPool.Enqueue([=]
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
 			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
@@ -712,6 +832,8 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 	{
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return rootObject.get();
 }
@@ -755,25 +877,27 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 	Texture* texture = nullptr;
 	if (hasTex)
 	{
-		aiString str;
-		material->GetTexture(type, index, &str);
-		std::string textureName = str.C_Str();
-		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
-		file::path _path = stemp.c_str();
-		auto it = DataSystems->Textures.find(textureName);
-		if (it != DataSystems->Textures.end())
-		{
-			texture = it->second.get();
-		}
-		else
-		{
-			texture = DataSystems->LoadMaterialTexture(_path.string());
-			if(nullptr != texture)
-			{
-				texture->m_name = textureName;
-				m_model->m_Textures.push_back(texture);
-			}
-		}
-	}
-	return texture;
+                aiString str;
+                material->GetTexture(type, index, &str);
+                std::string textureName = str.C_Str();
+                texture = GenerateTexture(textureName);
+        }
+        return texture;
+}
+
+Texture* ModelLoader::GenerateTexture(const std::string& textureName)
+{
+        if (textureName.empty())
+                return nullptr;
+
+        std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
+        file::path _path = stemp.c_str();
+
+        Texture* texture = DataSystems->LoadMaterialTexture(_path.string());
+        if (texture)
+        {
+                texture->m_name = textureName;
+                m_model->m_Textures.push_back(texture);
+        }
+        return texture;
 }

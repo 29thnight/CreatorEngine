@@ -2,18 +2,23 @@
 
 #pragma once
 
+#include "AssetEntry.h"
 #include "TerrainCollider.h"
 #include "CameraComponent.h"
 #include "Animation.h"
-#include "Skeleton.h"
-#include "Camera.h"
 #include "Scene.h"
 #include "EffectComponent.h"
+#include "Transform.h"
+#include "SpriteRenderer.h"
+#include "MeshRenderer.h"
+#include "AssetBundle.h"
+#include "Camera.h"
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
-#include "TestAniScprit.h"
 #include "Mesh.h"
+#include "Skeleton.h"
+#include "TestAniScprit.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
@@ -22,6 +27,7 @@
 #include "AniTransition.h"
 #include "InputActionComponent.h"
 #include "AvatarMask.h"
+#include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
 #include "BoxColliderComponent.h"
 #include "Canvas.h"
@@ -35,17 +41,15 @@
 #include "LightMapping.h"
 #include "RagdollComponent.h"
 #include "MeshCollider.h"
-#include "Transform.h"
-#include "SpriteRenderer.h"
-#include "MeshRenderer.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
+#include "UIButton.h"
+#include "Prefab.h"
 #include "RigidBodyComponent.h"
 #include "SphereColliderComponent.h"
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
-#include "UIButton.h"
 #include "UIComponent.h"
 
 REFLECTION_REGISTER()
@@ -56,7 +60,10 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(AnimationController);
     AUTO_REGISTER_CLASS(AnimationState);
     AUTO_REGISTER_CLASS(Animator);
+    AUTO_REGISTER_CLASS(AssetBundle);
+    AUTO_REGISTER_CLASS(AssetEntry);
     AUTO_REGISTER_CLASS(AvatarMask);
+    AUTO_REGISTER_CLASS(BehaviorTreeComponent);
     AUTO_REGISTER_CLASS(BoneMask);
     AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Camera);
@@ -80,6 +87,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(Scene);

@@ -37,11 +37,15 @@ public:
 #pragma region Script Build Helper
 	void UpdateSceneManager(void* sceneManager)
 	{
+		if (!m_setSceneManagerFunc) return;
+
 		m_setSceneManagerFunc(sceneManager);
 	}
 
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
+		if (!m_scriptFactoryFunc) return nullptr;
+
 		return m_scriptFactoryFunc(name);
 	}
 
@@ -79,6 +83,20 @@ public:
 	{
 		m_isReloading = value;
 	}
+
+	void ImiFreeLibrary()
+	{
+		if (hDll)
+		{
+			::FreeLibrary(hDll);
+			hDll = nullptr;
+			m_scriptFactoryFunc = nullptr;
+			m_initModuleFunc = nullptr;
+			m_scriptNamesFunc = nullptr;
+			m_setSceneManagerFunc = nullptr;
+		}
+	}
+
 #pragma endregion
 
 private:
@@ -92,6 +110,7 @@ private:
 	SetSceneManagerFunc m_setSceneManagerFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
+	std::wstring rebuildCommand{};
 	std::atomic_bool m_isStartUp{ false };
 
 #pragma region Script File String

@@ -54,7 +54,7 @@ void TestBehavior::Update(float tick)
 		if(playerTransform)
 		{
 			Mathf::Vector3 playerPosition = playerTransform->GetWorldPosition();
-			Mathf::Vector3 followDistance = { 24.f, 35.f, 15.f };
+			Mathf::Vector3 followDistance = { 33.f, 50.f, 15.f };
 			
 			GetComponent<Transform>().SetPosition(playerPosition + followDistance);
 		}

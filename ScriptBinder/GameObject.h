@@ -37,7 +37,8 @@ public:
 
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
-	void SetTag(const std::string_view& tag);
+        void SetTag(const std::string_view& tag);
+        void SetLayer(const std::string_view& layer);
 
 	virtual void Destroy() override final;
 
@@ -95,9 +96,10 @@ public:
 
 	void SetEnabled(bool able) override final;
 
-	void SetCollisionType(unsigned int uint) { m_collisionType = uint; }
-	unsigned int GetCollisionType() { return m_collisionType; }
-	unsigned int m_collisionType = 0;
+
+	void SetCollisionType(uint32 type) { m_collisionType = type; }
+	uint32 GetCollisionType() const { return m_collisionType; }
+
 
     [[Property]]
 	Transform m_transform{};
@@ -112,12 +114,16 @@ public:
 	std::vector<GameObject::Index> m_childrenIndices;
 	[[Property]]
 	HashedGuid m_attachedSoketID{};
+	[[Property]]
+	uint32 m_collisionType = 0;
 
 public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-	[[Property]]
-	HashingString m_tag{ "Untagged" };
+        [[Property]]
+        HashingString m_tag{ "Untagged" };
+        [[Property]]
+        HashingString m_layer{ "Default" };
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]

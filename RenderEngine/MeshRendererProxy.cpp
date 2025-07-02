@@ -27,7 +27,10 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
             m_animatorGuid = animator->GetInstanceID();
         }
 
-        m_materialGuid = m_Material->m_materialGuid;
+        if(nullptr != m_Material)
+        {
+            m_materialGuid = m_Material->m_materialGuid;
+        }
         m_instancedID = component->GetInstanceID();
     }
 
