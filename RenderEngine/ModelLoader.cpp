@@ -340,11 +340,11 @@ void ModelLoader::ParseModel()
     bool hasSkeleton = m_model->m_hasBones && m_model->m_Skeleton;
     file.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
 
+    if (hasSkeleton)
+        ParseSkeleton(file);
     ParseNodes(file);
     ParseMeshes(file);
     ParseMaterials(file);
-    if (hasSkeleton)
-        ParseSkeleton(file);
 }
 
 void ModelLoader::ParseNodes(std::ofstream& outfile)
@@ -441,8 +441,8 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 
     SetParentIndexRecursive(skeleton->m_rootBone, -1);
 
-    outfile.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(Mathf::Matrix));
-    outfile.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(Mathf::Matrix));
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
 
     uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
     outfile.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -455,7 +455,7 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 
         outfile.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         outfile.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(Mathf::Matrix));
+        outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
     }
 }
 
@@ -475,7 +475,6 @@ void ModelLoader::LoadModelFromAsset()
     file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
 
     LoadSkeleton(file);
-
     LoadNodes(file, nodeCount);
     LoadMesh(file, meshCount);
     LoadMaterial(file, materialCount);
@@ -506,7 +505,7 @@ void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
     infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
     infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
     infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(node->m_numChildren));
-    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
+    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(XMFLOAT4X4));
 
     node->m_meshes.resize(node->m_numMeshes);
     node->m_childrenIndex.resize(node->m_numChildren);
@@ -627,8 +626,8 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         return;
 
     Skeleton* skeleton = AllocateResource<Skeleton>();
-    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(Mathf::Matrix));
-    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(Mathf::Matrix));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
 
     uint32_t boneCount{};
     infile.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
@@ -646,7 +645,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         bone->m_name = name;
         infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
-        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(Mathf::Matrix));
+        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
         bone->m_localTransform = XMMatrixIdentity();
         bone->m_globalTransform = XMMatrixIdentity();
 
@@ -761,12 +760,13 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		Mesh* mesh				= m_model->m_Meshes[meshId];
 		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
 		Mathf::Matrix transform = node->m_transform;
+		Model* model = m_model;
 
 		SceneManagers->m_threadPool->Enqueue([=]
 		{
 			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-			if (m_model->m_isMakeMeshCollider)
+			if (model->m_isMakeMeshCollider)
 			{
 				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
 				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
@@ -929,8 +929,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 	{
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
-
-	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return rootObject.get();
 }

@@ -14,6 +14,7 @@ ReflectionFieldInheritance(GameObject, Object) \
 		meta_property(m_collisionType) \
 		meta_property(m_gameObjectType) \
 		meta_property(m_tag) \
+		meta_property(m_layer) \
 		meta_property(m_components) \
 	}); \
 	FieldEnd(GameObject, PropertyOnlyInheritance) \

@@ -7,6 +7,7 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Texture.h"
+#include <assimp/Exporter.hpp>
 
 namespace anim
 {
@@ -37,20 +38,20 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	Model* model{};
 	try
 	{
-		//file::path assetPath = filePath.data();
-		//assetPath = assetPath.replace_extension(".asset");
-		//if (file::exists(assetPath))
-		//{
-		//	Benchmark asset;
-		//	ModelLoader loader = ModelLoader(nullptr, assetPath.string());
-		//	model = loader.LoadModel();
-		//	model->path = path_;
+		file::path assetPath = filePath.data();
+		assetPath = assetPath.replace_extension(".asset");
+		if (file::exists(assetPath))
+		{
+			Benchmark asset;
+			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
+			model = loader.LoadModel();
+			model->path = path_;
 
-		//	std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
+			std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
 
-		//	return model;
-		//}
-		//else
+			return model;
+		}
+		else
 		{
 			Benchmark assimp;
 
@@ -95,11 +96,11 @@ Model* Model::LoadModel(const std::string_view& filePath)
 			}
 
 			Assimp::Importer importer;
+			Assimp::Exporter exproter;
 			importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
 			importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
 
 			const aiScene* assimpScene = importer.ReadFile(filePath.data(), settings);
-
 			if (nullptr == assimpScene)
 			{
 				throw std::exception("ModelLoader::Model file not found");
@@ -110,7 +111,6 @@ Model* Model::LoadModel(const std::string_view& filePath)
 				importer.ApplyPostProcessing(aiProcess_PreTransformVertices);
 				importer.ApplyPostProcessing(aiProcess_GenBoundingBoxes);
 			}
-
 			ModelLoader loader = ModelLoader(assimpScene, path_.string());
 
 			model = loader.LoadModel(isCreateMeshCollider);
@@ -206,6 +206,7 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	{
 		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return model;
 }
@@ -226,6 +227,7 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 	{
 		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
 	}
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 
 	return rootObj;
 }
