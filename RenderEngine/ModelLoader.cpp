@@ -877,27 +877,27 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 	Texture* texture = nullptr;
 	if (hasTex)
 	{
-                aiString str;
-                material->GetTexture(type, index, &str);
-                std::string textureName = str.C_Str();
-                texture = GenerateTexture(textureName);
-        }
-        return texture;
+        aiString str;
+        material->GetTexture(type, index, &str);
+        std::string textureName = str.C_Str();
+        texture = GenerateTexture(textureName);
+    }
+    return texture;
 }
 
 Texture* ModelLoader::GenerateTexture(const std::string& textureName)
 {
-        if (textureName.empty())
-                return nullptr;
+    if (textureName.empty())
+            return nullptr;
 
-        std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
-        file::path _path = stemp.c_str();
+    std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
+    file::path _path = stemp.c_str();
 
-        Texture* texture = DataSystems->LoadMaterialTexture(_path.string());
-        if (texture)
-        {
-                texture->m_name = textureName;
-                m_model->m_Textures.push_back(texture);
-        }
-        return texture;
+    Texture* texture = DataSystems->LoadMaterialTexture(_path.string());
+    if (texture)
+    {
+            texture->m_name = textureName;
+            m_model->m_Textures.push_back(texture);
+    }
+    return texture;
 }
