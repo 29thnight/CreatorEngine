@@ -337,9 +337,14 @@ void ModelLoader::ParseModel()
     file.write(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
     file.write(reinterpret_cast<char*>(&materialCnt), sizeof(materialCnt));
 
+    bool hasSkeleton = m_model->m_hasBones && m_model->m_Skeleton;
+    file.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
+
     ParseNodes(file);
     ParseMeshes(file);
     ParseMaterials(file);
+    if (hasSkeleton)
+        ParseSkeleton(file);
 }
 
 void ModelLoader::ParseNodes(std::ofstream& outfile)
@@ -419,6 +424,41 @@ void ModelLoader::ParseMaterials(std::ofstream& outfile)
     }
 }
 
+void SetParentIndexRecursive(Bone* bone, int parent)
+{
+    bone->m_parentIndex = parent;
+    for (Bone* child : bone->m_children)
+    {
+        SetParentIndexRecursive(child, bone->m_index);
+    }
+}
+
+void ModelLoader::ParseSkeleton(std::ofstream& outfile)
+{
+    Skeleton* skeleton = m_model->m_Skeleton;
+    if (!skeleton)
+        return;
+
+    SetParentIndexRecursive(skeleton->m_rootBone, -1);
+
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(Mathf::Matrix));
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(Mathf::Matrix));
+
+    uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
+    outfile.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+
+    for (Bone* bone : skeleton->m_bones)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(bone->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(bone->m_name.data(), nameSize);
+
+        outfile.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
+        outfile.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
+        outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(Mathf::Matrix));
+    }
+}
+
 void ModelLoader::LoadModelFromAsset()
 {
     file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
@@ -433,6 +473,8 @@ void ModelLoader::LoadModelFromAsset()
     file.read(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
     file.read(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
     file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
+
+    LoadSkeleton(file);
 
     LoadNodes(file, nodeCount);
     LoadMesh(file, meshCount);
@@ -574,6 +616,61 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         }
 
         m_model->m_Materials.push_back(mat);
+    }
+}
+
+void ModelLoader::LoadSkeleton(std::ifstream& infile)
+{
+    bool hasSkeleton{};
+    infile.read(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
+    if (!hasSkeleton)
+        return;
+
+    Skeleton* skeleton = AllocateResource<Skeleton>();
+    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(Mathf::Matrix));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(Mathf::Matrix));
+
+    uint32_t boneCount{};
+    infile.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+    skeleton->m_bones.reserve(boneCount);
+
+    for (uint32_t i = 0; i < boneCount; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        Bone* bone = AllocateResource<Bone>();
+        bone->m_name = name;
+        infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
+        infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
+        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(Mathf::Matrix));
+        bone->m_localTransform = XMMatrixIdentity();
+        bone->m_globalTransform = XMMatrixIdentity();
+
+        skeleton->m_bones.push_back(bone);
+    }
+
+    for (Bone* bone : skeleton->m_bones)
+    {
+        if (bone->m_parentIndex >= 0 && bone->m_parentIndex < static_cast<int>(boneCount))
+        {
+            skeleton->m_bones[bone->m_parentIndex]->m_children.push_back(bone);
+        }
+        else
+        {
+            skeleton->m_rootBone = bone;
+        }
+    }
+
+    m_model->m_Skeleton = skeleton;
+    m_model->m_hasBones = true;
+    if (m_model->m_animator)
+    {
+        m_model->m_animator->m_Skeleton = skeleton;
+        m_model->m_animator->SetEnabled(true);
     }
 }
 
