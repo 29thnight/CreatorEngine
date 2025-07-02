@@ -340,8 +340,7 @@ void ModelLoader::ParseModel()
     bool hasSkeleton = m_model->m_hasBones && m_model->m_Skeleton;
     file.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
 
-    if (hasSkeleton)
-        ParseSkeleton(file);
+    if (hasSkeleton) ParseSkeleton(file);
     ParseNodes(file);
     ParseMeshes(file);
     ParseMaterials(file);
