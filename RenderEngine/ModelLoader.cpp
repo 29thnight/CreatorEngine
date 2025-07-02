@@ -457,6 +457,58 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
         outfile.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
         outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
     }
+
+    uint32_t animCount = static_cast<uint32_t>(skeleton->m_animations.size());
+    outfile.write(reinterpret_cast<char*>(&animCount), sizeof(animCount));
+
+    for (const Animation& anim : skeleton->m_animations)
+    {
+        uint32_t animNameSize = static_cast<uint32_t>(anim.m_name.size());
+        outfile.write(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
+        outfile.write(anim.m_name.data(), animNameSize);
+
+        outfile.write(reinterpret_cast<const char*>(&anim.m_duration), sizeof(anim.m_duration));
+        outfile.write(reinterpret_cast<const char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+        outfile.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+
+        uint32_t nodeAnimCount = static_cast<uint32_t>(anim.m_nodeAnimations.size());
+        outfile.write(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
+
+        for (const auto& [nodeName, nodeAnim] : anim.m_nodeAnimations)
+        {
+            uint32_t nodeNameSize = static_cast<uint32_t>(nodeName.size());
+            outfile.write(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
+            outfile.write(nodeName.data(), nodeNameSize);
+
+            uint32_t posKeyCount = static_cast<uint32_t>(nodeAnim.m_positionKeys.size());
+            outfile.write(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
+            for (const auto& key : nodeAnim.m_positionKeys)
+            {
+                DirectX::XMFLOAT4 pos;
+                XMStoreFloat4(&pos, key.m_position);
+                outfile.write(reinterpret_cast<char*>(&pos), sizeof(pos));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+
+            uint32_t rotKeyCount = static_cast<uint32_t>(nodeAnim.m_rotationKeys.size());
+            outfile.write(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
+            for (const auto& key : nodeAnim.m_rotationKeys)
+            {
+                DirectX::XMFLOAT4 rot;
+                XMStoreFloat4(&rot, key.m_rotation);
+                outfile.write(reinterpret_cast<char*>(&rot), sizeof(rot));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+
+            uint32_t scaleKeyCount = static_cast<uint32_t>(nodeAnim.m_scaleKeys.size());
+            outfile.write(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
+            for (const auto& key : nodeAnim.m_scaleKeys)
+            {
+                outfile.write(reinterpret_cast<const char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+        }
+    }
 }
 
 void ModelLoader::LoadModelFromAsset()
@@ -662,6 +714,79 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         {
             skeleton->m_rootBone = bone;
         }
+    }
+
+    uint32_t animCount{};
+    infile.read(reinterpret_cast<char*>(&animCount), sizeof(animCount));
+    skeleton->m_animations.reserve(animCount);
+
+    for (uint32_t i = 0; i < animCount; ++i)
+    {
+        Animation anim{};
+
+        uint32_t animNameSize{};
+        infile.read(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
+        anim.m_name.resize(animNameSize);
+        infile.read(anim.m_name.data(), animNameSize);
+
+        infile.read(reinterpret_cast<char*>(&anim.m_duration), sizeof(anim.m_duration));
+        infile.read(reinterpret_cast<char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+        infile.read(reinterpret_cast<char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+
+        uint32_t nodeAnimCount{};
+        infile.read(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
+
+        for (uint32_t j = 0; j < nodeAnimCount; ++j)
+        {
+            uint32_t nodeNameSize{};
+            infile.read(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
+            std::string nodeName;
+            nodeName.resize(nodeNameSize);
+            infile.read(nodeName.data(), nodeNameSize);
+
+            NodeAnimation nodeAnim{};
+
+            uint32_t posKeyCount{};
+            infile.read(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
+            nodeAnim.m_positionKeys.reserve(posKeyCount);
+            for (uint32_t k = 0; k < posKeyCount; ++k)
+            {
+                NodeAnimation::PositionKey key{};
+                DirectX::XMFLOAT4 pos;
+                infile.read(reinterpret_cast<char*>(&pos), sizeof(pos));
+                key.m_position = XMLoadFloat4(&pos);
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_positionKeys.push_back(key);
+            }
+
+            uint32_t rotKeyCount{};
+            infile.read(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
+            nodeAnim.m_rotationKeys.reserve(rotKeyCount);
+            for (uint32_t k = 0; k < rotKeyCount; ++k)
+            {
+                NodeAnimation::RotationKey key{};
+                DirectX::XMFLOAT4 rot;
+                infile.read(reinterpret_cast<char*>(&rot), sizeof(rot));
+                key.m_rotation = XMLoadFloat4(&rot);
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_rotationKeys.push_back(key);
+            }
+
+            uint32_t scaleKeyCount{};
+            infile.read(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
+            nodeAnim.m_scaleKeys.reserve(scaleKeyCount);
+            for (uint32_t k = 0; k < scaleKeyCount; ++k)
+            {
+                NodeAnimation::ScaleKey key{};
+                infile.read(reinterpret_cast<char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_scaleKeys.push_back(key);
+            }
+
+            anim.m_nodeAnimations.emplace(nodeName, std::move(nodeAnim));
+        }
+
+        skeleton->m_animations.push_back(std::move(anim));
     }
 
     m_model->m_Skeleton = skeleton;
