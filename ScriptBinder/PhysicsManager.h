@@ -108,7 +108,9 @@ public:
 		for (int i = 0; i < 32; ++i) {
 			collisionMatrix[i] = 0; // ÃÊ±âÈ­
 			for (int j = 0; j < 32; ++j) {
-				collisionMatrix[i] |= (collisionGrid[i][j] ? (1 << j) : 0);
+				if (m_collisionMatrix[i][j] != 0) {
+					collisionMatrix[i] |= (1 << j);
+				}
 			}
 		}
 		Physics->SetCollisionMatrix(collisionMatrix);
