@@ -41,6 +41,8 @@ void PhysicsManager::Update(float fixedDeltaTime)
 
 	//물리씬에 데이터 가져오기
 	GetPhysicData();
+
+	ProcessCallback();
 	
 }
 void PhysicsManager::Shutdown()
@@ -55,11 +57,17 @@ void PhysicsManager::Shutdown()
 void PhysicsManager::ChangeScene()
 {
 	Physics->ChangeScene();
+	m_colliderContainer.clear();
 }
 void PhysicsManager::OnLoadScene()
 {
 	//todo : 물리씬 초기화
 	//CleanUp();
+
+	//컨테이너 제거
+	ChangeScene();
+	
+	m_colliderContainer.clear();
 
 	//todo : 현제의 게임씬을 찾아오기
 	auto scene = SceneManagers->GetActiveScene();
@@ -370,7 +378,8 @@ void PhysicsManager::OnLoadScene()
 void PhysicsManager::OnUnloadScene()
 {
 
-	for (auto& [id, info] : m_colliderContainer) {
+	for (auto& [id, info] : m_colliderContainer) 
+	{
 		info.bIsDestroyed = true;
 	}
 

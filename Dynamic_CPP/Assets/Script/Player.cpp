@@ -7,13 +7,14 @@
 #include "Socket.h"
 #include "pch.h"
 #include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
-	player->GetComponent<RigidBodyComponent>();
+	//player->GetComponent<RigidBodyComponent>();
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
@@ -33,6 +34,8 @@ void Player::Start()
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
+	//GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
+	//sword->GetComponent<BoxColliderComponent>()->SetExtents({10,10,10});
 
 }
 
@@ -41,7 +44,6 @@ void Player::Update(float tick)
 
 	static float elasepdTime = 0.f;
 	elasepdTime += tick;
-
 	if (elasepdTime >= 4.f)
 	{
 		//SceneManagers->GetActiveScene()->CreateGameObject("newenwenw");
@@ -120,17 +122,25 @@ void Player::Attack()
 void Player::SwapWeaponLeft()
 {
 	m_weaponIndex--;
-	m_curWeapon->SetEnabled(false);
-	m_curWeapon = m_weaponInventory[m_weaponIndex];
-	m_curWeapon->SetEnabled(true);
+	std::cout << "left weapon equipped" << std::endl;
+	if (m_curWeapon != nullptr)
+	{
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = m_weaponInventory[m_weaponIndex];
+		m_curWeapon->SetEnabled(true);
+	}
 }
 
 void Player::SwapWeaponRight()
 {
 	m_weaponIndex++;
-	m_curWeapon->SetEnabled(false);
-	m_curWeapon = m_weaponInventory[m_weaponIndex];
-	m_curWeapon->SetEnabled(true);
+	std::cout << "right weapon equipped" << std::endl;
+	if (m_curWeapon != nullptr)
+	{
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = m_weaponInventory[m_weaponIndex];
+		m_curWeapon->SetEnabled(true);
+	}
 }
 
 void Player::OnCollisionEnter(const Collision& collision)
@@ -150,7 +160,7 @@ void Player::OnCollisionStay(const Collision& collision)
 	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
 	{
 		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly ºÎµúÈû";
+		std::cout << "Sting-Sword lowpoly collision" << std::endl;
 	}
 	else
 	{
@@ -166,7 +176,7 @@ void Player::OnTriggerStay(const Collision& collision)
 	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
 	{
 		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly ºÎµúÈû";
+		std::cout << "Sting-Sword lowpoly trigger" << std::endl;
 	}
 	else
 	{

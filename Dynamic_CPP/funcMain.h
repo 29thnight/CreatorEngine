@@ -61,6 +61,7 @@ extern "C"
 		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
 		SceneManagers->SetActiveScene(ptr->GetActiveScene());
 		SceneManagers->SetGameStart(ptr->IsGameStart());
+		SceneManagers->SetInputActionManager(ptr->GetInputActionManager());
 	}
 #pragma	endregion
 

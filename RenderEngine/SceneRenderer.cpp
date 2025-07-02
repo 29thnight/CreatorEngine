@@ -385,7 +385,7 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//TODO : 시연용 Player주석 코드
-	//player.Update(deltaTime);
+	player.Update(deltaTime);
 	m_pEffectPass->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
