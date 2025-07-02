@@ -1,4 +1,6 @@
 #include "TagManager.h"
+#include "Core.Minimal.h"
+#include "ReflectionYml.h"
 
 void TagManager::Initialize()
 {
@@ -30,6 +32,7 @@ void TagManager::Load()
 
 void TagManager::Save()
 {
+
 }
 
 void TagManager::AddTag(const std::string_view& tag)

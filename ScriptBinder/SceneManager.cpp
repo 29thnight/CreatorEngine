@@ -8,6 +8,7 @@
 #include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
+#include "TagManager.h"
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
@@ -15,6 +16,7 @@ void SceneManager::ManagerInitialize()
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
+	TagManager::GetInstance()->Initialize();
 }
 
 void SceneManager::Editor()

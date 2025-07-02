@@ -14,12 +14,21 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	auto owner						= componentPtr->GetOwner();
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
+	Material* originMat				= pComponent->m_Material;
+
+	if (nullptr == originMat) 
+	{
+		m_updateFunction = [=]
+		{
+			// If the material is null, we do not need to update anything.
+		};
+		return;
+	}
 
 	auto& proxyObject				= renderScene->m_proxyMap[m_proxyGUID];
 	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
 	HashedGuid matGuid				= proxyObject->m_materialGuid;
 	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
-	Material* originMat				= pComponent->m_Material;
 
 	Mathf::xMatrix* palletePtr{ nullptr };
 	bool isAnimationUpdate{ false };
