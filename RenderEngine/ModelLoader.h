@@ -10,17 +10,20 @@
 
 class ModelLoader
 {
-	enum class LoadType
-	{
-		UNKNOWN,
-		OBJ,
-		GLTF,
-		FBX,
-		ASSET
-	};
+        enum class LoadType
+        {
+                UNKNOWN,
+                OBJ,
+                GLTF,
+                FBX,
+                ASSET
+        };
+
+public:
+        void ReserveGameObjectCapacity(size_t capacity);
 
 private:
-	friend class Model;
+        friend class Model;
 	ModelLoader();
 	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);

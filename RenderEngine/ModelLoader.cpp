@@ -32,8 +32,8 @@ ModelLoader::ModelLoader(const std::string_view& fileName)
 }
 
 ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fileName) :
-	m_AIScene(assimpScene),
-	m_skeletonLoader(assimpScene)
+        m_AIScene(assimpScene),
+        m_skeletonLoader(assimpScene)
 {
 	file::path filepath(fileName);
 	m_directory = filepath.parent_path().string() + "\\";
@@ -56,13 +56,18 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	}
 	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-	if(m_AIScene)
-	{
-		if (0 < m_AIScene->mNumAnimations)
-		{
-			m_model->m_animator = new Animator();
-		}
-	}
+        if(m_AIScene)
+        {
+                if (0 < m_AIScene->mNumAnimations)
+                {
+                        m_model->m_animator = new Animator();
+                }
+        }
+}
+
+void ModelLoader::ReserveGameObjectCapacity(size_t capacity)
+{
+        m_gameObjects.reserve(capacity);
 }
 
 void ModelLoader::ProcessNodes()
