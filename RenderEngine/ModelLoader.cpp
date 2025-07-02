@@ -402,6 +402,20 @@ void ModelLoader::ParseMaterials(std::ofstream& outfile)
         outfile.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
         outfile.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
         outfile.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto writeTexName = [&](Texture* tex)
+        {
+            std::string tname = tex ? tex->m_name : std::string();
+            uint32_t len = static_cast<uint32_t>(tname.size());
+            outfile.write(reinterpret_cast<char*>(&len), sizeof(len));
+            if(len) outfile.write(tname.data(), len);
+        };
+
+        writeTexName(mat->m_pBaseColor);
+        writeTexName(mat->m_pNormal);
+        writeTexName(mat->m_pOccRoughMetal);
+        writeTexName(mat->m_AOMap);
+        writeTexName(mat->m_pEmissive);
     }
 }
 
@@ -512,6 +526,52 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
         infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
         infile.read(reinterpret_cast<char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto readString = [&](std::string& outStr)
+        {
+            uint32_t len{};
+            infile.read(reinterpret_cast<char*>(&len), sizeof(len));
+            outStr.resize(len);
+            if (len) infile.read(outStr.data(), len);
+        };
+
+        std::string baseColorName;
+        std::string normalName;
+        std::string ormName;
+        std::string aoName;
+        std::string emissiveName;
+
+        readString(baseColorName);
+        readString(normalName);
+        readString(ormName);
+        readString(aoName);
+        readString(emissiveName);
+
+        if (mat->m_materialInfo.m_useBaseColor)
+        {
+            if (Texture* tex = GenerateTexture(baseColorName))
+                mat->UseBaseColorMap(tex);
+        }
+        if (mat->m_materialInfo.m_useNormalMap)
+        {
+            if (Texture* tex = GenerateTexture(normalName))
+                mat->UseNormalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useOccRoughMetal)
+        {
+            if (Texture* tex = GenerateTexture(ormName))
+                mat->UseOccRoughMetalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useAOMap)
+        {
+            if (Texture* tex = GenerateTexture(aoName))
+                mat->UseAOMap(tex);
+        }
+        if (mat->m_materialInfo.m_useEmissive)
+        {
+            if (Texture* tex = GenerateTexture(emissiveName))
+                mat->UseEmissiveMap(tex);
+        }
 
         m_model->m_Materials.push_back(mat);
     }
@@ -817,25 +877,27 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 	Texture* texture = nullptr;
 	if (hasTex)
 	{
-		aiString str;
-		material->GetTexture(type, index, &str);
-		std::string textureName = str.C_Str();
-		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
-		file::path _path = stemp.c_str();
-		auto it = DataSystems->Textures.find(textureName);
-		if (it != DataSystems->Textures.end())
-		{
-			texture = it->second.get();
-		}
-		else
-		{
-			texture = DataSystems->LoadMaterialTexture(_path.string());
-			if(nullptr != texture)
-			{
-				texture->m_name = textureName;
-				m_model->m_Textures.push_back(texture);
-			}
-		}
-	}
-	return texture;
+                aiString str;
+                material->GetTexture(type, index, &str);
+                std::string textureName = str.C_Str();
+                texture = GenerateTexture(textureName);
+        }
+        return texture;
+}
+
+Texture* ModelLoader::GenerateTexture(const std::string& textureName)
+{
+        if (textureName.empty())
+                return nullptr;
+
+        std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
+        file::path _path = stemp.c_str();
+
+        Texture* texture = DataSystems->LoadMaterialTexture(_path.string());
+        if (texture)
+        {
+                texture->m_name = textureName;
+                m_model->m_Textures.push_back(texture);
+        }
+        return texture;
 }

@@ -54,7 +54,8 @@ private:
 
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
-	Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
+        Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
+        Texture* GenerateTexture(const std::string& textureName);
 	//¿©±â Á» Á¤¸®°¡ ÇÊ¿äÇÒ µí
 	//std::shared_ptr<Assimp::Importer> m_importer{};
 	const aiScene* m_AIScene;
