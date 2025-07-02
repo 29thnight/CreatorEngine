@@ -140,6 +140,20 @@ std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)
     return nullptr;
 }
 
+std::shared_ptr<Component> GameObject::GetComponentByTypeID(uint32 id)
+{
+	if (id >= m_components.size())
+	{
+		return nullptr;
+	}
+	auto iter = m_componentIds.find(id);
+	if (iter != m_componentIds.end())
+	{
+		size_t index = iter->second;
+		return m_components[index];
+	}
+	return nullptr;
+}
 
 void GameObject::RemoveComponentIndex(uint32 id)
 {

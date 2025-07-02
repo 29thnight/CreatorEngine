@@ -1,21 +1,45 @@
 #pragma once
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
+#include "SceneManager.h"
+#include "Scene.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "CapsuleColliderComponent.generated.h"
 
-class CapsuleColliderComponent : public Component, public ICollider
+class CapsuleColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {
 public:
    ReflectCapsuleColliderComponent
 	[[Serializable(Inheritance:Component)]]
-	CapsuleColliderComponent() {
-		m_name = "CapsuleColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<CapsuleColliderComponent>();
+	CapsuleColliderComponent() 
+   {
+		m_name = "CapsuleColliderComponent"; 
+		m_typeID = TypeTrait::GUIDCreator::GetTypeID<CapsuleColliderComponent>();
 		m_type = EColliderType::COLLISION;
 		m_Info.radius = 1.0f;
 		m_Info.height = 1.0f;
-	} virtual ~CapsuleColliderComponent() = default;
+	} 
+   virtual ~CapsuleColliderComponent() = default;
 	
+   void Awake() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->CollectColliderComponent(this);
+	   }
+   }
+
+   void OnDistroy() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->UnCollectColliderComponent(this);
+	   }
+   }
 	
 
 	[[Property]]

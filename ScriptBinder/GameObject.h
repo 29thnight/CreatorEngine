@@ -47,6 +47,8 @@ public:
 
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 
+	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
+
 	template<typename T>
 	T* AddComponent();
 

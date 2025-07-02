@@ -11,6 +11,10 @@
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
 
+#include <algorithm>
+#include <execution>
+#include <iterator>
+
 //ThreadPool<std::function<void()>> ModelLoadPool{};
 
 ModelLoader::ModelLoader()
@@ -32,8 +36,8 @@ ModelLoader::ModelLoader(const std::string_view& fileName)
 }
 
 ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fileName) :
-        m_AIScene(assimpScene),
-        m_skeletonLoader(assimpScene)
+    m_AIScene(assimpScene),
+    m_skeletonLoader(assimpScene)
 {
 	file::path filepath(fileName);
 	m_directory = filepath.parent_path().string() + "\\";
@@ -56,18 +60,25 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	}
 	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-        if(m_AIScene)
+    if(m_AIScene)
+    {
+        if (0 < m_AIScene->mNumAnimations)
         {
-                if (0 < m_AIScene->mNumAnimations)
-                {
-                        m_model->m_animator = new Animator();
-                }
+            m_model->m_animator = new Animator();
         }
+    }
 }
 
-void ModelLoader::ReserveGameObjectCapacity(size_t capacity)
+size_t ModelLoader::CountNodes(aiNode* root)
 {
-        m_gameObjects.reserve(capacity);
+	if (!root)
+		return 0u;
+
+	size_t count = 1u;
+	for (uint32_t i = 0; i < root->mNumChildren; ++i)
+		count += CountNodes(root->mChildren[i]);
+
+	return count;
 }
 
 void ModelLoader::ProcessNodes()
@@ -129,6 +140,9 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 	}
 	else
 	{
+		auto count = CountNodes(m_AIScene->mRootNode);
+		m_model->m_nodes.reserve(count);
+
 		ProcessNodes();
 		ProcessFlatMeshes();
 		ProcessMaterials();
@@ -153,8 +167,6 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	std::vector<Vertex> vertices;
 	std::vector<uint32> indices;
 	m_numUVChannel = mesh->GetNumUVChannels(); //테스트 해보고 어떻게 되는지 확인해보기
-	bool hasTexCoords = mesh->mTextureCoords[0] != nullptr;
-	bool hasTexCoords1 = mesh->mTextureCoords[1] != nullptr;
     vertices.reserve(mesh->mNumVertices);
     indices.reserve(mesh->mNumFaces * 3);
 
@@ -920,13 +932,13 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		});
 
 		nextIndex = object->m_index;
-		m_gameObjects.push_back(object);
+		//m_gameObjects.push_back(object);
 	}
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
-		m_gameObjects.push_back(object);
+		//m_gameObjects.push_back(object);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -952,7 +964,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
-			m_gameObjects.push_back(boneObject);
+			//m_gameObjects.push_back(boneObject);
 		}
 		else
 		{
@@ -1051,7 +1063,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		});
 
 		nextIndex = object->m_index;
-		m_gameObjects.push_back(object);
+		//m_gameObjects.push_back(object);
 	}
 
 	if (false == isRoot && 0 == node->m_numMeshes)
@@ -1116,7 +1128,7 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
     return texture;
 }
 
-Texture* ModelLoader::GenerateTexture(std::string_view textureName)
+Texture* ModelLoader::GenerateTexture(const std::string_view& textureName)
 {
     if (textureName.empty())
         return nullptr;

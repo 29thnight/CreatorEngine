@@ -1,9 +1,9 @@
 #pragma once
-#include "GameObject.h"
 #include "LightProperty.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "Scene.generated.h"
+#include "EBodyType.h"
 
 class GameObject;
 class RenderScene;
@@ -12,8 +12,15 @@ class LightComponent;
 class MeshRenderer;
 struct ICollider;
 class Texture;
+class RigidBodyComponent;
 class TerrainComponent;
 class ReferenceAssets;
+class BoxColliderComponent;
+class SphereColliderComponent;
+class CapsuleColliderComponent;
+class MeshColliderComponent;
+class CharacterControllerComponent;
+class TerrainColliderComponent;
 class Scene
 {
 public:
@@ -148,12 +155,41 @@ public:
     void UnCollectTerrainComponent(TerrainComponent* ptr);
     std::vector<TerrainComponent*>& GetTerrainComponent() { return m_terrainComponents; }
 
+public:
+	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
+	void UnCollectRigidBodyComponent(RigidBodyComponent* ptr);
+
+	void CollectColliderComponent(BoxColliderComponent* ptr);
+	void CollectColliderComponent(SphereColliderComponent* ptr);
+	void CollectColliderComponent(CapsuleColliderComponent* ptr);
+	void CollectColliderComponent(MeshColliderComponent* ptr);
+	void CollectColliderComponent(CharacterControllerComponent* ptr);
+	void CollectColliderComponent(TerrainColliderComponent* ptr);
+
+public:
+	void UnCollectColliderComponent(BoxColliderComponent* ptr);
+	void UnCollectColliderComponent(SphereColliderComponent* ptr);
+	void UnCollectColliderComponent(CapsuleColliderComponent* ptr);
+	void UnCollectColliderComponent(MeshColliderComponent* ptr);
+	void UnCollectColliderComponent(CharacterControllerComponent* ptr);
+	void UnCollectColliderComponent(TerrainColliderComponent* ptr);
+
+	std::vector<BoxColliderComponent*>& GetBoxColliderComponents() { return m_boxColliderComponents; }
+	std::vector<SphereColliderComponent*>& GetSphereColliderComponents() { return m_sphereColliderComponents; }
+	std::vector<CapsuleColliderComponent*>& GetCapsuleColliderComponents() { return m_capsuleColliderComponents; }
+	std::vector<MeshColliderComponent*>& GetMeshColliderComponents() { return m_meshColliderComponents; }
+	std::vector<CharacterControllerComponent*>& GetCharacterControllerComponents() { return m_characterControllerComponents; }
+
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
     std::string GenerateUniqueGameObjectName(const std::string_view& name);
 	void RemoveGameObjectName(const std::string_view& name);
     void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
+
+private:
+	void SetInternalPhysicData();
+
 public:
     void AllUpdateWorldMatrix();
 
@@ -165,6 +201,22 @@ private:
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
 	std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
+
+private:
+	friend class PhysicsManager;
+	using RigidBodyTypeLinkCallback = std::unordered_map<GameObject*, std::function<void(const EBodyType&)>>;
+	using ColliderContainerType = std::unordered_map<PhysicsManager::ColliderID, PhysicsManager::ColliderInfo>;
+
+	std::vector<RigidBodyComponent*>            m_rigidBodyComponents;
+	std::vector<BoxColliderComponent*>          m_boxColliderComponents;
+	std::vector<SphereColliderComponent*>       m_sphereColliderComponents;
+	std::vector<CapsuleColliderComponent*>      m_capsuleColliderComponents;
+	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
+	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
+	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
+
+    RigidBodyTypeLinkCallback	m_ColliderTypeLinkCallback;
+	ColliderContainerType		m_colliderContainer;
 
 public:
 	HashingString GetSceneName() const { return m_sceneName; }

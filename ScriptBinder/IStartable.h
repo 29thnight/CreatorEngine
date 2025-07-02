@@ -3,9 +3,9 @@
 #include "SceneManager.h"
 #include "Scene.h"
 
-interface IAwakable
+interface IStartable
 {
-	IAwakable()
+	IStartable()
 	{
 		subscribedScene = SceneManagers->GetActiveScene();
 		if (!subscribedScene)
@@ -13,7 +13,7 @@ interface IAwakable
 			return;
 		}
 
-		m_awakeEventHandle = subscribedScene->AwakeEvent.AddLambda([this]
+		m_startEventHandle = subscribedScene->StartEvent.AddLambda([this]
 		{
 			auto ptr = dynamic_cast<Component*>(this);
 			auto sceneObject = ptr->GetOwner();
@@ -25,22 +25,22 @@ interface IAwakable
 				}
 				else if (!isStartCalled)
 				{
-					Awake();
+					Start();
 					isStartCalled = true;
 				}
 			}
 		});
 	}
 
-	virtual ~IAwakable()
+	virtual ~IStartable()
 	{
-		subscribedScene->AwakeEvent.Remove(m_awakeEventHandle);
+		subscribedScene->StartEvent.Remove(m_startEventHandle);
 	}
 
-	virtual void Awake() = 0;
+	virtual void Start() = 0;
 
 protected:
 	Scene* subscribedScene{};
-	Core::DelegateHandle m_awakeEventHandle{};
+	Core::DelegateHandle m_startEventHandle{};
 	bool isStartCalled = false;
 };

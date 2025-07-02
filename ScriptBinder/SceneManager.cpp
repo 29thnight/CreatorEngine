@@ -192,7 +192,18 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         if (m_activeScene)
         {
 			swapScene = m_activeScene.load();
+            swapScene->AllDestroyMark();
+            swapScene->OnDisable();
+            swapScene->OnDestroy();
+
+			sceneUnloadedEvent.Broadcast();
+
 			m_activeScene = nullptr;
+
+            std::erase_if(m_scenes,
+                [&](const auto& scene) { return scene == swapScene; });
+
+            delete swapScene;
         }
 		file::path sceneName = name.data();
         resourceTrimEvent.Broadcast();
@@ -227,14 +238,7 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 
         if (swapScene)
         {
-            swapScene->AllDestroyMark();
-            swapScene->OnDisable();
-            swapScene->OnDestroy();
 
-            std::erase_if(m_scenes,
-                [&](const auto& scene) { return scene == swapScene; });
-
-            delete swapScene;
         }
 
 		m_scenes.push_back(m_activeScene);
@@ -277,6 +281,9 @@ void SceneManager::CreateEditorOnlyPlayScene()
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
         m_activeSceneIndex = m_scenes.size() - 1;
+
+        sceneUnloadedEvent.Broadcast();
+        
         m_activeScene = playScene;
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
@@ -310,19 +317,21 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 		m_activeScene.load()->AllDestroyMark();
 		m_activeScene.load()->OnDisable();
 		m_activeScene.load()->OnDestroy();
+        sceneUnloadedEvent.Broadcast();
 		m_activeScene = nullptr;
 	}
 
 	Scene* swapScene = m_scenes[m_activeSceneIndex];
+
     std::erase_if(m_scenes,
         [&](const auto& scene) { return scene == swapScene; });
-	delete swapScene;
+	
+    delete swapScene;
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
 	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
-	sceneUnloadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;
 }
