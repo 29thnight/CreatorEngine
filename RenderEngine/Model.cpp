@@ -199,8 +199,9 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
         return nullptr;
     }
 
-	ModelLoader loader = ModelLoader(model, &Scene);
-	file::path path_ = model->path;
+        ModelLoader loader = ModelLoader(model, &Scene);
+        loader.ReserveGameObjectCapacity(model->m_nodes.size());
+        file::path path_ = model->path;
 	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
 	{
@@ -219,8 +220,9 @@ GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 		return nullptr;
 	}
 
-	ModelLoader loader = ModelLoader(model, &Scene);
-	file::path path_ = model->path;
+        ModelLoader loader = ModelLoader(model, &Scene);
+        loader.ReserveGameObjectCapacity(model->m_nodes.size());
+        file::path path_ = model->path;
 
 	auto rootObj = loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
 	if (model->m_hasBones)
