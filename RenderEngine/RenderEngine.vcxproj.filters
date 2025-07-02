@@ -927,16 +927,10 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.vs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Sparkle.ps.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpawnModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MovementModule.cs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LifeModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
@@ -974,6 +968,21 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Edgefilter.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ColorModule.cs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.vs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSpawnModule.cs.hlsl">
+      <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

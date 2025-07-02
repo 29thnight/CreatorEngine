@@ -133,9 +133,9 @@ void EffectEditor::ExportToManager(const std::string& effectName)
         manager->RegisterCustomEffect(effectName, emittersToExport);
 
         // 등록된 Effect를 바로 재생
-        if (auto* registeredEffect = manager->GetEffect(effectName)) {
+        /*if (auto* registeredEffect = manager->GetEffect(effectName)) {
             registeredEffect->Play();
-        }
+        }*/
 
         std::cout << "Effect exported and started: " << effectName << std::endl;
     }

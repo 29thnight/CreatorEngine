@@ -31,6 +31,7 @@ cbuffer SpawnParameters : register(b0)
     float gEmitterRadius; // 구/원/콘 이미터 반지름
     float3 gEmitterSize; // 박스/콘 이미터 크기
     uint gMaxParticles; // 최대 파티클 수
+    float3 gEmitterPosition;
 }
 
 // 파티클 템플릿
@@ -81,63 +82,73 @@ float RandomRange(uint seed, float minVal, float maxVal)
 // 이미터별 위치 생성
 float3 GenerateEmitterPosition(uint seed)
 {
+    float3 localPos = float3(0, 0, 0);
+    
     switch (gEmitterType)
     {
         case 0: // Point Emitter
-            return float3(0, 0, 0);
+            localPos = float3(0, 0, 0);
+            break;
             
         case 1: // Sphere Emitter
         {
-            // 구 내부 균등분포
                 float theta = RandomFloat01(seed) * 6.28318530718;
                 float phi = RandomFloat01(seed + 1) * 3.14159265359;
                 float r = gEmitterRadius * pow(RandomFloat01(seed + 2), 0.33333);
-            
-                return float3(
+        
+                localPos = float3(
                 r * sin(phi) * cos(theta),
                 r * sin(phi) * sin(theta),
                 r * cos(phi)
             );
+                break;
             }
-        
+    
         case 2: // Box Emitter
         {
-                return float3(
+                localPos = float3(
                 RandomRange(seed, -gEmitterSize.x * 0.5, gEmitterSize.x * 0.5),
                 RandomRange(seed + 1, -gEmitterSize.y * 0.5, gEmitterSize.y * 0.5),
                 RandomRange(seed + 2, -gEmitterSize.z * 0.5, gEmitterSize.z * 0.5)
             );
+                break;
             }
-        
+    
         case 3: // Cone Emitter
         {
                 float height = RandomFloat01(seed) * gEmitterSize.y;
                 float angle = RandomFloat01(seed + 1) * 6.28318530718;
                 float radiusAtHeight = gEmitterRadius * (1.0 - height / gEmitterSize.y);
                 float r = sqrt(RandomFloat01(seed + 2)) * radiusAtHeight;
-            
-                return float3(
+        
+                localPos = float3(
                 r * cos(angle),
                 height,
                 r * sin(angle)
             );
+                break;
             }
-        
+    
         case 4: // Circle Emitter
         {
                 float angle = RandomFloat01(seed) * 6.28318530718;
                 float r = sqrt(RandomFloat01(seed + 1)) * gEmitterRadius;
-            
-                return float3(
+        
+                localPos = float3(
                 r * cos(angle),
                 0.0,
                 r * sin(angle)
             );
+                break;
             }
-        
+    
         default:
-            return float3(0, 0, 0);
+            localPos = float3(0, 0, 0);
+            break;
     }
+    
+    // 로컬 위치에 이미터 월드 위치 더하기
+    return localPos + gEmitterPosition;
 }
 
 // 초기 속도 생성

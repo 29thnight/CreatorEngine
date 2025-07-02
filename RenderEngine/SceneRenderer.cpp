@@ -30,6 +30,7 @@
 
 #include "Animator.h"
 #include "EffectComponent.h"
+#include "EffectProxyController.h"
 
 using namespace lm;
 
@@ -907,6 +908,7 @@ void SceneRenderer::PrepareRender()
 
 	SwapEvent();
 	ProxyCommandQueue->AddFrame();
+	EffectProxyController::GetInstance()->AddFrame();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)

@@ -13,6 +13,7 @@ enum class EffectCommandType
     CreateEffect,
     RemoveEffect,
     UpdateEffectProperty,
+    CreateInstance,
 };
 
 class EffectManagerProxy
@@ -113,6 +114,18 @@ public:
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
             efm->RemoveEffect(effectName);
+            };
+        return cmd;
+    }
+
+    // 이펙트 인스턴스 생성
+    static EffectManagerProxy CreateEffectInstanceCommand(const std::string& templateName, const std::string& instanceName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::CreateInstance;
+        cmd.m_effectName = instanceName;
+        cmd.m_executeFunction = [templateName, instanceName]() {
+            efm->CreateEffectInstance(templateName, instanceName);
             };
         return cmd;
     }

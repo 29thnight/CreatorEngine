@@ -68,6 +68,7 @@ public:
     virtual void OnSystemResized(UINT maxParticles) override;
 
     // 스폰 설정 메서드들
+    void SetEmitterPosition(const Mathf::Vector3& position);
     void SetSpawnRate(float rate);
     void SetEmitterType(EmitterType type);
     void SetEmitterSize(const XMFLOAT3& size);
@@ -86,6 +87,7 @@ public:
     float GetSpawnRate() const { return m_spawnParams.spawnRate; }
     EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
+
 private:
     bool InitializeComputeShader();
     bool CreateConstantBuffers();

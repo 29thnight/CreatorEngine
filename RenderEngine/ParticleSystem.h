@@ -131,7 +131,7 @@ protected:
 	int m_activeParticleCount = 0;
 	int m_maxParticles;
 	std::vector<BillBoardInstanceData> m_instanceData;
-	Mathf::Vector3 m_position;
+	Mathf::Vector3 m_position = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

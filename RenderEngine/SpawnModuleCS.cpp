@@ -23,6 +23,7 @@ SpawnModuleCS::SpawnModuleCS()
     m_spawnParams.emitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_spawnParams.emitterRadius = 1.0f;
     m_spawnParams.maxParticles = 0;
+    m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
     // 파티클 템플릿 기본값
     m_particleTemplate.lifeTime = 10.0f;
@@ -262,6 +263,20 @@ void SpawnModuleCS::ReleaseResources()
     if (m_templateBuffer) { m_templateBuffer->Release(); m_templateBuffer = nullptr; }
     if (m_randomStateBuffer) { m_randomStateBuffer->Release(); m_randomStateBuffer = nullptr; }
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
+}
+
+void SpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
+{
+    Mathf::Vector3 newPos = position;
+
+    // 기존 위치와 다른 경우에만 업데이트
+    if (m_spawnParams.emitterPosition.x != newPos.x ||
+        m_spawnParams.emitterPosition.y != newPos.y ||
+        m_spawnParams.emitterPosition.z != newPos.z)
+    {
+        m_spawnParams.emitterPosition = newPos;
+        m_spawnParamsDirty = true;
+    }
 }
 
 // 설정 메서드들
