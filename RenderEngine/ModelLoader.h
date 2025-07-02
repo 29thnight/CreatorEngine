@@ -39,14 +39,16 @@ private:
 	void ParseModel();
 	void ParseNodes(std::ofstream& outfile);
 	void ParseNode(std::ofstream& outfile, const ModelNode* node);
-	void ParseMeshes(std::ofstream& outfile);
-	void ParseMaterials(std::ofstream& outfile);
+        void ParseMeshes(std::ofstream& outfile);
+        void ParseMaterials(std::ofstream& outfile);
+        void ParseSkeleton(std::ofstream& outfile);
 
-	void LoadModelFromAsset();
-	void LoadNodes(std::ifstream& infile, uint32_t size);
-	void LoadNode(std::ifstream& infile, ModelNode*& node);
-	void LoadMesh(std::ifstream& infile, uint32_t size);
-	void LoadMaterial(std::ifstream& infile, uint32_t size);
+        void LoadModelFromAsset();
+        void LoadNodes(std::ifstream& infile, uint32_t size);
+        void LoadNode(std::ifstream& infile, ModelNode*& node);
+        void LoadMesh(std::ifstream& infile, uint32_t size);
+        void LoadMaterial(std::ifstream& infile, uint32_t size);
+        void LoadSkeleton(std::ifstream& infile);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
