@@ -10,17 +10,20 @@
 
 class ModelLoader
 {
-	enum class LoadType
-	{
-		UNKNOWN,
-		OBJ,
-		GLTF,
-		FBX,
-		ASSET
-	};
+        enum class LoadType
+        {
+                UNKNOWN,
+                OBJ,
+                GLTF,
+                FBX,
+                ASSET
+        };
+
+public:
+        void ReserveGameObjectCapacity(size_t capacity);
 
 private:
-	friend class Model;
+        friend class Model;
 	ModelLoader();
 	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);
@@ -57,7 +60,7 @@ private:
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
     Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
-    Texture* GenerateTexture(const std::string& textureName);
+    Texture* GenerateTexture(std::string_view textureName);
 
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
