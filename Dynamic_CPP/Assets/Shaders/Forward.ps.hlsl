@@ -16,6 +16,10 @@ Texture2D OcclusionRoughnessMetal : register(t2);
 Texture2D AoMap : register(t3);
 Texture2D Emissive : register(t5);
 
+TextureCube EnvMap : register(t6);
+TextureCube PrefilteredSpecMap : register(t7);
+Texture2D BrdfLUT : register(t8);
+
 cbuffer PBRMaterial : register(b0)
 {
     float4 gAlbedo;
@@ -28,6 +32,12 @@ cbuffer PBRMaterial : register(b0)
     int gUseEmmisive;
     int gNormalState;
     int gConvertToLinear;
+}
+
+cbuffer ForwardCBuffer : register(b3)
+{
+    int useEnvMap;
+    float envMapIntensity;
 }
 
 struct PixelShaderInput
@@ -123,20 +133,20 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     }
 
     float3 ambient = globalAmbient.rgb * albedo.rgb;
-    //if (useEnvMap)
-    //{
-    //    float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
-    //    float3 kD = 1.0 - kS;
-    //    kD *= 1.0 - metallic;
-    //    float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
-    //    float3 diffuse = irradiance * albedo;
+    if (useEnvMap)
+    {
+        float3 kS = fresnelSchlickRoughness(saturate(surf.NdotV), F0, roughness);
+        float3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;
+        float3 irradiance = EnvMap.Sample(LinearSampler, surf.N).rgb;
+        float3 diffuse = irradiance * albedo.rgb;
 
-    //    float3 R = normalize(reflect(-surf.V, surf.N));
-    //    float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * 5.0).rgb;
-    //    float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(saturate(surf.NdotV), roughness)).rg;
-    //    float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
-    //    ambient = (kD * diffuse + specular);
-    //}
+        float3 R = normalize(reflect(-surf.V, surf.N));
+        float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * 5.0).rgb;
+        float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(saturate(surf.NdotV), roughness)).rg;
+        float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
+        ambient = (kD * diffuse + specular);
+    }
     
     float3 colour = ambient + Lo + emissive.rgb;
 

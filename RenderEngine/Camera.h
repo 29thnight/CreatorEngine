@@ -75,9 +75,9 @@ public:
 	[[Property]]
 	float m_nearPlane{ 0.1f };
 	[[Property]]
-	float m_farPlane{ 5000.f };
+	float m_farPlane{ 500.f };
 	[[Property]]
-	float m_speed{ 200.f }; //&&&&&camera
+	float m_speed{ 10.f }; //&&&&&camera
 
 	float m_aspectRatio{};
 	[[Property]]
@@ -93,7 +93,7 @@ public:
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
 
-	std::vector<float>			m_cascadeDevideRatios = { 0.02f, 0.1f };
+	std::vector<float>			m_cascadeDevideRatios = { 0.05f, 0.15f };
 	std::vector<float>			m_cascadeEnd;
 	std::vector<ShadowInfo>		m_cascadeinfo;
 	ShadowMapConstant           m_shadowMapConstant;

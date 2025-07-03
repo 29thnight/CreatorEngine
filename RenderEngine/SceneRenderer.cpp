@@ -180,6 +180,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBitMaskPass = std::make_unique<BitMaskPass>();
 	m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
 
+
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
 			auto scene = SceneManagers->GetActiveScene();
@@ -227,6 +228,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	{
 		m_renderScene->Update(0.f);
 	});
+
+	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 }
 
 SceneRenderer::~SceneRenderer()
@@ -371,6 +374,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
 	//TODO : 시연용 Player주석 코드
@@ -514,14 +518,6 @@ void SceneRenderer::SceneRendering()
 		}
 
 		{
-			DirectX11::BeginEvent(L"BitMaskPass");
-			Benchmark banch;
-			m_pBitMaskPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("BitMaskPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
-
-		{
 			PROFILE_CPU_BEGIN("ForwardPass");
 			DirectX11::BeginEvent(L"ForwardPass");
 			Benchmark banch;
@@ -588,6 +584,14 @@ void SceneRenderer::SceneRendering()
             DirectX11::EndEvent();
 			PROFILE_CPU_END();
         }
+
+		{
+			DirectX11::BeginEvent(L"BitMaskPass");
+			Benchmark banch;
+			m_pBitMaskPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("BitMaskPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 
 		//[6] AAPass
 		{
@@ -944,6 +948,7 @@ void SceneRenderer::ApplyNewCubeMap(const std::string_view& filename)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
 void SceneRenderer::UnbindRenderTargets()

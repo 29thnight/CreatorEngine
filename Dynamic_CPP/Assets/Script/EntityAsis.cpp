@@ -5,10 +5,17 @@
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
-
+#include "SceneManager.h"
+#include "InputActionManager.h"
 using namespace Mathf;
 void EntityAsis::Start()
 {
+	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
+	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
+
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W'},
+		[this](Mathf::Vector2 _vector2) {Inputblabla(_vector2);});
+
 	auto manager = GameObject::Find("Manager");
 	if (manager)
 	{
@@ -34,6 +41,13 @@ void EntityAsis::Start()
 
 void EntityAsis::Update(float tick)
 {
+	auto& tr = GetComponent<Transform>();
+	Mathf::Vector3 pos = tr.GetWorldPosition();
+	dir.Normalize();
+	pos += Vector3(dir.x, 0.f, dir.y) * tick * 5.f;
+	tr.SetPosition(pos);
+
+
 	timer += tick;
 	angle += tick * 5.f;
 	Transform* tailTr = asisTail->GetComponent<Transform>();
@@ -55,5 +69,10 @@ void EntityAsis::Update(float tick)
 			m_EntityItems[i]->GetComponent<Transform>().SetPosition(finalPos);
 		}
 	}
+}
+
+void EntityAsis::Inputblabla(Mathf::Vector2 dir)
+{
+	this->dir = dir;
 }
 

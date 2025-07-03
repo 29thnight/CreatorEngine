@@ -203,7 +203,7 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdCont
 	if (!isOn) return;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
-
+	auto& lightManager = scene.m_LightController;
 	ID3D11DeviceContext* defferdPtr = defferdContext;
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	ID3D11ShaderResourceView* nullSRVall[3] = { nullptr, nullptr, nullptr };
@@ -211,6 +211,7 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdCont
 
 	DirectX11::CSSetShader(defferdPtr, m_pMainShader->GetShader(), nullptr, 0);
 	defferdPtr->CSSetSamplers(0, 1, &m_pClampSampler);
+	defferdPtr->CSSetSamplers(1, 1, &m_pWrapSampler);
 	defferdPtr->CSSetSamplers(2, 1, &m_pShadowSamper);
 
 	int readIndex = mCurrentTexture3DRead;
@@ -240,7 +241,9 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdCont
 	data.Strength = mStrength;
 	data.ThicknessFactor = mThicknessFactor;
 	//GIT_COMBINE_WARN_END : shadowMapPass 코드 정리로 인한 로직 변경되었으니 병합 전 확인 바람. by Hero.P
-
+	if (lightManager->hasLightWithShadows) {
+		lightManager->CSBindCloudShadowMap(defferdPtr);
+	}
 	DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &data);
 	DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_Buffer.GetAddressOf());
 	DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &renderData->m_shadowMapTexture->m_pSRV);

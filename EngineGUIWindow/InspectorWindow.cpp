@@ -385,7 +385,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				float pyr[3];
 				float deltaEuler[3] = { 0, 0, 0 };
 				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+				float prevPYR[3];
+				prevRotation = rotation;
+
 				for (float& i : pyr) i *= Mathf::Rad2Deg;
+				prevPYR[0] = pyr[0];
+				prevPYR[1] = pyr[1];
+				prevPYR[2] = pyr[2];
 
 				ImGui::Text("Rotation ");
 				ImGui::SameLine();
@@ -399,8 +406,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						prevEuler[2] = pyr[2];
 						editingRotation = true;
 					}
-					Mathf::Vector3 radianEuler(pyr[0] * Mathf::Deg2Rad, pyr[1] * Mathf::Deg2Rad, pyr[2] * Mathf::Deg2Rad);
-					rotation = XMQuaternionRotationRollPitchYaw(radianEuler.x, radianEuler.y, radianEuler.z);
+					Mathf::Vector3 radianEuler(
+						pyr[0] - prevPYR[0],
+						pyr[1] - prevPYR[1],
+						pyr[2] - prevPYR[2]);
+					rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
 					selectedSceneObject->m_transform.m_dirty = true;
 				}
 				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
@@ -627,6 +637,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::OpenPopup("ComponentMenu");
 				isOpen = false;
 			}
+			if (menuClicked) {
+				ImGui::OpenPopup("TransformMenu");
+				menuClicked = false;
+			}
 
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
@@ -691,6 +705,18 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					selectedSceneObject->RemoveComponent(selectedComponent);
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
+				}
+				ImGui::EndPopup();
+			}
+			if (ImGui::BeginPopup("TransformMenu")) {
+				if (ImGui::MenuItem("Reset Transform"))
+				{
+					selectedSceneObject->m_transform.position = { 0, 0, 0, 1 };
+					selectedSceneObject->m_transform.rotation = XMQuaternionIdentity();
+					selectedSceneObject->m_transform.scale = { 1, 1, 1, 1 };
+					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.UpdateLocalMatrix();
+					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndPopup();
 			}

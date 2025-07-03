@@ -15,6 +15,8 @@
 
 //Texture2D ShadowMap : register(t4); // support 1 for now, future use array
 Texture2DArray ShadowMapArr : register(t4); //< -- t4 
+Texture2D CloudShadowMap : register(t10);
+
 struct Light
 {
     float4 position;
@@ -59,6 +61,14 @@ cbuffer ShadowMapConstants : register(b2) // supports one
     uint useCasCade;
     
 }
+cbuffer CloudShadowMapConstants : register(b4)
+{
+    float4x4 viewProjection;
+    float2 cloudMapSize;
+    float2 direction;
+    uint frameIndex;
+    float moveSpeed;
+}
 
 cbuffer CameraView : register(b10)
 {
@@ -76,6 +86,39 @@ float3 overlayCascadeDebug(float4 worldPosition)
               : (cascadeIndex == 2) ? float3(0, 0, 1)
               : float3(1, 1, 0);
     return color;
+}
+
+float CloudShadowFactor(float4 worldPosition)
+{
+    //float2 cloudUV = worldPosition.xz * 0.003 + frameIndex * 0.00005 * float2(0.9, 0.2); // * cloudScale + cloudOffset;)
+    //float shadow = 0;
+    //for (int x = -1; x < 2; ++x)
+    //{
+    //    //[unroll]
+    //    for (int y = -1; y < 2; ++y)
+    //    {
+    //        float2 uv = float2(cloudUV + float2(x, y) / cloudMapSize * 0.3);
+    //        float depth = CloudShadowMap.Sample(LinearSampler, uv).r;
+    //        shadow += depth;
+    //    }
+    //}
+    //shadow /= 9.0;
+    //return shadow;
+    float2 texelSize = float2(1, 1) / cloudMapSize;
+    
+    float4 lightSpacePosition = mul(viewProjection, worldPosition);
+    float3 projCoords = lightSpacePosition.xyz / lightSpacePosition.w;
+    float currentDepth = projCoords.z;
+    projCoords.y = -projCoords.y;
+    projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
+    
+    // (uv * size) + (time * moveSpeed * direction) = cloudMove
+    float2 uv = float2(projCoords.xy * 4 + frameIndex * 0.00003 *float2(1, 1)  /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
+    float closestDepth = CloudShadowMap.Sample(LinearSampler, uv).r;
+    float shadow = 0;
+    shadow = closestDepth;
+    
+    return shadow;
 }
 
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer
