@@ -416,9 +416,6 @@
     <ClCompile Include="ParticleModule.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="SparkleEffect.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -500,6 +497,24 @@
     <ClCompile Include="SizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClCompile>
+    <ClCompile Include="EffectEditor.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectManagerProxy.cpp">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectProxyController.cpp">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectSerializer.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClCompile>
+    <ClCompile Include="SparkleEffect.cpp">
+      <Filter>RenderPass\EffectPass\Old.</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+	</ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
@@ -676,9 +691,6 @@
     <ClInclude Include="ParticleModule.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="SparkleEffect.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
     <ClInclude Include="BaseEffectStruct.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
@@ -760,12 +772,6 @@
     <ClInclude Include="LODSetting.h">
       <Filter>Asset\LODGroup</Filter>
     </ClInclude>
-    <ClInclude Include="EffectBase.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
-    <ClInclude Include="EffectComponent.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
     <ClInclude Include="MeshSpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
@@ -775,6 +781,24 @@
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClInclude>
+    <ClInclude Include="EffectEditor.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectManagerProxy.h">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectProxyController.h">
+      <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectSerializer.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClInclude>
+    <ClInclude Include="SparkleEffect.h">
+      <Filter>RenderPass\EffectPass\Old.</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectBase.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+	</ClInclude>
     <ClInclude Include="TestAniScprit.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -933,19 +957,11 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.vs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Sparkle.ps.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpawnModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MovementModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LifeModule.cs.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
@@ -980,6 +996,21 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Edgefilter.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ColorModule.cs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.ps.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.vs.hlsl">
+      <Filter>Shaders\Effect</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSpawnModule.cs.hlsl">
+      <Filter>Shaders\Effect</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

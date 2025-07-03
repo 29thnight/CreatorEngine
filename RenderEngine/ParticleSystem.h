@@ -36,6 +36,17 @@ public:
 		return module;
 	}
 
+	void AddExistingModule(std::unique_ptr<ParticleModule> module)
+	{
+		if (module)
+		{
+			ParticleModule* rawPtr = module.release(); // unique_ptr에서 소유권 해제
+			rawPtr->Initialize();
+			rawPtr->OnSystemResized(m_maxParticles);
+			m_moduleList.Link(rawPtr);
+		}
+	}
+
 	template<typename T>
 	T* GetModule()
 	{
@@ -62,6 +73,16 @@ public:
 		module->Initialize();
 		m_renderModules.push_back(module);
 		return module;
+	}
+
+	void AddExistingRenderModule(std::unique_ptr<RenderModules> renderModule)
+	{
+		if (renderModule)
+		{
+			RenderModules* rawPtr = renderModule.release(); // unique_ptr에서 소유권 해제
+			rawPtr->Initialize();
+			m_renderModules.push_back(rawPtr);
+		}
 	}
 
 	template<typename T>
@@ -105,6 +126,12 @@ public:
 	std::vector<RenderModules*>& GetRenderModules() { return m_renderModules; }
 	const std::vector<RenderModules*>& GetRenderModules() const { return m_renderModules; }
 
+	// JSON 직렬화를 위한 getter들
+	UINT GetMaxParticles() const { return m_maxParticles; }
+	ParticleDataType GetParticleDataType() const { return m_particleDataType; }
+	const Mathf::Vector3& GetPosition() const { return m_position; }
+	bool IsRunning() const { return m_isRunning; }
+
 private:
 
 	void ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule);
@@ -131,7 +158,7 @@ protected:
 	int m_activeParticleCount = 0;
 	int m_maxParticles;
 	std::vector<BillBoardInstanceData> m_instanceData;
-	Mathf::Vector3 m_position;
+	Mathf::Vector3 m_position = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

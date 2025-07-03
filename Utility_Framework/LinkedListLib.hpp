@@ -141,6 +141,7 @@ public:
 
 	size_t size() const { return _size; }
 
+
 private:
 	LinkProperty<_Type>* _pHead{};
 	LinkProperty<_Type>* _pTail{};
