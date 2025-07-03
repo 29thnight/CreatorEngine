@@ -192,12 +192,14 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         if (m_activeScene)
         {
 			swapScene = m_activeScene.load();
-            m_activeScene.load()->AllDestroyMark();
-            m_activeScene.load()->OnDisable();
-            m_activeScene.load()->OnDestroy();
-			
-            m_activeScene = nullptr;
-            
+            swapScene->AllDestroyMark();
+            swapScene->OnDisable();
+            swapScene->OnDestroy();
+
+			sceneUnloadedEvent.Broadcast();
+
+			m_activeScene = nullptr;
+
             std::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
 
@@ -274,6 +276,9 @@ void SceneManager::CreateEditorOnlyPlayScene()
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
         m_activeSceneIndex = m_scenes.size() - 1;
+
+        sceneUnloadedEvent.Broadcast();
+        
         m_activeScene = playScene;
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
@@ -307,19 +312,21 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 		m_activeScene.load()->AllDestroyMark();
 		m_activeScene.load()->OnDisable();
 		m_activeScene.load()->OnDestroy();
+        sceneUnloadedEvent.Broadcast();
 		m_activeScene = nullptr;
 	}
 
 	Scene* swapScene = m_scenes[m_activeSceneIndex];
+
     std::erase_if(m_scenes,
         [&](const auto& scene) { return scene == swapScene; });
-	delete swapScene;
+	
+    delete swapScene;
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
 	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
-	sceneUnloadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;
 }
@@ -338,6 +345,15 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         if (obj)
         {
             Meta::Deserialize(obj, itNode);
+            if (!obj->m_tag.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+            }
+
+            if (!obj->m_layer.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+            }
         }
 
         if (itNode["m_components"])

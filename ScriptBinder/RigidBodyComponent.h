@@ -1,23 +1,20 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "RigidBodyComponent.generated.h"
+#include "EBodyType.h"
 
-enum class EBodyType
-{
-	STATIC,
-	DYNAMIC,
-	KINEMATIC
-};
-AUTO_REGISTER_ENUM(EBodyType)
-
-class RigidBodyComponent : public Component 
+class RigidBodyComponent : public Component, public IAwakable, public IOnDistroy
 {
 public:
    ReflectRigidBodyComponent
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(RigidBodyComponent)
 	
+   void Awake() override;
+   void OnDistroy() override;
 	
 	EBodyType GetBodyType() const { return m_bodyType; }
 	void SetBodyType(const EBodyType& bodyType) { m_bodyType = bodyType; }
@@ -46,12 +43,10 @@ public:
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
 private:
-
-	
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
 
-
+private:
 	bool m_isLockLinearX = false;
 	bool m_isLockLinearY = false;
 	bool m_isLockLinearZ = false;

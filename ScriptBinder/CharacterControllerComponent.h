@@ -2,6 +2,11 @@
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
+#include "IStartable.h"
+#include "IFixedUpdatable.h"
+#include "ILateUpdatable.h"
 #include "../physics/PhysicsCommon.h"
 #include "../physics/Physx.h"
 #include "../Physics/ICollider.h"
@@ -11,26 +16,45 @@
 #include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
-class CharacterControllerComponent : public Component, public ICollider
+class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDistroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
 {
 public:
-
    ReflectCharacterControllerComponent
-		[[Serializable(Inheritance:Component)]]
-	CharacterControllerComponent() {
-		m_name = "CharacterControllerComponent";
-		m_typeID = TypeTrait::GUIDCreator::GetTypeID<CharacterControllerComponent>();
+	[[Serializable(Inheritance:Component)]]
+	GENERATED_BODY(CharacterControllerComponent)
 
-		m_onStartHandle = SceneManagers->GetActiveScene()->StartEvent.AddRaw(this, &CharacterControllerComponent::OnStart);
-		m_onFixedUpdateHandle = SceneManagers->GetActiveScene()->FixedUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnFixedUpdate);
-		m_onLateUpdateHandle = SceneManagers->GetActiveScene()->LateUpdateEvent.AddRaw(this, &CharacterControllerComponent::OnLateUpdate);
+   void Awake() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->CollectColliderComponent(this);
+	   }
+   }
 
+   void Start() override
+   {
+	   OnStart();
+   }
 
-	} virtual ~CharacterControllerComponent() {
-		SceneManagers->GetActiveScene()->StartEvent.Remove(m_onStartHandle);
-		SceneManagers->GetActiveScene()->FixedUpdateEvent.Remove(m_onFixedUpdateHandle);
-		SceneManagers->GetActiveScene()->LateUpdateEvent.Remove(m_onLateUpdateHandle);
-	};
+   void FixedUpdate(float fixedDeltaTime) override
+   {
+	   OnFixedUpdate(fixedDeltaTime);
+   }
+
+   void LateUpdate(float fixedDeltaTime) override
+   {
+	   OnLateUpdate(fixedDeltaTime);
+   }
+
+   void OnDistroy() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->UnCollectColliderComponent(this);
+	   }
+   }
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
@@ -162,10 +186,6 @@ public:
 	{
 		m_bMoveRestrict = restrict;
 	}
-
-
-
-
 
 	//collision Ä«¿îÆ®
 	unsigned int GetCollisionCount() const

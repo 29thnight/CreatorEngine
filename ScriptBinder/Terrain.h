@@ -99,6 +99,7 @@ public:
     TerrainMesh* GetMesh() const { return m_pMesh; }
 	TerrainMaterial* GetMaterial() const { return m_pMaterial; }
 
+
     [[Property]]
 	FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::wstring m_terrainTargetPath{};

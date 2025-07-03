@@ -28,7 +28,5 @@ struct ICollider
 	virtual void OnCollisionEnter(ICollider* other) = 0;
 	virtual void OnCollisionStay(ICollider* other) = 0;
 	virtual void OnCollisionExit(ICollider* other) = 0;
-
-	
 };
 

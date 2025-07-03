@@ -264,6 +264,9 @@
     <ClCompile Include="PrefabUtility.cpp">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClCompile>
+    <ClCompile Include="RigidBodyComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -517,6 +520,15 @@
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
+    </ClInclude>
+    <ClInclude Include="IStartable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="ILateUpdatable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="EBodyType.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

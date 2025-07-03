@@ -16,6 +16,26 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     //    return true;
     //}
 
+    if (message == WM_SYSKEYDOWN)
+    {
+        if (wParam == VK_RETURN)
+        {
+            // Alt + Enter 조합 차단
+            return 0; // 메시지 처리 종료 (DefWindowProc으로 전달하지 않음)
+        }
+    }
+
+	if (message == WM_KEYDOWN)
+    {
+        if (wParam == VK_RETURN)
+        {
+
+            // 시스템 문자 입력도 무시
+            return 0;
+        }
+    }
+ 
+
     if (message == WM_SETCURSOR)
     {
         // 커서 설정

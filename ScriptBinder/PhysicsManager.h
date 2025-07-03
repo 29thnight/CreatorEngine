@@ -5,8 +5,6 @@
 #include "GameObject.h"
 #include "Component.h"
 
-
-
 struct Collision 
 {
 	GameObject* thisObj;
@@ -14,7 +12,6 @@ struct Collision
 
 	const std::vector<DirectX::SimpleMath::Vector3>& contactPoints;
 };
-
 
 //raycast event 관련 함수등록 관련 메인부에 문의 할것
 struct RayEvent {
@@ -42,8 +39,16 @@ struct RayEvent {
 struct ICollider;
 class Component;
 class GameObject;
+class BoxColliderComponent;
+class SphereColliderComponent;
+class CapsuleColliderComponent;
+class MeshColliderComponent;
+class CharacterControllerComponent;
+class TerrainColliderComponent;
+class Scene;
 class PhysicsManager : public Singleton<PhysicsManager>
 {
+
 	friend class Singleton;
 	//todo : 
 	// - 물리엔진 초기화 및 업데이트
@@ -52,6 +57,8 @@ class PhysicsManager : public Singleton<PhysicsManager>
 	// - Object를 순회하며 물리컴포넌트를 찾아 생성 및 업데이트 및 삭제
 	// - 물리엔진 콜리전 이벤트를 찾아서 콜백함수 호출
 	// - 물리엔지 컴포넌트의 데이터를 기반으로 디버그 정보 드로우
+public:
+	friend class Scene;
 	using ColliderID = unsigned int;
 	struct ColliderInfo
 	{
@@ -132,11 +139,25 @@ private:
 
 	//================
 	//terrain
-	void AddTerrainCollider(GameObject* object);
+	//void AddTerrainCollider(GameObject* object);
 
 	//
-	void AddCollider(GameObject* object);
-	void RemoveCollider(GameObject* object);
+	//void AddCollider(GameObject* object);
+	void AddCollider(BoxColliderComponent* box);
+	void AddCollider(SphereColliderComponent* sphere);
+	void AddCollider(CapsuleColliderComponent* capsule);
+	void AddCollider(MeshColliderComponent* mesh);
+	void AddCollider(CharacterControllerComponent* controller);
+	void AddCollider(TerrainColliderComponent* terrain);
+
+	//void RemoveCollider(GameObject* object);
+	void RemoveCollider(BoxColliderComponent* box);
+	void RemoveCollider(SphereColliderComponent* sphere);
+	void RemoveCollider(CapsuleColliderComponent* capsule);
+	void RemoveCollider(MeshColliderComponent* mesh);
+	void RemoveCollider(CharacterControllerComponent* controller);
+	void RemoveCollider(TerrainColliderComponent* terrain);
+
 	void RemoveRagdollCollider(GameObject* object);
 	void CallbackEvent(CollisionData data, ECollisionEventType type);
 	//
@@ -163,7 +184,7 @@ private:
 
 	
 	//물리엔진 객체
-	std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
+	//std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
 
 	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;

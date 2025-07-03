@@ -7,6 +7,15 @@
 #include "Terrain.h"
 #include "Animator.h"
 #include "Skeleton.h"
+#include "PhysicsManager.h"
+#include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
+#include "CapsuleColliderComponent.h"
+#include "MeshCollider.h"
+#include "CharacterControllerComponent.h"
+#include "TerrainCollider.h"
+#include "RigidBodyComponent.h"
+#include "TagManager.h"
 
 Scene::Scene()
 {
@@ -67,6 +76,16 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	if (parentObj->m_index != index)
 	{
 		parentObj->m_childrenIndices.push_back(index);
+	}
+
+	if (!newObj->m_tag.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(newObj->m_tag.ToString(), newObj.get());
+	}
+
+	if (!newObj->m_layer.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(newObj->m_layer.ToString(), newObj.get());
 	}
 
 	return m_SceneObjects[index];
@@ -204,6 +223,8 @@ void Scene::Start()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
+	SetInternalPhysicData();
+
     FixedUpdateEvent.Broadcast(deltaSecond);
 	InternalPhysicsUpdateEvent.Broadcast(deltaSecond);
 	// Internal Physics Update 작성
@@ -478,6 +499,366 @@ void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
 	}
 }
 
+void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_rigidBodyComponents.begin(),
+			m_rigidBodyComponents.end(),
+			[ptr](const auto& body) { return body == ptr; });
+		if (it == m_rigidBodyComponents.end())
+		{
+			m_rigidBodyComponents.push_back(ptr);
+		}
+	}
+}
+
+void Scene::UnCollectRigidBodyComponent(RigidBodyComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_rigidBodyComponents, [ptr](const auto& body) { return body == ptr; });
+	}
+}
+
+void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_boxColliderComponents.begin(),
+			m_boxColliderComponents.end(),
+			[ptr](const auto& box) { return box == ptr; });
+		if (it == m_boxColliderComponents.end())
+		{
+			m_boxColliderComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto callback = [=](const EBodyType& bodyType)
+		{
+			if (nullptr == ptr) return;
+
+			auto boxInfo = ptr->GetBoxInfo();
+			auto colliderID = boxInfo.colliderInfo.id;
+
+			if (bodyType == EBodyType::STATIC)
+			{
+				//pxScene에 엑터 추가
+				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{ m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+			else
+			{
+				bool isKinematic = bodyType == EBodyType::KINEMATIC;
+				Physics->CreateDynamicBody(boxInfo, EColliderType::COLLISION, isKinematic);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{
+						m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+		};
+
+		m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
+	}
+}
+
+void Scene::UnCollectColliderComponent(BoxColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_boxColliderComponents, [ptr](const auto& box) { return box == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
+void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_sphereColliderComponents.begin(),
+			m_sphereColliderComponents.end(),
+			[ptr](const auto& sphere) { return sphere == ptr; });
+		if (it == m_sphereColliderComponents.end())
+		{
+			m_sphereColliderComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto callback = [=](const EBodyType& bodyType)
+		{
+			if (nullptr == ptr) return;
+
+			auto sphereInfo = ptr->GetSphereInfo();
+			auto colliderID = sphereInfo.colliderInfo.id;
+
+			if (bodyType == EBodyType::STATIC)
+			{
+				//pxScene에 엑터 추가
+				Physics->CreateStaticBody(sphereInfo, EColliderType::COLLISION);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{ m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+			else
+			{
+				bool isKinematic = bodyType == EBodyType::KINEMATIC;
+				Physics->CreateDynamicBody(sphereInfo, EColliderType::COLLISION, isKinematic);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{
+						m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+		};
+
+		m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
+	}
+}
+
+void Scene::UnCollectColliderComponent(SphereColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_sphereColliderComponents, [ptr](const auto& sphere) { return sphere == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
+void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_capsuleColliderComponents.begin(),
+			m_capsuleColliderComponents.end(),
+			[ptr](const auto& capsule) { return capsule == ptr; });
+		if (it == m_capsuleColliderComponents.end())
+		{
+			m_capsuleColliderComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto callback = [=](const EBodyType& bodyType)
+		{
+			if (nullptr == ptr) return;
+
+			auto capsuleInfo = ptr->GetCapsuleInfo();
+			auto colliderID = capsuleInfo.colliderInfo.id;
+
+			if (bodyType == EBodyType::STATIC)
+			{
+				//pxScene에 엑터 추가
+				Physics->CreateStaticBody(capsuleInfo, EColliderType::COLLISION);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{ m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+			else
+			{
+				bool isKinematic = bodyType == EBodyType::KINEMATIC;
+				Physics->CreateDynamicBody(capsuleInfo, EColliderType::COLLISION, isKinematic);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{
+						m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+		};
+
+		m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
+	}
+}
+
+void Scene::UnCollectColliderComponent(CapsuleColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_capsuleColliderComponents, [ptr](const auto& capsule) { return capsule == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
+void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_meshColliderComponents.begin(),
+			m_meshColliderComponents.end(),
+			[ptr](const auto& mesh) { return mesh == ptr; });
+		if (it == m_meshColliderComponents.end())
+		{
+			m_meshColliderComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto callback = [=](const EBodyType& bodyType)
+		{
+			if (nullptr == ptr) return;
+
+			auto convexMeshInfo = ptr->GetMeshInfo();
+			auto colliderID = convexMeshInfo.colliderInfo.id;
+
+			if (bodyType == EBodyType::STATIC)
+			{
+				//pxScene에 엑터 추가
+				Physics->CreateStaticBody(convexMeshInfo, EColliderType::COLLISION);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{ m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+			else
+			{
+				bool isKinematic = bodyType == EBodyType::KINEMATIC;
+				Physics->CreateDynamicBody(convexMeshInfo, EColliderType::COLLISION, isKinematic);
+				//콜라이더 정보 저장
+				m_colliderContainer[colliderID] =
+					PhysicsManager::ColliderInfo{
+						m_boxTypeId,
+						ptr,
+						ptr->GetOwner(),
+						ptr,
+						false
+				};
+			}
+		};
+
+		m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
+	}
+}
+
+void Scene::UnCollectColliderComponent(MeshColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_meshColliderComponents, [ptr](const auto& mesh) { return mesh == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
+void Scene::CollectColliderComponent(CharacterControllerComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_characterControllerComponents.begin(),
+			m_characterControllerComponents.end(),
+			[ptr](const auto& character) { return character == ptr; });
+		if (it == m_characterControllerComponents.end())
+		{
+			m_characterControllerComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto controllerInfo = ptr->GetControllerInfo();
+		auto colliderID = controllerInfo.id;
+
+		m_colliderContainer[colliderID] =
+			PhysicsManager::ColliderInfo{ m_controllerTypeId,
+				ptr,
+				ptr->GetOwner(),
+				ptr,
+				false
+		};
+	}
+}
+
+void Scene::CollectColliderComponent(TerrainColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		auto it = std::find_if(
+			m_terrainColliderComponents.begin(),
+			m_terrainColliderComponents.end(),
+			[ptr](const auto& terrain) { return terrain == ptr; });
+		if (it == m_terrainColliderComponents.end())
+		{
+			m_terrainColliderComponents.push_back(ptr);
+		}
+
+		PhysicsManagers->AddCollider(ptr);
+
+		auto gameObject = ptr->GetOwner();
+		auto heightFieldInfo = ptr->GetHeightFieldColliderInfo();
+		auto colliderID = heightFieldInfo.colliderInfo.id;
+
+		m_colliderContainer.insert({ colliderID, {
+			m_heightFieldTypeId,
+			ptr, // corrected variable name from 'collider' to 'ptr'
+			gameObject,
+			ptr,
+			false
+		} });
+	}
+}
+
+void Scene::UnCollectColliderComponent(CharacterControllerComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_characterControllerComponents, [ptr](const auto& character) { return character == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
+void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
+{
+	if (ptr)
+	{
+		std::erase_if(m_terrainColliderComponents, [ptr](const auto& terrain) { return terrain == ptr; });
+
+		PhysicsManagers->RemoveCollider(ptr);
+	}
+}
+
 void Scene::DestroyGameObjects()
 {
     std::unordered_set<uint32_t> deletedIndices;
@@ -644,6 +1025,72 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 	{
 		UpdateModelRecursive(childIndex, model);
 	}
+}
+
+void Scene::SetInternalPhysicData()
+{
+	std::unordered_set<GameObject*> linkCompleteSet;
+	for (auto& box : m_boxColliderComponents)
+	{
+		if (box && box->GetOwner())
+		{
+			auto gameObject = box->GetOwner();
+			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
+			if(iter != m_ColliderTypeLinkCallback.end())
+			{
+				iter->second(EBodyType::STATIC);
+			}
+			linkCompleteSet.insert(gameObject);
+		}
+	}
+
+	for (auto& sphere : m_sphereColliderComponents)
+	{
+		if (sphere && sphere->GetOwner())
+		{
+			auto gameObject = sphere->GetOwner();
+			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
+			if(iter != m_ColliderTypeLinkCallback.end())
+			{
+				iter->second(EBodyType::STATIC);
+			}
+			linkCompleteSet.insert(gameObject);
+		}
+	}
+
+	for (auto& capsule : m_capsuleColliderComponents)
+	{
+		if (capsule && capsule->GetOwner())
+		{
+			auto gameObject = capsule->GetOwner();
+			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
+			if(iter != m_ColliderTypeLinkCallback.end())
+			{
+				iter->second(EBodyType::STATIC);
+			}
+			linkCompleteSet.insert(gameObject);
+		}
+	}
+
+	for (auto& mesh : m_meshColliderComponents)
+	{
+		if (mesh && mesh->GetOwner())
+		{
+			auto gameObject = mesh->GetOwner();
+			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
+			if(iter != m_ColliderTypeLinkCallback.end())
+			{
+				iter->second(EBodyType::STATIC);
+			}
+			linkCompleteSet.insert(gameObject);
+		}
+	}
+
+	std::erase_if(m_ColliderTypeLinkCallback, 
+		[&linkCompleteSet](const auto& pair)
+		{
+			return linkCompleteSet.contains(pair.first);
+		});
 }
 
 void Scene::AllUpdateWorldMatrix()
