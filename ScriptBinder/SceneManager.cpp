@@ -130,12 +130,15 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
 {
     if (m_activeScene)
     {
-        std::erase_if(m_scenes,
-            [&](const auto& scene) { return scene == m_activeScene.load(); });
+        sceneUnloadedEvent.Broadcast();
 
         m_activeScene.load()->AllDestroyMark();
         m_activeScene.load()->OnDisable();
         m_activeScene.load()->OnDestroy();
+
+        std::erase_if(m_scenes,
+            [&](const auto& scene) { return scene == m_activeScene.load(); });
+
         m_activeScene = nullptr;
     }
 
@@ -190,16 +193,16 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         Scene* swapScene{};
         if (m_activeScene)
-        {
-			swapScene = m_activeScene.load();
-            swapScene->AllDestroyMark();
-            swapScene->OnDisable();
-            swapScene->OnDestroy();
-
-			sceneUnloadedEvent.Broadcast();
-
-			m_activeScene = nullptr;
-
+            
+            sceneUnloadedEvent.Broadcast();
+            m_activeScene.load()->AllDestroyMark();
+			
+            m_activeScene = nullptr;
+            
+            m_activeScene.load()->OnDestroy();
+			
+            m_activeScene = nullptr;
+            
             std::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
 
@@ -269,6 +272,7 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
     try
     {
+		resourceTrimEvent.Broadcast();
         //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene.load());
 		resourceTrimEvent.Broadcast();
@@ -276,9 +280,6 @@ void SceneManager::CreateEditorOnlyPlayScene()
         m_scenes.push_back(playScene);
         m_EditorSceneIndex = m_activeSceneIndex;
         m_activeSceneIndex = m_scenes.size() - 1;
-
-        sceneUnloadedEvent.Broadcast();
-        
         m_activeScene = playScene;
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
@@ -309,6 +310,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 	if (m_activeScene)
 	{
         resetSelectedObjectEvent.Broadcast();
+        sceneUnloadedEvent.Broadcast();
 		m_activeScene.load()->AllDestroyMark();
 		m_activeScene.load()->OnDisable();
 		m_activeScene.load()->OnDestroy();
@@ -320,13 +322,14 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 
     std::erase_if(m_scenes,
         [&](const auto& scene) { return scene == swapScene; });
-	
+	swapScene = nullptr;
     delete swapScene;
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
 	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
+	sceneUnloadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;
 }
