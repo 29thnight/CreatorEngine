@@ -109,7 +109,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					{
 						animator->m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
 					}
-
 				}
 			}
 

@@ -10,6 +10,12 @@
 #include "Benchmark.hpp"
 #include "MeshRendererProxy.h"
 
+struct alignas(16) ForwardBuffer
+{
+	bool32 m_useEnvironmentMap{};
+	float m_envMapIntensity{ 1.f };
+};
+
 ForwardPass::ForwardPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -34,12 +40,20 @@ ForwardPass::ForwardPass()
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
 
+	m_Buffer = DirectX11::CreateBuffer(sizeof(ForwardBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_materialBuffer = DirectX11::CreateBuffer(sizeof(MaterialInfomation), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
 ForwardPass::~ForwardPass()
 {
+}
+
+void ForwardPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut)
+{
+	m_EnvironmentMap = envMap;
+	m_PreFilter = preFilter;
+	m_BrdfLut = brdfLut;
 }
 
 void ForwardPass::Execute(RenderScene& scene, Camera& camera)
@@ -69,6 +83,11 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 
 	m_pso->Apply(defferdPtr);
 
+	ForwardBuffer buffer{};
+	buffer.m_envMapIntensity = m_envMapIntensity;
+	buffer.m_useEnvironmentMap = m_UseEnvironmentMap;
+	DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &buffer);
+
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
 	DirectX11::OMSetRenderTargets(defferdPtr, 1, &view, renderData->m_depthStencil->m_pDSV);
 	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
@@ -76,13 +95,22 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, R
 	DirectX11::OMSetDepthStencilState(defferdPtr, DeviceState::g_pDepthStencilState, 1);
 	DirectX11::OMSetBlendState(defferdPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
 	DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
-	DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::VSSetConstantBuffer(defferdPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
+	DirectX11::PSSetConstantBuffer(defferdPtr, 3, 1, m_Buffer.GetAddressOf());
+
+	ID3D11ShaderResourceView* envSRVs[3] = {
+		m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr
+	};
+	DirectX11::PSSetShaderResources(defferdPtr, 6, 3, envSRVs);
 
 	auto& lightManager = scene.m_LightController;
 	if (lightManager->hasLightWithShadows) {
 		DirectX11::PSSetShaderResources(defferdPtr, 4, 1, &renderData->m_shadowMapTexture->m_pSRV);
 		DirectX11::PSSetConstantBuffer(defferdPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+		lightManager->PSBindCloudShadowMap(defferdPtr);
 	}
 
 	camera.UpdateBuffer(defferdPtr);

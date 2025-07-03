@@ -97,14 +97,12 @@ public:
 
     // 위치 설정 (모든 ParticleSystem에 적용)
     virtual void SetPosition(const Mathf::Vector3& position) {
-        Mathf::Vector3 offset = position - m_position;
         m_position = position;
 
-        // 모든 ParticleSystem 위치 업데이트
+        // 모든 ParticleSystem에 절대 위치 직접 전달 (offset 계산하지 않음)
         for (auto& ps : m_particleSystems) {
             if (ps) {
-                Mathf::Vector3 currentPos = ps->GetPosition();  // GetPosition 함수 필요
-                ps->SetPosition(currentPos + offset);
+                ps->SetPosition(position);  // 절대 위치 직접 전달
             }
         }
     }

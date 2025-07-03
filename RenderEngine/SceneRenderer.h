@@ -31,6 +31,8 @@
 #include "SSGIPass.h"
 #include "BitMaskPass.h"
 #include "TerrainGizmoPass.h"
+
+#include "EffectEditor.h"
 //작업자 세환 관련
 #include "TestPlayer.h"
 #endif // !DYNAMICCPP_EXPORTS
@@ -106,6 +108,7 @@ private:
 	std::unique_ptr<AAPass>						m_pAAPass{};
 	std::unique_ptr<PostProcessingPass>			m_pPostProcessingPass{};
 	std::unique_ptr<EffectManager>				m_pEffectPass{};
+	std::unique_ptr<EffectEditor>				m_EffectEditor;
 
 	std::unique_ptr<PositionMapPass>			m_pPositionMapPass{};
 	std::unique_ptr<LightMapPass>				m_pLightMapPass{};

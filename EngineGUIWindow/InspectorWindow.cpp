@@ -17,6 +17,7 @@
 #include "CustomCollapsingHeader.h"
 #include "Terrain.h"
 #include "FileDialog.h"
+#include "TagManager.h"
 //----------------------------
 #include "NodeFactory.h"
 #include "StateMachineComponent.h"
@@ -33,16 +34,13 @@ static const std::unordered_set<std::string> ignoredKeys = {
 	"importSettings"
 };
 
-
 ed::EditorContext* m_fsmEditorContext{ nullptr };
 bool			   s_CreatingLink = false;
 ed::PinId		   s_LinkStartPin = 0;
 ed::LinkId		   s_EditLinkId = 0;
 bool			   s_RenameNodePopup{ false };
 
-
 ed::EditorContext* s_BTEditorContext{ nullptr };
-
 
 void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
 {
@@ -236,7 +234,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled);
 			ImGui::SameLine();
 
-			if (ImGui::InputText("name",
+			if (ImGui::InputText("##name",
 				&name[0],
 				name.capacity() + 1,
 				ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
@@ -245,6 +243,92 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				selectedSceneObject->m_name.SetString(name);
 			}
+			
+			auto& tag_manager = TagManager::GetInstance();
+			auto& tags = tag_manager->GetTags();
+			auto& layers = tag_manager->GetLayers();
+			int tagCount = static_cast<int>(tags.size());
+			int layerCount = static_cast<int>(layers.size());
+			static int prevTagCount = 0;
+			static int prevLayerCount = 0;
+			static int selectedTagIndex = 0;
+			static int selectedLayerIndex = 0;
+
+			static const char* tagNames[64]{};
+			if(0 == prevTagCount || tagCount != prevTagCount)
+			{
+				memset(tagNames, 0, sizeof(tagNames));
+				for (int i = 0; i < tagCount; ++i) {
+					tagNames[i] = tags[i].c_str(); // Assuming TagManager::GetTags() returns a vector of strings
+				}
+			}
+
+			static const char* layerNames[64]{};
+			if(0 == prevLayerCount || layerCount != prevLayerCount)
+			{
+				memset(layerNames, 0, sizeof(layerNames));
+				for (int i = 0; i < layerCount; ++i) {
+					layerNames[i] = layers[i].c_str(); // Assuming TagManager::GetLayers() returns a vector of strings
+				}
+			}
+
+			auto& selectedTag = selectedSceneObject->m_tag;
+			auto& selectedLayer = selectedSceneObject->m_layer;
+
+			selectedTagIndex = tag_manager->GetTagIndex(selectedTag.ToString());
+			selectedLayerIndex = tag_manager->GetLayerIndex(selectedLayer.ToString());
+			if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
+			{
+				selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
+			}
+			// Tag 콤보박스
+			ImGui::Text("Tag");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+			if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
+			{
+				for (int i = 0; i < tagCount; ++i)
+				{
+					const bool isSelected = (selectedTag == tagNames[i]);
+					if (ImGui::Selectable(tagNames[i], isSelected))
+					{
+						tag_manager->RemoveTagFromObject(selectedTag.ToString(), selectedSceneObject);
+						selectedTag = tagNames[i];
+						tag_manager->AddTagToObject(selectedTag.ToString(), selectedSceneObject);
+						selectedTagIndex = i; // 선택된 인덱스 업데이트
+					}
+
+					if (isSelected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::SameLine();
+			ImGui::Text("Layer");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+			if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedTagIndex]))
+			{
+				for (int i = 0; i < layerCount; ++i)
+				{
+					const bool isSelected = (selectedLayer == layerNames[i]);
+					if (ImGui::Selectable(layerNames[i], isSelected))
+					{
+						tag_manager->RemoveObjectFromLayer(selectedLayer.ToString(), selectedSceneObject);
+						selectedLayer = layerNames[i];
+						tag_manager->AddObjectToLayer(selectedLayer.ToString(), selectedSceneObject);
+						selectedLayerIndex = i; // 선택된 인덱스 업데이트
+					}
+
+					if (isSelected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+
+			prevTagCount = tagCount;
+			prevLayerCount = layerCount;
+
 			// 현재 트랜스폼 값
 			Mathf::Vector4& position = selectedSceneObject->m_transform.position;
 			Mathf::Vector4& rotation = selectedSceneObject->m_transform.rotation;
@@ -301,7 +385,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				float pyr[3];
 				float deltaEuler[3] = { 0, 0, 0 };
 				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+				float prevPYR[3];
+				prevRotation = rotation;
+
 				for (float& i : pyr) i *= Mathf::Rad2Deg;
+				prevPYR[0] = pyr[0];
+				prevPYR[1] = pyr[1];
+				prevPYR[2] = pyr[2];
 
 				ImGui::Text("Rotation ");
 				ImGui::SameLine();
@@ -315,8 +406,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						prevEuler[2] = pyr[2];
 						editingRotation = true;
 					}
-					Mathf::Vector3 radianEuler(pyr[0] * Mathf::Deg2Rad, pyr[1] * Mathf::Deg2Rad, pyr[2] * Mathf::Deg2Rad);
-					rotation = XMQuaternionRotationRollPitchYaw(radianEuler.x, radianEuler.y, radianEuler.z);
+					Mathf::Vector3 radianEuler(
+						pyr[0] - prevPYR[0],
+						pyr[1] - prevPYR[1],
+						pyr[2] - prevPYR[2]);
+					rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
 					selectedSceneObject->m_transform.m_dirty = true;
 				}
 				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
@@ -543,6 +637,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::OpenPopup("ComponentMenu");
 				isOpen = false;
 			}
+			if (menuClicked) {
+				ImGui::OpenPopup("TransformMenu");
+				menuClicked = false;
+			}
 
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
@@ -607,6 +705,18 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					selectedSceneObject->RemoveComponent(selectedComponent);
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
+				}
+				ImGui::EndPopup();
+			}
+			if (ImGui::BeginPopup("TransformMenu")) {
+				if (ImGui::MenuItem("Reset Transform"))
+				{
+					selectedSceneObject->m_transform.position = { 0, 0, 0, 1 };
+					selectedSceneObject->m_transform.rotation = XMQuaternionIdentity();
+					selectedSceneObject->m_transform.scale = { 1, 1, 1, 1 };
+					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.UpdateLocalMatrix();
+					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndPopup();
 			}
@@ -1294,7 +1404,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
 							}
 						}
-						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+						
 					}
 					else if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Node && controller->m_nodeEditor->seletedCurNodeIndex != -1)
 					{

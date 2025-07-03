@@ -15,6 +15,7 @@
 #include "CharacterControllerComponent.h"
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
+#include "TagManager.h"
 
 Scene::Scene()
 {
@@ -75,6 +76,16 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	if (parentObj->m_index != index)
 	{
 		parentObj->m_childrenIndices.push_back(index);
+	}
+
+	if (!newObj->m_tag.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(newObj->m_tag.ToString(), newObj.get());
+	}
+
+	if (!newObj->m_layer.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(newObj->m_layer.ToString(), newObj.get());
 	}
 
 	return m_SceneObjects[index];

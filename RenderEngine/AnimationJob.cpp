@@ -163,6 +163,17 @@ void AnimationJob::Update(float deltaTime)
                 }
                 animation.InvokeEvent(animator);
             }
+
+            if (skeleton->HasSocket())
+            {
+                for (auto& socket : skeleton->m_sockets)
+                {
+                    socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                    socket->Update();
+                }
+            }
+
+
         });
     }
 
@@ -233,6 +244,18 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     bone->m_globalTransform = globalTransform;
+
+    if (skeleton->HasSocket())
+    {
+        for (auto& socket : skeleton->m_sockets)
+        {
+            if (bone->m_name == socket->m_ObjectName)
+            {
+                socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
+                socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+            }
+        }
+    }
     if (controller)
     {
         controller->m_LocalTransforms[bone->m_index] = blendTransform;
@@ -281,11 +304,10 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
             {
                 socket->m_boneMatrix = bone->m_globalTransform * socket->m_offset;
                 socket->m_boneMatrix = socket->m_boneMatrix* animator.GetOwner()->m_transform.GetWorldMatrix();
-                socket->transform.SetLocalMatrix(socket->m_boneMatrix);
-                socket->Update();
             }
         }
     }
+
 
     if (controller)
     {
@@ -324,6 +346,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 if (mask->IsBoneEnabled(bone->m_name) == true)
                 {
                     globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
+               
                 }
             }
         }
@@ -333,6 +356,18 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         }
     }
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
+
+    if (skeleton->HasSocket())
+    {
+        for (auto& socket : skeleton->m_sockets)
+        {
+            if (bone->m_name == socket->m_ObjectName)
+            {
+                socket->m_boneMatrix = globalTransform * socket->m_offset;
+                socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+            }
+        }
+    }
     for (Bone* child : bone->m_children)
     {
         UpdateBoneLayer(child, animator,globalTransform);

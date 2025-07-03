@@ -37,16 +37,14 @@ public:
 
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
-        void SetTag(const std::string_view& tag);
-        void SetLayer(const std::string_view& layer);
+    void SetTag(const std::string_view& tag);
+    void SetLayer(const std::string_view& layer);
 
 	virtual void Destroy() override final;
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
-
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
-
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 
 	template<typename T>
@@ -71,12 +69,9 @@ public:
 	void RemoveComponent(T* component);
 
 	void RemoveComponentIndex(uint32 id);
-
 	void RemoveComponentTypeID(uint32 typeID);
-
 	void RemoveScriptComponent(const std::string_view& scriptName);
 	void RemoveScriptComponent(ModuleBehavior* ptr);
-
 	void RemoveComponent(Meta::Type& type);
 
 	GameObjectType GetType() const { return m_gameObjectType; }
@@ -97,11 +92,8 @@ public:
 	}
 
 	void SetEnabled(bool able) override final;
-
-
 	void SetCollisionType(uint32 type) { m_collisionType = type; }
 	uint32 GetCollisionType() const { return m_collisionType; }
-
 
     [[Property]]
 	Transform m_transform{};
@@ -122,10 +114,10 @@ public:
 public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-        [[Property]]
-        HashingString m_tag{ "Untagged" };
-        [[Property]]
-        HashingString m_layer{ "Default" };
+    [[Property]]
+    HashingString m_tag{ "Untagged" };
+    [[Property]]
+    HashingString m_layer{ "Default" };
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]

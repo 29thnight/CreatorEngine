@@ -132,6 +132,9 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 
 void GizmoLinePass::ControlPanel()
 {
+    ImGui::Text("Gizmo Line Pass");
+	ImGui::Separator();
+	ImGui::Checkbox("Enable Draw Physics Gizmos", &m_isShowPhysicsDebugInfo);
 }
 
 void GizmoLinePass::Resize(uint32_t width, uint32_t height)

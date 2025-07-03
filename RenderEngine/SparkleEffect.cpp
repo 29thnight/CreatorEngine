@@ -10,7 +10,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
 
     // 실제 텍스처 사진
     m_sparkleTexture = DataSystems->LoadTexture("star.png");
-    {
+    /* {
         ImGui::ContextRegister("Sparkle Effect", true, [&]()
             {
                 //ImGui::SetWindowFocus("Sparkle Effect");
@@ -160,7 +160,7 @@ SparkleEffect::SparkleEffect(const Mathf::Vector3& position, int maxParticles) :
                 }
 
             });
-    }
+    } */
 
     InitializeModules();
 

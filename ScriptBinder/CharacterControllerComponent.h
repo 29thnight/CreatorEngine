@@ -187,10 +187,6 @@ public:
 		m_bMoveRestrict = restrict;
 	}
 
-
-
-
-
 	//collision Ä«¿îÆ®
 	unsigned int GetCollisionCount() const
 	{

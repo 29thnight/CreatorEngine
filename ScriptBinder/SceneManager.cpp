@@ -236,11 +236,6 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         }
         m_activeScene.load()->AllUpdateWorldMatrix();
 
-        if (swapScene)
-        {
-
-        }
-
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
 
@@ -350,6 +345,15 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         if (obj)
         {
             Meta::Deserialize(obj, itNode);
+            if (!obj->m_tag.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+            }
+
+            if (!obj->m_layer.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+            }
         }
 
         if (itNode["m_components"])

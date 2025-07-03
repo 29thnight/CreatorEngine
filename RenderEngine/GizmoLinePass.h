@@ -26,4 +26,6 @@ private:
 	ComPtr<ID3D11Buffer> m_lineVertexBuffer{};
 	uint32_t m_lineVertexCount{};
 	ComPtr<ID3D11DepthStencilState> m_NoWriteDepthStencilState{};
+
+	bool m_isShowPhysicsDebugInfo{ false };
 };
