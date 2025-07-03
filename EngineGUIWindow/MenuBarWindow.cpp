@@ -321,11 +321,6 @@ void MenuBarWindow::RenderMenuBar()
                     }
                 }
 
-                ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("Bake Lightmap"))
-            {
                 if (ImGui::MenuItem("LightMap Window"))
                 {
                     if (!ImGui::GetContext("LightMap").IsOpened())
@@ -333,12 +328,8 @@ void MenuBarWindow::RenderMenuBar()
                         ImGui::GetContext("LightMap").Open();
                     }
                 }
-                ImGui::EndMenu();
-            }
 
-            if (ImGui::BeginMenu("EffectEditor"))
-            {
-                if (ImGui::MenuItem("Editor Window"))
+                if (ImGui::MenuItem("Effect Editor"))
                 {
                     auto& ctx = ImGui::GetContext("EffectEdit");
                     if (ctx.IsOpened())
@@ -350,15 +341,13 @@ void MenuBarWindow::RenderMenuBar()
                         ctx.Open();
                     }
                 }
-                ImGui::EndMenu();
-            }
 
-            if (ImGui::BeginMenu("Option")) {
-
-                if (ImGui::MenuItem("Collision Matrix")) {
+                if (ImGui::MenuItem("Collision Matrix")) 
+                {
 
                     m_bCollisionMatrixWindow = true;
                 }
+
                 ImGui::EndMenu();
             }
 
@@ -388,7 +377,7 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(ICON_FA_CHESS_QUEEN " Content Drawer"))
+            if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
             {
                 auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
                 if (!contentDrawerContext.IsOpened())
