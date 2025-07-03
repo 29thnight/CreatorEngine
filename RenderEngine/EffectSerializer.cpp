@@ -1,4 +1,5 @@
 #include "EffectSerializer.h"
+#include "EffectBase.h"
 
 nlohmann::json EffectSerializer::SerializeEffect(const EffectBase& effect)
 {
@@ -293,6 +294,16 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
     }
 
     return module;
+}
+
+nlohmann::json EffectSerializer::SerializeRenderModule(const RenderModules& renderModule)
+{
+    return nlohmann::json();
+}
+
+std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const nlohmann::json& json)
+{
+    return std::unique_ptr<RenderModules>();
 }
 
 // 수학 타입 헬퍼 함수들

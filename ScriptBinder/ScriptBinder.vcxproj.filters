@@ -254,6 +254,7 @@
     </ClCompile>
     <ClCompile Include="EffectComponent.cpp">
       <Filter>Classes\Components\RenderableComponent</Filter>
+	</ClCompile>
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClCompile>
@@ -519,6 +520,7 @@
     </ClInclude>
     <ClInclude Include="ISerializable.h">
       <Filter>Interfaces</Filter>
+	</ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>

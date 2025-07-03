@@ -347,6 +347,10 @@ void MenuBarWindow::RenderMenuBar()
                     {
                         ctx.Open();
                     }
+                }
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Option")) {
 
                 if (ImGui::MenuItem("Collision Matrix")) {
@@ -355,8 +359,6 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 ImGui::EndMenu();
             }
-
-
 
             float availRegion = ImGui::GetContentRegionAvail().x;
 

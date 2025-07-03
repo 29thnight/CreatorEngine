@@ -514,6 +514,7 @@
     </ClCompile>
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+	</ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
@@ -797,6 +798,7 @@
     </ClInclude>
     <ClInclude Include="EffectBase.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+	</ClInclude>
     <ClInclude Include="TestAniScprit.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
