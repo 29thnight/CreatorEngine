@@ -27,7 +27,7 @@ public:
 	[[Property]]
 	std::vector<BoneMask*> m_BoneMasks;
 	[[Property]]
-	bool isHumanoid = true;  //상하체 분리만 쓸거면 체크 &&&&&
+	bool isHumanoid = true; 
 	[[Property]]
 	bool useAll = false;
 	[[Property]]

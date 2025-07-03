@@ -1294,7 +1294,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
 							}
 						}
-						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+						
 					}
 					else if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Node && controller->m_nodeEditor->seletedCurNodeIndex != -1)
 					{

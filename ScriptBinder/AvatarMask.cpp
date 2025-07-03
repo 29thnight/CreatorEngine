@@ -60,7 +60,6 @@ bool AvatarMask::IsBoneEnabled(const std::string& name)
             return mask->isEnabled;
     }
     return false; 
-    //&&&&& map 고려 성능
 }
 
 BoneMask* AvatarMask::MakeBoneMask(Bone* Bone)

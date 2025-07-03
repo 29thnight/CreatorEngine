@@ -64,7 +64,7 @@ public:
     XMMATRIX blendtransform;
 
     [[Property]]
-    std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; //&&&&& shared로 고치면 erase는 그냥가능
+    std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     //std::vector<AnimationController*> m_animationControllers{};
     [[Property]]
     std::vector<ConditionParameter*> Parameters;
