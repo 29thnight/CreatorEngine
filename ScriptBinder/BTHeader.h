@@ -232,7 +232,7 @@ namespace BT
 		}
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
 		{
-			m_action(deltatime, blackBoard);
+			return m_action(deltatime, blackBoard);
 		}
 	private:
 		ActionFunc m_action;//==>

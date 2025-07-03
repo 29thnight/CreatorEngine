@@ -1839,8 +1839,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 					{
 						if (ImGui::MenuItem(key.c_str()))
 						{
-							json p; p["key"] = key;
-							auto child = BTComponent->CreateNode(key, p);
+							auto child = BTComponent->CreateNode(key);
 							if (isComp)
 								std::dynamic_pointer_cast<BT::CompositeNode>(selectNode)->AddChild(child);
 							else
