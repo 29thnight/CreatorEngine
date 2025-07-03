@@ -193,12 +193,11 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
         MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
         Scene* swapScene{};
         if (m_activeScene)
-            
+        {
+			swapScene = m_activeScene.load();
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
-			
-            m_activeScene = nullptr;
-            
+            m_activeScene.load()->OnDisable();
             m_activeScene.load()->OnDestroy();
 			
             m_activeScene = nullptr;
@@ -314,7 +313,6 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 		m_activeScene.load()->AllDestroyMark();
 		m_activeScene.load()->OnDisable();
 		m_activeScene.load()->OnDestroy();
-        sceneUnloadedEvent.Broadcast();
 		m_activeScene = nullptr;
 	}
 
@@ -322,14 +320,13 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 
     std::erase_if(m_scenes,
         [&](const auto& scene) { return scene == swapScene; });
-	swapScene = nullptr;
+
     delete swapScene;
 	swapScene = nullptr;
 
 	m_activeSceneIndex = m_EditorSceneIndex;
 	m_activeScene = m_scenes[m_EditorSceneIndex];
 	activeSceneChangedEvent.Broadcast();
-	sceneUnloadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;
 }

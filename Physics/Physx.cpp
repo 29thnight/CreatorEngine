@@ -904,10 +904,12 @@ void PhysicX::RemoveCCT(const unsigned int& id)
 	if (controllerIter!= m_characterControllerContainer.end()) {
 		m_characterControllerContainer.erase(controllerIter);
 	}
+	
 }
 
 void PhysicX::RemoveAllCCT()
 {
+	m_characterControllerManager->purgeControllers();
 	m_characterControllerContainer.clear();
 	m_updateCCTList.clear();
 	m_waittingCCTList.clear();
