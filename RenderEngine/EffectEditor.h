@@ -99,7 +99,11 @@ private:
     int m_selectedModuleForEdit = -1;
     int m_selectedRenderForEdit = -1;
 
-
+    // json 관련
+    char m_saveFileName[256] = "my_effect.json";
+    char m_loadFileName[256] = "my_effect.json";
+    bool m_showSaveDialog = false;
+    bool m_showLoadDialog = false;
 
 private:
     // UI 렌더링 메서드들
@@ -109,15 +113,19 @@ private:
     void RenderPreviewControls();
     void RenderModifyEmitterEditor();
     void RenderTextureDragDropTarget();
-
+    void RenderJsonSaveLoadUI();
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();
     void SaveCurrentEmitter(const std::string& name);
     void CancelEditing();
 
+
     // 모듈 추가
     void AddSelectedModule();
     void AddSelectedRender();
 
+    // json 저장
+    void SaveEffectToJson(const std::string& filename);
+    void LoadEffectFromJson(const std::string& filename);
 };
