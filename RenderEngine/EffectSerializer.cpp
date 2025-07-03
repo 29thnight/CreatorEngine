@@ -298,13 +298,65 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
 
 nlohmann::json EffectSerializer::SerializeRenderModule(const RenderModules& renderModule)
 {
-    return nlohmann::json();
+    nlohmann::json json;
+
+    // ISerializable 인터페이스를 통한 직렬화
+    const ISerializable* serializable = dynamic_cast<const ISerializable*>(&renderModule);
+    if (serializable)
+    {
+        json["type"] = serializable->GetModuleType();
+        json["data"] = serializable->SerializeData();
+    }
+    else
+    {
+        // ISerializable을 구현하지 않은 렌더 모듈
+        json["type"] = "unknown";
+        json["data"] = nlohmann::json::object();
+    }
+
+    return json;
 }
 
 std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const nlohmann::json& json)
 {
-    return std::unique_ptr<RenderModules>();
+    if (!json.contains("type"))
+    {
+        std::cerr << "RenderModule JSON missing 'type' field" << std::endl;
+        return nullptr;
+    }
+
+    std::string moduleType = json["type"];
+    std::unique_ptr<RenderModules> renderModule;
+
+    // 렌더 모듈 타입별 생성
+    if (moduleType == "BillboardModuleGPU")
+    {
+        renderModule = std::make_unique<BillboardModuleGPU>();
+    }
+    else if (moduleType == "MeshModuleGPU")
+    {
+        renderModule = std::make_unique<MeshModuleGPU>();
+    }
+    // 다른 렌더 모듈들도 여기에 추가
+    else
+    {
+        std::cerr << "Unknown render module type: " << moduleType << std::endl;
+        return nullptr;
+    }
+
+    if (renderModule)
+    {
+        // ISerializable 인터페이스를 통한 역직렬화
+        ISerializable* serializable = dynamic_cast<ISerializable*>(renderModule.get());
+        if (serializable && json.contains("data"))
+        {
+            serializable->DeserializeData(json["data"]);
+        }
+    }
+
+    return renderModule;
 }
+
 
 // 수학 타입 헬퍼 함수들
 nlohmann::json EffectSerializer::SerializeVector3(const Mathf::Vector3& vec)
