@@ -313,14 +313,6 @@ void MenuBarWindow::RenderMenuBar()
 
             if (ImGui::BeginMenu("Edit"))
             {
-                if (ImGui::MenuItem("Pipeline Setting"))
-                {
-                    if (!ImGui::GetContext("RenderPass").IsOpened())
-                    {
-                        ImGui::GetContext("RenderPass").Open();
-                    }
-                }
-
                 if (ImGui::MenuItem("LightMap Window"))
                 {
                     if (!ImGui::GetContext("LightMap").IsOpened())
@@ -342,7 +334,20 @@ void MenuBarWindow::RenderMenuBar()
                     }
                 }
 
-                if (ImGui::MenuItem("Collision Matrix")) 
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Settings"))
+            {
+                if (ImGui::MenuItem("Pipeline Setting"))
+                {
+                    if (!ImGui::GetContext("RenderPass").IsOpened())
+                    {
+                        ImGui::GetContext("RenderPass").Open();
+                    }
+                }
+
+                if (ImGui::MenuItem("Collision Matrix"))
                 {
 
                     m_bCollisionMatrixWindow = true;
