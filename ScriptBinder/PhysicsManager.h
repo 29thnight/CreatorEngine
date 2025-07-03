@@ -5,8 +5,6 @@
 #include "GameObject.h"
 #include "Component.h"
 
-
-
 struct Collision 
 {
 	GameObject* thisObj;
@@ -14,7 +12,6 @@ struct Collision
 
 	const std::vector<DirectX::SimpleMath::Vector3>& contactPoints;
 };
-
 
 //raycast event 관련 함수등록 관련 메인부에 문의 할것
 struct RayEvent {
