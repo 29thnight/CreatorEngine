@@ -139,14 +139,17 @@ void RenderPassData::ClearRenderTarget()
 void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 {
 	Material* mat = proxy->m_Material;
+	Mesh* mesh = proxy->m_Mesh;
 	TerrainMaterial* terrainMat = proxy->m_terrainMaterial;
 
-	if (terrainMat != nullptr) {
+	if (terrainMat != nullptr) 
+	{
 		// Not assigned RenderingMode.
 		m_deferredQueue.push_back(proxy);
+		return;
 	}
 
-	if (nullptr == mat) return;
+	if (nullptr == mat || nullptr == mesh) return;
 
 	{
 		switch (mat->m_renderingMode)

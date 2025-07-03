@@ -37,7 +37,8 @@ public:
 
 	HashingString GetHashedName() const { return m_name; }
     void SetName(const std::string_view& name) { m_name = name.data(); }
-	void SetTag(const std::string_view& tag);
+        void SetTag(const std::string_view& tag);
+        void SetLayer(const std::string_view& layer);
 
 	virtual void Destroy() override final;
 
@@ -45,6 +46,8 @@ public:
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
 
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
+
+	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 
 	template<typename T>
 	T* AddComponent();
@@ -119,8 +122,10 @@ public:
 public:
 	[[Property]]
 	GameObjectType m_gameObjectType{ GameObjectType::Empty };
-	[[Property]]
-	HashingString m_tag{ "Untagged" };
+        [[Property]]
+        HashingString m_tag{ "Untagged" };
+        [[Property]]
+        HashingString m_layer{ "Default" };
 	
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]

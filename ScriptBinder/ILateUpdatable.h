@@ -5,9 +5,9 @@
 #include "GameObject.h"
 #include "Scene.h"
 
-interface IFixedUpdatable
+interface ILateUpdatable
 {
-    IFixedUpdatable()
+    ILateUpdatable()
     {
         subscribedScene = SceneManagers->GetActiveScene();
         if (!subscribedScene)
@@ -15,7 +15,7 @@ interface IFixedUpdatable
             return;
         }
 
-        m_fixedUpdateEventHandle = subscribedScene->FixedUpdateEvent.AddLambda([this](float deltaSecond)
+        m_lateUpdateEventHandle = subscribedScene->LateUpdateEvent.AddLambda([this](float deltaSecond)
         {
             GameObject* sceneObject{};
 
@@ -33,19 +33,19 @@ interface IFixedUpdatable
                 }
                 else
                 {
-                    FixedUpdate(deltaSecond);
+                    LateUpdate(deltaSecond);
                 }
             }
         });
     }
-    virtual ~IFixedUpdatable()
+    virtual ~ILateUpdatable()
     {
-        subscribedScene->FixedUpdateEvent.Remove(m_fixedUpdateEventHandle);
+        subscribedScene->LateUpdateEvent -= m_lateUpdateEventHandle;
     }
 
-    virtual void FixedUpdate(float deltaSecond) = 0;
+    virtual void LateUpdate(float deltaSecond) = 0;
 
 protected:
     Scene* subscribedScene{};
-    Core::DelegateHandle m_fixedUpdateEventHandle{};
+    Core::DelegateHandle m_lateUpdateEventHandle{};
 };

@@ -44,6 +44,14 @@ public:
 		return std::fread(buffer, 1, size, file);
 	}
 
+	template <typename T>
+	T read() 
+	{
+		T data;
+		read(reinterpret_cast<char*>(&data), sizeof(T));
+		return data;
+	}
+
 private:
 	std::filesystem::path filePath;
 	std::FILE* file;
@@ -68,6 +76,12 @@ public:
 		{
 			std::fclose(file);
 		}
+	}
+
+	template <typename T>
+	void write(const T& data) 
+	{
+		write(reinterpret_cast<const char*>(&data), sizeof(T));
 	}
 
 	void write(const char* buffer, std::size_t size) 

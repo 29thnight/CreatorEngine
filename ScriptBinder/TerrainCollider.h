@@ -1,15 +1,35 @@
 #pragma once
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "TerrainColliderComponent.generated.h"
 
-class TerrainColliderComponent : public Component, public ICollider
+class TerrainColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {
 public:
    ReflectTerrainColliderComponent
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(TerrainColliderComponent)
+
+   void Awake() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->CollectColliderComponent(this);
+	   }
+   }
+
+   void OnDistroy() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->UnCollectColliderComponent(this);
+	   }
+   }
 
 	[[Property]]
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
@@ -31,8 +51,19 @@ public:
 	}
 
 
+	HeightFieldColliderInfo GetHeightFieldColliderInfo() const
+	{
+		return m_heightFieldColliderInfo;
+	}
+
+	void SetHeightFieldColliderInfo(const HeightFieldColliderInfo& info)
+	{
+		m_heightFieldColliderInfo = info;
+	};
+
 private:
 	unsigned int m_colliderID;
+	HeightFieldColliderInfo m_heightFieldColliderInfo; // 콜라이더 정보
 
 	
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };

@@ -1,22 +1,43 @@
 #pragma once  
 #include "Component.h"  
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"
 #include "BoxColliderComponent.generated.h"
 
-class BoxColliderComponent : public Component, public ICollider  
+class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {  
 public:  
 
    ReflectBoxColliderComponent
 	[[Serializable(Inheritance:Component)]]
-    BoxColliderComponent() {
+    BoxColliderComponent() 
+   {
         m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
 		m_type = EColliderType::COLLISION;
         m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
 		m_boxExtent = m_Info.boxExtent;
-    } virtual ~BoxColliderComponent() = default;
+   } 
+   virtual ~BoxColliderComponent() = default;
 
+   void Awake() override  
+    {  
+        auto scene = SceneManagers->GetActiveScene();  
+        if (scene)  
+        {  
+            scene->CollectColliderComponent(this);  
+        }  
+   }
+
+   void OnDistroy() override  
+   {  
+       auto scene = SceneManagers->GetActiveScene();  
+       if (scene)  
+       {  
+           scene->UnCollectColliderComponent(this);  
+       }  
+   }
 
    [[Property]]  
    DirectX::SimpleMath::Vector3 m_boxExtent{ 1.0f, 1.0f, 1.0f };
@@ -24,8 +45,6 @@ public:
    DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };  
    [[Property]]  
    DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };  
-   
-
 
    DirectX::SimpleMath::Vector3 GetExtents()
    {  

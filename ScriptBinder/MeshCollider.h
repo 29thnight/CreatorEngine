@@ -1,10 +1,12 @@
 #pragma once
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "MeshColliderComponent.generated.h"
 
-class MeshColliderComponent : public Component, public ICollider
+class MeshColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {
 public:
    ReflectMeshColliderComponent
@@ -17,6 +19,23 @@ public:
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 	
+	void Awake() override
+	{
+		auto scene = SceneManagers->GetActiveScene();
+		if (scene)
+		{
+			scene->CollectColliderComponent(this);
+		}
+	}
+
+	void OnDistroy() override
+	{
+		auto scene = SceneManagers->GetActiveScene();
+		if (scene)
+		{
+			scene->UnCollectColliderComponent(this);
+		}
+	}
 	
 	//info
 	float GetStaticFriction() const
