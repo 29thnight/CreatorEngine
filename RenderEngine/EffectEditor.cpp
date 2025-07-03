@@ -224,6 +224,10 @@ void EffectEditor::RenderMainEditor()
                 if (ImGui::Button("Export to Game")) {
                     ExportToManager(std::string(effectName));
                 }
+
+                // json 저장
+                ImGui::Separator();
+                RenderJsonSaveLoadUI();
             }
         }
         ImGui::EndChild();
@@ -506,6 +510,72 @@ void EffectEditor::RenderTextureDragDropTarget()
     }
 }
 
+void EffectEditor::RenderJsonSaveLoadUI()
+{
+    ImGui::Text("JSON Save/Load");
+
+    // 저장 버튼
+    if (ImGui::Button("Save as JSON")) {
+        m_showSaveDialog = true;
+    }
+
+    // 로드 버튼
+    ImGui::SameLine();
+    if (ImGui::Button("Load from JSON")) {
+        m_showLoadDialog = true;
+    }
+
+    // 저장 다이얼로그
+    if (m_showSaveDialog) {
+        ImGui::OpenPopup("Save Effect as JSON");
+        m_showSaveDialog = false;
+    }
+
+    if (ImGui::BeginPopupModal("Save Effect as JSON", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Save current effect to JSON file");
+        ImGui::Separator();
+
+        ImGui::InputText("Filename", m_saveFileName, sizeof(m_saveFileName));
+
+        if (ImGui::Button("Save")) {
+            SaveEffectToJson(std::string(m_saveFileName));
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    // 로드 다이얼로그
+    if (m_showLoadDialog) {
+        ImGui::OpenPopup("Load Effect from JSON");
+        m_showLoadDialog = false;
+    }
+
+    if (ImGui::BeginPopupModal("Load Effect from JSON", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Load effect from JSON file");
+        ImGui::Separator();
+
+        ImGui::InputText("Filename", m_loadFileName, sizeof(m_loadFileName));
+
+        if (ImGui::Button("Load")) {
+            LoadEffectFromJson(std::string(m_loadFileName));
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
 
 void EffectEditor::StartModifyEmitter(int index)
 {
@@ -761,6 +831,91 @@ void EffectEditor::AddSelectedRender()
     case RenderType::Mesh:
         m_editingEmitter->AddRenderModule<MeshModuleGPU>();
         break;
+    }
+}
+
+void EffectEditor::SaveEffectToJson(const std::string& filename)
+{
+    if (m_tempEmitters.empty()) {
+        std::cout << "No emitters to save!" << std::endl;
+        return;
+    }
+
+    try {
+        // 임시 이펙트 생성
+        auto tempEffect = std::make_unique<EffectBase>();
+        tempEffect->SetName("EditorEffect");
+
+        // 모든 에미터를 이펙트에 추가
+        for (const auto& tempEmitter : m_tempEmitters) {
+            if (tempEmitter.particleSystem) {
+                tempEffect->AddParticleSystem(tempEmitter.particleSystem);
+            }
+        }
+
+        // JSON으로 직렬화
+        nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
+
+        // 파일로 저장
+        std::ofstream file(filename);
+        if (file.is_open()) {
+            file << effectJson.dump(4); // 들여쓰기로 보기 좋게
+            file.close();
+            std::cout << "Effect saved to: " << filename << std::endl;
+        }
+        else {
+            std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        }
+
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error saving effect: " << e.what() << std::endl;
+    }
+}
+
+void EffectEditor::LoadEffectFromJson(const std::string& filename)
+{
+    try {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open file: " << filename << std::endl;
+            return;
+        }
+
+        nlohmann::json effectJson;
+        file >> effectJson;
+        file.close();
+
+        // JSON에서 이펙트 복원
+        auto loadedEffect = EffectSerializer::DeserializeEffect(effectJson);
+
+        if (loadedEffect) {
+            // 기존 임시 에미터들 클리어
+            m_tempEmitters.clear();
+
+            // 로드된 이펙트의 ParticleSystem들을 임시 에미터로 변환
+            const auto& particleSystems = loadedEffect->GetAllParticleSystems();
+
+            for (size_t i = 0; i < particleSystems.size(); ++i) {
+                TempEmitterInfo tempEmitter;
+                tempEmitter.particleSystem = particleSystems[i];
+                tempEmitter.name = "LoadedEmitter_" + std::to_string(i + 1);
+                tempEmitter.isPlaying = false;
+
+                m_tempEmitters.push_back(tempEmitter);
+            }
+
+            std::cout << "Effect loaded from: " << filename << std::endl;
+            std::cout << "Loaded " << particleSystems.size() << " particle systems" << std::endl;
+
+        }
+        else {
+            std::cerr << "Failed to deserialize effect from JSON" << std::endl;
+        }
+
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error loading effect: " << e.what() << std::endl;
     }
 }
 
