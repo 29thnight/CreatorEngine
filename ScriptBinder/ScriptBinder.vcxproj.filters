@@ -506,6 +506,9 @@
     <ClInclude Include="EffectComponent.h">
       <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
+    <ClInclude Include="ISerializable.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

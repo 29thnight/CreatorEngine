@@ -1,5 +1,6 @@
 #pragma once
 #include "ParticleSystem.h"
+#include "EffectSerializer.h"
 
 enum class EffectModuleType
 {

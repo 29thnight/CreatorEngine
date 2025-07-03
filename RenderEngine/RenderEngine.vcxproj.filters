@@ -413,9 +413,6 @@
     <ClCompile Include="ParticleModule.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="SparkleEffect.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -479,9 +476,6 @@
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
-    <ClCompile Include="EffectBase.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
     <ClCompile Include="MeshSpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -499,6 +493,15 @@
     </ClCompile>
     <ClCompile Include="EffectProxyController.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectSerializer.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClCompile>
+    <ClCompile Include="SparkleEffect.cpp">
+      <Filter>RenderPass\EffectPass\Old.</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -673,9 +676,6 @@
     <ClInclude Include="ParticleModule.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
-    <ClInclude Include="SparkleEffect.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
     <ClInclude Include="BaseEffectStruct.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
@@ -760,9 +760,6 @@
     <ClInclude Include="LODSetting.h">
       <Filter>Asset\LODGroup</Filter>
     </ClInclude>
-    <ClInclude Include="EffectBase.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClInclude>
     <ClInclude Include="MeshSpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
@@ -780,6 +777,15 @@
     </ClInclude>
     <ClInclude Include="EffectProxyController.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectSerializer.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
+    </ClInclude>
+    <ClInclude Include="SparkleEffect.h">
+      <Filter>RenderPass\EffectPass\Old.</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectBase.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -932,8 +938,6 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MovementModule.cs.hlsl">
       <Filter>Shaders\Effect</Filter>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\GBuffer.ps.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
