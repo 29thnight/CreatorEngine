@@ -23,23 +23,23 @@ namespace BT
 		std::string m_name;
 	};
 
-	class RootNode : public BTNode
-	{
-	public:
-		RootNode() : BTNode("Root") {}
-		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
-		{
-			if (m_child)
-			{
-				return m_child->Tick(deltatime, blackBoard);
-			}
-			return NodeStatus::Failure; // No child to tick
-		}
-		void SetChild(NodePtr child) { m_child = child; }
-		NodePtr GetChild() const { return m_child; }
-	private:
-		NodePtr m_child; // Single child for the root node
-	};
+	//class RootNode : public BTNode
+	//{
+	//public:
+	//	RootNode() : BTNode("Root") {}
+	//	NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+	//	{
+	//		if (m_child)
+	//		{
+	//			return m_child->Tick(deltatime, blackBoard);
+	//		}
+	//		return NodeStatus::Failure; // No child to tick
+	//	}
+	//	void SetChild(NodePtr child) { m_child = child; }
+	//	NodePtr GetChild() const { return m_child; }
+	//private:
+	//	NodePtr m_child; // Single child for the root node
+	//};
 
 
 	class CompositeNode : public BTNode

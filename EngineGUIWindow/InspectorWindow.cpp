@@ -1665,6 +1665,8 @@ void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 	}
 }
 
+
+BT::BTNode::NodePtr selectNode = nullptr;
 void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
 	if (!BTComponent)
@@ -1707,13 +1709,13 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		//}
 
 		bool nodeMenuOpen = false;
-		BTNode::NodePtr selectNode = nullptr;
+		
 
 
 		//ImGui::Separator();
 		std::string _filepath = "BTNode.jon";
 		// === 캔버스 ===
-		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), true);
+		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 		// NodeEditor 컨텍스트 설정
 
 
@@ -1753,9 +1755,9 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 			// --- BeginNode ---
 			ed::BeginNode(nid);
-
+			
 			// 입력 핀 (루트 제외)
-			if (!std::dynamic_pointer_cast<BT::RootNode>(node))
+			if (node.get()->GetName()!= "RootSequence")
 			{
 				ed::BeginPin(inPin, ed::PinKind::Input);
 				ImGui::Text("I");
@@ -1770,23 +1772,28 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			ImGui::Text("O");
 			ed::EndPin();
 
-			// --- 컨텍스트 메뉴 (노드 우클릭) ---
-			if (ed::ShowNodeContextMenu(&nid))
-			{
-				selectNode = node;
-				nodeMenuOpen = true;
-				ImGui::OpenPopup("NodeMenu");
-			}
 
 			ed::EndNode();
 			// --- EndNode ---
-
+			auto openPopupPosition = ImGui::GetMousePos();
+			ed::Suspend();
+			// --- 컨텍스트 메뉴 (노드 우클릭) ---
+			if (ed::ShowNodeContextMenu(&nid))
+			{
+					ImGui::OpenPopup("NodeMenu");
+					selectNode = node;
+					nodeMenuOpen = true;
+			}
+			ed::Resume();
 			// 3) 드래그로 이동된 노드 위치 저장
 			ImVec2 now = ed::GetNodePosition(nid);
 			if (now.x != prev.x || now.y != prev.y) {
 				BTComponent->SetNodePosition(node, now);
 			}
 		});
+
+		
+
 
 		//// 4) 기존 부모→자식 링크 렌더링
 		//BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
@@ -1814,16 +1821,12 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 		//ImVec2 size = ed::GetScreenSize();
 		
-		ed::End(); // NodeEditor 종료
-		ed::SetCurrentEditor(nullptr);
 
-		ImGui::EndChild();
-		//======BTEditorCanvas============
-
-		// === 노드 매뉴 팝업 ===
+		ed::Suspend();
+		//=== 노드 매뉴 팝업 ===
 		if (ImGui::BeginPopup("NodeMenu")) {
 			// 헤더
-			ImGui::MenuItem(selectNode->GetName().c_str(), nullptr, false, false);
+			ImGui::MenuItem(selectNode.get()->GetName().c_str(), nullptr, false, false);
 			ImGui::Separator();
 			// Add Child (Composite/Decorator 만)
 			bool isComp = std::dynamic_pointer_cast<BT::CompositeNode>(selectNode) != nullptr ? true : false;
@@ -1857,7 +1860,21 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			{
 				ImGui::MenuItem("Delete Node", nullptr, false, false);
 			}
+
+			ImGui::EndPopup();
 		}
+		ed::Resume();
+
+
+		ed::End(); // NodeEditor 종료
+
+
+		ed::SetCurrentEditor(nullptr);
+
+
+		ImGui::EndChild();
+		//======BTEditorCanvas============
+		
 
 
 		ImGui::End(); // Behavior Tree Editor

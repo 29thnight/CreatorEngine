@@ -1,16 +1,17 @@
 #pragma once
 //#include "BlackBoard.h"
+#include "Core.Minimal.h"
 #include "NodeFactory.h"
 
-class AIManager
+class AIManager:public Singleton<AIManager>
 {
 public:
-	static AIManager& GetInstance()
-	{
-		static AIManager instance;
-		return instance;
-	}
-	
+	friend class Singleton;
+
+	AIManager() = default;
+	~AIManager() = default;
+
+
 	BlackBoard& GetGlobalBlackBoard()
 	{
 		return m_globalBB;
@@ -58,13 +59,9 @@ public:
 
 
 private:
-	AIManager() = default;
-	~AIManager() = default;
-	// Disable copy and move semantics
-	AIManager(const AIManager&) = delete;
-	AIManager& operator=(const AIManager&) = delete;
-	AIManager(AIManager&&) = delete;
-	AIManager& operator=(AIManager&&) = delete;
+	
 
 	BlackBoard m_globalBB;
 };
+
+static auto& AIManagers = AIManager::GetInstance();
