@@ -27,16 +27,24 @@ cbuffer CompositeParams{
 	bool32 useOnlySSGI;
 };
 
+cbuffer BilateralParams{
+    float2 screenSize;
+    float sigmaSpace;
+    float sigmaRange;
+};
+
 SSGIPass::SSGIPass()
 {
     m_pSSGIShader = &ShaderSystem->ComputeShaders["SSGI"];
     m_pCompositeShader = &ShaderSystem->ComputeShaders["SSGIComposite"];
+	//m_pBilateralFilterShader = &ShaderSystem->ComputeShaders["BiliteralFilter"];
 
 	m_pDownDualFilteringShader = &ShaderSystem->ComputeShaders["DownDualFiltering"];
 	m_pUpDualFilteringShaeder = &ShaderSystem->ComputeShaders["UpDualFiltering"];
 
     m_SSGIBuffer = DirectX11::CreateBuffer(sizeof(SSGIParams), D3D11_BIND_CONSTANT_BUFFER, nullptr);
     m_CompositeBuffer = DirectX11::CreateBuffer(sizeof(CompositeParams), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	//m_BilateralBuffer = DirectX11::CreateBuffer(sizeof(BilateralParams), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
     sample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
     pointSample = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -70,12 +78,22 @@ SSGIPass::SSGIPass()
         ssratio * 4,
         DeviceState::g_ClientRect.width,
         DeviceState::g_ClientRect.height,
-        "SSGICopiedTexture2",
+        "SSGICopiedTexture3",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
         D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
     );
     m_pTempTexture3->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
     m_pTempTexture3->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    /*m_pBilateralTexture = Texture::Create(
+        DeviceState::g_ClientRect.width,
+        DeviceState::g_ClientRect.height,
+        "BilateralTexture",
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS
+    );
+	m_pBilateralTexture->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_pBilateralTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);*/
 }
 
 SSGIPass::~SSGIPass()
@@ -138,15 +156,15 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     params.radius = radius;;
     params.thickness = thickness;
     params.frameIndex = Time->GetFrameCount();
-	params.ratio = ssratio;
-	params.intensity = intensity;
+    params.ratio = ssratio;
+    params.intensity = intensity;
 
     camera.UpdateBuffer(defferdPtr);
     DirectX11::UpdateBuffer(defferdPtr, m_SSGIBuffer.Get(), &params);
     DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_SSGIBuffer.GetAddressOf());
 
-	int ratioMulTread = ssratio * ssthreads;
-    DirectX11::Dispatch(defferdPtr, 
+    int ratioMulTread = ssratio * ssthreads;
+    DirectX11::Dispatch(defferdPtr,
         (DeviceState::g_Viewport.Width + ratioMulTread - 1) / (ratioMulTread),
         (DeviceState::g_Viewport.Height + ratioMulTread - 1) / (ratioMulTread), 1);
 
@@ -154,8 +172,6 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     ID3D11UnorderedAccessView* nulluav = nullptr;
     DirectX11::CSSetShaderResources(defferdPtr, 0, 4, nullsrv);
     DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
-
 
     CompositeParams compositeParams;
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
@@ -222,27 +238,48 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
 
     //DirectX11::CopyResource(defferdPtr, renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
     // Composite
-	DirectX11::CSSetShader(defferdPtr, m_pCompositeShader->GetShader(), nullptr, 0);
+    DirectX11::CSSetShader(defferdPtr, m_pCompositeShader->GetShader(), nullptr, 0);
 
     ID3D11ShaderResourceView* srv2[2] = {
-		m_pTempTexture->m_pSRV,
-		m_pDiffuseTexture->m_pSRV,
-	};
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 2, srv2);
+        m_pTempTexture->m_pSRV,
+        m_pDiffuseTexture->m_pSRV,
+    };
+    DirectX11::CSSetShaderResources(defferdPtr, 0, 2, srv2);
 
 
-	// Set output texture
-	ID3D11UnorderedAccessView* defferdUAV = renderData->m_renderTarget->m_pUAV;
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &defferdUAV, nullptr);
+    // Set output texture
+    ID3D11UnorderedAccessView* defferdUAV = renderData->m_renderTarget->m_pUAV;
+    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &defferdUAV, nullptr);
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
     DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
     DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-	DirectX11::Dispatch(defferdPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
-	// Clear resources
-	ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 2, nullSRV);
+    DirectX11::Dispatch(defferdPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
+    // Clear resources
+    ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
+    DirectX11::CSSetShaderResources(defferdPtr, 0, 2, nullSRV);
     DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
-
+    
+   /* else {
+		DirectX11::CSSetShader(defferdPtr, m_pBilateralFilterShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
+        DirectX11::CSSetShaderResources(defferdPtr, 1, 1, &m_pNormalTexture->m_pSRV);
+        DirectX11::CSSetShaderResources(defferdPtr, 2, 1, &m_pDiffuseTexture->m_pSRV);
+        ID3D11UnorderedAccessView* defferdUAV = renderData->m_renderTarget->m_pUAV;
+        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &defferdUAV, nullptr);
+		BilateralParams bilateralParams;
+		bilateralParams.screenSize = { DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height };
+		bilateralParams.sigmaSpace = sigmaSpace;
+		bilateralParams.sigmaRange = sigmaRange;
+		DirectX11::UpdateBuffer(defferdPtr, m_BilateralBuffer.Get(), &bilateralParams);
+		DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_BilateralBuffer.GetAddressOf());
+		DirectX11::Dispatch(defferdPtr,
+			(DeviceState::g_Viewport.Width + ssthreads - 1) / ssthreads,
+			(DeviceState::g_Viewport.Height + ssthreads - 1) / ssthreads, 1);
+		ID3D11ShaderResourceView* nullsrv[3] = { nullptr, nullptr, nullptr };
+		ID3D11UnorderedAccessView* nulluav = nullptr;
+		DirectX11::CSSetShaderResources(defferdPtr, 0, 3, nullsrv);
+		DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+    }*/
 
 
     ID3D11CommandList* commandList{};
@@ -256,6 +293,10 @@ void SSGIPass::ControlPanel()
     ImGui::Text("SSGI");
     ImGui::Checkbox("Enable SSGI", &isOn);
 	ImGui::Checkbox("Use Only SSGI", &useOnlySSGI);
+	//ImGui::Checkbox("Use Bilateral Filter", &useBilateralFiltering);
+	//ImGui::SliderFloat("Sigma Space", &sigmaSpace, 0.0f, 1.0f, "Sigma Space: %.2f");
+	//ImGui::SliderFloat("Sigma Range", &sigmaRange, 0.0f, 1.0f, "Sigma Range: %.2f");
+
 	ImGui::SliderInt("Use Dual Filtering", &useDualFilteringStep, 0, 2, "Step: %d");
     ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
     ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
@@ -264,6 +305,14 @@ void SSGIPass::ControlPanel()
     if (ImGui::SliderInt("SSGI Ratio", &ssratio, 1, 4, "SSGI Ratio: %d")) {
         m_pTempTexture->SetSizeRatio({ float(ssratio), float(ssratio)});
 		m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
+		m_pTempTexture3->SetSizeRatio({ float(ssratio * 4), float(ssratio * 4) });
+        m_pTempTexture->ResizeRelease();
+        m_pTempTexture2->ResizeRelease();
+        m_pTempTexture3->ResizeRelease();
+
+		m_pTempTexture->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+		m_pTempTexture2->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+		m_pTempTexture3->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
     }
 
 	if (ImGui::Button("Reset")) {

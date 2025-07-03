@@ -385,7 +385,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				float pyr[3];
 				float deltaEuler[3] = { 0, 0, 0 };
 				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+				float prevPYR[3];
+				prevRotation = rotation;
+
 				for (float& i : pyr) i *= Mathf::Rad2Deg;
+				prevPYR[0] = pyr[0];
+				prevPYR[1] = pyr[1];
+				prevPYR[2] = pyr[2];
 
 				ImGui::Text("Rotation ");
 				ImGui::SameLine();
@@ -399,8 +406,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						prevEuler[2] = pyr[2];
 						editingRotation = true;
 					}
-					Mathf::Vector3 radianEuler(pyr[0] * Mathf::Deg2Rad, pyr[1] * Mathf::Deg2Rad, pyr[2] * Mathf::Deg2Rad);
-					rotation = XMQuaternionRotationRollPitchYaw(radianEuler.x, radianEuler.y, radianEuler.z);
+					Mathf::Vector3 radianEuler(
+						pyr[0] - prevPYR[0],
+						pyr[1] - prevPYR[1],
+						pyr[2] - prevPYR[2]);
+					rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
 					selectedSceneObject->m_transform.m_dirty = true;
 				}
 				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
@@ -627,6 +637,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::OpenPopup("ComponentMenu");
 				isOpen = false;
 			}
+			if (menuClicked) {
+				ImGui::OpenPopup("TransformMenu");
+				menuClicked = false;
+			}
 
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
@@ -691,6 +705,18 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					selectedSceneObject->RemoveComponent(selectedComponent);
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
+				}
+				ImGui::EndPopup();
+			}
+			if (ImGui::BeginPopup("TransformMenu")) {
+				if (ImGui::MenuItem("Reset Transform"))
+				{
+					selectedSceneObject->m_transform.position = { 0, 0, 0, 1 };
+					selectedSceneObject->m_transform.rotation = XMQuaternionIdentity();
+					selectedSceneObject->m_transform.scale = { 1, 1, 1, 1 };
+					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.UpdateLocalMatrix();
+					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndPopup();
 			}
@@ -1378,7 +1404,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
 							}
 						}
-						//&&&&& 전이조건 condition 뛰우기 해당전이가 여러개면 
+						
 					}
 					else if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Node && controller->m_nodeEditor->seletedCurNodeIndex != -1)
 					{
@@ -1749,6 +1775,8 @@ void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 	}
 }
 
+
+BT::BTNode::NodePtr selectNode = nullptr;
 void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
 	if (!BTComponent)
@@ -1791,13 +1819,13 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		//}
 
 		bool nodeMenuOpen = false;
-		BTNode::NodePtr selectNode = nullptr;
+		
 
 
 		//ImGui::Separator();
 		std::string _filepath = "BTNode.jon";
 		// === 캔버스 ===
-		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), true);
+		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), true, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 		// NodeEditor 컨텍스트 설정
 
 
@@ -1837,9 +1865,9 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 			// --- BeginNode ---
 			ed::BeginNode(nid);
-
+			
 			// 입력 핀 (루트 제외)
-			if (!std::dynamic_pointer_cast<BT::RootNode>(node))
+			if (node.get()->GetName()!= "RootSequence")
 			{
 				ed::BeginPin(inPin, ed::PinKind::Input);
 				ImGui::Text("I");
@@ -1854,23 +1882,28 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			ImGui::Text("O");
 			ed::EndPin();
 
-			// --- 컨텍스트 메뉴 (노드 우클릭) ---
-			if (ed::ShowNodeContextMenu(&nid))
-			{
-				selectNode = node;
-				nodeMenuOpen = true;
-				ImGui::OpenPopup("NodeMenu");
-			}
 
 			ed::EndNode();
 			// --- EndNode ---
-
+			auto openPopupPosition = ImGui::GetMousePos();
+			ed::Suspend();
+			// --- 컨텍스트 메뉴 (노드 우클릭) ---
+			if (ed::ShowNodeContextMenu(&nid))
+			{
+					ImGui::OpenPopup("NodeMenu");
+					selectNode = node;
+					nodeMenuOpen = true;
+			}
+			ed::Resume();
 			// 3) 드래그로 이동된 노드 위치 저장
 			ImVec2 now = ed::GetNodePosition(nid);
 			if (now.x != prev.x || now.y != prev.y) {
 				BTComponent->SetNodePosition(node, now);
 			}
 		});
+
+		
+
 
 		//// 4) 기존 부모→자식 링크 렌더링
 		//BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
@@ -1898,16 +1931,12 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 		//ImVec2 size = ed::GetScreenSize();
 		
-		ed::End(); // NodeEditor 종료
-		ed::SetCurrentEditor(nullptr);
 
-		ImGui::EndChild();
-		//======BTEditorCanvas============
-
-		// === 노드 매뉴 팝업 ===
+		ed::Suspend();
+		//=== 노드 매뉴 팝업 ===
 		if (ImGui::BeginPopup("NodeMenu")) {
 			// 헤더
-			ImGui::MenuItem(selectNode->GetName().c_str(), nullptr, false, false);
+			ImGui::MenuItem(selectNode.get()->GetName().c_str(), nullptr, false, false);
 			ImGui::Separator();
 			// Add Child (Composite/Decorator 만)
 			bool isComp = std::dynamic_pointer_cast<BT::CompositeNode>(selectNode) != nullptr ? true : false;
@@ -1920,8 +1949,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 					{
 						if (ImGui::MenuItem(key.c_str()))
 						{
-							json p; p["key"] = key;
-							auto child = BTComponent->CreateNode(key, p);
+							auto child = BTComponent->CreateNode(key);
 							if (isComp)
 								std::dynamic_pointer_cast<BT::CompositeNode>(selectNode)->AddChild(child);
 							else
@@ -1941,7 +1969,21 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			{
 				ImGui::MenuItem("Delete Node", nullptr, false, false);
 			}
+
+			ImGui::EndPopup();
 		}
+		ed::Resume();
+
+
+		ed::End(); // NodeEditor 종료
+
+
+		ed::SetCurrentEditor(nullptr);
+
+
+		ImGui::EndChild();
+		//======BTEditorCanvas============
+		
 
 
 		ImGui::End(); // Behavior Tree Editor

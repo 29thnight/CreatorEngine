@@ -26,7 +26,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 
 	auto animation = player->GetComponent<Animator>();
 	animation->AddParameter("OnMove", true, ValueType::Bool);
-	animation->AddParameter("OnPunch", false, ValueType::Trigger);
+	animation->AddParameter("Attack", false, ValueType::Trigger);
 
 	animation->CreateController("upper");
 	auto upperController = animation->GetController("upper");
@@ -35,7 +35,7 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	upperController->CreateState("Walk",2);
 	upperController->CreateState("Punch",3);
 	upperController->SetCurState("Idle");
-	upperController->CreateTransition("Idle", "Punch")->AddCondition("OnPunch", true, ConditionType::None, ValueType::Trigger);
+	upperController->CreateTransition("Idle", "Punch")->AddCondition("Attack", true, ConditionType::None, ValueType::Trigger);
 	upperController->CreateTransition("Walk", "Punch")->AddCondition("OnPunch", true, ConditionType::None, ValueType::Trigger);
 	upperController->CreateTransition("Punch", "Idle");
 	upperController->CreateTransition("Punch", "Walk");

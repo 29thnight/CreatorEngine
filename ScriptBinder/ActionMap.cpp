@@ -9,32 +9,50 @@ ActionMap::~ActionMap()
 
 void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action)
 {
+	InputAction* inputAction = nullptr;
+	bool isNew = true;
 	for (auto& action : m_actions)
 	{
 		if (action->actionName == name)
-			return;
+		{
+			inputAction = action;
+			isNew = false;
+			break;
+		}
 	}
-	InputAction* inputAction = new InputAction();
+	if (!inputAction)
+		inputAction = new InputAction();
+
+
 	inputAction->actionName = name;
 	inputAction->playerIndex = _playerindex;
 
 	inputAction->actionType = ActionType::Button;
 	inputAction->inputType = _inputType;
 
-	inputAction->key.push_back(_key);
+	inputAction->key.resize(1);
+	inputAction->key[0] = _key;
 	inputAction->keystate = _state;
 	inputAction->buttonAction = _action;
+	if(isNew)
 	m_actions.push_back(inputAction);
 }
 
 void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(Mathf::Vector2)> _action)
 {
+	InputAction* inputAction =nullptr;
+	bool isNew = true;
 	for (auto& action : m_actions)
 	{
 		if (action->actionName == name)
-			return;
+		{
+			inputAction = action;
+			isNew = false;
+			break;
+		}
 	}
-	InputAction* inputAction = new InputAction();
+	if (!inputAction)
+		inputAction = new InputAction();
 	inputAction->actionName = name;
 	inputAction->playerIndex = _playerindex;
 	inputAction->actionType = ActionType::Value;
@@ -60,18 +78,26 @@ void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValue
 		}
 		};
 
-	m_actions.push_back(inputAction);
+	if(isNew)
+		m_actions.push_back(inputAction);
 }
 
 void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(float)> _action)
 {
 
+	InputAction* inputAction = nullptr;
+	bool isNew = true;
 	for (auto& action : m_actions)
 	{
 		if (action->actionName == name)
-			return;
+		{
+			inputAction = action;
+			isNew = false;
+			break;
+		}
 	}
-	InputAction* inputAction = new InputAction();
+	if (!inputAction)
+		inputAction = new InputAction();
 	inputAction->actionName = name;
 	inputAction->playerIndex = _playerindex;
 	inputAction->actionType = ActionType::Value;
@@ -96,7 +122,8 @@ void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValue
 			action(std::any_cast<float>(value));
 		}
 		};
-	m_actions.push_back(inputAction);
+	if(isNew)
+		m_actions.push_back(inputAction);
 }
 void ActionMap::CheckAction()
 {
