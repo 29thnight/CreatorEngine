@@ -12,6 +12,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	auto renderScene				= SceneManagers->GetRenderScene();
 	auto componentPtr				= pComponent;
 	auto owner						= componentPtr->GetOwner();
+	bool isStatic					= owner->IsStatic();
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
 	Material* originMat				= pComponent->m_Material;
@@ -79,8 +80,9 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 			proxyObject->m_finalTransforms = palletePtr;
 		}
 
-		proxyObject->m_worldMatrix = worldMatrix;
-		proxyObject->m_worldPosition = worldPosition;
+		proxyObject->m_worldMatrix		= worldMatrix;
+		proxyObject->m_worldPosition	= worldPosition;
+		proxyObject->m_isStatic			= isStatic;
 
 		if(isLightMappingUpdatable)
 		{

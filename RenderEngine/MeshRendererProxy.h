@@ -56,6 +56,7 @@ public:
 	Mathf::xMatrix		m_worldMatrix{ XMMatrixIdentity() };
 	HashedGuid			m_instancedID{};
 	bool				m_isCulled{ false };
+	bool				m_isStatic{ false };
 
 public:
 	//meshRenderer type
