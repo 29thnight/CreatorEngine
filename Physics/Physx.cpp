@@ -248,7 +248,8 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.slopeLimit = contrllerInfo.slopeLimit;
 			desc.position.x = contrllerInfo.position.x;
 			desc.position.y = contrllerInfo.position.y;
-			desc.position.z = contrllerInfo.position.z;
+			desc.position.z = contrllerInfo.position.z; 
+			desc.scaleCoeff = 1.0f;
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
@@ -904,10 +905,12 @@ void PhysicX::RemoveCCT(const unsigned int& id)
 	if (controllerIter!= m_characterControllerContainer.end()) {
 		m_characterControllerContainer.erase(controllerIter);
 	}
+	
 }
 
 void PhysicX::RemoveAllCCT()
 {
+	m_characterControllerManager->purgeControllers();
 	m_characterControllerContainer.clear();
 	m_updateCCTList.clear();
 	m_waittingCCTList.clear();

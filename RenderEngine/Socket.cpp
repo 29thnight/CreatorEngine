@@ -46,10 +46,12 @@ void Socket::DetachObject(GameObject* Object)
 
 void Socket::Update()
 {
+	
 
 	for (auto& obj : AttachObjects)
 	{
 		auto mat = transform.GetLocalMatrix();
+		
 		obj->m_transform.SetLocalMatrix(mat);
 	}
 

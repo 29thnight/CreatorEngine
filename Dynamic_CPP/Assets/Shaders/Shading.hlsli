@@ -72,7 +72,7 @@ inline void EvalDirectionalLight(SurfaceInfo surf, Light light, inout LightingIn
     li.distance = -1; // infinity
     li.attenuation = 1;
 
-    li.shadowFactor = (light.status == LIGHT_ENABLED_W_SHADOWMAP) ? 1 - ShadowFactor(surf.posW) : 1;
+    li.shadowFactor = (light.status == LIGHT_ENABLED_W_SHADOWMAP) ? (1 - ShadowFactor(surf.posW)) * (CloudShadowFactor(surf.posW)) : 1;
     CalcCommonLightInfo(surf, li);
 
 }

@@ -2,7 +2,8 @@
 #define PI 3.14159265358
 #define EPSILON 0.000001
 
-SamplerState SamplerLinear : register(s0);
+SamplerState SamplerLinearClamp : register(s0);
+SamplerState SamplerLinearWrap : register(s1);
 SamplerComparisonState CascadedPcfShadowMapSampler : register(s2);
 
 RWTexture3D<float4> VoxelWriteTexture : register(u0);
@@ -10,6 +11,7 @@ RWTexture3D<float4> VoxelWriteTexture : register(u0);
 Texture2DArray<float> ShadowTexture : register(t0);
 Texture2D<float4> BlueNoiseTexture : register(t1);
 Texture3D<float4> VoxelReadTexture : register(t2);
+Texture2D<float4> CloudShadowMap : register(t3);
 
 cbuffer VolumetricFogCBuffer : register(b0)
 {
@@ -27,6 +29,15 @@ cbuffer VolumetricFogCBuffer : register(b0)
     float Strength;
     float ThicknessFactor;
 }
+cbuffer CloudShadowMapConstants : register(b1)
+{
+    float4x4 viewProjection;
+    float2 cloudMapSize;
+    float2 direction;
+    uint frameIndex;
+    float moveSpeed;
+}
+
 float HenyeyGreensteinPhaseFunction(float3 viewDir, float3 lightDir, float g)
 {
     float cos_theta = dot(viewDir, lightDir);
@@ -50,6 +61,25 @@ float GetVisibility(float3 voxelWorldPoint, float4x4 svp)
     return ShadowTexture.SampleCmpLevelZero(CascadedPcfShadowMapSampler, float3(ShadowCoord.xy, 2), ShadowCoord.z).r;
 }
 
+float GetCloudVisibility(float4 worldPosition)
+{
+    float2 texelSize = float2(1, 1) / cloudMapSize;
+    
+    float4 lightSpacePosition = mul(viewProjection, worldPosition);
+    float3 projCoords = lightSpacePosition.xyz / lightSpacePosition.w;
+    float currentDepth = projCoords.z;
+    projCoords.y = -projCoords.y;
+    projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
+    
+    // (uv * size) + (time * moveSpeed * direction) = cloudMove
+    float2 uv = float2(projCoords.xy * 4 + frameIndex * 0.00003 * float2(1, 1) /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
+    float closestDepth = CloudShadowMap.SampleLevel(SamplerLinearWrap, uv, 0).r;
+    float shadow = 0;
+    shadow = closestDepth;
+    
+    return shadow;
+}
+
 [numthreads(8, 8, 1)]
 void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID)
 {
@@ -63,7 +93,7 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
         float3 viewDir = normalize(CameraPosition.xyz - voxelWorldPos);
     
         float3 lighting = float3(0.0, 0.0, 0.0);
-        float visibility = GetVisibility(voxelWorldPos, ShadowMatrix);
+        float visibility = GetVisibility(voxelWorldPos, ShadowMatrix) * GetCloudVisibility(float4(voxelWorldPos, 1.0));
         //float visibility2 = GetVisibility(voxelWorldPosNoJitter, ShadowMatrix);
 
         if (visibility > EPSILON)
@@ -79,7 +109,7 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV
             if (prevUV.x >= 0.0f && prevUV.y >= 0.0f && prevUV.z >= 0.0f &&
                 prevUV.x <= 1.0f && prevUV.y <= 1.0f && prevUV.z <= 1.0f)
             {
-                float4 prevResult = VoxelReadTexture.SampleLevel(SamplerLinear, prevUV, 0.0f);
+                float4 prevResult = VoxelReadTexture.SampleLevel(SamplerLinearClamp, prevUV, 0.0f);
                 result = lerp(result, prevResult, CameraNearFar_FrameIndex_PreviousFrameBlend.w);
             }
         }

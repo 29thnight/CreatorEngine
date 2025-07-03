@@ -277,8 +277,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			}
 			ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
 			ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
-			ImGui::InputFloat("Width", &cam->m_viewWidth);
-			ImGui::InputFloat("Hight", &cam->m_viewHeight);
+			ImGui::DragFloat("Width", &cam->m_viewWidth);
+			ImGui::DragFloat("Hight", &cam->m_viewHeight);
+			ImGui::DragFloat("Camera Speed", &cam->m_speed, 0.1f, 0.f, 200.f);
 			ImGui::EndPopup();
 		}
 

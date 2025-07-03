@@ -1,27 +1,16 @@
 #pragma once
-#include "../IRenderPass.h"
+#include "IRenderPass.h"
 #include "ParticleSystem.h"
 #include "EffectBase.h"
 
-class EffectManager : public IRenderPass
+class EffectManager : public IRenderPass, public Singleton<EffectManager>
 {
 private:
-	static EffectManager* s_currentInstance;
+	friend class Singleton<EffectManager>;
 
 public:
-	EffectManager() {
-		s_currentInstance = this;
-	}
-
-	~EffectManager() {
-		if (s_currentInstance == this) {
-			s_currentInstance = nullptr;
-		}
-	}
-
-	static EffectManager* GetCurrent() {
-		return s_currentInstance;
-	}
+	EffectManager() = default;
+	~EffectManager() = default;
 
 	void Initialize();
 
@@ -37,6 +26,8 @@ public:
 
 	void RegisterCustomEffect(const std::string& name, const std::vector<std::shared_ptr<ParticleSystem>>& emitters);
 
+	void CreateEffectInstance(const std::string& templateName, const std::string& instanceName);
+
 protected:
 	ComPtr<ID3D11Buffer> m_constantBuffer{};
 private:
@@ -46,10 +37,7 @@ private:
 	ComPtr<ID3D11Buffer> m_InstanceBuffer;
 	ComPtr<ID3D11Buffer> m_ModelBuffer;			// world view projÀü¿ë
 	
-	std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
-
+	static std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
 };
 
-
-
-
+static inline auto& efm = EffectManager::GetInstance();

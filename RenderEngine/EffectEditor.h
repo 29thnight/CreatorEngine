@@ -1,7 +1,6 @@
 #pragma once
 #include "ParticleSystem.h"
-#include "Component.h"
-#include "EffectComponent.generated.h"
+#include "EffectSerializer.h"
 
 enum class EffectModuleType
 {
@@ -24,42 +23,40 @@ struct TempEmitterInfo {
     std::string name;
 };
 
-class EffectComponent : public Component, public IAwakable, public IUpdatable, public IOnDistroy
+class EffectEditor
 {
 public:
-   ReflectEffectComponent
-        [[Serializable(Inheritance:Component)]]
-    GENERATED_BODY(EffectComponent)
+    EffectEditor();
+    void Release();
 
-    void Awake() override;
-    void Update(float tick) override;
-    void OnDistroy() override;
     void SetTexture(Texture* tex);
     void Render(RenderScene& scene, Camera& camera);
     void ExportToManager(const std::string& effectName);
+    void Update(float delta);
 
     // 미리보기 전용 메서드들
-    [[Method]]
     void PlayPreview();
-    [[Method]]
     void StopPreview();
-    [[Method]]
     void PlayEmitterPreview(int index);
-    [[Method]]
     void StopEmitterPreview(int index);
-    [[Method]]
     void RemoveEmitter(int index);
-    [[Method]]
     void AssignTextureToEmitter(int emitterIndex, int textureIndex);
 
-    [[Property]]
-    int num = 0;
-    [[Property]]
-    std::string test = "test";
+    // spawn module용 설정 메서드
+    void StartModifyEmitter(int index);
+    void SaveModifiedEmitter(const std::string& name = "");
+    void CancelModifyEmitter();
+    void RenderModuleDetailEditor();
+    void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
+    void RenderMovementModuleEditor(MovementModuleCS* movementModule);
+    void RenderColorModuleEditor(ColorModuleCS* colorModule);
+    void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
 
 private:
     // 미리보기용 임시 에미터들
     std::vector<TempEmitterInfo> m_tempEmitters;
+    char m_newEmitterName[256];
+    bool m_emitterNameInitialized;
 
     // 현재 편집 중인 에미터
     std::shared_ptr<ParticleSystem> m_editingEmitter = nullptr;
@@ -93,18 +90,42 @@ private:
         {"Mesh Render", RenderType::Mesh},
     };
 
+    // 모듈 편집 관련
+    bool m_isModifyingEmitter = false;
+    int m_modifyingEmitterIndex = -1;
+    std::shared_ptr<ParticleSystem> m_modifyingSystem = nullptr;
+
+    // 현재 선택된 모듈 정보
+    int m_selectedModuleForEdit = -1;
+    int m_selectedRenderForEdit = -1;
+
+    // json 관련
+    char m_saveFileName[256] = "my_effect.json";
+    char m_loadFileName[256] = "my_effect.json";
+    bool m_showSaveDialog = false;
+    bool m_showLoadDialog = false;
+
+private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
     void RenderEmitterEditor();
     void RenderExistingModules();
     void RenderPreviewControls();
+    void RenderModifyEmitterEditor();
+    void RenderTextureDragDropTarget();
+    void RenderJsonSaveLoadUI();
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();
-    void SaveCurrentEmitter();
+    void SaveCurrentEmitter(const std::string& name);
     void CancelEditing();
+
 
     // 모듈 추가
     void AddSelectedModule();
     void AddSelectedRender();
+
+    // json 저장
+    void SaveEffectToJson(const std::string& filename);
+    void LoadEffectFromJson(const std::string& filename);
 };

@@ -41,6 +41,8 @@ void PhysicsManager::Update(float fixedDeltaTime)
 
 	//물리씬에 데이터 가져오기
 	GetPhysicData();
+	//콜백 이벤트 처리
+	ProcessCallback();
 	
 }
 void PhysicsManager::Shutdown()

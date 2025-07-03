@@ -21,17 +21,21 @@ private:
 
 	Texture* m_pTempTexture{ nullptr };
 	Texture* m_pTempTexture2{ nullptr };
-
 	Texture* m_pTempTexture3{ nullptr };
+
+	//Texture* m_pBilateralTexture{ nullptr };
 
 	ComPtr<ID3D11Buffer> m_SSGIBuffer;
 	ComPtr<ID3D11Buffer> m_CompositeBuffer;
+	//ComPtr<ID3D11Buffer> m_BilateralBuffer;
 
 	ComputeShader* m_pSSGIShader{};
 	ComputeShader* m_pCompositeShader{};
 
 	ComputeShader* m_pDownDualFilteringShader{};
 	ComputeShader* m_pUpDualFilteringShaeder{};
+
+	//ComputeShader* m_pBilateralFilterShader{};
 
 	Sampler* sample = nullptr;
 	Sampler* pointSample = nullptr;
@@ -42,7 +46,10 @@ private:
 	float intensity = 1.f;
 	bool useOnlySSGI = false;
 	int useDualFilteringStep = 2;
-
 	bool isOn = true;
+
+	//bool useBilateralFiltering = true;
+	//float sigmaSpace = 0.1f;
+	//float sigmaRange = 0.1f;
 };
 

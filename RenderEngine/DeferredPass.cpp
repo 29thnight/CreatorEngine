@@ -165,6 +165,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
     if (lightManager->hasLightWithShadows)
     {
         DirectX11::PSSetConstantBuffer(defferdPtr, 2, 1, &lightManager->m_shadowMapBuffer);
+        lightManager->PSBindCloudShadowMap(defferdPtr);
     }
     DirectX11::Draw(defferdPtr, 4, 0);
 

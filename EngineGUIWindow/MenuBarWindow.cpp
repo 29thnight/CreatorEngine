@@ -336,6 +336,23 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("EffectEditor"))
+            {
+                if (ImGui::MenuItem("Editor Window"))
+                {
+                    auto& ctx = ImGui::GetContext("EffectEdit");
+                    if (ctx.IsOpened())
+                    {
+                        ctx.Close();
+                    }
+                    else
+                    {
+                        ctx.Open();
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Option")) {
 
                 if (ImGui::MenuItem("Collision Matrix")) {
@@ -344,8 +361,6 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 ImGui::EndMenu();
             }
-
-
 
             float availRegion = ImGui::GetContentRegionAvail().x;
 

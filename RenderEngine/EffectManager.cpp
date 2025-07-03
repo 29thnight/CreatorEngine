@@ -3,10 +3,11 @@
 #include "SparkleEffect.h"
 #include "ImGuiRegister.h"
 #include "imgui-node-editor/imgui_node_editor.h"
+#include "EffectProxyController.h"
 
 namespace ed = ax::NodeEditor;
 
-EffectManager* EffectManager::s_currentInstance = nullptr;
+std::unordered_map<std::string, std::unique_ptr<EffectBase>> EffectManager::effects;
 
 void EffectManager::Initialize()
 {
@@ -15,15 +16,17 @@ void EffectManager::Initialize()
 
 void EffectManager::Execute(RenderScene& scene, Camera& camera)
 {
+	EffectProxyController::GetInstance()->ExecuteEffectCommands();
 	for (auto& [key, effect] : effects) {
 		effect->Render(scene, camera);
 	}
-}
+}	
 
 void EffectManager::Update(float delta)
 {
 	for (auto& [key, effect] : effects) {
 		effect->Update(delta);
+		std::cout << effect->GetName();
 	}
 }
 
@@ -54,5 +57,16 @@ void EffectManager::RegisterCustomEffect(const std::string& name, const std::vec
 		}
 
 		effects[name] = std::move(effect);
+	}
+}
+
+void EffectManager::CreateEffectInstance(const std::string& templateName, const std::string& instanceName)
+{
+	auto templateIt = effects.find(templateName);
+	if (templateIt != effects.end()) {
+		// 템플릿을 복사해서 새 인스턴스 생성
+		auto newEffect = std::make_unique<EffectBase>(*templateIt->second);
+		newEffect->SetName(instanceName);
+		effects[instanceName] = std::move(newEffect);
 	}
 }

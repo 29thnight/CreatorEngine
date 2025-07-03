@@ -162,7 +162,6 @@ void AnimationController::UpdateState()
 }
 void AnimationController::Update(float tick)
 {
-	//Debug->Log(std::to_string(curAnimationProgress).c_str()); &&&&&
 	UpdateState();
 	if (needBlend)
 	{
