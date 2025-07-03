@@ -4,6 +4,15 @@
 #include "ShadowMapPass.h"
 #include "Texture.h"
 
+cbuffer CloudShadowMapBuffer
+{
+	Mathf::Matrix shadowViewProjection;
+	Mathf::Vector2 cloudMapSize;
+	Mathf::Vector2 direction;
+	UINT frameIndex;
+	float moveSpeed;
+};
+
 LightController::~LightController()
 {
 }
@@ -39,6 +48,8 @@ void LightController::Initialize()
     );
 
     DirectX::SetName(m_pLightCountBuffer, "Light Count Buffer");
+
+	m_cloudShadowMapBuffer = DirectX11::CreateBuffer(sizeof(CloudShadowMapBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
 	m_shadowMapPass = std::make_unique<ShadowMapPass>();
 }
@@ -160,6 +171,49 @@ void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredConte
 	{
 		m_shadowMapPass->CreateRenderCommandList(deferredContext, scene, camera);
 	}
+}
+
+void LightController::UseCloudShadowMap(const std::string_view& filename)
+{
+	file::path path = file::path(filename);
+	if (file::exists(path))
+	{
+		m_cloudShadowMapTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(filename));
+		m_cloudShadowMapTexture->m_textureType = TextureType::ImageTexture;
+	}
+}
+
+void LightController::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext)
+{
+	if (m_lightCount <= 0)
+		return;
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+
+	auto LightDir = GetLight(0).m_direction;
+	Mathf::Vector3 shadowPos = Mathf::Vector3(LightDir.x, LightDir.y, LightDir.z) * -250;
+	Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, Mathf::Vector3::Zero, { 0, 1, 0 });
+	Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(-512, 512, -512, 512, 0.1f, 500);
+
+	CloudShadowMapBuffer buffer{};
+	buffer.shadowViewProjection = lightView * lightProj;
+	buffer.cloudMapSize = m_cloudShadowMapTexture->GetImageSize();
+	buffer.direction = Mathf::Vector2(1.f, 0.f);
+	buffer.frameIndex = Time->GetFrameCount();
+	buffer.moveSpeed = 0.1f;
+	DirectX11::UpdateBuffer(defferdPtr, m_cloudShadowMapBuffer, &buffer);
+}
+
+void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext) {
+	UpdateCloudBuffer(defferdContext);
+	DirectX11::PSSetConstantBuffer(defferdContext, 4, 1, &m_cloudShadowMapBuffer);
+	DirectX11::PSSetShaderResources(defferdContext, 10, 1, &m_cloudShadowMapTexture->m_pSRV);
+}
+
+void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext)
+{
+	UpdateCloudBuffer(defferdContext);
+	DirectX11::CSSetConstantBuffer(defferdContext, 1, 1, &m_cloudShadowMapBuffer);
+	DirectX11::CSSetShaderResources(defferdContext, 3, 1, &m_cloudShadowMapTexture->m_pSRV);
 }
 
 //Texture* LightController::GetShadowMapTexture()

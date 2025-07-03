@@ -162,11 +162,14 @@
     <ClCompile Include="BillboardModuleGPU.cpp" />
     <ClCompile Include="EaseInOut.cpp" />
     <ClCompile Include="EffectBase.cpp" />
-    <ClCompile Include="EffectComponent.cpp" />
+    <ClCompile Include="EffectEditor.cpp" />
     <ClCompile Include="EffectManager.cpp" />
+    <ClCompile Include="EffectManagerProxy.cpp" />
     <ClCompile Include="EffectModules.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="EffectProxyController.cpp" />
+    <ClCompile Include="EffectSerializer.cpp" />
     <ClCompile Include="LODGroup.cpp" />
     <ClCompile Include="LODSetting.cpp" />
     <ClCompile Include="MeshModuleGPU.cpp" />
@@ -179,7 +182,9 @@
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
-    <ClCompile Include="SparkleEffect.cpp" />
+    <ClCompile Include="SparkleEffect.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp" />
     <ClCompile Include="ForwardPass.cpp" />
     <ClCompile Include="GizmoLinePass.cpp" />
@@ -248,11 +253,14 @@
     <ClInclude Include="BillboardModuleGPU.h" />
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="EffectBase.h" />
-    <ClInclude Include="EffectComponent.h" />
+    <ClInclude Include="EffectEditor.h" />
     <ClInclude Include="EffectManager.h" />
+    <ClInclude Include="EffectManagerProxy.h" />
     <ClInclude Include="EffectModules.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="EffectProxyController.h" />
+    <ClInclude Include="EffectSerializer.h" />
     <ClInclude Include="LODGroup.h" />
     <ClInclude Include="LODSetting.h" />
     <ClInclude Include="MeshModuleGPU.h" />
@@ -266,7 +274,9 @@
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="SizeModuleCS.h" />
     <ClInclude Include="Socket.h" />
-    <ClInclude Include="SparkleEffect.h" />
+    <ClInclude Include="SparkleEffect.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="SpawnModuleCS.h" />
     <ClInclude Include="GizmoCbuffer.h" />
     <ClInclude Include="GizmoLinePass.h" />
@@ -383,9 +393,20 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BiliteralFilter.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BillBoard.vs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -409,6 +430,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ColorModule.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\DownDualFiltering.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -424,6 +448,15 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.ps.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticle.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshSpawnModule.cs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGIComposite.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -539,10 +572,6 @@
       </ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0_level_9_3</ShaderModel>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\LifeModule.cs.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Lightmap.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -632,10 +661,6 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0_level_9_3</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Sparkle.ps.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SpawnModule.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -760,10 +785,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\WireFrame.vs.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>

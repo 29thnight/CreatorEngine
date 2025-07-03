@@ -1,9 +1,8 @@
 #pragma once
 #include "ParticleModule.h"
+#include "ISerializable.h"
 
-// 스폰 파라미터 구조체 (상수 버퍼)
-
-
+class EffectSerializer;
 // 파티클 템플릿 구조체 (상수 버퍼)
 struct alignas(16) ParticleTemplateParams
 {
@@ -26,7 +25,7 @@ struct alignas(16) ParticleTemplateParams
 };
 
 enum class EmitterType;
-class SpawnModuleCS : public ParticleModule
+class SpawnModuleCS : public ParticleModule, public ISerializable
 {
 private:
     // 컴퓨트 셰이더 관련
@@ -67,7 +66,14 @@ public:
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
 
+    // JSON 직렬화용 메소드들 추가 
+    const SpawnParams& GetSpawnParams() const { return m_spawnParams; }
+    const ParticleTemplateParams& GetParticleTemplate() const { return m_particleTemplate; }
+    bool IsInitialized() const { return m_isInitialized; }
+    UINT GetParticleCapacity() const { return m_particleCapacity; }
+
     // 스폰 설정 메서드들
+    void SetEmitterPosition(const Mathf::Vector3& position);
     void SetSpawnRate(float rate);
     void SetEmitterType(EmitterType type);
     void SetEmitterSize(const XMFLOAT3& size);
@@ -86,6 +92,16 @@ public:
     float GetSpawnRate() const { return m_spawnParams.spawnRate; }
     EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
+
+    // ISerializable 인터페이스 구현
+    virtual nlohmann::json SerializeData() const override;
+    
+
+    virtual void DeserializeData(const nlohmann::json& json) override;
+    
+
+    virtual std::string GetModuleType() const override;
+    
 private:
     bool InitializeComputeShader();
     bool CreateConstantBuffers();

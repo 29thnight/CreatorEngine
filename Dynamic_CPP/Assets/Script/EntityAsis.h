@@ -24,9 +24,12 @@ public:
 	virtual void Interact() override {}
 	virtual void AddItem(EntityItem* item) { m_EntityItems.push_back(item); }
 private:
+	void Inputblabla(Mathf::Vector2 dir);
+private:
 	std::vector<EntityItem*> m_EntityItems;
 	GameObject* asisTail{ nullptr };
 	float angle = 0.f;
 	float radius = 5.f;
 	float timer = 0.f;
+	Mathf::Vector2 dir{0.f,0.f};
 };

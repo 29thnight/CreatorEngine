@@ -29,6 +29,9 @@
 #include <regex>
 
 #include "Animator.h"
+#include "EffectComponent.h"
+#include "EffectProxyController.h"
+
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -177,6 +180,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pBitMaskPass = std::make_unique<BitMaskPass>();
 	m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
 
+
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
 			auto scene = SceneManagers->GetActiveScene();
@@ -216,6 +220,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 	m_pEffectPass = std::make_unique<EffectManager>();
+	m_EffectEditor = std::make_unique<EffectEditor>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
     m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 	m_trimEventHandle				= resourceTrimEvent.AddRaw(this, &SceneRenderer::ResourceTrim);
@@ -223,6 +228,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	{
 		m_renderScene->Update(0.f);
 	});
+
+	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 }
 
 SceneRenderer::~SceneRenderer()
@@ -367,8 +374,13 @@ void SceneRenderer::NewCreateSceneInitialize()
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
+	//TODO : 시연용 Player주석 코드
+/*	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	testt = Model::LoadModelToSceneObj(model[0], *scene);
+	player.GetPlayer(testt);*/ //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 	////TODO : 시연용 Player주석 코드
 	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
 	//testt = Model::LoadModelToSceneObj(model[0], *scene);
@@ -387,6 +399,7 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 	//TODO : 시연용 Player주석 코드
 	player.Update(deltaTime);
 	m_pEffectPass->Update(deltaTime);
+	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDistroy();
@@ -505,14 +518,6 @@ void SceneRenderer::SceneRendering()
 		}
 
 		{
-			DirectX11::BeginEvent(L"BitMaskPass");
-			Benchmark banch;
-			m_pBitMaskPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("BitMaskPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-		}
-
-		{
 			PROFILE_CPU_BEGIN("ForwardPass");
 			DirectX11::BeginEvent(L"ForwardPass");
 			Benchmark banch;
@@ -580,6 +585,14 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
         }
 
+		{
+			DirectX11::BeginEvent(L"BitMaskPass");
+			Benchmark banch;
+			m_pBitMaskPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("BitMaskPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
+
 		//[6] AAPass
 		{
 			PROFILE_CPU_BEGIN("AAPass");
@@ -629,6 +642,7 @@ void SceneRenderer::SceneRendering()
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
 			m_pEffectPass->Execute(*m_renderScene, *camera);
+			m_EffectEditor->Render(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
 			DirectX11::EndEvent();
 		}
@@ -900,6 +914,7 @@ void SceneRenderer::PrepareRender()
 
 	SwapEvent();
 	ProxyCommandQueue->AddFrame();
+	EffectProxyController::GetInstance()->AddFrame();
 }
 
 void SceneRenderer::Clear(const float color[4], float depth, uint8_t stencil)
@@ -933,6 +948,7 @@ void SceneRenderer::ApplyNewCubeMap(const std::string_view& filename)
 	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 }
 
 void SceneRenderer::UnbindRenderTargets()

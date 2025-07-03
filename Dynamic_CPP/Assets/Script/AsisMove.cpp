@@ -69,7 +69,7 @@ void AsisMove::Update(float tick)
 	//std::cout << points[0].x << ", " << points[0].y << ", " << points[0].z << std::endl;
 	//std::cout << points[1].x << ", " << points[1].y << ", " << points[1].z << std::endl;
 	//std::cout << points[2].x << ", " << points[2].y << ", " << points[2].z << std::endl;
-
+	return;
 	Transform& playerTransform = GetOwner()->m_transform;
 
 	Mathf::Vector3 playerPosition = playerTransform.GetWorldPosition();

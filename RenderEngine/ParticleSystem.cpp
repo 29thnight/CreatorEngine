@@ -114,11 +114,17 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {
 	m_position = position;
-	// SpawnModule은 위치를 직접 저장하지 않으므로, 모든 파티클의 위치를 이동
-	for (auto& particle : m_particleData) {
-		if (particle.isActive) {
-			// 기존 위치에서 새 위치로의 오프셋 적용
-			particle.position += position - m_position;
+
+	// 모든 스폰 모듈에 위치 업데이트 알림
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// SpawnModuleCS인지 확인하고 위치 설정
+		SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module);
+		if (spawnModule)
+		{
+			spawnModule->SetEmitterPosition(position);
 		}
 	}
 }
