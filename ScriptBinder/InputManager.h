@@ -92,14 +92,13 @@ public:
 	void HideCursor();
 	void ShowCursor();
 	void ResetMouseDelta();
-	short GetWheelDelta() const;
+	int16 GetWheelDelta() const;
 	KeyboardState keyboardstate{};
 	std::vector<GameInputKeyState> GkeyStates = {};
 	GameInputMouseState GmouseState{};
 	bool curkeyStates[KEYBOARD_COUNT] = {};
 
 	bool curmouseState[mouseCount] = {};
-
 
 	Mathf::Vector2 GameViewpos;
 	Mathf::Vector2 GameViewsize;
@@ -119,8 +118,8 @@ private:
 	float2 _mouseDelta{};
 	//마우스 휠?
 
-	short _mouseWheelDelta{};
-	short _premouseWheelDelta{};
+	int16 _mouseWheelDelta{};
+	int16 _premouseWheelDelta{};
 
 	bool _isCursorHidden = false;
 	//이 아래는 패드 컨트롤러

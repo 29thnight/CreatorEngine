@@ -5,6 +5,7 @@
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Profiler.h"
+#include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -161,7 +162,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         if(collisionMatrix.empty()){
             collisionMatrix = PhysicsManagers->GetCollisionMatrix();
         }
-        int flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
+        int flags = ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
 
         if (ImGui::BeginChild("Matrix", ImVec2(0, 0), flags))
         {
@@ -304,7 +305,8 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Exit"))
                 {
                     // Exit action
-                    PostQuitMessage(0);
+					HWND handle = m_sceneRenderer->m_deviceResources->GetWindow()->GetHandle();
+                    PostMessage(handle, WM_CLOSE, 0, 0);
                 }
                 ImGui::EndMenu();
             }
@@ -371,9 +373,9 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(ICON_FA_FOLDER_TREE " Content Drawer"))
+            if (ImGui::Button(ICON_FA_CHESS_QUEEN " Content Drawer"))
             {
-                auto& contentDrawerContext = ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser");
+                auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
                 if (!contentDrawerContext.IsOpened())
                 {
                     contentDrawerContext.Open();
@@ -385,7 +387,7 @@ void MenuBarWindow::RenderMenuBar()
             }
 
             ImGui::SameLine();
-            if (ImGui::Button(ICON_FA_CODE " Output Log "))
+            if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
                 m_bShowLogWindow = !m_bShowProfileWindow;
             }
@@ -408,15 +410,30 @@ void MenuBarWindow::RenderMenuBar()
 
     if (m_bShowProfileWindow)
     {
-        ImGui::Begin("FrameProfiler", &m_bShowProfileWindow);
+        ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);
         {
-            DrawProfilerHUD();
-        }
-        ImGui::End();
+            ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
+            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
-        ImGui::Begin("VRAM", &m_bShowProfileWindow);
-		auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
-        ShowVRAMBarGraph(info.CurrentUsage, info.Budget);
+            const float vramPanelHeight = 50.0f; // VRAM 그래프 높이
+            const float contentWidth = ImGui::GetContentRegionAvail().x;
+            const float contentHeight = ImGui::GetContentRegionAvail().y;
+
+            // 위쪽: HUD
+            ImGui::BeginChild("Profiler HUD", ImVec2(contentWidth, contentHeight - vramPanelHeight), false);
+            {
+                DrawProfilerHUD();
+            }
+            ImGui::EndChild();
+
+            // 아래쪽: VRAM 그래프
+            ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
+            {
+                auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
+                ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // 가로 막대 그래프
+            }
+            ImGui::EndChild();
+        }
         ImGui::End();
     }
 
@@ -470,7 +487,7 @@ void MenuBarWindow::ShowLogWindow()
     bool isClear = Debug->IsClear();
 
     ImGui::PushFont(m_koreanFont);
-    ImGui::Begin("Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
+    ImGui::Begin(ICON_FA_TERMINAL " Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
     ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
     ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 

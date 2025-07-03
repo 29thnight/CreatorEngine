@@ -74,6 +74,9 @@ public:
 	void RemoveScriptComponent(ModuleBehavior* ptr);
 	void RemoveComponent(Meta::Type& type);
 
+	bool IsStatic() const { return m_isStatic; }
+	void SetStatic(bool isStatic) { m_isStatic = isStatic; }
+
 	GameObjectType GetType() const { return m_gameObjectType; }
 
     static GameObject* Find(const std::string_view& name);
@@ -110,6 +113,8 @@ public:
 	HashedGuid m_attachedSoketID{};
 	[[Property]]
 	uint32 m_collisionType = 0;
+	[[Property]]
+	bool m_isStatic{ false };
 
 public:
 	[[Property]]

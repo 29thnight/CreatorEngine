@@ -3,6 +3,7 @@
 #include "ReflectionRegister.h"
 #include "SceneManager.h"
 #include "TypeTrait.h"
+#include "InputManager.h"
 
 using namespace TypeTrait;
 namespace Meta
@@ -93,12 +94,15 @@ namespace Meta
 				if (ImGui::InputText(prop.name, 
                     value.data(), 
                     value.size() + 1, 
-                    ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
+                    ImGuiInputTextFlags_CallbackResize,
 					Meta::InputTextCallback,
 					static_cast<void*>(&value)))
                 {
-                    MakePropChangeCommand(instance, prop, value);
-                    prop.setter(instance, value);
+                    if(InputManagement->IsKeyPressed(VK_RETURN))
+                    {
+                        MakePropChangeCommand(instance, prop, value);
+                        prop.setter(instance, value);
+                    }
                 }
 				ImGui::PopID();
             }//[OverWatching]

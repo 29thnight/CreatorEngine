@@ -159,6 +159,8 @@ void Camera::RegisterContainer()
 void Camera::HandleMovement(float deltaTime)
 {
 	float x = 0.f, y = 0.f, z = 0.f;
+	constexpr float minSpeed = 10.f;
+	constexpr float maxSpeed = 100.f;
 
 	if (InputManagement->IsKeyPressed('W'))
 	{
@@ -183,6 +185,22 @@ void Camera::HandleMovement(float deltaTime)
 	if (InputManagement->IsKeyPressed('E'))
 	{
 		y += 1.f;
+	}
+
+	if (InputManagement->IsWheelUp())
+	{
+		m_speedMul += 0.01f;
+		m_speedMul = std::clamp(m_speedMul, 0.01f, 2.f);
+		m_speed = m_speed * m_speedMul;
+		m_speed = std::clamp(m_speed, minSpeed, maxSpeed);
+	}
+
+	if (InputManagement->IsWheelDown())
+	{
+		m_speedMul -= 0.01f;
+		m_speedMul = std::clamp(m_speedMul, 0.01f, 2.f);
+		m_speed = m_speed * m_speedMul;
+		m_speed = std::clamp(m_speed, minSpeed, maxSpeed);
 	}
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();

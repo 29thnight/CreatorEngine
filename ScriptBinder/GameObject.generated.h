@@ -12,6 +12,7 @@ ReflectionFieldInheritance(GameObject, Object) \
 		meta_property(m_childrenIndices) \
 		meta_property(m_attachedSoketID) \
 		meta_property(m_collisionType) \
+		meta_property(m_isStatic) \
 		meta_property(m_gameObjectType) \
 		meta_property(m_tag) \
 		meta_property(m_layer) \

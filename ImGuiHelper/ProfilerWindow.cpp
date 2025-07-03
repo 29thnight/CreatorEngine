@@ -492,9 +492,6 @@ void DrawProfilerHUD()
 	static const char* buttonFmt = ICON_FA_PAUSE;
 	static bool isPaused{ false };
 
-	ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
-	ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-
 	if (gCPUProfiler.IsPaused())
 	{
 		buttonFmt = ICON_FA_PAUSE;

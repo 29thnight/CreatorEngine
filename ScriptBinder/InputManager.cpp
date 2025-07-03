@@ -161,7 +161,6 @@ float2 InputManager::GetMousePos()
 
 float2 InputManager::GetMouseDelta() const
 {
-  
     return _mouseDelta;
 }
 
@@ -218,7 +217,7 @@ void InputManager::ResetMouseDelta()
 {
     _prevMousePos = _mousePos;
     _mouseDelta = { 0, 0 };
-    _mouseWheelDelta = 0;
+    //_mouseWheelDelta = 0;
 }
 
 void InputManager::PadUpdate()

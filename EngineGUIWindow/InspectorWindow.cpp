@@ -178,7 +178,7 @@ constexpr XMVECTOR UP = XMVECTOR{ 0.f, 1.f, 0.f, 0.f };
 InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
 {
-	ImGui::ContextRegister("Inspector", [&]()
+	ImGui::ContextRegister(ICON_FA_CIRCLE_INFO "  Inspector", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
@@ -243,6 +243,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				selectedSceneObject->m_name.SetString(name);
 			}
+
+			ImGui::SameLine();
+			ImGui::Checkbox("Static", &selectedSceneObject->m_isStatic);
 			
 			auto& tag_manager = TagManager::GetInstance();
 			auto& tags = tag_manager->GetTags();
@@ -284,7 +287,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			// Tag 콤보박스
 			ImGui::Text("Tag");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
 			if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
 			{
 				for (int i = 0; i < tagCount; ++i)
@@ -306,7 +309,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SameLine();
 			ImGui::Text("Layer");
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
+			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
 			if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedTagIndex]))
 			{
 				for (int i = 0; i < layerCount; ++i)
@@ -875,7 +878,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				static int AvatarControllerIndex = -1;
 				static bool showAvatarMaskWindow = false;
 				auto& controllers = animator->m_animationControllers;
-				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), true); 
+				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), false); 
 				if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				{
 					if (ImGui::BeginTabItem("Layers"))
@@ -1093,7 +1096,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				 NodeEditor* nodeEdtior = nullptr;
 					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), true);
+					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), false);
 					if(!animator->m_animationControllers.empty() && selectedControllerIndex != -1)
 						controller= animator->m_animationControllers[selectedControllerIndex].get();
 					std::string controllerName;
@@ -1222,7 +1225,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), true);
+					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), false);
 					ImGui::Text("Inspector");
 					ImGui::Separator();
 					if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Link && linkIndex != -1)
@@ -1797,7 +1800,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		//ImGui::Separator();
 		std::string _filepath = "BTNode.jon";
 		// === 캔버스 ===
-		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), true);
+		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), false);
 		// NodeEditor 컨텍스트 설정
 
 

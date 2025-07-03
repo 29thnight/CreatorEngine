@@ -173,6 +173,7 @@ DirectX11::Dx11Main::~Dx11Main()
     isGameToRender = false;
 	m_deviceResources->RegisterDeviceNotify(nullptr);
     SceneManagers->Decommissioning();
+
     PROFILER_SHUTDOWN();
 }
 //test code

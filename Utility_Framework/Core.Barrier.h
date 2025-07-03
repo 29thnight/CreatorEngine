@@ -11,6 +11,14 @@ public:
 	{
 	}
 
+	~Barrier()
+	{
+		// 소멸 상태로 전환
+		m_destroyed.store(true, std::memory_order_release);
+		// 한 번이라도 대기 중인 스레드가 깰 수 있도록 generation 증가
+		m_generation.fetch_add(1, std::memory_order_release);
+	}
+
 	// 스레드가 도달할 때 호출
 	void ArriveAndWait()
 	{
@@ -18,16 +26,22 @@ public:
 
 		if (--m_count == 0)
 		{
-			// 마지막 스레드: 카운터 초기화 및 세대 전환
 			m_count.store(m_threshold, std::memory_order_relaxed);
 			m_generation.fetch_add(1, std::memory_order_release);
 		}
 		else
 		{
-			// 다른 스레드: 다음 세대까지 대기
-			while (m_generation.load(std::memory_order_acquire) == gen)
+			while (true)
 			{
-				_mm_pause(); // spin wait
+				// ① 정상적으로 다음 세대로 전환됐는지
+				if (m_generation.load(std::memory_order_acquire) != gen)
+					break;
+
+				// ② 객체가 파괴되었는지
+				if (m_destroyed.load(std::memory_order_acquire))
+					break;
+
+				_mm_pause();
 			}
 		}
 	}
@@ -36,6 +50,7 @@ private:
 	const int m_threshold;
 	std::atomic<int> m_count;
 	std::atomic<uint64_t> m_generation;
+	std::atomic<bool> m_destroyed;
 };
 
 namespace BarrierHelper

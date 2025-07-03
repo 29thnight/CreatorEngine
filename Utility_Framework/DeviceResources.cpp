@@ -41,6 +41,7 @@ DirectX11::DeviceResources::DeviceResources() :
 
 DirectX11::DeviceResources::~DeviceResources()
 {
+    m_swapChain->SetFullscreenState(FALSE, NULL); // 창 모드로
 }
 
 void DirectX11::DeviceResources::SetWindow(CoreWindow& window)
@@ -402,17 +403,9 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
         swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapChainDesc.Flags = 0;
+        swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
         swapChainDesc.Scaling = scaling;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-
-		DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
-
-		swapChainFullscreenDesc.RefreshRate.Numerator = 60;
-		swapChainFullscreenDesc.RefreshRate.Denominator = 1;
-		swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
-		swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-		swapChainFullscreenDesc.Windowed = TRUE;
 
         DirectX11::ThrowIfFailed(
             m_d3dDevice.As(&m_dxgiDevice)
@@ -433,16 +426,16 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
                 m_d3dDevice.Get(),
                 m_window->GetHandle(),
                 &swapChainDesc,
-                &swapChainFullscreenDesc,
+                nullptr,
                 nullptr,
                 &swapChain
             )
         );
 
-        dxgiFactory->MakeWindowAssociation(
-            m_window->GetHandle(),
-            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
-        );
+        //dxgiFactory->MakeWindowAssociation(
+        //    m_window->GetHandle(),
+        //    DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+        //);
 
         DirectX11::ThrowIfFailed(
             swapChain.As(&m_swapChain)

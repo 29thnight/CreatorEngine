@@ -100,7 +100,7 @@ void DataSystem::RenderForEditer()
 
 		ImTextureID iconTexture = (ImTextureID)ModelIcon->m_pSRV;
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), true, ImGuiWindowFlags_AlwaysUseWindowPadding))
+		if (ImGui::BeginChild("DirectoryHierarchy", ImVec2(0, 300), false, ImGuiWindowFlags_AlwaysUseWindowPadding))
 		{
 			const float tileSize = 100.0f;
 			float avail = ImGui::GetContentRegionAvail().x;
@@ -152,7 +152,7 @@ void DataSystem::RenderForEditer()
 		}
 		ImGui::EndChild();
 
-		ImGui::BeginChild("FileList", ImVec2(0, 50), true);
+		ImGui::BeginChild("FileList", ImVec2(0, 50), false);
 		if (nullptr != select_material)
 		{
 			ImGui::Text(select_material->m_name.c_str());
@@ -168,10 +168,10 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_NoScrollbar);
 	ImGui::GetContext("SelectMatarial").Close();
 
-	ImGui::ContextRegister(ICON_FA_FOLDER_OPEN " Content Browser", true, [&]()
+	ImGui::ContextRegister(ICON_FA_HARD_DRIVE " Content Browser", true, [&]()
 	{
 		static file::path DataDirectory = PathFinder::Relative();
-		if (ImGui::Button(ICON_FA_ARROWS_ROTATE " Reload", ImVec2(0, 0)))
+		if (ImGui::Button(ICON_FA_ARROWS_ROTATE " Shader Reload", ImVec2(0, 0)))
 		{
 			ShaderSystem->SetReloading(true);
 		}
@@ -180,7 +180,7 @@ void DataSystem::RenderForEditer()
 		filter.Draw(ICON_FA_MAGNIFYING_GLASS " Search", ImGui::GetContentRegionAvail().x);
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), true);
+		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
 		ImGuiTreeNodeFlags rootFlags = 
 			ImGuiTreeNodeFlags_OpenOnArrow | 
 			ImGuiTreeNodeFlags_SpanFullWidth | 
@@ -197,7 +197,7 @@ void DataSystem::RenderForEditer()
 
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 		ImGui::SameLine();
-		ImGui::BeginChild("FileList", ImVec2(0, 0), true);
+		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 		ImGui::PopStyleVar();
 
 		ShowCurrentDirectoryFiles();
@@ -265,7 +265,7 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_AlwaysAutoResize);
 
 	ImGui::GetContext("TextureType Selector").Close();
-	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Close();
+	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
 }
 
 void DataSystem::MonitorFiles()
@@ -566,12 +566,12 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 
 void DataSystem::OpenContentsBrowser()
 {
-	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Open();
+	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
 }
 
 void DataSystem::CloseContentsBrowser()
 {
-	ImGui::GetContext(ICON_FA_FOLDER_OPEN " Content Browser").Close();
+	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
 }
 
 void DataSystem::ShowDirectoryTree(const file::path& directory)

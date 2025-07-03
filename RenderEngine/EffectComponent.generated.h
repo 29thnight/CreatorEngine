@@ -6,6 +6,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 	PropertyField \
 	({ \
 		meta_property(num) \
+		meta_property(test) \
 	}); \
 	MethodField \
 	({ \

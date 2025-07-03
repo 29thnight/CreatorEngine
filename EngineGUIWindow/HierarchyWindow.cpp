@@ -12,10 +12,13 @@
 #include "DataSystem.h"
 #include "PathFinder.h"
 
+#include "IconsFontAwesome6.h"
+#include "fa.h"
+
 HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
 {
-	ImGui::ContextRegister("Hierarchy", [&]()
+	ImGui::ContextRegister(ICON_FA_BARS_STAGGERED "  Hierarchy", [&]()
 	{
 		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
@@ -200,11 +203,17 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 		if (m_sceneRenderer)
 		{
+			std::string SceneIcon{};
+			if (0 != scene->m_SceneObjects.size())
+			{
+				SceneIcon = ICON_FA_BOLT + std::string(" ") + scene->m_SceneObjects[0]->m_name.ToString();
+			}
+
 			if (0 == scene->m_SceneObjects.size())
 			{
 				ImGui::Text("No GameObject in Scene");
 			}
-			else if (ImGui::TreeNodeEx(scene->m_SceneObjects[0]->m_name.ToString().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			else if (ImGui::TreeNodeEx(SceneIcon.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				for (auto& obj : scene->m_SceneObjects)
 				{
@@ -243,7 +252,8 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		flags |= ImGuiTreeNodeFlags_Leaf;
 	}
 
-	bool opened = ImGui::TreeNodeEx(obj->m_name.ToString().c_str(), flags);
+	std::string icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
+	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
 
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
 	{

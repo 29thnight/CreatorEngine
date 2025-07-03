@@ -54,6 +54,8 @@ public:
 
     [[Property]]
     int num = 0;
+    [[Property]]
+    std::string test = "test";
 
 private:
     // 미리보기용 임시 에미터들
