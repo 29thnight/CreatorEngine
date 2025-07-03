@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "GizmoRenderer.h"
 #include "SceneRenderer.h"
 #include "RenderScene.h"
@@ -83,3 +84,4 @@ void GizmoRenderer::OnDrawGizmos()
 	}
 	PROFILE_CPU_END();
 }
+#endif // !DYNAMICCPP_EXPORTS

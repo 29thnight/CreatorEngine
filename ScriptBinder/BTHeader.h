@@ -1,11 +1,12 @@
 #pragma once
-#include"BlackBoard.h"
+#include "Core.Minimal.h"
+#include "BlackBoard.h"
 #include <memory>
 
 namespace BT
 {
 	enum class NodeStatus { Success, Failure, Running };
-
+	
 	class BTNode
 	{
 	public:
@@ -22,12 +23,32 @@ namespace BT
 		std::string m_name;
 	};
 
+	class RootNode : public BTNode
+	{
+	public:
+		RootNode() : BTNode("Root") {}
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+		{
+			if (m_child)
+			{
+				return m_child->Tick(deltatime, blackBoard);
+			}
+			return NodeStatus::Failure; // No child to tick
+		}
+		void SetChild(NodePtr child) { m_child = child; }
+		NodePtr GetChild() const { return m_child; }
+	private:
+		NodePtr m_child; // Single child for the root node
+	};
+
+
 	class CompositeNode : public BTNode
 	{
 	public:
 		CompositeNode(const std::string& name) : BTNode(name) {}
 		void AddChild(NodePtr child) { m_children.push_back(child); }
 
+		std::vector<NodePtr>& GetChildren() { return m_children; } 
 	protected:
 		std::vector<NodePtr> m_children;
 	};
@@ -94,6 +115,9 @@ namespace BT
 	public:
 		DecoratorNode(const std::string& name, NodePtr child)
 			: BTNode(name), m_child(child) {}
+
+		NodePtr GetChild() const { return m_child; }
+		void SetChild(NodePtr child) { m_child = child; }
 	protected:
 		NodePtr m_child;
 	};
@@ -125,7 +149,32 @@ namespace BT
 			return cond(blackBoard) ? NodeStatus::Success : NodeStatus::Failure;
 		}
 	private:
-		ConditionFunc cond;
+		ConditionFunc cond;//==>
+	};
+
+	class ConditionScriptNode : public BTNode
+	{
+	public:
+		ConditionScriptNode(const std::string& name, const std::string& typeName, const std::string& methodName, void* scriptPtr)
+			: BTNode(name), scriptInstance(scriptPtr), m_typeName(typeName), m_name(methodName) {
+		}
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+		{
+			auto type = Meta::Find(m_typeName);
+			if (!scriptInstance || !type) {
+				Debug->LogError("Type not found: " + m_typeName);
+				return NodeStatus::Failure;
+			}
+			if (Meta::InvokeMethodByMetaName(scriptInstance, *type, m_name, { deltatime, blackBoard }))
+			{
+				return NodeStatus::Success;
+			}
+			return NodeStatus::Failure;
+		}
+	private:
+		void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
+		std::string m_typeName; // 스크립트 컴포넌트의 타입이름
+		std::string m_name; // 메서드 이름
 	};
 
 
@@ -183,9 +232,57 @@ namespace BT
 		}
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
 		{
-			return m_action(deltatime, blackBoard);
+			m_action(deltatime, blackBoard);
 		}
 	private:
-		ActionFunc m_action;
+		ActionFunc m_action;//==>
+
+		
 	};
+
+	class ActionScriptNode : public BTNode
+	{
+	public:
+		ActionScriptNode(const std::string& name, const std::string& typeName, const std::string& methodName,void* scriptPtr)
+			: BTNode(name), scriptInstance(scriptPtr), m_typeName(typeName), m_name(methodName) {			
+		}
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+		{
+			auto type = Meta::Find(m_typeName);
+			if (!scriptInstance||!type) {
+				Debug->LogError("Type not found: " + m_typeName);
+				return NodeStatus::Failure;
+			}
+			if (Meta::InvokeMethodByMetaName(scriptInstance, *type, m_name, { deltatime, blackBoard }))
+			{
+				return NodeStatus::Success;
+			}
+			return NodeStatus::Failure;
+		}
+	private:
+		void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
+		std::string m_typeName; // 스크립트 컴포넌트의 타입이름
+		std::string m_name; // 메서드 이름
+	};
+
+	inline void DFS(const BTNode::NodePtr& node, std::function<void(const BTNode::NodePtr)> visit)
+	{
+		if (!node) return;
+		visit(node);
+		auto composite = std::dynamic_pointer_cast<CompositeNode>(node);
+		if (composite)
+		{
+			for (const auto& child : composite->GetChildren())
+			{
+				DFS(child, visit);
+			}
+		}
+		else if (auto decorator = std::dynamic_pointer_cast<DecoratorNode>(node))
+		{
+			auto child = decorator->GetChild();
+			DFS(child, visit);
+		}
+	}
+
+	
 }

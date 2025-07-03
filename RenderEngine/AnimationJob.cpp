@@ -53,7 +53,8 @@ void AnimationJob::Update(float deltaTime)
 	int counter = 0;
     for (auto& sceneObj : scene->m_SceneObjects)
     {
-        Animator* animator = sceneObj->GetComponent<Animator>();
+		auto type = Meta::Find("Animator");
+        Animator* animator = dynamic_cast<Animator*>(sceneObj->GetComponent(*type).get());
         if (nullptr == animator || !animator->IsEnabled()) continue;
 
         m_currAnimator.push_back(animator);
@@ -106,7 +107,7 @@ void AnimationJob::Update(float deltaTime)
                         UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
 
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent();
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
                 }
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
 
@@ -160,7 +161,7 @@ void AnimationJob::Update(float deltaTime)
                 {
                     UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
                 }
-                animation.InvokeEvent();
+                animation.InvokeEvent(animator);
             }
         });
     }

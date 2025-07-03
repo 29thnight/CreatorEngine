@@ -1,13 +1,12 @@
 #pragma once
-#include "EngineSetting.h"
 #include "Core.Minimal.h"
 #include "EngineVersion.h"
 #include "Core.Mathf.h"
 #include "SpinLock.h"
 #include "Core.Fence.h"
 #include "Core.Barrier.h"
-#include <yaml-cpp/yaml.h>
 
+#include <yaml-cpp/yaml.h>
 namespace MetaYml = YAML;
 
 enum class MSVCVersion

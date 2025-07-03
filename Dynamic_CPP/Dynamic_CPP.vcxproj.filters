@@ -39,11 +39,26 @@
     <ClInclude Include="Assets\Script\TestBehavior.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
+    <ClInclude Include="Assets\Script\AsisMove.h">
       <Filter>Script\ScriptClass</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Script\NewBehaviourScript.h">
+    <ClInclude Include="Assets\Script\Entity.h">
       <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Temp.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityAsis.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\EntityItem.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Script\Player.h">
+      <Filter>Script\ScriptClass</Filter>
+    </ClInclude>
+    <ClInclude Include="funcMain.h">
+      <Filter>Script\CreateFactory</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -54,6 +69,21 @@
       <Filter>Common\SourceFile</Filter>
     </ClCompile>
     <ClCompile Include="Assets\Script\TestBehavior.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\AsisMove.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\Temp.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityAsis.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\EntityItem.cpp">
+      <Filter>Script\ScriptClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Script\Player.cpp">
       <Filter>Script\ScriptClass</Filter>
     </ClCompile>
   </ItemGroup>

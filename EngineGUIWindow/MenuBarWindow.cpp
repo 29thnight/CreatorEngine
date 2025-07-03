@@ -8,6 +8,25 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
+{
+    float usagePercent = (float)usedVRAM / (float)budgetVRAM;
+    ImGui::Text("VRAM Usage: %.2f MB / %.2f MB", usedVRAM / (1024.0f * 1024.0f), budgetVRAM / (1024.0f * 1024.0f));
+
+    // 바 높이와 너비 정의
+    ImVec2 barSize = ImVec2(300, 20);
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 배경 바
+    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + barSize.x, cursorPos.y + barSize.y), IM_COL32(100, 100, 100, 255));
+
+    // 사용량 바
+    float fillWidth = barSize.x * usagePercent;
+    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + fillWidth, cursorPos.y + barSize.y), IM_COL32(50, 200, 50, 255));
+
+    ImGui::Dummy(barSize); // 레이아웃 공간 확보
+}
 
 std::string WordWrapText(const std::string& input, size_t maxLineLength)
 {
@@ -133,6 +152,99 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
     });
 
     ImGui::GetContext("LightMap").Close();
+
+    ImGui::ContextRegister("CollisionMatrixPopup", true, [&]() 
+    {
+        ImGui::Text("Collision Matrix");
+        ImGui::Separator();
+        //todo::grid matrix
+        if(collisionMatrix.empty()){
+            collisionMatrix = PhysicsManagers->GetCollisionMatrix();
+        }
+        int flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
+
+        if (ImGui::BeginChild("Matrix", ImVec2(0, 0), flags))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2, 2));
+            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1.0f, 1.0f, 1.0f, 0.0f)); // 진한 줄 - 반투명 흰색
+            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));  // 연한 줄 - 더 투명
+
+            const int matrixSize = 32;
+            const float checkboxSize = ImGui::GetFrameHeight();
+            const float cellWidth = checkboxSize;
+
+            // 총 열 개수 = 인덱스 번호 포함해서 33개
+            if (ImGui::BeginTable("CollisionMatrixTable", matrixSize + 1,
+                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit))
+            {
+                // -------------------------
+                // 첫 번째 헤더 행
+                // -------------------------
+                ImGui::TableNextRow();
+                for (int col = -1; col < matrixSize; ++col)
+                {
+                    ImGui::TableNextColumn();
+                    if (col >= 0)
+                        ImGui::Text("%2d", col);
+                    else
+                        ImGui::Text("   "); // 좌상단 빈칸
+                }
+
+                // -------------------------
+                // 본문 행 렌더링
+                // -------------------------
+                for (int row = 0; row < matrixSize; ++row)
+                {
+                    ImGui::TableNextRow();
+                    for (int col = -1; col < matrixSize; ++col)
+                    {
+                        ImGui::TableNextColumn();
+                        if (col == -1)
+                        {
+                            // 행 번호
+                            ImGui::Text("%2d", row);
+                        }
+                        else
+                        {
+                            ImGui::PushID(row * matrixSize + col);
+
+                            if (row <= col)
+                            {
+                                bool checkboxValue = (bool)collisionMatrix[row][col];
+                                ImGui::Checkbox("##chk", &checkboxValue);
+                                collisionMatrix[row][col] = (uint8_t)checkboxValue;
+                            }
+                            else
+                            {
+                                // 시각적으로 동일한 크기 확보
+                                ImGui::Dummy(ImVec2(cellWidth, checkboxSize));
+                            }
+
+                            ImGui::PopID();
+                        }
+                    }
+                }
+
+                ImGui::EndTable();
+            }
+
+            ImGui::PopStyleColor(2); // 설정한 2개 색상 pop
+            ImGui::PopStyleVar();
+            ImGui::EndChild();
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Save"))
+        {
+            //적용된 충돌 매스릭스 저장
+            PhysicsManagers->SetCollisionMatrix(collisionMatrix);
+            m_bCollisionMatrixWindow = false;
+            ImGui::GetContext("CollisionMatrixPopup").Close();
+        }
+        
+    }, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+   
+	ImGui::GetContext("CollisionMatrixPopup").Close();
 }
 
 void MenuBarWindow::RenderMenuBar()
@@ -147,9 +259,14 @@ void MenuBarWindow::RenderMenuBar()
         {
             if (ImGui::BeginMenu("File"))
             {
+                if (ImGui::MenuItem("New Scene"))
+                {
+                    m_bShowNewScenePopup = true;
+				}
                 if (ImGui::MenuItem("Save Current Scene"))
                 {
                     //Test
+                    SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
 						L"Save Scene",
@@ -230,9 +347,16 @@ void MenuBarWindow::RenderMenuBar()
                     {
                         ctx.Open();
                     }
+            if (ImGui::BeginMenu("Option")) {
+
+                if (ImGui::MenuItem("Collision Matrix")) {
+
+                    m_bCollisionMatrixWindow = true;
                 }
                 ImGui::EndMenu();
             }
+
+
 
             float availRegion = ImGui::GetContentRegionAvail().x;
 
@@ -302,6 +426,53 @@ void MenuBarWindow::RenderMenuBar()
             DrawProfilerHUD();
         }
         ImGui::End();
+
+        ImGui::Begin("VRAM", &m_bShowProfileWindow);
+		auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
+        ShowVRAMBarGraph(info.CurrentUsage, info.Budget);
+        ImGui::End();
+    }
+
+    if (m_bShowNewScenePopup)
+    {
+        ImGui::OpenPopup("NewScenePopup");
+        m_bShowNewScenePopup = false;
+	}
+
+
+    if (m_bCollisionMatrixWindow) 
+    {
+        ImGui::GetContext("CollisionMatrixPopup").Open();
+		m_bCollisionMatrixWindow = false;
+    }
+
+    if (ImGui::BeginPopup("NewScenePopup"))
+    {
+        static char newSceneName[256];
+        ImGui::InputText("Scene Name", newSceneName, 256);
+        ImGui::Separator();
+        if (ImGui::Button("Create"))
+        {
+            SceneManagers->resetSelectedObjectEvent.Broadcast();
+            std::string sceneName = newSceneName;
+            if (sceneName.empty())
+            {
+                SceneManagers->CreateScene();
+            }
+            else
+            {
+                SceneManagers->CreateScene(sceneName);
+            }
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            memset(newSceneName, 0, sizeof(newSceneName));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }
 

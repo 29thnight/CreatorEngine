@@ -5,7 +5,7 @@
 
 bool RenderPassData::VaildCheck(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		if (nullptr != renderScene->GetRenderPassData(pCamera->m_cameraIndex))
@@ -18,7 +18,7 @@ bool RenderPassData::VaildCheck(Camera* pCamera)
 
 RenderPassData* RenderPassData::GetData(Camera* pCamera)
 {
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (pCamera && renderScene)
 	{
 		auto renderPassData = renderScene->GetRenderPassData(pCamera->m_cameraIndex);
@@ -43,6 +43,8 @@ RenderPassData::~RenderPassData()
 void RenderPassData::Initalize(uint32 index)
 {
 	if (m_isInitalized) return;
+
+	m_index = index;
 
 	std::string cameraRTVName = "RenderPassData(" + std::to_string(index) + ") RTV";
 
@@ -137,7 +139,17 @@ void RenderPassData::ClearRenderTarget()
 void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 {
 	Material* mat = proxy->m_Material;
-	if (nullptr == mat) return;
+	Mesh* mesh = proxy->m_Mesh;
+	TerrainMaterial* terrainMat = proxy->m_terrainMaterial;
+
+	if (terrainMat != nullptr) 
+	{
+		// Not assigned RenderingMode.
+		m_deferredQueue.push_back(proxy);
+		return;
+	}
+
+	if (nullptr == mat || nullptr == mesh) return;
 
 	{
 		switch (mat->m_renderingMode)
@@ -236,4 +248,3 @@ void RenderPassData::ClearShadowRenderDataBuffer()
 	size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
 	m_findShadowProxyVec[prevIndex].clear();
 }
-

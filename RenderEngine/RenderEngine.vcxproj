@@ -154,6 +154,7 @@
     <ClCompile Include="Animation.cpp" />
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="AnimationLoader.cpp" />
+    <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="BitMaskPass.cpp" />
     <ClCompile Include="ColorGradingPass.cpp" />
     <ClCompile Include="ColorModuleCS.cpp" />
@@ -201,6 +202,7 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
+    <ClCompile Include="TestAniScprit.cpp" />
     <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
@@ -238,6 +240,8 @@
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
     <ClInclude Include="AssetBundle.h" />
+    <ClInclude Include="AssetEntry.h" />
+    <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="AssetMetaWather.h" />
     <ClInclude Include="BitMaskPass.h" />
@@ -299,6 +303,7 @@
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
+    <ClInclude Include="TestAniScprit.h" />
     <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />

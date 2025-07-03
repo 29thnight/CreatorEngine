@@ -50,9 +50,9 @@ public:
 protected:
     friend class SceneManager;
     friend class RenderScene;
-	HashedGuid        m_typeID{ type_guid(Object) };
+	HashedGuid              m_typeID{ type_guid(Object) };
     [[Property]]
-    HashedGuid        m_instanceID{ make_guid() };
-	bool              m_destroyMark{ false };
-	bool              m_dontDestroyOnLoad{ false };
+    HashedGuid              m_instanceID{ make_guid() };
+	bool                    m_destroyMark{ false };
+	bool                    m_dontDestroyOnLoad{ false };
 };

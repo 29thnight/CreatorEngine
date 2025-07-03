@@ -38,6 +38,7 @@ void Socket::DetachObject(GameObject* Object)
 		if (Object->GetInstanceID() == AttachObejctIndex[i])
 		{
 			AttachObejctIndex.erase(AttachObejctIndex.begin() + i);
+			Object->m_attachedSoketID = -1;
 			AttachObjects.erase(AttachObjects.begin() + i);
 		}
 	}

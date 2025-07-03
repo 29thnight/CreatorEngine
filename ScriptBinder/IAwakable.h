@@ -23,10 +23,10 @@ interface IAwakable
 				{
 					return;
 				}
-				else if (!isAwakeCalled)
+				else if (!isStartCalled)
 				{
 					Awake();
-					isAwakeCalled = true;
+					isStartCalled = true;
 				}
 			}
 		});
@@ -42,5 +42,5 @@ interface IAwakable
 protected:
 	Scene* subscribedScene{};
 	Core::DelegateHandle m_awakeEventHandle{};
-	bool isAwakeCalled = false;
+	bool isStartCalled = false;
 };

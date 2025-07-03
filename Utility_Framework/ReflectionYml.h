@@ -59,6 +59,10 @@ namespace Meta
 		{
 			node[prop.name] = std::any_cast<double>(value);
 		}
+		else if (typeID == GUIDCreator::GetTypeID<file::path>())
+		{
+			node[prop.name] = std::any_cast<file::path>(value).string();
+		}
 		else if (typeID == GUIDCreator::GetTypeID<std::string>())
 		{
 			node[prop.name] = std::any_cast<std::string>(value);
@@ -151,6 +155,10 @@ namespace Meta
 				prop.setter(instance, node[prop.name].as<bool>());
 			}
 			else if (prop.typeID == type_guid(std::string))
+			{
+				prop.setter(instance, node[prop.name].as<std::string>());
+			}
+			else if (prop.typeID == type_guid(file::path))
 			{
 				prop.setter(instance, node[prop.name].as<std::string>());
 			}

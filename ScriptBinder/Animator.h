@@ -11,6 +11,7 @@ constexpr uint32 MAX_BONES{ 512 };
 
 class Skeleton;
 class AnimationController;
+class Socket;
 class Animator : public Component, public IUpdatable, public IAwakable, public IOnDistroy
 {
 public:
@@ -43,6 +44,9 @@ public:
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
+
+    Socket* MakeSocket(const std::string_view& socketName,const std::string_view& boneName);
+    Socket* FindSocket(const std::string_view& socketName);
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};

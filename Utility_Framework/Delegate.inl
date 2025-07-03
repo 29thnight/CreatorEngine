@@ -45,12 +45,14 @@ namespace Core
 	}
 
 	template <typename Ret, typename... Args>
-	void Delegate<Ret, Args...>::Remove(const DelegateHandle& handle)
+	void Delegate<Ret, Args...>::Remove(DelegateHandle& handle)
 	{
 		SpinLock lock(atomic_flag_);
 		if (callbacks_.size() == 0) return;
 		callbacks_.erase(std::remove_if(callbacks_.begin(), callbacks_.end(),
 			[&handle](const CallbackInfo& info) { return info.handle == handle; }), callbacks_.end());
+
+		handle.Reset();
 	}
 
 	template <typename Ret, typename... Args>

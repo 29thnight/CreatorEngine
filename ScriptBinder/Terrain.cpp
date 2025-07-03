@@ -1,9 +1,9 @@
+ï»¿#include "Transform.h"
 #include "Terrain.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image.h"
 #include "stb_image_write.h"
-
 
 #pragma pack(push, 1) // 1 byte alignment for DirectX structures
 struct TerrainBinHeader {
@@ -19,22 +19,26 @@ struct TerrainBinHeader {
 #pragma pack(pop) // Restore previous alignment
 
 
-//utill :wsting->utf8 string ³ªÁß¿¡ utillÂÊÀ¸·Î »©´Â°Å »ı°¢Áß
-static std::string Utf8Encode(const std::wstring& wstr) {
+//utill :wsting->utf8 string ï¿½ï¿½ï¿½ß¿ï¿½ utillï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+static std::string Utf8Encode(const std::wstring& wstr) 
+{
+	int size = static_cast<int>(wstr.size());
+	const wchar_t* wstrPtr = wstr.c_str();
 	int size_needed = WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		nullptr, 0, nullptr, nullptr);
+
 	std::string str(size_needed, 0);
+
 	WideCharToMultiByte(
 		CP_UTF8, 0,
-		wstr.c_str(), (int)wstr.size(),
+		wstrPtr, size,
 		&str[0], size_needed,
 		nullptr, nullptr);
+
 	return str;
 }
-
-
 
 TerrainComponent::TerrainComponent() : m_threadPool(4) 
 {
@@ -48,11 +52,11 @@ void TerrainComponent::Initialize()
 	m_heightMap.assign(m_width * m_height, 0.0f);
 	m_vNormalMap.assign(m_width * m_height, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f });
 
-	// ·¹ÀÌ¾î ÃÊ±âÈ­
+	// ë ˆì´ì–´ ì´ˆê¸°í™”
 	m_layers.clear();
 	m_layerHeightMap.clear();
 
-	// ÇÑ ¹ø¸¸ ÃÊ±â ¸Ş½¬ »ı¼º
+	// í•œ ë²ˆë§Œ ì´ˆê¸° ë©”ì‰¬ ìƒì„±
 	std::vector<Vertex> verts(m_width * m_height);
 	for (int i = 0; i < m_height; ++i)
 	{
@@ -60,9 +64,9 @@ void TerrainComponent::Initialize()
 		{
 			int idx = i * m_width + j;
 			verts[idx] = Vertex(
-				// À§Ä¡(x, ³ôÀÌ, z)
+				// ìœ„ì¹˜(x, ë†’ì´, z)
 				DirectX::XMFLOAT3((float)j, m_heightMap[idx], (float)i),
-				// ³ë¸»
+				// ë…¸ë§
 				m_vNormalMap[idx],
 				// UV0
 				DirectX::XMFLOAT2((float)j / (float)m_width, (float)i / (float)m_height)
@@ -82,18 +86,18 @@ void TerrainComponent::Initialize()
 			uint32_t topRight = i * m_width + (j + 1);
 			uint32_t bottomRight = (i + 1) * m_width + (j + 1);
 
-			// »ï°¢Çü 1
+			// ì‚¼ê°í˜• 1
 			indices.push_back(topLeft);
 			indices.push_back(bottomLeft);
 			indices.push_back(topRight);
-			// »ï°¢Çü 2
+			// ì‚¼ê°í˜• 2
 			indices.push_back(bottomLeft);
 			indices.push_back(bottomRight);
 			indices.push_back(topRight);
 		}
 	}
 
-	// TerrainMesh »ı¼º (ÇÑ ¹ø¸¸)
+	// TerrainMesh ìƒì„± (í•œ ë²ˆë§Œ)
 	m_pMesh = new TerrainMesh(
 		m_name.ToString(),
 		verts,
@@ -103,39 +107,29 @@ void TerrainComponent::Initialize()
 
 
 	m_pMaterial = new TerrainMaterial();
-	//// TerrainMaterial ÃÊ±âÈ­ -> ½ºÇÃ·§¸Ê ÅØ½ºÃ³ »ı¼º
+	//// TerrainMaterial ì´ˆê¸°í™” -> ìŠ¤í”Œë«ë§µ í…ìŠ¤ì²˜ ìƒì„±
 	m_pMaterial->Initialize(m_width, m_height);
 }
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
-	if (2 > newWidth)
-	{
-		newWidth = 2; // ÃÖ¼Ò Å©±â Á¦ÇÑ
-	}
 
-	if (2 > newHeight)
-	{
-		newHeight = 2; // ÃÖ¼Ò Å©±â Á¦ÇÑ
-	}
-
-	// 1) »õ Å©±â·Î ³»ºÎ º¤ÅÍ ÀçÇÒ´ç
 	m_width = newWidth;
 	m_height = newHeight;
 	m_heightMap.assign(m_width * m_height, 0.0f);
 	m_vNormalMap.assign(m_width * m_height, { 0.0f, 1.0f, 0.0f });
 
-	// ·¹ÀÌ¾î °¡ÁßÄ¡ ¿ª½Ã ´Ù½Ã ÃÊ±âÈ­
+	// ë ˆì´ì–´ ê°€ì¤‘ì¹˜ ì—­ì‹œ ë‹¤ì‹œ ì´ˆê¸°í™”
 	for (auto& w : m_layerHeightMap)
 		w.assign(m_width * m_height, 0.0f);
 
-	// 2) ±âÁ¸ ¸Ş½Ã ÇØÁ¦
+	// 2) ê¸°ì¡´ ë©”ì‹œ í•´ì œ
 	if (m_pMesh) {
 		delete m_pMesh;
 		m_pMesh = nullptr;
 	}
 
-	// 3) ¸Ş½Ã Àç»ı¼º (initMesh ·ÎÁ÷ ±×´ë·Î Àç»ç¿ë)
+	// 3) ë©”ì‹œ ì¬ìƒì„± (initMesh ë¡œì§ ê·¸ëŒ€ë¡œ ì¬ì‚¬ìš©)
 	{
 		std::vector<Vertex> verts(m_width * m_height);
 		for (int i = 0; i < m_height; ++i)
@@ -167,24 +161,40 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 		m_pMesh = new TerrainMesh(m_name.ToString(), verts, indices, (uint32_t)m_width);
 	}
 
-	// 4) ½ºÇÃ·§ ¸Ê ÅØ½ºÃ³ ÃÊ±âÈ­
+	// 4) ìŠ¤í”Œë« ë§µ í…ìŠ¤ì²˜ ì´ˆê¸°í™”
 	m_pMaterial->InitSplatMapTexture(m_width, m_height);
 }
 
 void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
-	// 1) ºê·¯½Ã°¡ ´êÀ» ÃÖ¼Ò/ÃÖ´ë X,Y °è»ê
-	int minX = std::max(0, int(brush.m_center.x - brush.m_radius));
-	int maxX = std::min(m_width - 1, int(brush.m_center.x + brush.m_radius));
-	int minY = std::max(0, int(brush.m_center.y - brush.m_radius));
-	int maxY = std::min(m_height - 1, int(brush.m_center.y + brush.m_radius));
+	// 1) ë¸ŒëŸ¬ì‹œê°€ ë‹¿ì„ ìµœì†Œ/ìµœëŒ€ X,Y ê³„ì‚°
+	Mathf::Vector3 pivotWorldPos;
+	Mathf::Quaternion rot;
+	Mathf::Vector3 scale;
+	{
+		// ì›”ë“œ ë§¤íŠ¸ë¦­ìŠ¤ì—ì„œ ìœ„ì¹˜ ë¶€ë¶„ë§Œ ë¶„í•´
+		Mathf::Matrix worldMat = GetOwner()->m_transform.GetWorldMatrix();
+		worldMat.Decompose(scale, rot, pivotWorldPos);
+	}
 
-	// 2) ³ôÀÌ ¸Ê °»½Å: ºê·¯½Ã ¿ø ³»ºÎ¸¸
+	// 1) ë¸ŒëŸ¬ì‹œ ì›”ë“œ ìœ„ì¹˜
+	Mathf::Vector3 brushWorldPos{ brush.m_center.x, 0.0f, brush.m_center.y };
+
+	// 2) ë¡œì»¬ ê·¸ë¦¬ë“œ ìœ„ì¹˜ = ë¸ŒëŸ¬ì‹œ ì›”ë“œ ì¢Œí‘œ â€“ í”¼ë²— ì›”ë“œ ì¢Œí‘œ
+	Mathf::Vector3 localPos = brushWorldPos - pivotWorldPos;
+		
+	
+	int minX = std::max(0, int(localPos.x - brush.m_radius));
+	int maxX = std::min(m_width - 1, int(localPos.x + brush.m_radius));
+	int minY = std::max(0, int(localPos.z - brush.m_radius));
+	int maxY = std::min(m_height - 1, int(localPos.z + brush.m_radius));
+
+	// 2) ë†’ì´ ë§µ ê°±ì‹ : ë¸ŒëŸ¬ì‹œ ì› ë‚´ë¶€ë§Œ
 	for (int i = minY; i <= maxY; ++i)
 	{
 		for (int j = minX; j <= maxX; ++j)
 		{
-			float dx = brush.m_center.x - (float)j;
-			float dy = brush.m_center.y - (float)i;
+			float dx = localPos.x - (float)j;
+			float dy = localPos.z - (float)i;
 			float distSq = dx * dx + dy * dy;
 			if (distSq <= brush.m_radius * brush.m_radius)
 			{
@@ -196,11 +206,11 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 				{
 				case TerrainBrush::Mode::Raise:
 					m_heightMap[idx] += t;
-					if (m_heightMap[idx] > m_maxHeight) m_heightMap[idx] = m_maxHeight; // ÃÖ´ë ³ôÀÌ Á¦ÇÑ
+					if (m_heightMap[idx] > m_maxHeight) m_heightMap[idx] = m_maxHeight; // ìµœëŒ€ ë†’ì´ ì œí•œ
 					break;
 				case TerrainBrush::Mode::Lower:
 					m_heightMap[idx] -= t;
-					if (m_heightMap[idx] < m_minHeight) m_heightMap[idx] = m_minHeight; // ÃÖ¼Ò ³ôÀÌ Á¦ÇÑ
+					if (m_heightMap[idx] < m_minHeight) m_heightMap[idx] = m_minHeight; // ìµœì†Œ ë†’ì´ ì œí•œ
 					break;
 				case TerrainBrush::Mode::Flatten:
 					m_heightMap[idx] = brush.m_flatTargetHeight;
@@ -213,11 +223,11 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 		}
 	}
 
-	// 3) ³ë¸Ö Àç°è»ê (¹Ù²ï ¿µ¿ª + ÁÖº¯ 1ÇÈ¼¿¸¸)
+	// 3) ë…¸ë©€ ì¬ê³„ì‚° (ë°”ë€ ì˜ì—­ + ì£¼ë³€ 1í”½ì…€ë§Œ)
 	RecalculateNormalsPatch(minX, minY, maxX, maxY);
 
-	// 4) ¹öÅØ½º ¹öÆÛ ºÎºĞ ¾÷·Îµå
-	//    ÆĞÄ¡ Å©±â = (maxX-minX+1) ¡¿ (maxY-minY+1)
+	// 4) ë²„í…ìŠ¤ ë²„í¼ ë¶€ë¶„ ì—…ë¡œë“œ
+	//    íŒ¨ì¹˜ í¬ê¸° = (maxX-minX+1) Ã— (maxY-minY+1)
 	int patchW = maxX - minX + 1;
 	int patchH = maxY - minY + 1;
 	std::vector<Vertex> patchVerts;
@@ -232,12 +242,12 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 			v.position = { (float)j, m_heightMap[idx], (float)i };
 			v.normal = m_vNormalMap[idx];
 			v.uv0 = { (float)j / (float)m_width, (float)i / (float)m_height };
-			// uv1, tangent, bitangent, boneIndices, boneWeights´Â ÇÊ¿äÇÒ ¶§ Ãß°¡ º¹»ç
+			// uv1, tangent, bitangent, boneIndices, boneWeightsëŠ” í•„ìš”í•  ë•Œ ì¶”ê°€ ë³µì‚¬
 			patchVerts.push_back(v);
 		}
 	}
 
-	// ½ÇÁ¦ GPU ¹öÆÛ¿¡ ÆĞÄ¡¸¸ ¾÷·Îµå
+	// ì‹¤ì œ GPU ë²„í¼ì— íŒ¨ì¹˜ë§Œ ì—…ë¡œë“œ
 	m_pMesh->UpdateVertexBufferPatch(
 		patchVerts.data(),
 		(uint32_t)minX,
@@ -247,26 +257,26 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	);
 
 
-	// ·¹ÀÌ¾î ÆäÀÎÆ® splet ¸Ê ¾÷µ¥ÀÌÆ®
+	// ë ˆì´ì–´ í˜ì¸íŠ¸ splet ë§µ ì—…ë°ì´íŠ¸
 	
-	std::vector<BYTE> materialpatchData(m_width * m_height * 4, 0); // RGBA 4Ã¤³Î
+	std::vector<BYTE> materialpatchData(m_width * m_height * 4, 0); // RGBA 4ì±„ë„
 	for (int y = 0; y < m_height; ++y)
 	{
 		for (int x = 0; x < m_width; ++x)
 		{
 			int idx = y * m_width + x;
-			int dstOffset = (y * m_width + x) * 4; // RGBA 4Ã¤³Î
+			int dstOffset = (y * m_width + x) * 4; // RGBA 4ì±„ë„
 
-			// ·¹ÀÌ¾î °¡ÁßÄ¡ °è»ê
-			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // ÃÖ´ë 4°³ ·¹ÀÌ¾î¸¸ »ç¿ë
+			// ë ˆì´ì–´ ê°€ì¤‘ì¹˜ ê³„ì‚°
+			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // ìµœëŒ€ 4ê°œ ë ˆì´ì–´ë§Œ ì‚¬ìš©
 			{
 				float w = std::clamp(m_layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
-				materialpatchData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A Ã¤³Î¿¡ °¡ÁßÄ¡ ÀúÀå
+				materialpatchData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A ì±„ë„ì— ê°€ì¤‘ì¹˜ ì €ì¥
 			}
 		}
 	}
 
-	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, materialpatchData); // layer Ãß°¡ ÈÄ ½ºÇÃ·§¸Ê ¾÷µ¥ÀÌÆ®
+	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, materialpatchData); // layer ì¶”ê°€ í›„ ìŠ¤í”Œë«ë§µ ì—…ë°ì´íŠ¸
 }
 
 void TerrainComponent::RecalculateNormalsPatch(int minX, int minY, int maxX, int maxY)
@@ -303,34 +313,34 @@ void TerrainComponent::RecalculateNormalsPatch(int minX, int minY, int maxX, int
 }
 
 void TerrainComponent::PaintLayer(uint32_t layerId, int x, int y, float strength) {
-	if (layerId >= m_layers.size()) return; // À¯È¿ÇÑ ·¹ÀÌ¾îÀÎÁö È®ÀÎ
+	if (layerId >= m_layers.size()) return; // ìœ íš¨í•œ ë ˆì´ì–´ì¸ì§€ í™•ì¸
 	int idx = y * m_width + x;
-	if (idx < 0 || idx >= m_height * m_width) return; // ¹üÀ§ Ã¼Å©
+	if (idx < 0 || idx >= m_height * m_width) return; // ë²”ìœ„ ì²´í¬
 
-	// ÇØ´ç ·¹ÀÌ¾î °¡ÁßÄ¡ ¾÷µ¥ÀÌÆ®
+	// í•´ë‹¹ ë ˆì´ì–´ ê°€ì¤‘ì¹˜ ì—…ë°ì´íŠ¸
 	m_layerHeightMap[layerId][idx] += strength;
 
 	float sum = 0.0f;
 	for (auto& layer : m_layerHeightMap) {
 		sum += layer[idx];
 	}
-	//¿À¹öÇÃ·Î¿ì Ã³¸®
+	//ì˜¤ë²„í”Œë¡œìš° ì²˜ë¦¬
 	if (sum > 1.0f) {
-		// °¡ÁßÄ¡°¡ 1.0f¸¦ ÃÊ°úÇÏ¸é ¿À¹öÇÃ·Î¿ì ¹ß»ı
-		// ÆíÁı ÇÏÁö ¾Ê´Â °¢ ·¹ÀÌ¾îÀÇ °¡ÁßÄ¡¸¦ ºñÀ²¿¡ µû¶ó Á¶Á¤
+		// ê°€ì¤‘ì¹˜ê°€ 1.0fë¥¼ ì´ˆê³¼í•˜ë©´ ì˜¤ë²„í”Œë¡œìš° ë°œìƒ
+		// í¸ì§‘ í•˜ì§€ ì•ŠëŠ” ê° ë ˆì´ì–´ì˜ ê°€ì¤‘ì¹˜ë¥¼ ë¹„ìœ¨ì— ë”°ë¼ ì¡°ì •
 		if (m_layerHeightMap.size() > 1) {
 			float overflow = sum - 1.0f / (m_layerHeightMap.size() - 1);
 			for (auto& layer : m_layerHeightMap) {
 				if (layer != m_layerHeightMap[layerId]) {
 					layer[idx] -= overflow;
 					if (layer[idx] < 0.0f) {
-						layer[idx] = 0.0f; // À½¼ö ¹æÁö
+						layer[idx] = 0.0f; // ìŒìˆ˜ ë°©ì§€
 					}
 				}
 			}
 		}
 		else {
-			// ·¹ÀÌ¾î°¡ ÇÏ³ª»ÓÀÎ °æ¿ì, ±×³É 1.0f·Î ¼³Á¤
+			// ë ˆì´ì–´ê°€ í•˜ë‚˜ë¿ì¸ ê²½ìš°, ê·¸ëƒ¥ 1.0fë¡œ ì„¤ì •
 			m_layerHeightMap[layerId][idx] = 1.0f;
 		}
 	}
@@ -339,7 +349,7 @@ void TerrainComponent::PaintLayer(uint32_t layerId, int x, int y, float strength
 void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& name)
 {
 
-	//debug¿ë
+	//debugìš©
 	std::wcout << L"Saving dir: " << assetRoot << std::endl;
 	std::wcout << L"Saving terrain: " << name << std::endl;
 
@@ -347,15 +357,15 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	fs::path assetPath = fs::path(assetRoot);
 	fs::path terrainDir = PathFinder::Relative("Terrain");
 	fs::path terrainPath; 
-	//assetPath°¡ terrainDir ¿Í °°Àº¸é »ó´ë °æ·Î·Î ÀúÀå ¾Æ´Ï¸é Ç®ÆĞ½º·Î ÀúÀåÇØ¾ßµÊ
+	//assetPathê°€ terrainDir ì™€ ê°™ì€ë©´ ìƒëŒ€ ê²½ë¡œë¡œ ì €ì¥ ì•„ë‹ˆë©´ í’€íŒ¨ìŠ¤ë¡œ ì €ì¥í•´ì•¼ë¨
 	if (terrainDir == assetPath) {
 		terrainPath = fs::relative(assetPath, terrainDir);
 	}
 	else {
-		//Á¸ÀçÇÏÁö ¾ÊÀ¸¸é Ç®ÆĞ½º·Î ÀúÀå
+		//ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ í’€íŒ¨ìŠ¤ë¡œ ì €ì¥
 		terrainPath = assetPath;
 	}
-	//ÅÍ·¹ÀÎ ³»ºÎ ÅØ½ºÃÄ ÀúÀå °æ·Î
+	//í„°ë ˆì¸ ë‚´ë¶€ í…ìŠ¤ì³ ì €ì¥ ê²½ë¡œ
 	fs::path difusePath = terrainPath / L"Texture";
 
 	
@@ -370,7 +380,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	
 	//SaveEditorHeightMap(heightMapPath, m_minHeight, m_maxHeight);
 	//SaveEditorSplatMap(splatMapPath);
-	//½º·¹µå·Î ÀÌ¹ÌÁö ÀúÀå ºÎÅÍ
+	//ìŠ¤ë ˆë“œë¡œ ì´ë¯¸ì§€ ì €ì¥ ë¶€í„°
 	m_threadPool.Enqueue(
 		[this, heightMapPath]() 
 		{
@@ -386,13 +396,13 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	std::vector<fs::path> diffuseTexturePaths;
 
-	//·¹ÀÌ¾î¿¡ »ç¿ëµÇ¾ú´ø ÅØ½ºÃÄµé º¹»ç
+	//ë ˆì´ì–´ì— ì‚¬ìš©ë˜ì—ˆë˜ í…ìŠ¤ì³ë“¤ ë³µì‚¬
 	for (const auto& layer : m_layers)
 	{	
 		if (fs::exists(layer.diffuseTexturePath)) 
 		{
 			fs::path destPath = difusePath / fs::path(layer.diffuseTexturePath).filename();
-			//ÀÌ¹Ì Á¸Á¦ÇÏ¸é º¹	»çÇÏÁö ¾ÊÀ½
+			//ì´ë¯¸ ì¡´ì œí•˜ë©´ ë³µ	ì‚¬í•˜ì§€ ì•ŠìŒ
 			if (!fs::exists(destPath)) {
 				m_threadPool.Enqueue(
 					[src = layer.diffuseTexturePath, dst = destPath.wstring()]()
@@ -410,14 +420,17 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		}
 	}
 
-	//½º·¹µå ´ë±â
+	//ìŠ¤ë ˆë“œ ëŒ€ê¸°
 	m_threadPool.NotifyAllAndWait();
 
-	//Ç®Æä½º ÀúÀå ÇÏ¸é ´Ù¸¥ »ç¶÷ÀÌ ¾²±è Èûµë »ó´ë°æ·Î ¾µ·¹
+	//í’€í˜ìŠ¤ ì €ì¥ í•˜ë©´ ë‹¤ë¥¸ ì‚¬ëŒì´ ì“°ê¹€ í˜ë“¬ ìƒëŒ€ê²½ë¡œ ì“¸ë ˆ
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);
 	fs::path relsplatMap = fs::relative(splatMapPath, terrainDir);
 
-	//¸ŞÅ¸µ¥ÀÌÅÍ ÀúÀå .meta ÀÎ´ë json ¾µ°ÅÀÓ
+
+
+
+	//ë©”íƒ€ë°ì´í„° ì €ì¥ .meta ì¸ëŒ€ json ì“¸ê±°ì„
 	json metaData;
 	metaData["name"] = name;
 	metaData["terrainID"] = m_terrainID;
@@ -425,10 +438,10 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	metaData["height"] = m_height;
 	metaData["minHeight"] = m_minHeight;
 	metaData["maxHeight"] = m_maxHeight;
-	//metaData["heightmap"] = fs::path(heightMapPath).u8string(); //ASCII°æ·ÎÀÌ¸é ÇÑ±Û ¾²·Á¸é utf8 º¯È¯ ÇØ¾ßÇÒµí
+	//metaData["heightmap"] = fs::path(heightMapPath).u8string(); //ASCIIê²½ë¡œì´ë©´ í•œê¸€ ì“°ë ¤ë©´ utf8 ë³€í™˜ í•´ì•¼í• ë“¯
 	
 	metaData["heightmap"] = Utf8Encode(relheightMap);
-	//metaData["splatmap"] = fs::path(splatMapPath).u8string(); //ASCII°æ·ÎÀÌ¸é ÇÑ±Û ¾²·Á¸é utf8 º¯È¯ ÇØ¾ßÇÒµí
+	//metaData["splatmap"] = fs::path(splatMapPath).u8string(); //ASCIIê²½ë¡œì´ë©´ í•œê¸€ ì“°ë ¤ë©´ utf8 ë³€í™˜ í•´ì•¼í• ë“¯
 	metaData["splatmap"] = Utf8Encode(relsplatMap);
 
 	metaData["layers"] = json::array();
@@ -437,15 +450,17 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 		json layerData;
 		layerData["layerID"] = layer.m_layerID;
 		layerData["layerName"] = layer.layerName;
-		fs::path reldiffusePath = fs::relative(diffuseTexturePaths[index], terrainDir); //º¹»çÇØµĞ °æ·Î
-		//layerData["diffuseTexturePath"] = reldiffusePath.u8string(); //ASCII°æ·ÎÀÌ¸é ÇÑ±Û ¾²·Á¸é utf8 º¯È¯ ÇØ¾ßÇÒµí
+		fs::path reldiffusePath = fs::relative(diffuseTexturePaths[index], terrainDir); //ë³µì‚¬í•´ë‘” ê²½ë¡œ
+		//layerData["diffuseTexturePath"] = reldiffusePath.u8string(); //ASCIIê²½ë¡œì´ë©´ í•œê¸€ ì“°ë ¤ë©´ utf8 ë³€í™˜ í•´ì•¼í• ë“¯
 		layerData["diffuseTexturePath"]= Utf8Encode(reldiffusePath);
 		layerData["tilling"] = layer.tilling;
 		metaData["layers"].push_back(layerData);
 		index++;
 	}
+
 	std::ofstream ofs(m_terrainTargetPath);
-	ofs << metaData.dump(4); // 4Ä­ µé¿©¾²±â
+	ofs << metaData.dump(4); // 4Ä­ ï¿½é¿©ï¿½ï¿½ï¿½ï¿½
+
 
 
 	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
@@ -454,10 +469,10 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 bool TerrainComponent::Load(const std::wstring& filePath)
 {
-	//debug¿ë
+	//debugìš©
 	Debug->LogDebug("Loading terrain from: " + Utf8Encode(filePath));
 
-	//¼¼ÀÌºê ¿ª¼øÀ¸·Î ¸ŞÅ¸µ¥ÀÌÅÍ ºÎÅÍ ÀĞ¾î ¿À´Â´ë filePath·Î .meta ÆÄÀÏ ÀĞ¾î¿È
+	//ì„¸ì´ë¸Œ ì—­ìˆœìœ¼ë¡œ ë©”íƒ€ë°ì´í„° ë¶€í„° ì½ì–´ ì˜¤ëŠ”ëŒ€ filePathë¡œ .meta íŒŒì¼ ì½ì–´ì˜´
 	//.meta
 	namespace fs = std::filesystem;
 	fs::path metaPath = filePath;
@@ -467,19 +482,23 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		return false;
 	}
 
-	//metaPath°¡ ¿¹Á¤µÈ °æ·Î°¡ ¾Æ´Ï¸é Ç®ÆĞ½º·Î »ç¿ë ¾Æ´Ï¸é »ó´ë°æ·Î·Î »ç¿ë //¿¹Á¤µÈ °æ·Î´Â PathFinder::Relative("Terrain") ÀÌ´Ù.
+	//metaPathê°€ ì˜ˆì •ëœ ê²½ë¡œê°€ ì•„ë‹ˆë©´ í’€íŒ¨ìŠ¤ë¡œ ì‚¬ìš© ì•„ë‹ˆë©´ ìƒëŒ€ê²½ë¡œë¡œ ì‚¬ìš© //ì˜ˆì •ëœ ê²½ë¡œëŠ” PathFinder::Relative("Terrain") ì´ë‹¤.
 	bool isRelative = false;
 	fs::path rel = PathFinder::Relative("Terrain");
 	if (metaPath.parent_path() != rel) {
-		//Ç®ÆĞ½º·Î »ç¿ë
+		//í’€íŒ¨ìŠ¤ë¡œ ì‚¬ìš©
 		isRelative = false;
 	}
 	else {
-		//»ó´ë°æ·Î·Î »ç¿ë
+		//ìƒëŒ€ê²½ë¡œë¡œ ì‚¬ìš©
 		isRelative = true;
 	}
 
-	//.meta -> json ÀĞ±â
+
+
+
+	//.meta -> json ì½ê¸°
+
 	std::ifstream ifs(metaPath);
 	json metaData;
 	try {
@@ -490,22 +509,22 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		return false;
 	}
 
-	//ÀÓ½ÃÀúÀåº¯¼ö ¼±¾ğ
+	//ì„ì‹œì €ì¥ë³€ìˆ˜ ì„ ì–¸
 	uint32_t tmpTerrainID = metaData["terrainID"].get<uint32_t>();
 	int tmpWidth = metaData["width"].get<int>();
 	int tmpHeight = metaData["height"].get<int>();
 	fs::path heightMapPath = fs::path(metaData["heightmap"].get<std::string>());
 	fs::path splatMapPath = fs::path(metaData["splatmap"].get<std::string>());
 	auto tmpHeightMap = std::vector<float>(tmpWidth * tmpHeight, 0.0f);
-	auto tmpLayerHeightMap = std::vector<std::vector<float>>(4, std::vector<float>(tmpWidth * tmpHeight, 0.0f)); //4°³ ·¹ÀÌ¾î·Î ÃÊ±âÈ­
+	auto tmpLayerHeightMap = std::vector<std::vector<float>>(4, std::vector<float>(tmpWidth * tmpHeight, 0.0f)); //4ê°œ ë ˆì´ì–´ë¡œ ì´ˆê¸°í™”
 	auto tmpLayerDescs = std::vector<TerrainLayer>();
 
-	heightMapPath = isRelative ? PathFinder::TerrainSourcePath(heightMapPath.string()) : heightMapPath; //»ó´ë°æ·Î·Î º¯È¯
-	splatMapPath = isRelative ? PathFinder::TerrainSourcePath(splatMapPath.string()) : splatMapPath; //»ó´ë°æ·Î·Î º¯È¯
+	heightMapPath = isRelative ? PathFinder::TerrainSourcePath(heightMapPath.string()) : heightMapPath; //ìƒëŒ€ê²½ë¡œë¡œ ë³€í™˜
+	splatMapPath = isRelative ? PathFinder::TerrainSourcePath(splatMapPath.string()) : splatMapPath; //ìƒëŒ€ê²½ë¡œë¡œ ë³€í™˜
 
-	//ÇìÀÌÆ®¸Ê ÀÓ½ÃÀúÀå
+	//í—¤ì´íŠ¸ë§µ ì„ì‹œì €ì¥
 	LoadEditorHeightMap(heightMapPath, tmpWidth, tmpHeight,  metaData["minHeight"].get<float>(), metaData["maxHeight"].get<float>(), tmpHeightMap);
-	//½ºÇÃ·§¸Ê ÀÓ½ÃÀúÀå
+	//ìŠ¤í”Œë«ë§µ ì„ì‹œì €ì¥
 	LoadEditorSplatMap(splatMapPath, tmpWidth, tmpHeight, tmpLayerHeightMap);
 
 	float tmpNextLayerID = 0;
@@ -514,11 +533,11 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		desc.m_layerID = layerData["layerID"].get<uint32_t>();
 		desc.layerName = layerData["layerName"].get<std::string>();
 		auto diffusePath = fs::path(layerData["diffuseTexturePath"].get<std::string>());
-		diffusePath = isRelative ? PathFinder::TerrainSourcePath(diffusePath.string()) : diffusePath; //»ó´ë°æ·Î·Î º¯È¯
+		diffusePath = isRelative ? PathFinder::TerrainSourcePath(diffusePath.string()) : diffusePath; //ìƒëŒ€ê²½ë¡œë¡œ ë³€í™˜
 		desc.diffuseTexturePath = diffusePath;
 		desc.tilling = layerData["tilling"].get<float>();
 		
-		//diffuseTexture ·Îµå
+		//diffuseTexture ë¡œë“œ
 		ID3D11Resource* diffuseResource = nullptr;
 		ID3D11Texture2D* diffuseTexture = nullptr;
 		ID3D11ShaderResourceView* diffuseSRV = nullptr;
@@ -527,27 +546,27 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			TerrainLayer newLayer;
 			desc.diffuseTexture = diffuseTexture;
 			desc.diffuseSRV = diffuseSRV;
-			//m_layerHeightMap.push_back(std::vector<float>(tmpWidth * tmpHeight, 0.0f)); // ·¹ÀÌ¾îº° ³ôÀÌ ¸Ê ÃÊ±âÈ­ => loadLoadEditorSplatMap() ÀÌ¹Ì ·Îµå
+			//m_layerHeightMap.push_back(std::vector<float>(tmpWidth * tmpHeight, 0.0f)); // ë ˆì´ì–´ë³„ ë†’ì´ ë§µ ì´ˆê¸°í™” => loadLoadEditorSplatMap() ì´ë¯¸ ë¡œë“œ
 		}
 		else {
 			Debug->LogError("Failed to load diffuse texture: " + diffusePath.string());
-			continue; // ·Îµå ½ÇÆĞ½Ã ÇØ´ç ·¹ÀÌ¾î´Â ¹«½Ã
+			continue; // ë¡œë“œ ì‹¤íŒ¨ì‹œ í•´ë‹¹ ë ˆì´ì–´ëŠ” ë¬´ì‹œ
 		}
 
-		//·¹ÀÌ¾î Á¤º¸ ÀúÀå
+		//ë ˆì´ì–´ ì •ë³´ ì €ì¥
 		tmpLayerDescs.push_back(desc);
 		tmpNextLayerID++;
 	}
 
-	//ÀÓ½ÃÀúÀå º¯¼ö ½º¿Ò ¹×
-	//¹Ù²ï ¸É¹ö Á¤º¸·Î ¸Ş½¬ ¹× ¹öÆÛ,ÅØ½ºÃÄ ¾÷µ¥ÀÌÆ®
+	//ì„ì‹œì €ì¥ ë³€ìˆ˜ ìŠ¤ì™‘ ë°
+	//ë°”ë€ ë§´ë²„ ì •ë³´ë¡œ ë©”ì‰¬ ë° ë²„í¼,í…ìŠ¤ì³ ì—…ë°ì´íŠ¸
 	std::swap(m_terrainID, tmpTerrainID);
 	std::swap(m_width, tmpWidth);
 	std::swap(m_height, tmpHeight);
-	Resize(m_width, m_height); // ³ôÀÌ¸Ê Å©±â º¯°æ
+	Resize(m_width, m_height); // ë†’ì´ë§µ í¬ê¸° ë³€ê²½
 	std::swap(m_heightMap, tmpHeightMap);
-	RecalculateNormalsPatch(0, 0, m_width, m_height); // ³ôÀÌ¸Ê º¯°æ ÈÄ ³ë¸» Àç°è»ê
-	//¸Ş½¬ ¾÷µ¥ÀÌÆ®
+	RecalculateNormalsPatch(0, 0, m_width, m_height); // ë†’ì´ë§µ ë³€ê²½ í›„ ë…¸ë§ ì¬ê³„ì‚°
+	//ë©”ì‰¬ ì—…ë°ì´íŠ¸
 	std::vector<Vertex> patchVerts;
 	patchVerts.reserve(m_width * m_height);
 	for (int i = 0; i < m_height; ++i) {
@@ -564,18 +583,18 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		patchVerts.data(),
 		(uint32_t)m_width *
 		(uint32_t)m_height
-	); // ³ôÀÌ¸Ê º¯°æ ÈÄ ¸Ş½¬ ¾÷µ¥ÀÌÆ®
-	//InitSplatMapTexture(m_width, m_height); // ½ºÇÃ·§¸Ê ÅØ½ºÃ³ ÃÊ±âÈ­
+	); // ë†’ì´ë§µ ë³€ê²½ í›„ ë©”ì‰¬ ì—…ë°ì´íŠ¸
+	//InitSplatMapTexture(m_width, m_height); // ìŠ¤í”Œë«ë§µ í…ìŠ¤ì²˜ ì´ˆê¸°í™”
 	std::swap(m_layerHeightMap, tmpLayerHeightMap);
-	//UpdateSplatMapPatch(0, 0, m_width, m_height); // ½ºÇÃ·§¸Ê ÆĞÄ¡ ¾÷µ¥ÀÌÆ®
+	//UpdateSplatMapPatch(0, 0, m_width, m_height); // ìŠ¤í”Œë«ë§µ íŒ¨ì¹˜ ì—…ë°ì´íŠ¸
 	std::swap(m_layers, tmpLayerDescs);
-	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // ·¹ÀÌ¾î Á¤º¸ ¾÷µ¥ÀÌÆ®
+	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // ë ˆì´ì–´ ì •ë³´ ì—…ë°ì´íŠ¸
 	m_nextLayerID = tmpNextLayerID;
-	m_selectedLayerID = 0xFFFFFFFF; // ¼±ÅÃµÈ ·¹ÀÌ¾î ÃÊ±âÈ­
+	m_selectedLayerID = 0xFFFFFFFF; // ì„ íƒëœ ë ˆì´ì–´ ì´ˆê¸°í™”
 	//LoadLayers();	
 
 
-	//·Îµå ¿Ï·á ÈÄ ¸®¼Ò½º ÇØÁ¦
+	//ë¡œë“œ ì™„ë£Œ í›„ ë¦¬ì†ŒìŠ¤ í•´ì œ
 	tmpHeightMap.clear();
 	tmpLayerHeightMap.clear();
 	for (auto& layer : tmpLayerDescs) {
@@ -603,9 +622,9 @@ void TerrainComponent::SaveEditorHeightMap(const std::wstring& pngPath, float mi
 		float   f = m_heightMap[i];
 		uint32_t bits;
 		static_assert(sizeof(float) == 4, "float must be 32-bit");
-		std::memcpy(&bits, &f, sizeof(bits));  // float ºñÆ®¿­À» uint32_t ·Î º¹»ç
+		std::memcpy(&bits, &f, sizeof(bits));  // float ë¹„íŠ¸ì—´ì„ uint32_t ë¡œ ë³µì‚¬
 
-		// ºò¿£µğ¾È ¼ø¼­·Î Ã¤³Î¿¡ ÀúÀå (R=MSB, A=LSB)
+		// ë¹…ì—”ë””ì•ˆ ìˆœì„œë¡œ ì±„ë„ì— ì €ì¥ (R=MSB, A=LSB)
 		buf[i * 4 + 0] = uint8_t((bits >> 24) & 0xFF);
 		buf[i * 4 + 1] = uint8_t((bits >> 16) & 0xFF);
 		buf[i * 4 + 2] = uint8_t((bits >> 8) & 0xFF);
@@ -648,7 +667,7 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath,float 
 		out[i] = f;
 	}
 	
-	//float normalized = (static_cast<float>(data[i * channels + c]) / 100.0f) + minH; // 0 ~ 1 ¹üÀ§·Î Á¤±ÔÈ­
+	//float normalized = (static_cast<float>(data[i * channels + c]) / 100.0f) + minH; // 0 ~ 1 ë²”ìœ„ë¡œ ì •ê·œí™”
 	//out[i] = normalized;
 
     stbi_image_free(data);  
@@ -661,7 +680,7 @@ void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
 {
 	int w = m_width;
 	int h = m_height;
-	std::vector<uint8_t> buffer(w * h * 4, 0); // RGBA 4Ã¤³Î
+	std::vector<uint8_t> buffer(w * h * 4, 0); // RGBA 4ì±„ë„
 	for (int i = 0; i < w * h; ++i) {
 		for (int c = 0; c<4&& c < m_layers.size(); ++c){
 			buffer[i * 4 + c] = static_cast<uint8_t>(std::clamp(m_layerHeightMap[c][i], 0.0f, 1.0f) * 255.0f);
@@ -702,7 +721,7 @@ bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float 
 				int idx = y * width + x;
 				unsigned char* pixel = &data[(y * width + x) * channels];
 				if (i < channels) {
-					out[i][idx] = pixel[i] / 255.0f; // R, G, B, A Ã¤³Î¿¡ °¡ÁßÄ¡ ÀúÀå
+					out[i][idx] = pixel[i] / 255.0f; // R, G, B, A ì±„ë„ì— ê°€ì¤‘ì¹˜ ì €ì¥
 				}
 			}
 		}
@@ -732,11 +751,11 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 		}
 		else
 		{
-			tilefector[i] = 1.0f; // ±âº»°ª
+			tilefector[i] = 1.0f; // ê¸°ë³¸ê°’
 		}
 	}
 
-	//tilefector[layerID] = newDesc.tilling; // ¾÷µ¥ÀÌÆ®µÈ Å¸ÀÏ¸µ °ª
+	//tilefector[layerID] = newDesc.tilling; // ì—…ë°ì´íŠ¸ëœ íƒ€ì¼ë§ ê°’
 	//layerBuffer.layerTilling = DirectX::XMFLOAT4(tilefector[0] / 4096, tilefector[1] / 4096, tilefector[2] / 4096, tilefector[3] / 4096);
 
 	layerBuffer.layerTilling0 = tilefector[0];
@@ -750,7 +769,7 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 void TerrainComponent::Awake()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
@@ -760,7 +779,7 @@ void TerrainComponent::Awake()
 void TerrainComponent::OnDistroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto renderScene = SceneManagers->m_ActiveRenderScene;
+	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
@@ -776,30 +795,30 @@ void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& di
 	newLayer.layerName = std::string(diffuseFile.begin(), diffuseFile.end());
 	newLayer.diffuseTexturePath = path;
 	newLayer.tilling = tilling;
-	// diffuseTexture ·Îµå
+	// diffuseTexture ë¡œë“œ
 
-	m_pMaterial->AddLayer(newLayer); // ¸ÓÆ¼¸®¾ó¿¡ ·¹ÀÌ¾î Ãß°¡
+	m_pMaterial->AddLayer(newLayer); // ë¨¸í‹°ë¦¬ì–¼ì— ë ˆì´ì–´ ì¶”ê°€
 	m_layers.push_back(newLayer);
 	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
-	std::vector<BYTE> splatMapData(m_width * m_height * 4, 0); // RGBA 4Ã¤³Î ÃÊ±âÈ­
+	std::vector<BYTE> splatMapData(m_width * m_height * 4, 0); // RGBA 4ì±„ë„ ì´ˆê¸°í™”
 
 	for (int y = 0; y < m_height; ++y)
 	{
 		for (int x = 0; x < m_width; ++x)
 		{
 			int idx = y * m_width + x;
-			int dstOffset = (y * m_width + x) * 4; // RGBA 4Ã¤³Î
+			int dstOffset = (y * m_width + x) * 4; // RGBA 4ì±„ë„
 
-			// ·¹ÀÌ¾î °¡ÁßÄ¡ °è»ê
-			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // ÃÖ´ë 4°³ ·¹ÀÌ¾î¸¸ »ç¿ë
+			// ë ˆì´ì–´ ê°€ì¤‘ì¹˜ ê³„ì‚°
+			for (int layerIdx = 0; layerIdx < (int)m_layers.size() && layerIdx < 4; ++layerIdx) // ìµœëŒ€ 4ê°œ ë ˆì´ì–´ë§Œ ì‚¬ìš©
 			{
 				float w = std::clamp(m_layerHeightMap[layerIdx][idx], 0.0f, 1.0f);
-				splatMapData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A Ã¤³Î¿¡ °¡ÁßÄ¡ ÀúÀå
+				splatMapData[dstOffset + layerIdx] = static_cast<BYTE>(w * 255.0f); // R, G, B, A ì±„ë„ì— ê°€ì¤‘ì¹˜ ì €ì¥
 			}
 		}
 	}
 
-	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, splatMapData); // layer Ãß°¡ ÈÄ ½ºÇÃ·§¸Ê ¾÷µ¥ÀÌÆ®
+	m_pMaterial->UpdateSplatMapPatch(0, 0, m_width, m_height, splatMapData); // layer ì¶”ê°€ í›„ ìŠ¤í”Œë«ë§µ ì—…ë°ì´íŠ¸
 }
 
 void TerrainComponent::RemoveLayer(uint32_t layerID)
@@ -808,14 +827,14 @@ void TerrainComponent::RemoveLayer(uint32_t layerID)
 		Debug->LogError("Invalid layer ID: " + std::to_string(layerID));
 		return;
 	}
-	// ·¹ÀÌ¾î Á¦°Å
+	// ë ˆì´ì–´ ì œê±°
 	m_layers.erase(m_layers.begin() + layerID);
 	m_layerHeightMap.erase(m_layerHeightMap.begin() + layerID);
-	// ·¹ÀÌ¾î ID ¾÷µ¥ÀÌÆ®
+	// ë ˆì´ì–´ ID ì—…ë°ì´íŠ¸
 	for (uint32_t i = layerID; i < m_layers.size(); ++i) {
 		m_layers[i].m_layerID = i;
 	}
-	// ´ÙÀ½ ·¹ÀÌ¾î ID ¾÷µ¥ÀÌÆ®
+	// ë‹¤ìŒ ë ˆì´ì–´ ID ì—…ë°ì´íŠ¸
 	if (m_nextLayerID > layerID) {
 		m_nextLayerID--;
 	}
@@ -828,24 +847,24 @@ void TerrainComponent::ClearLayers()
 	m_layerHeightMap.clear();
 	m_nextLayerID = 0;
 	
-	m_pMaterial->ClearLayers(); // ¸ÓÆ¼¸®¾ó¿¡¼­ ·¹ÀÌ¾î Á¦°Å
+	m_pMaterial->ClearLayers(); // ë¨¸í‹°ë¦¬ì–¼ì—ì„œ ë ˆì´ì–´ ì œê±°
 }
 
 
 void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::wstring& terrainName)
 {
-	//build½Ã name.tbin
+	//buildì‹œ name.tbin
 	
 
-	//debug¿ë
+	//debugìš©
 	Debug->LogDebug("Building terrain: " + Utf8Encode(terrainName) + " at " + Utf8Encode(buildPath));
-	//ºôµå °æ·Î°¡ Á¸ÀçÇÏÁö ¾ÊÀ¸¸é »ı¼º
+	//ë¹Œë“œ ê²½ë¡œê°€ ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ ìƒì„±
 	namespace fs = std::filesystem;
 	fs::path outDir = fs::path(buildPath) / L"Assets" / L"Terrain";
 	if (!fs::exists(outDir)) {
 		fs::create_directories(outDir);
 	}
-	//ºôµå °æ·Î¿¡ .tbin ÆÄÀÏ ÀúÀå
+	//ë¹Œë“œ ê²½ë¡œì— .tbin íŒŒì¼ ì €ì¥
 	fs::path terrainFile = outDir / (terrainName + L".tbin");
 	std::ofstream ofs(terrainFile, std::ios::binary);
 	if (!ofs) {
@@ -862,11 +881,11 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 	header.minHeight = m_minHeight;
 	header.maxHeight = m_maxHeight;
 	header.layers = static_cast<uint32_t>(m_layers.size());
-	//Çì´õ ¾²±â
+	//í—¤ë” ì“°ê¸°
 	ofs.write(reinterpret_cast<const char*>(&header), sizeof(header));
-	//³ôÀÌ¸Ê ¾²±â
+	//ë†’ì´ë§µ ì“°ê¸°
 	ofs.write(reinterpret_cast<const char*>(m_heightMap.data()), sizeof(float)*m_width*m_height);
-	//·¹ÀÌ¾îº° °¡ÁßÄ¡ ¾²±â
+	//ë ˆì´ì–´ë³„ ê°€ì¤‘ì¹˜ ì“°ê¸°
 	{
 		size_t N = size_t(m_width) * size_t(m_height);
 		std::vector<uint8_t> buf(N * 4);
@@ -878,7 +897,7 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 		ofs.write(reinterpret_cast<const char*>(buf.data()), buf.size());
 	}
 
-	//·¹ÀÌ¾îÀÇ ÅØ½ºÃÄ ÀÌ¸§¸¸ ±â·Ï ·±Å¸ÀÓ¿¡¼­ ¸®¼Ò½º ¸Ş´ÏÀú¿¡ ¾ø´Ù¸é ºó ÅØ½ºÃÄ·Î ·Îµå
+	//ë ˆì´ì–´ì˜ í…ìŠ¤ì³ ì´ë¦„ë§Œ ê¸°ë¡ ëŸ°íƒ€ì„ì—ì„œ ë¦¬ì†ŒìŠ¤ ë©”ë‹ˆì €ì— ì—†ë‹¤ë©´ ë¹ˆ í…ìŠ¤ì³ë¡œ ë¡œë“œ
 	std::vector<std::string> textureNames;
 	textureNames.reserve(m_layers.size());
 
@@ -896,10 +915,10 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 		cursor += static_cast<uint32_t>(textureNames[i].size()) + 1; // +1 for null terminator
 	}
 
-	//¿ÀÇÁ¼Â ¾²±â
+	//ì˜¤í”„ì…‹ ì“°ê¸°
 	ofs.write(reinterpret_cast<const char*>(offsets.data()), sizeof(uint32_t)*header.layers);
 
-	//ÅØ½ºÃÄ ÀÌ¸§ ¾²±â
+	//í…ìŠ¤ì³ ì´ë¦„ ì“°ê¸°
 	for (const auto& name : textureNames) {
 		ofs.write(name.c_str(), name.size());
 		ofs.put('\0'); // null terminator
@@ -914,7 +933,7 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 
 bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 {
-	//debug¿ë
+	//debugìš©
 	Debug->LogDebug("Loading runtime terrain from: " + Utf8Encode(filePath));
 	namespace fs = std::filesystem;
 	fs::path terrainPath = filePath;
@@ -928,7 +947,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 		return false;
 	}
 
-	//ÆÄÀÏ Çì´õ ÀĞ±â
+	//íŒŒì¼ í—¤ë” ì½ê¸°
 	TerrainBinHeader header;
 	ifs.read(reinterpret_cast<char*>(&header), sizeof(header));
 	if (header.magic != 0x5442524E || header.version != 1) {
@@ -942,17 +961,17 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 	m_maxHeight = header.maxHeight;
 	size_t N = size_t(m_width) * size_t(m_height);
 
-	//³ôÀÌ¸Ê
+	//ë†’ì´ë§µ
 	m_heightMap.assign(N, 0.0f);
 	ifs.read(reinterpret_cast<char*>(m_heightMap.data()), sizeof(float) * N);
 	
-	//½ºÇÃ·¿¸Ê
-	std::vector<uint8_t> splatMapData(N * 4); // RGBA 4Ã¤³Î
+	//ìŠ¤í”Œë ›ë§µ
+	std::vector<uint8_t> splatMapData(N * 4); // RGBA 4ì±„ë„
 	ifs.read(reinterpret_cast<char*>(splatMapData.data()), splatMapData.size());
 	m_layerHeightMap.assign(header.layers, std::vector<float>(N));
 	for (size_t i = 0; i < N; ++i) {
 		for (int c = 0; c < header.layers; ++c) {
-			m_layerHeightMap[c][i] = splatMapData[i * 4 + c] / 255.0f; // RGBA Ã¤³Î¿¡¼­ °¡ÁßÄ¡ ÃßÃâ
+			m_layerHeightMap[c][i] = splatMapData[i * 4 + c] / 255.0f; // RGBA ì±„ë„ì—ì„œ ê°€ì¤‘ì¹˜ ì¶”ì¶œ
 		}
 	}
 
@@ -960,7 +979,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 	std::vector<uint32_t> textureOffsets(header.layers);
 	ifs.read(reinterpret_cast<char*>(textureOffsets.data()), sizeof(uint32_t) * header.layers);
 
-	//ÅØ½ºÃÄ ÀÌ¸§ ÀĞ±â
+	//í…ìŠ¤ì³ ì´ë¦„ ì½ê¸°
 	std::streampos cur = ifs.tellg();
 	ifs.seekg(0, std::ios::end);
 	size_t remain = static_cast<size_t>(ifs.tellg() - cur);
@@ -975,7 +994,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 	for (uint32_t i = 0; i < header.layers; ++i) {
 		uint32_t offset = textureOffsets[i];
 		const char* namePtr = namesBuf.data() + offset;
-		textureNames[i] = std::string(namePtr); // null terminator·Î ÀÚµ¿ Á¾·áµÊ
+		textureNames[i] = std::string(namePtr); // null terminatorë¡œ ìë™ ì¢…ë£Œë¨
 	}
 
 	UINT width = 512;
@@ -1002,5 +1021,5 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 
 	arrayTex->CreateSRV(format,D3D11_SRV_DIMENSION_TEXTURE2DARRAY,1);
 
-	m_pMaterial->m_layerSRV = arrayTex->m_pSRV; // ¸ÓÆ¼¸®¾ó¿¡ ·¹ÀÌ¾î ¹è¿­ ÅØ½ºÃ³ ¼³Á¤ -> ¹Ù²ã¾ß ÇÒµí
+	m_pMaterial->m_layerSRV = arrayTex->m_pSRV; // ë¨¸í‹°ë¦¬ì–¼ì— ë ˆì´ì–´ ë°°ì—´ í…ìŠ¤ì²˜ ì„¤ì • -> ë°”ê¿”ì•¼ í• ë“¯
 }

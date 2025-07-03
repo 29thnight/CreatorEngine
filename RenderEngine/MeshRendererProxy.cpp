@@ -5,6 +5,7 @@
 #include "Material.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
+#include "Terrain.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
@@ -26,7 +27,10 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
             m_animatorGuid = animator->GetInstanceID();
         }
 
-        m_materialGuid = m_Material->m_materialGuid;
+        if(nullptr != m_Material)
+        {
+            m_materialGuid = m_Material->m_materialGuid;
+        }
         m_instancedID = component->GetInstanceID();
     }
 
@@ -39,8 +43,27 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     }
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component)
+PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) : 
+    m_terrainMaterial(component->GetMaterial()),
+    m_terrainMesh(component->GetMesh()),
+    m_isSkinnedMesh(false),
+    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
+    m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
 {
+    GameObject* owner = GameObject::FindIndex(component->GetOwner()->m_parentIndex);
+    if (owner)
+    {
+        //m_materialGuid = m_Material->m_materialGuid;
+        m_instancedID = component->GetInstanceID();
+    }
+
+    if (!m_isSkinnedMesh)
+    {
+        //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
+        //CullingManagers->Insert(this);
+
+        m_isNeedUpdateCulling = true;
+    }
 }
 
 PrimitiveRenderProxy::~PrimitiveRenderProxy()

@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include <set>
 #include <memory>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <wincrypt.h>
 #include "combaseapi.h"
 
@@ -13,58 +16,6 @@ inline GUID GenerateGUID()
 	GUID guid;
 	HRESULT hr = CoCreateGuid(&guid);
 	return guid;
-}
-
-inline GUID GenerateDeterministicGUIDFromName(const std::string& name)
-{
-	GUID outGuid{};
-	HCRYPTPROV hProv = NULL;
-	HCRYPTHASH hHash = NULL;
-
-	// Acquire a cryptographic provider context
-	if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
-	{
-		throw std::runtime_error("Create Filed GUID using string");
-	}
-
-	// Create a hash object
-	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
-	{
-		CryptReleaseContext(hProv, 0);
-		throw std::runtime_error("Create Filed GUID using string");
-	}
-
-	// Hash the input string
-	if (!CryptHashData(hHash, reinterpret_cast<const BYTE*>(name.c_str()), name.length(), 0))
-	{
-		CryptDestroyHash(hHash);
-		CryptReleaseContext(hProv, 0);
-		throw std::runtime_error("Create Filed GUID using string");
-	}
-
-	BYTE hash[16]; // MD5 = 128-bit
-	DWORD hashLen = sizeof(hash);
-	if (!CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0))
-	{
-		CryptDestroyHash(hHash);
-		CryptReleaseContext(hProv, 0);
-		throw std::runtime_error("Create Filed GUID using string");
-	}
-
-	CryptDestroyHash(hHash);
-	CryptReleaseContext(hProv, 0);
-
-	// Map the hash to GUID format
-	outGuid.Data1 = *(DWORD*)&hash[0];
-	outGuid.Data2 = *(WORD*)&hash[4];
-	outGuid.Data3 = *(WORD*)&hash[6];
-	memcpy(outGuid.Data4, &hash[8], 8);
-
-	// Optional: Set version bits to indicate this is "name-based" (version 5 style)
-	outGuid.Data3 = (outGuid.Data3 & 0x0FFF) | (5 << 12);     // Set version to 5
-	outGuid.Data4[0] = (outGuid.Data4[0] & 0x3F) | 0x80;       // Set variant to RFC4122
-
-	return outGuid;
 }
 
 inline size_t ConvertGUIDToHash(const GUID& guid)
@@ -137,27 +88,20 @@ struct HashedGuid
 
 struct FileGuid
 {
-	unsigned long  Data1;
-	unsigned short Data2;
-	unsigned short Data3;
-	unsigned char  Data4[8];
+	boost::uuids::uuid m_guid;
 
-	FileGuid() = default;
-	FileGuid(GUID guid)
+	static inline boost::uuids::uuid ns_filesystem() noexcept
 	{
-		Data1 = guid.Data1;
-		Data2 = guid.Data2;
-		Data3 = guid.Data3;
-		for (int i = 0; i < 8; ++i)
-		{
-			Data4[i] = guid.Data4[i];
-		}
+		return { { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+				  0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0 } };
 	}
 
+	FileGuid() = default;
 	FileGuid(const std::string& str)
 	{
 		FromString(str);
 	}
+	FileGuid(const boost::uuids::uuid& guid) : m_guid(guid) {}
 
 	FileGuid(const FileGuid&) = default;
 	FileGuid(FileGuid&&) = default;
@@ -165,17 +109,6 @@ struct FileGuid
 
 	FileGuid& operator=(const FileGuid&) = default;
 	FileGuid& operator=(FileGuid&&) = default;
-	FileGuid& operator=(GUID guid)
-	{
-		Data1 = guid.Data1;
-		Data2 = guid.Data2;
-		Data3 = guid.Data3;
-		for (int i = 0; i < 8; ++i)
-		{
-			Data4[i] = guid.Data4[i];
-		}
-		return *this;
-	}
 
 	FileGuid& operator=(const std::string& str)
 	{
@@ -185,63 +118,38 @@ struct FileGuid
 
 	friend auto operator<=>(const FileGuid& lhs, const FileGuid& rhs)
 	{
-		return std::memcmp(&lhs, &rhs, sizeof(FileGuid)) <=> 0;
+		return lhs.m_guid <=> rhs.m_guid;
 	}
 
 	friend bool operator==(const FileGuid& lhs, const FileGuid& rhs)
 	{
-		return std::memcmp(&lhs, &rhs, sizeof(FileGuid)) == 0;
+		return lhs.m_guid == rhs.m_guid;
+	}
+
+	bool operator==(const boost::uuids::uuid& guid) const
+	{
+		return m_guid == guid;
 	}
 
 	std::string ToString()
 	{
-		std::ostringstream oss;
-		oss << std::hex << std::uppercase << std::setfill('0');
-		oss << '{';
-		oss << std::setw(8) << Data1 << '-';
-		oss << std::setw(4) << Data2 << '-';
-		oss << std::setw(4) << Data3 << '-';
-		oss << std::setw(2) << static_cast<int>(Data4[0]);
-		oss << std::setw(2) << static_cast<int>(Data4[1]) << '-';
-		for (int i = 2; i < 8; ++i)
-			oss << std::setw(2) << static_cast<int>(Data4[i]);
-		oss << '}';
-		return oss.str();
+		return boost::uuids::to_string(m_guid);
 	}
 
 	void FromString(const std::string& str)
 	{
-		std::string clean = str;
+		boost::uuids::string_generator gen;
+		m_guid = gen(str);
+	}
 
-		if (!clean.empty() && clean.front() == '{') clean = clean.substr(1);
-		if (!clean.empty() && clean.back() == '}') clean.pop_back();
-
-		// sscanf_s용 형식 지정자: %8lx, %4hx, %2hhx
-		unsigned int d1;
-		unsigned short d2, d3;
-		unsigned char d4[8];
-
-		int result = sscanf_s(clean.c_str(), "%8x-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-			&d1, &d2, &d3,
-			&d4[0], &d4[1],
-			&d4[2], &d4[3], &d4[4], &d4[5], &d4[6], &d4[7]);
-
-		if (result == 11)
-		{
-			Data1 = d1;
-			Data2 = d2;
-			Data3 = d3;
-			for (int i = 0; i < 8; ++i)
-				Data4[i] = d4[i];
-		}
-		else
-		{
-			std::cerr << "[FileGuid::FromString] Failed to parse GUID: " << str << std::endl;
-		}
+	void CreateFromName(const std::string& name)
+	{
+		boost::uuids::name_generator gen(ns_filesystem());
+		m_guid = gen(name);
 	}
 };
 
-static inline FileGuid nullFileGuid;
+static inline FileGuid nullFileGuid{ boost::uuids::nil_uuid() };
 
 namespace std {
 	template <>
@@ -268,7 +176,6 @@ namespace std
 }
 
 static std::set<HashedGuid> g_guids;
-static std::set<FileGuid> g_fileGuids;
 
 namespace TypeTrait
 {
@@ -306,27 +213,22 @@ namespace TypeTrait
 			return hash;
 		}
 
-		static inline FileGuid MakeFileGUID()
-		{
-			FileGuid guid(GenerateGUID());
-			while (g_fileGuids.find(guid) != g_fileGuids.end())
-			{
-				guid = GenerateGUID();
-			}
-			g_fileGuids.insert(guid);
+		//static inline FileGuid MakeFileGUID()
+		//{
+		//	FileGuid guid();
+		//	while (g_fileGuids.find(guid) != g_fileGuids.end())
+		//	{
+		//		guid = GenerateGUID();
+		//	}
+		//	g_fileGuids.insert(guid);
 
-			return guid;
-		}
+		//	return guid;
+		//}
 
 		static inline FileGuid MakeFileGUID(const std::string& filePath)
 		{
-			FileGuid guid(GenerateDeterministicGUIDFromName(filePath));
-			while (g_fileGuids.find(guid) != g_fileGuids.end())
-			{
-				guid = GenerateGUID();
-			}
-			g_fileGuids.insert(guid);
-
+			FileGuid guid;
+			guid.CreateFromName(filePath);
 			return guid;
 		}
 	};

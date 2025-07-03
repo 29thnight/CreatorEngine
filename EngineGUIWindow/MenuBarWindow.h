@@ -19,6 +19,9 @@ private:
     int  m_selectedLogIndex{};
     bool m_bShowLogWindow{ false };
 	bool m_bShowProfileWindow{ false };
+	bool m_bShowNewScenePopup{ false };
 	bool m_bShowLightMapWindow{ false };
+	bool m_bCollisionMatrixWindow{ false };
+	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 };
 #endif // !DYNAMICCPP_EXPORTS

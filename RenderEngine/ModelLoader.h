@@ -10,22 +10,24 @@
 
 class ModelLoader
 {
-	enum class LoadType
-	{
-		UNKNOWN,
-		OBJ,
-		GLTF,
-		FBX,
-		ASSET
-	};
+    enum class LoadType
+    {
+            UNKNOWN,
+            OBJ,
+            GLTF,
+            FBX,
+            ASSET
+    };
 
 private:
-	friend class Model;
+    friend class Model;
 	ModelLoader();
 	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);
 	ModelLoader(const std::string_view& fileName);
 	ModelLoader(const aiScene* assimpScene, const std::string_view& fileName);
+
+	size_t CountNodes(aiNode* root);
 
 	void ProcessNodes();
 	ModelNode* ProcessNode(aiNode* node, int parentIndex);
@@ -37,16 +39,18 @@ private:
 
 	//Save To InHouse Format
 	void ParseModel();
-	void ParseNodes(std::fstream& outfile);
-	void ParseNode(std::fstream& outfile, ModelNode* node);
-	void ParseMeshes(std::fstream& outfile);
-	void ParseMaterials(std::fstream& outfile);
+	void ParseNodes(std::ofstream& outfile);
+	void ParseNode(std::ofstream& outfile, const ModelNode* node);
+    void ParseMeshes(std::ofstream& outfile);
+    void ParseMaterials(std::ofstream& outfile);
+    void ParseSkeleton(std::ofstream& outfile);
 
-	void LoadModelFromAsset();
-	void LoadNodes(std::fstream& infile, uint32 size);
-	void LoadNode(std::fstream& infile, ModelNode* node);
-	void LoadMesh(std::fstream& infile);
-	void LoadMaterial(std::fstream& infile);
+    void LoadModelFromAsset();
+    void LoadNodes(std::ifstream& infile, uint32_t size);
+    void LoadNode(std::ifstream& infile, ModelNode*& node);
+    void LoadMesh(std::ifstream& infile, uint32_t size);
+    void LoadMaterial(std::ifstream& infile, uint32_t size);
+    void LoadSkeleton(std::ifstream& infile);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
@@ -54,9 +58,9 @@ private:
 
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
-	Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
-	//여기 좀 정리가 필요할 듯
-	//std::shared_ptr<Assimp::Importer> m_importer{};
+    Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
+    Texture* GenerateTexture(const std::string_view& textureName);
+
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };
 	std::string m_directory{};

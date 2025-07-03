@@ -97,7 +97,7 @@ inline void GameObject::RemoveComponent(T* component)
 	{
 		if (ModuleBehavior* script = dynamic_cast<ModuleBehavior*>(component))
 		{
-            m_componentIds.erase(script->m_scriptTypeID);
+			RemoveScriptComponent(script);
 		}
         else
         {

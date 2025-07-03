@@ -1,4 +1,5 @@
 #pragma once
+#ifndef DYNAMICCPP_EXPORTS
 #include "../Utility_Framework/HLSLCompiler.h"
 #include "Texture.h"
 #include "ImGuiRegister.h"
@@ -6,6 +7,8 @@
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "concurrent_queue.h"
+#include "AssetJob.h"
+
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
@@ -166,3 +169,4 @@ private:
 };
 
 static inline auto& DataSystems = DataSystem::GetInstance();
+#endif // !DYNAMICCPP_EXPORTS

@@ -1,15 +1,35 @@
 #pragma once
 #include "Component.h"
+#include "IAwakable.h"
+#include "IOnDistroy.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "SphereColliderComponent.generated.h"
 
-class SphereColliderComponent : public Component, public ICollider
+class SphereColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {
 public:
    ReflectSphereColliderComponent
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(SphereColliderComponent)
+
+   void Awake() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->CollectColliderComponent(this);
+	   }
+   }
+
+   void OnDistroy() override
+   {
+	   auto scene = SceneManagers->GetActiveScene();
+	   if (scene)
+	   {
+		   scene->UnCollectColliderComponent(this);
+	   }
+   }
 
 	[[Property]]
 	float radius = 1.0f;

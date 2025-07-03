@@ -195,9 +195,6 @@
     <Filter Include="RenderPass\PostProcessingPass\VolumetricFogPass">
       <UniqueIdentifier>{58f16791-412c-4cde-8140-c46c487171c6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ManagerSystem\AssetBundle">
-      <UniqueIdentifier>{2b0dcc16-18b4-487b-957c-42ced7d3cc45}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\EffectPass\0.Example">
       <UniqueIdentifier>{108adae5-f5fb-4472-bbce-788658390ee4}</UniqueIdentifier>
     </Filter>
@@ -269,6 +266,12 @@
     </Filter>
     <Filter Include="RenderPass\EffectPass\5.Size">
       <UniqueIdentifier>{cdb96e48-44af-4e2f-b1c0-4152bd9984db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\JobSystem\Asset">
+      <UniqueIdentifier>{8fd7ed60-c364-4d51-988d-8434ef51db2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\AssetBundle">
+      <UniqueIdentifier>{fe7e6475-d490-4ac1-a741-7548758437e4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -476,6 +479,15 @@
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClCompile>
+    <ClCompile Include="TestAniScprit.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>RenderPass\EffectPass\0.Example</Filter>
+    </ClCompile>
     <ClCompile Include="MeshSpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -502,6 +514,8 @@
     </ClCompile>
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+    <ClCompile Include="AssetJob.cpp">
+      <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -745,9 +759,6 @@
     <ClInclude Include="Socket.h">
       <Filter>Resources\Skeleton</Filter>
     </ClInclude>
-    <ClInclude Include="AssetBundle.h">
-      <Filter>Asset\ManagerSystem\AssetBundle</Filter>
-    </ClInclude>
     <ClInclude Include="BitMaskPass.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClInclude>
@@ -786,6 +797,17 @@
     </ClInclude>
     <ClInclude Include="EffectBase.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
+    <ClInclude Include="TestAniScprit.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetJob.h">
+      <Filter>Asset\JobSystem\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetBundle.h">
+      <Filter>Resources\AssetBundle</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetEntry.h">
+      <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

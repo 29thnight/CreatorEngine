@@ -43,7 +43,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_threadPool = new ThreadPool;
 	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
 	m_renderScene = new RenderScene();
-	SceneManagers->m_ActiveRenderScene = m_renderScene;
+	SceneManagers->SetRenderScene(m_renderScene);
 
 	//sampler 생성
 	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
@@ -222,6 +222,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_EffectEditor = std::make_unique<EffectEditor>();
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
     m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
+	m_trimEventHandle				= resourceTrimEvent.AddRaw(this, &SceneRenderer::ResourceTrim);
 	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&] 
 	{
 		m_renderScene->Update(0.f);
@@ -372,13 +373,14 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
 
-	auto sehawn = SceneManagers->GetActiveScene()->CreateGameObject("Test");
-	sehawn->AddComponent<EffectComponent>();
-
 	//TODO : 시연용 Player주석 코드
 /*	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
 	testt = Model::LoadModelToSceneObj(model[0], *scene);
 	player.GetPlayer(testt);*/ //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
+	////TODO : 시연용 Player주석 코드
+	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
+	//testt = Model::LoadModelToSceneObj(model[0], *scene);
+	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -954,5 +956,10 @@ void SceneRenderer::UnbindRenderTargets()
 void SceneRenderer::ReloadShaders()
 {
 	ShaderSystem->ReloadShaders();
+}
+
+void SceneRenderer::ResourceTrim()
+{
+	m_deviceResources->Trim();
 }
 

@@ -115,9 +115,6 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\PostProcessingManager">
-      <UniqueIdentifier>{7ea8156f-f2bf-4249-8956-67f849e68b6d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\InputAction">
       <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
     </Filter>
@@ -135,6 +132,9 @@
     </Filter>
     <Filter Include="Classes\GameAI\AIFramework\BT">
       <UniqueIdentifier>{23404554-a029-4e9c-bced-46e99feb929d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameObject\PrefabUtility">
+      <UniqueIdentifier>{bd79e2da-c4c1-4c05-9605-8ee739a79c80}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -254,6 +254,20 @@
     </ClCompile>
     <ClCompile Include="EffectComponent.cpp">
       <Filter>Classes\Components\RenderableComponent</Filter>
+    <ClCompile Include="BehaviorTreeComponent.cpp">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeFactory.cpp">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClCompile>
+    <ClCompile Include="Prefab.cpp">
+      <Filter>Classes\GameObject\Prefab</Filter>
+    </ClCompile>
+    <ClCompile Include="PrefabUtility.cpp">
+      <Filter>Classes\GameObject\PrefabUtility</Filter>
+    </ClCompile>
+    <ClCompile Include="RigidBodyComponent.cpp">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -437,9 +451,6 @@
     <ClInclude Include="InputActionManager.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
-    <ClInclude Include="PrefabUtility.h">
-      <Filter>Classes\GameObject\Prefab</Filter>
-    </ClInclude>
     <ClInclude Include="TagManager.h">
       <Filter>Managers\TagManager</Filter>
     </ClInclude>
@@ -508,6 +519,23 @@
     </ClInclude>
     <ClInclude Include="ISerializable.h">
       <Filter>Interfaces</Filter>
+    <ClInclude Include="Prefab.h">
+      <Filter>Classes\GameObject\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeFactory.h">
+      <Filter>Classes\GameAI\AIFramework\BT</Filter>
+    </ClInclude>
+    <ClInclude Include="PrefabUtility.h">
+      <Filter>Classes\GameObject\PrefabUtility</Filter>
+    </ClInclude>
+    <ClInclude Include="IStartable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="ILateUpdatable.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="EBodyType.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

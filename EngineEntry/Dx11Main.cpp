@@ -17,8 +17,15 @@
 #include "UIManager.h"
 #include "InputActionManager.h"
 #include "Profiler.h"
+#include "WinProcProxy.h"
+
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx11.h"
 //#include "SwapEvent.h"
 
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 std::atomic<bool> isGameToRender = false;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
@@ -68,7 +75,12 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
     {
         InputManagement->Update(deltaSecond);
-        InputActionManagers->Update(deltaSecond);
+        if (InputActionManagers == nullptr)
+        {
+            Debug->LogDebug("null입니다ㅏㅏ");
+        }
+        else
+         InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
         if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
         {
@@ -131,6 +143,16 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         PROFILE_REGISTER_THREAD("[CE-Thread]");
         while (isGameToRender)
         {
+            while (!WinProcProxy::GetInstance()->IsEmpty())
+            {
+				auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
+
+                if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
+                {
+                    continue;
+                }
+            }
+
             if (m_isInvokeResize)
             {
                 CreateWindowSizeDependentResources();

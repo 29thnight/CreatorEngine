@@ -93,41 +93,6 @@ GBufferOutput main(PixelShaderInput IN)
             albedo = SRGBtoLINEAR(albedo);
     }
     
-    [branch]
-    if (useTerrainLayers)
-    {
-        float2 uv = IN.texCoord;
-        uv.y = -uv.y;
-        
-        float2 uv0 = uv * gLayerTiling0;
-        float2 uv1 = uv * gLayerTiling1;
-        float2 uv2 = uv * gLayerTiling2;
-        float2 uv3 = uv * gLayerTiling3;
-        
-        float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0).rgb;
-        float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0).rgb;
-        float3 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0).rgb;
-        float3 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0).rgb;
-        
-        float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
-        
-        float weigt0 = splat.r;
-        float weigt1 = splat.g;
-        float weigt2 = splat.b;
-        float weigt3 = splat.a;
-        
-        
-        
-        float3 color = layer0 * weigt0 + layer1 * weigt1 + layer2 * weigt2 + layer3 * weigt3;
-        //color = layer0;
-        
-        //color.r = gLayerTiling.r - 1.0;
-        //color.bg = 0;
-        albedo = float4(color, 1.0);
-
-        if (gConvertToLinear)
-            albedo = SRGBtoLINEAR(albedo);
-    }
         
     
     
@@ -161,6 +126,48 @@ GBufferOutput main(PixelShaderInput IN)
 
     }
 
+    
+    if (useTerrainLayers)
+    {
+        float2 uv = IN.texCoord;
+        uv.y = -uv.y;
+        
+        float2 uv0 = uv * gLayerTiling0;
+        float2 uv1 = uv * gLayerTiling1;
+        float2 uv2 = uv * gLayerTiling2;
+        float2 uv3 = uv * gLayerTiling3;
+        
+        float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0).rgb;
+        float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0).rgb;
+        float3 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0).rgb;
+        float3 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0).rgb;
+        
+        float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
+        
+        float weigt0 = splat.r;
+        float weigt1 = splat.g;
+        float weigt2 = splat.b;
+        float weigt3 = splat.a;
+        
+        
+        
+        float3 color = layer0 * weigt0 + layer1 * weigt1 + layer2 * weigt2 + layer3 * weigt3;
+        //color = layer0;
+        
+        //color.r = gLayerTiling.r - 1.0;
+        //color.bg = 0;
+        albedo = float4(color, 1.0);
+
+        //if (gConvertToLinear)
+            albedo = SRGBtoLINEAR(albedo);
+        
+        occlusion = 1;
+        metallic = 0.0;
+        roughness = 1.0;
+        surf.N = float3(0, 1, 0);
+
+    }
+    
 
     OUT.diffuse = (float4(albedo.rgb, 0));
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 0);

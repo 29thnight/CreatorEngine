@@ -5,7 +5,7 @@
 #include "DirectXMath.h"
 #include "Core.Memory.hpp"
 #include "DirectXColors.h"
-
+#include "DeviceState.h"
 using namespace DirectX;
 
 namespace DisplayMetrics
@@ -78,14 +78,12 @@ void DirectX11::DeviceResources::ValidateDevice()
     // D3D 디바이스는 더 이상 유효하지 않습니다.
     // 먼저, 디바이스를 만들었을 때의 기본 어댑터에 대한 정보를 가져옵니다.
 
-    ComPtr<IDXGIDevice3> dxgiDevice;
-    DirectX11::ThrowIfFailed(m_d3dDevice.As(&dxgiDevice));
+    DirectX11::ThrowIfFailed(m_d3dDevice.As(&m_dxgiDevice));
 
-    ComPtr<IDXGIAdapter> deviceAdapter;
-    DirectX11::ThrowIfFailed(dxgiDevice->GetAdapter(&deviceAdapter));
+    DirectX11::ThrowIfFailed(m_dxgiDevice->GetAdapter(&m_deviceAdapter));
 
     ComPtr<IDXGIFactory4> deviceFactory;
-    DirectX11::ThrowIfFailed(deviceAdapter->GetParent(IID_PPV_ARGS(&deviceFactory)));
+    DirectX11::ThrowIfFailed(m_deviceAdapter->GetParent(IID_PPV_ARGS(&deviceFactory)));
 
     ComPtr<IDXGIAdapter1> previousDefaultAdapter;
     DirectX11::ThrowIfFailed(deviceFactory->EnumAdapters1(0, &previousDefaultAdapter));
@@ -111,8 +109,8 @@ void DirectX11::DeviceResources::ValidateDevice()
         FAILED(m_d3dDevice->GetDeviceRemovedReason()))
     {
         // 이전 디바이스와 관련된 리소스에 대한 참조를 해제합니다.
-        dxgiDevice = nullptr;
-        deviceAdapter = nullptr;
+        m_dxgiDevice = nullptr;
+        m_deviceAdapter = nullptr;
         deviceFactory = nullptr;
         previousDefaultAdapter = nullptr;
 
@@ -146,10 +144,7 @@ void DirectX11::DeviceResources::RegisterDeviceNotify(IDeviceNotify* deviceNotif
 
 void DirectX11::DeviceResources::Trim()
 {
-    ComPtr<IDXGIDevice3> dxgiDevice;
-    m_d3dDevice.As(&dxgiDevice);
-
-    dxgiDevice->Trim();
+    m_dxgiDevice->Trim();
 }
 
 void DirectX11::DeviceResources::Present()
@@ -160,8 +155,8 @@ void DirectX11::DeviceResources::Present()
     DXGI_PRESENT_PARAMETERS parameters = { 0 };
     if(m_swapChain == nullptr)
     {
-        // 스왑 체인이 없으면 창 크기 조정이 필요합니다.
-        CreateDeviceResources();
+        //스왑체인 잃었을때 작업
+        HandleLostSwapChain();
         return;
 	}
 
@@ -215,6 +210,18 @@ void DirectX11::DeviceResources::ResizeResources()
 	CreateWindowSizeDependentResources();
 }
 
+DXGI_QUERY_VIDEO_MEMORY_INFO DirectX11::DeviceResources::GetVideoMemoryInfo() const
+{
+    DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo = {};
+    if (m_deviceAdapter)
+    {
+        ComPtr<IDXGIAdapter3> dxgiAdapter;
+        DirectX11::ThrowIfFailed(m_deviceAdapter.As(&dxgiAdapter));
+        DirectX11::ThrowIfFailed(dxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo));
+    }
+    return memoryInfo;
+}
+
 void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 {
 #if defined(_DEBUG)
@@ -227,6 +234,7 @@ void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 
 void DirectX11::DeviceResources::CreateDeviceIndependentResources()
 {
+
 }
 
 void DirectX11::DeviceResources::CreateDeviceResources()
@@ -291,6 +299,22 @@ void DirectX11::DeviceResources::CreateDeviceResources()
         m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
 
         m_infoQueue->Release();
+    }
+
+    DirectX11::ThrowIfFailed(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgiDebug)));
+    {
+        DirectX11::ThrowIfFailed(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgiInfoQueue)));
+        
+        // WARNING 메시지에 Breakpoint
+		m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, FALSE);
+        
+        // ERROR 메시지에 Breakpoint
+        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, TRUE);
+        
+        // CORRUPTION 메시지에 Breakpoint (메모리 손상, 치명적)
+        m_dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+		
+        m_dxgiInfoQueue->Release();
     }
 #endif
 
@@ -390,25 +414,18 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		swapChainFullscreenDesc.Windowed = TRUE;
 
-        ComPtr<IDXGIDevice3> dxgiDevice;
         DirectX11::ThrowIfFailed(
-            m_d3dDevice.As(&dxgiDevice)
+            m_d3dDevice.As(&m_dxgiDevice)
         );
 
-        ComPtr<IDXGIAdapter> dxgiAdapter;
         DirectX11::ThrowIfFailed(
-            dxgiDevice->GetAdapter(&dxgiAdapter)
+            m_dxgiDevice->GetAdapter(&m_deviceAdapter)
         );
 
         ComPtr<IDXGIFactory2> dxgiFactory;
         DirectX11::ThrowIfFailed(
-            dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
+            m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
         );
-
-        dxgiFactory->MakeWindowAssociation(
-            m_window->GetHandle(),
-            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
-		);
 
         ComPtr<IDXGISwapChain1> swapChain;
         DirectX11::ThrowIfFailed(
@@ -422,6 +439,11 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             )
         );
 
+        dxgiFactory->MakeWindowAssociation(
+            m_window->GetHandle(),
+            DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+        );
+
         DirectX11::ThrowIfFailed(
             swapChain.As(&m_swapChain)
         );
@@ -429,7 +451,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
         DirectX11::ThrowIfFailed(
-            dxgiDevice->SetMaximumFrameLatency(1)
+            m_dxgiDevice->SetMaximumFrameLatency(1)
         );
 
         ComPtr<ID3D11Texture2D1> backBuffer;
@@ -572,5 +594,96 @@ void DirectX11::DeviceResources::UpdateRenderTargetSize()
 
 	m_d3dRenderTargetSize.width = m_outputSize.width;
 	m_d3dRenderTargetSize.height = m_outputSize.height;
+}
+
+void DirectX11::DeviceResources::HandleLostSwapChain()
+{
+    ComPtr<IDXGIFactory2> dxgiFactory;
+    DirectX11::ThrowIfFailed(
+        m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
+    );
+
+    DXGI_SCALING scaling = DisplayMetrics::SupportHighResolutions ? DXGI_SCALING_NONE : DXGI_SCALING_STRETCH;
+    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
+
+    m_d3dRenderTargetSize.width = m_logicalSize.width;
+    m_d3dRenderTargetSize.height = m_logicalSize.height;
+
+    swapChainDesc.Width = lround(m_d3dRenderTargetSize.width);		// 창의 크기를 맞춥니다.
+    swapChainDesc.Height = lround(m_d3dRenderTargetSize.height);
+    swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
+    swapChainDesc.Stereo = false;
+    swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
+    swapChainDesc.SampleDesc.Quality = 0;
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
+    swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapChainDesc.Flags = 0;
+    swapChainDesc.Scaling = scaling;
+    swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+
+    DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
+
+    swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+    swapChainFullscreenDesc.RefreshRate.Denominator = 1;
+    swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+    swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+    swapChainFullscreenDesc.Windowed = TRUE;
+
+    ComPtr<IDXGISwapChain1> swapChain;
+    DirectX11::ThrowIfFailed(
+        dxgiFactory->CreateSwapChainForHwnd(
+            m_d3dDevice.Get(),
+            m_window->GetHandle(),
+            &swapChainDesc,
+            &swapChainFullscreenDesc,
+            nullptr,
+            &swapChain
+        )
+    );
+
+    dxgiFactory->MakeWindowAssociation(
+        m_window->GetHandle(),
+        DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
+    );
+
+    DirectX11::ThrowIfFailed(
+        swapChain.As(&m_swapChain)
+    );
+
+    DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
+
+    DirectX11::ThrowIfFailed(
+        m_dxgiDevice->SetMaximumFrameLatency(1)
+    );
+
+    ComPtr<ID3D11Texture2D1> backBuffer;
+    DirectX11::ThrowIfFailed(
+        m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))
+    );
+
+    D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
+    renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+    DirectX11::ThrowIfFailed(
+        m_d3dDevice->CreateRenderTargetView1(
+            backBuffer.Get(),
+            &renderTargetViewDesc,
+            &m_d3dRenderTargetView
+        )
+    );
+
+    m_d3dContext->ClearRenderTargetView(m_d3dRenderTargetView.Get(), Colors::SlateGray);
+
+    DirectX::SetName(backBuffer.Get(), "BackBuffer");
+    //백버퍼 텍스쳐 받아오기
+    ID3D11Resource* pResource = nullptr;
+    m_d3dRenderTargetView->GetResource(&pResource);
+    DirectX11::ThrowIfFailed(
+        pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_backBuffer)
+    );
+    DeviceState::g_backBufferRTV = m_d3dRenderTargetView.Get();
 }
 #endif // !DYNAMICCPP_EXPORTS

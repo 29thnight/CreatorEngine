@@ -8,9 +8,14 @@
 #include "ReflectionYml.h"
 #include "SceneManager.h"
 #include "meshoptimizer.h"
-//
 #include "RigidBodyComponent.h"
 #include "MeshCollider.h"
+
+#include <algorithm>
+#include <execution>
+#include <iterator>
+
+//ThreadPool<std::function<void()>> ModelLoadPool{};
 
 ModelLoader::ModelLoader()
 {
@@ -31,8 +36,8 @@ ModelLoader::ModelLoader(const std::string_view& fileName)
 }
 
 ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fileName) :
-	m_AIScene(assimpScene),
-	m_skeletonLoader(assimpScene)
+    m_AIScene(assimpScene),
+    m_skeletonLoader(assimpScene)
 {
 	file::path filepath(fileName);
 	m_directory = filepath.parent_path().string() + "\\";
@@ -55,10 +60,25 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	}
 	m_model = AllocateResource<Model>();
 	m_model->name = filepath.stem().string();
-    if(0 < m_AIScene->mNumAnimations)
+    if(m_AIScene)
     {
-        m_model->m_animator = new Animator();
+        if (0 < m_AIScene->mNumAnimations)
+        {
+            m_model->m_animator = new Animator();
+        }
     }
+}
+
+size_t ModelLoader::CountNodes(aiNode* root)
+{
+	if (!root)
+		return 0u;
+
+	size_t count = 1u;
+	for (uint32_t i = 0; i < root->mNumChildren; ++i)
+		count += CountNodes(root->mChildren[i]);
+
+	return count;
 }
 
 void ModelLoader::ProcessNodes()
@@ -120,6 +140,9 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 	}
 	else
 	{
+		auto count = CountNodes(m_AIScene->mRootNode);
+		m_model->m_nodes.reserve(count);
+
 		ProcessNodes();
 		ProcessFlatMeshes();
 		ProcessMaterials();
@@ -132,7 +155,7 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 		}
-		//ParseModel(); //not used in current implementation
+		ParseModel(); //not used in current implementation
 	}
 
 	m_model->m_isMakeMeshCollider = isCreateMeshCollider;
@@ -144,8 +167,6 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 	std::vector<Vertex> vertices;
 	std::vector<uint32> indices;
 	m_numUVChannel = mesh->GetNumUVChannels(); //테스트 해보고 어떻게 되는지 확인해보기
-	bool hasTexCoords = mesh->mTextureCoords[0] != nullptr;
-	bool hasTexCoords1 = mesh->mTextureCoords[1] != nullptr;
     vertices.reserve(mesh->mNumVertices);
     indices.reserve(mesh->mNumFaces * 3);
 
@@ -172,12 +193,12 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 
 	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
-
-	if(!m_model->m_hasBones)
-	{
-		MeshOptimizer::Optimize(*meshObj, 1.05f);
-		MeshOptimizer::GenerateShadowMesh(*meshObj);
-	}
+	meshObj->m_modelName = m_model->name;
+	//if(!m_model->m_hasBones)
+	//{
+	//	MeshOptimizer::Optimize(*meshObj, 1.05f);
+	//	MeshOptimizer::GenerateShadowMesh(*meshObj);
+	//}
 
 	m_model->m_Meshes.push_back(meshObj);
 
@@ -320,125 +341,484 @@ Material* ModelLoader::GenerateMaterial(int index)
 
 void ModelLoader::ParseModel()
 {
-	std::fstream file;
-	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
-	file.open(filepath, std::ios::out | std::ios::binary);
-	if (file.is_open())
-	{
-		uint32 size = m_model->m_nodes.size();
-		file.write(reinterpret_cast<char*>(&size), sizeof(uint32));
-		ParseNodes(file);
-		ParseMeshes(file);
-		ParseMaterials(file);
-		file.close();
-	}
+    file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
+    std::ofstream file(filepath, std::ios::binary);
+    if (!file)
+        return;
+
+    uint32_t nodeCount   = static_cast<uint32_t>(m_model->m_nodes.size());
+    uint32_t meshCount   = static_cast<uint32_t>(m_model->m_Meshes.size());
+    uint32_t materialCnt = static_cast<uint32_t>(m_model->m_Materials.size());
+
+    file.write(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
+    file.write(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
+    file.write(reinterpret_cast<char*>(&materialCnt), sizeof(materialCnt));
+
+    bool hasSkeleton = m_model->m_hasBones && m_model->m_Skeleton;
+    file.write(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
+
+    if (hasSkeleton) ParseSkeleton(file);
+    ParseNodes(file);
+    ParseMeshes(file);
+    ParseMaterials(file);
 }
 
-void ModelLoader::ParseNodes(std::fstream& outfile)
+void ModelLoader::ParseNodes(std::ofstream& outfile)
 {
-	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
-	{
-		ModelNode* node = m_model->m_nodes[i];
-		ParseNode(outfile, node);
-	}
+    for (const ModelNode* node : m_model->m_nodes)
+    {
+        ParseNode(outfile, node);
+    }
 }
 
-void ModelLoader::ParseNode(std::fstream& outfile, ModelNode* node)
+void ModelLoader::ParseNode(std::ofstream& outfile, const ModelNode* node)
 {
-	size_t strSize = node->m_name.size();
-	outfile.write(reinterpret_cast<char*>(&strSize), sizeof(size_t));
-	outfile.write(reinterpret_cast<char*>(node->m_name.data()), strSize);
-	outfile.write(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
-	outfile.write(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
-	outfile.write(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_meshes.size());
-	outfile.write(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_childrenIndex.size());
+    uint32_t nameSize = static_cast<uint32_t>(node->m_name.size());
+    outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+    outfile.write(node->m_name.data(), nameSize);
+
+    outfile.write(reinterpret_cast<const char*>(&node->m_index), sizeof(node->m_index));
+    outfile.write(reinterpret_cast<const char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
+    outfile.write(reinterpret_cast<const char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
+    outfile.write(reinterpret_cast<const char*>(&node->m_numChildren), sizeof(node->m_numChildren));
+    outfile.write(reinterpret_cast<const char*>(&node->m_transform), sizeof(Mathf::Matrix));
+
+    if (!node->m_meshes.empty())
+        outfile.write(reinterpret_cast<const char*>(node->m_meshes.data()), node->m_meshes.size() * sizeof(uint32_t));
+    if (!node->m_childrenIndex.empty())
+        outfile.write(reinterpret_cast<const char*>(node->m_childrenIndex.data()), node->m_childrenIndex.size() * sizeof(uint32_t));
 }
 
-void ModelLoader::ParseMeshes(std::fstream& outfile)
+void ModelLoader::ParseMeshes(std::ofstream& outfile)
 {
-	for (uint32 i = 0; i < m_model->m_Meshes.size(); i++)
-	{
-		Mesh* mesh = m_model->m_Meshes[i];
-		outfile.write(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
-		outfile.write(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
-		outfile.write(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
-		//outfile.write(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
-		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-		outfile.write(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
-	}
+    for (const Mesh* mesh : m_model->m_Meshes)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(mesh->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(mesh->m_name.data(), nameSize);
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
+
+        uint32_t vertexCount = static_cast<uint32_t>(mesh->m_vertices.size());
+        outfile.write(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
+        if (vertexCount)
+            outfile.write(reinterpret_cast<const char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
+
+        uint32_t indexCount = static_cast<uint32_t>(mesh->m_indices.size());
+        outfile.write(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
+        if (indexCount)
+            outfile.write(reinterpret_cast<const char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
+
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+        outfile.write(reinterpret_cast<const char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+    }
 }
 
-void ModelLoader::ParseMaterials(std::fstream& outfile)
+void ModelLoader::ParseMaterials(std::ofstream& outfile)
 {
+    for (const Material* mat : m_model->m_Materials)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(mat->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(mat->m_name.data(), nameSize);
+        outfile.write(reinterpret_cast<const char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
+        outfile.write(reinterpret_cast<const char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
+        outfile.write(reinterpret_cast<const char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto writeTexName = [&](Texture* tex)
+        {
+            std::string tname = tex ? tex->m_name : std::string();
+            uint32_t len = static_cast<uint32_t>(tname.size());
+            outfile.write(reinterpret_cast<char*>(&len), sizeof(len));
+            if(len) outfile.write(tname.data(), len);
+        };
+
+        writeTexName(mat->m_pBaseColor);
+        writeTexName(mat->m_pNormal);
+        writeTexName(mat->m_pOccRoughMetal);
+        writeTexName(mat->m_AOMap);
+        writeTexName(mat->m_pEmissive);
+    }
+}
+
+void SetParentIndexRecursive(Bone* bone, int parent)
+{
+    bone->m_parentIndex = parent;
+    for (Bone* child : bone->m_children)
+    {
+        SetParentIndexRecursive(child, bone->m_index);
+    }
+}
+
+void ModelLoader::ParseSkeleton(std::ofstream& outfile)
+{
+    Skeleton* skeleton = m_model->m_Skeleton;
+	Animator* animator = m_model->m_animator;
+    if (!skeleton || !animator)
+        return;
+
+    SetParentIndexRecursive(skeleton->m_rootBone, -1);
+
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
+    outfile.write(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
+
+    uint32_t boneCount = static_cast<uint32_t>(skeleton->m_bones.size());
+    outfile.write(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+
+    for (Bone* bone : skeleton->m_bones)
+    {
+        uint32_t nameSize = static_cast<uint32_t>(bone->m_name.size());
+        outfile.write(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        outfile.write(bone->m_name.data(), nameSize);
+
+        outfile.write(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
+        outfile.write(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
+        outfile.write(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
+    }
+
+    uint32_t animCount = static_cast<uint32_t>(skeleton->m_animations.size());
+    outfile.write(reinterpret_cast<char*>(&animCount), sizeof(animCount));
+
+    for (const Animation& anim : skeleton->m_animations)
+    {
+        uint32_t animNameSize = static_cast<uint32_t>(anim.m_name.size());
+        outfile.write(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
+        outfile.write(anim.m_name.data(), animNameSize);
+
+        outfile.write(reinterpret_cast<const char*>(&anim.m_duration), sizeof(anim.m_duration));
+        outfile.write(reinterpret_cast<const char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+        outfile.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+
+        uint32_t nodeAnimCount = static_cast<uint32_t>(anim.m_nodeAnimations.size());
+        outfile.write(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
+
+        for (const auto& [nodeName, nodeAnim] : anim.m_nodeAnimations)
+        {
+            uint32_t nodeNameSize = static_cast<uint32_t>(nodeName.size());
+            outfile.write(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
+            outfile.write(nodeName.data(), nodeNameSize);
+
+            uint32_t posKeyCount = static_cast<uint32_t>(nodeAnim.m_positionKeys.size());
+            outfile.write(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
+            for (const auto& key : nodeAnim.m_positionKeys)
+            {
+                DirectX::XMFLOAT4 pos;
+                XMStoreFloat4(&pos, key.m_position);
+                outfile.write(reinterpret_cast<char*>(&pos), sizeof(pos));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+
+            uint32_t rotKeyCount = static_cast<uint32_t>(nodeAnim.m_rotationKeys.size());
+            outfile.write(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
+            for (const auto& key : nodeAnim.m_rotationKeys)
+            {
+                DirectX::XMFLOAT4 rot;
+                XMStoreFloat4(&rot, key.m_rotation);
+                outfile.write(reinterpret_cast<char*>(&rot), sizeof(rot));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+
+            uint32_t scaleKeyCount = static_cast<uint32_t>(nodeAnim.m_scaleKeys.size());
+            outfile.write(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
+            for (const auto& key : nodeAnim.m_scaleKeys)
+            {
+                outfile.write(reinterpret_cast<const char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                outfile.write(reinterpret_cast<const char*>(&key.m_time), sizeof(key.m_time));
+            }
+        }
+    }
+
+	boost::uuids::uuid guid = animator->m_Motion.m_guid;
+	outfile.write(reinterpret_cast<const char*>(&guid), sizeof(boost::uuids::uuid));
 }
 
 void ModelLoader::LoadModelFromAsset()
 {
-	std::fstream file;
-	file::path filepath = PathFinder::Relative("Models\\").string() + m_model->name + ".asset";
-	file.open(filepath, std::ios::in | std::ios::binary);
-	if (file.is_open())
-	{
-        uint32 size{};
-		file.read(reinterpret_cast<char*>(&size), sizeof(uint32));
-		m_model->m_nodes.resize(size);
-		LoadNodes(file, size);
-		LoadMesh(file);
-		LoadMaterial(file);
-		file.close();
-	}
+    file::path filepath = PathFinder::Relative("Models\\") / (m_model->name + ".asset");
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file)
+        return;
+
+    uint32_t nodeCount{};
+    uint32_t meshCount{};
+    uint32_t materialCount{};
+
+    file.read(reinterpret_cast<char*>(&nodeCount), sizeof(nodeCount));
+    file.read(reinterpret_cast<char*>(&meshCount), sizeof(meshCount));
+    file.read(reinterpret_cast<char*>(&materialCount), sizeof(materialCount));
+
+    LoadSkeleton(file);
+    LoadNodes(file, nodeCount);
+    LoadMesh(file, meshCount);
+    LoadMaterial(file, materialCount);
 }
 
-void ModelLoader::LoadNodes(std::fstream& infile, uint32 size)
+void ModelLoader::LoadNodes(std::ifstream& infile, uint32_t size)
 {
-	for (uint32 i = 0; i < size; i++)
-	{
-		LoadNode(infile, m_model->m_nodes[i]);
-	}
+    m_model->m_nodes.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        ModelNode* node{};
+        LoadNode(infile, node);
+        m_model->m_nodes.push_back(node);
+    }
 }
 
-void ModelLoader::LoadNode(std::fstream& infile, ModelNode* node)
+void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
 {
-    size_t size{};
-	std::string name;
-	infile.read(reinterpret_cast<char*>(&size), sizeof(size_t));
-	infile.read(reinterpret_cast<char*>(name.data()), size);
-	node = new ModelNode(name);
+    uint32_t nameSize{};
+    infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+    std::string name;
+    name.resize(nameSize);
+    infile.read(name.data(), nameSize);
 
-	infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(uint32));
-	infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(Mathf::Matrix));
-	infile.read(reinterpret_cast<char*>(node->m_meshes.data()), sizeof(uint32) * node->m_numMeshes);
-	infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), sizeof(uint32) * node->m_numChildren);
+    node = AllocateResource<ModelNode>(name);
+
+    infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(node->m_index));
+    infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
+    infile.read(reinterpret_cast<char*>(&node->m_numMeshes), sizeof(node->m_numMeshes));
+    infile.read(reinterpret_cast<char*>(&node->m_numChildren), sizeof(node->m_numChildren));
+    infile.read(reinterpret_cast<char*>(&node->m_transform), sizeof(XMFLOAT4X4));
+
+    node->m_meshes.resize(node->m_numMeshes);
+    node->m_childrenIndex.resize(node->m_numChildren);
+    if (node->m_numMeshes)
+        infile.read(reinterpret_cast<char*>(node->m_meshes.data()), node->m_numMeshes * sizeof(uint32_t));
+    if (node->m_numChildren)
+        infile.read(reinterpret_cast<char*>(node->m_childrenIndex.data()), node->m_numChildren * sizeof(uint32_t));
 }
 
-void ModelLoader::LoadMesh(std::fstream& infile)
+void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
 {
-	for (uint32 i = 0; i < m_model->m_nodes.size(); i++)
-	{
-		ModelNode* node = m_model->m_nodes[i];
-		for (uint32 j = 0; j < node->m_numMeshes; j++)
-		{
-			Mesh* mesh = new Mesh();
-			infile.read(reinterpret_cast<char*>(mesh->m_name.data()), sizeof(mesh->m_name.size()));
-			infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), mesh->m_vertices.size() * sizeof(Vertex));
-			infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), mesh->m_indices.size() * sizeof(uint32));
-			//infile.read(reinterpret_cast<char*>(&mesh->m_transform), sizeof(Mathf::Matrix));
-			infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
-			infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
-			m_model->m_Meshes.push_back(mesh);
-			//m_model->m_Materials.push_back(new Material());
-		}
-	}
+    m_model->m_Meshes.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        auto* mesh = AllocateResource<Mesh>();
+        mesh->m_name = name;
+        infile.read(reinterpret_cast<char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
+
+        uint32_t vertexCount{};
+        infile.read(reinterpret_cast<char*>(&vertexCount), sizeof(vertexCount));
+        mesh->m_vertices.resize(vertexCount);
+        if (vertexCount)
+            infile.read(reinterpret_cast<char*>(mesh->m_vertices.data()), vertexCount * sizeof(Vertex));
+
+        uint32_t indexCount{};
+        infile.read(reinterpret_cast<char*>(&indexCount), sizeof(indexCount));
+        mesh->m_indices.resize(indexCount);
+        if (indexCount)
+            infile.read(reinterpret_cast<char*>(mesh->m_indices.data()), indexCount * sizeof(uint32_t));
+
+        infile.read(reinterpret_cast<char*>(&mesh->m_boundingBox), sizeof(DirectX::BoundingBox));
+        infile.read(reinterpret_cast<char*>(&mesh->m_boundingSphere), sizeof(DirectX::BoundingSphere));
+
+		mesh->AssetInit();
+
+        m_model->m_Meshes.push_back(mesh);
+    }
 }
 
-void ModelLoader::LoadMaterial(std::fstream& infile)
+void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 {
+    m_model->m_Materials.reserve(size);
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        Material* mat = AllocateResource<Material>();
+        mat->m_name = name;
+        infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
+        infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
+        infile.read(reinterpret_cast<char*>(&mat->m_fileGuid), sizeof(FileGuid));
+
+        auto readString = [&](std::string& outStr)
+        {
+            uint32_t len{};
+            infile.read(reinterpret_cast<char*>(&len), sizeof(len));
+            outStr.resize(len);
+            if (len) infile.read(outStr.data(), len);
+        };
+
+        std::string baseColorName;
+        std::string normalName;
+        std::string ormName;
+        std::string aoName;
+        std::string emissiveName;
+
+        readString(baseColorName);
+        readString(normalName);
+        readString(ormName);
+        readString(aoName);
+        readString(emissiveName);
+
+        if (mat->m_materialInfo.m_useBaseColor)
+        {
+            if (Texture* tex = GenerateTexture(baseColorName))
+                mat->UseBaseColorMap(tex);
+        }
+        if (mat->m_materialInfo.m_useNormalMap)
+        {
+            if (Texture* tex = GenerateTexture(normalName))
+                mat->UseNormalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useOccRoughMetal)
+        {
+            if (Texture* tex = GenerateTexture(ormName))
+                mat->UseOccRoughMetalMap(tex);
+        }
+        if (mat->m_materialInfo.m_useAOMap)
+        {
+            if (Texture* tex = GenerateTexture(aoName))
+                mat->UseAOMap(tex);
+        }
+        if (mat->m_materialInfo.m_useEmissive)
+        {
+            if (Texture* tex = GenerateTexture(emissiveName))
+                mat->UseEmissiveMap(tex);
+        }
+
+        m_model->m_Materials.push_back(mat);
+    }
+}
+
+void ModelLoader::LoadSkeleton(std::ifstream& infile)
+{
+    bool hasSkeleton{};
+    infile.read(reinterpret_cast<char*>(&hasSkeleton), sizeof(hasSkeleton));
+    if (!hasSkeleton)
+        return;
+
+    Skeleton* skeleton = AllocateResource<Skeleton>();
+    infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
+    infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
+
+    uint32_t boneCount{};
+    infile.read(reinterpret_cast<char*>(&boneCount), sizeof(boneCount));
+    skeleton->m_bones.reserve(boneCount);
+
+    for (uint32_t i = 0; i < boneCount; ++i)
+    {
+        uint32_t nameSize{};
+        infile.read(reinterpret_cast<char*>(&nameSize), sizeof(nameSize));
+        std::string name;
+        name.resize(nameSize);
+        infile.read(name.data(), nameSize);
+
+        Bone* bone = AllocateResource<Bone>();
+        bone->m_name = name;
+        infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
+        infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));
+        infile.read(reinterpret_cast<char*>(&bone->m_offset), sizeof(XMFLOAT4X4));
+        bone->m_localTransform = XMMatrixIdentity();
+        bone->m_globalTransform = XMMatrixIdentity();
+
+        skeleton->m_bones.push_back(bone);
+    }
+
+    for (Bone* bone : skeleton->m_bones)
+    {
+        if (bone->m_parentIndex >= 0 && bone->m_parentIndex < static_cast<int>(boneCount))
+        {
+            skeleton->m_bones[bone->m_parentIndex]->m_children.push_back(bone);
+        }
+        else
+        {
+            skeleton->m_rootBone = bone;
+        }
+    }
+
+    uint32_t animCount{};
+    infile.read(reinterpret_cast<char*>(&animCount), sizeof(animCount));
+    skeleton->m_animations.reserve(animCount);
+
+    for (uint32_t i = 0; i < animCount; ++i)
+    {
+        Animation anim{};
+
+        uint32_t animNameSize{};
+        infile.read(reinterpret_cast<char*>(&animNameSize), sizeof(animNameSize));
+        anim.m_name.resize(animNameSize);
+        infile.read(anim.m_name.data(), animNameSize);
+
+        infile.read(reinterpret_cast<char*>(&anim.m_duration), sizeof(anim.m_duration));
+        infile.read(reinterpret_cast<char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+        infile.read(reinterpret_cast<char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+
+        uint32_t nodeAnimCount{};
+        infile.read(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
+
+        for (uint32_t j = 0; j < nodeAnimCount; ++j)
+        {
+            uint32_t nodeNameSize{};
+            infile.read(reinterpret_cast<char*>(&nodeNameSize), sizeof(nodeNameSize));
+            std::string nodeName;
+            nodeName.resize(nodeNameSize);
+            infile.read(nodeName.data(), nodeNameSize);
+
+            NodeAnimation nodeAnim{};
+
+            uint32_t posKeyCount{};
+            infile.read(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));
+            nodeAnim.m_positionKeys.reserve(posKeyCount);
+            for (uint32_t k = 0; k < posKeyCount; ++k)
+            {
+                NodeAnimation::PositionKey key{};
+                DirectX::XMFLOAT4 pos;
+                infile.read(reinterpret_cast<char*>(&pos), sizeof(pos));
+                key.m_position = XMLoadFloat4(&pos);
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_positionKeys.push_back(key);
+            }
+
+            uint32_t rotKeyCount{};
+            infile.read(reinterpret_cast<char*>(&rotKeyCount), sizeof(rotKeyCount));
+            nodeAnim.m_rotationKeys.reserve(rotKeyCount);
+            for (uint32_t k = 0; k < rotKeyCount; ++k)
+            {
+                NodeAnimation::RotationKey key{};
+                DirectX::XMFLOAT4 rot;
+                infile.read(reinterpret_cast<char*>(&rot), sizeof(rot));
+                key.m_rotation = XMLoadFloat4(&rot);
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_rotationKeys.push_back(key);
+            }
+
+            uint32_t scaleKeyCount{};
+            infile.read(reinterpret_cast<char*>(&scaleKeyCount), sizeof(scaleKeyCount));
+            nodeAnim.m_scaleKeys.reserve(scaleKeyCount);
+            for (uint32_t k = 0; k < scaleKeyCount; ++k)
+            {
+                NodeAnimation::ScaleKey key{};
+                infile.read(reinterpret_cast<char*>(&key.m_scale), sizeof(Mathf::Vector3));
+                infile.read(reinterpret_cast<char*>(&key.m_time), sizeof(key.m_time));
+                nodeAnim.m_scaleKeys.push_back(key);
+            }
+
+            anim.m_nodeAnimations.emplace(nodeName, std::move(nodeAnim));
+        }
+
+        skeleton->m_animations.push_back(std::move(anim));
+    }
+
+	boost::uuids::uuid guid;
+	infile.read(reinterpret_cast<char*>(&guid), sizeof(boost::uuids::uuid));
+
+    m_model->m_Skeleton = skeleton;
+    m_model->m_hasBones = true;
+	
+	m_model->m_animator = new Animator();
+	m_model->m_animator->m_Skeleton = skeleton;
+	m_model->m_animator->m_Motion.m_guid = guid;
+	m_model->m_animator->SetEnabled(true);
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
@@ -523,34 +903,42 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	for (uint32 i = 0; i < node->m_numMeshes; ++i)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
-		m_gameObjects.push_back(object);
-		uint32 meshId = node->m_meshes[i];
-		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[mesh->m_materialIndex];
-		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-		if(m_model->m_isMakeMeshCollider)
+		uint32 meshId			= node->m_meshes[i];
+		Mesh* mesh				= m_model->m_Meshes[meshId];
+		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
+		Mathf::Matrix transform = node->m_transform;
+		Model* model = m_model;
+
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
-			MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
-			convexMesh->SetDensity(0);
-			convexMesh->SetDynamicFriction(0);
-			convexMesh->SetStaticFriction(0);
-			convexMesh->SetRestitution(0);
-		}
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-		meshRenderer->SetEnabled(true);
-		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(node->m_transform);
+			if (model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
+
 		nextIndex = object->m_index;
+		//m_gameObjects.push_back(object);
 	}
 
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
-		m_gameObjects.push_back(object);
+		//m_gameObjects.push_back(object);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -576,7 +964,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);
-			m_gameObjects.push_back(boneObject);
+			//m_gameObjects.push_back(boneObject);
 		}
 		else
 		{
@@ -638,6 +1026,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
+
 			nextIndex = rootObject->m_index;
 			return rootObject.get();
 		}
@@ -649,25 +1038,32 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
-		Material* material = m_model->m_Materials[meshId];
-		MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
+		Material* material = m_model->m_Materials[mesh->m_materialIndex];
+		Mathf::Matrix transform = node->m_transform;
 
-		if (m_model->m_isMakeMeshCollider)
+		SceneManagers->m_threadPool->Enqueue([=]
 		{
-			RigidBodyComponent* rigidbody = rootObject->AddComponent<RigidBodyComponent>();
-			MeshColliderComponent* convexMesh = rootObject->AddComponent<MeshColliderComponent>();
-			convexMesh->SetDensity(0);
-			convexMesh->SetDynamicFriction(0);
-			convexMesh->SetStaticFriction(0);
-			convexMesh->SetRestitution(0);
-		}
+			MeshRenderer* meshRenderer = object->AddComponent<MeshRenderer>();
 
-		meshRenderer->SetEnabled(true);
-		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
-		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->m_transform.SetLocalMatrix(node->m_transform);
+			if (m_model->m_isMakeMeshCollider)
+			{
+				RigidBodyComponent* rigidbody = object->AddComponent<RigidBodyComponent>();
+				MeshColliderComponent* convexMesh = object->AddComponent<MeshColliderComponent>();
+				convexMesh->SetDensity(0);
+				convexMesh->SetDynamicFriction(0);
+				convexMesh->SetStaticFriction(0);
+				convexMesh->SetRestitution(0);
+			}
+
+			meshRenderer->SetEnabled(true);
+			meshRenderer->m_Mesh = mesh;
+			meshRenderer->m_Material = material;
+			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+			object->m_transform.SetLocalMatrix(transform);
+		});
+
 		nextIndex = object->m_index;
+		//m_gameObjects.push_back(object);
 	}
 
 	if (false == isRoot && 0 == node->m_numMeshes)
@@ -681,6 +1077,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 	{
 		GenerateSceneObjectHierarchy(m_model->m_nodes[node->m_childrenIndex[i]], false, nextIndex);
 	}
+
 	return rootObject.get();
 }
 
@@ -723,25 +1120,25 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
 	Texture* texture = nullptr;
 	if (hasTex)
 	{
-		aiString str;
-		material->GetTexture(type, index, &str);
-		std::string textureName = str.C_Str();
-		std::wstring stemp = std::wstring(textureName.begin(), textureName.end());
-		file::path _path = stemp.c_str();
-		auto it = DataSystems->Textures.find(textureName);
-		if (it != DataSystems->Textures.end())
-		{
-			texture = it->second.get();
-		}
-		else
-		{
-			texture = DataSystems->LoadMaterialTexture(_path.string());
-			if(nullptr != texture)
-			{
-				texture->m_name = textureName;
-				m_model->m_Textures.push_back(texture);
-			}
-		}
-	}
-	return texture;
+        aiString str;
+        material->GetTexture(type, index, &str);
+        std::string textureName = str.C_Str();
+        texture = GenerateTexture(textureName);
+    }
+    return texture;
+}
+
+Texture* ModelLoader::GenerateTexture(const std::string_view& textureName)
+{
+    if (textureName.empty())
+        return nullptr;
+
+    file::path path(textureName);
+    Texture* texture = DataSystems->LoadMaterialTexture(path.string());
+    if (texture)
+    {
+        texture->m_name = std::string(textureName);
+        m_model->m_Textures.push_back(texture);
+    }
+    return texture;
 }

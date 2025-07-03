@@ -6,6 +6,9 @@
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
+#include "../RenderEngine/Material.h"
+#include "../RenderEngine/Mesh.h"
+#include "ResourceAllocator.h"
 
 MeshRenderer::MeshRenderer()
 {
@@ -20,7 +23,7 @@ MeshRenderer::~MeshRenderer()
 void MeshRenderer::Awake()
 {
     auto scene = SceneManagers->GetActiveScene();
-    auto renderScene = SceneManagers->m_ActiveRenderScene;
+    auto renderScene = SceneManagers->GetRenderScene();
     if (scene)
     {
         scene->CollectMeshRenderer(this);
@@ -39,7 +42,7 @@ void MeshRenderer::OnDistroy()
 {
     CullingManagers->Remove(this);
 	auto scene = SceneManagers->GetActiveScene();
-    auto renderScene = SceneManagers->m_ActiveRenderScene;
+    auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
 		scene->UnCollectMeshRenderer(this);

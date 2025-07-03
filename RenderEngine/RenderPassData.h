@@ -27,15 +27,17 @@ public:
 	ProxyContainer			  m_forwardQueue;
 	ProxyContainer			  m_shadowRenderQueue;
 	Camera					  m_shadowCamera;
+	//flags
 	std::atomic_bool          m_isInitalized{ false };
 	std::atomic_bool          m_isDestroy{ false };
+	std::atomic<uint32>		  m_index{ 0 };
 	std::atomic<uint32>       m_frame{};
 
 	Mathf::xMatrix            m_frameCalculatedView{};
 	Mathf::xMatrix            m_frameCalculatedProjection{};
 
-	ComPtr<ID3D11Buffer>	m_ViewBuffer;
-	ComPtr<ID3D11Buffer>	m_ProjBuffer;
+	ComPtr<ID3D11Buffer>	  m_ViewBuffer;
+	ComPtr<ID3D11Buffer>	  m_ProjBuffer;
 
 	RenderPassData();
 	~RenderPassData();

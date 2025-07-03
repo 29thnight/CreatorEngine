@@ -1,3 +1,4 @@
+#ifndef DYNAMICCPP_EXPORTS
 #include "PSO.h"
 #include "ShaderSystem.h"
 
@@ -217,3 +218,4 @@ void PipelineStateObject::Reset()
     DeviceState::g_pDeviceContext->OMSetBlendState(nullptr, nullptr, 0xffffffff);
     DeviceState::g_pDeviceContext->OMSetDepthStencilState(nullptr, 0);
 }
+#endif // !DYNAMICCPP_EXPORTS
