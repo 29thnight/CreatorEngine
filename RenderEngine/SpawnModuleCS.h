@@ -1,5 +1,5 @@
 #pragma once
-#include "ParticleModule.h"
+#include "SpawnSystem.h"
 #include "ISerializable.h"
 
 class EffectSerializer;
@@ -25,7 +25,7 @@ struct alignas(16) ParticleTemplateParams
 };
 
 enum class EmitterType;
-class SpawnModuleCS : public ParticleModule, public ISerializable
+class SpawnModuleCS : public SpawnSystem, public ISerializable
 {
 private:
     // 컴퓨트 셰이더 관련
@@ -94,13 +94,13 @@ public:
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
 
     // ISerializable 인터페이스 구현
-    virtual nlohmann::json SerializeData() const override;
-    
+    virtual nlohmann::json SerializeData() const override;    
 
     virtual void DeserializeData(const nlohmann::json& json) override;
     
-
     virtual std::string GetModuleType() const override;
+
+    virtual void DrawNodeGUI();
     
 private:
     bool InitializeComputeShader();

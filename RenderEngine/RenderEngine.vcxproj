@@ -254,6 +254,7 @@
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="EffectBase.h" />
     <ClInclude Include="EffectEditor.h" />
+    <ClInclude Include="EffectEventUnit.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectManagerProxy.h" />
     <ClInclude Include="EffectModules.h">
@@ -267,8 +268,10 @@
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="MeshSpawnModuleCS.h" />
     <ClInclude Include="MovementModuleCS.h" />
+    <ClInclude Include="OutputParticleUnit.h" />
     <ClInclude Include="ParticleModule.h" />
     <ClInclude Include="ParticleSystem.h" />
+    <ClInclude Include="ParticlesUnit.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderModules.h" />
@@ -283,7 +286,6 @@
     <ClInclude Include="GizmoPass.h" />
     <ClInclude Include="GizmoRenderer.h" />
     <ClInclude Include="MaterialInfomation.h" />
-    <ClInclude Include="ModuleLink.h" />
     <ClInclude Include="ProjectionType.h" />
     <ClInclude Include="MeshRendererProxy.h" />
     <ClInclude Include="RenderJob.h" />
@@ -297,6 +299,7 @@
     <ClInclude Include="LightMapPass.h" />
     <ClInclude Include="PositionMapPass.h" />
     <ClInclude Include="RenderState.h" />
+    <ClInclude Include="SpawnSystem.h" />
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
     <ClInclude Include="SwapEvent.h" />

@@ -136,6 +136,12 @@
     <Filter Include="Classes\GameObject\PrefabUtility">
       <UniqueIdentifier>{bd79e2da-c4c1-4c05-9605-8ee739a79c80}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Event">
+      <UniqueIdentifier>{639e06f8-b3d7-4b24-b637-d2f3853fe045}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers\EventManager%28작성 대기중%29">
+      <UniqueIdentifier>{4de8f52f-10d6-4657-819b-fffe3de24e1a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -254,7 +260,7 @@
     </ClCompile>
     <ClCompile Include="EffectComponent.cpp">
       <Filter>Classes\Components\RenderableComponent</Filter>
-	</ClCompile>
+    </ClCompile>
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClCompile>
@@ -520,7 +526,7 @@
     </ClInclude>
     <ClInclude Include="ISerializable.h">
       <Filter>Interfaces</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
@@ -538,6 +544,12 @@
     </ClInclude>
     <ClInclude Include="EBodyType.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="EventManager.h">
+      <Filter>Managers\EventManager%28작성 대기중%29</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>Classes\Event</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

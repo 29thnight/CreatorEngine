@@ -20,6 +20,7 @@ class EffectManagerProxy
 {
 public:
     EffectManagerProxy() = default;
+	~EffectManagerProxy() = default;
 
     // 복사 생성자 추가
     EffectManagerProxy(const EffectManagerProxy& other) :
@@ -164,7 +165,7 @@ public:
     const std::string& GetEffectName() const { return m_effectName; }
 
 private:
-    std::function<void()> m_executeFunction;
-    EffectCommandType m_commandType;
-    std::string m_effectName;
+    std::function<void()> m_executeFunction{};
+    EffectCommandType m_commandType{};
+    std::string m_effectName{};
 };

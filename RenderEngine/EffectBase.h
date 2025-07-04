@@ -2,7 +2,8 @@
 #include "ParticleSystem.h"
 
 // Effect의 기본 인터페이스
-class EffectBase {
+class EffectBase 
+{
 protected:
     // 여러 ParticleSystem들을 관리
     std::vector<std::shared_ptr<ParticleSystem>> m_particleSystems;

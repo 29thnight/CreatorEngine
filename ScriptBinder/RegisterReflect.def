@@ -10,12 +10,13 @@
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
-#include "Skeleton.h"
 #include "Camera.h"
+#include "EffectEventUnit.h"
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
 #include "Mesh.h"
+#include "Skeleton.h"
 #include "TestAniScprit.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
@@ -74,6 +75,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
     AUTO_REGISTER_CLASS(EffectComponent);
+    AUTO_REGISTER_CLASS(EffectEventUnit);
     AUTO_REGISTER_CLASS(GameObject);
     AUTO_REGISTER_CLASS(ImageComponent);
     AUTO_REGISTER_CLASS(InputAction);

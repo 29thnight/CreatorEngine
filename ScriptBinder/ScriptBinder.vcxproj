@@ -194,6 +194,8 @@
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
+    <ClInclude Include="Event.h" />
+    <ClInclude Include="EventManager.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />

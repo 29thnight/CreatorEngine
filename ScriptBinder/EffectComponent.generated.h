@@ -13,6 +13,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_property(m_duration) \
 		meta_property(m_currentTime) \
 		meta_property(num) \
+		meta_property(m_particleEvents) \
 	}); \
 	MethodField \
 	({ \
@@ -23,6 +24,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_method(ResumeEffect) \
 		meta_method(ChangeEffect, "std", "newEffectName") \
 		meta_method(PlayEffectByName, "std", "effectName") \
+		meta_method(AddParticleEvent, "std", "eventName") \
 	}); \
 	FieldEnd(EffectComponent, PropertyAndMethodInheritance) \
 };

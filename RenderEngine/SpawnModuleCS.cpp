@@ -483,3 +483,86 @@ std::string SpawnModuleCS::GetModuleType() const
 {
 	return "SpawnModuleCS";
 }
+
+void SpawnModuleCS::DrawNodeGUI()
+{
+	using namespace ax::NodeEditor;
+
+	BeginNode(m_instanceID.m_ID_Data);
+	ImGui::Text("SpawnModuleCS");
+
+	// 式式式式式式式式式 Input Pins 式式式式式式式式式
+	BeginPin(m_startPinID.m_ID_Data, PinKind::Input);
+	ImGui::Text("Start");
+	EndPin();
+
+	ImGui::SameLine();
+
+	BeginPin(m_endPinID.m_ID_Data, PinKind::Input);
+	ImGui::Text("End");
+	EndPin();
+
+	// 式式式式式式式式式 SpawnParams 式式式式式式式式式
+	if (ImGui::CollapsingHeader("Spawn Settings", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::DragFloat("Spawn Rate", &m_spawnParams.spawnRate, 0.1f, 0.0f, 1000.0f))
+			m_spawnParamsDirty = true;
+
+		if (ImGui::DragFloat3("Emitter Size", &m_spawnParams.emitterSize.x, 0.1f))
+			m_spawnParamsDirty = true;
+
+		if (ImGui::DragFloat("Emitter Radius", &m_spawnParams.emitterRadius, 0.1f, 0.0f, 100.0f))
+			m_spawnParamsDirty = true;
+
+		if (ImGui::DragInt("Max Particles", (int*)&m_spawnParams.maxParticles, 1, 1, 100000))
+			m_spawnParamsDirty = true;
+
+		if (ImGui::DragFloat3("Emitter Position", &m_spawnParams.emitterPosition.x, 0.1f))
+			m_spawnParamsDirty = true;
+
+		const char* emitterTypes[] = { "Box", "Sphere", "Cone" };
+		int currentType = static_cast<int>(m_spawnParams.emitterType);
+		if (ImGui::Combo("Emitter Type", &currentType, emitterTypes, IM_ARRAYSIZE(emitterTypes))) {
+			m_spawnParams.emitterType = currentType;
+			m_spawnParamsDirty = true;
+		}
+	}
+
+	// 式式式式式式式式式 ParticleTemplateParams 式式式式式式式式式
+	if (ImGui::CollapsingHeader("Particle Template", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::DragFloat("Lifetime", &m_particleTemplate.lifeTime, 0.1f, 0.0f, 60.0f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat("Rotate Speed", &m_particleTemplate.rotateSpeed, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat2("Size", &m_particleTemplate.size.x, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::ColorEdit4("Color", &m_particleTemplate.color.x))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat3("Velocity", &m_particleTemplate.velocity.x, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat3("Acceleration", &m_particleTemplate.acceleration.x, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat("Min Vertical Vel", &m_particleTemplate.minVerticalVelocity, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat("Max Vertical Vel", &m_particleTemplate.maxVerticalVelocity, 0.1f))
+			m_templateDirty = true;
+
+		if (ImGui::DragFloat("Horizontal Range", &m_particleTemplate.horizontalVelocityRange, 0.1f))
+			m_templateDirty = true;
+	}
+
+	// 式式式式式式式式式 Output Pins 式式式式式式式式式
+	BeginPin(m_SpawnEventPinID.m_ID_Data, PinKind::Output);
+	ImGui::Text("SpawnOut");
+	EndPin();
+
+	EndNode();
+}

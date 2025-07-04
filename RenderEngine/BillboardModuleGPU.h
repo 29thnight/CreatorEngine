@@ -30,13 +30,10 @@ public:
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
 
-
     virtual void DeserializeData(const nlohmann::json& json) override;
-    
 
     virtual std::string GetModuleType() const override;
     
-
     // 추가 Getter 메소드들 (JSON 직렬화용)
     UINT GetMaxCount() const { return m_maxCount; }
     const std::vector<BillboardVertex>& GetVertices() const { return m_vertices; }

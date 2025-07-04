@@ -4,22 +4,59 @@
 
 EffectEditor::EffectEditor()
 {
-    ImGui::ContextRegister("EffectEdit", false, [&]() {
-        if (ImGui::BeginMenuBar())
-        {
-            ImGui::Text("Effect Editor");
+    // 수정 해야 함.
+    ImGui::ContextRegister("EffectEdit", true, [&]() 
+    {
+        RenderMainEditor();
+    });
+    ImGui::GetContext("EffectEdit").Close();
 
-            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 30);
-            if (ImGui::SmallButton(ICON_FA_X))
-            {
-                ImGui::GetContext("EffectEdit").Close();
-            }
-            ImGui::EndMenuBar();
+    ImGui::ContextRegister("EffectModuleDetail", true, [&]() 
+    {
+        auto availableRegion = ImGui::GetContentRegionAvail();
+        static std::string comparedFileName;
+        MetaNode::Config config;
+        if (!m_editorContext)
+        {
+            MetaNode::Config config;
+			config.SettingsFile = m_saveFileName;
+            m_editorContext = MetaNode::CreateEditor(&config);
+        }
+        else if (config.SettingsFile != comparedFileName)
+        {
+			MetaNode::DestroyEditor(m_editorContext);
+
+            MetaNode::Config config;
+            config.SettingsFile = m_saveFileName;
+            m_editorContext = MetaNode::CreateEditor(&config);
         }
 
-        RenderMainEditor();
-        }, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar);
-    ImGui::GetContext("EffectEdit").Close();
+        if (m_editorContext)
+        {
+            auto cursorTopLeft = ImGui::GetCursorScreenPos();
+            MetaNode::SetCurrentEditor(m_editorContext);
+            MetaNode::Begin("Effect Graph", availableRegion);
+
+            for (auto& link : m_links)
+            {
+                MetaNode::Link(link.id, link.from, link.to);
+            }
+
+            if (!m_tempEmitters.empty())
+            {
+                auto spawner = m_tempEmitters[0].particleSystem->GetModule<SpawnModuleCS>();
+                if (spawner)
+                {
+                    spawner->DrawNodeGUI();
+                }
+            }
+
+            MetaNode::End(); // End Editor
+            MetaNode::SetCurrentEditor(nullptr);
+		    ImGui::SetCursorScreenPos(cursorTopLeft);
+        }
+
+	});
 
     Texture* example = DataSystems->LoadTexture("123.png");
 
@@ -210,8 +247,13 @@ void EffectEditor::RenderMainEditor()
             // 드래그 드롭 타겟 추가
             RenderTextureDragDropTarget();
 
-            if (ImGui::Button("Create New Emitter")) {
+            if (ImGui::Button("Create New Emitter")) 
+            {
                 StartCreateEmitter();
+                //test code
+                {
+
+                }
             }
 
             if (!m_tempEmitters.empty()) {
@@ -333,6 +375,16 @@ void EffectEditor::RenderMainEditor()
         RenderTextureDragDropTarget();
         RenderModifyEmitterEditor();
     }
+}
+
+void EffectEditor::AddLink(ax::NodeEditor::PinId from, ax::NodeEditor::PinId to)
+{
+    ParticleLink link;
+    link.id = ax::NodeEditor::LinkId{ make_guid() }; // 고유한 링크 ID 생성
+    link.from = from;
+    link.to = to;
+
+    m_links.push_back(link);
 }
 
 void EffectEditor::RenderPreviewControls()

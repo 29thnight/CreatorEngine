@@ -105,6 +105,10 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     m_currentTime = 0.0f;
 }
 
+void EffectComponent::AddParticleEvent(const std::string& eventName)
+{
+}
+
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
 {
     if (newEffectName.empty()) return;

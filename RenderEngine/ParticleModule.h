@@ -5,7 +5,7 @@
 #include "EaseInOut.h"
 #include "BaseEffectStruct.h"
 
-#define THREAD_GROUP_SIZE 1024
+constexpr int THREAD_GROUP_SIZE = 1024;
 
 // easing 위치 고민 현재는 그냥 모든 module에 넣을수 있는 구조
 
@@ -73,20 +73,20 @@ public:
 	// *****파이프라인을 스테이지 별로 해서 하기*****
 	ModuleStage GetStage() const { return m_stage; }
 	void SetStage(ModuleStage stage) { m_stage = stage; }
-
+	
 protected:
 	// 이징 변수
-	bool m_useEasing;
-	EasingEffect m_easingType;
-	StepAnimation m_animationType;
-	float m_easingDuration;
+	bool m_useEasing{};
+	EasingEffect m_easingType{};
+	StepAnimation m_animationType{};
+	float m_easingDuration{};
 
 	// 멤버 변수
-	ID3D11UnorderedAccessView* m_inputUAV;
-	ID3D11ShaderResourceView* m_inputSRV;
-	ID3D11UnorderedAccessView* m_outputUAV;
-	ID3D11ShaderResourceView* m_outputSRV;
+	ID3D11UnorderedAccessView* m_inputUAV{ nullptr };
+	ID3D11ShaderResourceView* m_inputSRV{ nullptr };
+	ID3D11UnorderedAccessView* m_outputUAV{ nullptr };
+	ID3D11ShaderResourceView* m_outputSRV{ nullptr };
 
 	// 파이프라인 변수
-	ModuleStage m_stage = ModuleStage::SIMULATION;
+	ModuleStage m_stage{ ModuleStage::SIMULATION };
 };

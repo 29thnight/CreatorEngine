@@ -1,5 +1,6 @@
 #pragma once
 #include "ParticleSystem.h"
+#include "EffectEventUnit.h"
 #include "EffectSerializer.h"
 
 enum class EffectModuleType
@@ -105,9 +106,13 @@ private:
     bool m_showSaveDialog = false;
     bool m_showLoadDialog = false;
 
+    std::vector<ParticleLink> m_links;
+    ax::NodeEditor::EditorContext* m_editorContext = nullptr;
+
 private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
+    void AddLink(ax::NodeEditor::PinId from, ax::NodeEditor::PinId to);
     void RenderEmitterEditor();
     void RenderExistingModules();
     void RenderPreviewControls();

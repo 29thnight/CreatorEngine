@@ -4,6 +4,7 @@
 #include "DeviceState.h"
 #include "GameObject.h"
 #include "RenderPassData.h"
+#include "OutputParticleUnit.h"
 
 enum class BillBoardType
 {
@@ -33,19 +34,19 @@ struct ModelConstantBuffer
     Mathf::Matrix projection;
 };
 
-class RenderModules
+class RenderModules : public OutputParticleUnit
 {
 public:
-    virtual void Initialize() {}
-    virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) {}
+    virtual void Initialize() override {}
+    virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override {}
     void movePSO(std::unique_ptr<PipelineStateObject> pso) { m_pso.swap(pso); }
     PipelineStateObject* GetPSO() { return m_pso.get(); }
 
-    virtual void SetTexture(Texture* texture) {}
-    virtual void BindResource() {}
-    virtual void SetupRenderTarget(RenderPassData* renderData) {}
+    virtual void SetTexture(Texture* texture) override {}
+    virtual void BindResource() override {}
+    virtual void SetupRenderTarget(RenderPassData* renderData) override {}
     
-    virtual void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instancecount) = 0;
+    virtual void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instancecount) override abstract;
 
     void CleanupRenderState();
     void SaveRenderState();

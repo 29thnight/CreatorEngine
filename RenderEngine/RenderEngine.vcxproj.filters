@@ -147,9 +147,6 @@
     <Filter Include="Asset\ManagerSystem\AssetMetaHandler">
       <UniqueIdentifier>{877eb15b-a659-4718-b21a-240ac64cd8e1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\EffectPass\NodeEditor">
-      <UniqueIdentifier>{59756b78-9541-4a5b-a697-3b1827319005}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resources\Skeleton\Bone">
       <UniqueIdentifier>{dedebb22-4667-41cf-a65e-94cc10e22ea1}</UniqueIdentifier>
     </Filter>
@@ -272,6 +269,12 @@
     </Filter>
     <Filter Include="Resources\AssetBundle">
       <UniqueIdentifier>{fe7e6475-d490-4ac1-a741-7548758437e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\EffectPass\1.Base\DefineBase">
+      <UniqueIdentifier>{964b6314-351b-46d2-8aac-352b3a365c7d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderPass\EffectPass\1.Base\BaseLoopUnits">
+      <UniqueIdentifier>{3d7ea55e-eca0-46e3-8ef2-aee6a928cd49}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -410,12 +413,6 @@
     <ClCompile Include="EffectModules.cpp">
       <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClCompile>
-    <ClCompile Include="EaseInOut.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
-    <ClCompile Include="ParticleModule.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
     <ClCompile Include="SpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -482,12 +479,6 @@
     <ClCompile Include="TestAniScprit.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="EffectBase.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
-    <ClCompile Include="EffectComponent.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
     <ClCompile Include="MeshSpawnModuleCS.cpp">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClCompile>
@@ -497,26 +488,35 @@
     <ClCompile Include="SizeModuleCS.cpp">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClCompile>
-    <ClCompile Include="EffectEditor.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
     <ClCompile Include="EffectManagerProxy.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
     <ClCompile Include="EffectProxyController.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>
-    <ClCompile Include="EffectSerializer.cpp">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClCompile>
     <ClCompile Include="SparkleEffect.cpp">
       <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClCompile>
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
-	</ClCompile>
+    </ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="EaseInOut.cpp">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectBase.cpp">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectEditor.cpp">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectSerializer.cpp">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleModule.cpp">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -625,9 +625,6 @@
     <ClInclude Include="AssetMetaRegistry.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
-    <ClInclude Include="ModuleLink.h">
-      <Filter>RenderPass\EffectPass\NodeEditor</Filter>
-    </ClInclude>
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
@@ -684,15 +681,6 @@
     </ClInclude>
     <ClInclude Include="EffectModules.h">
       <Filter>RenderPass\EffectPass\Old.</Filter>
-    </ClInclude>
-    <ClInclude Include="EaseInOut.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
-    <ClInclude Include="ParticleModule.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
-    <ClInclude Include="BaseEffectStruct.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
@@ -781,24 +769,15 @@
     <ClInclude Include="SizeModuleCS.h">
       <Filter>RenderPass\EffectPass\5.Size</Filter>
     </ClInclude>
-    <ClInclude Include="EffectEditor.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
     <ClInclude Include="EffectManagerProxy.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
     <ClInclude Include="EffectProxyController.h">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClInclude>
-    <ClInclude Include="EffectSerializer.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
     <ClInclude Include="SparkleEffect.h">
       <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClInclude>
-    <ClInclude Include="EffectBase.h">
-      <Filter>RenderPass\EffectPass\1.Base</Filter>
-	</ClInclude>
     <ClInclude Include="TestAniScprit.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -810,6 +789,36 @@
     </ClInclude>
     <ClInclude Include="AssetEntry.h">
       <Filter>Resources\AssetBundle</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseEffectStruct.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="EaseInOut.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectBase.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectEditor.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectSerializer.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleModule.h">
+      <Filter>RenderPass\EffectPass\1.Base\DefineBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SpawnSystem.h">
+      <Filter>RenderPass\EffectPass\1.Base\BaseLoopUnits</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticlesUnit.h">
+      <Filter>RenderPass\EffectPass\1.Base\BaseLoopUnits</Filter>
+    </ClInclude>
+    <ClInclude Include="OutputParticleUnit.h">
+      <Filter>RenderPass\EffectPass\1.Base\BaseLoopUnits</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectEventUnit.h">
+      <Filter>RenderPass\EffectPass\1.Base\BaseLoopUnits</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -972,7 +981,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\NormalizeTexture.cs.hlsl">
       <Filter>Shaders\LightMap</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl" />
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>

@@ -1,6 +1,7 @@
 #pragma once
 #include "ParticleSystem.h"
 #include "Component.h"
+#include "EffectEventUnit.h"
 #include "EffectComponent.generated.h"
 
 class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDistroy
@@ -37,6 +38,9 @@ public:
     [[Method]]
     void PlayEffectByName(const std::string& effectName);
 
+    [[Method]]
+    void AddParticleEvent(const std::string& eventName);
+
     // 에디터에서 선택할 템플릿 이펙트 이름 (런타임에서 변경 가능)
     [[Property]]
     std::string m_effectTemplateName = "Null";
@@ -62,6 +66,9 @@ public:
 
     [[Property]]
     int num = 0;
+    
+    [[Property]]
+	std::vector<EffectEventUnit> m_particleEvents{}; // 이펙트에서 발생하는 이벤트들
 
 private:
     // 실제 사용되는 고유 인스턴스 이름
