@@ -13,7 +13,7 @@ void Player::Start()
 	player = GameObject::Find("Punch");
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
-	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
+	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
 	//player->GetComponent<RigidBodyComponent>();
 
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
@@ -34,8 +34,6 @@ void Player::Start()
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
-	//GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
-	//sword->GetComponent<BoxColliderComponent>()->SetExtents({10,10,10});
 
 }
 
@@ -122,7 +120,7 @@ void Player::Attack()
 void Player::SwapWeaponLeft()
 {
 	m_weaponIndex--;
-	std::cout << "left weapon equipped" << std::endl;
+	//std::cout << "left weapon equipped" << std::endl;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -134,13 +132,18 @@ void Player::SwapWeaponLeft()
 void Player::SwapWeaponRight()
 {
 	m_weaponIndex++;
-	std::cout << "right weapon equipped" << std::endl;
+	//std::cout << "right weapon equipped" << std::endl;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
 	}
+}
+
+void Player::Punch()
+{
+	std::cout << "ppppuuuunchhhhhhh" << std::endl;
 }
 
 void Player::OnCollisionEnter(const Collision& collision)
@@ -168,6 +171,17 @@ void Player::OnCollisionStay(const Collision& collision)
 	}
 }
 
+void Player::OnTriggerEnter(const Collision& collision)
+{
+	if (collision.thisObj == collision.otherObj)
+		return;
+
+
+	//m_nearObject = collision.otherObj;
+	std::cout << collision.otherObj->ToString() << std::endl;
+	
+
+}
 void Player::OnTriggerStay(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)

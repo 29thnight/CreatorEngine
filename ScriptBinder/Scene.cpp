@@ -547,7 +547,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION); //&&&&&trigger
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -1038,7 +1038,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(EBodyType::DYNAMIC);
 			}
 			linkCompleteSet.insert(gameObject);
 		}

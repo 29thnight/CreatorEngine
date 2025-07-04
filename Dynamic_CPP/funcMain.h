@@ -68,6 +68,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
 		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });

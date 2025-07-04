@@ -24,10 +24,10 @@ PxFilterFlags CustomFilterShader(
 	PxFilterData fd1,
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
-	
+	//&&&&& 충돌매트릭스 조건 먼가이상함 
 	if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
 	{
-		if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+		/*if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
 			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
 				| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
 				| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
@@ -35,7 +35,7 @@ PxFilterFlags CustomFilterShader(
 		}
 	}
 
-	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+	/*if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
 		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
 			| physx::PxPairFlag::eDETECT_CCD_CONTACT
 			| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
@@ -46,7 +46,8 @@ PxFilterFlags CustomFilterShader(
 			| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
 		return physx::PxFilterFlag::eDEFAULT;
 	}
-	else {
+	//else 
+	{
 		pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT; 
 		return physx::PxFilterFlag::eSUPPRESS;
 	}
@@ -202,6 +203,7 @@ void PhysicX::RemoveActors()
 }
 void PhysicX::UnInitialize() {
 	if (m_foundation) m_foundation->release();
+	
 }
 
 
@@ -263,11 +265,14 @@ void PhysicX::Update(float fixedDeltaTime)
 			body->setSolverIterationCounts(8, 4);
 			shape->setContactOffset(0.02f);
 			shape->setRestOffset(0.01f);
-
+			
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
+			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+			shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
+			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 
 			collisionData->thisId = contrllerInfo.id;
 			collisionData->thisLayerNumber = contrllerInfo.layerNumber;
@@ -608,7 +613,6 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	 //filterData.word1 = collisionMatrix[colInfo.layerNumber];
 	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
-
 	//collisionData
 	StaticRigidBody* staticBody = new StaticRigidBody(collideType,colInfo.id,colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
@@ -795,6 +799,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 			DirectX::SimpleMath::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
 
 		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
+		pxBody->setGlobalPose(pxCurrTransform);
 	}
 }
 
