@@ -61,8 +61,8 @@ public:
 
     void ApplyLightData(Light& light)
     {
-        light.m_position = m_pOwner->m_transform.position;
-        light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.rotation);
+        light.m_position = m_pOwner->m_transform.GetWorldPosition();
+        light.m_direction = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), m_pOwner->m_transform.GetWorldQuaternion());
         light.m_direction.Normalize();
         m_direction = light.m_direction;
         light.m_color = m_color * m_intencity;

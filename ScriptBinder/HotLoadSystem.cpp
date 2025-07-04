@@ -329,6 +329,8 @@ void HotLoadSystem::ReplaceScriptComponent()
 	if (true == m_isReloading && false == m_isCompileEventInvoked)
 	{
 		auto activeScene = SceneManagers->GetActiveScene();
+		activeScene->m_selectedSceneObject = nullptr;
+
 		auto& gameObjects = activeScene->m_SceneObjects;
 		std::unordered_set<GameObject*> gameObjectSet;
 
@@ -386,15 +388,15 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 			{
 				if (event == "Awake")
 				{
-					if (script->m_startEventHandle.IsValid()) continue;
+					if (script->m_awakeEventHandle.IsValid()) continue;
 
-					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::StartInvoke);
+					script->m_awakeEventHandle = activeScene->AwakeEvent.AddRaw(script, &ModuleBehavior::AwakeInvoke);
 				}
 				else if (event == "OnEnable")
 				{
-					if (script->m_startEventHandle.IsValid()) continue;
+					if (script->m_onEnableEventHandle.IsValid()) continue;
 
-					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
+					script->m_onEnableEventHandle = activeScene->OnEnableEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
 				}
 				else if (event == "Start")
 				{
