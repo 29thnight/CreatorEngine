@@ -114,6 +114,8 @@ public:
 
 	void ResizeParticleSystem(UINT newMaxParticles);
 
+	void SetParticleDatatype(ParticleDataType type);
+
 	void ReleaseBuffers();
 
 	void ReleaseParticleBuffers();
@@ -141,8 +143,6 @@ private:
 private:
 
 	void InitializeParticleIndices();
-
-	void SetParticleDatatype(ParticleDataType type);
 
 	size_t GetParticleStructSize() const;
 

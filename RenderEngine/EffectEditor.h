@@ -42,15 +42,21 @@ public:
     void RemoveEmitter(int index);
     void AssignTextureToEmitter(int emitterIndex, int textureIndex);
 
-    // spawn module용 설정 메서드
+    // 2D 모듈용 설정 메서드
     void StartModifyEmitter(int index);
     void SaveModifiedEmitter(const std::string& name = "");
     void CancelModifyEmitter();
     void RenderModuleDetailEditor();
+    void RenderRenderModuleDetailEditor();
     void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
     void RenderMovementModuleEditor(MovementModuleCS* movementModule);
     void RenderColorModuleEditor(ColorModuleCS* colorModule);
     void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
+    void RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule);
+
+    // 3D 모듈용 설정 메서드
+    void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
+    void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
 
 private:
     // 미리보기용 임시 에미터들

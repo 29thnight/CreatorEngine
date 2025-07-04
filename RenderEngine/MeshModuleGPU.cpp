@@ -201,6 +201,10 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     RestoreRenderState();
 }
 
+void MeshModuleGPU::SetTexture(Texture* texture)
+{
+}
+
 void MeshModuleGPU::Release()
 {
     // 소유권이 있는 메시만 삭제

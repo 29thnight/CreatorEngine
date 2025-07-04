@@ -197,6 +197,30 @@ void EffectEditor::RenderModuleDetailEditor()
     else if (auto* sizeModule = dynamic_cast<SizeModuleCS*>(targetModule)) {
         RenderSizeModuleEditor(sizeModule);
     }
+    else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(targetModule)) {
+        RenderMeshSpawnModuleEditor(meshSpawnModule);
+    }
+}
+
+void EffectEditor::RenderRenderModuleDetailEditor()
+{
+    if (!m_modifyingSystem || m_selectedRenderForEdit < 0) return;
+
+    auto& renderList = m_modifyingSystem->GetRenderModules();
+
+    if (m_selectedRenderForEdit >= renderList.size()) return;
+
+    auto renderModule = renderList[m_selectedRenderForEdit];
+
+    ImGui::Text("Render Module Settings:");
+    ImGui::Separator();
+
+    if (auto* billboardRender = dynamic_cast<BillboardModuleGPU*>(renderModule)) {
+        RenderBillboardModuleGPUEditor(billboardRender);
+    }
+    else if (auto* meshRender = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+        RenderMeshModuleGPUEditor(meshRender);
+    }
 }
 
 void EffectEditor::RenderMainEditor()
@@ -374,10 +398,8 @@ void EffectEditor::RenderModifyEmitterEditor()
 
     for (auto it = moduleList.begin(); it != moduleList.end(); ++it) {
         ParticleModule& module = *it;
-
         ImGui::PushID(moduleIndex);
 
-        // 모듈 타입 표시
         std::string moduleName = "Unknown Module";
         if (dynamic_cast<SpawnModuleCS*>(&module)) {
             moduleName = "Spawn Module";
@@ -398,7 +420,7 @@ void EffectEditor::RenderModifyEmitterEditor()
         bool isSelected = (m_selectedModuleForEdit == moduleIndex);
         if (ImGui::Selectable((moduleName + "##" + std::to_string(moduleIndex)).c_str(), isSelected)) {
             m_selectedModuleForEdit = isSelected ? -1 : moduleIndex;
-            m_selectedRenderForEdit = -1;
+            m_selectedRenderForEdit = -1; // 다른 모듈 선택시 렌더 선택 해제
         }
 
         ImGui::PopID();
@@ -414,7 +436,6 @@ void EffectEditor::RenderModifyEmitterEditor()
 
     for (auto it = renderList.begin(); it != renderList.end(); ++it) {
         RenderModules& render = **it;
-
         ImGui::PushID(renderIndex + 1000);
 
         std::string renderName = "Unknown Render";
@@ -428,7 +449,7 @@ void EffectEditor::RenderModifyEmitterEditor()
         bool isSelected = (m_selectedRenderForEdit == renderIndex);
         if (ImGui::Selectable((renderName + "##" + std::to_string(renderIndex)).c_str(), isSelected)) {
             m_selectedRenderForEdit = isSelected ? -1 : renderIndex;
-            m_selectedModuleForEdit = -1;
+            m_selectedModuleForEdit = -1; // 다른 렌더 선택시 모듈 선택 해제
         }
 
         ImGui::PopID();
@@ -437,22 +458,27 @@ void EffectEditor::RenderModifyEmitterEditor()
 
     ImGui::Separator();
 
-    // 선택된 모듈의 세부 설정 UI
+    // 선택된 모듈의 세부 설정 UI (ParticleModule)
     if (m_selectedModuleForEdit >= 0) {
         RenderModuleDetailEditor();
     }
 
+    // 선택된 렌더 모듈의 세부 설정 UI (RenderModules)
+    if (m_selectedRenderForEdit >= 0) {
+        RenderRenderModuleDetailEditor();
+    }
+
     ImGui::Separator();
 
-    // 저장/취소 버튼 - 이름을 매개변수로 전달
+    // 저장/취소 버튼
     if (ImGui::Button("Save Changes")) {
         SaveModifiedEmitter(std::string(m_newEmitterName));
-        m_emitterNameInitialized = false; // 다음번을 위해 초기화 플래그 리셋
+        m_emitterNameInitialized = false;
     }
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
         CancelModifyEmitter();
-        m_emitterNameInitialized = false; // 취소시에도 플래그 리셋
+        m_emitterNameInitialized = false;
     }
 }
 
@@ -826,9 +852,11 @@ void EffectEditor::AddSelectedRender()
 
     switch (type) {
     case RenderType::Billboard:
+        m_editingEmitter->SetParticleDatatype(ParticleDataType::Standard);
         m_editingEmitter->AddRenderModule<BillboardModuleGPU>();
         break;
     case RenderType::Mesh:
+        m_editingEmitter->SetParticleDatatype(ParticleDataType::Mesh);
         m_editingEmitter->AddRenderModule<MeshModuleGPU>();
         break;
     }
@@ -934,7 +962,7 @@ void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
     // 에미터 타입 설정
     EmitterType currentType = spawnModule->GetEmitterType();
     int typeIndex = static_cast<int>(currentType);
-    const char* emitterTypes[] = { "Point", "Box", "Sphere", "Circle", "Cone"};
+    const char* emitterTypes[] = { "Point", "Sphere", "Box", "Cone", "Circle"};
 
     if (ImGui::Combo("Emitter Type", &typeIndex, emitterTypes, IM_ARRAYSIZE(emitterTypes))) {
         spawnModule->SetEmitterType(static_cast<EmitterType>(typeIndex));
@@ -1030,4 +1058,295 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 
 void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 {
+}
+
+void EffectEditor::RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule)
+{
+    if (!billboardModule) return;
+
+    ImGui::Text("Billboard Render Module Settings");
+
+    // 텍스처 설정 UI
+    ImGui::Text("Texture Assignment:");
+
+    if (!m_textures.empty()) {
+        static int selectedTextureIndex = 0;
+
+        std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
+            ? m_textures[selectedTextureIndex]->m_name
+            : "None";
+
+        if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
+            for (int t = 0; t < m_textures.size(); ++t) {
+                bool isSelected = (selectedTextureIndex == t);
+                std::string textureLabel = m_textures[t]->m_name;
+
+                if (textureLabel.empty()) {
+                    textureLabel = "Texture " + std::to_string(t);
+                }
+
+                if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
+                    selectedTextureIndex = t;
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Assign Texture")) {
+            if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
+                billboardModule->SetTexture(m_textures[selectedTextureIndex]);
+            }
+        }
+    }
+    else {
+        ImGui::Text("No textures available");
+        ImGui::Text("Drag and drop texture files to add them");
+    }
+
+    ImGui::Separator();
+
+    // 빌보드 관련 추가 설정들이 있다면 여기에 추가
+    ImGui::Text("Additional billboard settings can be added here");
+}
+
+void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModule)
+{
+    if (!meshSpawnModule) return;
+
+    ImGui::Text("Mesh Spawn Module Settings");
+
+    // 스폰 레이트 설정
+    float spawnRate = meshSpawnModule->GetSpawnRate();
+    if (ImGui::DragFloat("Spawn Rate", &spawnRate, 0.1f, 0.0f, 1000.0f)) {
+        meshSpawnModule->SetSpawnRate(spawnRate);
+    }
+
+    // 에미터 타입 설정
+    EmitterType currentType = meshSpawnModule->GetEmitterType();
+    int typeIndex = static_cast<int>(currentType);
+    const char* emitterTypes[] = { "Point", "Sphere", "Box", "Cone", "Circle" };
+
+    if (ImGui::Combo("Emitter Type", &typeIndex, emitterTypes, IM_ARRAYSIZE(emitterTypes))) {
+        meshSpawnModule->SetEmitterType(static_cast<EmitterType>(typeIndex));
+    }
+
+    // 에미터 크기/반지름 설정
+    static float emitterSize[3] = { 1.0f, 1.0f, 1.0f };
+    static float emitterRadius = 1.0f;
+
+    if (currentType == EmitterType::box) {
+        if (ImGui::DragFloat3("Emitter Size", emitterSize, 0.1f, 0.1f, 100.0f)) {
+            meshSpawnModule->SetEmitterSize(XMFLOAT3(emitterSize[0], emitterSize[1], emitterSize[2]));
+        }
+    }
+    else if (currentType == EmitterType::cone) {
+        if (ImGui::DragFloat("Cone Radius", &emitterRadius, 0.1f, 0.1f, 100.0f)) {
+            meshSpawnModule->SetEmitterRadius(emitterRadius);
+        }
+    }
+    else if (currentType == EmitterType::sphere || currentType == EmitterType::circle) {
+        if (ImGui::DragFloat("Emitter Radius", &emitterRadius, 0.1f, 0.1f, 100.0f)) {
+            meshSpawnModule->SetEmitterRadius(emitterRadius);
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Mesh Particle Template Settings");
+
+    // 메시 파티클 템플릿 설정 (3D 기반)
+    MeshParticleTemplateParams currentTemplate = meshSpawnModule->GetTemplate();
+
+    // 라이프타임
+    if (ImGui::DragFloat("Life Time", &currentTemplate.lifeTime, 0.1f, 0.1f, 100.0f)) {
+        meshSpawnModule->SetParticleLifeTime(currentTemplate.lifeTime);
+    }
+
+    // 3D 스케일 범위
+    float minScale[3] = { currentTemplate.minScale.x, currentTemplate.minScale.y, currentTemplate.minScale.z };
+    float maxScale[3] = { currentTemplate.maxScale.x, currentTemplate.maxScale.y, currentTemplate.maxScale.z };
+
+    if (ImGui::DragFloat3("Min Scale", minScale, 0.01f, 0.01f, 10.0f)) {
+        meshSpawnModule->SetParticleScaleRange(
+            XMFLOAT3(minScale[0], minScale[1], minScale[2]),
+            XMFLOAT3(maxScale[0], maxScale[1], maxScale[2])
+        );
+    }
+
+    if (ImGui::DragFloat3("Max Scale", maxScale, 0.01f, 0.01f, 10.0f)) {
+        meshSpawnModule->SetParticleScaleRange(
+            XMFLOAT3(minScale[0], minScale[1], minScale[2]),
+            XMFLOAT3(maxScale[0], maxScale[1], maxScale[2])
+        );
+    }
+
+    // 3D 회전 속도 범위
+    float minRotSpeed[3] = { currentTemplate.minRotationSpeed.x, currentTemplate.minRotationSpeed.y, currentTemplate.minRotationSpeed.z };
+    float maxRotSpeed[3] = { currentTemplate.maxRotationSpeed.x, currentTemplate.maxRotationSpeed.y, currentTemplate.maxRotationSpeed.z };
+
+    if (ImGui::DragFloat3("Min Rotation Speed", minRotSpeed, 0.1f, -360.0f, 360.0f)) {
+        meshSpawnModule->SetParticleRotationSpeedRange(
+            XMFLOAT3(minRotSpeed[0], minRotSpeed[1], minRotSpeed[2]),
+            XMFLOAT3(maxRotSpeed[0], maxRotSpeed[1], maxRotSpeed[2])
+        );
+    }
+
+    if (ImGui::DragFloat3("Max Rotation Speed", maxRotSpeed, 0.1f, -360.0f, 360.0f)) {
+        meshSpawnModule->SetParticleRotationSpeedRange(
+            XMFLOAT3(minRotSpeed[0], minRotSpeed[1], minRotSpeed[2]),
+            XMFLOAT3(maxRotSpeed[0], maxRotSpeed[1], maxRotSpeed[2])
+        );
+    }
+
+    // 3D 초기 회전 범위
+    float minInitRot[3] = { currentTemplate.minInitialRotation.x, currentTemplate.minInitialRotation.y, currentTemplate.minInitialRotation.z };
+    float maxInitRot[3] = { currentTemplate.maxInitialRotation.x, currentTemplate.maxInitialRotation.y, currentTemplate.maxInitialRotation.z };
+
+    if (ImGui::DragFloat3("Min Initial Rotation", minInitRot, 0.1f, -360.0f, 360.0f)) {
+        meshSpawnModule->SetParticleInitialRotationRange(
+            XMFLOAT3(minInitRot[0], minInitRot[1], minInitRot[2]),
+            XMFLOAT3(maxInitRot[0], maxInitRot[1], maxInitRot[2])
+        );
+    }
+
+    if (ImGui::DragFloat3("Max Initial Rotation", maxInitRot, 0.1f, -360.0f, 360.0f)) {
+        meshSpawnModule->SetParticleInitialRotationRange(
+            XMFLOAT3(minInitRot[0], minInitRot[1], minInitRot[2]),
+            XMFLOAT3(maxInitRot[0], maxInitRot[1], maxInitRot[2])
+        );
+    }
+
+    // 색상
+    float color[4] = { currentTemplate.color.x, currentTemplate.color.y, currentTemplate.color.z, currentTemplate.color.w };
+    if (ImGui::ColorEdit4("Color", color)) {
+        meshSpawnModule->SetParticleColor(XMFLOAT4(color[0], color[1], color[2], color[3]));
+    }
+
+    // 속도
+    float velocity[3] = { currentTemplate.velocity.x, currentTemplate.velocity.y, currentTemplate.velocity.z };
+    if (ImGui::DragFloat3("Velocity", velocity, 0.1f, -100.0f, 100.0f)) {
+        meshSpawnModule->SetParticleVelocity(XMFLOAT3(velocity[0], velocity[1], velocity[2]));
+    }
+
+    // 가속도
+    float acceleration[3] = { currentTemplate.acceleration.x, currentTemplate.acceleration.y, currentTemplate.acceleration.z };
+    if (ImGui::DragFloat3("Acceleration", acceleration, 0.1f, -100.0f, 100.0f)) {
+        meshSpawnModule->SetParticleAcceleration(XMFLOAT3(acceleration[0], acceleration[1], acceleration[2]));
+    }
+
+    // 속도 범위
+    float minVertical = currentTemplate.minVerticalVelocity;
+    float maxVertical = currentTemplate.maxVerticalVelocity;
+    float horizontalRange = currentTemplate.horizontalVelocityRange;
+
+    if (ImGui::DragFloat("Min Vertical Velocity", &minVertical, 0.1f, -100.0f, 100.0f)) {
+        meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
+    }
+    if (ImGui::DragFloat("Max Vertical Velocity", &maxVertical, 0.1f, -100.0f, 100.0f)) {
+        meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
+    }
+    if (ImGui::DragFloat("Horizontal Velocity Range", &horizontalRange, 0.1f, 0.0f, 100.0f)) {
+        meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
+    }
+}
+
+void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
+{
+    if (!meshModule) return;
+
+    ImGui::Text("Mesh Render Module Settings");
+
+    // 메시 타입 설정
+    MeshType currentMeshType = meshModule->GetMeshType();
+    int meshTypeIndex = static_cast<int>(currentMeshType);
+    const char* meshTypes[] = { "None", "Cube", "Sphere", "Custom" };
+
+    if (ImGui::Combo("Mesh Type", &meshTypeIndex, meshTypes, IM_ARRAYSIZE(meshTypes))) {
+        meshModule->SetMeshType(static_cast<MeshType>(meshTypeIndex));
+    }
+
+    // 카메라 위치 설정
+    static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
+    if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
+        meshModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
+    }
+
+    ImGui::Separator();
+
+    // 텍스처 설정 UI
+    ImGui::Text("Texture Assignment:");
+
+    if (!m_textures.empty()) {
+        static int selectedTextureIndex = 0;
+
+        // 현재 선택된 텍스처의 이름 표시
+        std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
+            ? m_textures[selectedTextureIndex]->m_name
+            : "None";
+
+        if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
+            for (int t = 0; t < m_textures.size(); ++t) {
+                bool isSelected = (selectedTextureIndex == t);
+                std::string textureLabel = m_textures[t]->m_name;
+
+                if (textureLabel.empty()) {
+                    textureLabel = "Texture " + std::to_string(t);
+                }
+
+                if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
+                    selectedTextureIndex = t;
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Assign Texture")) {
+            if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
+                meshModule->SetTexture(m_textures[selectedTextureIndex]);
+            }
+        }
+    }
+    else {
+        ImGui::Text("No textures available");
+        ImGui::Text("Drag and drop texture files to add them");
+    }
+
+    ImGui::Separator();
+
+    // 외부 메시 로드 UI
+    ImGui::Text("Custom Mesh Settings:");
+
+    static char meshFilePath[256] = "";
+    ImGui::InputText("Mesh File Path", meshFilePath, sizeof(meshFilePath));
+
+    ImGui::SameLine();
+    if (ImGui::Button("Load Mesh")) {
+        // 외부 메시 로드 로직 (실제 구현은 프로젝트에 맞게 수정 필요)
+        if (strlen(meshFilePath) > 0) {
+            // 예시: Mesh* customMesh = MeshLoader::LoadMesh(meshFilePath);
+            // if (customMesh) {
+            //     meshModule->SetCustomMesh(customMesh);
+            // }
+            ImGui::Text("Mesh loading functionality needs to be implemented");
+        }
+    }
+
+    // 파티클 데이터 설정 정보 표시
+    ImGui::Separator();
+    ImGui::Text("Particle Data Info:");
+
+    UINT instanceCount = meshModule->GetInstanceCount();
+    ImGui::Text("Instance Count: %u", instanceCount);
+
+    if (instanceCount == 0) {
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No particle data assigned");
+        ImGui::Text("This will be automatically set when connected to a particle system");
+    }
 }

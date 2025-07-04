@@ -26,9 +26,13 @@ class MeshModuleGPU : public RenderModules
 public:
     void Initialize() override;
     void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override;
+    void SetTexture(Texture* texture) override;
+    Texture* GetTexture() const { return m_assignedTexture; }
+    UINT GetInstanceCount() const { return m_instanceCount; }
 
     // 메시 설정
     void SetMeshType(MeshType type);
+    MeshType GetMeshType() { return m_meshType; }
     void SetCustomMesh(Mesh* customMesh);  // 포인터로 변경
 
     // 파티클 데이터 설정 (빌보드 모듈과 동일한 방식)
@@ -39,6 +43,7 @@ public:
     void SetCameraPosition(const Mathf::Vector3& position);
 
     void Release();
+
 
 private:
     void CreateCubeMesh();
@@ -61,4 +66,7 @@ private:
 
     // 상수 버퍼 데이터
     MeshConstantBuffer m_constantBufferData;
+
+
+    Texture* m_assignedTexture;
 };
