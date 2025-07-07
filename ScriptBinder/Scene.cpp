@@ -1038,7 +1038,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::DYNAMIC);
+				iter->second(EBodyType::STATIC);
 			}
 			linkCompleteSet.insert(gameObject);
 		}

@@ -27,7 +27,8 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	//righthand->m_offset= DirectX::SimpleMath::Matrix::CreateTranslation(50.0f, 0.0f, 0.0f);
+	righthand->m_offset = Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
+	
 	
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/

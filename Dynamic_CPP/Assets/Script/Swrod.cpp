@@ -9,11 +9,11 @@ void Swrod::Start()
 {
 	std::cout << "gum start!!!" << std::endl;
 	GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
-	sword->GetComponent<BoxColliderComponent>()->SetExtents({ 16,2.5,100 });
+	sword->GetComponent<BoxColliderComponent>()->SetExtents({ 4,2,10 });
 	auto swordmap = SceneManagers->GetInputActionManager()->AddActionMap("sword");
 
 
-	GetComponent<RigidBodyComponent>().SetBodyType(EBodyType::DYNAMIC);
+	//GetComponent<RigidBodyComponent>().SetBodyType(EBodyType::DYNAMIC);
 	swordmap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 		{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 			KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,

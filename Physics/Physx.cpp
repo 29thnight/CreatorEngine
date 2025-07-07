@@ -27,7 +27,7 @@ PxFilterFlags CustomFilterShader(
 	//&&&&& 충돌매트릭스 조건 먼가이상함 
 	if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
 	{
-		/*if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
+		if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
 			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
 				| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
 				| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
@@ -35,7 +35,7 @@ PxFilterFlags CustomFilterShader(
 		}
 	}
 
-	/*if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
+	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
 		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
 			| physx::PxPairFlag::eDETECT_CCD_CONTACT
 			| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
@@ -46,10 +46,10 @@ PxFilterFlags CustomFilterShader(
 			| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
 		return physx::PxFilterFlag::eDEFAULT;
 	}
-	//else 
+	else 
 	{
-		pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT; 
-		return physx::PxFilterFlag::eSUPPRESS;
+		pairFlags &= ~physx::PxPairFlag::eTRIGGER_DEFAULT;
+		return physx::PxFilterFlag::eDEFAULT; //&&&&&sehwan
 	}
 }
 
@@ -272,7 +272,6 @@ void PhysicX::Update(float fixedDeltaTime)
 			shape->setSimulationFilterData(filterData);
 			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 			shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
-			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 
 			collisionData->thisId = contrllerInfo.id;
 			collisionData->thisLayerNumber = contrllerInfo.layerNumber;

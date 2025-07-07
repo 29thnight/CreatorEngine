@@ -34,8 +34,8 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	if (!m_bIsInitialized) return;
 	
 	//물리씬에 데이터 셋
+	m_callbacks.clear();
 	SetPhysicData();
-
 	//물리씬 업데이트
 	Physics->Update(fixedDeltaTime);
 
