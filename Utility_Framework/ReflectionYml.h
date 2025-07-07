@@ -31,51 +31,51 @@ namespace Meta
 	{
 		HashedGuid typeID = prop.typeID;
 
-		if (typeID == GUIDCreator::GetTypeID<int>())
+		if (typeID == type_guid(int))
 		{
 			node[prop.name] = std::any_cast<int>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<float>())
+		else if (typeID == type_guid(float))
 		{
 			node[prop.name] = std::any_cast<float>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<bool>())
+		else if (typeID == type_guid(bool))
 		{
 			node[prop.name] = std::any_cast<bool>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<uint32_t>())
+		else if (typeID == type_guid(uint32_t))
 		{
 			node[prop.name] = std::any_cast<uint32_t>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<int64_t>())
+		else if (typeID == type_guid(int64_t))
 		{
 			node[prop.name] = std::any_cast<int64_t>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<uint64_t>())
+		else if (typeID == type_guid(uint64_t))
 		{
 			node[prop.name] = std::any_cast<uint64_t>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<double>())
+		else if (typeID == type_guid(double))
 		{
 			node[prop.name] = std::any_cast<double>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<file::path>())
+		else if (typeID == type_guid(file::path))
 		{
 			node[prop.name] = std::any_cast<file::path>(value).string();
 		}
-		else if (typeID == GUIDCreator::GetTypeID<std::string>())
+		else if (typeID == type_guid(std::string))
 		{
 			node[prop.name] = std::any_cast<std::string>(value);
 		}
-		else if (typeID == GUIDCreator::GetTypeID<HashingString>())
+		else if (typeID == type_guid(HashingString))
 		{
 			node[prop.name] = std::any_cast<HashingString>(value).ToString();
 		}
-		else if (typeID == GUIDCreator::GetTypeID<HashedGuid>())
+		else if (typeID == type_guid(HashedGuid))
 		{
 			node[prop.name] = std::any_cast<HashedGuid>(value).m_ID_Data;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<Mathf::Vector2>())
+		else if (typeID == type_guid(Mathf::Vector2))
 		{
 			Mathf::Vector2 vec = std::any_cast<Mathf::Vector2>(value);
 			MetaYml::Node vecNode;
@@ -84,7 +84,7 @@ namespace Meta
 			vecNode["y"] = vec.y;
 			node[prop.name] = vecNode;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<Mathf::Vector3>())
+		else if (typeID == type_guid(Mathf::Vector3))
 		{
 			Mathf::Vector3 vec = std::any_cast<Mathf::Vector3>(value);
 			MetaYml::Node vecNode;
@@ -94,7 +94,7 @@ namespace Meta
 			vecNode["z"] = vec.z;
 			node[prop.name] = vecNode;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<Mathf::Color4>())
+		else if (typeID == type_guid(Mathf::Color4))
 		{
 			Mathf::Color4 color = std::any_cast<Mathf::Color4>(value);
 			MetaYml::Node vecNode;
@@ -105,7 +105,7 @@ namespace Meta
 			vecNode["a"] = color.w;
 			node[prop.name] = vecNode;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<Mathf::Vector4>())
+		else if (typeID == type_guid(Mathf::Vector4))
 		{
 			Mathf::Vector4 vec = std::any_cast<Mathf::Vector4>(value);
 			MetaYml::Node vecNode;
@@ -116,7 +116,7 @@ namespace Meta
 			vecNode["w"] = vec.w;
 			node[prop.name] = vecNode;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<Mathf::Quaternion>())
+		else if (typeID == type_guid(Mathf::Quaternion))
 		{
 			Mathf::Quaternion quat = std::any_cast<Mathf::Quaternion>(value);
 			MetaYml::Node vecNode;
@@ -127,7 +127,7 @@ namespace Meta
 			vecNode["w"] = quat.w;
 			node[prop.name] = vecNode;
 		}
-		else if (typeID == GUIDCreator::GetTypeID<FileGuid>())
+		else if (typeID == type_guid(FileGuid))
 		{
 			FileGuid fileGuid = std::any_cast<FileGuid>(value);
 			node[prop.name] = fileGuid.ToString();
@@ -237,6 +237,18 @@ namespace Meta
 		{
 			const Type& compRealType = *FindTypeByInstance(instance);
 			node[compRealType.name] = compRealType.typeID.m_ID_Data;
+			if (compRealType.typeID == type_guid(ModuleBehavior))
+			{
+				// ModuleBehavior는 특별히 처리
+				auto* script = static_cast<ModuleBehavior*>(instance);
+				const auto& scriptType = script->ScriptReflect();
+
+				MetaYml::Node scriptNode = Serialize(instance, scriptType);
+				for (const auto& it : scriptNode)
+				{
+					node[it.first.Scalar()] = it.second;
+				}
+			}
 		}
 
 		// 부모 먼저 직렬화
@@ -553,4 +565,6 @@ namespace Meta
 	{
 		Deserialize(reinterpret_cast<void*>(instance), T::Reflect(), node);
 	}
+
+
 }

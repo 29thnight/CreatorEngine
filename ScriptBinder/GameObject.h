@@ -46,6 +46,7 @@ public:
 	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
+	void RefreshComponentIdIndices();
 
 	template<typename T>
 	T* AddComponent();

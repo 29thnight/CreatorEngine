@@ -859,6 +859,17 @@ void InspectorWindow::ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavi
 			DataSystems->OpenSolutionAndFile(slnPath, scriptFullPath);
 		}
 		ImGui::PopStyleVar(2);
+
+		const Meta::Type* type = Meta::Find(moduleBehavior->m_name.ToString());
+		if (type)
+		{
+			Meta::DrawProperties(moduleBehavior, *type);
+			Meta::DrawMethods(moduleBehavior, *type);
+		}
+		else
+		{
+			ImGui::Text("Script type not found: %s", moduleBehavior->m_name.ToString().c_str());
+		}
 	}
 }
 

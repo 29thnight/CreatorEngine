@@ -625,14 +625,17 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 			std::string extension = entry.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-            if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb" ||
-				extension == ".png" || extension == ".dds" || extension == ".hdr" ||
-				extension == ".hlsl" || extension == ".cpp" || extension == ".h" || 
+            if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || 
+				extension == ".glb" || extension == ".png" || extension == ".dds" || 
+				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" || 
 				extension == ".cs" || extension == ".wav" || extension == ".mp3")
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
-				if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || extension == ".glb")
+				if (extension == ".fbx" || 
+					extension == ".gltf" || 
+					extension == ".obj" || 
+					extension == ".glb")
 				{
 					fileType = FileType::Model;
 					iconTexture = (ImTextureID)ModelIcon->m_pSRV;
@@ -652,7 +655,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 					fileType = FileType::Shader;
 					iconTexture = (ImTextureID)ShaderIcon->m_pSRV;
 				}
-				else if (extension == ".cpp" || extension == ".h")
+				else if (extension == ".cpp")
 				{
 					fileType = FileType::CppScript;
 					iconTexture = (ImTextureID)CodeIcon->m_pSRV;
@@ -714,6 +717,17 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		if (ImGui::MenuItem("Delete"))
 		{
 			file::remove(directory);
+			if (directory.extension() == ".cpp")
+			{
+				file::path headerPath = directory;
+				headerPath.replace_extension(".h");
+				if (file::exists(headerPath))
+				{
+					file::remove(headerPath);
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+					ScriptManager->CompileEvent();
+				}
+			}
 		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{

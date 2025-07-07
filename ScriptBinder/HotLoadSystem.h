@@ -8,7 +8,6 @@ class ModuleBehavior;
 class GameObject;
 class SceneManager;
 #pragma region DLLFunctionPtr
-typedef void (*InitModuleFunc)();
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
@@ -33,6 +32,8 @@ public:
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
+	void RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script);
+	void UnRegisterScriptReflection(const std::string_view& name);
 
 #pragma region Script Build Helper
 	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
@@ -83,20 +84,6 @@ public:
 	{
 		m_isReloading = value;
 	}
-
-	void ImiFreeLibrary()
-	{
-		if (hDll)
-		{
-			::FreeLibrary(hDll);
-			hDll = nullptr;
-			m_scriptFactoryFunc = nullptr;
-			m_initModuleFunc = nullptr;
-			m_scriptNamesFunc = nullptr;
-			m_setSceneManagerFunc = nullptr;
-		}
-	}
-
 #pragma endregion
 
 private:
@@ -105,7 +92,6 @@ private:
 private:
 	HMODULE hDll{};
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
-	InitModuleFunc m_initModuleFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
 	SetSceneManagerFunc m_setSceneManagerFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };

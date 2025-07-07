@@ -130,6 +130,10 @@
 			<EnableUAC>false</EnableUAC>
 			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
+		<PreBuildEvent>
+			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
+"../x64\HeaderTool\ScriptReflectionHeaderTool.exe"</Command>
+		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
 		<ClCompile>
@@ -154,6 +158,10 @@
 			<EnableUAC>false</EnableUAC>
 			<AdditionalDependencies>../Bin\Editor\ScriptBinder.lib;../Bin\Editor\Utility_Framework.lib;../Bin\Editor\\ImGuiHelper.lib;../Bin\Editor\RenderEngine.lib;../Bin\Editor\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
+		<PreBuildEvent>
+			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
+"../x64\HeaderTool\ScriptReflectionHeaderTool.exe"</Command>
+		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
 		<ClInclude Include="Assets\Script\AsisMove.h" />

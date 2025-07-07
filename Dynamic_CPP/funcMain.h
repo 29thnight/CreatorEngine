@@ -36,7 +36,7 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void SetInstanceFuncPtr(Singleton<SceneManager>::FGetInstance funcPtr)
+	EXPORT_API void SetSceneManager(Singleton<SceneManager>::FGetInstance funcPtr)
 	{
 		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
 	}
