@@ -41,6 +41,7 @@ public:
     void StopEmitterPreview(int index);
     void RemoveEmitter(int index);
     void AssignTextureToEmitter(int emitterIndex, int textureIndex);
+    void RenderUnifiedDragDropTarget();
 
     // 2D 모듈용 설정 메서드
     void StartModifyEmitter(int index);
@@ -57,7 +58,6 @@ public:
     // 3D 모듈용 설정 메서드
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
     void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
-
 private:
     // 미리보기용 임시 에미터들
     std::vector<TempEmitterInfo> m_tempEmitters;
@@ -118,7 +118,6 @@ private:
     void RenderExistingModules();
     void RenderPreviewControls();
     void RenderModifyEmitterEditor();
-    void RenderTextureDragDropTarget();
     void RenderJsonSaveLoadUI();
 
     // 에미터 생성/편집 관련

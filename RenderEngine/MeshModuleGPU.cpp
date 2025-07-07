@@ -1,4 +1,5 @@
 #include "MeshModuleGPU.h"
+#include "ShaderSystem.h"
 
 void MeshModuleGPU::Initialize()
 {
@@ -6,8 +7,9 @@ void MeshModuleGPU::Initialize()
     m_meshType = MeshType::None;
     m_instanceCount = 0;
     m_particleSRV = nullptr;
-    m_currentMesh = nullptr;
-    m_ownsMesh = false;
+    m_model = nullptr;
+    m_meshIndex = 0;
+    m_assignedTexture = nullptr;
 
     // 블렌드 스테이트 (알파 블렌딩)
     D3D11_BLEND_DESC blendDesc = {};
@@ -92,26 +94,22 @@ void MeshModuleGPU::CreateCubeMesh()
     auto vertices = PrimitiveCreator::CubeVertices();
     auto indices = PrimitiveCreator::CubeIndices();
 
-    m_currentMesh = new Mesh("CubeParticle", vertices, indices);
-    m_ownsMesh = true;
+    // 임시 큐브 메시 생성 (Model 시스템과 분리)
+    if (m_tempCubeMesh)
+    {
+        delete m_tempCubeMesh;
+    }
+    m_tempCubeMesh = new Mesh("CubeParticle", vertices, indices);
 }
 
 void MeshModuleGPU::CreateSphereMesh()
 {
-    // 현재는 큐브만 지원
+    // 향후 구현 예정
 }
 
 void MeshModuleGPU::SetMeshType(MeshType type)
 {
     if (m_meshType == type) return;
-
-    // 기존 메시 정리 (소유권이 있는 경우만)
-    if (m_ownsMesh && m_currentMesh)
-    {
-        delete m_currentMesh;
-        m_currentMesh = nullptr;
-        m_ownsMesh = false;
-    }
 
     m_meshType = type;
 
@@ -119,27 +117,67 @@ void MeshModuleGPU::SetMeshType(MeshType type)
     {
     case MeshType::Cube:
         CreateCubeMesh();
+        m_model = nullptr;
         break;
     case MeshType::Sphere:
         CreateSphereMesh();
+        m_model = nullptr;
         break;
-    case MeshType::Custom:
-        // SetCustomMesh에서 설정됨
+    case MeshType::Model:
+        // SetModel에서 설정됨
         break;
     }
 }
 
-void MeshModuleGPU::SetCustomMesh(Mesh* customMesh)
+void MeshModuleGPU::SetModel(Model* model, int meshIndex)
 {
-    // 기존 메시 정리 (소유권이 있는 경우만)
-    if (m_ownsMesh && m_currentMesh)
+    if (!model) return;
+
+    if (meshIndex < 0 || meshIndex >= model->m_numTotalMeshes)
     {
-        delete m_currentMesh;
+        meshIndex = 0; // 기본값으로 첫 번째 메시 사용
     }
 
-    m_meshType = MeshType::Custom;
-    m_currentMesh = customMesh;
-    m_ownsMesh = false;  // 외부에서 받은 메시이므로 소유권 없음
+    m_meshType = MeshType::Model;
+    m_model = model;
+    m_meshIndex = meshIndex;
+}
+
+void MeshModuleGPU::SetModel(Model* model, const std::string_view& meshName)
+{
+    if (!model) return;
+
+    m_meshType = MeshType::Model;
+    m_model = model;
+
+    // 메시 이름으로 인덱스 찾기
+    for (int i = 0; i < model->m_numTotalMeshes; ++i)
+    {
+        auto mesh = model->GetMesh(i);
+        if (mesh && mesh->GetName() == meshName)
+        {
+            m_meshIndex = i;
+            return;
+        }
+    }
+
+    // 찾지 못한 경우 첫 번째 메시 사용
+    m_meshIndex = 0;
+}
+
+Mesh* MeshModuleGPU::GetCurrentMesh() const
+{
+    switch (m_meshType)
+    {
+    case MeshType::Cube:
+        return m_tempCubeMesh;
+    case MeshType::Sphere:
+        return nullptr; // 미구현
+    case MeshType::Model:
+        return m_model ? m_model->GetMesh(m_meshIndex) : nullptr;
+    default:
+        return nullptr;
+    }
 }
 
 void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
@@ -165,7 +203,8 @@ void MeshModuleGPU::UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
 {
-    if (!m_currentMesh || !m_particleSRV || m_instanceCount == 0)
+    auto currentMesh = GetCurrentMesh();
+    if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
@@ -180,22 +219,41 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     // 파티클 SRV 바인딩
     deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
 
+    // 텍스처 바인딩
+    if (m_assignedTexture)
+    {
+        if (m_assignedTexture->m_pSRV)
+        {
+            deviceContext->PSSetShaderResources(0, 1, &m_assignedTexture->m_pSRV);
+        }
+    }
+    else if (m_meshType == MeshType::Model && m_model)
+    {
+        // 모델의 기본 텍스처 사용 (BaseColor 텍스처)
+        auto material = m_model->GetMaterial(m_meshIndex);
+        if (material && material->m_pBaseColor && material->m_pBaseColor->m_pSRV)
+        {
+            deviceContext->PSSetShaderResources(0, 1, &material->m_pBaseColor->m_pSRV);
+        }
+    }
+
     // 메시의 버텍스/인덱스 버퍼 바인딩
-    UINT stride = m_currentMesh->GetStride();
+    UINT stride = currentMesh->GetStride();
     UINT offset = 0;
-    auto vertexBuffer = m_currentMesh->GetVertexBuffer();
-    auto indexBuffer = m_currentMesh->GetIndexBuffer();
+    auto vertexBuffer = currentMesh->GetVertexBuffer();
+    auto indexBuffer = currentMesh->GetIndexBuffer();
 
     deviceContext->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
     deviceContext->IASetIndexBuffer(indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
     // 인스턴싱 렌더링
-    const auto& indices = m_currentMesh->GetIndices();
+    const auto& indices = currentMesh->GetIndices();
     deviceContext->DrawIndexedInstanced(indices.size(), m_instanceCount, 0, 0, 0);
 
     // 리소스 정리
     ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
     deviceContext->VSSetShaderResources(0, 1, nullSRV);
+    deviceContext->PSSetShaderResources(0, 1, nullSRV);
 
     // 렌더 상태 복원
     RestoreRenderState();
@@ -203,19 +261,22 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
 
 void MeshModuleGPU::SetTexture(Texture* texture)
 {
+    m_assignedTexture = texture;
 }
 
 void MeshModuleGPU::Release()
 {
-    // 소유권이 있는 메시만 삭제
-    if (m_ownsMesh && m_currentMesh)
+    // 임시 큐브 메시 정리
+    if (m_tempCubeMesh)
     {
-        delete m_currentMesh;
+        delete m_tempCubeMesh;
+        m_tempCubeMesh = nullptr;
     }
 
     m_constantBuffer.Reset();
-    m_currentMesh = nullptr;
-    m_ownsMesh = false;
+    m_model = nullptr;
+    m_meshIndex = 0;
     m_particleSRV = nullptr;
     m_instanceCount = 0;
+    m_assignedTexture = nullptr;
 }
