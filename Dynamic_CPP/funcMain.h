@@ -36,32 +36,9 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void SetSceneManager(void* sceneManager)
+	EXPORT_API void SetInstanceFuncPtr(Singleton<SceneManager>::FGetInstance funcPtr)
 	{
-		SceneManager* ptr = static_cast<SceneManager*>(sceneManager);
-		auto& vector = SceneManagers->GetScenes();
-		auto& exeVector = ptr->GetScenes();
-
-		vector.clear();
-		for (auto& scene : exeVector)
-		{
-			vector.push_back(scene);
-		}
-
-		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
-		SceneManagers->SetActiveScene(ptr->GetActiveScene());
-		SceneManagers->SetGameStart(ptr->IsGameStart());
-		auto& dontDestroyOnLoadObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		auto& exeDontDestroyOnLoadObjects = ptr->GetDontDestroyOnLoadObjects();
-		dontDestroyOnLoadObjects.clear();
-		for (auto& obj : exeDontDestroyOnLoadObjects)
-		{
-			dontDestroyOnLoadObjects.push_back(obj);
-		}
-		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
-		SceneManagers->SetActiveScene(ptr->GetActiveScene());
-		SceneManagers->SetGameStart(ptr->IsGameStart());
-		SceneManagers->SetInputActionManager(ptr->GetInputActionManager());
+		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
 	}
 #pragma	endregion
 

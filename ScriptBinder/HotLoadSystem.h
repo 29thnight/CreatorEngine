@@ -6,12 +6,12 @@
 
 class ModuleBehavior;
 class GameObject;
-
+class SceneManager;
 #pragma region DLLFunctionPtr
 typedef void (*InitModuleFunc)();
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
-typedef void (*SetSceneManagerFunc)(void*);
+typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
@@ -35,7 +35,7 @@ public:
 	void CreateScriptFile(const std::string_view& name);
 
 #pragma region Script Build Helper
-	void UpdateSceneManager(void* sceneManager)
+	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
 	{
 		if (!m_setSceneManagerFunc) return;
 
