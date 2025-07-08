@@ -30,7 +30,6 @@ namespace BT
 		}
 		
 	private :
-		NodeFactory() = default;
 		std::map<std::string, CreateNodeFunc> m_registry;
 	};
 } // namespace BT
