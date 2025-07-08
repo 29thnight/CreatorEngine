@@ -25,32 +25,49 @@ PxFilterFlags CustomFilterShader(
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
 	//&&&&& 충돌매트릭스 조건 먼가이상함 
-	if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
+	//if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
+	//{
+	//	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+	//		pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
+	//			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
+	//		return physx::PxFilterFlag::eDEFAULT;
+	//	}
+	//}
+
+	//if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+	//	pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
+	//		| physx::PxPairFlag::eDETECT_CCD_CONTACT
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
+	//		| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
+	//		| physx::PxPairFlag::eCONTACT_EVENT_POSE
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	//	return physx::PxFilterFlag::eDEFAULT;
+	//}
+	//else 
+	//{
+	//	pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT;
+	//	return physx::PxFilterFlag::eSUPPRESS; //&&&&&sehwan
+	//}
+
+
+
+	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
-		if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
-			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
-				| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-				| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
-			return physx::PxFilterFlag::eDEFAULT;
-		}
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+			| PxPairFlag::eNOTIFY_TOUCH_FOUND
+			| PxPairFlag::eNOTIFY_TOUCH_LOST;
+		return PxFilterFlag::eDEFAULT;
 	}
 
-	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0))*/ {
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
-			| physx::PxPairFlag::eDETECT_CCD_CONTACT
-			| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
-			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
-			| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
-			| physx::PxPairFlag::eCONTACT_EVENT_POSE
-			| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-		return physx::PxFilterFlag::eDEFAULT;
-	}
-	else 
-	{
-		pairFlags &= ~physx::PxPairFlag::eTRIGGER_DEFAULT;
-		return physx::PxFilterFlag::eDEFAULT; //&&&&&sehwan
-	}
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT
+		| PxPairFlag::eNOTIFY_TOUCH_FOUND
+		| PxPairFlag::eNOTIFY_TOUCH_LOST
+		| PxPairFlag::eNOTIFY_CONTACT_POINTS
+		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	return PxFilterFlag::eDEFAULT;
 }
 
 class RaycastQueryFilter : public physx::PxQueryFilterCallback
@@ -268,10 +285,11 @@ void PhysicX::Update(float fixedDeltaTime)
 			
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
-			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
+			filterData.word1= 0xFFFFFFFF;
+			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
-			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
-			shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
+			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+			//shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
 
 			collisionData->thisId = contrllerInfo.id;
 			collisionData->thisLayerNumber = contrllerInfo.layerNumber;

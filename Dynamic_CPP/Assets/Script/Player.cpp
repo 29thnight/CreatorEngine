@@ -6,16 +6,14 @@
 #include "Animator.h"
 #include "Socket.h"
 #include "pch.h"
-#include "RigidBodyComponent.h"
-#include "BoxColliderComponent.h"
+#include "MeshRenderer.h"
+#include "Material.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
-	//player->GetComponent<RigidBodyComponent>();
-
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  Attack();});
@@ -40,16 +38,8 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-
-	static float elasepdTime = 0.f;
-	elasepdTime += tick;
-	if (elasepdTime >= 4.f)
-	{
-		//SceneManagers->GetActiveScene()->CreateGameObject("newenwenw");
-		elasepdTime = 0;
-	}
-
-
+	if(m_nearObject)
+		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 16;
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -94,12 +84,16 @@ void Player::Catch()
 		catchedObject = m_nearObject;
 	}*/
 
-	player = GameObject::Find("Punch");
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	m_nearObject = GameObject::Find("Sting-Sword lowpoly");
-	righthand->AttachObject(m_nearObject);
-	catchedObject = m_nearObject;
+
+	if (m_nearObject != nullptr)
+	{
+		player = GameObject::Find("Punch");
+		auto animator = player->GetComponent<Animator>();
+		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		righthand->AttachObject(m_nearObject);
+		catchedObject = m_nearObject;
+		m_nearObject = nullptr;
+	}
 }
 
 void Player::Throw()
@@ -109,6 +103,7 @@ void Player::Throw()
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
 	catchedObject = nullptr;
+	m_nearObject = nullptr; //&&&&&
 }
 
 void Player::Attack()
@@ -147,30 +142,35 @@ void Player::Punch()
 	std::cout << "ppppuuuunchhhhhhh" << std::endl;
 }
 
-void Player::OnCollisionEnter(const Collision& collision)
+void Player::FindNearObject(GameObject* gameObject)
 {
-	if (collision.thisObj == collision.otherObj)
-		return;
-
 	
+	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
+	auto objectPos = gameObject->m_transform.GetWorldPosition();
+	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
+	XMVECTOR distSqVec = XMVector3LengthSq(diff);
 
-}
-
-void Player::OnCollisionStay(const Collision& collision)
-{
-	if (collision.thisObj == collision.otherObj)
-		return;
-
-	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
+	float distance;
+	XMStoreFloat(&distance, distSqVec);
+	if (m_nearObject == nullptr)
 	{
-		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly collision" << std::endl;
+		m_nearObject = gameObject;
+		m_nearDistance = distance;
 	}
 	else
 	{
-		m_nearObject = nullptr;
+		
+		if (distance < m_nearDistance)
+		{
+			m_nearObject = gameObject;
+			m_nearDistance = distance;
+		}
 	}
+	
 }
+
+
+
 
 void Player::OnTriggerEnter(const Collision& collision)
 {
@@ -178,24 +178,22 @@ void Player::OnTriggerEnter(const Collision& collision)
 		return;
 
 
-	//m_nearObject = collision.otherObj;
-	std::cout << collision.otherObj->ToString() << std::endl;
-	
 
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
+	FindNearObject(collision.otherObj);
+	std::cout << "player muunga boodit him" << std::endl;
+}
 
-	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
+void Player::OnTriggerExit(const Collision& collision)
+{
+	if (m_nearObject == collision.otherObj)
 	{
-		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly trigger" << std::endl;
-	}
-	else
-	{
+		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
+		//abc
 	}
-
 }

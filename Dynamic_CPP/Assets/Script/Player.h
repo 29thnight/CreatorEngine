@@ -12,11 +12,11 @@ public:
 
 	virtual void OnTriggerEnter(const Collision& collision) override;
 	virtual void OnTriggerStay(const Collision& collision) override;
-	virtual void OnTriggerExit(const Collision& collision) override {}
+	virtual void OnTriggerExit(const Collision& collision) override;
 
 
-	virtual void OnCollisionEnter(const Collision& collision) override;
-	virtual void OnCollisionStay(const Collision& collision) override;
+	virtual void OnCollisionEnter(const Collision& collision) override {}
+	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
 
 	virtual void Update(float tick) override;
@@ -31,9 +31,13 @@ public:
 	void Attack();
 	void SwapWeaponLeft();
 	void SwapWeaponRight();
+
 	int m_weaponIndex = 0;
 	void Punch();
 
+
+	void FindNearObject(GameObject* gameObject);
+	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon;
 	GameObject* player = nullptr;
