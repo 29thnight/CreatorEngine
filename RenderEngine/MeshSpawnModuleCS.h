@@ -6,36 +6,38 @@
 struct alignas(16) MeshParticleTemplateParams
 {
     float lifeTime;
-    float3 pad1;                      
+    float3 pad1;
 
-    float3 minScale;                  
+    float3 minScale;
     float pad2;
-    float3 maxScale;                  
+
+    float3 maxScale;
     float pad3;
 
-    float3 minRotationSpeed;          
+    float3 minRotationSpeed;
     float pad4;
-    float3 maxRotationSpeed;          
+
+    float3 maxRotationSpeed;
     float pad5;
 
-    float3 minInitialRotation;        
+    float3 minInitialRotation;
     float pad6;
-    float3 maxInitialRotation;        
+
+    float3 maxInitialRotation;
     float pad7;
 
-    float4 color;                     
+    float4 color;
 
-    float3 velocity;                  
-    float pad8;
-    float3 acceleration;              
-    float pad9;
+    float3 velocity;
+    float minVerticalVelocity;
 
-    float minVerticalVelocity;        
-    float maxVerticalVelocity;        
-    float horizontalVelocityRange;    
-    float pad10;
+    float3 acceleration;
+    float maxVerticalVelocity;
+
+    float horizontalVelocityRange;
+    UINT textureIndex; 
+    float2 pad8;
 };
-
 class MeshSpawnModuleCS : public ParticleModule
 {
 private:
@@ -73,6 +75,8 @@ public:
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
 
+    void SetEmitterPosition(const Mathf::Vector3& position);
+
     // 스폰 설정 메서드들
     void SetSpawnRate(float rate);
     void SetEmitterType(EmitterType type);
@@ -88,6 +92,8 @@ public:
     void SetParticleVelocity(const XMFLOAT3& velocity);
     void SetParticleAcceleration(const XMFLOAT3& acceleration);
     void SetVelocityRange(float minVertical, float maxVertical, float horizontalRange);
+
+    void SetTextureIndex(UINT textureIndex);
 
     // 상태 조회
     float GetSpawnRate() const { return m_spawnParams.spawnRate; }

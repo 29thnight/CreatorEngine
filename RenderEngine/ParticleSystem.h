@@ -21,7 +21,7 @@ enum class ParticleDataType
 class ParticleSystem
 {
 public:
-	ParticleSystem(int maxParticles = 1000, ParticleDataType dataType = ParticleDataType::Standard);
+	ParticleSystem(int maxParticles, ParticleDataType dataType = ParticleDataType::Standard);
 	~ParticleSystem();
 
 	template<typename T, typename... Args>

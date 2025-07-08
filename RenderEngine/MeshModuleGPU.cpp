@@ -75,6 +75,7 @@ void MeshModuleGPU::Initialize()
     // 샘플러 설정
     auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
     auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+
     m_pso->m_samplers.push_back(linearSampler);
     m_pso->m_samplers.push_back(pointSampler);
 
@@ -186,6 +187,13 @@ void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT 
     m_instanceCount = instanceCount;
 }
 
+void MeshModuleGPU::SetupRenderTarget(RenderPassData* renderData)
+{
+    auto& deviceContext = DeviceState::g_pDeviceContext;
+    ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
+    deviceContext->OMSetRenderTargets(1, &rtv, renderData->m_depthStencil->m_pDSV);
+}
+
 void MeshModuleGPU::SetCameraPosition(const Mathf::Vector3& position)
 {
     m_constantBufferData.cameraPosition = position;
@@ -208,9 +216,6 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         return;
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
-
-    // 렌더 상태 저장
-    SaveRenderState();
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffer(world, view, projection);
@@ -254,9 +259,6 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
     deviceContext->VSSetShaderResources(0, 1, nullSRV);
     deviceContext->PSSetShaderResources(0, 1, nullSRV);
-
-    // 렌더 상태 복원
-    RestoreRenderState();
 }
 
 void MeshModuleGPU::SetTexture(Texture* texture)

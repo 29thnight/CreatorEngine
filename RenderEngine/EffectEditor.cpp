@@ -229,8 +229,8 @@ void EffectEditor::RenderMainEditor()
 
         // 상단 영역: 에미터 생성 및 내보내기
         if (ImGui::BeginChild("CreateSection", ImVec2(0, windowSize.y * 0.3f), true)) {
-            // 드래그 드롭 타겟 추가
-            RenderTextureDragDropTarget();
+            // 드래그 드롭 타겟 추가 (통합된 버전)
+            RenderUnifiedDragDropTarget();
 
             if (ImGui::Button("Create New Emitter")) {
                 StartCreateEmitter();
@@ -256,8 +256,8 @@ void EffectEditor::RenderMainEditor()
 
         // 하단 영역: 에미터 관리 및 미리보기
         if (ImGui::BeginChild("ManageSection", ImVec2(0, 0), true)) {
-            // 드래그 드롭 타겟 추가
-            RenderTextureDragDropTarget();
+            // 드래그 드롭 타겟 추가 (통합된 버전)
+            RenderUnifiedDragDropTarget();
 
             RenderPreviewControls();
 
@@ -346,13 +346,13 @@ void EffectEditor::RenderMainEditor()
         ImGui::EndChild();
     }
     else if (m_isEditingEmitter) {
-        // 에미터 편집 모드에서도 드래그 드롭 적용
-        RenderTextureDragDropTarget();
+        // 에미터 편집 모드에서도 드래그 드롭 적용 (통합된 버전)
+        RenderUnifiedDragDropTarget();
         RenderEmitterEditor();
     }
     else if (m_isModifyingEmitter) {
-        // 에미터 수정 모드에서도 드래그 드롭 적용
-        RenderTextureDragDropTarget();
+        // 에미터 수정 모드에서도 드래그 드롭 적용 (통합된 버전)
+        RenderUnifiedDragDropTarget();
         RenderModifyEmitterEditor();
     }
 }
@@ -480,60 +480,6 @@ void EffectEditor::RenderModifyEmitterEditor()
     }
 }
 
-void EffectEditor::RenderTextureDragDropTarget()
-{
-    // 현재 창의 전체 영역을 드래그 드롭 타겟으로 설정
-    ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 windowPos = ImGui::GetCursorScreenPos();
-    ImRect dropRect(windowPos, ImVec2(windowPos.x + availSize.x, windowPos.y + availSize.y));
-
-    if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("EffectEditorDropTarget")))
-    {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
-        {
-            const char* droppedFilePath = (const char*)payload->Data;
-            file::path filename = droppedFilePath;
-            file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
-
-            // 텍스처 로드
-            Texture* texture = DataSystems->LoadTexture(filepath.string().c_str());
-
-            if (texture)
-            {
-                // 텍스처에 파일명 설정 (확장자 제거)
-                std::string textureName = filename.stem().string();
-                texture->m_name = textureName;
-
-                // 이름으로 중복 체크
-                bool isDuplicate = false;
-                for (const auto& existingTexture : m_textures)
-                {
-                    if (existingTexture->m_name == textureName)
-                    {
-                        isDuplicate = true;
-                        break;
-                    }
-                }
-
-                if (!isDuplicate)
-                {
-                    m_textures.push_back(texture);
-                    std::cout << "Texture added to EffectEditor: " << textureName << std::endl;
-                }
-                else
-                {
-                    std::cout << "Texture already exists in list: " << textureName << std::endl;
-                }
-            }
-            else
-            {
-                std::cout << "Failed to load texture: " << filepath.string() << std::endl;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
-}
-
 void EffectEditor::RenderJsonSaveLoadUI()
 {
     ImGui::Text("JSON Save/Load");
@@ -599,7 +545,6 @@ void EffectEditor::RenderJsonSaveLoadUI()
         ImGui::EndPopup();
     }
 }
-
 
 void EffectEditor::StartModifyEmitter(int index)
 {
@@ -1278,6 +1223,10 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
     if (currentMeshType == MeshType::Model) {
         ImGui::Text("Model Settings:");
 
+        // 드래그 드롭 안내
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Drag & Drop FBX files here!");
+        ImGui::Text("Or use manual load:");
+
         static char modelFilePath[256] = "";
         ImGui::InputText("Model File Path", modelFilePath, sizeof(modelFilePath));
 
@@ -1285,7 +1234,7 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
         if (ImGui::Button("Load Model")) {
             if (strlen(modelFilePath) > 0) {
                 // FBX 모델 로드
-                Model* loadedModel = Model::LoadModel(modelFilePath);
+                Model* loadedModel = DataSystems->LoadCashedModel(modelFilePath);
                 if (loadedModel) {
                     meshModule->SetModel(loadedModel, 0); // 첫 번째 메시 사용
                     std::cout << "Model loaded: " << modelFilePath << std::endl;
@@ -1296,6 +1245,23 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
             }
         }
 
+        // 퀵 로드 버튼들
+        ImGui::Text("Quick Load:");
+        if (ImGui::Button("Punch.fbx")) {
+            Model* model = DataSystems->LoadCashedModel("Punch.fbx");
+            if (model) meshModule->SetModel(model, 0);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Character.fbx")) {
+            Model* model = DataSystems->LoadCashedModel("Character.fbx");
+            if (model) meshModule->SetModel(model, 0);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Weapon.fbx")) {
+            Model* model = DataSystems->LoadCashedModel("Weapon.fbx");
+            if (model) meshModule->SetModel(model, 0);
+        }
+
         // 현재 모델이 설정되어 있다면 메시 선택 UI 표시
         Model* currentModel = meshModule->GetCurrentModel();
         if (currentModel && currentModel->m_numTotalMeshes > 0) {
@@ -1303,6 +1269,9 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
             ImGui::Text("Mesh Selection:");
 
             static int selectedMeshIndex = 0;
+            if (selectedMeshIndex >= currentModel->m_numTotalMeshes) {
+                selectedMeshIndex = 0; // 안전장치
+            }
 
             // 메시 인덱스 선택
             if (ImGui::SliderInt("Mesh Index", &selectedMeshIndex, 0, currentModel->m_numTotalMeshes - 1)) {
@@ -1313,8 +1282,9 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
             Mesh* currentMesh = currentModel->GetMesh(selectedMeshIndex);
             if (currentMesh) {
                 ImGui::Text("Current Mesh: %s", currentMesh->GetName().c_str());
-                ImGui::Text("Vertex Count: %zu", currentMesh->GetVertices().size());
-                ImGui::Text("Index Count: %zu", currentMesh->GetIndices().size());
+                ImGui::Text("Vertices: %zu | Indices: %zu",
+                    currentMesh->GetVertices().size(),
+                    currentMesh->GetIndices().size());
             }
 
             // 메시 이름으로 선택하는 UI (옵션)
@@ -1443,78 +1413,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
         ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No mesh selected");
     }
 }
-
-void EffectEditor::RenderModelDragDropTarget()
-{
-    // 현재 창의 전체 영역을 드래그 드롭 타겟으로 설정
-    ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 windowPos = ImGui::GetCursorScreenPos();
-    ImRect dropRect(windowPos, ImVec2(windowPos.x + availSize.x, windowPos.y + availSize.y));
-
-    if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("ModelDropTarget")))
-    {
-        // FBX 파일 드롭 처리
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
-        {
-            const char* droppedFilePath = (const char*)payload->Data;
-            file::path filename = droppedFilePath;
-
-            // FBX 파일인지 확인
-            std::string extension = filename.extension().string();
-            std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-
-            if (extension == ".fbx" || extension == ".obj" || extension == ".dae") {
-                // LoadCashedModel로 로드
-                Model* loadedModel = DataSystems->LoadCashedModel(filename.filename().string());
-
-                if (loadedModel) {
-                    // 현재 편집 중인 MeshModule에 자동 할당
-                    if (m_modifyingSystem) {
-                        auto& renderModules = m_modifyingSystem->GetRenderModules();
-                        for (auto& renderModule : renderModules) {
-                            if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
-                                meshModule->SetMeshType(MeshType::Model);
-                                meshModule->SetModel(loadedModel, 0);
-                                std::cout << "Model assigned to MeshModule: " << filename.filename().string() << std::endl;
-                                break;
-                            }
-                        }
-                    }
-
-                    // 로드된 모델을 리스트에 추가 (선택적)
-                    std::string modelName = filename.stem().string();
-
-                    // 중복 체크
-                    bool isDuplicate = false;
-                    for (const auto& existingModel : m_loadedModels) {
-                        if (existingModel->name == modelName) {
-                            isDuplicate = true;
-                            break;
-                        }
-                    }
-
-                    if (!isDuplicate) {
-                        m_loadedModels.push_back(loadedModel);
-                        std::cout << "Model added to loaded list: " << modelName << std::endl;
-                    }
-                    else {
-                        std::cout << "Model already exists in list: " << modelName << std::endl;
-                    }
-                }
-                else {
-                    std::cout << "Failed to load model: " << filename.string() << std::endl;
-                }
-            }
-            else {
-                std::cout << "Unsupported model format: " << extension << std::endl;
-                std::cout << "Supported formats: .fbx, .obj, .dae" << std::endl;
-            }
-        }
-
-        ImGui::EndDragDropTarget();
-    }
-}
-
 void EffectEditor::RenderUnifiedDragDropTarget()
 {
     // 현재 창의 전체 영역을 드래그 드롭 타겟으로 설정
@@ -1578,7 +1476,7 @@ void EffectEditor::RenderUnifiedDragDropTarget()
             std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
 
             if (extension == ".fbx" || extension == ".obj" || extension == ".dae") {
-                // LoadCashedModel로 로드
+                // LoadCashedModel로 로드 (자동으로 캐시 관리됨)
                 Model* loadedModel = DataSystems->LoadCashedModel(filename.filename().string());
 
                 if (loadedModel) {

@@ -24,8 +24,13 @@ struct MeshConstantBuffer
 class MeshModuleGPU : public RenderModules
 {
 public:
-    void Initialize();
-    void Release();
+    void Initialize() override;
+    void Release() override;
+    void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override;
+
+    void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
+    void SetupRenderTarget(RenderPassData* renderData) override;
+    void SetTexture(Texture* texture) override;
 
     // 메시 타입 설정
     void SetMeshType(MeshType type);
@@ -35,18 +40,8 @@ public:
 
     // 모델 설정 (이름 기반)
     void SetModel(Model* model, const std::string_view& meshName);
-
-    // 파티클 데이터 설정
-    void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount);
-
     // 카메라 위치 설정
     void SetCameraPosition(const Mathf::Vector3& position);
-
-    // 텍스처 설정
-    void SetTexture(Texture* texture);
-
-    // 렌더링
-    void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection);
 
     // 상태 조회 함수들 (UI에서 사용)
     MeshType GetMeshType() const { return m_meshType; }
@@ -64,7 +59,6 @@ private:
  
 
 private:
-    std::unique_ptr<PipelineStateObject> m_pso;
     ComPtr<ID3D11Buffer> m_constantBuffer;
     MeshConstantBuffer m_constantBufferData;
 

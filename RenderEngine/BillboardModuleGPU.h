@@ -10,18 +10,20 @@ public:
 public:
 
     void Initialize() override;
+    void Release() override;
     void CreateBillboard();
     void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override;
 
     void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
-    
+    void SetupRenderTarget(RenderPassData* renderData) override;
+    void SetTexture(Texture* texture) override;
 
     BillBoardType GetBillboardType() const { return m_BillBoardType; }
     PipelineStateObject* GetPSO() { return m_pso.get(); }
 
-    void SetTexture(Texture* texture) override;
 
-    void SetupRenderTarget(RenderPassData* renderData) override;
+
+
 
     void BindResource() override;
 

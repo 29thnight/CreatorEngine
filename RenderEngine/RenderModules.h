@@ -36,16 +36,18 @@ struct ModelConstantBuffer
 class RenderModules
 {
 public:
+    virtual ~RenderModules() { Release(); }
     virtual void Initialize() {}
     virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) {}
-    void movePSO(std::unique_ptr<PipelineStateObject> pso) { m_pso.swap(pso); }
-    PipelineStateObject* GetPSO() { return m_pso.get(); }
-
+    virtual void Release() {}
     virtual void SetTexture(Texture* texture) {}
     virtual void BindResource() {}
     virtual void SetupRenderTarget(RenderPassData* renderData) {}
-    
+
     virtual void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instancecount) = 0;
+
+    void movePSO(std::unique_ptr<PipelineStateObject> pso) { m_pso.swap(pso); }
+    PipelineStateObject* GetPSO() { return m_pso.get(); }
 
     void CleanupRenderState();
     void SaveRenderState();

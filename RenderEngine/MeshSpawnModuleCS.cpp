@@ -1,4 +1,4 @@
-﻿// MeshSpawnModuleCS.cpp - 주요 변경 부분들
+﻿// MeshSpawnModuleCS.cpp - emitterPosition 추가
 #include "MeshSpawnModuleCS.h"
 #include "ShaderSystem.h"
 
@@ -15,16 +15,17 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     , m_randomGenerator(m_randomDevice())
     , m_uniform(0.0f, 1.0f)
 {
-    // 스폰 파라미터 기본값 (동일)
+    // 스폰 파라미터 기본값
     m_spawnParams.spawnRate = 1.0f;
     m_spawnParams.deltaTime = 0.0f;
     m_spawnParams.currentTime = 0.0f;
     m_spawnParams.emitterType = static_cast<int>(EmitterType::point);
-    m_spawnParams.emitterSize = XMFLOAT3(0.5f, 0.5f, 0.5f);
     m_spawnParams.emitterRadius = 1.0f;
+    m_spawnParams.emitterSize = XMFLOAT3(0.5f, 0.5f, 0.5f);
     m_spawnParams.maxParticles = 0;
+    m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-    // 🔥 3D 메시 파티클 템플릿 기본값
+    // 3D 메시 파티클 템플릿 기본값
     m_meshParticleTemplate.lifeTime = 10.0f;
 
     // 3D 스케일 범위
@@ -46,6 +47,8 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.minVerticalVelocity = 0.0f;
     m_meshParticleTemplate.maxVerticalVelocity = 0.0f;
     m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
+    m_meshParticleTemplate.textureIndex = 0;
+    m_meshParticleTemplate.textureIndex = 0;
 }
 
 MeshSpawnModuleCS::~MeshSpawnModuleCS()
@@ -100,7 +103,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     // 파티클 용량 업데이트
     m_spawnParams.maxParticles = m_particleCapacity;
     m_spawnParams.deltaTime = deltaTime;
-    m_spawnParams.currentTime = currentTime;  // TimeSystem에서 가져온 시간
+    m_spawnParams.currentTime = currentTime;
     m_spawnParamsDirty = true;
 
     // 디버깅: 시간 정보 출력
@@ -108,7 +111,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     if (debugCount < 5)
     {
         char debug[256];
-        sprintf_s(debug, "SpawnModule Frame %d: Rate=%.2f, DeltaTime=%.4f, CycleTime=%.2f/%.1f\n",
+        sprintf_s(debug, "MeshSpawnModule Frame %d: Rate=%.2f, DeltaTime=%.4f, CycleTime=%.2f/%.1f\n",
             debugCount, m_spawnParams.spawnRate, deltaTime, currentTime, maxCycleTime);
         OutputDebugStringA(debug);
         debugCount++;
@@ -128,7 +131,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
     DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
-    // 출력 리소스 바인딩 (스폰 타이머 버퍼 제거)
+    // 출력 리소스 바인딩
     ID3D11UnorderedAccessView* uavs[] = {
         m_outputUAV,        // u0: 파티클 출력
         m_randomStateUAV    // u1: 난수 상태
@@ -137,7 +140,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
 
     // 디스패치 실행
-    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;  // 64는 셰이더의 THREAD_GROUP_SIZE
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
@@ -171,17 +174,15 @@ void MeshSpawnModuleCS::OnSystemResized(UINT maxParticles)
     }
 }
 
-
 bool MeshSpawnModuleCS::InitializeComputeShader()
 {
     m_computeShader = ShaderSystem->ComputeShaders["MeshSpawnModule"].GetShader();
     return m_computeShader != nullptr;
 }
 
-// 상수 버퍼 생성: 크기만 변경
 bool MeshSpawnModuleCS::CreateConstantBuffers()
 {
-    // 스폰 파라미터 상수 버퍼 (동일)
+    // 스폰 파라미터 상수 버퍼
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(SpawnParams);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -192,7 +193,7 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
     if (FAILED(hr))
         return false;
 
-    // 🔥 메시 파티클 템플릿 상수 버퍼: 크기 변경
+    // 메시 파티클 템플릿 상수 버퍼
     bufferDesc.ByteWidth = sizeof(MeshParticleTemplateParams);
     hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_templateBuffer);
     if (FAILED(hr))
@@ -203,7 +204,7 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
 
 bool MeshSpawnModuleCS::CreateUtilityBuffers()
 {
-    // 난수 상태 버퍼만 생성 (스폰 타이머 버퍼 제거)
+    // 난수 상태 버퍼만 생성
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(UINT);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -232,16 +233,12 @@ bool MeshSpawnModuleCS::CreateUtilityBuffers()
     if (FAILED(hr))
         return false;
 
-    // 디버그 출력
-    //OutputDebugStringA("SpawnModule: Utility buffers created successfully\n");
-
     return true;
 }
 
-// 상수 버퍼 업데이트: 구조체 이름만 변경
 void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 {
-    // 스폰 파라미터 업데이트 (동일)
+    // 스폰 파라미터 업데이트
     if (m_spawnParamsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -255,7 +252,7 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
         }
     }
 
-    // 메시 파티클 템플릿 업데이트: 구조체 변경
+    // 메시 파티클 템플릿 업데이트
     if (m_templateDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -277,6 +274,21 @@ void MeshSpawnModuleCS::ReleaseResources()
     if (m_templateBuffer) { m_templateBuffer->Release(); m_templateBuffer = nullptr; }
     if (m_randomStateBuffer) { m_randomStateBuffer->Release(); m_randomStateBuffer = nullptr; }
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
+}
+
+// emitterPosition 설정 메서드 추가
+void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
+{
+    Mathf::Vector3 newPos = position;
+
+    // 기존 위치와 다른 경우에만 업데이트
+    if (m_spawnParams.emitterPosition.x != newPos.x ||
+        m_spawnParams.emitterPosition.y != newPos.y ||
+        m_spawnParams.emitterPosition.z != newPos.z)
+    {
+        m_spawnParams.emitterPosition = newPos;
+        m_spawnParamsDirty = true;
+    }
 }
 
 void MeshSpawnModuleCS::SetSpawnRate(float rate)
@@ -335,7 +347,6 @@ void MeshSpawnModuleCS::SetParticleInitialRotationRange(const XMFLOAT3& minRot, 
     m_templateDirty = true;
 }
 
-// 🔥 기존 메서드들: 멤버 변수 이름만 변경
 void MeshSpawnModuleCS::SetParticleLifeTime(float lifeTime)
 {
     if (m_meshParticleTemplate.lifeTime != lifeTime)
@@ -371,13 +382,11 @@ void MeshSpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, f
     m_templateDirty = true;
 }
 
-
-// ... 기타 Set 메서드들도 m_particleTemplate → m_meshParticleTemplate 로 변경
-
-// 🔥 핵심 변경사항 요약:
-// 1. 멤버 변수: m_particleTemplate → m_meshParticleTemplate
-// 2. 구조체 타입: ParticleTemplateParams → MeshParticleTemplateParams  
-// 3. 상수 버퍼 크기: sizeof(MeshParticleTemplateParams)
-// 4. 컴퓨트 셰이더: "SpawnModule" → "MeshSpawnModule"
-// 5. Update 함수의 파라미터 타입: ParticleData → MeshParticleData
-// 6. 3D 관련 새로운 설정 메서드들 추가
+void MeshSpawnModuleCS::SetTextureIndex(UINT textureIndex)
+{
+    if (m_meshParticleTemplate.textureIndex != textureIndex)
+    {
+        m_meshParticleTemplate.textureIndex = textureIndex;
+        m_templateDirty = true;
+    }
+}

@@ -98,6 +98,19 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 
 	for (auto* renderModule : m_renderModules)
 	{
+		if (!renderModule) {
+			OutputDebugStringA("Error: renderModule is nullptr\n");
+			continue;
+		}
+
+		// 가상 함수 테이블 확인
+		void* vtable = *reinterpret_cast<void**>(renderModule);
+		if (!vtable) {
+			OutputDebugStringA("Error: vtable is nullptr\n");
+			continue;
+		}
+
+
 		renderModule->SaveRenderState();
 		renderModule->SetupRenderTarget(renderData);
 
@@ -114,17 +127,24 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {
 	m_position = position;
-
 	// 모든 스폰 모듈에 위치 업데이트 알림
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
 	{
 		ParticleModule& module = *it;
 
-		// SpawnModuleCS인지 확인하고 위치 설정
+		// SpawnModuleCS 체크
 		SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module);
 		if (spawnModule)
 		{
 			spawnModule->SetEmitterPosition(position);
+			continue; // 하나 찾았으면 다음으로
+		}
+
+		// MeshSpawnModuleCS 체크
+		MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module);
+		if (meshSpawnModule)
+		{
+			meshSpawnModule->SetEmitterPosition(position);
 		}
 	}
 }

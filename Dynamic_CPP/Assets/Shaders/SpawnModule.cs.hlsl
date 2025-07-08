@@ -28,10 +28,11 @@ cbuffer SpawnParameters : register(b0)
     float gCurrentTime; // 누적된 총 시간
     int gEmitterType; // 이미터 타입 (0:Point, 1:Sphere, 2:Box, 3:Cone, 4:Circle)
     
-    float gEmitterRadius; // 구/원/콘 이미터 반지름
     float3 gEmitterSize; // 박스/콘 이미터 크기
+    float gEmitterRadius; // 구/원/콘 이미터 반지름
+    
     uint gMaxParticles; // 최대 파티클 수
-    float3 gEmitterPosition;
+    float3 gEmitterPosition; // 이미터 월드 위치
 }
 
 // 파티클 템플릿

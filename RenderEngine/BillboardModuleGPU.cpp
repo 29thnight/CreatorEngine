@@ -70,6 +70,36 @@ void BillboardModuleGPU::Initialize()
 	CreateBillboard();
 }
 
+
+void BillboardModuleGPU::Release()
+{
+	// ComPtr 리소스들 자동 해제
+	if (billboardVertexBuffer) {
+		billboardVertexBuffer.Reset();
+	}
+
+	if (billboardIndexBuffer) {
+		billboardIndexBuffer.Reset();
+	}
+
+	if (m_ModelBuffer) {
+		m_ModelBuffer.Reset();
+	}
+
+	// 일반 포인터들 초기화
+	m_particleSRV = nullptr;
+	m_assignedTexture = nullptr;
+
+	// 기본값 복원
+	m_instanceCount = 0;
+	m_BillBoardType = BillBoardType::Basic;
+	m_maxCount = 0;
+
+	// 벡터 클리어
+	m_vertices.clear();
+	m_indices.clear();
+}
+
 void BillboardModuleGPU::CreateBillboard()
 {
 	D3D11_BUFFER_DESC vbDesc = {};
