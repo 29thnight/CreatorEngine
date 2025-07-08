@@ -25,9 +25,6 @@
     <Filter Include="Managers">
       <UniqueIdentifier>{da5e0785-8ccd-4eb4-9aff-9a74beb9502b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\HotLoadSystem">
-      <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Resources\Light">
       <UniqueIdentifier>{044c4c77-9762-42ae-9e91-6e8e20d089b0}</UniqueIdentifier>
     </Filter>
@@ -136,13 +133,16 @@
     <Filter Include="Classes\GameObject\PrefabUtility">
       <UniqueIdentifier>{bd79e2da-c4c1-4c05-9605-8ee739a79c80}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\HotLoadSystem">
+      <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
     <ClCompile Include="HotLoadSystem.cpp">
-      <Filter>Classes\HotLoadSystem</Filter>
+      <Filter>Managers\HotLoadSystem</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
       <Filter>Managers\SceneManager</Filter>
@@ -282,7 +282,7 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="HotLoadSystem.h">
-      <Filter>Classes\HotLoadSystem</Filter>
+      <Filter>Managers\HotLoadSystem</Filter>
     </ClInclude>
     <ClInclude Include="LightProperty.h">
       <Filter>Classes\Resources\Light</Filter>

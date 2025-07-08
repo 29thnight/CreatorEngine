@@ -124,6 +124,16 @@ namespace Meta
             }
         }
 
+        //[warning] 스크립트에서 타입을 등록해제할 때 사용
+        void UnRegister(const std::string& name)
+        {
+            auto it = map.find(name);
+            if (it != map.end())
+            {
+                map.erase(it);
+            }
+		}
+
         const Type* Find(const std::string& name)
         {
             auto it = map.find(name);

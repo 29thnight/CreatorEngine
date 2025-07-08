@@ -7,22 +7,23 @@
 #include "MaterialInfomation.h"
 #include "SceneManager.h"
 #include "InputActionManager.h"
+
+#include "GameManager.h"
 using namespace Mathf;
 void EntityAsis::Start()
 {
-	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
+	//auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
 
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W'},
-		[this](Mathf::Vector2 _vector2) {Inputblabla(_vector2);});
+	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W'}, [this](Mathf::Vector2 _vector2) {Inputblabla(_vector2);});
 
-	auto manager = GameObject::Find("Manager");
-	if (manager)
+	auto gameManager = GameObject::Find("GameManager");	
+	if (gameManager)
 	{
-		auto temp = manager->GetComponent<Temp>();
-		if (temp)
+		auto gm = gameManager->GetComponent<GameManager>();
+		if (gm)
 		{
-			temp->AddEntity(this);
+			gm->PushEntity(this);
 		}
 	}
 

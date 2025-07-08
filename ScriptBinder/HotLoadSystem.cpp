@@ -14,6 +14,7 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 #include <winternl.h>                   //PROCESS_BASIC_INFORMATION
 
+constexpr int MAX__COMPILE_ITERATION = 4;
 
 // warning C4996: 'GetVersionExW': was declared deprecated
 #pragma warning (disable : 4996)
@@ -189,10 +190,19 @@ void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 		}
     }
 
+	DWORD exitCode = 0;
+
     WaitForSingleObject(pi.hProcess, INFINITE);
+	GetExitCodeProcess(pi.hProcess, &exitCode);
+
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
     CloseHandle(hRead);
+
+	if (exitCode != 0)
+	{
+		throw std::runtime_error("Build failed with exit code: " + std::to_string(exitCode));
+	}
 }
 
 void HotLoadSystem::Initialize()
@@ -231,7 +241,6 @@ void HotLoadSystem::Initialize()
 		}
 	}
 
-	m_initModuleFunc();
 	const char** scriptNames = nullptr;
 	int scriptCount = 0;
 	scriptNames = m_scriptNamesFunc(&scriptCount);
@@ -306,7 +315,6 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			return;
 		}
 
-		m_initModuleFunc();
 		m_scriptNames.clear();
 		const char** scriptNames = nullptr;
 		int scriptCount = 0;
@@ -319,6 +327,22 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			m_scriptNames.push_back(scriptName);
 		}
 
+		std::unordered_set<std::string> validNames(m_scriptNames.begin(), m_scriptNames.end());
+
+		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+		{
+			if (!validNames.count(name))
+			{
+				std::cout << "Invalid Script : " << name << " (GameObject index: " << index << ")\n";
+				gameObject = nullptr; // GameObject도 nullptr로 설정
+			}
+		}
+
+		std::erase_if(m_scriptComponentIndexs, [](const auto& tuple)
+		{
+			return std::get<0>(tuple) == nullptr; // GameObject가 nullptr인 경우 제거
+		});
+
 		ReplaceScriptComponent();
 		g_progressWindow->Close();
 	}
@@ -329,6 +353,8 @@ void HotLoadSystem::ReplaceScriptComponent()
 	if (true == m_isReloading && false == m_isCompileEventInvoked)
 	{
 		auto activeScene = SceneManagers->GetActiveScene();
+		activeScene->m_selectedSceneObject = nullptr;
+
 		auto& gameObjects = activeScene->m_SceneObjects;
 		std::unordered_set<GameObject*> gameObjectSet;
 
@@ -352,7 +378,16 @@ void HotLoadSystem::ReplaceScriptComponent()
 			}
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
-			gameObject->m_components[index].swap(sharedScript);
+			if(index >= gameObject->m_components.size())
+			{
+				gameObject->m_components.push_back(sharedScript);
+				size_t backIndex = gameObject->m_components.size() - 1;
+				gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+			}
+			else
+			{
+				gameObject->m_components[index].swap(sharedScript);
+			}
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
 		m_isReloading = false;
@@ -373,7 +408,9 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 
 	if (file::exists(scriptMetaFileName))
 	{
+		bool haveScriptReflectionAttribute{ false };
 		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFileName.string());
+
 		std::vector<std::string> events;
 		if (scriptNode["eventRegisterSetting"])
 		{
@@ -386,15 +423,15 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 			{
 				if (event == "Awake")
 				{
-					if (script->m_startEventHandle.IsValid()) continue;
+					if (script->m_awakeEventHandle.IsValid()) continue;
 
-					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::StartInvoke);
+					script->m_awakeEventHandle = activeScene->AwakeEvent.AddRaw(script, &ModuleBehavior::AwakeInvoke);
 				}
 				else if (event == "OnEnable")
 				{
-					if (script->m_startEventHandle.IsValid()) continue;
+					if (script->m_onEnableEventHandle.IsValid()) continue;
 
-					script->m_startEventHandle = activeScene->StartEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
+					script->m_onEnableEventHandle = activeScene->OnEnableEvent.AddRaw(script, &ModuleBehavior::OnEnableInvoke);
 				}
 				else if (event == "Start")
 				{
@@ -747,6 +784,33 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 	}
 }
 
+void HotLoadSystem::RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script)
+{
+	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
+	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
+
+	if (file::exists(scriptMetaFileName))
+	{
+		bool haveScriptReflectionAttribute{ false };
+		MetaYml::Node scriptNode = MetaYml::LoadFile(scriptMetaFileName.string());
+
+		if (scriptNode["reflectionFlag"] && !scriptNode["reflectionFlag"].IsNull())
+		{
+			haveScriptReflectionAttribute = scriptNode["reflectionFlag"].as<bool>();
+		}
+
+		if (true == haveScriptReflectionAttribute)
+		{
+			Meta::Registry::GetInstance()->ScriptRegister(name.data(), script->ScriptReflect());
+		}
+	}
+}
+
+void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
+{
+	Meta::Registry::GetInstance()->UnRegister(name.data());
+}
+
 void HotLoadSystem::Compile()
 {
 	if (hDll)
@@ -766,7 +830,6 @@ void HotLoadSystem::Compile()
 			FreeLibrary(hDll);
 		}
 		m_scriptFactoryFunc		= nullptr;
-		m_initModuleFunc		= nullptr;
 		m_scriptNamesFunc		= nullptr;
 		m_setSceneManagerFunc	= nullptr;
 		hDll					= nullptr;
@@ -774,15 +837,29 @@ void HotLoadSystem::Compile()
 
 	if (EngineSettingInstance->GetMSVCVersion() != MSVCVersion::None)
 	{
-		try
+		bool buildSuccess = false;
+		for (int attempt = 1; attempt <= MAX__COMPILE_ITERATION; ++attempt)
 		{
-			RunMsbuildWithLiveLog(command);
-		}
-		catch (const std::exception& e)
-		{
-			m_isReloading = false;
-			g_progressWindow->SetStatusText(L"Build failed...");
-			throw std::runtime_error("Build failed");
+			try
+			{
+				RunMsbuildWithLiveLog(command);
+				buildSuccess = true;
+				break; // 성공 시 반복 종료
+			}
+			catch (const std::exception& e)
+			{
+				g_progressWindow->SetStatusText(L"Build failed...(" + std::to_wstring(attempt) + L"/" + std::to_wstring(MAX__COMPILE_ITERATION) + L")");
+				if (attempt == MAX__COMPILE_ITERATION)
+				{
+					m_isReloading = false;
+					g_progressWindow->SetStatusText(L"Build failed...");
+					throw std::runtime_error("Build failed after 4 attempts");
+				}
+				else
+				{
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+				}
+			}
 		}
 	}
 	else
@@ -802,14 +879,6 @@ void HotLoadSystem::Compile()
 	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));
 	if (!m_scriptFactoryFunc)
 
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
-	}
-
-	m_initModuleFunc = reinterpret_cast<InitModuleFunc>(GetProcAddress(hDll, "InitModuleFactory"));
-	if (!m_initModuleFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");

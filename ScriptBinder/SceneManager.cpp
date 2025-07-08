@@ -25,7 +25,7 @@ void SceneManager::Editor()
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
-        ScriptManager->UpdateSceneManager(SceneManager::GetInstance().get());
+        ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
         m_activeScene.load()->Reset();
 		m_isEditorSceneLoaded = true;
     }

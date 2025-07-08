@@ -41,6 +41,14 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 	{
 		std::string scriptName = itNode["m_name"].as<std::string>();
 		auto scriptComponent = obj->AddScriptComponent(scriptName);
+		const auto& scriptType = scriptComponent->ScriptReflect();
+		Meta::Deserialize(reinterpret_cast<void*>(scriptComponent), scriptType, itNode);
+
+		if (isEditorToGame)
+		{
+			scriptComponent->MakeInstanceID();
+		}
+
 		return;
 	}
 
@@ -324,7 +332,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		}
 		else
 		{
-            Meta::Deserialize(component, itNode);
+            Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);
 			component->SetOwner(obj);
 		}
 
