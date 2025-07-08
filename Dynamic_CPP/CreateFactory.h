@@ -4,6 +4,7 @@
 
 // Automation include ScriptClass header
 #include "GameManager.h"
+#include "Swrod.h"
 #include "EntityItem.h"
 #include "EntityAsis.h"
 #include "Temp.h"

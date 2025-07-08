@@ -46,6 +46,7 @@ extern "C"
 	{
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
 		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });

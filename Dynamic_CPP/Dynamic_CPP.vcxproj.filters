@@ -63,6 +63,9 @@
 		<ClInclude Include="Assets\Script\GameManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\Swrod.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -90,6 +93,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\GameManager.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Swrod.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
