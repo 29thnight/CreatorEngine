@@ -547,7 +547,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION); //&&&&&trigger
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -1028,6 +1028,14 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 void Scene::SetInternalPhysicData()
 {
+	std::unordered_map<GameObject*, EBodyType> m_bodyType;
+
+	for (auto& rigid : m_rigidBodyComponents)
+	{
+		auto gameObject = rigid->GetOwner();
+		m_bodyType[gameObject] = rigid->GetBodyType();
+	}
+
 	std::unordered_set<GameObject*> linkCompleteSet;
 	for (auto& box : m_boxColliderComponents)
 	{
@@ -1037,7 +1045,8 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1051,7 +1060,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1065,7 +1074,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1079,7 +1088,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}

@@ -34,11 +34,12 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	if (!m_bIsInitialized) return;
 	
 	//물리씬에 데이터 셋
+	m_callbacks.clear();
 	SetPhysicData();
-
 	//물리씬 업데이트
 	Physics->Update(fixedDeltaTime);
 
+	
 	//물리씬에 데이터 가져오기
 	GetPhysicData();
 	//콜백 이벤트 처리
@@ -54,10 +55,15 @@ void PhysicsManager::Shutdown()
 	Container.clear();
 	//물리 씬 해제
 	Physics->UnInitialize();
+
 }
 void PhysicsManager::ChangeScene()
 {
 	Physics->ChangeScene();
+	/*Physics->Initialize();
+	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
+		this->CallbackEvent(data, type);
+		});*/
 }
 void PhysicsManager::OnLoadScene()
 {
@@ -369,6 +375,7 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	controllerInfo.position = position + controller->GetPositionOffset();
 	Physics->CreateCCT(controllerInfo, movementInfo);
 
+
 	controller->SetControllerInfo(controllerInfo);
 }
 
@@ -576,7 +583,9 @@ void PhysicsManager::GetPhysicData()
 		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
-		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) {
+		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) 
+		{
+			//TODO : 콜라이더도 type 변경해야함
 			continue;
 		}
 
@@ -627,6 +636,7 @@ void PhysicsManager::GetPhysicData()
 			}
 
 			transform.SetAndDecomposeMatrix(matrix);
+
 		}
 	}
 }

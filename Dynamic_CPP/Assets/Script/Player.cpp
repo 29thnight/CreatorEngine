@@ -6,16 +6,14 @@
 #include "Animator.h"
 #include "Socket.h"
 #include "pch.h"
-#include "RigidBodyComponent.h"
-#include "BoxColliderComponent.h"
+#include "MeshRenderer.h"
+#include "Material.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
 
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
-	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::LeftControl, KeyState::Down, [this]() { Punch();});
-	//player->GetComponent<RigidBodyComponent>();
-
+	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  Attack();});
@@ -27,30 +25,21 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	//righthand->m_offset= DirectX::SimpleMath::Matrix::CreateTranslation(50.0f, 0.0f, 0.0f);
+	righthand->m_offset = Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
+	
 	
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
-	//GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
-	//sword->GetComponent<BoxColliderComponent>()->SetExtents({10,10,10});
 
 }
 
 void Player::Update(float tick)
 {
-
-	static float elasepdTime = 0.f;
-	elasepdTime += tick;
-	if (elasepdTime >= 4.f)
-	{
-		//SceneManagers->GetActiveScene()->CreateGameObject("newenwenw");
-		elasepdTime = 0;
-	}
-
-
+	if(m_nearObject)
+		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 16;
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -95,12 +84,16 @@ void Player::Catch()
 		catchedObject = m_nearObject;
 	}*/
 
-	player = GameObject::Find("Punch");
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	m_nearObject = GameObject::Find("Sting-Sword lowpoly");
-	righthand->AttachObject(m_nearObject);
-	catchedObject = m_nearObject;
+
+	if (m_nearObject != nullptr)
+	{
+		player = GameObject::Find("Punch");
+		auto animator = player->GetComponent<Animator>();
+		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		righthand->AttachObject(m_nearObject);
+		catchedObject = m_nearObject;
+		m_nearObject = nullptr;
+	}
 }
 
 void Player::Throw()
@@ -110,6 +103,7 @@ void Player::Throw()
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
 	catchedObject = nullptr;
+	m_nearObject = nullptr; //&&&&&
 }
 
 void Player::Attack()
@@ -122,7 +116,7 @@ void Player::Attack()
 void Player::SwapWeaponLeft()
 {
 	m_weaponIndex--;
-	std::cout << "left weapon equipped" << std::endl;
+	//std::cout << "left weapon equipped" << std::endl;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -134,7 +128,7 @@ void Player::SwapWeaponLeft()
 void Player::SwapWeaponRight()
 {
 	m_weaponIndex++;
-	std::cout << "right weapon equipped" << std::endl;
+	//std::cout << "right weapon equipped" << std::endl;
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
@@ -143,44 +137,65 @@ void Player::SwapWeaponRight()
 	}
 }
 
-void Player::OnCollisionEnter(const Collision& collision)
+void Player::Punch()
 {
-	if (collision.thisObj == collision.otherObj)
-		return;
-
-	
-
+	std::cout << "ppppuuuunchhhhhhh" << std::endl;
 }
 
-void Player::OnCollisionStay(const Collision& collision)
+void Player::FindNearObject(GameObject* gameObject)
 {
-	if (collision.thisObj == collision.otherObj)
-		return;
+	
+	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
+	auto objectPos = gameObject->m_transform.GetWorldPosition();
+	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
+	XMVECTOR distSqVec = XMVector3LengthSq(diff);
 
-	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
+	float distance;
+	XMStoreFloat(&distance, distSqVec);
+	if (m_nearObject == nullptr)
 	{
-		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly collision" << std::endl;
+		m_nearObject = gameObject;
+		m_nearDistance = distance;
 	}
 	else
 	{
-		m_nearObject = nullptr;
+		
+		if (distance < m_nearDistance)
+		{
+			m_nearObject = gameObject;
+			m_nearDistance = distance;
+		}
 	}
+	
 }
 
+
+
+
+void Player::OnTriggerEnter(const Collision& collision)
+{
+	if (collision.thisObj == collision.otherObj)
+		return;
+
+
+}
 void Player::OnTriggerStay(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
 
-	if (collision.otherObj->ToString() == "Sting-Sword lowpoly")
-	{
-		m_nearObject = collision.otherObj;
-		std::cout << "Sting-Sword lowpoly trigger" << std::endl;
-	}
-	else
-	{
-		m_nearObject = nullptr;
-	}
+	if(collision.otherObj->m_tag == "Monster")
+	FindNearObject(collision.otherObj);
 
+	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+}
+
+void Player::OnTriggerExit(const Collision& collision)
+{
+	if (m_nearObject == collision.otherObj)
+	{
+		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
+		m_nearObject = nullptr;
+		//abc
+	}
 }
