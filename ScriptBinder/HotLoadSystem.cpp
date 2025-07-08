@@ -303,6 +303,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		g_progressWindow->Launch();
 		g_progressWindow->SetStatusText(L"Compile Script Library...");
 		g_progressWindow->SetProgress(100);
+
 		try
 		{
 			Compile();
