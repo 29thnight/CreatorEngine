@@ -92,7 +92,7 @@ public:
 	void ChangeScene();
 
 	//씬 로드 -> 남아 있을지 모를 물리객체를 삭제하고 현제 게임씬의 객체에 대한 물리엔진 객체를 생성및 등록
-	void OnLoadScene();
+	[[maybe_unused]] void OnLoadScene();
 
 	//씬 언로드
 	void OnUnloadScene();

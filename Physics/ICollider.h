@@ -1,7 +1,6 @@
 #pragma once
 #include <tuple>
 
-
 struct ICollider
 {
 	/*virtual void SetLocalPosition(std::tuple<float, float, float> pos) = 0;

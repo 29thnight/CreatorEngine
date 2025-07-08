@@ -720,6 +720,26 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	return rigidBodyData;
 }
 
+RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
+{
+	//등록되어 있는지 검사
+	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
+	{
+		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		return nullptr;
+	}
+	RigidBody* body = m_rigidBodyContainer[id];
+	if (body)
+	{
+		return body;
+	}
+	else
+	{
+		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		return nullptr;
+	}
+}
+
 void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData)
 {
 	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사

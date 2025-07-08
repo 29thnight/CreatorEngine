@@ -906,6 +906,7 @@ void Scene::DestroyGameObjects()
         {
             obj->m_parentIndex = indexMap[obj->m_parentIndex];
 			obj->m_rootIndex = indexMap[obj->m_rootIndex];
+			obj->m_transform.SetParentID(obj->m_parentIndex);
         }
         else
         {
