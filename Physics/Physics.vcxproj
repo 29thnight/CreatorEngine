@@ -177,6 +177,7 @@
   <ItemGroup>
     <ClInclude Include="CharacterController.h" />
     <ClInclude Include="CharacterMovement.h" />
+    <ClInclude Include="ColliderDebugData.h" />
     <ClInclude Include="ConvexMeshResource.h" />
     <ClInclude Include="DynamicRigidBody.h" />
     <ClInclude Include="framework.h" />

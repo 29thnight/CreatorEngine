@@ -12,6 +12,7 @@ GameObject::GameObject() :
 	m_parentIndex(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
 }
 
@@ -22,6 +23,7 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
     m_parentIndex(parentIndex)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 
@@ -32,6 +34,7 @@ GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObje
 	m_parentIndex(parentIndex)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 

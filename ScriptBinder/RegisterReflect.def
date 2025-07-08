@@ -10,6 +10,7 @@
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
+#include "InvalidScriptComponent.h"
 #include "Skeleton.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
@@ -78,6 +79,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(ImageComponent);
     AUTO_REGISTER_CLASS(InputAction);
     AUTO_REGISTER_CLASS(InputActionComponent);
+    AUTO_REGISTER_CLASS(InvalidScriptComponent);
     AUTO_REGISTER_CLASS(LightComponent);
     AUTO_REGISTER_CLASS(LightMapping);
     AUTO_REGISTER_CLASS(Material);

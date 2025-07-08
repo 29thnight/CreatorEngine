@@ -54,7 +54,7 @@ public:
 
 
 	BTNode::NodePtr CreateNode(const std::string& key,const json& data = {}) {
-		return BTNodeFactory.Create(key, data);
+		return BTNodeFactory->Create(key, data);
 	}
 
 	void DeleteNode(const BTNode::NodePtr& node) {

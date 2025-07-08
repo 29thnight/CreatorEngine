@@ -21,6 +21,7 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 	if (m_colliderType == EColliderType::COLLISION)
 	{
 		shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
+		shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 	}
 	else {
 		shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);

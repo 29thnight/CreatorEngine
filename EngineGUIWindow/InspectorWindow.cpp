@@ -236,6 +236,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled);
 			ImGui::SameLine();
 
+			selectedSceneObject->SetEnabled(selectedSceneObject->m_isEnabled);
+
 			if (ImGui::InputText("##name",
 				&name[0],
 				name.capacity() + 1,
@@ -496,7 +498,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				bool* isEnabled = &component->m_isEnabled;
 				if (ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, isEnabled))
 				{
-					if(isOpen)
+					if(isOpen && nullptr == selectedComponent)
 					{
 						selectedComponent = component.get();
 					}
@@ -1994,7 +1996,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			{
 				if (ImGui::BeginMenu("Add Child"))
 				{
-					for (auto& key : BTNodeFactory.GetReisteredKeys())
+					for (auto& key : BTNodeFactory->GetReisteredKeys())
 					{
 						if (ImGui::MenuItem(key.c_str()))
 						{

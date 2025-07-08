@@ -7,10 +7,15 @@
 class ModuleBehavior;
 class GameObject;
 class SceneManager;
+namespace BT
+{
+	class NodeFactory;
+}
 #pragma region DLLFunctionPtr
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
+typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
@@ -43,6 +48,13 @@ public:
 		m_setSceneManagerFunc(sceneManager);
 	}
 
+	void UpdateBTNodeFactory(Singleton<BT::NodeFactory>::FGetInstance btNodeFactory)
+	{
+		if (!m_setBTNodeFactoryFunc) return;
+
+		m_setBTNodeFactoryFunc(btNodeFactory);
+	}
+
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
 		if (!m_scriptFactoryFunc) return nullptr;
@@ -63,6 +75,11 @@ public:
 		{
 			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
 		});
+	}
+
+	bool IsScriptExists(const std::string_view& name) const
+	{
+		return std::ranges::find(m_scriptNames, name) != m_scriptNames.end();
 	}
 
 	std::vector<std::string>& GetScriptNames()
@@ -94,6 +111,7 @@ private:
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
 	SetSceneManagerFunc m_setSceneManagerFunc{};
+	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
 	std::wstring rebuildCommand{};

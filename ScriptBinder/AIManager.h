@@ -30,15 +30,15 @@ public:
 	void InitalizeBehaviorTreeSystem()
 	{
 		// 파라미터가 없는 노드 등록
-		BTNodeFactory.Register("Sequence", [](const json& params) {
+		BTNodeFactory->Register("Sequence", [](const json& params) {
 			return std::make_shared<BT::SequenceNode>("Sequence");
 				});
-		BTNodeFactory.Register("Selector", [](const json& params) {
+		BTNodeFactory->Register("Selector", [](const json& params) {
 			return std::make_shared<BT::SelectorNode>("Selector");
 			});
 
 		// 파라미터가 있는 노드 등록 (ActionScriptNode)
-		BTNodeFactory.Register("ActionScript", [&](const json& params) {
+		BTNodeFactory->Register("ActionScript", [&](const json& params) {
 			// json에서 파라미터 추출
 			if (params.empty()) {
 				// 파라미터가 없으면 기본값 사용
@@ -54,7 +54,7 @@ public:
 			});
 
 		// InverterNode 같은 Decorator 등록
-		BTNodeFactory.Register("Inverter", [](const json& params) {
+		BTNodeFactory->Register("Inverter", [](const json& params) {
 			// Decorator는 자식 노드를 가지지만, 자식 연결은 팩토리 이후 로직에서 처리
 			return std::make_shared<BT::InverterNode>("Inverter", nullptr);
 			});

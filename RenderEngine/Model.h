@@ -20,7 +20,6 @@ public:
     static Model* LoadModelToScene(Model* model, Scene& Scene);
     static Model* LoadModel(const std::string_view& filePath);
 
-    //sehwan make test
     static GameObject* LoadModelToSceneObj(Model* model, Scene& Scene);
 	Mesh* GetMesh(const std::string_view& name);
 	Mesh* GetMesh(int index);

@@ -162,6 +162,22 @@ private:
 
             ShowWindow(m_hWnd, SW_SHOWNORMAL);
             UpdateWindow(m_hWnd);
+
+            //&&&&&consol
+            //{
+            //    AllocConsole();
+            //    FILE* fp;
+            //    freopen_s(&fp, "CONOUT$", "w", stdout);
+            //    freopen_s(&fp, "CONIN$", "r", stdin);
+            //    freopen_s(&fp, "CONOUT$", "w", stderr);
+
+            //    auto consoleHwnd = GetConsoleWindow(); // 콘솔 창 핸들 가져오기
+            //    SetWindowPos(consoleHwnd, nullptr, 500, 500, 1920, 1080, SWP_NOZORDER);
+
+            //    LONG style = GetWindowLong(consoleHwnd, GWL_STYLE);
+            //    style &= ~(WS_CAPTION | WS_THICKFRAME);  // 타이틀 바와 사이즈 조정 프레임 제거
+            //    SetWindowLong(consoleHwnd, GWL_STYLE, style);
+            //}
         }
     }
 

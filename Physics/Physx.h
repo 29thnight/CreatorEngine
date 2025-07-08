@@ -32,16 +32,11 @@ public:
 	//core
 	//물리엔진 세팅
 	bool Initialize();
-	
 
-	
 	//물리엔진 업데이트
 	void Update(float fixedDeltaTime);
-	
-
 
 	void AddActor(physx::PxActor* actor) { m_scene->addActor(*actor); }
-
 
 	physx::PxPhysics* GetPhysics() { return m_physics; }
 	physx::PxScene* GetPxScene() { return m_scene; }
@@ -86,6 +81,7 @@ public:
 
 	//반환
 	RigidBodyGetSetData GetRigidBodyData(unsigned int id);
+	RigidBody* GetRigidBody(const unsigned int& id);
 	//수정
 	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData);
 	//삭제

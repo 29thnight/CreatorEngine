@@ -11,6 +11,8 @@
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
+#include "InvalidScriptComponent.h"
+
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -40,6 +42,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 	if (itNode["ModuleBehavior"])
 	{
 		std::string scriptName = itNode["m_name"].as<std::string>();
+		if (!ScriptManager->IsScriptExists(scriptName))
+		{
+			auto invalidComponent = obj->AddComponent<InvalidScriptComponent>();
+			return;
+		}
+
 		auto scriptComponent = obj->AddScriptComponent(scriptName);
 		const auto& scriptType = scriptComponent->ScriptReflect();
 		Meta::Deserialize(reinterpret_cast<void*>(scriptComponent), scriptType, itNode);
@@ -78,7 +86,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             if (model && getMeshNode)
             {
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
-                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
 			meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);

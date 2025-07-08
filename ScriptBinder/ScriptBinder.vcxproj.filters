@@ -443,9 +443,6 @@
     <ClInclude Include="ModuleBehavior.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
-    <ClInclude Include="ModuleBehaviorInfo.h">
-      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
-    </ClInclude>
     <ClInclude Include="ActionMap.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
@@ -538,6 +535,9 @@
     </ClInclude>
     <ClInclude Include="EBodyType.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="InvalidScriptComponent.h">
+      <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
     <ClInclude Include="LuaEngine.h">
       <Filter>Classes\GameAI\Core</Filter>

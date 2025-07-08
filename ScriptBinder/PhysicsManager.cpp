@@ -34,11 +34,12 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	if (!m_bIsInitialized) return;
 	
 	//물리씬에 데이터 셋
+	m_callbacks.clear();
 	SetPhysicData();
-
 	//물리씬 업데이트
 	Physics->Update(fixedDeltaTime);
 
+	
 	//물리씬에 데이터 가져오기
 	GetPhysicData();
 	//콜백 이벤트 처리
@@ -54,322 +55,18 @@ void PhysicsManager::Shutdown()
 	Container.clear();
 	//물리 씬 해제
 	Physics->UnInitialize();
+
 }
 void PhysicsManager::ChangeScene()
 {
 	Physics->ChangeScene();
+	/*Physics->Initialize();
+	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
+		this->CallbackEvent(data, type);
+		});*/
 }
 void PhysicsManager::OnLoadScene()
 {
-	//todo : 물리씬 초기화
-	//CleanUp();
-
-	//todo : 현제의 게임씬을 찾아오기
-#pragma region NotUse
-	//auto scene = SceneManagers->GetActiveScene();
-
-	//for (auto& obj : scene->m_SceneObjects)
-	//{
-
-	//	AddTerrainCollider(obj.get());
-
-
-	//	auto rigid = obj->GetComponent<RigidBodyComponent>();
-	//	if (!rigid)
-	//	{
-	//		continue;
-	//	}
-
-	//	auto& transform = obj->m_transform;
-	//	auto bodyType = rigid->GetBodyType();
-
-	//	auto box = obj->GetComponent<BoxColliderComponent>();
-
-	//	//박스 콜라이더라면
-	//	if (box)
-	//	{
-	//		unsigned int colliderID = ++m_lastColliderID;
-	//		auto boxInfo = box->GetBoxInfo();
-	//		auto tranformOffset = box->GetPositionOffset();
-	//		auto rotationOffset = box->GetRotationOffset();
-
-	//		boxInfo.colliderInfo.id = colliderID;
-	//		boxInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	//		boxInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	//		boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
-	//		boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
-	//		boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
-
-	//		//offset 계산
-	//		if (tranformOffset != DirectX::SimpleMath::Vector3::Zero)
-	//		{
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._42 = 0.0f;
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._43 = 0.0f;
-
-	//			tranformOffset = DirectX::SimpleMath::Vector3::Transform(tranformOffset, boxInfo.colliderInfo.collsionTransform.worldMatrix);
-
-	//			boxInfo.colliderInfo.collsionTransform.worldPosition += tranformOffset;
-
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._41 = boxInfo.colliderInfo.collsionTransform.worldPosition.x;
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._42 = boxInfo.colliderInfo.collsionTransform.worldPosition.y;
-	//			boxInfo.colliderInfo.collsionTransform.worldMatrix._43 = boxInfo.colliderInfo.collsionTransform.worldPosition.z;
-
-	//		}
-
-	//		box->SetBoxInfoMation(boxInfo);
-
-	//		if (bodyType == EBodyType::STATIC) {
-	//			//pxScene에 엑터 추가
-	//			Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
-	//			//콜라이더 정보 저장
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_boxTypeId,
-	//				box,
-	//				box->GetOwner(),
-	//				box,
-	//				false
-	//				}
-	//				});
-	//		}
-	//		else {
-	//			bool isKinematic = bodyType == EBodyType::KINEMATIC;
-	//			Physics->CreateDynamicBody(boxInfo, EColliderType::COLLISION, isKinematic);
-	//			//콜라이더 정보 저장
-	//			m_colliderContainer.insert({ colliderID,
-	//				{m_boxTypeId,box,box->GetOwner(),box,false
-	//				}
-	//				});
-	//		}
-
-	//	}
-	//	//todo :sphere 콜라이더라면
-	//	auto sphere = obj->GetComponent<SphereColliderComponent>();
-	//	if (sphere) {
-
-	//		auto type = sphere->GetColliderType();
-	//		auto sphereInfo = sphere->GetSphereInfo();
-	//		auto posOffset = sphere->GetPositionOffset();
-	//		auto rotOffset = sphere->GetRotationOffset();
-
-	//		unsigned int colliderID = ++m_lastColliderID;
-
-	//		sphereInfo.colliderInfo.id = colliderID;
-	//		sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	//		sphereInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	//		sphereInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
-	//		sphereInfo.colliderInfo.collsionTransform.localMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.localScale, sphereInfo.colliderInfo.collsionTransform.localRotation, sphereInfo.colliderInfo.collsionTransform.localPosition);
-	//		sphereInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.worldScale, sphereInfo.colliderInfo.collsionTransform.worldRotation, sphereInfo.colliderInfo.collsionTransform.worldPosition);
-
-	//		//offset 계산
-	//		if (posOffset != DirectX::SimpleMath::Vector3::Zero)
-	//		{
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._42 = 0.0f;
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._43 = 0.0f;
-
-	//			posOffset = DirectX::SimpleMath::Vector3::Transform(posOffset, sphereInfo.colliderInfo.collsionTransform.worldMatrix);
-
-	//			sphereInfo.colliderInfo.collsionTransform.worldPosition += posOffset;
-
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._41 = sphereInfo.colliderInfo.collsionTransform.worldPosition.x;
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._42 = sphereInfo.colliderInfo.collsionTransform.worldPosition.y;
-	//			sphereInfo.colliderInfo.collsionTransform.worldMatrix._43 = sphereInfo.colliderInfo.collsionTransform.worldPosition.z;
-	//		}
-	//		sphere->SetSphereInfoMation(sphereInfo);
-
-	//		if (bodyType == EBodyType::STATIC) {
-	//			//pxScene에 엑터 추가
-	//			Physics->CreateStaticBody(sphereInfo, EColliderType::COLLISION);
-	//			//콜라이더 정보 저장
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_sphereTypeId,
-	//				sphere,
-	//				sphere->GetOwner(),
-	//				sphere,
-	//				false
-	//				}
-	//				});
-	//		}
-	//		else {
-	//			bool isKinematic = bodyType == EBodyType::KINEMATIC;
-	//			Physics->CreateDynamicBody(sphereInfo, EColliderType::COLLISION, isKinematic);
-	//			//콜라이더 정보 저장
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_sphereTypeId,
-	//				sphere,
-	//				sphere->GetOwner(),
-	//				sphere,
-	//				false
-	//				}
-	//				});
-	//		}
-	//	}
-	//	//todo : capsule 콜라이더라면
-	//	auto capsule = obj->GetComponent<CapsuleColliderComponent>();
-	//	if (capsule) {
-
-	//		auto capsuleInfo = capsule->GetCapsuleInfo();
-	//		auto posOffset = capsule->GetPositionOffset();
-	//		auto rotOffset = capsule->GetRotationOffset();
-	//		unsigned int colliderID = ++m_lastColliderID;
-	//		capsuleInfo.colliderInfo.id = colliderID;
-	//		capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	//		capsuleInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	//		capsuleInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
-	//		capsuleInfo.colliderInfo.collsionTransform.localMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.localScale, capsuleInfo.colliderInfo.collsionTransform.localRotation, capsuleInfo.colliderInfo.collsionTransform.localPosition);
-	//		capsuleInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.worldScale, capsuleInfo.colliderInfo.collsionTransform.worldRotation, capsuleInfo.colliderInfo.collsionTransform.worldPosition);
-	//		//offset 계산
-	//		if (posOffset != DirectX::SimpleMath::Vector3::Zero)
-	//		{
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._42 = 0.0f;
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._43 = 0.0f;
-	//			posOffset = DirectX::SimpleMath::Vector3::Transform(posOffset, capsuleInfo.colliderInfo.collsionTransform.worldMatrix);
-	//			capsuleInfo.colliderInfo.collsionTransform.worldPosition += posOffset;
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._41 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.x;
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._42 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.y;
-	//			capsuleInfo.colliderInfo.collsionTransform.worldMatrix._43 = capsuleInfo.colliderInfo.collsionTransform.worldPosition.z;
-	//		}
-	//		capsule->SetCapsuleInfoMation(capsuleInfo);
-	//		if (bodyType == EBodyType::STATIC) {
-	//			//pxScene에 엑터 추가
-	//			Physics->CreateStaticBody(capsule->GetCapsuleInfo(), EColliderType::COLLISION);
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_capsuleTypeId,
-	//				capsule,
-	//				capsule->GetOwner(),
-	//				capsule,
-	//				false
-	//				}
-	//				});
-	//		}
-	//		else {
-	//			bool isKinematic = bodyType == EBodyType::KINEMATIC;
-	//			Physics->CreateDynamicBody(capsuleInfo, EColliderType::COLLISION, isKinematic);
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_capsuleTypeId,
-	//				capsule,
-	//				capsule->GetOwner(),
-	//				capsule,
-	//				false
-	//				}
-	//				});
-	//		}
-	//	}
-	//	//todo : convex 콜라이더라면
-
-	//	auto convex = obj->GetComponent<MeshColliderComponent>();
-	//	bool hasMesh = obj->HasComponent<MeshRenderer>();
-	//	if (convex && hasMesh) {
-
-	//		auto type = convex->GetColliderType();
-	//		auto convexMeshInfo = convex->GetMeshInfo();
-	//		auto posOffset = convex->GetPositionOffset();
-	//		auto rotOffset = convex->GetRotationOffset();
-
-	//		unsigned int colliderID = ++m_lastColliderID;
-	//		convexMeshInfo.colliderInfo.id = colliderID;
-	//		convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
-	//		//convexMeshInfo.colliderInfo.layerNumber = 0xffffff;
-
-	//		convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
-	//		convexMeshInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
-	//		convexMeshInfo.colliderInfo.collsionTransform.localMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.localScale, convexMeshInfo.colliderInfo.collsionTransform.localRotation, convexMeshInfo.colliderInfo.collsionTransform.localPosition);
-	//		convexMeshInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.worldScale, convexMeshInfo.colliderInfo.collsionTransform.worldRotation, convexMeshInfo.colliderInfo.collsionTransform.worldPosition);
-
-	//		//offset 계산
-	//		if (posOffset != DirectX::SimpleMath::Vector3::Zero)
-	//		{
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._42 = 0.0f;
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._43 = 0.0f;
-	//			posOffset = DirectX::SimpleMath::Vector3::Transform(posOffset, convexMeshInfo.colliderInfo.collsionTransform.worldMatrix);
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldPosition += posOffset;
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._41 = convexMeshInfo.colliderInfo.collsionTransform.worldPosition.x;
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._42 = convexMeshInfo.colliderInfo.collsionTransform.worldPosition.y;
-	//			convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._43 = convexMeshInfo.colliderInfo.collsionTransform.worldPosition.z;
-	//		}
-
-	//		auto model = obj->GetComponent<MeshRenderer>();
-	//		auto modelVertices = model->m_Mesh->GetVertices();
-	//		convexMeshInfo.vertices = new DirectX::SimpleMath::Vector3[modelVertices.size()];
-	//		convexMeshInfo.vertexSize = modelVertices.size();
-	//		for (int i = 0; i < modelVertices.size(); i++)
-	//		{
-	//			convexMeshInfo.vertices[i] = modelVertices[i].position;
-	//		}
-
-	//		convex->SetMeshInfoMation(convexMeshInfo);
-
-	//		if (bodyType == EBodyType::STATIC) {
-	//			//pxScene에 엑터 추가
-	//			Physics->CreateStaticBody(convexMeshInfo, EColliderType::COLLISION);
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_convexTypeId,
-	//				convex,
-	//				convex->GetOwner(),
-	//				convex,
-	//				false
-	//				}
-	//				});
-	//		}
-	//		else {
-	//			bool isKinematic = bodyType == EBodyType::KINEMATIC;
-	//			Physics->CreateDynamicBody(convexMeshInfo, EColliderType::COLLISION, isKinematic);
-	//			m_colliderContainer.insert({ colliderID, {
-	//				m_convexTypeId,
-	//				convex,
-	//				convex->GetOwner(),
-	//				convex,
-	//				false
-	//				}
-	//				});
-	//		}
-	//	}
-
-	//	//todo : controller Component라면
-	//	auto controller = obj->GetComponent<CharacterControllerComponent>();
-	//	if (controller) {
-	//		auto controllerInfo = controller->GetControllerInfo();
-	//		auto movementInfo = controller->GetMovementInfo();
-	//		auto posOffset = controller->GetPositionOffset();
-	//		auto rotOffset = controller->GetRotationOffset();
-	//		auto transform = obj->m_transform;
-
-	//		ColliderID colliderID = ++m_lastColliderID;
-	//		controllerInfo.id = colliderID;
-	//		controllerInfo.layerNumber = obj->GetCollisionType();
-	//		DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
-	//		controllerInfo.position = position + controller->GetPositionOffset();
-
-	//		Physics->CreateCCT(controllerInfo, movementInfo);
-
-	//		m_colliderContainer.insert({ colliderID, {
-	//			m_controllerTypeId,
-	//			controller,
-	//			controller->GetOwner(),
-	//			controller,
-	//			false
-	//			} });
-
-	//		controller->SetControllerInfo(controllerInfo);
-	//	}
-	//	//관절 정보가 있는 ragdoll이라면
-	//	//auto ragdoll = obj->GetComponent<RagdollComponent>();
-	//	//if (ragdoll) {
-	//		//todo : ragdoll 콜라이더 생성
-	//	//}
-	//	//todo : heightfield 콜라이더라면
-	//	//auto heightfield = obj->GetComponent<HeightFieldColliderComponent>();
-	//	//if (heightfield) {
-	//		//todo : heightfield 콜라이더 생성
-	//	// }
-
-
-	//};
-#pragma endregion
-	
 }
 
 void PhysicsManager::OnUnloadScene()
@@ -520,7 +217,7 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	}
 
 	auto& transform = obj->m_transform;
-	unsigned int colliderID = ++m_lastColliderID;
+	unsigned int colliderID = box->GetInstanceID();
 	auto boxInfo = box->GetBoxInfo();
 	auto tranformOffset = box->GetPositionOffset();
 	auto rotationOffset = box->GetRotationOffset();
@@ -563,7 +260,7 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	auto posOffset = sphere->GetPositionOffset();
 	auto rotOffset = sphere->GetRotationOffset();
 
-	unsigned int colliderID = ++m_lastColliderID;
+	unsigned int colliderID = sphere->GetInstanceID();
 
 	sphereInfo.colliderInfo.id = colliderID;
 	sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
@@ -600,7 +297,7 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	auto capsuleInfo = capsule->GetCapsuleInfo();
 	auto posOffset = capsule->GetPositionOffset();
 	auto rotOffset = capsule->GetRotationOffset();
-	unsigned int colliderID = ++m_lastColliderID;
+	unsigned int colliderID = capsule->GetInstanceID();
 	capsuleInfo.colliderInfo.id = colliderID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	capsuleInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
@@ -636,7 +333,7 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	auto convexMeshInfo = mesh->GetMeshInfo();
 	auto posOffset = mesh->GetPositionOffset();
 	auto rotOffset = mesh->GetRotationOffset();
-	unsigned int colliderID = ++m_lastColliderID;
+	unsigned int colliderID = mesh->GetInstanceID();
 	convexMeshInfo.colliderInfo.id = colliderID;
 	convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
@@ -671,12 +368,13 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	auto movementInfo = controller->GetMovementInfo();
 	auto posOffset = controller->GetPositionOffset();
 	auto rotOffset = controller->GetRotationOffset();
-	ColliderID colliderID = ++m_lastColliderID;
+	ColliderID colliderID = controller->GetInstanceID();
 	controllerInfo.id = colliderID;
 	controllerInfo.layerNumber = obj->GetCollisionType();
 	DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 	controllerInfo.position = position + controller->GetPositionOffset();
 	Physics->CreateCCT(controllerInfo, movementInfo);
+
 
 	controller->SetControllerInfo(controllerInfo);
 }
@@ -692,7 +390,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 	HeightFieldColliderInfo heightFieldInfo;
 
-	ColliderID colliderID = ++m_lastColliderID;
+	ColliderID colliderID = terrain->GetInstanceID();
 
 	collider->SetColliderID(colliderID);
 	heightFieldInfo.colliderInfo.id = colliderID;
@@ -885,7 +583,9 @@ void PhysicsManager::GetPhysicData()
 		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
-		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) {
+		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) 
+		{
+			//TODO : 콜라이더도 type 변경해야함
 			continue;
 		}
 
@@ -936,6 +636,7 @@ void PhysicsManager::GetPhysicData()
 			}
 
 			transform.SetAndDecomposeMatrix(matrix);
+
 		}
 	}
 }

@@ -18,7 +18,7 @@ void PhysicsEventCallback::onSleep(PxActor** actors, PxU32 count)
 
 void PhysicsEventCallback::onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs)
 {
-	std::cout << "onContact" << std::endl;
+	//std::cout << "onContact" << std::endl;
 	//발생한 충동 이벤트 전체 이벤트 순회
 	for (PxU32 i = 0; i < nbPairs; i++) {
 

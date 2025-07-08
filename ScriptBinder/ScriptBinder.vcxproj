@@ -194,12 +194,12 @@
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
+    <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />
     <ClInclude Include="IStartable.h" />
-    <ClInclude Include="LuaEngine.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">
@@ -265,7 +265,6 @@
     <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />
-    <ClInclude Include="ModuleBehaviorInfo.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="MonoManager.h" />
     <ClInclude Include="MonoObjectBinding.h" />

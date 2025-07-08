@@ -2,6 +2,7 @@
 #include "Export.h"
 #include "CreateFactory.h"
 #include "SceneManager.h"
+#include "NodeFactory.h"
 
 extern "C"
 {
@@ -40,6 +41,11 @@ extern "C"
 	{
 		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
 	}
+
+	EXPORT_API void SetNodeFactory(Singleton<BT::NodeFactory>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<BT::NodeFactory>&>(BTNodeFactory) = funcPtr();
+	}
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
@@ -48,6 +54,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("NewBehaviourScript", []() { return new NewBehaviourScript(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
 		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });

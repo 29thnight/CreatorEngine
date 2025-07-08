@@ -901,6 +901,14 @@ void HotLoadSystem::Compile()
 		throw std::runtime_error("Failed to get function address");
 	}
 
+	m_setBTNodeFactoryFunc = reinterpret_cast<SetBTNodeFactoryFunc>(GetProcAddress(hDll, "SetNodeFactory"));
+	if (!m_setBTNodeFactoryFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
 }

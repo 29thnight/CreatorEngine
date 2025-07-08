@@ -8,7 +8,9 @@
 #include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
+#include "NodeFactory.h"
 #include "TagManager.h"
+
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();
@@ -26,6 +28,7 @@ void SceneManager::Editor()
     {
         CreateEditorOnlyPlayScene();
         ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
+		ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
         m_activeScene.load()->Reset();
 		m_isEditorSceneLoaded = true;
     }

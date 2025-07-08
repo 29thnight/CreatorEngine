@@ -191,7 +191,30 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		ProcessBones(mesh, vertices);
 	}
 
-	Mesh* meshObj = AllocateResource<Mesh>(mesh->mName.C_Str(), vertices, indices);
+	std::string baseName = mesh->mName.C_Str();
+	std::string uniqueName = baseName;
+	int suffix = 1;
+
+	while (true)
+	{
+		Mesh* mesh = m_model->GetMesh(uniqueName);
+		if (nullptr != mesh)
+		{
+			bool isVertexDeff = mesh->m_vertices.size() != vertices.size();
+			bool isIndexDeff = mesh->m_indices.size() != indices.size();
+			if(isVertexDeff || isIndexDeff)
+			{
+				uniqueName = baseName + "(" + std::to_string(suffix++) + ")";
+				break;
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	Mesh* meshObj = AllocateResource<Mesh>(uniqueName, vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
 	meshObj->m_modelName = m_model->name;
 	//if(!m_model->m_hasBones)

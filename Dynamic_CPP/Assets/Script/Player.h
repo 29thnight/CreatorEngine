@@ -1,22 +1,25 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Player.generated.h"
 
 class Player : public ModuleBehavior
 {
 public:
+   ReflectPlayer
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Player)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
 
-	virtual void OnTriggerEnter(const Collision& collision) override {}
+	virtual void OnTriggerEnter(const Collision& collision) override;
 	virtual void OnTriggerStay(const Collision& collision) override;
-	virtual void OnTriggerExit(const Collision& collision) override {}
+	virtual void OnTriggerExit(const Collision& collision) override;
 
 
-	virtual void OnCollisionEnter(const Collision& collision) override;
-	virtual void OnCollisionStay(const Collision& collision) override;
+	virtual void OnCollisionEnter(const Collision& collision) override {}
+	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
 
 	virtual void Update(float tick) override;
@@ -31,8 +34,14 @@ public:
 	void Attack();
 	void SwapWeaponLeft();
 	void SwapWeaponRight();
-	int m_weaponIndex = 0;
 
+	int m_weaponIndex = 0;
+	void Punch();
+
+	[[Property]]
+	float HP = 0;
+	void FindNearObject(GameObject* gameObject);
+	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon;
 	GameObject* player = nullptr;
