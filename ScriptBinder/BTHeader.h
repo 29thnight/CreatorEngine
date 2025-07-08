@@ -148,6 +148,7 @@ namespace BT
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override {
 			return cond(blackBoard) ? NodeStatus::Success : NodeStatus::Failure;
 		}
+		void SetCondition(ConditionFunc condition) { cond = condition; }
 	private:
 		ConditionFunc cond;//==>
 	};
@@ -234,6 +235,8 @@ namespace BT
 		{
 			return m_action(deltatime, blackBoard);
 		}
+		void SetAction(ActionFunc action) { m_action = action; }
+
 	private:
 		ActionFunc m_action;//==>
 
