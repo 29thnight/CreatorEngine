@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Player.generated.h"
 
 class Player : public ModuleBehavior
 {
 public:
+   ReflectPlayer
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Player)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -35,7 +38,8 @@ public:
 	int m_weaponIndex = 0;
 	void Punch();
 
-
+	[[Property]]
+	float HP = 0;
 	void FindNearObject(GameObject* gameObject);
 	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;

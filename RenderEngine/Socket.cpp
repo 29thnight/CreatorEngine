@@ -6,7 +6,7 @@
 Socket::Socket()
 {
 	AttachObjects.clear();
-	m_activeSceneChangedEventHandle = activeSceneChangedEvent.AddLambda([&]
+	m_activeSceneChangedEventHandle = SceneManagers->activeSceneChangedEvent.AddLambda([&]
 	{
 		for (auto& ID : AttachObejctIndex)
 		{
@@ -17,11 +17,10 @@ Socket::Socket()
 			}
 		}
 	});
-
 }
 Socket::~Socket()
 {
-	activeSceneChangedEvent -= m_activeSceneChangedEventHandle;
+	SceneManagers->activeSceneChangedEvent -= m_activeSceneChangedEventHandle;
 }
 
 void Socket::AttachObject(GameObject* Object)

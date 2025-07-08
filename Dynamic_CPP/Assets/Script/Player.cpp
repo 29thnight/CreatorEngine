@@ -178,14 +178,16 @@ void Player::OnTriggerEnter(const Collision& collision)
 		return;
 
 
-
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
+
+	if(collision.otherObj->m_tag == "Monster")
 	FindNearObject(collision.otherObj);
-	std::cout << "player muunga boodit him" << std::endl;
+
+	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
 }
 
 void Player::OnTriggerExit(const Collision& collision)

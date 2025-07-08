@@ -9,7 +9,8 @@ void Swrod::Start()
 {
 	std::cout << "gum start!!!" << std::endl;
 	GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
-	sword->GetComponent<BoxColliderComponent>()->SetExtents({ 6,4,12 });
+	auto box = sword->GetComponent<BoxColliderComponent>();
+	box->SetExtents({ 3,2,6 });
 	auto swordmap = SceneManagers->GetInputActionManager()->AddActionMap("sword");
 
 

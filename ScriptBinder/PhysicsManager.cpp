@@ -892,7 +892,9 @@ void PhysicsManager::GetPhysicData()
 		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
-		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) {
+		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) 
+		{
+			//TODO : 콜라이더도 type 변경해야함
 			continue;
 		}
 
