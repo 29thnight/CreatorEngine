@@ -236,3 +236,4 @@ namespace TypeTrait
 
 #define type_guid(T) TypeTrait::GUIDCreator::GetTypeID<T>()
 #define make_guid() TypeTrait::GUIDCreator::MakeGUID()
+#define make_file_guid(filePath) TypeTrait::GUIDCreator::MakeFileGUID(filePath)

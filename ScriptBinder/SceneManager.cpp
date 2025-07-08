@@ -9,6 +9,7 @@
 #include "Profiler.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
+
 void SceneManager::ManagerInitialize()
 {
     REFLECTION_REGISTER_EXECUTE();

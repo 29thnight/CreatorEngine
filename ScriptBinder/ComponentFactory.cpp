@@ -10,6 +10,7 @@
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
+
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -77,7 +78,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             if (model && getMeshNode)
             {
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
-                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
 			meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
