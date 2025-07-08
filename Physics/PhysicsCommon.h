@@ -14,11 +14,6 @@ const static uint32_t m_heightFieldTypeId = 9005;
 const static uint32_t m_controllerTypeId = 9006;
 const static uint32_t m_convexTypeId = 9007;
 
-
-
-
-
-
 //==========================================================
 // EnumClass
 //콜라이더 타입 //트리거 : 충돌되지 않고 겹치면 이벤트 발생 , 콜리전 : 충돌되면 이벤트 발생

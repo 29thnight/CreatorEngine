@@ -13,6 +13,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	auto componentPtr				= pComponent;
 	auto owner						= componentPtr->GetOwner();
 	bool isStatic					= owner->IsStatic();
+	bool isEnabled					= owner->IsEnabled();
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
 	Material* originMat				= pComponent->m_Material;
@@ -83,6 +84,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		proxyObject->m_worldMatrix		= worldMatrix;
 		proxyObject->m_worldPosition	= worldPosition;
 		proxyObject->m_isStatic			= isStatic;
+		proxyObject->m_isEnableShadow	= isEnabled;
 
 		if(isLightMappingUpdatable)
 		{

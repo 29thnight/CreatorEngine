@@ -234,6 +234,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled);
 			ImGui::SameLine();
 
+			selectedSceneObject->SetEnabled(selectedSceneObject->m_isEnabled);
+
 			if (ImGui::InputText("##name",
 				&name[0],
 				name.capacity() + 1,

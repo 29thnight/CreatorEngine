@@ -10,6 +10,7 @@
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
+#include "InvalidScriptComponent.h"
 
 void ComponentFactory::Initialize()
 {
@@ -40,6 +41,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 	if (itNode["ModuleBehavior"])
 	{
 		std::string scriptName = itNode["m_name"].as<std::string>();
+		if (!ScriptManager->IsScriptExists(scriptName))
+		{
+			auto invalidComponent = obj->AddComponent<InvalidScriptComponent>();
+			return;
+		}
+
 		auto scriptComponent = obj->AddScriptComponent(scriptName);
 		const auto& scriptType = scriptComponent->ScriptReflect();
 		Meta::Deserialize(reinterpret_cast<void*>(scriptComponent), scriptType, itNode);

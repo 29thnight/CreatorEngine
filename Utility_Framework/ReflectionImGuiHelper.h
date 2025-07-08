@@ -28,7 +28,7 @@ namespace Meta
     {
         for (const auto& prop : type.properties)
         {
-			if (prop.name == "m_isEnabled")
+            if (prop.name == "m_isEnabled" || (prop.typeID == type_guid(Object) && prop.name == "m_name"))
 				continue;
 
             const HashedGuid hash = prop.typeID;
@@ -105,6 +105,13 @@ namespace Meta
                     }
                 }
 				ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<const char*>())
+            {
+                const char* value = std::any_cast<const char*>(prop.getter(instance));
+                ImGui::PushID(prop.name);
+				ImGui::Text(value);
+                ImGui::PopID();
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
             {

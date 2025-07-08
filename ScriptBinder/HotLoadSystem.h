@@ -65,6 +65,11 @@ public:
 		});
 	}
 
+	bool IsScriptExists(const std::string_view& name) const
+	{
+		return std::ranges::find(m_scriptNames, name) != m_scriptNames.end();
+	}
+
 	std::vector<std::string>& GetScriptNames()
 	{
 		return m_scriptNames;

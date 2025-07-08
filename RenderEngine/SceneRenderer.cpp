@@ -883,11 +883,15 @@ void SceneRenderer::PrepareRender()
 		{
 			for (auto& mesh : allMeshes)
 			{
+				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				
 				data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 
 			for (auto& culledMesh : staticMeshes)
 			{
+				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+
 				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(culledMesh->GetBoundingBox()))
 				{
@@ -897,7 +901,7 @@ void SceneRenderer::PrepareRender()
 
 			for (auto& skinnedMesh : skinnedMeshes)
 			{
-				if (false == skinnedMesh->IsEnabled()) continue;
+				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
 
 				auto frustum = camera->GetFrustum();
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
