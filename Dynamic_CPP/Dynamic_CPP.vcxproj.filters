@@ -60,6 +60,9 @@
 		<ClInclude Include="funcMain.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\GameManager.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\Swrod.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -87,6 +90,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Player.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\GameManager.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Swrod.cpp">
