@@ -31,6 +31,7 @@ public:
 	void CatchAndThrow();
 	void Catch();
 	void Throw();
+	void Dash();
 	void Attack();
 	void SwapWeaponLeft();
 	void SwapWeaponRight();

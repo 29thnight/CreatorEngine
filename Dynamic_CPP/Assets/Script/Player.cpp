@@ -8,6 +8,7 @@
 #include "pch.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "RigidBodyComponent.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
@@ -91,6 +92,9 @@ void Player::Catch()
 		auto animator = player->GetComponent<Animator>();
 		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		righthand->AttachObject(m_nearObject);
+
+		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
+		rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
 	}
@@ -102,6 +106,8 @@ void Player::Throw()
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
+	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
+	rigidbody->SetBodyType(EBodyType::DYNAMIC);
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 }
@@ -183,11 +189,16 @@ void Player::OnTriggerStay(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
-
-	if(collision.otherObj->m_tag == "Monster")
-	FindNearObject(collision.otherObj);
-
 	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	if (collision.otherObj->m_tag == "Respawn")
+	{
+		
+	}
+	else
+	{
+		FindNearObject(collision.otherObj);
+		
+	}
 }
 
 void Player::OnTriggerExit(const Collision& collision)

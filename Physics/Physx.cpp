@@ -268,7 +268,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.position.x = contrllerInfo.position.x;
 			desc.position.y = contrllerInfo.position.y;
 			desc.position.z = contrllerInfo.position.z; 
-			desc.scaleCoeff = 1.2f;
+			desc.scaleCoeff = 1.0f;
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
