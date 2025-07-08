@@ -248,6 +248,8 @@ namespace BT
 		}
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
 		{
+			Debug->LogError("Action Node Tick" + std::to_string(deltatime));
+
 			auto type = Meta::Find(m_typeName);
 			if (!scriptInstance||!type) {
 				Debug->LogError("Type not found: " + m_typeName);
@@ -259,6 +261,10 @@ namespace BT
 			}
 			return NodeStatus::Failure;
 		}
+
+		std::string GetTypeName() const { return m_typeName; }
+		std::string GetMethodName() const { return m_name; }
+
 	private:
 		void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
 		std::string m_typeName; // 스크립트 컴포넌트의 타입이름

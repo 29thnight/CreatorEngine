@@ -22,6 +22,8 @@
 #include "NodeFactory.h"
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
+#include "LuaEngine.h"
+#include "FunctionRegistry.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -1785,6 +1787,8 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 	if (!BTComponent)
 		return;
 
+	ImguiDrawLuaScriptPopup();
+
 	
 
 	static bool showEditor = false;
@@ -1837,15 +1841,10 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 			//////config
 			ed::Config config;
-			//ImVector<float> zoomLevels;
-			//zoomLevels.push_back(0.5f);
-			//zoomLevels.push_back(1.0f);
-			//zoomLevels.push_back(2.0f);
-			//zoomLevels.push_back(4.0f);
+
 			config.SettingsFile = _filepath.c_str(); // 설정 파일 경로
 			////todo : 에디터 설정
 			//config.CustomZoomLevels = zoomLevels;
-
 
 			// NodeEditor 컨텍스트가 없으면 생성
 			s_BTEditorContext = ed::CreateEditor(&config);
@@ -1880,6 +1879,38 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			// 노드 이름
 			ImGui::TextUnformatted(node->GetName().c_str());
 
+			auto action = std::dynamic_pointer_cast<BT::ActionScriptNode>(node);
+
+			if (action !=nullptr) {
+				// 스크립트 이름 콤보박스
+				static int currentItem = 0;
+				std::vector<std::string> scriptNames = {
+					"Script1",
+					"Script2",
+					"Script3"
+				};
+				//todo:
+				/*for (const auto& script : BTComponent->GetScriptList())
+				{
+					scriptNames.push_back(script->GetMethodName());
+				}*/
+				//ed::Suspend();
+				if(ImGui::BeginCombo("Script name", scriptNames[currentItem].c_str())) {
+					for (int i = 0; i < scriptNames.size(); ++i) {
+						bool isSelected = (currentItem == i);
+						if (ImGui::Selectable(scriptNames[i].c_str(), isSelected)) {
+							currentItem = i;
+						}
+						if (isSelected) {
+							ImGui::SetItemDefaultFocus(); // 자동 포커스
+						}
+					}
+					ImGui::EndCombo();
+				}
+				//ed::Resume();
+			}
+
+
 			// 출력 핀
 			ed::BeginPin(outPin, ed::PinKind::Output);
 			ImGui::Text("O");
@@ -1894,7 +1925,10 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			if (ed::ShowNodeContextMenu(&nid))
 			{
 					ImGui::OpenPopup("NodeMenu");
-					selectNode = node;
+					BTNode* raw = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(nid));
+					if (node.get() == raw) {
+						selectNode = node;
+					}
 					nodeMenuOpen = true;
 			}
 			ed::Resume();
@@ -1909,28 +1943,28 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 
 		//// 4) 기존 부모→자식 링크 렌더링
-		//BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
-		//	uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
-		//	ed::PinId outPin{ base | 1 };
-		//	if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
-		//	{
-		//		for (auto& c : comp->GetChildren())
-		//		{
-		//			ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-		//			ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-		//						  ^ reinterpret_cast<uintptr_t>(c.get()) };
-		//			ed::Link(lid, outPin, inPin);
-		//		}
-		//	}
-		//	else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-		//	{
-		//		auto c = dec->GetChild();
-		//		ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-		//		ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-		//					  ^ reinterpret_cast<uintptr_t>(c.get()) };
-		//		ed::Link(lid, outPin, inPin);
-		//	}
-		//});
+		BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
+			uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
+			ed::PinId outPin{ base | 1 };
+			if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+			{
+				for (auto& c : comp->GetChildren())
+				{
+					ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+					ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+								  ^ reinterpret_cast<uintptr_t>(c.get()) };
+					ed::Link(lid, outPin, inPin);
+				}
+			}
+			else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+			{
+				auto c = dec->GetChild();
+				ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+				ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+							  ^ reinterpret_cast<uintptr_t>(c.get()) };
+				ed::Link(lid, outPin, inPin);
+			}
+		});
 
 		//ImVec2 size = ed::GetScreenSize();
 		
@@ -1991,6 +2025,114 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 		ImGui::End(); // Behavior Tree Editor
 	}
+}
+
+static std::string s_scriptName;
+static std::string s_scriptCode;
+
+
+// 고정 크기 버퍼 (필요에 따라 크기 조정)
+static char nameBuf[128] = "";
+static char codeBuf[4096] = "";
+
+
+void InspectorWindow::ImguiDrawLuaScriptPopup()
+{
+	// 열기 버튼
+	if (ImGui::Button("Lua Script Editor"))
+		ImGui::OpenPopup("LuaScriptEditorPopup");
+
+	// 팝업 모달
+	if (ImGui::BeginPopupModal("LuaScriptEditorPopup", nullptr,
+		ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Lua Script Editor");
+		ImGui::Separator();
+
+		// 스크립트 이름 & 코드 입력
+		ImGui::InputText("Function Name", nameBuf, sizeof(nameBuf));
+		ImGui::InputTextMultiline("Script Code", codeBuf, sizeof(codeBuf), ImVec2(-1, 300));
+
+		// -----------------------
+		// Save Script 버튼: 스크립트 본문만 저장
+		// (추후 JSON에 s_scriptCode 함께 직렬화)
+		// -----------------------
+		if (ImGui::Button("Save Script"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				// 성공적으로 로드만 해두고 → 팝업 닫기
+
+				ImGui::CloseCurrentPopup();
+			}
+			else
+			{
+				ImGui::TextColored(ImVec4(1, 0, 0, 1),
+					"Failed to load script. Check console.");
+			}
+		}
+
+		ImGui::Separator();
+
+		// -----------------------
+		// Register as Condition
+		// -----------------------
+		if (ImGui::Button("Register as Condition"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			// 코드가 최신인지 확인
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				ConditionFunc fn = LuaEngine::Get().GetConditionFunction(s_scriptName);
+				if (fn)
+				{
+					FunctionRegistry::RegisterCondition(s_scriptName, fn);
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					ImGui::TextColored(ImVec4(1, 0, 0, 1),
+						"Function not found: %s", s_scriptName.c_str());
+				}
+			}
+		}
+		ImGui::SameLine();
+
+		// -----------------------
+		// Register as Action
+		// -----------------------
+		if (ImGui::Button("Register as Action"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				auto fn = LuaEngine::Get().GetActionFunction(s_scriptName);
+				if (fn)
+				{
+					FunctionRegistry::RegisterAction(s_scriptName, fn);
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					ImGui::TextColored(ImVec4(1, 0, 0, 1),
+						"Function not found: %s", s_scriptName.c_str());
+				}
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+
 }
 
 #endif // !DYNAMICCPP_EXPORTS

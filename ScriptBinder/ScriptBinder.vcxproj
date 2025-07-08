@@ -194,10 +194,12 @@
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
+    <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />
     <ClInclude Include="IStartable.h" />
+    <ClInclude Include="LuaEngine.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">

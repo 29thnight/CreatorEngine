@@ -36,5 +36,7 @@ private:
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	bool m_openBTPopup{ false };
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
+
+	void ImguiDrawLuaScriptPopup();
 };
 #endif // !DYNAMICCPP_EXPORTS

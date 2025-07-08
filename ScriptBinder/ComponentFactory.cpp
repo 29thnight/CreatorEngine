@@ -5,6 +5,7 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
+#include "BoxColliderComponent.h"
 #include "CharacterControllerComponent.h"
 #include "Terrain.h"
 #include "Model.h"
@@ -259,7 +260,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto rigidBody = static_cast<RigidBodyComponent*>(component);
 			Meta::Deserialize(rigidBody, itNode);
 			rigidBody->SetOwner(obj);
-			}
+		}
+		else if (componentType->typeID == type_guid(BoxColliderComponent))
+		{
+			auto boxCollider = static_cast<BoxColliderComponent*>(component);
+			Meta::Deserialize(boxCollider, itNode);
+			boxCollider->SetOwner(obj);
+		}
 		else if (componentType->typeID == type_guid(CharacterControllerComponent))
 		{
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
