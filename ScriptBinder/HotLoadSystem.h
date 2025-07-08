@@ -7,10 +7,15 @@
 class ModuleBehavior;
 class GameObject;
 class SceneManager;
+namespace BT
+{
+	class NodeFactory;
+}
 #pragma region DLLFunctionPtr
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
+typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
@@ -41,6 +46,13 @@ public:
 		if (!m_setSceneManagerFunc) return;
 
 		m_setSceneManagerFunc(sceneManager);
+	}
+
+	void UpdateBTNodeFactory(Singleton<BT::NodeFactory>::FGetInstance btNodeFactory)
+	{
+		if (!m_setBTNodeFactoryFunc) return;
+
+		m_setBTNodeFactoryFunc(btNodeFactory);
 	}
 
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
@@ -99,6 +111,7 @@ private:
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
 	SetSceneManagerFunc m_setSceneManagerFunc{};
+	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
 	std::wstring rebuildCommand{};
