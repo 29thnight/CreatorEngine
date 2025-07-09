@@ -59,7 +59,7 @@ public:
 			return std::make_shared<BT::InverterNode>("Inverter", nullptr);
 			});
 		// ConditionScriptNode 같은 조건 노드 등록
-		BTNodeFactory.Register("ConditionScript", [&](const json& params) {
+		BTNodeFactory->Register("ConditionScript", [&](const json& params) {
 
 			if (params.empty())
 			{
@@ -72,10 +72,10 @@ public:
 			// 주의: scriptPtr은 런타임에 BehaviorTreeComponent에서 동적으로 할당해야 함
 			// 팩토리 시점에서는 nullptr로 초기화
 			return std::make_shared<BT::ConditionScriptNode>(name, typeName, methodName, nullptr);
-			});
+		});
 
 		// 기본 ConditionNode 등록
-		BTNodeFactory.Register("Condition", [&](const json& params) {
+		BTNodeFactory->Register("Condition", [&](const json& params) {
 			if (params.empty())
 			{
 				// 파라미터가 없으면 기본값 사용
@@ -93,7 +93,7 @@ public:
 			});
 
 		// 기본 ActionNode 등록
-		BTNodeFactory.Register("Action", [&](const json& params) {
+		BTNodeFactory->Register("Action", [&](const json& params) {
 			if (params.empty())
 			{
 				return std::make_shared<BT::ActionNode>("Action",[](float, BlackBoard&){return BT::NodeStatus::Success; });
