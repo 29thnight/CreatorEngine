@@ -18,6 +18,9 @@
 #include "InspectorWindow.h"
 #include "ProgressWindow.h"
 
+#include "LuaEngine.h"
+
+
 #include <memory>
 #include <future>
 

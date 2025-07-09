@@ -22,6 +22,8 @@
 #include "NodeFactory.h"
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
+#include "LuaEngine.h"
+#include "FunctionRegistry.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -330,7 +332,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 				ImGui::EndCombo();
 			}
-
+			
 			prevTagCount = tagCount;
 			prevLayerCount = layerCount;
 
@@ -1798,6 +1800,8 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 	if (!BTComponent)
 		return;
 
+	ImguiDrawLuaScriptPopup();
+
 	
 
 	static bool showEditor = false;
@@ -1850,15 +1854,10 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 			//////config
 			ed::Config config;
-			//ImVector<float> zoomLevels;
-			//zoomLevels.push_back(0.5f);
-			//zoomLevels.push_back(1.0f);
-			//zoomLevels.push_back(2.0f);
-			//zoomLevels.push_back(4.0f);
+
 			config.SettingsFile = _filepath.c_str(); // 설정 파일 경로
 			////todo : 에디터 설정
 			//config.CustomZoomLevels = zoomLevels;
-
 
 			// NodeEditor 컨텍스트가 없으면 생성
 			s_BTEditorContext = ed::CreateEditor(&config);
@@ -1893,6 +1892,39 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			// 노드 이름
 			ImGui::TextUnformatted(node->GetName().c_str());
 
+			auto action = std::dynamic_pointer_cast<BT::ActionScriptNode>(node);
+
+			if (action !=nullptr) {
+				// 스크립트 이름 콤보박스
+				static int currentItem = 0;
+				std::vector<std::string> scriptNames = {
+					"Script1",
+					"Script2",
+					"Script3"
+				};
+				//todo:
+				/*for (const auto& script : BTComponent->GetScriptList())
+				{
+					scriptNames.push_back(script->GetMethodName());
+				}*/
+				
+				//ed::Suspend();
+				if(ImGui::BeginCombo("Script name", scriptNames[currentItem].c_str())) {
+					for (int i = 0; i < scriptNames.size(); ++i) {
+						bool isSelected = (currentItem == i);
+						if (ImGui::Selectable(scriptNames[i].c_str(), isSelected)) {
+							currentItem = i;
+						}
+						if (isSelected) {
+							ImGui::SetItemDefaultFocus(); // 자동 포커스
+						}
+					}
+					ImGui::EndCombo();
+				}
+				//ed::Resume();
+			}
+
+
 			// 출력 핀
 			ed::BeginPin(outPin, ed::PinKind::Output);
 			ImGui::Text("O");
@@ -1907,7 +1939,10 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			if (ed::ShowNodeContextMenu(&nid))
 			{
 					ImGui::OpenPopup("NodeMenu");
-					selectNode = node;
+					BTNode* raw = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(nid));
+					if (node.get() == raw) {
+						selectNode = node;
+					}
 					nodeMenuOpen = true;
 			}
 			ed::Resume();
@@ -1922,28 +1957,28 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 
 		//// 4) 기존 부모→자식 링크 렌더링
-		//BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
-		//	uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
-		//	ed::PinId outPin{ base | 1 };
-		//	if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
-		//	{
-		//		for (auto& c : comp->GetChildren())
-		//		{
-		//			ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-		//			ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-		//						  ^ reinterpret_cast<uintptr_t>(c.get()) };
-		//			ed::Link(lid, outPin, inPin);
-		//		}
-		//	}
-		//	else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-		//	{
-		//		auto c = dec->GetChild();
-		//		ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-		//		ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-		//					  ^ reinterpret_cast<uintptr_t>(c.get()) };
-		//		ed::Link(lid, outPin, inPin);
-		//	}
-		//});
+		BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
+			uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
+			ed::PinId outPin{ base | 1 };
+			if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+			{
+				for (auto& c : comp->GetChildren())
+				{
+					ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+					ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+								  ^ reinterpret_cast<uintptr_t>(c.get()) };
+					ed::Link(lid, outPin, inPin);
+				}
+			}
+			else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+			{
+				auto c = dec->GetChild();
+				ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
+				ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
+							  ^ reinterpret_cast<uintptr_t>(c.get()) };
+				ed::Link(lid, outPin, inPin);
+			}
+		});
 
 		//ImVec2 size = ed::GetScreenSize();
 		
@@ -2004,6 +2039,252 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 		ImGui::End(); // Behavior Tree Editor
 	}
+}
+
+static std::string s_scriptName;
+static std::string s_scriptCode;
+
+
+// 고정 크기 버퍼 (필요에 따라 크기 조정)
+static char nameBuf[128] = "";
+static char codeBuf[4096] = "";
+
+
+void InspectorWindow::ImguiDrawLuaScriptPopup()
+{
+	// 열기 버튼
+	if (ImGui::Button("Lua Script Editor"))
+		ImGui::OpenPopup("LuaScriptEditorPopup");
+
+	// 팝업 모달
+	if (ImGui::BeginPopupModal("LuaScriptEditorPopup", nullptr,
+		ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Lua Script Editor");
+		ImGui::Separator();
+
+		// 스크립트 이름 & 코드 입력
+		ImGui::InputText("Function Name", nameBuf, sizeof(nameBuf));
+		ImGui::InputTextMultiline("Script Code", codeBuf, sizeof(codeBuf), ImVec2(-1, 300));
+
+		// -----------------------
+		// Save Script 버튼: 스크립트 본문만 저장
+		// (추후 JSON에 s_scriptCode 함께 직렬화)
+		// -----------------------
+		if (ImGui::Button("Save Script"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				// 성공적으로 로드만 해두고 → 팝업 닫기
+
+				ImGui::CloseCurrentPopup();
+			}
+			else
+			{
+				ImGui::TextColored(ImVec4(1, 0, 0, 1),
+					"Failed to load script. Check console.");
+			}
+		}
+
+		ImGui::Separator();
+
+		// -----------------------
+		// Register as Condition
+		// -----------------------
+		if (ImGui::Button("Register as Condition"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			// 코드가 최신인지 확인
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				ConditionFunc fn = LuaEngine::Get().GetConditionFunction(s_scriptName);
+				if (fn)
+				{
+					FunctionRegistry::RegisterCondition(s_scriptName, fn);
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					ImGui::TextColored(ImVec4(1, 0, 0, 1),
+						"Function not found: %s", s_scriptName.c_str());
+				}
+			}
+		}
+		ImGui::SameLine();
+
+		// -----------------------
+		// Register as Action
+		// -----------------------
+		if (ImGui::Button("Register as Action"))
+		{
+			s_scriptName = nameBuf;
+			s_scriptCode = codeBuf;
+			if (LuaEngine::Get().LoadScript(s_scriptCode))
+			{
+				auto fn = LuaEngine::Get().GetActionFunction(s_scriptName);
+				if (fn)
+				{
+					FunctionRegistry::RegisterAction(s_scriptName, fn);
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					ImGui::TextColored(ImVec4(1, 0, 0, 1),
+						"Function not found: %s", s_scriptName.c_str());
+				}
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+
+}
+
+
+static float CalcMaxPopupHeightFromItemCount(int items_count)
+{
+	ImGuiContext& g = *GImGui;
+	if (items_count <= 0)
+		return FLT_MAX;
+	return (g.FontSize + g.Style.ItemSpacing.y) * items_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2);
+}
+
+
+
+bool InspectorWindow::BeginNodeCombo(const char* label, const char* preview_value, ImGuiComboFlags flags)
+{
+	using namespace ImGui;
+
+	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
+	ImGuiContext& g = *GImGui;
+	bool has_window_size_constraint = (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint) != 0;
+	g.NextWindowData.Flags &= ~ImGuiNextWindowDataFlags_HasSizeConstraint;
+
+	ImGuiWindow* window = GetCurrentWindow();
+	if (window->SkipItems)
+		return false;
+
+	IM_ASSERT((flags & (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)) != (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)); // Can't use both flags together
+
+	const ImGuiStyle& style = g.Style;
+	const ImGuiID id = window->GetID(label);
+
+	const float arrow_size = (flags & ImGuiComboFlags_NoArrowButton) ? 0.0f : GetFrameHeight();
+	const ImVec2 label_size = CalcTextSize(label, NULL, true);
+	const float expected_w = CalcItemWidth();
+	const float w = (flags & ImGuiComboFlags_NoPreview) ? arrow_size : expected_w;
+	const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(w, label_size.y + style.FramePadding.y * 2.0f));
+	const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0.0f));
+	ItemSize(total_bb, style.FramePadding.y);
+	if (!ItemAdd(total_bb, id, &frame_bb))
+		return false;
+
+	bool hovered, held;
+	bool pressed = ButtonBehavior(frame_bb, id, &hovered, &held);
+	bool popup_open = IsPopupOpen(id, ImGuiPopupFlags_None);
+
+	const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+	const float value_x2 = ImMax(frame_bb.Min.x, frame_bb.Max.x - arrow_size);
+	RenderNavHighlight(frame_bb, id);
+	if (!(flags & ImGuiComboFlags_NoPreview))
+		window->DrawList->AddRectFilled(frame_bb.Min, ImVec2(value_x2, frame_bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+	if (!(flags & ImGuiComboFlags_NoArrowButton))
+	{
+		ImU32 bg_col = GetColorU32((popup_open || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+		ImU32 text_col = GetColorU32(ImGuiCol_Text);
+		window->DrawList->AddRectFilled(ImVec2(value_x2, frame_bb.Min.y), frame_bb.Max, bg_col, style.FrameRounding, (w <= arrow_size) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
+		if (value_x2 + arrow_size - style.FramePadding.x <= frame_bb.Max.x)
+			RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, frame_bb.Min.y + style.FramePadding.y), text_col, ImGuiDir_Down, 1.0f);
+	}
+	RenderFrameBorder(frame_bb.Min, frame_bb.Max, style.FrameRounding);
+	if (preview_value != NULL && !(flags & ImGuiComboFlags_NoPreview))
+		RenderTextClipped(frame_bb.Min + style.FramePadding, ImVec2(value_x2, frame_bb.Max.y), preview_value, NULL, NULL, ImVec2(0.0f, 0.0f));
+	if (label_size.x > 0)
+		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);
+
+	if ((pressed || g.NavActivateId == id) && !popup_open)
+	{
+		if (window->DC.NavLayerCurrent == 0)
+			window->NavLastIds[0] = id;
+		OpenPopupEx(id, ImGuiPopupFlags_None);
+		popup_open = true;
+	}
+
+	if (!popup_open)
+		return false;
+
+	if (has_window_size_constraint)
+	{
+		g.NextWindowData.Flags |= ImGuiNextWindowDataFlags_HasSizeConstraint;
+		g.NextWindowData.SizeConstraintRect.Min.x = ImMax(g.NextWindowData.SizeConstraintRect.Min.x, w);
+	}
+	else
+	{
+		if ((flags & ImGuiComboFlags_HeightMask_) == 0)
+			flags |= ImGuiComboFlags_HeightRegular;
+		IM_ASSERT(ImIsPowerOfTwo(flags & ImGuiComboFlags_HeightMask_));    // Only one
+		int popup_max_height_in_items = -1;
+		if (flags & ImGuiComboFlags_HeightRegular)     popup_max_height_in_items = 8;
+		else if (flags & ImGuiComboFlags_HeightSmall)  popup_max_height_in_items = 4;
+		else if (flags & ImGuiComboFlags_HeightLarge)  popup_max_height_in_items = 20;
+		SetNextWindowSizeConstraints(ImVec2(w, 0.0f), ImVec2(FLT_MAX, CalcMaxPopupHeightFromItemCount(popup_max_height_in_items)));
+	}
+
+	char name[16];
+	ImFormatString(name, IM_ARRAYSIZE(name), "##Combo_%02d", g.BeginPopupStack.Size); // Recycle windows based on depth
+
+	// Position the window given a custom constraint (peak into expected window size so we can position it)
+	// This might be easier to express with an hypothetical SetNextWindowPosConstraints() function.
+	if (ImGuiWindow* popup_window = FindWindowByName(name))
+		if (popup_window->WasActive)
+		{
+			ImVec2 cursorScreenPos = ed::CanvasToScreen(ImGui::GetCursorScreenPos());
+			ed::Suspend();
+			ImGui::SetCursorScreenPos(cursorScreenPos);
+			// Always override 'AutoPosLastDirection' to not leave a chance for a past value to affect us.
+			ImVec2 size_expected = CalcWindowNextAutoFitSize(popup_window);
+			if (flags & ImGuiComboFlags_PopupAlignLeft)
+				popup_window->AutoPosLastDirection = ImGuiDir_Left; // "Below, Toward Left"
+			else
+				popup_window->AutoPosLastDirection = ImGuiDir_Down; // "Below, Toward Right (default)"
+			ImRect r_outer = GetPopupAllowedExtentRect(popup_window);
+			ImVec2 pos = FindBestWindowPosForPopupEx(frame_bb.GetBL(), size_expected, &popup_window->AutoPosLastDirection, r_outer, frame_bb, ImGuiPopupPositionPolicy_ComboBox);
+			SetNextWindowPos(pos);
+			ed::Resume();
+		}
+
+	// We don't use BeginPopupEx() solely because we have a custom name string, which we could make an argument to BeginPopupEx()
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
+
+	ed::Suspend();
+
+	// Horizontally align ourselves with the framed text
+	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(style.FramePadding.x, style.WindowPadding.y));
+	bool ret = Begin(name, NULL, window_flags);
+	PopStyleVar();
+	if (!ret)
+	{
+		EndPopup();
+		IM_ASSERT(0);   // This should never happen as we tested for IsPopupOpen() above
+		return false;
+	}
+	return true;
+}
+
+void InspectorWindow::EndNodeCombo()
+{
+	ImGui::EndPopup();
+
+	ed::Resume();
 }
 
 #endif // !DYNAMICCPP_EXPORTS

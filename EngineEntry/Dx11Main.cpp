@@ -18,6 +18,7 @@
 #include "InputActionManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
+
 #include "AIManager.h"
 
 #include "imgui.h"
@@ -122,6 +123,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
+	LuaEngine::Get().Initialize();
     AIManagers->InitalizeBehaviorTreeSystem();
 
     isGameToRender = true;

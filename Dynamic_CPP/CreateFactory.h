@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TestTreeBehavior.h"
+#include "NewBehaviourScript.h"
 #include "GameManager.h"
 #include "Swrod.h"
 #include "EntityItem.h"

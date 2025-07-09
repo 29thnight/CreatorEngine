@@ -26,6 +26,13 @@ public:
         auto scene = SceneManagers->GetActiveScene();  
         if (scene)  
         {  
+            if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
+            {
+                m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
+            }
+            else {
+                m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
+            }
             scene->CollectColliderComponent(this);  
         }  
    }
@@ -79,6 +86,9 @@ public:
 	   {
 		   m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
 	   }
+       else {
+           m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
+       }
 
 	   return m_Info;
    }
