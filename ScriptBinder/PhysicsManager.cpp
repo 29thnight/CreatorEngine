@@ -107,7 +107,7 @@ void PhysicsManager::ProcessCallback()
 
 		switch (type)
 		{
-		case ECollisionEventType::ENTER_OVERLAP:
+	/*	case ECollisionEventType::ENTER_OVERLAP:
 			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
 			break;
 		case ECollisionEventType::ON_OVERLAP:
@@ -124,6 +124,26 @@ void PhysicsManager::ProcessCallback()
 			break;
 		case ECollisionEventType::END_COLLISION:
 			SceneManagers->GetActiveScene()->OnTriggerExit(collision);
+			break;
+		default:
+			break;*/
+		case ECollisionEventType::ENTER_OVERLAP:
+			SceneManagers->GetActiveScene()->OnTriggerEnter(collision);
+			break;
+		case ECollisionEventType::ON_OVERLAP:
+			SceneManagers->GetActiveScene()->OnTriggerStay(collision);
+			break;
+		case ECollisionEventType::END_OVERLAP:
+			SceneManagers->GetActiveScene()->OnTriggerExit(collision);
+			break;
+		case ECollisionEventType::ENTER_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
+			break;
+		case ECollisionEventType::ON_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionStay(collision);
+			break;
+		case ECollisionEventType::END_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionExit(collision);
 			break;
 		default:
 			break;
