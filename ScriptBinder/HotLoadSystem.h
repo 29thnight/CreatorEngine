@@ -73,7 +73,7 @@ public:
 		std::unique_lock lock(m_scriptFileMutex);
 		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
 		{
-			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
+			return std::get<0>(tuple) == gameObject && std::get<2>(tuple) == name;
 		});
 	}
 

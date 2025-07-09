@@ -39,6 +39,7 @@ void SceneManager::Editor()
 
     if (!m_isGameStart)
     {
+		m_inputActionManager->ClearActionMaps();
         ScriptManager->ReloadDynamicLibrary();
 		m_activeScene.load()->Awake();
 	}

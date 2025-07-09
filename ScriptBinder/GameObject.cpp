@@ -172,7 +172,9 @@ void GameObject::RefreshComponentIdIndices()
 		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(m_components[i]);
 		if (scriptComponent)
 		{
+			ScriptManager->UnCollectScriptComponent(this, i, scriptComponent->m_name.ToString());
 			newMap[scriptComponent->m_scriptTypeID] = i;
+			ScriptManager->CollectScriptComponent(this, i, scriptComponent->m_name.ToString());
 		}
 		else
 		{

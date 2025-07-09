@@ -12,6 +12,15 @@ public:
 	ActionMap* AddActionMap(std::string name);
 	void DeleteActionMap(std::string name);
 	ActionMap* FindActionMap(std::string name);
+
+	void ClearActionMaps() 
+	{
+		for (auto& actionMap : m_actionMaps) 
+		{
+			delete actionMap;
+		}
+		m_actionMaps.clear();
+	}
 private:
 	std::vector<ActionMap*> m_actionMaps;
 };
