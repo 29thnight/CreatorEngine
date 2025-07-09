@@ -2,6 +2,7 @@
 #include "Export.h"
 #include "CreateFactory.h"
 #include "SceneManager.h"
+#include "NodeFactory.h"
 
 extern "C"
 {
@@ -39,6 +40,11 @@ extern "C"
 	EXPORT_API void SetSceneManager(Singleton<SceneManager>::FGetInstance funcPtr)
 	{
 		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
+	}
+
+	EXPORT_API void SetNodeFactory(Singleton<BT::NodeFactory>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<BT::NodeFactory>&>(BTNodeFactory) = funcPtr();
 	}
 #pragma	endregion
 

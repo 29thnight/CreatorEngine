@@ -303,6 +303,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		g_progressWindow->Launch();
 		g_progressWindow->SetStatusText(L"Compile Script Library...");
 		g_progressWindow->SetProgress(100);
+
 		try
 		{
 			Compile();
@@ -895,6 +896,14 @@ void HotLoadSystem::Compile()
 
 	m_setSceneManagerFunc = reinterpret_cast<SetSceneManagerFunc>(GetProcAddress(hDll, "SetSceneManager"));
 	if (!m_setSceneManagerFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	m_setBTNodeFactoryFunc = reinterpret_cast<SetBTNodeFactoryFunc>(GetProcAddress(hDll, "SetNodeFactory"));
+	if (!m_setBTNodeFactoryFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");

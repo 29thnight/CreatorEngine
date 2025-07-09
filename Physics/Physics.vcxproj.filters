@@ -98,6 +98,9 @@
     <ClInclude Include="RagdollLink.h">
       <Filter>Ragdoll</Filter>
     </ClInclude>
+    <ClInclude Include="ColliderDebugData.h">
+      <Filter>Data</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Physics.cpp">

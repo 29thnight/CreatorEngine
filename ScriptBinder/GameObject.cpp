@@ -12,6 +12,7 @@ GameObject::GameObject() :
 	m_parentIndex(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
 }
 
@@ -22,6 +23,7 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
     m_parentIndex(parentIndex)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 
@@ -32,6 +34,7 @@ GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObje
 	m_parentIndex(parentIndex)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 
@@ -169,7 +172,9 @@ void GameObject::RefreshComponentIdIndices()
 		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(m_components[i]);
 		if (scriptComponent)
 		{
+			ScriptManager->UnCollectScriptComponent(this, i, scriptComponent->m_name.ToString());
 			newMap[scriptComponent->m_scriptTypeID] = i;
+			ScriptManager->CollectScriptComponent(this, i, scriptComponent->m_name.ToString());
 		}
 		else
 		{

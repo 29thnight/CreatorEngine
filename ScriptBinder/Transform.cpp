@@ -135,6 +135,19 @@ void Transform::UpdateLocalMatrix()
 	}
 }
 
+void Transform::SetOwner(GameObject* owner)
+{
+	m_owner = owner;
+	if (owner)
+	{
+		m_parentID = owner->m_parentIndex;
+	}
+	else
+	{
+		m_parentID = 0;
+	}
+}
+
 void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 {
 	Mathf::xVector _scale{}, _rotation{}, _position{};
@@ -156,8 +169,15 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 
 	m_worldMatrix = matrix;
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
+
+	GameObject* parentObject = GameObject::FindIndex(m_parentID);
+	if (!parentObject)
+	{
+		m_parentID = m_owner->m_parentIndex;
+		parentObject = GameObject::FindIndex(m_parentID);
+	}
 	
-	XMMATRIX parentMat = GameObject::FindIndex(m_parentID)->m_transform.GetWorldMatrix();
+	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
 	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	m_localMatrix = newLocalMatrix;

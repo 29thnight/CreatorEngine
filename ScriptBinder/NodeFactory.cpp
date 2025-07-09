@@ -1,12 +1,6 @@
 #include "NodeFactory.h"
 
 using namespace BT;
-    NodeFactory& NodeFactory::GetInstance()
-    {
-		static NodeFactory instance; // Singleton instance
-		return instance;
-    }
-
     void NodeFactory::Register(const std::string& typeName, CreateNodeFunc func)
     {
 		m_registry[typeName] = func;
