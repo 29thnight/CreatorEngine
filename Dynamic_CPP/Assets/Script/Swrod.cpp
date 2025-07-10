@@ -10,7 +10,7 @@ void Swrod::Start()
 	std::cout << "gum start!!!" << std::endl;
 	GameObject* sword = GameObject::Find("Sting-Sword lowpoly");
 	auto box = sword->GetComponent<BoxColliderComponent>();
-	box->SetExtents({ 3,2,6 });
+	box->SetExtents({ 6,3,24 });
 
 	auto rigidbody = sword->GetComponent<RigidBodyComponent>();
 	rigidbody->SetLockAngularX(true);

@@ -228,7 +228,6 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
 	boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
-
 	//offset °è»ê
 	if (tranformOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
@@ -538,6 +537,8 @@ void PhysicsManager::SetPhysicData()
 			data.isLockAngularY = rigidbody->IsLockAngularY();
 			data.isLockAngularZ = rigidbody->IsLockAngularZ();
 
+			data.shouldApplyImpulse = rigidbody->shouldApplyImpulse;
+			data.impulse = rigidbody->impulse;
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
 				data.transform._41 = 0.0f;

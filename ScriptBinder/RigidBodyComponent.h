@@ -39,9 +39,12 @@ public:
 	bool IsLockAngularY() const { return m_isLockAngularY; }
 	bool IsLockAngularZ() const { return m_isLockAngularZ; }
 
+	void SetImpulseForce(const Mathf::Vector3& force);
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
+	DirectX::SimpleMath::Vector3 impulse{};
+	bool shouldApplyImpulse = false; //순간적인 힘 받은게있는지
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
@@ -53,5 +56,7 @@ private:
 	bool m_isLockAngularX = false;
 	bool m_isLockAngularY = false;
 	bool m_isLockAngularZ = false;
+
+
 };
 

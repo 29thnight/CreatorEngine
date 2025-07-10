@@ -83,7 +83,7 @@ public:
 	RigidBodyGetSetData GetRigidBodyData(unsigned int id);
 	RigidBody* GetRigidBody(const unsigned int& id);
 	//수정
-	void SetRigidBodyData(const unsigned int& id,const RigidBodyGetSetData& rigidBodyData);
+	void SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData); //&&&&& RigidBodyGetSetData const 지웠음sehwan
 	//삭제
 	void RemoveRigidBody(const unsigned int& id,physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
 	//전체 삭제

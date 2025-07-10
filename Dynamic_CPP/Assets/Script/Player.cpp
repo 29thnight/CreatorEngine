@@ -92,7 +92,6 @@ void Player::Catch()
 		auto animator = player->GetComponent<Animator>();
 		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		righthand->AttachObject(m_nearObject);
-
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 		rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
@@ -108,6 +107,25 @@ void Player::Throw()
 	righthand->DetachObject(catchedObject);
 	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
 	rigidbody->SetBodyType(EBodyType::DYNAMIC);
+	rigidbody->SetLockAngularX(false);
+	rigidbody->SetLockAngularY(false);
+	rigidbody->SetLockAngularZ(false);
+	rigidbody->SetLockLinearX(false);
+	rigidbody->SetLockLinearY(false);
+	rigidbody->SetLockLinearZ(false);
+	auto& transform = GetOwner()->m_transform;
+	auto q = transform.GetWorldQuaternion();
+	Mathf::Vector3 forward = Mathf::Vector3::Transform(Mathf::Vector3::UnitZ, q);
+
+	// 2. Y 제거 (XZ 평면에 투영)
+	forward.y = 0.0f;
+
+	// 3. 정규화 (방향만 남기고 길이 1로)
+	forward.Normalize();
+
+	// 4. 힘 적용
+	rigidbody->SetImpulseForce(forward * 2.0f);
+
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 }

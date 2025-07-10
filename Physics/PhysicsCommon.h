@@ -89,6 +89,9 @@ struct RigidBodyGetSetData
 	bool isLockAngularX = false;	//X축 회전 고정
 	bool isLockAngularY = false;	//Y축 회전 고정
 	bool isLockAngularZ = false;	//Z축 회전 고정
+
+	DirectX::SimpleMath::Vector3 impulse{};
+	bool shouldApplyImpulse = false; //순간적인 힘 받은게있는지
 };
 
 //CharacterController의 GetSetData를 위한 구조체
@@ -249,8 +252,8 @@ struct CharacterControllerInfo
 	unsigned int layerNumber = 0;	//레이어 넘버
 
 	DirectX::SimpleMath::Vector3 position = {0.0f,0.0f,0.0f};	//위치
-	float height = 3.3f;	//높이
-	float radius = 0.35f;	//반지름
+	float height = 8.5f;	//높이
+	float radius = 0.55f;	//반지름
 	float stepOffset = 0.001f;	//오를 수 있는 계단 높이 (코사인)
 	float slopeLimit = 0.7f;	//오를 수 있는 최대 경사각
 	float contactOffset = 0.001f;	//충돌 감지를 위한 여유 거리

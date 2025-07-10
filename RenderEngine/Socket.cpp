@@ -75,7 +75,7 @@ void Socket::Update()
 		DirectX::XMVECTOR scaleVec = obj->m_transform.GetWorldScale(); 
 		DirectX::XMMATRIX scaleMat = DirectX::XMMatrixScalingFromVector(scaleVec);
 		DirectX::XMMATRIX localWithScale = scaleMat * finalMat;
-		obj->m_transform.SetLocalMatrix(finalMat);
+		obj->m_transform.SetLocalMatrix(localWithScale);
 	}
 
 

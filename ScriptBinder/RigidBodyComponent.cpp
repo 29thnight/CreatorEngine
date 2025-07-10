@@ -19,3 +19,9 @@ void RigidBodyComponent::OnDistroy()
 		scene->UnCollectRigidBodyComponent(this);
 	}
 }
+
+void RigidBodyComponent::SetImpulseForce(const Mathf::Vector3& force)
+{
+	shouldApplyImpulse = true;
+	impulse = force;
+}
