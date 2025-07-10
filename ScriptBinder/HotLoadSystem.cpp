@@ -7,6 +7,7 @@
 #include "pugixml.hpp"
 #include "ReflectionYml.h"
 #include "ProgressWindow.h"
+#include "ReflectionRegister.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -252,10 +253,29 @@ void HotLoadSystem::Initialize()
 		m_scriptNames.push_back(scriptName);
 	}
 
+	for (auto& scriptName : m_scriptNames)
+	{
+		auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
+		if (nullptr == tempPtr)
+		{
+			Debug->LogError("Failed to create script: " + scriptName);
+			continue;
+		}
+		RegisterScriptReflection(scriptName, tempPtr.get());
+	}
+
 }
 
 void HotLoadSystem::Shutdown()
 {
+	for(auto& scriptName : m_scriptNames)
+	{
+		UnRegisterScriptReflection(scriptName);
+	}
+
+	Meta::UndoCommandManager->Clear();
+	Meta::UndoCommandManager->ClearGameMode();
+
 	if (hDll)
 	{
 		FreeLibrary(hDll);
@@ -328,6 +348,19 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			m_scriptNames.push_back(scriptName);
 		}
 
+		for (auto& scriptName : m_scriptNames)
+		{
+			auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
+			if (nullptr == tempPtr)
+			{
+				Debug->LogError("Failed to create script: " + scriptName);
+				continue;
+			}
+			file::path scriptPath = PathFinder::Relative("Script\\" + scriptName + ".cpp");
+			DataSystems->ForceCreateYamlMetaFile(scriptPath);
+			RegisterScriptReflection(scriptName, tempPtr.get());
+		}
+
 		std::unordered_set<std::string> validNames(m_scriptNames.begin(), m_scriptNames.end());
 
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
@@ -346,6 +379,7 @@ void HotLoadSystem::ReloadDynamicLibrary()
 
 		ReplaceScriptComponent();
 		g_progressWindow->Close();
+
 	}
 }
 
@@ -377,6 +411,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 			{
 				ScriptManager->BindScriptEvents(newScript, name);
 			}
+
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
 			if(index >= gameObject->m_components.size())
@@ -384,13 +419,54 @@ void HotLoadSystem::ReplaceScriptComponent()
 				gameObject->m_components.push_back(sharedScript);
 				size_t backIndex = gameObject->m_components.size() - 1;
 				gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+
+				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
+				const auto& scriptType = newScript->ScriptReflect();
+
+				for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				{
+					if (gameObject == gameObject && index == idx)
+					{
+						Meta::Deserialize(scriptPtr, scriptType, node);
+						break;
+					}
+				}
 			}
 			else
 			{
-				gameObject->m_components[index].swap(sharedScript);
+				if(nullptr != gameObject->m_components[index])
+				{
+					auto node = Meta::Serialize(gameObject->m_components[index].get());
+
+					gameObject->m_components[index].swap(sharedScript);
+					void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
+					const auto& scriptType = newScript->ScriptReflect();
+
+					Meta::Deserialize(scriptPtr, scriptType, node);
+				}
+				else
+				{
+					gameObject->m_components[index].swap(sharedScript);
+					void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
+					const auto& scriptType = newScript->ScriptReflect();
+
+					for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+					{
+						if (gameObject == gameObject && index == idx)
+						{
+							Meta::Deserialize(scriptPtr, scriptType, node);
+							break;
+						}
+					}
+				}
+
+
 			}
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
+
+		m_scriptComponentIndexs.clear();
+
 		m_isReloading = false;
 	}
 }
@@ -814,17 +890,45 @@ void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
 
 void HotLoadSystem::Compile()
 {
+	file::path scriptPath = PathFinder::Relative("Script\\");
+
+	for(auto& iterPath : file::recursive_directory_iterator(scriptPath))
+	{
+		if (iterPath.is_regular_file() && iterPath.path().extension() == ".cpp")
+		{
+			std::string scriptName = iterPath.path().stem().string();
+			DataSystems->GetAssetMetaWatcher()->CreateYamlMeta(iterPath);
+		}
+	}
+
 	if (hDll)
 	{
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
-			auto* script = dynamic_cast<ModuleBehavior*>(gameObject->m_components[index].get());
-			if (script)
+			auto script = std::dynamic_pointer_cast<ModuleBehavior>(gameObject->m_components[index]);
+			if (nullptr != script)
 			{
-				UnbindScriptEvents(script, name);
+				// 스크립트 재 컴파일 할 경우 복원할 이전 값 직렬화
+				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
+				auto& type = script->ScriptReflect();
+				if(!type.name.empty())
+				{
+					auto scriptNode = Meta::Serialize(scriptPtr, type);
+					m_scriptComponentMetaIndexs.emplace_back(gameObject, index, scriptNode);
+				}
+
+				UnbindScriptEvents(script.get(), name);
 				gameObject->m_components[index].reset();
 			}
 		}
+
+		for(auto& scriptName : m_scriptNames)
+		{
+			UnRegisterScriptReflection(scriptName);
+		}
+
+		Meta::UndoCommandManager->Clear();
+		Meta::UndoCommandManager->ClearGameMode();
 
 		while(GetModuleLoadCount(hDll) > 0)
 		{

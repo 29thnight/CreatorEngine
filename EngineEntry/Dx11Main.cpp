@@ -84,12 +84,13 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         else
          InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
-        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Z))
+        bool isPressedCtrl = InputManagement->IsKeyPressed(VK_LCONTROL);
+        if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
         {
 			Meta::UndoCommandManager->Undo();
         }
 
-        if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyDown(ImGuiKey_Y))
+        if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
         {
 			Meta::UndoCommandManager->Redo();
         }

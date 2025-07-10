@@ -45,5 +45,3 @@ public:
 	}
 	std::unordered_map<std::string, std::function<ModuleBehavior*()>> factoryMap;
 };
-
-static inline auto& ModuleFactory = CreateFactory::GetInstance();

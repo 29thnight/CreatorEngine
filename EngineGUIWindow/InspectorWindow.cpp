@@ -29,6 +29,8 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
+#include "PinHelper.h"
+
 #include "NodeEditor.h"
 namespace ed = ax::NodeEditor;
 static const std::unordered_set<std::string> ignoredKeys = {
@@ -43,6 +45,12 @@ ed::LinkId		   s_EditLinkId = 0;
 bool			   s_RenameNodePopup{ false };
 
 ed::EditorContext* s_BTEditorContext{ nullptr };
+
+ed::NodeId GetTreeNodeIdFromPin(ed::PinId pin)
+{
+	return ed::NodeId(reinterpret_cast<void*>((uintptr_t)pin.Get() >> 1));
+}
+
 
 void DrawYamlNodeEditor(YAML::Node& node, const std::string& label = "")
 {
@@ -1641,7 +1649,6 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 	}
 }
 
-
 void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 {
 	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
@@ -1797,192 +1804,307 @@ void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 BT::BTNode::NodePtr selectNode = nullptr;
 void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
-	if (!BTComponent)
-		return;
+	//		auto action = std::dynamic_pointer_cast<BT::ActionScriptNode>(node);
+
+	//		if (action !=nullptr) {
+	//			// 스크립트 이름 콤보박스
+	//			static int currentItem = 0;
+	//			std::vector<std::string> scriptNames = {
+	//				"Script1",
+	//				"Script2",
+	//				"Script3"
+	//			};
+	//			//todo:
+	//			/*for (const auto& script : BTComponent->GetScriptList())
+	//			{
+	//				scriptNames.push_back(script->GetMethodName());
+	//			}*/
+	//			
+	//			//ed::Suspend();
+	//			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
+	//			if(ImGui::BeginCombo("Script name", scriptNames[currentItem].c_str())) {
+	//				for (int i = 0; i < scriptNames.size(); ++i) {
+	//					bool isSelected = (currentItem == i);
+	//					if (ImGui::Selectable(scriptNames[i].c_str(), isSelected)) {
+	//						currentItem = i;
+	//					}
+	//					if (isSelected) {
+	//						ImGui::SetItemDefaultFocus(); // 자동 포커스
+	//					}
+	//				}
+	//				ImGui::EndCombo();
+	//			}
+	//			//ed::Resume();
+	//		}
+
+	if (!BTComponent) return;
 
 	ImguiDrawLuaScriptPopup();
 
+	struct ImRect
+	{
+		ImVec2 Min, Max;
+		ImRect() : Min(0, 0), Max(0, 0) {}
+		ImRect(const ImVec2& min, const ImVec2& max) : Min(min), Max(max) {}
+		ImVec2 GetTL() const { return Min; }
+		ImVec2 GetBR() const { return Max; }
+	};
 	
-
+	
 	static bool showEditor = false;
 	if (ImGui::Button("Edit Behavior Tree")) {
 		showEditor = !showEditor;
 	}
-
 	
-	if(showEditor){
-
-		// 에디터 창 열기
+	if (showEditor) {
+	
 		ImGui::Begin("Behavior Tree Editor", &showEditor);
-
-		//// === 툴바: 노드 생성 콤보박스 & 버튼 ===
-		//static std::string newNodeKey = "Sequence";
-		//if (ImGui::BeginCombo("New Node Type", newNodeKey.c_str()))
-		//{
-		//	for (auto& key : BTNodeFactory.GetReisteredKeys())
-		//		if (ImGui::Selectable(key.c_str(), key == newNodeKey))
-		//			newNodeKey = key;
-		//	ImGui::EndCombo();
-		//}
-		//ImGui::SameLine();
-		//if (ImGui::Button("Create Node"))
-		//{
-		//	// 루트가 없으면 새 루트로, 있으면 트리 최상위에 붙이기
-		//	json p;
-		//	p["type"] = newNodeKey; // 노드 타입 설정
-		//	p["name"] = newNodeKey + " Node"; // 노드 이름 설정
-		//	auto node = BTComponent->CreateNode(newNodeKey, p);
-		//	//if (!BTComponent->GetRoot())
-		//	//	BTComponent->SetRoot(node);
-		//	//else
-		//	std::dynamic_pointer_cast<BT::CompositeNode>(BTComponent->GetRoot())->AddChild(node);
-		//}
-
+	
 		bool nodeMenuOpen = false;
-		
-
-
-		//ImGui::Separator();
+	
 		std::string _filepath = "BTNode.jon";
-		// === 캔버스 ===
-		ImGui::BeginChild("BTEditorCanvas", ImVec2(1200, 500), false, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
-		// NodeEditor 컨텍스트 설정
-
-
+	
 		if (!s_BTEditorContext)
 		{
-
-			//////config
 			ed::Config config;
-
-			config.SettingsFile = _filepath.c_str(); // 설정 파일 경로
-			////todo : 에디터 설정
-			//config.CustomZoomLevels = zoomLevels;
-
-			// NodeEditor 컨텍스트가 없으면 생성
+			config.SettingsFile = _filepath.c_str();
 			s_BTEditorContext = ed::CreateEditor(&config);
 		}
 
-		// 1) NodeEditor 시작
+
+		static ed::NodeId s_SelectedNodeId = 0;
+		constexpr float rounding = 5.0f;
+		constexpr float padding = 15.0f;
+		constexpr ImVec2 insidePadding = { 8.f, 0.f };
+	
 		ed::SetCurrentEditor(s_BTEditorContext);
 		ed::Begin("BTEditor");
-
-		//// 2) 모든 노드 DFS 순회 · 그리기 · 드래그 이동 · 컨텍스트 메뉴
+	
 		BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
 			ed::NodeId nid{ node.get() };
-			// 이전 위치
 			ImVec2 prev = BTComponent->GetNodePosition(node);
-
-			// PinId 계산 (짝수=input, 홀수=output)
+	
 			uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
 			ed::PinId inPin{ base };
 			ed::PinId outPin{ base | 1 };
+			std::string nodeName = node->GetName();
+	
+			const ImVec4 pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
+			ImColor nodeBgColor = pinBackground + ImColor(15, 15, 15, 0);
+	
+			ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(nodeBgColor));
+			ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(32, 32, 32, 200));
+			ed::PushStyleColor(ed::StyleColor_PinRect, ImColor(60, 180, 255, 150));
+			ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor(60, 180, 255, 150));
+	
+			ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(0, 0, 0, 0));
+			ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
+			ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f, 1.0f));
+			ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
+			ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
+			ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
+			ed::PushStyleVar(ed::StyleVar_PinRadius, 5.0f);
 
-			// --- BeginNode ---
-			ed::BeginNode(nid);
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
+
+			ImGui::BeginGroup();
 			
-			// 입력 핀 (루트 제외)
-			if (node.get()->GetName()!= "RootSequence")
+			ed::BeginNode(nid);
+
+			ImRect inputsRect;
+			int inputAlpha = 200;
+			if (nodeName != "RootSequence")
 			{
+				ImGui::Dummy(ImVec2(160, padding));
+				inputsRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+	
+				ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
+				ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
+				ed::PushStyleVar(ed::StyleVar_PinCorners, ImDrawFlags_RoundCornersBottom);
+
 				ed::BeginPin(inPin, ed::PinKind::Input);
-				ImGui::Text("I");
+				ed::PinPivotRect(inputsRect.GetTL(), inputsRect.GetBR());
+				ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
 				ed::EndPin();
+				ed::PopStyleVar(3);
 			}
+			else
+				ImGui::Dummy(ImVec2(160, padding));
+	
+			ImGui::Dummy(ImVec2(160, 10));
 
-			// 노드 이름
-			ImGui::TextUnformatted(node->GetName().c_str());
+			ImGui::Dummy(ImVec2(160, 50));
+			ImRect contentRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+			ImVec2 textSize = ImGui::CalcTextSize(node->GetName().c_str());
+			ImVec2 textPos = ImVec2(contentRect.GetTL().x + (160 - textSize.x) / 2, contentRect.GetTL().y + (50 - textSize.y) / 2);
+			ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32_WHITE, node->GetName().c_str());
+	
+			ImRect outputsRect;
+			int outputAlpha = 200;
+			bool isComposite = (std::dynamic_pointer_cast<BT::CompositeNode>(node) != nullptr);
+			bool isDecorator = (std::dynamic_pointer_cast<BT::DecoratorNode>(node) != nullptr);
 
-			auto action = std::dynamic_pointer_cast<BT::ActionScriptNode>(node);
+			ImGui::Dummy(ImVec2(160, 10));
 
-			if (action !=nullptr) {
-				// 스크립트 이름 콤보박스
-				static int currentItem = 0;
-				std::vector<std::string> scriptNames = {
-					"Script1",
-					"Script2",
-					"Script3"
-				};
-				//todo:
-				/*for (const auto& script : BTComponent->GetScriptList())
-				{
-					scriptNames.push_back(script->GetMethodName());
-				}*/
-				
-				//ed::Suspend();
-				if(ImGui::BeginCombo("Script name", scriptNames[currentItem].c_str())) {
-					for (int i = 0; i < scriptNames.size(); ++i) {
-						bool isSelected = (currentItem == i);
-						if (ImGui::Selectable(scriptNames[i].c_str(), isSelected)) {
-							currentItem = i;
-						}
-						if (isSelected) {
-							ImGui::SetItemDefaultFocus(); // 자동 포커스
-						}
-					}
-					ImGui::EndCombo();
-				}
-				//ed::Resume();
+			if (isComposite || isDecorator)
+			{
+				ImGui::Dummy(ImVec2(160, padding));
+				outputsRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+
+				ed::PushStyleVar(ed::StyleVar_PinCorners, ImDrawFlags_RoundCornersTop);
+				ed::BeginPin(outPin, ed::PinKind::Output);
+				ed::PinPivotRect(outputsRect.GetTL(), outputsRect.GetBR());
+				ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
+				ed::EndPin();
+				ed::PopStyleVar();
 			}
-
-
-			// 출력 핀
-			ed::BeginPin(outPin, ed::PinKind::Output);
-			ImGui::Text("O");
-			ed::EndPin();
-
-
+			else
+				ImGui::Dummy(ImVec2(160, padding));
+	
 			ed::EndNode();
-			// --- EndNode ---
-			auto openPopupPosition = ImGui::GetMousePos();
+			ed::PopStyleVar(7);
+			ed::PopStyleColor(4);
+
+			ImGui::EndGroup();
+
+			ImGui::PopStyleVar(3);
+	
+			auto drawList = ed::GetNodeBackgroundDrawList(nid);
+	
+			const auto topRoundCornersFlags = ImDrawFlags_RoundCornersTop;
+			const auto bottomRoundCornersFlags = ImDrawFlags_RoundCornersBottom;
+
+			if (nodeName != "RootSequence")
+			{
+				drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+					IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, bottomRoundCornersFlags);
+				drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+					IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, bottomRoundCornersFlags);
+			}
+	
+			if (isComposite || isDecorator)
+			{
+				drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+					IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, topRoundCornersFlags);
+				drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+					IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, topRoundCornersFlags);
+			}
+	
+			drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(170, 100, 255, 255), 0.0f);
+			drawList->AddRect(
+				contentRect.GetTL(),
+				contentRect.GetBR(),
+				IM_COL32(200, 140, 255, 255), 0.0f);
+
+			static ed::PinId prevPinID{};
+			static ed::PinId m_DraggingPin = 0;
+			static BTNode* waitRaw = nullptr;
+			static ImVec2 pinPos;
+			ed::PinId pinID  = ed::GetHoveredPin();
+			
+			if (pinID.Get() != 0 &&
+				prevPinID.Get() != pinID.Get() &&
+				ImGui::IsMouseDown(ImGuiMouseButton_Left)
+				)
+			{
+				s_SelectedNodeId = GetTreeNodeIdFromPin(pinID);
+				m_DraggingPin = pinID;
+				prevPinID = pinID;
+				pinPos = ImGui::GetMousePos();
+			}
+			//static 
+			if (m_DraggingPin.Get() != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			{
+				m_DraggingPin = 0;
+				prevPinID = 0;
+				pinPos = {};
+
+				BTNode* raw = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(s_SelectedNodeId));
+				waitRaw = raw;
+			}
+
+			if (waitRaw)
+			{
+				ed::Suspend();
+				ImGui::OpenPopup("NodeMenu");
+				if (node.get() == waitRaw) {
+					selectNode = node;
+					nodeMenuOpen = true;
+					waitRaw = nullptr;
+				}
+				ed::Resume();
+			}
+
+			if (m_DraggingPin)
+			{
+				ed::NodeId nodeID = s_SelectedNodeId;
+				ImVec2 p1 = pinPos;
+				ImVec2 p2 = ImGui::GetMousePos();
+				ImVec2 dir = p2 - p1;
+				float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+				ImVec2 normDir = ImVec2(dir.x / length, dir.y / length);
+				ImVec2 perpendicular = ImVec2(-normDir.y, normDir.x);
+				float offsetAmount = 5.0f;
+				ImVec2 offset = perpendicular * offsetAmount;
+
+				ImVec2 p1_offset = p1 + offset;
+				ImVec2 p2_offset = p2 + offset;
+				ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
+				ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
+				ImU32 color = IM_COL32(255, 255, 255, 125);
+				float thickness = 3.0f;
+				ImDrawList* drawList = ImGui::GetWindowDrawList();
+				drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
+			}
+
 			ed::Suspend();
 			// --- 컨텍스트 메뉴 (노드 우클릭) ---
-			if (ed::ShowNodeContextMenu(&nid))
+			if (ed::ShowNodeContextMenu(&s_SelectedNodeId))
 			{
-					ImGui::OpenPopup("NodeMenu");
-					BTNode* raw = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(nid));
-					if (node.get() == raw) {
-						selectNode = node;
-					}
-					nodeMenuOpen = true;
+				ImGui::OpenPopup("NodeMenu");
+				BTNode* raw = reinterpret_cast<BTNode*>(static_cast<uintptr_t>(s_SelectedNodeId));
+				if (node.get() == raw) {
+					selectNode = node;
+				}
+				nodeMenuOpen = true;
 			}
 			ed::Resume();
-			// 3) 드래그로 이동된 노드 위치 저장
-			ImVec2 now = ed::GetNodePosition(nid);
-			if (now.x != prev.x || now.y != prev.y) {
-				BTComponent->SetNodePosition(node, now);
-			}
-		});
-
-		
-
-
-		//// 4) 기존 부모→자식 링크 렌더링
-		BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
-			uintptr_t base = reinterpret_cast<uintptr_t>(node.get()) << 1;
-			ed::PinId outPin{ base | 1 };
-			if (auto comp = std::dynamic_pointer_cast<BT::CompositeNode>(node))
+	
+			if (ImGui::IsItemVisible() && ed::IsNodeSelected(nid))
 			{
-				for (auto& c : comp->GetChildren())
+				if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 				{
-					ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-					ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-								  ^ reinterpret_cast<uintptr_t>(c.get()) };
-					ed::Link(lid, outPin, inPin);
+					ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+					BTComponent->SetNodePosition(node, { prev.x + delta.x, prev.y + delta.y });
 				}
 			}
-			else if (auto dec = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-			{
-				auto c = dec->GetChild();
-				ed::PinId inPin{ reinterpret_cast<uintptr_t>(c.get()) << 1 };
-				ed::LinkId lid{ reinterpret_cast<uintptr_t>(node.get())
-							  ^ reinterpret_cast<uintptr_t>(c.get()) };
-				ed::Link(lid, outPin, inPin);
-			}
 		});
-
-		//ImVec2 size = ed::GetScreenSize();
-		
-
+	
+		BT::DFS(BTComponent->GetRoot(), [&](const BTNode::NodePtr& node) {
+			auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node);
+			if (composite)
+			{
+				for (const auto& child : composite->GetChildren())
+				{
+					uintptr_t parentBase = reinterpret_cast<uintptr_t>(node.get()) << 1;
+					uintptr_t childBase = reinterpret_cast<uintptr_t>(child.get()) << 1;
+					ed::PinId parentOut{ parentBase | 1 };
+					ed::PinId childIn{ childBase };
+					ed::Link(ed::LinkId(child.get()), parentOut, childIn);
+				}
+			}
+			});
+	
+	
+		ed::Suspend();
+		if (nodeMenuOpen)
+		{
+			ImGui::OpenPopup("NodeMenu");
+		}
+		ed::Resume();
+	
 		ed::Suspend();
 		//=== 노드 매뉴 팝업 ===
 		if (ImGui::BeginPopup("NodeMenu")) {
@@ -2014,7 +2136,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			bool isRoot = selectNode == BTComponent->GetRoot();
 			if (!isRoot && ImGui::MenuItem("Delete Node"))
 			{
-				BTComponent->DeleteNode(selectNode);
+				BTComponent->DeleteNode(selectNode);				
 			}
 			else if (isRoot)
 			{
@@ -2024,20 +2146,33 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			ImGui::EndPopup();
 		}
 		ed::Resume();
+	
+		ed::Suspend();
+		if (ImGui::BeginPopup("AddNodePopup"))
+		{
+			for (auto& key : BTNodeFactory->GetReisteredKeys())
+			{
+				if (ImGui::MenuItem(key.c_str()))
+				{
+					json p;
+					p["type"] = key;
+					p["name"] = key + " Node";
+					auto newNode = BTComponent->CreateNode(key, p);
+					auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(selectNode);
+					if (composite)
+					{
+						composite->AddChild(newNode);
+					}
+				}
+			}
+			ImGui::EndPopup();
+		}
+		ed::Resume();
 
-
-		ed::End(); // NodeEditor 종료
-
-
+		ed::End();
 		ed::SetCurrentEditor(nullptr);
 
-
-		ImGui::EndChild();
-		//======BTEditorCanvas============
-		
-
-
-		ImGui::End(); // Behavior Tree Editor
+		ImGui::End();
 	}
 }
 

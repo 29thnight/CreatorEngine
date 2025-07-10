@@ -63,4 +63,9 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
 	}
+
+	EXPORT_API void InitActionFactory()
+	{
+		// Register the factory function for BTAction Automation
+	}
 }

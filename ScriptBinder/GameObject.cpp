@@ -114,7 +114,7 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 		return nullptr;
 	}
 	component->SetOwner(this);
-	ScriptManager->RegisterScriptReflection(scriptName.data(), component.get());
+	//ScriptManager->RegisterScriptReflection(scriptName.data(), component.get());
 
 	std::string scriptFile = std::string(scriptName) + ".cpp";
 
