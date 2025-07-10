@@ -136,7 +136,7 @@ void EntityAsis::Purification(float tick)
 EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 {
 	if (m_currentEntityItemCount <= 0) 
-		return;
+		return nullptr;
 
 	m_currentEntityItemCount--;
 	EntityItem* purificationItem = m_EntityItemQueue[m_EntityItemQueueIndex];
@@ -147,7 +147,7 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 		m_EntityItemQueueIndex = 0; // Reset index if it exceeds the max count
 	}
 
-	return purificationItem
+	return purificationItem;
 }
 
 void EntityAsis::Inputblabla(Mathf::Vector2 dir)

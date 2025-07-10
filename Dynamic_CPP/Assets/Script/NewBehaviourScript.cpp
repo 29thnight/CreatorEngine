@@ -148,9 +148,9 @@ void NewBehaviourScript::Update(float tick)
 bool NewBehaviourScript::DetectCondition(const BlackBoard& bb)
 {
 	//auto transform = m_pOwner->GetComponent<Transform>();
-	float p1Distance =  bb.Get<float>("Player1Distance");
-	float p2Distance = bb.Get<float>("Player2Distance");
-	float AsisDistance = bb.Get<float>("AsisDistance");
+	float p1Distance = 0.f;// bb.Get<float>("Player1Distance");
+	float p2Distance = 0.f;// bb.Get<float>("Player2Distance");
+	float AsisDistance = 0.f;//bb.Get<float>("AsisDistance");
 
 	if (p1Distance < m_detectRange || p2Distance < m_detectRange || AsisDistance < m_detectRange)
 	{
@@ -198,7 +198,7 @@ bool NewBehaviourScript::ChaseCondition(const BlackBoard& bb)
 		}
 		else if (m_isChasing)
 		{
-			m_countDown += bb.Get<float>("DeltaTime");
+			m_countDown += 0.f;//bb.Get<float>("DeltaTime");
 			if (m_countDown >= m_chaseDelay)
 			{
 				// tracking end
