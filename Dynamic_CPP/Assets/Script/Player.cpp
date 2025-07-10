@@ -114,18 +114,22 @@ void Player::Throw()
 	rigidbody->SetLockLinearY(false);
 	rigidbody->SetLockLinearZ(false);
 	auto& transform = GetOwner()->m_transform;
-	auto q = transform.GetWorldQuaternion();
-	Mathf::Vector3 forward = Mathf::Vector3::Transform(Mathf::Vector3::UnitZ, q);
+	auto q = transform.GetWorldMatrix();
+	auto rotationOnly = q;
+	rotationOnly.r[3] = XMVectorSet(0, 0, 0, 1); // 위치 성분 제거
+	rotationOnly.r[0] = XMVector3Normalize(rotationOnly.r[0]); // X축 정규화 (스케일 제거)
+	rotationOnly.r[1] = XMVector3Normalize(rotationOnly.r[1]); // Y축 정규화
+	rotationOnly.r[2] = XMVector3Normalize(rotationOnly.r[2]); // Z축 정규화
 
-	// 2. Y 제거 (XZ 평면에 투영)
-	forward.y = 0.0f;
+	auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, rotationOnly);
+	//Mathf::Vector3 forward = Mathf::Vector3::Transform(Mathf::Vector3::UnitZ, q);
+	//auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, q);
 
-	// 3. 정규화 (방향만 남기고 길이 1로)
 	forward.Normalize();
-
+	forward = -forward;
 	// 4. 힘 적용
-	rigidbody->SetImpulseForce(forward * 2.0f);
-
+	rigidbody->SetImpulseForce({ forward.x * 10.0f,6.0f,forward.z *10.0f });
+	std::cout << "awdwadadwad" << std::endl;
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 }
@@ -168,12 +172,10 @@ void Player::Punch()
 
 void Player::FindNearObject(GameObject* gameObject)
 {
-	
 	auto playerPos = GetOwner()->m_transform.GetWorldPosition();
 	auto objectPos = gameObject->m_transform.GetWorldPosition();
 	XMVECTOR diff = XMVectorSubtract(playerPos, objectPos);
 	XMVECTOR distSqVec = XMVector3LengthSq(diff);
-
 	float distance;
 	XMStoreFloat(&distance, distSqVec);
 	if (m_nearObject == nullptr)
@@ -183,7 +185,6 @@ void Player::FindNearObject(GameObject* gameObject)
 	}
 	else
 	{
-		
 		if (distance < m_nearDistance)
 		{
 			m_nearObject = gameObject;
@@ -205,8 +206,6 @@ void Player::OnTriggerEnter(const Collision& collision)
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
-	if (collision.thisObj == collision.otherObj)
-		return;
 	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
 	if (collision.otherObj->m_tag == "Respawn")
 	{
@@ -226,5 +225,33 @@ void Player::OnTriggerExit(const Collision& collision)
 		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
 		//abc
+	}
+}
+
+void Player::OnCollisionEnter(const Collision& collision)
+{
+	std::cout << " Player OnCollisionEnter" << std::endl;
+}
+
+void Player::OnCollisionStay(const Collision& collision)
+{
+	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	if (collision.otherObj->m_tag == "Respawn")
+	{
+
+	}
+	else
+	{
+		FindNearObject(collision.otherObj);
+
+	}
+}
+
+void Player::OnCollisionExit(const Collision& collision)
+{
+	if (m_nearObject == collision.otherObj)
+	{
+		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
+		m_nearObject = nullptr;
 	}
 }

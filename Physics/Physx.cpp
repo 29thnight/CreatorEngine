@@ -282,7 +282,6 @@ void PhysicX::Update(float fixedDeltaTime)
 			body->setSolverIterationCounts(8, 4);
 			shape->setContactOffset(0.02f);
 			shape->setRestOffset(0.01f);
-			
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1= 0xFFFFFFFF;
@@ -800,6 +799,9 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 			rigidBodyData.shouldApplyImpulse = false;
 		}
 
+		pxBody->setAngularDamping(rigidBodyData.AngularDamping);
+		pxBody->setLinearDamping(rigidBodyData.LinearDamping);
+		pxBody->setMass(rigidBodyData.mass);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X, rigidBodyData.isLockAngularX);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y, rigidBodyData.isLockAngularY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z, rigidBodyData.isLockAngularZ);

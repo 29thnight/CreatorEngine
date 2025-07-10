@@ -20,6 +20,16 @@ void RigidBodyComponent::OnDistroy()
 	}
 }
 
+void RigidBodyComponent::SetAngularDamping(float _AngularDamping)
+{
+	AngularDamping = _AngularDamping;
+}
+
+void RigidBodyComponent::SetLinearDamping(float _LinearDamping)
+{
+	LinearDamping = _LinearDamping;
+}
+
 void RigidBodyComponent::SetImpulseForce(const Mathf::Vector3& force)
 {
 	shouldApplyImpulse = true;

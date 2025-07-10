@@ -18,9 +18,9 @@ public:
 	virtual void OnTriggerExit(const Collision& collision) override;
 
 
-	virtual void OnCollisionEnter(const Collision& collision) override {}
-	virtual void OnCollisionStay(const Collision& collision) override {}
-	virtual void OnCollisionExit(const Collision& collision) override {}
+	virtual void OnCollisionEnter(const Collision& collision) override;
+	virtual void OnCollisionStay(const Collision& collision) override;
+	virtual void OnCollisionExit(const Collision& collision) override;
 
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
