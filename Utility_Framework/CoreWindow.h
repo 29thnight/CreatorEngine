@@ -107,8 +107,8 @@ public:
 	}
 
 private:
-    static inline CoreWindow* s_instance;
-    static inline DUMP_TYPE g_dumpType;
+    static CoreWindow* s_instance;
+    static DUMP_TYPE g_dumpType;
     HINSTANCE m_hInstance = nullptr;
     HWND m_hWnd = nullptr;
     int m_width = 800;

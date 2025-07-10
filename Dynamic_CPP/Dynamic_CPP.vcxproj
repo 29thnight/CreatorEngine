@@ -166,6 +166,7 @@
 	<ItemGroup>
 		<ClInclude Include="Assets\Script\AsisMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
+		<ClInclude Include="BTActtionFactory.h" />
 		<ClInclude Include="CreateFactory.h" />
 		<ClInclude Include="Export.h" />
 		<ClInclude Include="framework.h" />

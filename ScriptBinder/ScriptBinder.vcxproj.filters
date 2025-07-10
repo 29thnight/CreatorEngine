@@ -539,9 +539,6 @@
     <ClInclude Include="InvalidScriptComponent.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
-    <ClInclude Include="LuaEngine.h">
-      <Filter>Classes\GameAI\Core</Filter>
-    </ClInclude>
     <ClInclude Include="FunctionRegistry.h">
       <Filter>Classes\GameAI\Core</Filter>
     </ClInclude>
