@@ -792,6 +792,11 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	ImGui::PopID();
 }
 
+void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
+{
+	m_assetMetaWatcher->CreateYamlMeta(filepath);
+}
+
 void DataSystem::OpenFile(const file::path& filepath)
 {
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
