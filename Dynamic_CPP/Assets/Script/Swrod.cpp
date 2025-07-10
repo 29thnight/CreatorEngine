@@ -13,12 +13,12 @@ void Swrod::Start()
 	box->SetExtents({ 6,3,24 });
 
 	auto rigidbody = sword->GetComponent<RigidBodyComponent>();
-	rigidbody->SetLockAngularX(true);
-	rigidbody->SetLockAngularY(true);
-	rigidbody->SetLockAngularZ(true);
-	rigidbody->SetLockLinearX(true);
-	rigidbody->SetLockLinearY(true);
-	rigidbody->SetLockLinearZ(true);
+	//rigidbody->SetLockAngularX(true);
+	//rigidbody->SetLockAngularY(true);
+	//rigidbody->SetLockAngularZ(true);
+	//rigidbody->SetLockLinearX(true);
+	//rigidbody->SetLockLinearY(true);
+	//rigidbody->SetLockLinearZ(true);
 	auto swordmap = SceneManagers->GetInputActionManager()->AddActionMap("sword");
 
 

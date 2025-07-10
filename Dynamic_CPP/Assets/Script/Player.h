@@ -41,6 +41,10 @@ public:
 
 	[[Property]]
 	float HP = 0;
+	[[Property]]
+	float ThrowPowerX = 2.0;
+	[[Property]]
+	float ThrowPowerY = 10.0;
 	void FindNearObject(GameObject* gameObject);
 	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;

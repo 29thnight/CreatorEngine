@@ -3,7 +3,7 @@
 //#include "../Utility_Framework/Core.Minimal.h"
 #include "PhysicsCommon.h"
 #include "CharacterMovement.h"
-
+using namespace physx;
 class CharacterController
 {
 public:
@@ -58,3 +58,27 @@ protected:
 
 };
 
+class PhysicsControllerFilterCallback : public PxQueryFilterCallback
+{
+public:
+	PhysicsControllerFilterCallback() = default;
+	~PhysicsControllerFilterCallback() = default;
+
+	virtual PxQueryHitType::Enum preFilter(
+		const PxFilterData& filterData,
+		const PxShape* shape,
+		const PxRigidActor* actor,
+		PxHitFlags& queryFlags) override
+	{
+		
+		// 특정 조건에 따라 통과 처리
+		if (shape->getQueryFilterData().word0 == 4) { //&&&&&sewhan controller
+			return PxQueryHitType::eTOUCH;  //
+		}
+		return PxQueryHitType::eBLOCK;    // 막힘
+	}
+	virtual PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor)
+	{
+		return PxQueryHitType::eBLOCK;
+	}
+};

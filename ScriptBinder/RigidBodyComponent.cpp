@@ -35,3 +35,8 @@ void RigidBodyComponent::SetImpulseForce(const Mathf::Vector3& force)
 	shouldApplyImpulse = true;
 	impulse = force;
 }
+
+void RigidBodyComponent::SetMass(float _mass)
+{
+	m_mass = _mass;
+}

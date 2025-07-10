@@ -561,6 +561,7 @@ void PhysicsManager::SetPhysicData()
 			data.impulse = rigidbody->impulse;
 			data.AngularDamping = rigidbody->AngularDamping;
 			data.LinearDamping = rigidbody->LinearDamping;
+			data.mass = rigidbody->m_mass;
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
 				data.transform._41 = 0.0f;

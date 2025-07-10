@@ -152,7 +152,7 @@ public:
 
     /*void SetIsTrigger(bool isTrigger) override;
     bool GetIsTrigger() override;*/
-
+    BoxColliderInfo m_Info;
 private:  
 
     void OnTriggerEnter(ICollider* other) override;
@@ -169,5 +169,4 @@ private:
 
     EColliderType m_type;
 	unsigned int m_collsionCount = 0;
-    BoxColliderInfo m_Info;
 };

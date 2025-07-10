@@ -52,8 +52,7 @@ PxFilterFlags CustomFilterShader(
 	//	return physx::PxFilterFlag::eSUPPRESS; //&&&&&sehwan
 	//}
 
-
-
+	
 	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
 		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
@@ -68,6 +67,7 @@ PxFilterFlags CustomFilterShader(
 		| PxPairFlag::eNOTIFY_CONTACT_POINTS
 		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
 	return PxFilterFlag::eDEFAULT;
+
 }
 
 class RaycastQueryFilter : public physx::PxQueryFilterCallback
@@ -86,6 +86,7 @@ public:
 		}
 
 		return physx::PxQueryHitType::eNONE;
+
 	}
 	
 	physx::PxQueryHitType::Enum postFilter(const physx::PxFilterData& filterData,
@@ -188,7 +189,9 @@ bool PhysicX::Initialize()
 	//debug용 plane 생성 --> triangle mesh로 대체 예정
 	
 	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
-	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *m_defaultMaterial);
+	auto material = m_defaultMaterial;
+	material->setRestitution(0.0f);
+	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *material);
 	planeShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 	planeShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 	physx::PxFilterData filterData;
@@ -277,9 +280,9 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
-
+		
 			physx::PxController* pxController = m_characterControllerManager->createController(desc);
-
+			
 			physx::PxRigidDynamic* body = pxController->getActor();
 			physx::PxShape* shape;
 			int shapeSize = body->getNbShapes();
@@ -290,8 +293,10 @@ void PhysicX::Update(float fixedDeltaTime)
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
 			filterData.word1= 0xFFFFFFFF;
+			
 			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
+			//shape->setQueryFilterData(filterData);
 			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 			//shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
 
@@ -418,6 +423,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 	}
 
 	RaycastQueryFilter queryFilter;
+	
 	bool isAnyHit;
 		
 	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData,&queryFilter);
@@ -662,7 +668,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//filterData.word1 = collisionMatrix[colInfo.layerNumber];
 	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
-
+	shape->setQueryFilterData(filterData);
 	//collisionData
 	DynamicRigidBody* dynamicBody = new DynamicRigidBody(collideType, colInfo.id, colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();

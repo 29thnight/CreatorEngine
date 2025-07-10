@@ -42,13 +42,17 @@ public:
 	void SetAngularDamping(float _AngularDamping = 0.05f);
 	void SetLinearDamping(float _LinearDamping);
 	void SetImpulseForce(const Mathf::Vector3& force);
+	void SetMass(float _mass);
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
 	DirectX::SimpleMath::Vector3 impulse{};
 	bool shouldApplyImpulse = false; //순간적인 힘 받은게있는지
 	float AngularDamping =0.05f;
+	[[Property]]
 	float LinearDamping = 0;
+	[[Property]]
+	float m_mass = 70.f;
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;

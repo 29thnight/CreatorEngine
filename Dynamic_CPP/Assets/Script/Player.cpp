@@ -124,11 +124,16 @@ void Player::Throw()
 	auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, rotationOnly);
 	//Mathf::Vector3 forward = Mathf::Vector3::Transform(Mathf::Vector3::UnitZ, q);
 	//auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, q);
-
 	forward.Normalize();
 	forward = -forward;
+	DirectX::SimpleMath::Vector3 upward(0, 1, 0);
+
+	DirectX::SimpleMath::Vector3 throwDir = forward * ThrowPowerX + upward * ThrowPowerY;
+	throwDir.Normalize();
+	float impulseStrength = 1.0f;
+	DirectX::SimpleMath::Vector3 finalImpulse = throwDir * impulseStrength;
 	// 4. Èû Àû¿ë
-	rigidbody->SetImpulseForce({ forward.x * 10.0f,6.0f,forward.z *10.0f });
+	rigidbody->SetImpulseForce(finalImpulse);
 	std::cout << "awdwadadwad" << std::endl;
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
@@ -206,13 +211,14 @@ void Player::OnTriggerEnter(const Collision& collision)
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
-	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	std::cout << "player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str() << std::endl;
 	if (collision.otherObj->m_tag == "Respawn")
 	{
 		
 	}
 	else
 	{
+
 		FindNearObject(collision.otherObj);
 		
 	}
