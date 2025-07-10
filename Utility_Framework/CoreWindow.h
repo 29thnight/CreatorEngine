@@ -19,10 +19,10 @@ public:
     CoreWindow(HINSTANCE hInstance, const wchar_t* title, int width, int height)
         : m_hInstance(hInstance), m_width(width), m_height(height)
     {
+        s_instance = this;
         RegisterWindowClass();
         CreateAppWindow(title);
         SetUnhandledExceptionFilter(ErrorDumpHandeler);
-        s_instance = this;
     }
 
     ~CoreWindow()
@@ -77,11 +77,11 @@ public:
 
     static LONG WINAPI ErrorDumpHandeler(EXCEPTION_POINTERS* pExceptionPointers)
     {
-        int msgResult = MessageBox(NULL, L"Should Create Dump ?", L"Exception", MB_YESNO | MB_ICONQUESTION);
+        int msgResult = MessageBox(NULL, L"Should Create Dump ?", L"Exception", MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
 
         if (msgResult == IDYES)
         {
-            CreateDump(pExceptionPointers, g_dumpType);
+            CreateDump(pExceptionPointers, g_dumpType, s_instance->m_hWnd);
         }
 
         return msgResult;
@@ -162,22 +162,6 @@ private:
 
             ShowWindow(m_hWnd, SW_SHOWNORMAL);
             UpdateWindow(m_hWnd);
-
-            //&&&&&consol
-            //{
-            //    AllocConsole();
-            //    FILE* fp;
-            //    freopen_s(&fp, "CONOUT$", "w", stdout);
-            //    freopen_s(&fp, "CONIN$", "r", stdin);
-            //    freopen_s(&fp, "CONOUT$", "w", stderr);
-
-            //    auto consoleHwnd = GetConsoleWindow(); // 콘솔 창 핸들 가져오기
-            //    SetWindowPos(consoleHwnd, nullptr, 500, 500, 1920, 1080, SWP_NOZORDER);
-
-            //    LONG style = GetWindowLong(consoleHwnd, GWL_STYLE);
-            //    style &= ~(WS_CAPTION | WS_THICKFRAME);  // 타이틀 바와 사이즈 조정 프레임 제거
-            //    SetWindowLong(consoleHwnd, GWL_STYLE, style);
-            //}
         }
     }
 

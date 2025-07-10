@@ -281,6 +281,7 @@ private:
         }
     }
 
+public:
     void CreateYamlMeta(const std::filesystem::path& targetFile) 
     {
         std::filesystem::path metaPath = targetFile.string() + ".meta";

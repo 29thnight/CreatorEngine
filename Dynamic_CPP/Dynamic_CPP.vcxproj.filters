@@ -22,6 +22,12 @@
 			<UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
 			<Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
 		</Filter>
+		<Filter Include="Script\BTActionClass">
+			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Script\AnimationBehavior">
+			<UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
+		</Filter>
 	</ItemGroup>
 	<ItemGroup>
 		<ClInclude Include="framework.h">
@@ -63,8 +69,17 @@
 		<ClInclude Include="Assets\Script\GameManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\NewBehaviourScript.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\Swrod.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="BTActtionFactory.h">
+			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\AsisFeed.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -99,6 +114,12 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\GameManager.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewBehaviourScript.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Swrod.cpp">

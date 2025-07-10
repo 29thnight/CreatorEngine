@@ -117,6 +117,7 @@ private:
 	std::wstring rebuildCommand{};
 	std::atomic_bool m_isStartUp{ false };
 
+private:
 #pragma region Script File String
 	std::string scriptIncludeString
 	{
@@ -219,6 +220,10 @@ private:
 	};
 #pragma endregion
 	
+private:
+
+
+private:
 	std::vector<std::string> m_scriptNames{};
 	std::vector<std::tuple<GameObject*, size_t, std::string>> m_scriptComponentIndexs{};
 	std::thread m_scriptFileThread{};

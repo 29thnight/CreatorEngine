@@ -20,3 +20,5 @@ BTNode::NodePtr BehaviorTreeComponent::FindNodeByPin(ax::NodeEditor::PinId pin)
 
 	return std::shared_ptr<BTNode>(ptr, [](BTNode*) {});
 }
+
+

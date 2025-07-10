@@ -117,6 +117,8 @@ public:
 	ImFont* GetSmallFont() const { return smallFont; }
 	ImFont* GetExtraSmallFont() const { return extraSmallFont; }
 
+	AssetMetaWatcher* GetAssetMetaWatcher() const { return m_assetMetaWatcher.get(); }
+
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;

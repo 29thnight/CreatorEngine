@@ -195,6 +195,7 @@
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
+    <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />

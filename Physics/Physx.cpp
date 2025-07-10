@@ -249,6 +249,11 @@ void PhysicX::Update(float fixedDeltaTime)
 		//케릭터 컨트롤러 업데이트
 		for (const auto& controller : m_characterControllerContainer) {
 			controller.second->Update(fixedDeltaTime);
+			//컨트롤러가 삭제 예정이라면
+			//if(todo : condition){
+			//controller.second->GetController()->release();
+			// }
+
 		}
 		//생성 예정인 케릭터 컨트롤러를 씬에 추가
 		for (auto& [contrllerInfo, movementInfo] : m_updateCCTList)

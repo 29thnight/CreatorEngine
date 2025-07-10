@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "AsisMove.generated.h"
 
 class AsisMove : public ModuleBehavior
 {
 public:
+   ReflectAsisMove
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(AsisMove)
 
 public:
@@ -29,6 +32,8 @@ private:
 		{ 0.f, 0.f, 0.f }
 	};
 
-	float moveSpeed = 5.f;
+	[[Property]]
+	float moveSpeed = 10.f;
+	[[Property]]
 	int currentPointIndex = 0;
 };

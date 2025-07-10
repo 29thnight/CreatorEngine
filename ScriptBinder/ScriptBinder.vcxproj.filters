@@ -539,6 +539,9 @@
     <ClInclude Include="InvalidScriptComponent.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
+    <ClInclude Include="FunctionRegistry.h">
+      <Filter>Classes\GameAI\Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

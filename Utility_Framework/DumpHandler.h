@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Definition.h"
 #include "EngineSetting.h"
+#include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
 
@@ -12,30 +13,19 @@ enum DUMP_TYPE
     DUMP_TYPE_FULL = MiniDumpWithFullMemory | MiniDumpIgnoreInaccessibleMemory
 };
 
-inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpType)
+inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpType, HWND handle)
 {
     wchar_t moduleFileName[MAX_PATH] = { 0, };
-    std::wstring fileName(moduleFileName);
-    if (GetModuleFileName(NULL, moduleFileName, MAX_PATH) == 0)
-    {
-        fileName = L"unknown_project.dmp";
-    }
-    else
-    {
-        fileName = std::wstring(moduleFileName);
-        size_t pos = fileName.find_last_of(L"\\/");
-        if (pos != std::wstring::npos)
-        {
-            fileName = fileName.substr(pos + 1);
-        }
-        pos = fileName.find_last_of(L'.');
-        if (pos != std::wstring::npos)
-        {
-            fileName = fileName.substr(0, pos);
-        }
+    file::path fileName(PathFinder::DumpPath());
 
-        fileName += L".dmp";
-    }
+    if (GetModuleFileNameW(NULL, moduleFileName, MAX_PATH) == 0)
+    {
+        Debug->LogError("Failed to get module file name for dump creation.");
+        return;
+	}
+
+    fileName /= file::path(moduleFileName).filename().replace_extension(L".dmp");
+
     HANDLE hFile = CreateFile(fileName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return;
     MINIDUMP_EXCEPTION_INFORMATION dumpInfo{};
@@ -66,7 +56,7 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
 
     CloseHandle(hFile);
 
-    std::wstring adsName = fileName + L":GitHash";
+    std::wstring adsName = fileName.wstring() + L":GitHash";
     std::ofstream ads(adsName, std::ios::binary);
     if (ads)
     {
@@ -75,6 +65,9 @@ inline void CreateDump(EXCEPTION_POINTERS* pExceptionPointers, DUMP_TYPE dumpTyp
     }
 
     Debug->Finalize();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    PostMessage(handle, WM_CLOSE, 0, 0);
 }
 
 inline std::wstring GetDumpGitHashADS(const std::wstring& dumpFilePath)

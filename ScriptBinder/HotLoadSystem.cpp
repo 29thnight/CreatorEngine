@@ -252,10 +252,26 @@ void HotLoadSystem::Initialize()
 		m_scriptNames.push_back(scriptName);
 	}
 
+	for (auto& scriptName : m_scriptNames)
+	{
+		auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
+		if (nullptr == tempPtr)
+		{
+			Debug->LogError("Failed to create script: " + scriptName);
+			continue;
+		}
+		RegisterScriptReflection(scriptName, tempPtr.get());
+	}
+
 }
 
 void HotLoadSystem::Shutdown()
 {
+	for(auto& scriptName : m_scriptNames)
+	{
+		UnRegisterScriptReflection(scriptName);
+	}
+
 	if (hDll)
 	{
 		FreeLibrary(hDll);
@@ -328,6 +344,17 @@ void HotLoadSystem::ReloadDynamicLibrary()
 			m_scriptNames.push_back(scriptName);
 		}
 
+		for (auto& scriptName : m_scriptNames)
+		{
+			auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
+			if (nullptr == tempPtr)
+			{
+				Debug->LogError("Failed to create script: " + scriptName);
+				continue;
+			}
+			RegisterScriptReflection(scriptName, tempPtr.get());
+		}
+
 		std::unordered_set<std::string> validNames(m_scriptNames.begin(), m_scriptNames.end());
 
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
@@ -387,7 +414,12 @@ void HotLoadSystem::ReplaceScriptComponent()
 			}
 			else
 			{
+				auto node = Meta::Serialize(gameObject->m_components[index].get());
+				
 				gameObject->m_components[index].swap(sharedScript);
+				const auto& scriptType = newScript->ScriptReflect();
+
+				Meta::Deserialize(reinterpret_cast<void*>(gameObject->m_components[index].get()), scriptType, node);
 			}
 			newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
 		}
@@ -814,6 +846,17 @@ void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
 
 void HotLoadSystem::Compile()
 {
+	file::path scriptPath = PathFinder::Relative("Script\\");
+
+	for(auto& iterPath : file::recursive_directory_iterator(scriptPath))
+	{
+		if (iterPath.is_regular_file() && iterPath.path().extension() == ".cpp")
+		{
+			std::string scriptName = iterPath.path().stem().string();
+			DataSystems->GetAssetMetaWatcher()->CreateYamlMeta(iterPath);
+		}
+	}
+
 	if (hDll)
 	{
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
@@ -824,6 +867,11 @@ void HotLoadSystem::Compile()
 				UnbindScriptEvents(script, name);
 				gameObject->m_components[index].reset();
 			}
+		}
+
+		for(auto& scriptName : m_scriptNames)
+		{
+			UnRegisterScriptReflection(scriptName);
 		}
 
 		while(GetModuleLoadCount(hDll) > 0)

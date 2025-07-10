@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TestTreeBehavior.h"
+#include "NewBehaviourScript.h"
 #include "Rock.h"
 #include "AsisFeed.h"
 #include "GameManager.h"
@@ -45,5 +47,3 @@ public:
 	}
 	std::unordered_map<std::string, std::function<ModuleBehavior*()>> factoryMap;
 };
-
-static inline auto& ModuleFactory = CreateFactory::GetInstance();
