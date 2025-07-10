@@ -17,7 +17,7 @@ public:
 	}
 
 	template<typename T>
-	T& get(const std::string& key)
+	T& Get(const std::string& key) 
 	{
 		auto it = m_blackBoard.find(key);
 		if (it != m_blackBoard.end())

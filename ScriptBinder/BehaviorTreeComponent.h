@@ -83,6 +83,7 @@ public:
 		});
 	}
 
+	BlackBoard& GetBlackBoard() { return m_blackboard; }
 private:
 
 	BlackBoard m_blackboard; // 블랙보드 데이터
