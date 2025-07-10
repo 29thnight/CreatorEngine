@@ -1,5 +1,4 @@
-// MeshParticle.hlsl - 3D 메시 파티클 버텍스 셰이더
-
+// MeshParticle.hlsl - 수정된 3D 메시 파티클 버텍스 셰이더
 struct MeshParticleData
 {
     float3 position; // 12 bytes
@@ -23,13 +22,14 @@ struct MeshParticleData
     float age; // 4 bytes
     float lifeTime; // 4 bytes
     uint isActive; // 4 bytes
-    float pad7; // 4 bytes -> 112 bytes total
+    uint renderMode; // 4 bytes -> 112 bytes total
     
     float4 color; // 16 bytes -> 128 bytes total
     
     uint textureIndex; // 4 bytes
     float3 pad8; // 12 bytes -> 144 bytes total
 };
+
 cbuffer MeshConstantBuffer : register(b0)
 {
     matrix gWorld;
@@ -64,6 +64,7 @@ struct VertexOutput
     float4 color : COLOR;
     float3 viewDir : VIEW_DIR;
     float alpha : ALPHA;
+    uint renderMode : RENDER_MODE;
 };
 
 float3x3 CreateRotationMatrix(float3 rotation)
@@ -104,6 +105,7 @@ VertexOutput main(VertexInput input)
     
     if (particle.isActive == 0)
     {
+        // 비활성 파티클은 화면 밖으로 이동
         output.position = float4(0, 0, 0, 0);
         output.worldPos = float3(0, 0, 0);
         output.normal = float3(0, 0, 0);
@@ -114,31 +116,30 @@ VertexOutput main(VertexInput input)
         return output;
     }
     
+    // 로컬 변환: 스케일 -> 회전
     float3x3 rotMatrix = CreateRotationMatrix(particle.rotation);
-    
     float3 scaledPos = input.position * particle.scale;
     float3 rotatedPos = mul(scaledPos, rotMatrix);
-    float3 worldPos = rotatedPos + particle.position;
-    
     float3 rotatedNormal = mul(input.normal, rotMatrix);
     
-    matrix worldMatrix = gWorld;
-    worldMatrix._14 = worldPos.x;
-    worldMatrix._24 = worldPos.y;
-    worldMatrix._34 = worldPos.z;
+    // 월드 변환: 로컬 변환된 버텍스를 파티클 위치로 이동
+    float3 worldPos = rotatedPos + particle.position;
     
-    float4 worldPosition = mul(float4(rotatedPos, 1.0), worldMatrix);
+    // 최종 월드 매트릭스 적용 (gWorld는 전역 변환용)
+    float4 worldPosition = mul(float4(worldPos, 1.0), gWorld);
+    
+    // 뷰 및 프로젝션 변환
     float4 viewPosition = mul(worldPosition, gView);
     output.position = mul(viewPosition, gProjection);
     
+    // 출력 설정
     output.worldPos = worldPosition.xyz;
     output.normal = normalize(mul(rotatedNormal, (float3x3) gWorld));
     output.texCoord = input.texCoord;
     output.color = particle.color;
     output.viewDir = normalize(gCameraPosition - worldPosition.xyz);
-    
-    float ageRatio = particle.age / particle.lifeTime;
-    output.alpha = particle.color.a * (1.0 - ageRatio);
+    output.alpha = particle.color.a;
+    output.renderMode = particle.renderMode;
     
     return output;
 }

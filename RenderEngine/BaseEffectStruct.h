@@ -81,7 +81,7 @@ struct alignas(16) MeshParticleData
 	float age;
 	float lifeTime;
 	uint32_t isActive;
-	float pad7;
+	uint32_t renderMode;
 
 	Mathf::Vector4 color;
 

@@ -1,5 +1,6 @@
 #include "BillboardModuleGPU.h"
 #include "ShaderSystem.h"
+#include "DataSystem.h"
 
 void BillboardModuleGPU::Initialize()
 {
@@ -176,12 +177,7 @@ nlohmann::json BillboardModuleGPU::SerializeData() const
 
 	if (m_assignedTexture)
 	{
-		// 텍스처 파일 경로나 이름을 저장 (Texture 클래스에 GetPath() 같은 메소드가 있다고 가정)
-		// json["texture"]["path"] = m_assignedTexture->GetPath();
-		// 또는 텍스처 ID나 이름
-		// json["texture"]["name"] = m_assignedTexture->GetName();
-
-		// 현재는 텍스처가 할당되어 있다는 정보만 저장
+		json["texture"]["name"] = m_assignedTexture->m_name;
 		json["texture"]["assigned"] = true;
 	}
 
@@ -238,12 +234,14 @@ void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 	{
 		const auto& textureJson = json["texture"];
 
-		// 텍스처 로드는 별도로 처리해야 함
-		// 텍스처 매니저를 통해 로드하거나, 경로를 저장해두었다가 나중에 로드
-		if (textureJson.contains("path"))
+		if (textureJson.contains("name"))
 		{
-			// std::string texturePath = textureJson["path"];
-			// m_assignedTexture = TextureManager::LoadTexture(texturePath);
+			std::string textureName = textureJson["name"];
+			if (textureName.find('.') == std::string::npos)
+			{
+				textureName += ".png";
+			}
+			m_assignedTexture = DataSystems->LoadTexture(textureName);
 		}
 	}
 

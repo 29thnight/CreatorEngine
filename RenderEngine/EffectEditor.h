@@ -47,8 +47,12 @@ public:
     void StartModifyEmitter(int index);
     void SaveModifiedEmitter(const std::string& name = "");
     void CancelModifyEmitter();
-    void RenderModuleDetailEditor();
-    void RenderRenderModuleDetailEditor();
+
+    // 렌더 모듈용 설정 메서드
+    void RenderModuleDetailEditor();            // 2d
+    void RenderRenderModuleDetailEditor();      // 3d
+
+    // 2D 모듈용 설정 메서드
     void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
     void RenderMovementModuleEditor(MovementModuleCS* movementModule);
     void RenderColorModuleEditor(ColorModuleCS* colorModule);
@@ -58,6 +62,7 @@ public:
     // 3D 모듈용 설정 메서드
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
     void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
+
 private:
     // 미리보기용 임시 에미터들
     std::vector<TempEmitterInfo> m_tempEmitters;
@@ -125,7 +130,6 @@ private:
     void SaveCurrentEmitter(const std::string& name);
     void CancelEditing();
 
-
     // 모듈 추가
     void AddSelectedModule();
     void AddSelectedRender();
@@ -133,4 +137,6 @@ private:
     // json 저장
     void SaveEffectToJson(const std::string& filename);
     void LoadEffectFromJson(const std::string& filename);
+    void SyncResourcesFromLoadedEmitters();
+    void AddTextureToEditorList(Texture* texture);
 };

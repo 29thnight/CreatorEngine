@@ -86,6 +86,9 @@ void MeshModuleGPU::Initialize()
         &m_constantBufferData
     );
 
+    // 클리핑 버퍼 생성
+    CreateClippingBuffer();
+
     // 기본 큐브 메시 설정
     SetMeshType(MeshType::Cube);
 }
@@ -181,6 +184,348 @@ Mesh* MeshModuleGPU::GetCurrentMesh() const
     }
 }
 
+void MeshModuleGPU::OnClippingStateChanged()
+{
+    if (!m_pso || !ShaderSystem)
+        return;
+
+    if (IsClippingEnabled()) {
+        auto it = ShaderSystem->PixelShaders.find("MeshParticleClipping");
+        if (it != ShaderSystem->PixelShaders.end()) {
+            m_pso->m_pixelShader = &it->second;
+        }
+    }
+    else {
+        auto it = ShaderSystem->PixelShaders.find("MeshParticle");
+        if (it != ShaderSystem->PixelShaders.end()) {
+            m_pso->m_pixelShader = &it->second;
+        }
+    }
+}
+
+void MeshModuleGPU::CreateClippingBuffer()
+{
+    if (m_clippingBuffer)
+        return;
+
+    // 클리핑 파라미터용 상수 버퍼 생성
+    D3D11_BUFFER_DESC bufferDesc = {};
+    bufferDesc.ByteWidth = sizeof(ClippingParams);
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bufferDesc.MiscFlags = 0;
+    bufferDesc.StructureByteStride = 0;
+
+    // 초기 데이터로 현재 클리핑 파라미터 사용
+    D3D11_SUBRESOURCE_DATA initData = {};
+    initData.pSysMem = &GetClippingParams();
+    initData.SysMemPitch = 0;
+    initData.SysMemSlicePitch = 0;
+
+    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_clippingBuffer);
+    if (FAILED(hr))
+    {
+        // 에러 처리
+        m_clippingBuffer.Reset();
+    }
+}
+
+void MeshModuleGPU::UpdateClippingBuffer()
+{
+    if (!SupportsClipping())
+        return;
+
+    // DirectX 디바이스가 준비되었는지 확인
+    if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
+        return;
+
+    if (!m_clippingBuffer)
+    {
+        CreateClippingBuffer();
+        if (!m_clippingBuffer) // 생성 실패시 리턴
+            return;
+    }
+
+    auto& deviceContext = DeviceState::g_pDeviceContext;
+
+    // 상수 버퍼 매핑
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    HRESULT hr = deviceContext->Map(m_clippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
+    if (SUCCEEDED(hr))
+    {
+        // 클리핑 파라미터 복사
+        memcpy(mappedResource.pData, &GetClippingParams(), sizeof(ClippingParams));
+
+        // 언맵
+        deviceContext->Unmap(m_clippingBuffer.Get(), 0);
+    }
+}
+
+void MeshModuleGPU::SetClippingAnimation(bool enable, float speed)
+{
+    m_isClippingAnimating = enable;
+    m_clippingAnimationSpeed = speed;
+}
+
+nlohmann::json MeshModuleGPU::SerializeData() const
+{
+    nlohmann::json json;
+
+    // 메시 타입 정보
+    json["mesh"] = {
+        {"type", static_cast<int>(m_meshType)},
+        {"meshIndex", m_meshIndex}
+    };
+
+    // 모델 정보 (모델의 경로나 이름 저장)
+    json["model"] = {
+        {"hasModel", m_model != nullptr}
+    };
+
+    if (m_model)
+    {
+        // 모델 파일 경로나 이름을 저장 (Model 클래스에 GetPath() 같은 메소드가 있다고 가정)
+        // json["model"]["path"] = m_model->GetPath();
+        json["model"]["name"] = m_model->name;
+
+        // 현재는 모델이 할당되어 있다는 정보만 저장
+        json["model"]["assigned"] = true;
+        json["model"]["meshIndex"] = m_meshIndex;
+    }
+
+    // 텍스처 정보
+    json["texture"] = {
+        {"hasTexture", m_assignedTexture != nullptr}
+    };
+
+    if (m_assignedTexture)
+    {
+        json["texture"]["name"] = m_assignedTexture->m_name;
+        json["texture"]["assigned"] = true;
+    }
+
+    // 클리핑 관련 설정 (RenderModules 베이스 클래스에서 상속받은 클리핑 기능)
+    if (SupportsClipping())
+    {
+        json["clipping"] = {
+            {"enabled", IsClippingEnabled()},
+            {"animating", m_isClippingAnimating},
+            {"animationSpeed", m_clippingAnimationSpeed}
+        };
+
+        // 클리핑 파라미터
+        const auto& clippingParams = GetClippingParams();
+        json["clipping"]["params"] = {
+            {"clippingProgress", clippingParams.clippingProgress},
+            {"clippingAxis", {
+                {"x", clippingParams.clippingAxis.x},
+                {"y", clippingParams.clippingAxis.y},
+                {"z", clippingParams.clippingAxis.z}
+            }},
+            {"boundsMin", {
+                {"x", clippingParams.boundsMin.x},
+                {"y", clippingParams.boundsMin.y},
+                {"z", clippingParams.boundsMin.z}
+            }},
+            {"boundsMax", {
+                {"x", clippingParams.boundsMax.x},
+                {"y", clippingParams.boundsMax.y},
+                {"z", clippingParams.boundsMax.z}
+            }},
+            {"clippingEnabled", clippingParams.clippingEnabled}
+        };
+    }
+
+    // 상수 버퍼 데이터
+    json["constantBuffer"] = {
+        {"cameraPosition", {
+            {"x", m_constantBufferData.cameraPosition.x},
+            {"y", m_constantBufferData.cameraPosition.y},
+            {"z", m_constantBufferData.cameraPosition.z}
+        }}
+    };
+
+    // 렌더링 상태
+    json["renderState"] = {
+        {"instanceCount", m_instanceCount}
+    };
+
+    return json;
+}
+
+void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
+{
+    // 메시 타입 정보 복원
+    if (json.contains("mesh"))
+    {
+        const auto& meshJson = json["mesh"];
+
+        if (meshJson.contains("type"))
+        {
+            MeshType type = static_cast<MeshType>(meshJson["type"]);
+            SetMeshType(type);
+        }
+
+        if (meshJson.contains("meshIndex"))
+        {
+            m_meshIndex = meshJson["meshIndex"];
+        }
+    }
+
+    // 모델 정보 복원
+    if (json.contains("model"))
+    {
+        const auto& modelJson = json["model"];
+
+        if (modelJson.contains("name"))
+        {
+            std::string modelName = modelJson["name"];
+            if (modelName.find('.') == std::string::npos)
+            {
+                modelName += ".fbx";
+            }
+            m_model = DataSystems->LoadCashedModel(modelName);
+        }
+
+        if (modelJson.contains("meshIndex"))
+        {
+            m_meshIndex = modelJson["meshIndex"];
+        }
+    }
+
+    // 텍스처 정보 복원
+    if (json.contains("texture"))
+    {
+        const auto& textureJson = json["texture"];
+
+        if (textureJson.contains("name"))
+        {
+            std::string textureName = textureJson["name"];
+            if (textureName.find('.') == std::string::npos)
+            {
+                textureName += ".png";
+            }
+            m_assignedTexture = DataSystems->LoadTexture(textureName);
+        }
+    }
+
+    // 클리핑 관련 설정 복원
+    if (json.contains("clipping"))
+    {
+        const auto& clippingJson = json["clipping"];
+
+        if (clippingJson.contains("enabled"))
+        {
+            bool enabled = clippingJson["enabled"];
+            EnableClipping(enabled);
+        }
+
+        if (clippingJson.contains("animating"))
+        {
+            m_isClippingAnimating = clippingJson["animating"];
+        }
+
+        if (clippingJson.contains("animationSpeed"))
+        {
+            m_clippingAnimationSpeed = clippingJson["animationSpeed"];
+        }
+
+        // 클리핑 파라미터 복원
+        if (clippingJson.contains("params"))
+        {
+            const auto& paramsJson = clippingJson["params"];
+
+            if (paramsJson.contains("clippingProgress"))
+            {
+                float progress = paramsJson["clippingProgress"];
+                SetClippingProgress(progress);
+            }
+
+            if (paramsJson.contains("clippingAxis"))
+            {
+                const auto& axisJson = paramsJson["clippingAxis"];
+                Mathf::Vector3 axis(
+                    axisJson.value("x", 0.0f),
+                    axisJson.value("y", 1.0f),
+                    axisJson.value("z", 0.0f)
+                );
+                SetClippingAxis(axis);
+            }
+
+            if (paramsJson.contains("boundsMin") && paramsJson.contains("boundsMax"))
+            {
+                const auto& minJson = paramsJson["boundsMin"];
+                const auto& maxJson = paramsJson["boundsMax"];
+
+                Mathf::Vector3 boundsMin(
+                    minJson.value("x", -1.0f),
+                    minJson.value("y", -1.0f),
+                    minJson.value("z", -1.0f)
+                );
+
+                Mathf::Vector3 boundsMax(
+                    maxJson.value("x", 1.0f),
+                    maxJson.value("y", 1.0f),
+                    maxJson.value("z", 1.0f)
+                );
+
+                SetClippingBounds(boundsMin, boundsMax);
+            }
+
+            if (paramsJson.contains("clippingEnabled"))
+            {
+                float enabled = paramsJson["clippingEnabled"];
+                EnableClipping(enabled > 0.5f);
+            }
+        }
+    }
+
+    // 상수 버퍼 데이터 복원
+    if (json.contains("constantBuffer"))
+    {
+        const auto& cbJson = json["constantBuffer"];
+
+        if (cbJson.contains("cameraPosition"))
+        {
+            const auto& camPosJson = cbJson["cameraPosition"];
+            Mathf::Vector3 cameraPosition(
+                camPosJson.value("x", 0.0f),
+                camPosJson.value("y", 0.0f),
+                camPosJson.value("z", 0.0f)
+            );
+            SetCameraPosition(cameraPosition);
+        }
+    }
+
+    // 렌더링 상태 복원
+    if (json.contains("renderState"))
+    {
+        const auto& renderJson = json["renderState"];
+
+        if (renderJson.contains("instanceCount"))
+        {
+            m_instanceCount = renderJson["instanceCount"];
+        }
+    }
+
+    // 클리핑 버퍼 업데이트 (클리핑 설정이 변경된 경우)
+    if (IsClippingEnabled())
+    {
+        // DirectX가 준비된 상태에서만 버퍼 업데이트
+        if (DeviceState::g_pDevice && DeviceState::g_pDeviceContext)
+        {
+            UpdateClippingBuffer();
+        }
+    }
+}
+
+std::string MeshModuleGPU::GetModuleType() const
+{
+    return "MeshModuleGPU";
+}
+
 void MeshModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
 {
     m_particleSRV = particleSRV;
@@ -215,11 +560,27 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;
 
+    // 클리핑 애니메이션 처리 (매 프레임 실행)
+    if (m_isClippingAnimating && IsClippingEnabled())
+    {
+        // ImGui의 시간 함수 사용 (UI와 동일한 시간 기준)
+        float currentTime = ImGui::GetTime();
+        float animatedProgress = (sin(currentTime * m_clippingAnimationSpeed) + 1.0f) * 0.5f;
+        SetClippingProgress(animatedProgress);
+        UpdateClippingBuffer();
+    }
+
     auto& deviceContext = DeviceState::g_pDeviceContext;
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
+
+    // 클리핑 상수 버퍼 바인딩 (1번)
+    if (IsClippingEnabled() && m_clippingBuffer)
+    {
+        deviceContext->PSSetConstantBuffers(1, 1, m_clippingBuffer.GetAddressOf());
+    }
 
     // 파티클 SRV 바인딩
     deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
@@ -259,8 +620,13 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
     deviceContext->VSSetShaderResources(0, 1, nullSRV);
     deviceContext->PSSetShaderResources(0, 1, nullSRV);
-}
 
+    if (IsClippingEnabled())
+    {
+        ID3D11Buffer* nullBuffer[1] = { nullptr };
+        deviceContext->PSSetConstantBuffers(1, 1, nullBuffer);
+    }
+}
 void MeshModuleGPU::SetTexture(Texture* texture)
 {
     m_assignedTexture = texture;
@@ -276,6 +642,7 @@ void MeshModuleGPU::Release()
     }
 
     m_constantBuffer.Reset();
+    m_clippingBuffer.Reset();
     m_model = nullptr;
     m_meshIndex = 0;
     m_particleSRV = nullptr;

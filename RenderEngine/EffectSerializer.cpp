@@ -5,7 +5,6 @@ nlohmann::json EffectSerializer::SerializeEffect(const EffectBase& effect)
 {
     nlohmann::json json;
 
-    // 기본 Effect 정보
     json["name"] = effect.GetName();
     json["position"] = SerializeVector3(effect.GetPosition());
     json["isPlaying"] = effect.IsPlaying();
@@ -15,7 +14,6 @@ nlohmann::json EffectSerializer::SerializeEffect(const EffectBase& effect)
     json["loop"] = effect.IsLooping();
     json["currentTime"] = effect.GetCurrentTime();
 
-    // ParticleSystem들 직렬화
     json["particleSystems"] = nlohmann::json::array();
     for (const auto& ps : effect.GetAllParticleSystems())
     {
@@ -32,7 +30,6 @@ std::unique_ptr<EffectBase> EffectSerializer::DeserializeEffect(const nlohmann::
 {
     auto effect = std::make_unique<EffectBase>();
 
-    // 기본 정보 복원
     if (json.contains("name"))
         effect->SetName(json["name"]);
 
@@ -48,7 +45,6 @@ std::unique_ptr<EffectBase> EffectSerializer::DeserializeEffect(const nlohmann::
     if (json.contains("loop"))
         effect->SetLoop(json["loop"]);
 
-    // ParticleSystem들 복원
     if (json.contains("particleSystems"))
     {
         for (const auto& psJson : json["particleSystems"])
@@ -68,22 +64,18 @@ nlohmann::json EffectSerializer::SerializeParticleSystem(ParticleSystem& system)
 {
     nlohmann::json json;
 
-    // ParticleSystem 기본 정보
     json["maxParticles"] = system.GetMaxParticles();
     json["particleDataType"] = static_cast<int>(system.GetParticleDataType());
     json["position"] = SerializeVector3(system.GetPosition());
     json["isRunning"] = system.IsRunning();
 
-    // 모듈들 직렬화 (Iterator 사용)
     json["modules"] = nlohmann::json::array();
 
-    // Iterator를 사용해서 LinkedList 순회
     for (auto it = system.GetModuleList().begin(); it != system.GetModuleList().end(); ++it)
     {
         json["modules"].push_back(SerializeModule(*it));
     }
 
-    // 렌더 모듈들 직렬화 (별도 처리)
     json["renderModules"] = nlohmann::json::array();
     for (const auto& renderModule : system.GetRenderModules())
     {
@@ -98,20 +90,17 @@ nlohmann::json EffectSerializer::SerializeParticleSystem(ParticleSystem& system)
 
 std::shared_ptr<ParticleSystem> EffectSerializer::DeserializeParticleSystem(const nlohmann::json& json)
 {
-    // 기본 정보 읽기
-    int maxParticles = json.value("maxParticles", 1000);
-    ParticleDataType dataType = static_cast<ParticleDataType>(json.value("particleDataType", 0));
+    // JSON에서 실제 저장된 값을 읽어오기
+    int maxParticles = json["maxParticles"];
+    ParticleDataType dataType = static_cast<ParticleDataType>(json["particleDataType"]);
 
-    // ParticleSystem 생성
     auto system = std::make_shared<ParticleSystem>(maxParticles, dataType);
 
-    // 위치 설정
     if (json.contains("position"))
     {
         system->SetPosition(DeserializeVector3(json["position"]));
     }
 
-    // 모듈들 복원
     if (json.contains("modules"))
     {
         for (const auto& moduleJson : json["modules"])
@@ -124,7 +113,6 @@ std::shared_ptr<ParticleSystem> EffectSerializer::DeserializeParticleSystem(cons
         }
     }
 
-    // 렌더 모듈들 복원
     if (json.contains("renderModules"))
     {
         for (const auto& renderModuleJson : json["renderModules"])
@@ -148,7 +136,6 @@ bool EffectSerializer::SaveEffectsToFile(const std::string& filePath,
         nlohmann::json json;
         json["effects"] = nlohmann::json::object();
 
-        // 모든 이펙트 직렬화
         for (const auto& [name, effect] : effects)
         {
             if (effect)
@@ -157,7 +144,6 @@ bool EffectSerializer::SaveEffectsToFile(const std::string& filePath,
             }
         }
 
-        // 파일에 저장
         std::ofstream file(filePath);
         if (!file.is_open())
         {
@@ -194,10 +180,8 @@ bool EffectSerializer::LoadEffectsFromFile(const std::string& filePath,
         file >> json;
         file.close();
 
-        // 기존 이펙트들 클리어
         effects.clear();
 
-        // 이펙트들 복원
         if (json.contains("effects"))
         {
             for (const auto& [name, effectJson] : json["effects"].items())
@@ -224,20 +208,17 @@ nlohmann::json EffectSerializer::SerializeModule(const ParticleModule& module)
 {
     nlohmann::json json;
 
-    // ISerializable 인터페이스를 통한 직렬화
     const ISerializable* serializable = dynamic_cast<const ISerializable*>(&module);
     if (serializable)
     {
         json["type"] = serializable->GetModuleType();
         json["data"] = serializable->SerializeData();
 
-        // ParticleModule의 공통 데이터도 저장
         json["stage"] = static_cast<int>(module.GetStage());
         json["useEasing"] = module.IsEasingEnabled();
     }
     else
     {
-        // ISerializable을 구현하지 않은 모듈
         json["type"] = "unknown";
         json["data"] = nlohmann::json::object();
     }
@@ -256,16 +237,14 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
     std::string moduleType = json["type"];
     std::unique_ptr<ParticleModule> module;
 
-    // 각 모듈 타입별로 직접 생성 (ParticleModule만)
     if (moduleType == "SpawnModuleCS")
     {
         module = std::make_unique<SpawnModuleCS>();
     }
-    // 다른 ParticleModule 계열 모듈들 추가
-    // else if (moduleType == "UpdateModuleCS")
-    // {
-    //     module = std::make_unique<UpdateModuleCS>();
-    // }
+    else if (moduleType == "MeshSpawnModuleCS")
+    {
+        module = std::make_unique<MeshSpawnModuleCS>();
+    }
     else
     {
         std::cerr << "Unknown module type: " << moduleType << std::endl;
@@ -274,7 +253,6 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
 
     if (module)
     {
-        // ParticleModule 공통 데이터 복원
         if (json.contains("stage"))
         {
             module->SetStage(static_cast<ModuleStage>(json["stage"]));
@@ -285,7 +263,6 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
             module->EnableEasing(json["useEasing"]);
         }
 
-        // ISerializable 인터페이스를 통한 역직렬화
         ISerializable* serializable = dynamic_cast<ISerializable*>(module.get());
         if (serializable && json.contains("data"))
         {
@@ -300,7 +277,6 @@ nlohmann::json EffectSerializer::SerializeRenderModule(const RenderModules& rend
 {
     nlohmann::json json;
 
-    // ISerializable 인터페이스를 통한 직렬화
     const ISerializable* serializable = dynamic_cast<const ISerializable*>(&renderModule);
     if (serializable)
     {
@@ -309,7 +285,6 @@ nlohmann::json EffectSerializer::SerializeRenderModule(const RenderModules& rend
     }
     else
     {
-        // ISerializable을 구현하지 않은 렌더 모듈
         json["type"] = "unknown";
         json["data"] = nlohmann::json::object();
     }
@@ -328,7 +303,6 @@ std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const n
     std::string moduleType = json["type"];
     std::unique_ptr<RenderModules> renderModule;
 
-    // 렌더 모듈 타입별 생성
     if (moduleType == "BillboardModuleGPU")
     {
         renderModule = std::make_unique<BillboardModuleGPU>();
@@ -337,7 +311,6 @@ std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const n
     {
         renderModule = std::make_unique<MeshModuleGPU>();
     }
-    // 다른 렌더 모듈들도 여기에 추가
     else
     {
         std::cerr << "Unknown render module type: " << moduleType << std::endl;
@@ -346,7 +319,6 @@ std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const n
 
     if (renderModule)
     {
-        // ISerializable 인터페이스를 통한 역직렬화
         ISerializable* serializable = dynamic_cast<ISerializable*>(renderModule.get());
         if (serializable && json.contains("data"))
         {
@@ -357,8 +329,6 @@ std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const n
     return renderModule;
 }
 
-
-// 수학 타입 헬퍼 함수들
 nlohmann::json EffectSerializer::SerializeVector3(const Mathf::Vector3& vec)
 {
     return nlohmann::json{

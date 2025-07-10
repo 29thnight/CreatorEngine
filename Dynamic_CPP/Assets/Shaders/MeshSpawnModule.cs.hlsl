@@ -23,7 +23,7 @@ struct MeshParticleData
     float age; // 4 bytes
     float lifeTime; // 4 bytes
     uint isActive; // 4 bytes
-    float pad7; // 4 bytes -> 112 bytes total
+    uint renderMode; // 4 bytes -> 112 bytes total
     
     float4 color; // 16 bytes -> 128 bytes total
     
@@ -47,37 +47,38 @@ cbuffer SpawnParameters : register(b0)
 }
 
 // 3D 메시 파티클 템플릿
-cbuffer MeshParticleTemplate : register(b1)
+cbuffer MeshParticleTemplateParams : register(b1)
 {
-    float gLifeTime; // 파티클 수명
-    float3 pad1;
-    
-    float3 gMinScale; // 최소 스케일
+    float gLifeTime;
+    float3 gMinScale;
+
+    float3 gMaxScale;
+    float pad1;
+
+    float3 gMinRotationSpeed;
     float pad2;
-    float3 gMaxScale; // 최대 스케일
+
+    float3 gMaxRotationSpeed;
     float pad3;
-    
-    float3 gMinRotationSpeed; // 최소 회전 속도
+
+    float3 gMinInitialRotation;
     float pad4;
-    float3 gMaxRotationSpeed; // 최대 회전 속도
+
+    float3 gMaxInitialRotation;
     float pad5;
-    
-    float3 gMinInitialRotation; // 최소 초기 회전
-    float pad6;
-    float3 gMaxInitialRotation; // 최대 초기 회전
-    float pad7;
-    
-    float4 gColor; // 파티클 색상
-    
-    float3 gVelocity; // 기본 속도
+
+    float4 gColor;
+
+    float3 gVelocity;
     float gMinVerticalVelocity;
-    
-    float3 gAcceleration; // 가속도
+
+    float3 gAcceleration;
     float gMaxVerticalVelocity;
-    
-    float gHorizontalVelocityRange; // 수평 속도 범위
-    uint gTextureIndex; // 텍스처 인덱스
-    float2 pad8;
+
+    float gHorizontalVelocityRange;
+    int gTextureIndex;
+    int gRenderMode;
+    float pad6;
 }
 
 // 버퍼 바인딩
@@ -226,6 +227,7 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.lifeTime = gLifeTime;
     particle.color = gColor;
     particle.textureIndex = 0; // 기본값으로 0 설정
+    particle.renderMode = gRenderMode;
     particle.isActive = 1;
 }
 

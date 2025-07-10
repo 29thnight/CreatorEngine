@@ -1,4 +1,14 @@
-// MeshParticlePS.hlsl - 3D 메시 파티클 픽셀 셰이더
+// MeshParticleClippingPS.hlsl - 클리핑 기능이 있는 3D 메시 파티클 픽셀 셰이더
+
+cbuffer ClippingParams : register(b1)
+{
+    float clippingProgress;
+    float3 clippingAxis;
+    float3 boundsMin;
+    float pad1;
+    float3 boundsMax;
+    float clippingEnabled;
+};
 
 struct PixelInput
 {
@@ -25,11 +35,39 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
+    float3 normalizedPos = (input.worldPos - boundsMin) / (boundsMax - boundsMin);
+    float3 absAxis = abs(clippingAxis);
+    float axisProgress = dot(normalizedPos, absAxis);
+
+    // 원래 축이 음수였는지 확인
+    bool axisIsNegative = any(clippingAxis < 0.0);
+    if (axisIsNegative)
+    {
+        axisProgress = 1.0 - axisProgress; // 진행 방향 뒤집기
+    }
+
+    float threshold = clippingProgress >= 0.0 ? clippingProgress : (1.0 + clippingProgress);
+    bool reverseDirection = clippingProgress < 0.0;
+
+    if (reverseDirection)
+    {
+        clip(threshold - axisProgress);
+    }
+    else
+    {
+        clip(axisProgress - threshold);
+    }
+    
+    float3 normal = normalize(input.normal);
+    float3 viewDir = normalize(input.viewDir);
+    
     float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);
     
+    // 텍스처의 알파값이 임계값 이하면 픽셀 버리기
     if (diffuseColor.a < 0.1)
         discard;
     
+    // 파티클 알파값도 체크
     if (input.alpha <= 0.01)
         discard;
     

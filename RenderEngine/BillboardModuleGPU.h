@@ -21,10 +21,6 @@ public:
     BillBoardType GetBillboardType() const { return m_BillBoardType; }
     PipelineStateObject* GetPSO() { return m_pso.get(); }
 
-
-
-
-
     void BindResource() override;
 
     void SetBillboardType(BillBoardType type) { m_BillBoardType = type; }
@@ -32,18 +28,14 @@ public:
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
 
-
     virtual void DeserializeData(const nlohmann::json& json) override;
-    
 
     virtual std::string GetModuleType() const override;
-    
 
     // 추가 Getter 메소드들 (JSON 직렬화용)
     UINT GetMaxCount() const { return m_maxCount; }
     const std::vector<BillboardVertex>& GetVertices() const { return m_vertices; }
     const std::vector<uint32>& GetIndices() const { return m_indices; }
-    Texture* GetAssignedTexture() const { return m_assignedTexture; }
 
     // 복원 후 리소스 재생성을 위한 메소드
     void RecreateResources()
@@ -52,7 +44,6 @@ public:
         CreateBillboard();
         // 필요하다면 Initialize() 호출
     }
-
 
 private:
     BillBoardType m_BillBoardType;
@@ -78,7 +69,5 @@ private:
 
     std::vector<BillboardVertex> m_vertices;
     std::vector<uint32> m_indices;
-
-    Texture* m_assignedTexture;
 };
 

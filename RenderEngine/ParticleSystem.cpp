@@ -145,6 +145,7 @@ void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 		if (meshSpawnModule)
 		{
 			meshSpawnModule->SetEmitterPosition(position);
+			continue;
 		}
 	}
 }
@@ -168,6 +169,7 @@ void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 		for (UINT i = 0; i < numParticles; ++i)
 		{
 			meshInitialData[i].isActive = 0;
+			meshInitialData[i].renderMode = 0;
 			meshInitialData[i].age = 0.0f;
 			meshInitialData[i].lifeTime = 0.0f;
 			meshInitialData[i].position = XMFLOAT3(0.0f, 0.0f, 0.0f);

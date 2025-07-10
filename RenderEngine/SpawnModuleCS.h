@@ -93,13 +93,11 @@ public:
     EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
     ParticleTemplateParams GetTemplate() const { return m_particleTemplate; }
 
+    // 직렬화
+public:
     // ISerializable 인터페이스 구현
     virtual nlohmann::json SerializeData() const override;
-    
-
     virtual void DeserializeData(const nlohmann::json& json) override;
-    
-
     virtual std::string GetModuleType() const override;
     
 private:
