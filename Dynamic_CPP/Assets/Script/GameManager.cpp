@@ -14,14 +14,14 @@ void GameManager::Awake()
 }
 
 inline static void Loaderererer() {
-	std::cout << "Loaderererer" << std::endl;
+	std::cout << "Loader" << std::endl;
 }
 void GameManager::Start()
 {
 	std::cout << "GameManager Start" << std::endl;
 	playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
-	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { });
-	playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
+	playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Inputblabla(); });
+	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
 	playerMap->AddButtonAction("LODADADW", 0, InputType::KeyBoard, KeyBoard::M, KeyState::Down, [this]() { std::cout << "adsqawdadad" << std::endl;});
 	//playerMap->AddValueAction("LoadScene", 0, InputValueType::Float, InputType::KeyBoard, { 'N', 'M' }, [this](float value) {Inputblabla(value);});
 }
@@ -50,8 +50,7 @@ void GameManager::OnDisable()
 
 void GameManager::LoadScene(const std::string& sceneName)
 {
-	file::path fileName = PathFinder::Relative("Scenes\\SponzaTest.creator").wstring();
-	SceneManagers->LoadScene(fileName.string());
+	
 }
 
 void GameManager::PushEntity(Entity* entity)

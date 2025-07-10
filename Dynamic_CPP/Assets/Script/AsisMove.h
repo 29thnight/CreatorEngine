@@ -26,14 +26,21 @@ private:
 	GameObject* m_playerObject{ nullptr };
 	Mathf::Vector3 nextMovePoint{ 0.f, 0.f, 0.f };
 
-	Mathf::Vector3 points[3] = {
-		{ 0.f, 0.f, 0.f },
-		{ 0.f, 0.f, 0.f },
-		{ 0.f, 0.f, 0.f }
-	};
+	std::vector<Mathf::Vector3> points;
 
+	int currentPointIndex = 0;
+
+private:
 	[[Property]]
 	float moveSpeed = 10.f;
 	[[Property]]
-	int currentPointIndex = 0;
+	float pathRadius = 3.f;
+	[[Property]]
+	float predictNextTime = 5.0f; // 예측 시간
+	[[Property]]
+	float rotateSpeed = 5.f;
+
+#ifdef _DEBUG
+	GameObject* DebugPoint{ nullptr };
+#endif // _DEBUG
 };

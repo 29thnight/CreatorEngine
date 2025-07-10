@@ -7,6 +7,7 @@
 #include "EntityAsis.h"
 
 #include "GameManager.h"
+#include "BoxColliderComponent.h"
 
 using namespace Mathf;
 void EntityItem::Start()
@@ -31,13 +32,26 @@ void EntityItem::Start()
 		}
 	}
 
+	//GetComponent<BoxColliderComponent>().SetExtents({ 10.f, 10.f, 10.f });
+
 
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 }
 
+void EntityItem::OnTriggerEnter(const Collision& collision)
+{
+	//std::cout << "OnTriggerEnter Item" << std::endl;
+}
+
+void EntityItem::OnTriggerExit(const Collision& collision)
+{
+	//std::cout << "OnCollisionEnter Item" << std::endl;
+}
+
 void EntityItem::Update(float tick)
 {
+	return;
 	if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
 		if (tailTransform)

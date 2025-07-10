@@ -547,7 +547,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION); //&&&&&trigger
+				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); //&&&&&trigger
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -560,7 +560,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(boxInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(boxInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -612,7 +612,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(sphereInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(sphereInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -625,7 +625,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(sphereInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(sphereInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -677,7 +677,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(capsuleInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(capsuleInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -690,7 +690,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(capsuleInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(capsuleInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -742,7 +742,7 @@ void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(convexMeshInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(convexMeshInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -755,7 +755,7 @@ void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(convexMeshInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(convexMeshInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{

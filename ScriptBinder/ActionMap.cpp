@@ -33,6 +33,7 @@ void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType
 	inputAction->key.resize(1);
 	inputAction->key[0] = _key;
 	inputAction->keystate = _state;
+	inputAction->buttonAction = nullptr;
 	inputAction->buttonAction = _action;
 	if(isNew)
 	m_actions.push_back(inputAction);

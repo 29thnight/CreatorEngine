@@ -9,7 +9,6 @@
 class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {  
 public:  
-
    ReflectBoxColliderComponent
 	[[Serializable(Inheritance:Component)]]
     BoxColliderComponent() 

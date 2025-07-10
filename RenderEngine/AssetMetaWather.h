@@ -298,7 +298,15 @@ public:
             root["guid"] = GUIDCreator::MakeFileGUID(targetFile.filename().string()).ToString();
 
         root["importSettings"]["extension"] = targetFile.extension().string();
-        root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();
+        try
+        {
+            root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Error getting last write time: " << e.what() << std::endl;
+            root["importSettings"]["timestamp"] = 0; // Fallback to 0 if error occurs
+		}
 
         if (targetFile.extension() == ".cpp")
         {
