@@ -266,7 +266,10 @@ namespace BT
 			: BTNode(name) {
 		}
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override abstract;
+		void SetAction(ActionFunc action) { m_action = action; }
 		NodeType GetNodeType() const override final { return NodeType::Action; }
+	private:
+		ActionFunc m_action; // Action function to be executed
 	};
 
 	inline void DFS(const BTNode::NodePtr& node, std::function<void(const BTNode::NodePtr)> visit)

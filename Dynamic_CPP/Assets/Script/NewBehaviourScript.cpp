@@ -147,7 +147,6 @@ void NewBehaviourScript::Update(float tick)
 
 bool NewBehaviourScript::DetectCondition(const BlackBoard& bb)
 {
-	
 	//auto transform = m_pOwner->GetComponent<Transform>();
 	float p1Distance =  bb.Get<float>("Player1Distance");
 	float p2Distance = bb.Get<float>("Player2Distance");
