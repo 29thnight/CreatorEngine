@@ -40,10 +40,26 @@ void Swrod::OnTriggerStay(const Collision& collision)
 	std::cout << "gum trigger stay!!!" << std::endl;
 }
 
+void Swrod::OnTriggerExit(const Collision& collision)
+{
+	std::cout << "gum trigger exit!!!" << std::endl;
+}
+
 void Swrod::OnCollisionEnter(const Collision& collision)
 {
 	std::cout << "gum OnCollisionEnter !!!" << std::endl;
 }
+
+void Swrod::OnCollisionStay(const Collision& collision)
+{
+	std::cout << "gum OnCollisionStay !!!" << std::endl;
+}
+
+void Swrod::OnCollisionExit(const Collision& collision)
+{
+	std::cout << "gum OnCollisionExit !!!" << std::endl;
+}
+
 
 void Swrod::Update(float tick)
 {

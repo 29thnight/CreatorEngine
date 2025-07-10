@@ -42,7 +42,7 @@ void PhysicsEventCallback::onContact(const PxContactPairHeader& pairHeader, cons
 
 void PhysicsEventCallback::onTrigger(PxTriggerPair* pairs, PxU32 count)
 {
-	std::cout << "onTrigger" << std::endl;
+	//std::cout << "onTrigger" << std::endl;
 	for (PxU32 i = 0; i < count; i++)
 	{
 		//Start OverLap 
