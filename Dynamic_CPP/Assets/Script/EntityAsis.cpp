@@ -8,6 +8,8 @@
 #include "InputActionManager.h"
 #include "RigidBodyComponent.h"
 
+#include "Player.h"
+
 #include "GameManager.h"
 using namespace Mathf;
 void EntityAsis::Start()
@@ -66,8 +68,8 @@ void EntityAsis::Update(float tick)
 	auto& tr = GetComponent<Transform>();
 	Mathf::Vector3 pos = tr.GetWorldPosition();
 	dir.Normalize();
-	pos += Vector3(dir.x, 0.f, dir.y) * tick * 5.f;
-	tr.SetPosition(pos);
+	//pos += Vector3(dir.x, 0.f, dir.y) * tick * 5.f;
+	//tr.SetPosition(pos);
 
 
 	timer += tick;
@@ -124,6 +126,17 @@ void EntityAsis::Purification(float tick)
 		if (m_currentTailPurificationDuration >= tailPurificationDuration) {
 			// 정화 시간 완료 시
 			auto item = GetPurificationItemInEntityItemQueue();
+
+			auto weapon = GameObject::Find("Sword");
+			if (weapon)
+			{
+				auto player = GameObject::Find("Punch");
+				if (player)
+				{
+					auto playerScr = player->GetComponent<Player>();
+					playerScr->AddWeapon(weapon);
+				}
+			}
 			//item->GetOwner()->GetComponent<RigidBodyComponent>().
 		}
 	}

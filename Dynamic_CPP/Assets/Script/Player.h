@@ -35,7 +35,10 @@ public:
 	void Attack();
 	void SwapWeaponLeft();
 	void SwapWeaponRight();
-
+	void AddWeapon(GameObject* weapon);
+	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
+	void DeleteWeapon(int index);
+	void DeleteWeapon(GameObject* weapon);
 	int m_weaponIndex = 0;
 	void Punch();
 
@@ -48,7 +51,7 @@ public:
 	void FindNearObject(GameObject* gameObject);
 	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;
-	GameObject* m_curWeapon;
+	GameObject* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
 	GameObject* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;

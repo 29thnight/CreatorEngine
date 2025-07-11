@@ -843,6 +843,33 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
+		PxU32 shapeCount = pxBody->getNbShapes();
+		std::vector<physx::PxShape*> shapes(shapeCount);
+		pxBody->getShapes(shapes.data(), shapeCount);
+		for (PxShape* shape : shapes)
+		{
+			if (rigidBodyData.isColliderEnabled == false)
+			{
+				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+			}
+			else 
+			{
+				
+			/*	if () //&&&&&키는거 만드는중
+				{
+
+				}
+				else
+				{
+
+				}*/
+
+
+
+			}
+
+		}
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
 		DirectX::SimpleMath::Quaternion rotation;

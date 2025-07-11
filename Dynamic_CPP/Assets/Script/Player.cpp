@@ -26,7 +26,8 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	righthand->m_offset = Mathf::Matrix::CreateTranslation(20.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
+	righthand->DetachAllObject();
+	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
 	
 	
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
@@ -96,6 +97,8 @@ void Player::Catch()
 		rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
+		if (m_curWeapon)
+			m_curWeapon->SetEnabled(false);
 	}
 }
 
@@ -116,14 +119,12 @@ void Player::Throw()
 	auto& transform = GetOwner()->m_transform;
 	auto q = transform.GetWorldMatrix();
 	auto rotationOnly = q;
-	rotationOnly.r[3] = XMVectorSet(0, 0, 0, 1); // 위치 성분 제거
-	rotationOnly.r[0] = XMVector3Normalize(rotationOnly.r[0]); // X축 정규화 (스케일 제거)
-	rotationOnly.r[1] = XMVector3Normalize(rotationOnly.r[1]); // Y축 정규화
-	rotationOnly.r[2] = XMVector3Normalize(rotationOnly.r[2]); // Z축 정규화
+	rotationOnly.r[3] = XMVectorSet(0, 0, 0, 1); 
+	rotationOnly.r[0] = XMVector3Normalize(rotationOnly.r[0]); 
+	rotationOnly.r[1] = XMVector3Normalize(rotationOnly.r[1]); 
+	rotationOnly.r[2] = XMVector3Normalize(rotationOnly.r[2]); 
 
 	auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, rotationOnly);
-	//Mathf::Vector3 forward = Mathf::Vector3::Transform(Mathf::Vector3::UnitZ, q);
-	//auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, q);
 	forward.Normalize();
 	forward = -forward;
 	DirectX::SimpleMath::Vector3 upward(0, 1, 0);
@@ -132,12 +133,11 @@ void Player::Throw()
 	throwDir.Normalize();
 	float impulseStrength = 1.0f;
 	DirectX::SimpleMath::Vector3 finalImpulse = throwDir * impulseStrength;
-	// 4. 힘 적용
-	//rigidbody->SetImpulseForce(finalImpulse);
 	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
-	std::cout << "awdwadadwad" << std::endl;
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
+	if(m_curWeapon)
+		m_curWeapon->SetEnabled(true);
 }
 
 void Player::Attack()
@@ -149,27 +149,40 @@ void Player::Attack()
 
 void Player::SwapWeaponLeft()
 {
-	m_weaponIndex--;
+	//m_weaponIndex--;
 	//std::cout << "left weapon equipped" << std::endl;
-	if (m_curWeapon != nullptr)
+	/*if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
-	}
+	}*/
 }
 
 void Player::SwapWeaponRight()
 {
-	m_weaponIndex++;
-	//std::cout << "right weapon equipped" << std::endl;
-	if (m_curWeapon != nullptr)
-	{
-		m_curWeapon->SetEnabled(false);
-		m_curWeapon = m_weaponInventory[m_weaponIndex];
-		m_curWeapon->SetEnabled(true);
-	}
+	//m_weaponIndex++;
+	////std::cout << "right weapon equipped" << std::endl;
+	//if (m_curWeapon != nullptr)
+	//{
+	//	m_curWeapon->SetEnabled(false);
+	//	m_curWeapon = m_weaponInventory[m_weaponIndex];
+	//	m_curWeapon->SetEnabled(true);
+	//}
 }
+
+void Player::AddWeapon(GameObject* weapon)
+{
+	if (m_weaponInventory.size() >= 4) return;
+
+	m_weaponInventory.push_back(weapon);
+	m_curWeapon = weapon;
+	auto animator = player->GetComponent<Animator>();
+	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	righthand->AttachObject(m_curWeapon);
+	
+}
+
 
 void Player::Punch()
 {
@@ -212,7 +225,7 @@ void Player::OnTriggerEnter(const Collision& collision)
 }
 void Player::OnTriggerStay(const Collision& collision)
 {
-	std::cout << "player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	//std::cout << "player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str() << std::endl;
 	if (collision.otherObj->m_tag == "Respawn")
 	{
 		
@@ -242,7 +255,7 @@ void Player::OnCollisionEnter(const Collision& collision)
 
 void Player::OnCollisionStay(const Collision& collision)
 {
-	std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
+	//std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
 	if (collision.otherObj->m_tag == "Respawn")
 	{
 

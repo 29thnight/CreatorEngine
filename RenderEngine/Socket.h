@@ -25,6 +25,7 @@ public:
     std::vector<GameObject*> AttachObjects;
     void AttachObject(GameObject* Object);
     void DetachObject(GameObject* Object);
+    void DetachAllObject();
     void Update();
 };
 

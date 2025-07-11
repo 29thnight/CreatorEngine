@@ -486,9 +486,10 @@ void PhysicsManager::SetPhysicData()
 		}
 
 		auto& transform = colliderInfo.gameObject->m_transform;
+		//colliderInfo.collider.
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
-
+		bool _isColliderEnabled = colliderInfo.collider->isEnabled;
 		//todo : CCT,Controller,ragdoll,capsule,Â÷ÈÄ deformeSuface
 		if (colliderInfo.id == m_controllerTypeId)
 		{
@@ -549,8 +550,8 @@ void PhysicsManager::SetPhysicData()
 			data.LinearDamping = rigidbody->LinearDamping;
 			data.mass = rigidbody->m_mass;
 
-
-
+			
+			data.isColliderEnabled = _isColliderEnabled;
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{

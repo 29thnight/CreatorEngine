@@ -43,6 +43,19 @@ void Socket::DetachObject(GameObject* Object)
 	}
 }
 
+void Socket::DetachAllObject()
+{
+	for (auto& obj : AttachObjects)
+	{
+		if (obj)
+			obj->m_attachedSoketID = -1;
+	}
+
+	AttachObjects.clear();
+	AttachObejctIndex.clear();
+}
+
+
 void Socket::Update()
 {
 	

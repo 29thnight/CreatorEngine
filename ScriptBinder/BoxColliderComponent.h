@@ -67,8 +67,6 @@ public:
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
    }  
-
-
    EColliderType GetColliderType() const  
    {  
 	   return m_type;
@@ -148,7 +146,6 @@ public:
     void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
 
     DirectX::SimpleMath::Quaternion GetRotationOffset() override;
-
     /*void SetIsTrigger(bool isTrigger) override;
     bool GetIsTrigger() override;*/
     BoxColliderInfo m_Info;

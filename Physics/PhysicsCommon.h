@@ -98,6 +98,7 @@ struct RigidBodyGetSetData
 	float maxContactImpulse = 1e+32;
 	float maxDepenetrationVelocity = 1e+32;
 
+	bool isColliderEnabled = true;
 	DirectX::SimpleMath::Vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
 };
@@ -181,6 +182,7 @@ struct ColliderInfo
 	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
 	float restitution = 1.0f;	//탄성 계수
 	float density = 1.0f;	//밀도
+
 };
 
 //구형 콜라이더 정보
