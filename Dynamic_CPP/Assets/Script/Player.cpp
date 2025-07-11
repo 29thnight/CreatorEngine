@@ -112,9 +112,9 @@ void Player::Throw()
 	righthand->DetachObject(catchedObject);
 	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
 	rigidbody->SetBodyType(EBodyType::DYNAMIC);
-	rigidbody->SetLockAngularX(false);
-	rigidbody->SetLockAngularY(false);
-	rigidbody->SetLockAngularZ(false);
+	//rigidbody->SetLockAngularX(false);
+	//rigidbody->SetLockAngularY(false);
+	//rigidbody->SetLockAngularZ(false);
 	rigidbody->SetLockLinearX(false);
 	rigidbody->SetLockLinearY(false);
 	rigidbody->SetLockLinearZ(false);
@@ -181,6 +181,7 @@ void Player::AddWeapon(GameObject* weapon)
 
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
+	m_curWeapon->SetEnabled(true);
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->AttachObject(m_curWeapon);
@@ -196,7 +197,8 @@ void Player::DeleteCurWeapon()
 
 	if (it != m_weaponInventory.end())
 	{
-		m_weaponInventory.erase(it); 
+		m_weaponInventory.erase(it);
+		m_curWeapon->SetEnabled(false);
 		m_curWeapon = nullptr;    
 	}
 }

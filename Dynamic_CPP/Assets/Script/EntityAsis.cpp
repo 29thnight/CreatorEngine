@@ -44,7 +44,6 @@ void EntityAsis::Start()
 
 	m_EntityItemQueue.resize(maxTailCapacity);
 
-	m_fakeItemQueue.resize(maxTailCapacity);
 	auto fakeObjects = GameObject::Find("fake");
 	if (fakeObjects) {
 		for (auto& index : fakeObjects->m_childrenIndices) {
