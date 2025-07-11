@@ -19,7 +19,7 @@ void EntityAsis::Start()
 
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W'}, [this](Mathf::Vector2 _vector2) {Inputblabla(_vector2);});
 
-	auto gameManager = GameObject::Find("GameManager");	
+	auto gameManager = GameObject::Find("GameManager");
 	if (gameManager)
 	{
 		auto gm = gameManager->GetComponent<GameManager>();
@@ -161,7 +161,7 @@ void EntityAsis::Purification(float tick)
 
 EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 {
-	if (m_currentEntityItemCount <= 0) 
+	if (m_currentEntityItemCount <= 0)
 		return nullptr;
 
 	m_currentEntityItemCount--;
