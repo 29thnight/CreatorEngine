@@ -51,9 +51,6 @@
 		<ClInclude Include="Assets\Script\Entity.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\Temp.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityAsis.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -99,9 +96,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\AsisMove.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Temp.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityAsis.cpp">

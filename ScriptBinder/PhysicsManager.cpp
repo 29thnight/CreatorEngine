@@ -537,11 +537,16 @@ void PhysicsManager::SetPhysicData()
 			data.isLockAngularY = rigidbody->IsLockAngularY();
 			data.isLockAngularZ = rigidbody->IsLockAngularZ();
 
-			data.shouldApplyImpulse = rigidbody->shouldApplyImpulse;
-			data.impulse = rigidbody->impulse;
+			data.forceMode = static_cast<int>(rigidbody->forceMode);
+			rigidbody->forceMode = EForceMode::NONE;
+			data.velocity = rigidbody->velocity;
 			data.AngularDamping = rigidbody->AngularDamping;
 			data.LinearDamping = rigidbody->LinearDamping;
 			data.mass = rigidbody->m_mass;
+
+
+
+
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
 				data.transform._41 = 0.0f;

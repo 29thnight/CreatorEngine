@@ -803,11 +803,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 
 		}
 
-		if (rigidBodyData.shouldApplyImpulse) {
-			PxVec3 impulse;
-			CopyVectorDxToPx(rigidBodyData.impulse, impulse);
-			pxBody->addForce(impulse, PxForceMode::eIMPULSE);
-			rigidBodyData.shouldApplyImpulse = false;
+		if (rigidBodyData.forceMode != 4) {
+			PxVec3 velocity;
+			CopyVectorDxToPx(rigidBodyData.velocity, velocity);
+			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
+			rigidBodyData.forceMode = 4;
 		}
 
 		pxBody->setAngularDamping(rigidBodyData.AngularDamping);

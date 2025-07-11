@@ -1,6 +1,5 @@
 #include "EntityItem.h"
 #include "pch.h"
-#include "Temp.h"
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
@@ -84,10 +83,10 @@ void EntityItem::Update(float tick)
 						entityAsis->AddItem(this);
 				}
 				asisTail = nullptr;
-				Temp* temp = GameObject::Find("Manager")->GetComponent<Temp>();
+				GameManager* temp = GameObject::Find("GameManager")->GetComponent<GameManager>();
 				if (temp)
 				{
-					auto array = temp->arrayEntities();
+					auto& array = temp->GetEntities();
 					for (auto& entity : array)
 					{
 						auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();

@@ -133,7 +133,7 @@ void Player::Throw()
 	float impulseStrength = 1.0f;
 	DirectX::SimpleMath::Vector3 finalImpulse = throwDir * impulseStrength;
 	// 4. Èû Àû¿ë
-	rigidbody->SetImpulseForce(finalImpulse);
+	rigidbody->AddForce(finalImpulse, EForceMode::IMPULSE);
 	std::cout << "awdwadadwad" << std::endl;
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&

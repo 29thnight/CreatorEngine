@@ -59,7 +59,6 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
-		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });

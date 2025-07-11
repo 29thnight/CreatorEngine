@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-
 namespace BT
 {
 	enum class NodeStatus;

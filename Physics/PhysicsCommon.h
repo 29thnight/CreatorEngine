@@ -92,8 +92,8 @@ struct RigidBodyGetSetData
 	float AngularDamping = 0.05f;
 	float LinearDamping = 0.0f;
 	float mass = 100.f;
-	DirectX::SimpleMath::Vector3 impulse{};
-	bool shouldApplyImpulse = false; //순간적인 힘 받은게있는지
+	DirectX::SimpleMath::Vector3 velocity{};
+	int forceMode{ 4 }; // 4 == NONE
 };
 
 //CharacterController의 GetSetData를 위한 구조체
