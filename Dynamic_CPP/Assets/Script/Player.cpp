@@ -129,7 +129,6 @@ void Player::Throw()
 	forward.Normalize();
 	forward = -forward;
 
-	throwDir.Normalize();
 	// 4. Èû Àû¿ë
 	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
 	std::cout << "awdwadadwad" << std::endl;
