@@ -43,6 +43,15 @@ void EntityAsis::Start()
 	asisHead = GameObject::Find("AsisHead");
 
 	m_EntityItemQueue.resize(maxTailCapacity);
+
+	m_fakeItemQueue.resize(maxTailCapacity);
+	auto fakeObjects = GameObject::Find("fake");
+	if (fakeObjects) {
+		for (auto& index : fakeObjects->m_childrenIndices) {
+			auto object = GameObject::FindIndex(index);
+			m_fakeItemQueue.push_back(object);
+		}
+	}
 }
 
 void EntityAsis::OnTriggerEnter(const Collision& collision)
@@ -82,10 +91,12 @@ void EntityAsis::Update(float tick)
 	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
 	for (int i = 0; i < maxTailCapacity; i++)
 	{
-		if (m_EntityItemQueue.size() < i + 1) return;
+		if (m_fakeItemQueue.size() < i + 1) return;
 
-		if (m_EntityItemQueue[i] != nullptr)
+		if (m_fakeItemQueue[i] != nullptr)
 		{
+			m_fakeItemQueue[i]->SetEnabled(m_EntityItemQueue[i] != nullptr ? true : false);
+
 			float orbitAngle = angle + XM_PI * 2.f * i / 3.f;;
 			float r = radius + sinf(timer) * 3.f;
 			Vector3 localOrbit = Vector3(cos(orbitAngle) * r, 0.f, sin(orbitAngle) * r);
@@ -93,7 +104,7 @@ void EntityAsis::Update(float tick)
 			XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
 
 			Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
-			m_EntityItemQueue[i]->GetComponent<Transform>().SetPosition(finalPos);
+			m_fakeItemQueue[i]->GetComponent<Transform>()->SetPosition(finalPos);
 		}
 	}
 
@@ -139,6 +150,8 @@ void EntityAsis::Purification(float tick)
 				{
 					auto playerScr = player->GetComponent<Player>();
 					playerScr->AddWeapon(weapon);
+
+					m_currentTailPurificationDuration = 0;
 				}
 			}
 			//item->GetOwner()->GetComponent<RigidBodyComponent>().

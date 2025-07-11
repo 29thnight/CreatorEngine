@@ -35,6 +35,9 @@ private:
 
 private:
 	std::vector<EntityItem*>		m_EntityItemQueue;
+
+	std::vector<GameObject*>		m_fakeItemQueue;
+
 	int								m_EntityItemQueueIndex = 0;
 	int								m_currentEntityItemCount = 0;
 	GameObject* asisTail{ nullptr };
