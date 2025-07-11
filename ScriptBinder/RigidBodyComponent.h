@@ -53,9 +53,15 @@ public:
 	float LinearDamping = 0;
 	[[Property]]
 	float m_mass = 70.f;
+
+	float maxLinearVelocity = 1e+16;
+	float maxAngularVelocity = 100.f;
+	float maxContactImpulse = 1e+32;
+	float maxDepenetrationVelocity = 1e+32;
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
+
 
 private:
 	bool m_isLockLinearX = false;

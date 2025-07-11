@@ -537,6 +537,11 @@ void PhysicsManager::SetPhysicData()
 			data.isLockAngularY = rigidbody->IsLockAngularY();
 			data.isLockAngularZ = rigidbody->IsLockAngularZ();
 
+			data.maxAngularVelocity = rigidbody->maxAngularVelocity;
+			data.maxLinearVelocity = rigidbody->maxLinearVelocity;
+			data.maxContactImpulse = rigidbody->maxContactImpulse;
+			data.maxDepenetrationVelocity = rigidbody->maxDepenetrationVelocity;
+
 			data.forceMode = static_cast<int>(rigidbody->forceMode);
 			rigidbody->forceMode = EForceMode::NONE;
 			data.velocity = rigidbody->velocity;

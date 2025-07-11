@@ -92,6 +92,12 @@ struct RigidBodyGetSetData
 	float AngularDamping = 0.05f;
 	float LinearDamping = 0.0f;
 	float mass = 100.f;
+
+	float maxLinearVelocity = 1e+16;
+	float maxAngularVelocity = 100.f;
+	float maxContactImpulse = 1e+32;
+	float maxDepenetrationVelocity = 1e+32;
+
 	DirectX::SimpleMath::Vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
 };

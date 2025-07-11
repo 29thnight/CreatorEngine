@@ -7,6 +7,7 @@
 
 #include "GameManager.h"
 #include "BoxColliderComponent.h"
+#include "RigidBodyComponent.h"
 
 using namespace Mathf;
 void EntityItem::Start()
@@ -36,6 +37,7 @@ void EntityItem::Start()
 
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+
 }
 
 void EntityItem::OnTriggerEnter(const Collision& collision)

@@ -810,6 +810,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 			rigidBodyData.forceMode = 4;
 		}
 
+		pxBody->setMaxLinearVelocity(rigidBodyData.maxLinearVelocity);
+		pxBody->setMaxAngularVelocity(rigidBodyData.maxAngularVelocity);
+		pxBody->setMaxContactImpulse(rigidBodyData.maxContactImpulse);
+		pxBody->setMaxDepenetrationVelocity(rigidBodyData.maxDepenetrationVelocity);
+
 		pxBody->setAngularDamping(rigidBodyData.AngularDamping);
 		pxBody->setLinearDamping(rigidBodyData.LinearDamping);
 		pxBody->setMass(rigidBodyData.mass);
