@@ -821,12 +821,17 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 
 		}
 
-		if (rigidBodyData.shouldApplyImpulse) {
-			PxVec3 impulse;
-			CopyVectorDxToPx(rigidBodyData.impulse, impulse);
-			pxBody->addForce(impulse, PxForceMode::eIMPULSE);
-			rigidBodyData.shouldApplyImpulse = false;
+		if (rigidBodyData.forceMode != 4) {
+			PxVec3 velocity;
+			CopyVectorDxToPx(rigidBodyData.velocity, velocity);
+			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
+			rigidBodyData.forceMode = 4;
 		}
+
+		pxBody->setMaxLinearVelocity(rigidBodyData.maxLinearVelocity);
+		pxBody->setMaxAngularVelocity(rigidBodyData.maxAngularVelocity);
+		pxBody->setMaxContactImpulse(rigidBodyData.maxContactImpulse);
+		pxBody->setMaxDepenetrationVelocity(rigidBodyData.maxDepenetrationVelocity);
 
 		pxBody->setAngularDamping(rigidBodyData.AngularDamping);
 		pxBody->setLinearDamping(rigidBodyData.LinearDamping);

@@ -32,13 +32,13 @@ private:
 
 private:
 	[[Property]]
-	float moveSpeed = 10.f;
+	float m_moveSpeed = 2.f;
 	[[Property]]
-	float pathRadius = 3.f;
+	float m_pathRadius = 1.f;
 	[[Property]]
-	float predictNextTime = 5.0f; // 예측 시간
+	float m_predictNextTime = 5.0f; // 예측 시간
 	[[Property]]
-	float rotateSpeed = 5.f;
+	float m_rotateSpeed = 5.f;
 
 #ifdef _DEBUG
 	GameObject* DebugPoint{ nullptr };

@@ -1,7 +1,6 @@
 #include "EntityAsis.h"
 #include "pch.h"
 #include "EntityItem.h"
-#include "Temp.h"
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
@@ -64,12 +63,6 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
-	Purification(tick);
-
-	return;
-
-
-
 	auto& tr = GetComponent<Transform>();
 	Mathf::Vector3 pos = tr.GetWorldPosition();
 	dir.Normalize();
@@ -82,7 +75,7 @@ void EntityAsis::Update(float tick)
 	Transform* tailTr = asisTail->GetComponent<Transform>();
 	Vector3 tailPos = tailTr->GetWorldPosition();
 	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < maxTailCapacity; i++)
 	{
 		if (m_EntityItemQueue.size() < i + 1) return;
 
@@ -98,6 +91,9 @@ void EntityAsis::Update(float tick)
 			m_EntityItemQueue[i]->GetComponent<Transform>().SetPosition(finalPos);
 		}
 	}
+
+
+	Purification(tick);
 }
 
 void EntityAsis::AddItem(EntityItem* item)

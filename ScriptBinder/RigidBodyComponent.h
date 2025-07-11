@@ -5,7 +5,7 @@
 #include "IOnDistroy.h"
 #include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
-
+#include "EForceMode.h"
 class RigidBodyComponent : public Component, public IAwakable, public IOnDistroy
 {
 public:
@@ -41,21 +41,27 @@ public:
 
 	void SetAngularDamping(float _AngularDamping = 0.05f);
 	void SetLinearDamping(float _LinearDamping);
-	void SetImpulseForce(const Mathf::Vector3& force);
+	void AddForce(const Mathf::Vector3& force, EForceMode forceMode = EForceMode::FORCE);
 	void SetMass(float _mass);
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
-	DirectX::SimpleMath::Vector3 impulse{};
-	bool shouldApplyImpulse = false; //순간적인 힘 받은게있는지
+	Mathf::Vector3 velocity{};
+	EForceMode forceMode{ EForceMode::NONE };
 	float AngularDamping =0.05f;
 	[[Property]]
 	float LinearDamping = 0;
 	[[Property]]
 	float m_mass = 70.f;
+
+	float maxLinearVelocity = 1e+16;
+	float maxAngularVelocity = 100.f;
+	float maxContactImpulse = 1e+32;
+	float maxDepenetrationVelocity = 1e+32;
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
+
 
 private:
 	bool m_isLockLinearX = false;

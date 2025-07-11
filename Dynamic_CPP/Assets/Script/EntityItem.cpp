@@ -1,6 +1,5 @@
 #include "EntityItem.h"
 #include "pch.h"
-#include "Temp.h"
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
@@ -8,6 +7,7 @@
 
 #include "GameManager.h"
 #include "BoxColliderComponent.h"
+#include "RigidBodyComponent.h"
 
 using namespace Mathf;
 void EntityItem::Start()
@@ -37,6 +37,7 @@ void EntityItem::Start()
 
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+
 }
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
@@ -84,10 +85,10 @@ void EntityItem::Update(float tick)
 						entityAsis->AddItem(this);
 				}
 				asisTail = nullptr;
-				Temp* temp = GameObject::Find("Manager")->GetComponent<Temp>();
+				GameManager* temp = GameObject::Find("GameManager")->GetComponent<GameManager>();
 				if (temp)
 				{
-					auto array = temp->arrayEntities();
+					auto& array = temp->GetEntities();
 					for (auto& entity : array)
 					{
 						auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();

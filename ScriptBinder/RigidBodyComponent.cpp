@@ -30,10 +30,10 @@ void RigidBodyComponent::SetLinearDamping(float _LinearDamping)
 	LinearDamping = _LinearDamping;
 }
 
-void RigidBodyComponent::SetImpulseForce(const Mathf::Vector3& force)
+void RigidBodyComponent::AddForce(const Mathf::Vector3& force, EForceMode mode)
 {
-	shouldApplyImpulse = true;
-	impulse = force;
+	forceMode = mode;
+	velocity = force;
 }
 
 void RigidBodyComponent::SetMass(float _mass)

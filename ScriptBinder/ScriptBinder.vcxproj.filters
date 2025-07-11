@@ -542,6 +542,9 @@
     <ClInclude Include="FunctionRegistry.h">
       <Filter>Classes\GameAI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="EForceMode.h">
+      <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GameObejct.inl">

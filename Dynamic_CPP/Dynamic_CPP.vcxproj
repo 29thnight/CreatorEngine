@@ -173,7 +173,6 @@
 		<ClInclude Include="funcMain.h" />
 		<ClInclude Include="pch.h" />
 		<ClInclude Include="Assets\Script\Entity.h" />
-		<ClInclude Include="Assets\Script\Temp.h" />
 		<ClInclude Include="Assets\Script\EntityAsis.h" />
 		<ClInclude Include="Assets\Script\EntityItem.h" />
 		<ClInclude Include="Assets\Script\Player.h" />
@@ -193,10 +192,6 @@
 			<PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
 			<PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
 			<PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Temp.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityAsis.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>

@@ -28,7 +28,14 @@ public:
 
 public:
 	void PushEntity(Entity* entity);
+	const std::vector<Entity*>& GetEntities();
+
 private:
-	std::vector<Entity*> m_Entities;
+	std::vector<Entity*> m_entities;
 	ActionMap* playerMap{ nullptr };
+
+	std::vector<Entity*> m_resourcePool;
+	std::vector<Entity*> m_weaponPiecePool;
+private:
+	void CheatMiningResource();
 };
