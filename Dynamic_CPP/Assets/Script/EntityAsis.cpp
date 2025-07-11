@@ -59,19 +59,22 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 	auto item = collision.otherObj->GetComponent<EntityItem>();
 	if (item) {
 		std::cout << "OnCollision Item" << std::endl;
-		AddItem(item);
+		auto owner = item->GetThrowOwner();
+		if (owner) {
+			bool result = AddItem(item);
+
+			if (!result) {
+				// »πµÊ¿ª Ω«∆–«ﬂ¿ª ∂ß.
+			}
+			else {
+				// »πµÊ«ﬂ¿ª ∂ß √≥∏Æ.
+			}
+		}
 	}
 }
 
 void EntityAsis::Update(float tick)
 {
-	auto& tr = GetComponent<Transform>();
-	Mathf::Vector3 pos = tr.GetWorldPosition();
-	dir.Normalize();
-	//pos += Vector3(dir.x, 0.f, dir.y) * tick * 5.f;
-	//tr.SetPosition(pos);
-
-
 	timer += tick;
 	angle += tick * 5.f;
 	Transform* tailTr = asisTail->GetComponent<Transform>();
@@ -98,24 +101,25 @@ void EntityAsis::Update(float tick)
 	Purification(tick);
 }
 
-void EntityAsis::AddItem(EntityItem* item)
+bool EntityAsis::AddItem(EntityItem* item)
 {
 	if (m_currentEntityItemCount >= maxTailCapacity)
 	{
 		std::cout << "EntityAsis: Max item count reached, cannot add more items." << std::endl;
-		return;
+		return false;
 	}
 
 	if (item == nullptr)
 	{
 		std::cout << "EntityAsis: Cannot add a null item." << std::endl;
-		return;
+		return false;
 	}
 
 	m_EntityItemQueue[m_currentEntityItemCount] = item;
 	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
 
 	m_currentEntityItemCount++;
+	return true;
 }
 
 void EntityAsis::Purification(float tick)

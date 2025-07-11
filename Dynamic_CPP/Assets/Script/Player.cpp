@@ -9,6 +9,7 @@
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "RigidBodyComponent.h"
+#include "EntityItem.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
@@ -127,13 +128,16 @@ void Player::Throw()
 	auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, rotationOnly);
 	forward.Normalize();
 	forward = -forward;
-	DirectX::SimpleMath::Vector3 upward(0, 1, 0);
 
-	DirectX::SimpleMath::Vector3 throwDir = forward * ThrowPowerX + upward * ThrowPowerY;
 	throwDir.Normalize();
-	float impulseStrength = 1.0f;
-	DirectX::SimpleMath::Vector3 finalImpulse = throwDir * impulseStrength;
+	// 4. Èû Àû¿ë
 	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
+	std::cout << "awdwadadwad" << std::endl;
+
+	auto item = catchedObject->GetComponent<EntityItem>();
+	if (item) {
+		item->SetThrowOwner(this);
+	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 	if(m_curWeapon)

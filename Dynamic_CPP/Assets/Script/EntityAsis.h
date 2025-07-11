@@ -26,7 +26,7 @@ public:
 public:
 	virtual void Interact() override {}
 	
-	void AddItem(EntityItem* item);
+	bool AddItem(EntityItem* item);
 	void Purification(float tick);
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
