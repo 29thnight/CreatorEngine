@@ -26,7 +26,7 @@ public:
 public:
 	virtual void Interact() override {}
 	
-	void AddItem(EntityItem* item);
+	bool AddItem(EntityItem* item);
 	void Purification(float tick);
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
@@ -35,6 +35,9 @@ private:
 
 private:
 	std::vector<EntityItem*>		m_EntityItemQueue;
+
+	std::vector<GameObject*>		m_fakeItemQueue;
+
 	int								m_EntityItemQueueIndex = 0;
 	int								m_currentEntityItemCount = 0;
 	GameObject* asisTail{ nullptr };

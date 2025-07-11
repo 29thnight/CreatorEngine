@@ -8,6 +8,7 @@
 #include "GameManager.h"
 #include "BoxColliderComponent.h"
 #include "RigidBodyComponent.h"
+#include "Player.h"
 
 using namespace Mathf;
 void EntityItem::Start()
@@ -48,6 +49,14 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 void EntityItem::OnTriggerExit(const Collision& collision)
 {
 	//std::cout << "OnCollisionEnter Item" << std::endl;
+}
+
+void EntityItem::OnCollisionEnter(const Collision& collision)
+{
+}
+
+void EntityItem::OnCollisionExit(const Collision& collision)
+{
 }
 
 void EntityItem::Update(float tick)
@@ -105,5 +114,20 @@ void EntityItem::Update(float tick)
 			}
 		}
 	}
+}
+
+void EntityItem::SetThrowOwner(Player* player)
+{
+	throwOwner = player;
+}
+
+Player* EntityItem::GetThrowOwner()
+{
+	return throwOwner;
+}
+
+void EntityItem::ClearThrowOwner()
+{
+	throwOwner = nullptr;
 }
 
