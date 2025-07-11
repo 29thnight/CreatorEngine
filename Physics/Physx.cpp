@@ -51,7 +51,25 @@ PxFilterFlags CustomFilterShader(
 	//	pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT;
 	//	return physx::PxFilterFlag::eSUPPRESS; //&&&&&sehwan
 	//}
+	
 
+	//if (fd0.word0 == 5)
+	//{
+	//	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
+	//	{
+	//		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+	//			| PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//			| PxPairFlag::eNOTIFY_TOUCH_LOST;
+	//		return PxFilterFlag::eDEFAULT;
+	//	}
+
+	//	pairFlags =  PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//		| PxPairFlag::eNOTIFY_TOUCH_LOST
+	//		| PxPairFlag::eNOTIFY_CONTACT_POINTS
+	//		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	//	return PxFilterFlag::eDEFAULT;
+
+	//}
 	
 	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{

@@ -539,6 +539,7 @@ void PhysicsManager::SetPhysicData()
 
 			data.shouldApplyImpulse = rigidbody->shouldApplyImpulse;
 			data.impulse = rigidbody->impulse;
+			rigidbody->shouldApplyImpulse = false;
 			data.AngularDamping = rigidbody->AngularDamping;
 			data.LinearDamping = rigidbody->LinearDamping;
 			data.mass = rigidbody->m_mass;

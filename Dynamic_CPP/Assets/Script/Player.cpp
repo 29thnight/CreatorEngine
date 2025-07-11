@@ -26,7 +26,7 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	righthand->m_offset = Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
+	righthand->m_offset = Mathf::Matrix::CreateTranslation(20.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
 	
 	
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
@@ -133,7 +133,8 @@ void Player::Throw()
 	float impulseStrength = 1.0f;
 	DirectX::SimpleMath::Vector3 finalImpulse = throwDir * impulseStrength;
 	// 4. Èû Àû¿ë
-	rigidbody->SetImpulseForce(finalImpulse);
+	//rigidbody->SetImpulseForce(finalImpulse);
+	rigidbody->SetImpulseForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX });
 	std::cout << "awdwadadwad" << std::endl;
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&

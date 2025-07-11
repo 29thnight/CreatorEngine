@@ -73,7 +73,7 @@ public:
 		
 		// 특정 조건에 따라 통과 처리
 		if (shape->getQueryFilterData().word0 == 4) { //&&&&&sewhan controller
-			return PxQueryHitType::eTOUCH;  //
+			return PxQueryHitType::eNONE;  //
 		}
 		return PxQueryHitType::eBLOCK;    // 막힘
 	}

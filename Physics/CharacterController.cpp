@@ -26,7 +26,7 @@ void CharacterController::Initialize(const CharacterControllerInfo& info, const 
 	m_filterData = new physx::PxFilterData();
 	m_filterData->word0 = 0;
 	m_filters = new physx::PxControllerFilters(m_filterData);
-	//m_filters->mFilterCallback = new PhysicsControllerFilterCallback();
+	//m_filters->mFilterCallback = new PhysicsControllerFilterCallback(); //&&&&&filter
 	m_characterMovement = new CharacterMovement();
 	m_characterMovement->Initialize(moveInfo);
 }
