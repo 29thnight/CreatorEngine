@@ -53,10 +53,13 @@ public:
 	float LinearDamping = 0;
 	[[Property]]
 	float m_mass = 70.f;
-
+	[[Property]]
 	float maxLinearVelocity = 1e+16;
+	[[Property]]
 	float maxAngularVelocity = 100.f;
+	[[Property]]
 	float maxContactImpulse = 1e+32;
+	[[Property]]
 	float maxDepenetrationVelocity = 1e+32;
 private:
 	Mathf::Vector3 m_linearVelocity;
