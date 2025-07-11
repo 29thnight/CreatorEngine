@@ -24,6 +24,7 @@ void Player::Start()
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
+	playerMap->AddButtonAction("curweaponend", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::Y), KeyState::Down, [this]() { DeleteCurWeapon();});
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
@@ -181,6 +182,20 @@ void Player::AddWeapon(GameObject* weapon)
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->AttachObject(m_curWeapon);
 	
+}
+
+void Player::DeleteCurWeapon()
+{
+	if (!m_curWeapon)
+		return;
+
+	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
+
+	if (it != m_weaponInventory.end())
+	{
+		m_weaponInventory.erase(it); 
+		m_curWeapon = nullptr;    
+	}
 }
 
 

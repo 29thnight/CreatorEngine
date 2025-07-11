@@ -43,6 +43,17 @@ void EntityAsis::Start()
 	asisHead = GameObject::Find("AsisHead");
 
 	m_EntityItemQueue.resize(maxTailCapacity);
+<<<<<<< Updated upstream
+=======
+
+	auto fakeObjects = GameObject::Find("fake");
+	if (fakeObjects) {
+		for (auto& index : fakeObjects->m_childrenIndices) {
+			auto object = GameObject::FindIndex(index);
+			m_fakeItemQueue.push_back(object);
+		}
+	}
+>>>>>>> Stashed changes
 }
 
 void EntityAsis::OnTriggerEnter(const Collision& collision)
