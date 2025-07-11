@@ -40,6 +40,7 @@ private:
 
 	int								m_EntityItemQueueIndex = 0;
 	int								m_currentEntityItemCount = 0;
+	int								m_currentEntityItemIndex = 0;
 	GameObject* asisTail{ nullptr };
 	GameObject* asisHead{ nullptr };
 	float angle = 0.f;

@@ -126,10 +126,11 @@ bool EntityAsis::AddItem(EntityItem* item)
 		return false;
 	}
 
-	m_EntityItemQueue[m_currentEntityItemCount] = item;
-	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
+	m_EntityItemQueue[m_currentEntityItemIndex] = item;
+	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemIndex << std::endl;
 
 	m_currentEntityItemCount++;
+	m_currentEntityItemIndex = (m_currentEntityItemIndex + 1) % maxTailCapacity; // 다음에 적재할 인덱스
 	return true;
 }
 
@@ -167,11 +168,7 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 	m_currentEntityItemCount--;
 	EntityItem* purificationItem = m_EntityItemQueue[m_EntityItemQueueIndex];
 	m_EntityItemQueue[m_EntityItemQueueIndex] = nullptr;
-	m_EntityItemQueueIndex++;
-	if (m_EntityItemQueueIndex >= maxTailCapacity)
-	{
-		m_EntityItemQueueIndex = 0; // Reset index if it exceeds the max count
-	}
+	m_EntityItemQueueIndex = (m_EntityItemQueueIndex + 1) % maxTailCapacity;
 
 	return purificationItem;
 }
