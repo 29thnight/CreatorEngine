@@ -70,7 +70,8 @@ namespace InternalPath
 	inline file::path BaseProjectPath{};
 	inline file::path ProjectSettingsPath{};
 	inline file::path TerrainSourcePath{};
-
+	inline file::path DumpPath{};
+	inline file::path NodeEditorPath{};
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -80,6 +81,8 @@ namespace InternalPath
         file::path p(path);
 
         ExecuteablePath = p.remove_filename();
+
+		DumpPath = file::path(ExecuteablePath).append("Dump\\").lexically_normal();
 
         auto base = file::path(ExecuteablePath);
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
@@ -99,8 +102,12 @@ namespace InternalPath
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
 
 		TerrainSourcePath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
-
+		NodeEditorPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
 		//dir not exist -> create dir
+		if (!file::exists(DumpPath))
+		{
+			file::create_directories(DumpPath);
+		}
 		if (!file::exists(DataPath))
 		{
 			file::create_directories(DataPath);
@@ -145,6 +152,8 @@ namespace InternalPath
 		{
 			file::create_directories(TerrainSourcePath);
 		}
+
+		
     }
 };
 
@@ -161,7 +170,12 @@ public:
 		return InternalPath::DataPath;
 	}
 
-    static inline file::path Relative(const std::string_view& path)
+	static inline file::path DumpPath()
+	{
+		return InternalPath::DumpPath;
+	}
+
+	static inline file::path Relative(const std::string_view& path)
     {
         return file::path(InternalPath::DataPath) / path;
     }
@@ -224,5 +238,10 @@ public:
 	static inline file::path TerrainSourcePath(const std::string_view& path)
 	{
 		return file::path(InternalPath::TerrainSourcePath) / path;
+	}
+
+	static inline file::path NodeEditorPath(const std::string_view& path)
+	{
+		return file::path(InternalPath::NodeEditorPath) / path;
 	}
 };

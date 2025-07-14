@@ -44,6 +44,8 @@ public:
 		}
 	};
 
+	using FGetInstance = const std::shared_ptr<T>& (*)();
+
 private:
 	static std::shared_ptr<T> s_instance;
 	static std::once_flag s_onceFlag;

@@ -24,32 +24,68 @@ PxFilterFlags CustomFilterShader(
 	PxFilterData fd1,
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
+	//&&&&& 충돌매트릭스 조건 먼가이상함 
+	//if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
+	//{
+	//	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+	//		pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
+	//			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
+	//		return physx::PxFilterFlag::eDEFAULT;
+	//	}
+	//}
+
+	//if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
+	//	pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
+	//		| physx::PxPairFlag::eDETECT_CCD_CONTACT
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
+	//		| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
+	//		| physx::PxPairFlag::eCONTACT_EVENT_POSE
+	//		| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	//	return physx::PxFilterFlag::eDEFAULT;
+	//}
+	//else 
+	//{
+	//	pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT;
+	//	return physx::PxFilterFlag::eSUPPRESS; //&&&&&sehwan
+	//}
 	
-	if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
+
+	//if (fd0.word0 == 5)
+	//{
+	//	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
+	//	{
+	//		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+	//			| PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//			| PxPairFlag::eNOTIFY_TOUCH_LOST;
+	//		return PxFilterFlag::eDEFAULT;
+	//	}
+
+	//	pairFlags =  PxPairFlag::eNOTIFY_TOUCH_FOUND
+	//		| PxPairFlag::eNOTIFY_TOUCH_LOST
+	//		| PxPairFlag::eNOTIFY_CONTACT_POINTS
+	//		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	//	return PxFilterFlag::eDEFAULT;
+
+	//}
+	
+	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
-		if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
-			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
-				| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-				| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
-			return physx::PxFilterFlag::eDEFAULT;
-		}
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+			| PxPairFlag::eNOTIFY_TOUCH_FOUND
+			| PxPairFlag::eNOTIFY_TOUCH_LOST;
+		return PxFilterFlag::eDEFAULT;
 	}
 
-	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
-			| physx::PxPairFlag::eDETECT_CCD_CONTACT
-			| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
-			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
-			| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
-			| physx::PxPairFlag::eCONTACT_EVENT_POSE
-			| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-		return physx::PxFilterFlag::eDEFAULT;
-	}
-	else {
-		pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT; 
-		return physx::PxFilterFlag::eSUPPRESS;
-	}
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT
+		| PxPairFlag::eNOTIFY_TOUCH_FOUND
+		| PxPairFlag::eNOTIFY_TOUCH_LOST
+		| PxPairFlag::eNOTIFY_CONTACT_POINTS
+		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
+	return PxFilterFlag::eDEFAULT;
+
 }
 
 class RaycastQueryFilter : public physx::PxQueryFilterCallback
@@ -68,6 +104,7 @@ public:
 		}
 
 		return physx::PxQueryHitType::eNONE;
+
 	}
 	
 	physx::PxQueryHitType::Enum postFilter(const physx::PxFilterData& filterData,
@@ -170,7 +207,9 @@ bool PhysicX::Initialize()
 	//debug용 plane 생성 --> triangle mesh로 대체 예정
 	
 	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
-	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *m_defaultMaterial);
+	auto material = m_defaultMaterial;
+	material->setRestitution(0.0f);
+	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *material);
 	planeShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 	planeShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 	physx::PxFilterData filterData;
@@ -202,6 +241,7 @@ void PhysicX::RemoveActors()
 }
 void PhysicX::UnInitialize() {
 	if (m_foundation) m_foundation->release();
+	
 }
 
 
@@ -230,6 +270,11 @@ void PhysicX::Update(float fixedDeltaTime)
 		//케릭터 컨트롤러 업데이트
 		for (const auto& controller : m_characterControllerContainer) {
 			controller.second->Update(fixedDeltaTime);
+			//컨트롤러가 삭제 예정이라면
+			//if(todo : condition){
+			//controller.second->GetController()->release();
+			// }
+
 		}
 		//생성 예정인 케릭터 컨트롤러를 씬에 추가
 		for (auto& [contrllerInfo, movementInfo] : m_updateCCTList)
@@ -253,9 +298,9 @@ void PhysicX::Update(float fixedDeltaTime)
 			desc.maxJumpHeight = 100.0f;
 			desc.nonWalkableMode = physx::PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
 			desc.material = m_defaultMaterial;
-
+		
 			physx::PxController* pxController = m_characterControllerManager->createController(desc);
-
+			
 			physx::PxRigidDynamic* body = pxController->getActor();
 			physx::PxShape* shape;
 			int shapeSize = body->getNbShapes();
@@ -263,11 +308,15 @@ void PhysicX::Update(float fixedDeltaTime)
 			body->setSolverIterationCounts(8, 4);
 			shape->setContactOffset(0.02f);
 			shape->setRestOffset(0.01f);
-
 			physx::PxFilterData filterData;
 			filterData.word0 = contrllerInfo.layerNumber;
-			filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
+			filterData.word1= 0xFFFFFFFF;
+			
+			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
+			//shape->setQueryFilterData(filterData);
+			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+			//shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
 
 			collisionData->thisId = contrllerInfo.id;
 			collisionData->thisLayerNumber = contrllerInfo.layerNumber;
@@ -392,6 +441,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 	}
 
 	RaycastQueryFilter queryFilter;
+	
 	bool isAnyHit;
 		
 	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData,&queryFilter);
@@ -608,7 +658,6 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	 //filterData.word1 = collisionMatrix[colInfo.layerNumber];
 	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
-
 	//collisionData
 	StaticRigidBody* staticBody = new StaticRigidBody(collideType,colInfo.id,colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
@@ -637,7 +686,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//filterData.word1 = collisionMatrix[colInfo.layerNumber];
 	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
-
+	shape->setQueryFilterData(filterData);
 	//collisionData
 	DynamicRigidBody* dynamicBody = new DynamicRigidBody(collideType, colInfo.id, colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
@@ -720,7 +769,27 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	return rigidBodyData;
 }
 
-void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData& rigidBodyData)
+RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
+{
+	//등록되어 있는지 검사
+	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
+	{
+		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		return nullptr;
+	}
+	RigidBody* body = m_rigidBodyContainer[id];
+	if (body)
+	{
+		return body;
+	}
+	else
+	{
+		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		return nullptr;
+	}
+}
+
+void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData)
 {
 	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
@@ -749,8 +818,24 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 		{
 			pxBody->setLinearVelocity(pxLinearVelocity);
 			pxBody->setAngularVelocity(pxAngularVelocity);
+
 		}
 
+		if (rigidBodyData.forceMode != 4) {
+			PxVec3 velocity;
+			CopyVectorDxToPx(rigidBodyData.velocity, velocity);
+			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
+			rigidBodyData.forceMode = 4;
+		}
+
+		pxBody->setMaxLinearVelocity(rigidBodyData.maxLinearVelocity);
+		pxBody->setMaxAngularVelocity(rigidBodyData.maxAngularVelocity);
+		pxBody->setMaxContactImpulse(rigidBodyData.maxContactImpulse);
+		pxBody->setMaxDepenetrationVelocity(rigidBodyData.maxDepenetrationVelocity);
+
+		pxBody->setAngularDamping(rigidBodyData.AngularDamping);
+		pxBody->setLinearDamping(rigidBodyData.LinearDamping);
+		pxBody->setMass(rigidBodyData.mass);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X, rigidBodyData.isLockAngularX);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y, rigidBodyData.isLockAngularY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z, rigidBodyData.isLockAngularZ);
@@ -758,6 +843,33 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
+		PxU32 shapeCount = pxBody->getNbShapes();
+		std::vector<physx::PxShape*> shapes(shapeCount);
+		pxBody->getShapes(shapes.data(), shapeCount);
+		for (PxShape* shape : shapes)
+		{
+			if (rigidBodyData.isColliderEnabled == false)
+			{
+				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+			}
+			else 
+			{
+				
+			/*	if () //&&&&&키는거 만드는중
+				{
+
+				}
+				else
+				{
+
+				}*/
+
+
+
+			}
+
+		}
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
 		DirectX::SimpleMath::Quaternion rotation;
@@ -795,6 +907,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, const RigidBodyGetSetData
 			DirectX::SimpleMath::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
 
 		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
+		pxBody->setGlobalPose(pxCurrTransform);
 	}
 }
 

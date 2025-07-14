@@ -14,7 +14,7 @@ inline T& Component::GetComponent()
 	}
 	else
 	{
-		auto component = m_pOwner->template GameObject::GetComponent<T>();
+		auto component = m_pOwner->GameObject::GetComponent<T>();
 		if (component)
 		{
 			return *component;

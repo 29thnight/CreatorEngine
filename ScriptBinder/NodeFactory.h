@@ -5,12 +5,15 @@
 
 namespace BT
 {
-	class NodeFactory
+	class NodeFactory : public Singleton<NodeFactory>
 	{
+	private:
+		friend class Singleton;
+		NodeFactory() = default;
+		~NodeFactory() = default;
+
 	public:
 		using CreateNodeFunc = std::function<BTNode::NodePtr(const json&)>;
-
-		static NodeFactory& GetInstance();
 
 		void Register(const std::string& typeName, CreateNodeFunc func);
 		BTNode::NodePtr Create(const std::string& typeName, const json& data = {});
@@ -27,7 +30,6 @@ namespace BT
 		}
 		
 	private :
-		NodeFactory() = default;
 		std::map<std::string, CreateNodeFunc> m_registry;
 	};
 } // namespace BT

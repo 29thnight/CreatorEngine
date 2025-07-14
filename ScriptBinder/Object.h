@@ -40,7 +40,6 @@ public:
     static void SetDontDestroyOnLoad(Object* objPtr);
     static Object* Instantiate(const Object* original, const std::string_view& newName);
 
-
 public:
     [[Property]]
     HashingString m_name{ "Object" };

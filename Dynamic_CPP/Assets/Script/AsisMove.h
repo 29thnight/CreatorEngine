@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "AsisMove.generated.h"
 
 class AsisMove : public ModuleBehavior
 {
 public:
+   ReflectAsisMove
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(AsisMove)
 
 public:
@@ -23,12 +26,21 @@ private:
 	GameObject* m_playerObject{ nullptr };
 	Mathf::Vector3 nextMovePoint{ 0.f, 0.f, 0.f };
 
-	Mathf::Vector3 points[3] = {
-		{ 0.f, 0.f, 0.f },
-		{ 0.f, 0.f, 0.f },
-		{ 0.f, 0.f, 0.f }
-	};
+	std::vector<Mathf::Vector3> points;
 
-	float moveSpeed = 5.f;
 	int currentPointIndex = 0;
+
+private:
+	[[Property]]
+	float m_moveSpeed = 2.f;
+	[[Property]]
+	float m_pathRadius = 1.f;
+	[[Property]]
+	float m_predictNextTime = 5.0f; // 예측 시간
+	[[Property]]
+	float m_rotateSpeed = 5.f;
+
+#ifdef _DEBUG
+	GameObject* DebugPoint{ nullptr };
+#endif // _DEBUG
 };

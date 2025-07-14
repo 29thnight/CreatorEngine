@@ -427,9 +427,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	fs::path relheightMap = fs::relative(heightMapPath, terrainDir);
 	fs::path relsplatMap = fs::relative(splatMapPath, terrainDir);
 
-
-
-
 	//메타데이터 저장 .meta 인대 json 쓸거임
 	json metaData;
 	metaData["name"] = name;
@@ -461,10 +458,27 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::ofstream ofs(m_terrainTargetPath);
 	ofs << metaData.dump(4); // 4ĭ �鿩����
 
-
-
 	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
 	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
+
+	ofs.flush();
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+
+	file::path metaPath = m_terrainTargetPath + L".meta";
+	if (file::exists(metaPath))
+	{
+		auto node = MetaYml::LoadFile(metaPath.string());
+
+		if (node["guid"] && !node["guid"].IsNull())
+		{
+			FileGuid fileGuid = node["guid"].as<std::string>();
+			if (fileGuid != nullFileGuid)
+			{
+				m_trrainAssetGuid = fileGuid;
+			}
+		}
+	}
+
 }
 
 bool TerrainComponent::Load(const std::wstring& filePath)

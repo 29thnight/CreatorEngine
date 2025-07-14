@@ -27,6 +27,9 @@
     <Filter Include="소스 파일\ImGuiHeader">
       <UniqueIdentifier>{124ca35f-a6c4-4762-a42b-dd7a728b6b19}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\Blueprint">
+      <UniqueIdentifier>{c79060ed-c9e0-42fe-9cca-496f0b4d6e7b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGuiContext.h">
@@ -68,6 +71,15 @@
     <ClInclude Include="ImGui.h">
       <Filter>소스 파일\ImGuiHeader</Filter>
     </ClInclude>
+    <ClInclude Include="PinHelper.h">
+      <Filter>소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="BlueprintBuilder.h">
+      <Filter>소스 파일\Blueprint</Filter>
+    </ClInclude>
+    <ClInclude Include="HorizontalLayout.h">
+      <Filter>소스 파일\NodeEditorHelper</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp">
@@ -84,6 +96,9 @@
     </ClCompile>
     <ClCompile Include="ProfilerWindow.cpp">
       <Filter>소스 파일\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BlueprintBuilder.cpp">
+      <Filter>소스 파일\Blueprint</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

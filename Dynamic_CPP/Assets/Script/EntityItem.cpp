@@ -1,23 +1,28 @@
 #include "EntityItem.h"
 #include "pch.h"
-#include "Temp.h"
 #include "MeshRenderer.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
 #include "EntityAsis.h"
 
+#include "GameManager.h"
+#include "BoxColliderComponent.h"
+#include "RigidBodyComponent.h"
+#include "Player.h"
+
 using namespace Mathf;
 void EntityItem::Start()
 {
-	auto manager = GameObject::Find("Manager");
-	if (manager)
+	auto gameManager = GameObject::Find("GameManager");
+	if (gameManager)
 	{
-		auto temp = manager->GetComponent<Temp>();
-		if (temp)
+		auto gm = gameManager->GetComponent<GameManager>();
+		if (gm)
 		{
-			temp->AddEntity(this);
+			gm->PushEntity(this);
 		}
 	}
+
 	auto meshrenderer = GetOwner()->GetComponent<MeshRenderer>();
 	if (meshrenderer)
 	{
@@ -28,13 +33,35 @@ void EntityItem::Start()
 		}
 	}
 
+	//GetComponent<BoxColliderComponent>().SetExtents({ 10.f, 10.f, 10.f });
+
 
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+
+}
+
+void EntityItem::OnTriggerEnter(const Collision& collision)
+{
+	//std::cout << "OnTriggerEnter Item" << std::endl;
+}
+
+void EntityItem::OnTriggerExit(const Collision& collision)
+{
+	//std::cout << "OnCollisionEnter Item" << std::endl;
+}
+
+void EntityItem::OnCollisionEnter(const Collision& collision)
+{
+}
+
+void EntityItem::OnCollisionExit(const Collision& collision)
+{
 }
 
 void EntityItem::Update(float tick)
 {
+	return;
 	if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
 		if (tailTransform)
@@ -61,13 +88,16 @@ void EntityItem::Update(float tick)
 			}
 			else {
 				auto asis = GameObject::Find("Asis_01");
-				if(asis != nullptr)
-					asis->GetComponent<EntityAsis>()->AddItem(this);
+				if (asis != nullptr) {
+					auto entityAsis = asis->GetComponent<EntityAsis>();
+					if(entityAsis) 
+						entityAsis->AddItem(this);
+				}
 				asisTail = nullptr;
-				Temp* temp = GameObject::Find("Manager")->GetComponent<Temp>();
+				GameManager* temp = GameObject::Find("GameManager")->GetComponent<GameManager>();
 				if (temp)
 				{
-					auto array = temp->arrayEntities();
+					auto& array = temp->GetEntities();
 					for (auto& entity : array)
 					{
 						auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
@@ -84,5 +114,20 @@ void EntityItem::Update(float tick)
 			}
 		}
 	}
+}
+
+void EntityItem::SetThrowOwner(Player* player)
+{
+	throwOwner = player;
+}
+
+Player* EntityItem::GetThrowOwner()
+{
+	return throwOwner;
+}
+
+void EntityItem::ClearThrowOwner()
+{
+	throwOwner = nullptr;
 }
 

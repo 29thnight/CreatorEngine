@@ -149,6 +149,25 @@ public:
         return functions;
     }
 
+    bool HasScriptReflectionFieldAttribute(const std::filesystem::path& file)
+    {
+        std::ifstream fin(file);
+        std::string line;
+
+        // [[ScriptReflectionField]] or [[ScriptReflectionField(...)]]
+        std::regex attrRegex(R"(\[\[\s*ScriptReflectionField(?:\s*\([^)]*\))?\s*\]\])");
+
+        while (std::getline(fin, line))
+        {
+            if (std::regex_search(line, attrRegex))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 private:
 
     FileGuid LoadGuidFromMeta(const std::filesystem::path& metaPath)
@@ -262,6 +281,7 @@ private:
         }
     }
 
+public:
     void CreateYamlMeta(const std::filesystem::path& targetFile) 
     {
         std::filesystem::path metaPath = targetFile.string() + ".meta";
@@ -278,11 +298,29 @@ private:
             root["guid"] = GUIDCreator::MakeFileGUID(targetFile.filename().string()).ToString();
 
         root["importSettings"]["extension"] = targetFile.extension().string();
-        root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();
+        try
+        {
+            root["importSettings"]["timestamp"] = std::filesystem::last_write_time(targetFile).time_since_epoch().count();
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Error getting last write time: " << e.what() << std::endl;
+            root["importSettings"]["timestamp"] = 0; // Fallback to 0 if error occurs
+		}
 
         if (targetFile.extension() == ".cpp")
         {
             auto functions = ExtractFunctionNames(targetFile);
+            bool haveScriptReflectionAttribute = false;
+            file::path headerfile = targetFile;
+            headerfile = headerfile.replace_extension(".h");
+            if(file::exists(headerfile))
+            {
+                haveScriptReflectionAttribute = HasScriptReflectionFieldAttribute(headerfile);
+            }
+
+            root.remove("reflectionFlag");
+            root["reflectionFlag"] = haveScriptReflectionAttribute;
 
             root.remove("eventRegisterSetting");
             for (const auto& f : functions)
@@ -305,4 +343,5 @@ private:
 
 private:
     AssetMetaRegistry* m_assetMetaRegistry;
+    bool m_isStartUp{ false };
 };

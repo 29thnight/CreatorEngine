@@ -6,7 +6,8 @@
 namespace BT
 {
 	enum class NodeStatus { Success, Failure, Running };
-	
+	enum class NodeType { Composite, Decorator, Condition, Action };
+
 	class BTNode
 	{
 	public:
@@ -19,8 +20,13 @@ namespace BT
 		const std::string& GetName() const { return m_name; }
 		void SetName(const std::string& name) { m_name = name; }
 
+		virtual bool IsOutpinConnected() const { return false; }
+
+		virtual NodeType GetNodeType() const = 0;
+
 	protected:
 		std::string m_name;
+		bool m_isOutpinConnected{ false };
 	};
 
 	//class RootNode : public BTNode
@@ -49,6 +55,13 @@ namespace BT
 		void AddChild(NodePtr child) { m_children.push_back(child); }
 
 		std::vector<NodePtr>& GetChildren() { return m_children; } 
+		bool IsOutpinConnected() const override final
+		{
+			return !m_children.empty();
+		}
+
+		NodeType GetNodeType() const override { return NodeType::Composite; }
+
 	protected:
 		std::vector<NodePtr> m_children;
 	};
@@ -77,6 +90,9 @@ namespace BT
 			m_currentIndex = 0; // Reset index for next tick
 			return NodeStatus::Success; // All children failed
 		}
+
+		NodeType GetNodeType() const override { return NodeType::Composite; }
+
 	private:
 		size_t m_currentIndex = 0;
 	};
@@ -106,6 +122,8 @@ namespace BT
 			return NodeStatus::Failure; // All children failed
 		}
 
+		NodeType GetNodeType() const override { return NodeType::Composite; }
+
 	private:
 		size_t m_currentIndex = 0;
 	};
@@ -118,10 +136,15 @@ namespace BT
 
 		NodePtr GetChild() const { return m_child; }
 		void SetChild(NodePtr child) { m_child = child; }
+		bool IsOutpinConnected() const override final
+		{
+			return m_child != nullptr; // Decorator nodes always have a single child
+		}
+
+		NodeType GetNodeType() const override { return NodeType::Decorator; }
 	protected:
 		NodePtr m_child;
 	};
-
 
 	class InverterNode : public DecoratorNode
 	{
@@ -131,6 +154,8 @@ namespace BT
 		}
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
 		{
+			if (!m_child) return NodeStatus::Failure;
+
 			auto status = m_child->Tick(deltatime, blackBoard);
 			if (status == NodeStatus::Success)
 				return NodeStatus::Failure;
@@ -138,6 +163,8 @@ namespace BT
 				return NodeStatus::Success;
 			return status; // Running state remains unchanged
 		}
+
+		NodeType GetNodeType() const override { return NodeType::Decorator; }
 	};
 
 	class ConditionNode : public BTNode
@@ -148,6 +175,9 @@ namespace BT
 		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override {
 			return cond(blackBoard) ? NodeStatus::Success : NodeStatus::Failure;
 		}
+		void SetCondition(ConditionFunc condition) { cond = condition; }
+
+		NodeType GetNodeType() const override { return NodeType::Condition; }
 	private:
 		ConditionFunc cond;//==>
 	};
@@ -171,6 +201,9 @@ namespace BT
 			}
 			return NodeStatus::Failure;
 		}
+
+		NodeType GetNodeType() const override { return NodeType::Condition; }
+
 	private:
 		void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
 		std::string m_typeName; // 스크립트 컴포넌트의 타입이름
@@ -219,6 +252,8 @@ namespace BT
 			}
 		}
 
+		NodeType GetNodeType() const override { return NodeType::Composite; }
+
 	private:
 		ParallelPolicy m_policy;
 	};
@@ -227,42 +262,14 @@ namespace BT
 	{
 	public:
 		using ActionFunc = std::function<NodeStatus(float, BlackBoard&)>;
-		ActionNode(const std::string& name, ActionFunc action)
-			: BTNode(name), m_action(action) {
+		ActionNode(const std::string& name)
+			: BTNode(name) {
 		}
-		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
-		{
-			return m_action(deltatime, blackBoard);
-		}
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override abstract;
+		void SetAction(ActionFunc action) { m_action = action; }
+		NodeType GetNodeType() const override final { return NodeType::Action; }
 	private:
-		ActionFunc m_action;//==>
-
-		
-	};
-
-	class ActionScriptNode : public BTNode
-	{
-	public:
-		ActionScriptNode(const std::string& name, const std::string& typeName, const std::string& methodName,void* scriptPtr)
-			: BTNode(name), scriptInstance(scriptPtr), m_typeName(typeName), m_name(methodName) {			
-		}
-		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
-		{
-			auto type = Meta::Find(m_typeName);
-			if (!scriptInstance||!type) {
-				Debug->LogError("Type not found: " + m_typeName);
-				return NodeStatus::Failure;
-			}
-			if (Meta::InvokeMethodByMetaName(scriptInstance, *type, m_name, { deltatime, blackBoard }))
-			{
-				return NodeStatus::Success;
-			}
-			return NodeStatus::Failure;
-		}
-	private:
-		void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
-		std::string m_typeName; // 스크립트 컴포넌트의 타입이름
-		std::string m_name; // 메서드 이름
+		ActionFunc m_action; // Action function to be executed
 	};
 
 	inline void DFS(const BTNode::NodePtr& node, std::function<void(const BTNode::NodePtr)> visit)

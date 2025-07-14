@@ -9,7 +9,6 @@
 class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {  
 public:  
-
    ReflectBoxColliderComponent
 	[[Serializable(Inheritance:Component)]]
     BoxColliderComponent() 
@@ -26,6 +25,13 @@ public:
         auto scene = SceneManagers->GetActiveScene();  
         if (scene)  
         {  
+            if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
+            {
+                m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
+            }
+            else {
+                m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
+            }
             scene->CollectColliderComponent(this);  
         }  
    }
@@ -61,8 +67,6 @@ public:
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
    }  
-
-
    EColliderType GetColliderType() const  
    {  
 	   return m_type;
@@ -79,6 +83,9 @@ public:
 	   {
 		   m_Info.boxExtent = { m_boxExtent.x, m_boxExtent.y, m_boxExtent.z };
 	   }
+       else {
+           m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
+       }
 
 	   return m_Info;
    }
@@ -139,10 +146,9 @@ public:
     void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
 
     DirectX::SimpleMath::Quaternion GetRotationOffset() override;
-
     /*void SetIsTrigger(bool isTrigger) override;
     bool GetIsTrigger() override;*/
-
+    BoxColliderInfo m_Info;
 private:  
 
     void OnTriggerEnter(ICollider* other) override;
@@ -159,5 +165,4 @@ private:
 
     EColliderType m_type;
 	unsigned int m_collsionCount = 0;
-    BoxColliderInfo m_Info;
 };

@@ -337,10 +337,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		{
 			oldLocalMatrix = obj->m_transform.GetLocalMatrix();
 		}
-	
+		XMMATRIX deltaMat = XMMatrixIdentity();
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
-			nullptr, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
-	
+			deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
+
 		XMMATRIX parentMat = GameObject::FindIndex(obj->m_parentIndex)->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
@@ -363,7 +363,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			);
 		}
 		//실시간 변화
-		obj->m_transform.SetLocalMatrix(newLocalMatrix);
+		if (!XMMatrixIsIdentity(deltaMat))
+			obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
 		wasDragging = isDragging;
 	}
 

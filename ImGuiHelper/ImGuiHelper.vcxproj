@@ -19,9 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BlueprintBuilder.h" />
     <ClInclude Include="CustomCollapsingHeader.h" />
     <ClInclude Include="drawing.h" />
     <ClInclude Include="fa.h" />
+    <ClInclude Include="HorizontalLayout.h" />
     <ClInclude Include="IconsFontAwesome4.h" />
     <ClInclude Include="IconsFontAwesome6.h" />
     <ClInclude Include="ImGui.h" />
@@ -30,10 +32,12 @@
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />
     <ClInclude Include="NodeEditor.h" />
+    <ClInclude Include="PinHelper.h" />
     <ClInclude Include="Profiler.h" />
     <ClInclude Include="widgets.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BlueprintBuilder.cpp" />
     <ClCompile Include="drawing.cpp" />
     <ClCompile Include="NodeEditor.cpp" />
     <ClCompile Include="Profiler.cpp" />

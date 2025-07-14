@@ -12,6 +12,7 @@ GameObject::GameObject() :
 	m_parentIndex(0)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
 }
 
@@ -22,6 +23,7 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
     m_parentIndex(parentIndex)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 
@@ -32,6 +34,7 @@ GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObje
 	m_parentIndex(parentIndex)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
+	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 }
 
@@ -49,15 +52,15 @@ void GameObject::SetTag(const std::string_view& tag)
 
 void GameObject::SetLayer(const std::string_view& layer)
 {
-        if (layer.empty())
-        {
-                return;
-        }
+    if (layer.empty())
+    {
+        return;
+    }
 
-        if (TagManager::GetInstance()->HasLayer(layer))
-        {
-                m_layer = layer.data();
-        }
+    if (TagManager::GetInstance()->HasLayer(layer))
+    {
+        m_layer = layer.data();
+    }
 }
 
 void GameObject::Destroy()
@@ -111,6 +114,7 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
 		return nullptr;
 	}
 	component->SetOwner(this);
+	//ScriptManager->RegisterScriptReflection(scriptName.data(), component.get());
 
 	std::string scriptFile = std::string(scriptName) + ".cpp";
 
@@ -155,6 +159,32 @@ std::shared_ptr<Component> GameObject::GetComponentByTypeID(uint32 id)
 	return nullptr;
 }
 
+void GameObject::RefreshComponentIdIndices()
+{
+	std::unordered_map<HashedGuid, size_t> newMap;
+
+	for (size_t i = 0; i < m_components.size(); ++i)
+	{
+		const auto& component = m_components[i];
+		if (!component)
+			continue;
+
+		auto scriptComponent = std::dynamic_pointer_cast<ModuleBehavior>(m_components[i]);
+		if (scriptComponent)
+		{
+			ScriptManager->UnCollectScriptComponent(this, i, scriptComponent->m_name.ToString());
+			newMap[scriptComponent->m_scriptTypeID] = i;
+			ScriptManager->CollectScriptComponent(this, i, scriptComponent->m_name.ToString());
+		}
+		else
+		{
+			newMap[component->GetTypeID()] = i;
+		}
+	}
+
+	m_componentIds = std::move(newMap);
+}
+
 void GameObject::RemoveComponentIndex(uint32 id)
 {
 	if (id >= m_components.size())
@@ -167,7 +197,11 @@ void GameObject::RemoveComponentIndex(uint32 id)
 	{
 		m_componentIds.erase(iter);
 	}
-	m_components[id]->Destroy();
+
+	if(nullptr != m_components[id])
+	{
+		m_components[id]->Destroy();
+	}
 }
 
 void GameObject::RemoveComponentTypeID(uint32 typeID)

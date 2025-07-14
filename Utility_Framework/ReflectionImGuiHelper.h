@@ -28,7 +28,7 @@ namespace Meta
     {
         for (const auto& prop : type.properties)
         {
-			if (prop.name == "m_isEnabled")
+            if (prop.name == "m_isEnabled" || (prop.typeID == type_guid(Object) && prop.name == "m_name"))
 				continue;
 
             const HashedGuid hash = prop.typeID;
@@ -36,7 +36,7 @@ namespace Meta
             {
                 int value = std::any_cast<int>(prop.getter(instance));
                 ImGui::PushID(prop.name);
-                if (ImGui::InputInt(prop.name, &value))
+                if (ImGui::DragInt(prop.name, &value))
                 {
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -47,7 +47,7 @@ namespace Meta
             {
                 unsigned int value = std::any_cast<unsigned int>(prop.getter(instance));
 				ImGui::PushID(prop.name);
-                if (ImGui::InputScalar(prop.name, ImGuiDataType_S32, &value))
+                if (ImGui::DragScalar(prop.name, ImGuiDataType_S32, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -58,7 +58,7 @@ namespace Meta
             {
                 long long value = std::any_cast<long long>(prop.getter(instance));
 				ImGui::PushID(prop.name);
-                if (ImGui::InputScalar(prop.name, ImGuiDataType_S64, &value))
+                if (ImGui::DragScalar(prop.name, ImGuiDataType_S64, &value))
                 {
 					MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -69,7 +69,7 @@ namespace Meta
             {
                 float value = std::any_cast<float>(prop.getter(instance));
 				ImGui::PushID(prop.name);
-                if (ImGui::InputFloat(prop.name, &value))
+                if (ImGui::DragFloat(prop.name, &value))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -105,6 +105,13 @@ namespace Meta
                     }
                 }
 				ImGui::PopID();
+            }
+            else if (hash == GUIDCreator::GetTypeID<const char*>())
+            {
+                const char* value = std::any_cast<const char*>(prop.getter(instance));
+                ImGui::PushID(prop.name);
+				ImGui::Text(value);
+                ImGui::PopID();
             }//[OverWatching]
             else if (hash == GUIDCreator::GetTypeID<std::vector<std::string>>())
             {
@@ -255,7 +262,7 @@ namespace Meta
             {
                 auto value = std::any_cast<int2>(prop.getter(instance));
 				ImGui::PushID(prop.name);
-                if (ImGui::InputInt2(prop.name, &value.x))
+                if (ImGui::DragInt2(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);
@@ -266,7 +273,7 @@ namespace Meta
             {
                 auto value = std::any_cast<int3>(prop.getter(instance));
 				ImGui::PushID(prop.name);
-                if (ImGui::InputInt3(prop.name, &value.x))
+                if (ImGui::DragInt3(prop.name, &value.x))
                 {
                     MakePropChangeCommand(instance, prop, value);
                     prop.setter(instance, value);

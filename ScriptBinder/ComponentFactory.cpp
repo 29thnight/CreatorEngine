@@ -5,11 +5,14 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
+#include "BoxColliderComponent.h"
 #include "CharacterControllerComponent.h"
 #include "Terrain.h"
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
+#include "InvalidScriptComponent.h"
+
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -39,7 +42,21 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 	if (itNode["ModuleBehavior"])
 	{
 		std::string scriptName = itNode["m_name"].as<std::string>();
+		if (!ScriptManager->IsScriptExists(scriptName))
+		{
+			auto invalidComponent = obj->AddComponent<InvalidScriptComponent>();
+			return;
+		}
+
 		auto scriptComponent = obj->AddScriptComponent(scriptName);
+		const auto& scriptType = scriptComponent->ScriptReflect();
+		Meta::Deserialize(reinterpret_cast<void*>(scriptComponent), scriptType, itNode);
+
+		if (isEditorToGame)
+		{
+			scriptComponent->MakeInstanceID();
+		}
+
 		return;
 	}
 
@@ -69,7 +86,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             if (model && getMeshNode)
             {
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
-                meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
 			meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
@@ -259,7 +276,13 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto rigidBody = static_cast<RigidBodyComponent*>(component);
 			Meta::Deserialize(rigidBody, itNode);
 			rigidBody->SetOwner(obj);
-			}
+		}
+		else if (componentType->typeID == type_guid(BoxColliderComponent))
+		{
+			auto boxCollider = static_cast<BoxColliderComponent*>(component);
+			Meta::Deserialize(boxCollider, itNode);
+			boxCollider->SetOwner(obj);
+		}
 		else if (componentType->typeID == type_guid(CharacterControllerComponent))
 		{
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
@@ -317,7 +340,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		}
 		else
 		{
-            Meta::Deserialize(component, itNode);
+            Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);
 			component->SetOwner(obj);
 		}
 

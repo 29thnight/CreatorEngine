@@ -1,7 +1,6 @@
 #pragma once
 #include <tuple>
 
-
 struct ICollider
 {
 	/*virtual void SetLocalPosition(std::tuple<float, float, float> pos) = 0;
@@ -20,7 +19,9 @@ struct ICollider
 	//virtual void SetIsTrigger(bool isTrigger) = 0; 
 	//virtual bool GetIsTrigger() = 0;
 
-	//
+	virtual void SetEnabled(bool able) { isEnabled = able; };
+	bool isEnabled = true;
+
 	virtual void OnTriggerEnter(ICollider* other) = 0;
 	virtual void OnTriggerStay(ICollider* other) = 0;
 	virtual void OnTriggerExit(ICollider* other) = 0;

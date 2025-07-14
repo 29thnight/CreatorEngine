@@ -14,11 +14,6 @@ const static uint32_t m_heightFieldTypeId = 9005;
 const static uint32_t m_controllerTypeId = 9006;
 const static uint32_t m_convexTypeId = 9007;
 
-
-
-
-
-
 //==========================================================
 // EnumClass
 //콜라이더 타입 //트리거 : 충돌되지 않고 겹치면 이벤트 발생 , 콜리전 : 충돌되면 이벤트 발생
@@ -94,6 +89,18 @@ struct RigidBodyGetSetData
 	bool isLockAngularX = false;	//X축 회전 고정
 	bool isLockAngularY = false;	//Y축 회전 고정
 	bool isLockAngularZ = false;	//Z축 회전 고정
+	float AngularDamping = 0.05f;
+	float LinearDamping = 0.0f;
+	float mass = 100.f;
+
+	float maxLinearVelocity = 1e+16;
+	float maxAngularVelocity = 100.f;
+	float maxContactImpulse = 1e+32;
+	float maxDepenetrationVelocity = 1e+32;
+
+	bool isColliderEnabled = true;
+	DirectX::SimpleMath::Vector3 velocity{};
+	int forceMode{ 4 }; // 4 == NONE
 };
 
 //CharacterController의 GetSetData를 위한 구조체
@@ -175,6 +182,7 @@ struct ColliderInfo
 	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
 	float restitution = 1.0f;	//탄성 계수
 	float density = 1.0f;	//밀도
+
 };
 
 //구형 콜라이더 정보
@@ -254,8 +262,8 @@ struct CharacterControllerInfo
 	unsigned int layerNumber = 0;	//레이어 넘버
 
 	DirectX::SimpleMath::Vector3 position = {0.0f,0.0f,0.0f};	//위치
-	float height = 0.1f;	//높이
-	float radius = 0.05f;	//반지름
+	float height = 8.5f;	//높이
+	float radius = 0.55f;	//반지름
 	float stepOffset = 0.001f;	//오를 수 있는 계단 높이 (코사인)
 	float slopeLimit = 0.7f;	//오를 수 있는 최대 경사각
 	float contactOffset = 0.001f;	//충돌 감지를 위한 여유 거리

@@ -19,10 +19,10 @@ public:
     CoreWindow(HINSTANCE hInstance, const wchar_t* title, int width, int height)
         : m_hInstance(hInstance), m_width(width), m_height(height)
     {
+        s_instance = this;
         RegisterWindowClass();
         CreateAppWindow(title);
         SetUnhandledExceptionFilter(ErrorDumpHandeler);
-        s_instance = this;
     }
 
     ~CoreWindow()
@@ -77,11 +77,11 @@ public:
 
     static LONG WINAPI ErrorDumpHandeler(EXCEPTION_POINTERS* pExceptionPointers)
     {
-        int msgResult = MessageBox(NULL, L"Should Create Dump ?", L"Exception", MB_YESNO | MB_ICONQUESTION);
+        int msgResult = MessageBox(NULL, L"Should Create Dump ?", L"Exception", MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
 
         if (msgResult == IDYES)
         {
-            CreateDump(pExceptionPointers, g_dumpType);
+            CreateDump(pExceptionPointers, g_dumpType, s_instance->m_hWnd);
         }
 
         return msgResult;

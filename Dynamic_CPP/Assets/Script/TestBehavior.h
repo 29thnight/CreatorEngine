@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "TestBehavior.generated.h"
 
 class TestBehavior : public ModuleBehavior
 {
 public:
+   ReflectTestBehavior
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(TestBehavior)
 
 public:
@@ -18,4 +21,10 @@ public:
 	virtual void OnCollisionExit(const Collision& collider) override;
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override;
+
+public:
+	[[Property]]
+	int testValue = 0;
+	[[Property]]
+	std::string testString = "TestBehavior";
 };

@@ -4,6 +4,7 @@
 
 class RenderScene;
 class InspectorWindow;
+class GameObject;
 struct Transform
 {
 public:
@@ -31,6 +32,8 @@ public:
 	Transform& SetRotation(Mathf::Quaternion quaternion);
 	Transform& AddRotation(Mathf::Quaternion quaternion);
 
+	void SetOwner(GameObject* owner);
+
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
 	Mathf::xMatrix GetInverseMatrix() const;
@@ -54,6 +57,7 @@ private:
 	friend class RenderScene;
 	friend class InspectorWindow;
 
+	GameObject* m_owner{ nullptr };
 	uint32 m_parentID{ 0 };
 
 	[[Property]]

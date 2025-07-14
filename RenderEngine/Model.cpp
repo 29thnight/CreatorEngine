@@ -140,6 +140,8 @@ Mesh* Model::GetMesh(const std::string_view& name)
 			return mesh;
 		}
 	}
+
+	return nullptr;
 }
 
 Mesh* Model::GetMesh(int index)

@@ -2,6 +2,7 @@
 #include "Export.h"
 #include "CreateFactory.h"
 #include "SceneManager.h"
+#include "NodeFactory.h"
 
 extern "C"
 {
@@ -36,44 +37,36 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void SetSceneManager(void* sceneManager)
+	EXPORT_API void SetSceneManager(Singleton<SceneManager>::FGetInstance funcPtr)
 	{
-		SceneManager* ptr = static_cast<SceneManager*>(sceneManager);
-		auto& vector = SceneManagers->GetScenes();
-		auto& exeVector = ptr->GetScenes();
+		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
+	}
 
-		vector.clear();
-		for (auto& scene : exeVector)
-		{
-			vector.push_back(scene);
-		}
-
-		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
-		SceneManagers->SetActiveScene(ptr->GetActiveScene());
-		SceneManagers->SetGameStart(ptr->IsGameStart());
-		auto& dontDestroyOnLoadObjects = SceneManagers->GetDontDestroyOnLoadObjects();
-		auto& exeDontDestroyOnLoadObjects = ptr->GetDontDestroyOnLoadObjects();
-		dontDestroyOnLoadObjects.clear();
-		for (auto& obj : exeDontDestroyOnLoadObjects)
-		{
-			dontDestroyOnLoadObjects.push_back(obj);
-		}
-		SceneManagers->SetActiveSceneIndex(ptr->GetActiveSceneIndex());
-		SceneManagers->SetActiveScene(ptr->GetActiveScene());
-		SceneManagers->SetGameStart(ptr->IsGameStart());
-		SceneManagers->SetInputActionManager(ptr->GetInputActionManager());
+	EXPORT_API void SetNodeFactory(Singleton<BT::NodeFactory>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<BT::NodeFactory>&>(BTNodeFactory) = funcPtr();
 	}
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
+		CreateFactory::GetInstance()->RegisterFactory("NewBehaviourScript", []() { return new NewBehaviourScript(); });
+		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
+		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });
+		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
+		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
-		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
+	}
+
+	EXPORT_API void InitActionFactory()
+	{
+		// Register the factory function for BTAction Automation
 	}
 }

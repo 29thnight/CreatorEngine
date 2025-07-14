@@ -7,7 +7,7 @@ class EffectComponent : public Component, public IUpdatable, public IAwakable, p
 {
 public:
     ReflectEffectComponent
-        [[Serializable(Inheritance:Component)]]
+    [[Serializable(Inheritance:Component)]]
     GENERATED_BODY(EffectComponent)
 
     void Awake() override;

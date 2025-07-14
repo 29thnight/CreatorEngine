@@ -547,7 +547,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); //&&&&&trigger
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -560,7 +560,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(boxInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(boxInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -612,7 +612,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(sphereInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(sphereInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -625,7 +625,7 @@ void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(sphereInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(sphereInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -677,7 +677,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(capsuleInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(capsuleInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -690,7 +690,7 @@ void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(capsuleInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(capsuleInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -742,7 +742,7 @@ void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(convexMeshInfo, EColliderType::COLLISION);
+				Physics->CreateStaticBody(convexMeshInfo, ptr->GetColliderType());
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -755,7 +755,7 @@ void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
 			else
 			{
 				bool isKinematic = bodyType == EBodyType::KINEMATIC;
-				Physics->CreateDynamicBody(convexMeshInfo, EColliderType::COLLISION, isKinematic);
+				Physics->CreateDynamicBody(convexMeshInfo, ptr->GetColliderType(), isKinematic);
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{
@@ -906,6 +906,7 @@ void Scene::DestroyGameObjects()
         {
             obj->m_parentIndex = indexMap[obj->m_parentIndex];
 			obj->m_rootIndex = indexMap[obj->m_rootIndex];
+			obj->m_transform.SetParentID(obj->m_parentIndex);
         }
         else
         {
@@ -955,15 +956,13 @@ void Scene::DestroyComponents()
 			std::erase_if(obj->m_components, [](const auto& component)
 			{
 				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
-				if (!behavior)
-				{
-					int a = 0;
-				}
-
 				return component == nullptr;
 			});
+
+			obj->RefreshComponentIdIndices();
 		}
 	}
+
 }
 
 std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
@@ -1029,6 +1028,14 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 void Scene::SetInternalPhysicData()
 {
+	std::unordered_map<GameObject*, EBodyType> m_bodyType;
+
+	for (auto& rigid : m_rigidBodyComponents)
+	{
+		auto gameObject = rigid->GetOwner();
+		m_bodyType[gameObject] = rigid->GetBodyType();
+	}
+
 	std::unordered_set<GameObject*> linkCompleteSet;
 	for (auto& box : m_boxColliderComponents)
 	{
@@ -1038,7 +1045,8 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1052,7 +1060,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1066,7 +1074,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}
@@ -1080,7 +1088,7 @@ void Scene::SetInternalPhysicData()
 			auto iter = m_ColliderTypeLinkCallback.find(gameObject);
 			if(iter != m_ColliderTypeLinkCallback.end())
 			{
-				iter->second(EBodyType::STATIC);
+				iter->second(m_bodyType[gameObject]);
 			}
 			linkCompleteSet.insert(gameObject);
 		}

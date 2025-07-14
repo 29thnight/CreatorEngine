@@ -1,5 +1,6 @@
 #pragma once
 #include "imgui-node-editor\imgui_node_editor.h"
+#include "IUpdatable.h"
 #include "Component.h"
 #include "IAIComponent.h"
 #include "NodeFactory.h"
@@ -8,7 +9,7 @@
 
 using namespace BT;
 
-class BehaviorTreeComponent : public Component, public IAIComponent
+class BehaviorTreeComponent : public Component, public IAIComponent, public IUpdatable
 {
 public:
    ReflectBehaviorTreeComponent
@@ -29,10 +30,16 @@ public:
 			m_root = std::make_shared<SequenceNode>("RootSequence");
 		}
 	}
-	void Tick(float deltaTime) override {
+
+	void Update(float deltaSecond) override {
 		if (m_root) {
-			m_root->Tick(deltaTime,m_blackboard);
+			m_root->Tick(deltaSecond, m_blackboard);
 		}
+	}
+	void Tick(float deltaTime) override {
+		/*if (m_root) {
+			m_root->Tick(deltaTime,m_blackboard);
+		}*/
 	}
 
 	// Behavior Tree 관련 메서드
@@ -47,7 +54,7 @@ public:
 
 
 	BTNode::NodePtr CreateNode(const std::string& key,const json& data = {}) {
-		return BTNodeFactory.Create(key, data);
+		return BTNodeFactory->Create(key, data);
 	}
 
 	void DeleteNode(const BTNode::NodePtr& node) {
@@ -76,6 +83,7 @@ public:
 		});
 	}
 
+	BlackBoard& GetBlackBoard() { return m_blackboard; }
 private:
 
 	BlackBoard m_blackboard; // 블랙보드 데이터
@@ -85,6 +93,9 @@ private:
 	std::unordered_map<BTNode*, ImVec2> _nodePositions;
 
 	void* scriptInstance{ nullptr }; // 스크립트 인스턴스 포인터
-	std::string typeName; // 스크립트 컴포넌트의 타입이름
+	std::string typeName;
+	// IUpdatable을(를) 통해 상속됨
+	
+	// 스크립트 컴포넌트의 타입이름
 };
 

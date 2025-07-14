@@ -6,12 +6,16 @@
 
 class ModuleBehavior;
 class GameObject;
-
+class SceneManager;
+namespace BT
+{
+	class NodeFactory;
+}
 #pragma region DLLFunctionPtr
-typedef void (*InitModuleFunc)();
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef const char** (*GetScriptNamesFunc)(int*);
-typedef void (*SetSceneManagerFunc)(void*);
+typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
+typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
@@ -33,13 +37,22 @@ public:
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void CreateScriptFile(const std::string_view& name);
+	void RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script);
+	void UnRegisterScriptReflection(const std::string_view& name);
 
 #pragma region Script Build Helper
-	void UpdateSceneManager(void* sceneManager)
+	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
 	{
 		if (!m_setSceneManagerFunc) return;
 
 		m_setSceneManagerFunc(sceneManager);
+	}
+
+	void UpdateBTNodeFactory(Singleton<BT::NodeFactory>::FGetInstance btNodeFactory)
+	{
+		if (!m_setBTNodeFactoryFunc) return;
+
+		m_setBTNodeFactoryFunc(btNodeFactory);
 	}
 
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
@@ -60,8 +73,13 @@ public:
 		std::unique_lock lock(m_scriptFileMutex);
 		std::erase_if(m_scriptComponentIndexs, [&](const auto& tuple)
 		{
-			return std::get<0>(tuple) == gameObject && std::get<1>(tuple) == index && std::get<2>(tuple) == name;
+			return std::get<0>(tuple) == gameObject && std::get<2>(tuple) == name;
 		});
+	}
+
+	bool IsScriptExists(const std::string_view& name) const
+	{
+		return std::ranges::find(m_scriptNames, name) != m_scriptNames.end();
 	}
 
 	std::vector<std::string>& GetScriptNames()
@@ -83,20 +101,6 @@ public:
 	{
 		m_isReloading = value;
 	}
-
-	void ImiFreeLibrary()
-	{
-		if (hDll)
-		{
-			::FreeLibrary(hDll);
-			hDll = nullptr;
-			m_scriptFactoryFunc = nullptr;
-			m_initModuleFunc = nullptr;
-			m_scriptNamesFunc = nullptr;
-			m_setSceneManagerFunc = nullptr;
-		}
-	}
-
 #pragma endregion
 
 private:
@@ -105,14 +109,15 @@ private:
 private:
 	HMODULE hDll{};
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
-	InitModuleFunc m_initModuleFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
 	SetSceneManagerFunc m_setSceneManagerFunc{};
+	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};
 	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
 	std::wstring command{};
 	std::wstring rebuildCommand{};
 	std::atomic_bool m_isStartUp{ false };
 
+private:
 #pragma region Script File String
 	std::string scriptIncludeString
 	{
@@ -215,8 +220,13 @@ private:
 	};
 #pragma endregion
 	
+private:
+
+
+private:
 	std::vector<std::string> m_scriptNames{};
 	std::vector<std::tuple<GameObject*, size_t, std::string>> m_scriptComponentIndexs{};
+	std::vector<std::tuple<GameObject*, size_t, MetaYml::Node>> m_scriptComponentMetaIndexs{};
 	std::thread m_scriptFileThread{};
 	std::mutex m_scriptFileMutex{};
 	std::atomic_bool m_isReloading{ false };

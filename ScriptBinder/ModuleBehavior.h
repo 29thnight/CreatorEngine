@@ -22,10 +22,8 @@ public:
 	GENERATED_BODY(ModuleBehavior)
 
 public:
-	virtual Meta::Type ScriptReflect() 
-	{ 
-		return {}; 
-	};
+	ScriptFieldDefault();
+
 	virtual void Awake() {};
 	virtual void OnEnable() {};
 	virtual void Start() {};

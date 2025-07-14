@@ -252,8 +252,20 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		flags |= ImGuiTreeNodeFlags_Leaf;
 	}
 
+	if (!obj->IsEnabled())
+	{
+		// 회색으로 텍스트 색상 변경
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+	}
+
 	std::string icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
 	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
+
+
+	if (!obj->IsEnabled())
+	{
+		ImGui::PopStyleColor();
+	}
 
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
 	{
