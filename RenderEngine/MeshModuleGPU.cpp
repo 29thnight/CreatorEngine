@@ -1,15 +1,29 @@
 #include "MeshModuleGPU.h"
 #include "ShaderSystem.h"
 
-void MeshModuleGPU::Initialize()
+MeshModuleGPU::MeshModuleGPU()
 {
-    m_pso = std::make_unique<PipelineStateObject>();
+    // 모든 포인터와 값들을 안전하게 초기화
+    m_pso = nullptr;
     m_meshType = MeshType::None;
     m_instanceCount = 0;
     m_particleSRV = nullptr;
     m_model = nullptr;
     m_meshIndex = 0;
     m_assignedTexture = nullptr;
+    m_tempCubeMesh = nullptr;
+    m_clippingBuffer = nullptr;
+    m_isClippingAnimating = false;
+    m_clippingAnimationSpeed = 1.0f;
+
+    // 상수 버퍼 데이터도 초기화
+    memset(&m_constantBufferData, 0, sizeof(MeshConstantBuffer));
+}
+void MeshModuleGPU::Initialize()
+{
+    m_pso = std::make_unique<PipelineStateObject>();
+    m_instanceCount = 0;
+    m_particleSRV = nullptr;
 
     // 블렌드 스테이트 (알파 블렌딩)
     D3D11_BLEND_DESC blendDesc = {};
@@ -90,7 +104,13 @@ void MeshModuleGPU::Initialize()
     CreateClippingBuffer();
 
     // 기본 큐브 메시 설정
-    SetMeshType(MeshType::Cube);
+    if (m_meshType == MeshType::None) {
+        SetMeshType(MeshType::Cube);
+    }
+
+    if (IsClippingEnabled()) {
+        OnClippingStateChanged();
+    }
 }
 
 void MeshModuleGPU::CreateCubeMesh()
@@ -240,6 +260,7 @@ void MeshModuleGPU::UpdateClippingBuffer()
     if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
         return;
 
+    // 버퍼가 없으면 생성
     if (!m_clippingBuffer)
     {
         CreateClippingBuffer();
@@ -357,28 +378,10 @@ nlohmann::json MeshModuleGPU::SerializeData() const
 
 void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
 {
-    // 메시 타입 정보 복원
-    if (json.contains("mesh"))
-    {
-        const auto& meshJson = json["mesh"];
-
-        if (meshJson.contains("type"))
-        {
-            MeshType type = static_cast<MeshType>(meshJson["type"]);
-            SetMeshType(type);
-        }
-
-        if (meshJson.contains("meshIndex"))
-        {
-            m_meshIndex = meshJson["meshIndex"];
-        }
-    }
-
     // 모델 정보 복원
     if (json.contains("model"))
     {
         const auto& modelJson = json["model"];
-
         if (modelJson.contains("name"))
         {
             std::string modelName = modelJson["name"];
@@ -387,11 +390,32 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 modelName += ".fbx";
             }
             m_model = DataSystems->LoadCashedModel(modelName);
-        }
 
+            if (m_model) {
+                m_meshType = MeshType::Model;
+            }
+        }
         if (modelJson.contains("meshIndex"))
         {
             m_meshIndex = modelJson["meshIndex"];
+        }
+    }
+
+    // 메시 타입 정보 복원
+    if (json.contains("mesh"))
+    {
+        const auto& meshJson = json["mesh"];
+        if (meshJson.contains("type"))
+        {
+            MeshType jsonType = static_cast<MeshType>(meshJson["type"]);
+            // 모델이 로드되지 않았거나, JSON에서 명시적으로 다른 타입을 지정한 경우에만 변경
+            if (!m_model || jsonType != MeshType::Model) {
+                SetMeshType(jsonType);
+            }
+        }
+        if (meshJson.contains("meshIndex"))
+        {
+            m_meshIndex = meshJson["meshIndex"];
         }
     }
 
@@ -408,6 +432,11 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 textureName += ".png";
             }
             m_assignedTexture = DataSystems->LoadTexture(textureName);
+
+            if (m_assignedTexture) {
+                std::string nameWithoutExtension = file::path(textureName).stem().string();
+                m_assignedTexture->m_name = nameWithoutExtension;
+            }
         }
     }
 
@@ -517,6 +546,7 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         if (DeviceState::g_pDevice && DeviceState::g_pDeviceContext)
         {
             UpdateClippingBuffer();
+            OnClippingStateChanged();
         }
     }
 }
@@ -564,7 +594,7 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     if (m_isClippingAnimating && IsClippingEnabled())
     {
         // ImGui의 시간 함수 사용 (UI와 동일한 시간 기준)
-        float currentTime = ImGui::GetTime();
+        float currentTime = Time->GetTotalSeconds();
         float animatedProgress = (sin(currentTime * m_clippingAnimationSpeed) + 1.0f) * 0.5f;
         SetClippingProgress(animatedProgress);
         UpdateClippingBuffer();
@@ -627,6 +657,7 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         deviceContext->PSSetConstantBuffers(1, 1, nullBuffer);
     }
 }
+
 void MeshModuleGPU::SetTexture(Texture* texture)
 {
     m_assignedTexture = texture;

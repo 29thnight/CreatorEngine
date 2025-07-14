@@ -24,6 +24,7 @@ struct MeshConstantBuffer
 class MeshModuleGPU : public RenderModules, public ISerializable
 {
 public:
+	MeshModuleGPU();
 	void Initialize() override;
 	void Release() override;
 	void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) override;

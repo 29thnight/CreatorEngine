@@ -850,8 +850,6 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 
 void EffectEditor::LoadEffectFromJson(const std::string& filename)
 {
-	std::cout << "=== LoadEffectFromJson START ===" << std::endl;
-
 	try {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
@@ -862,63 +860,52 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 		nlohmann::json effectJson;
 		file >> effectJson;
 		file.close();
-		std::cout << "JSON loaded successfully" << std::endl;
 
 		// JSON에서 이펙트 복원
 		auto loadedEffect = EffectSerializer::DeserializeEffect(effectJson);
-		std::cout << "DeserializeEffect completed. Result: " << (loadedEffect ? "SUCCESS" : "FAILED") << std::endl;
 
 		if (loadedEffect) {
 			// 기존 임시 에미터들 클리어
-			std::cout << "Clearing existing emitters (count: " << m_tempEmitters.size() << ")" << std::endl;
 			m_tempEmitters.clear();
-
-			// 기존 텍스처 리스트 상태 확인
-			std::cout << "Current texture list size before sync: " << m_textures.size() << std::endl;
 
 			// 로드된 이펙트의 ParticleSystem들을 임시 에미터로 변환
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
-			std::cout << "Found " << particleSystems.size() << " particle systems" << std::endl;
 
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
 				tempEmitter.particleSystem = particleSystems[i];
 				tempEmitter.name = "LoadedEmitter_" + std::to_string(i + 1);
 				tempEmitter.isPlaying = false;
+
 				m_tempEmitters.push_back(tempEmitter);
 
-				std::cout << "Added emitter " << i << ": " << tempEmitter.name << std::endl;
-
-				// 각 에미터의 렌더 모듈 상태 즉시 확인
+				// 즉시 참조 확인
+				std::cout << "Emitter " << i << " added. Checking references..." << std::endl;
 				if (tempEmitter.particleSystem) {
 					const auto& renderModules = tempEmitter.particleSystem->GetRenderModules();
-					std::cout << "  Emitter " << i << " has " << renderModules.size() << " render modules" << std::endl;
+					std::cout << "  RenderModules count: " << renderModules.size() << std::endl;
 
 					for (size_t j = 0; j < renderModules.size(); ++j) {
 						auto renderModule = renderModules[j];
+						std::cout << "    Module[" << j << "] ptr: " << renderModule << std::endl;
+
 						if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
 							Texture* tex = meshModule->GetAssignedTexture();
-							std::cout << "    MeshModule[" << j << "] texture: " << (tex ? tex->m_name : "NONE") << std::endl;
-
-							Model* model = meshModule->GetCurrentModel();
-							std::cout << "    MeshModule[" << j << "] model: " << (model ? model->name : "NONE") << std::endl;
-						}
-						if (auto* billboardModule = dynamic_cast<BillboardModuleGPU*>(renderModule)) {
-							Texture* tex = billboardModule->GetAssignedTexture();
-							std::cout << "    BillboardModule[" << j << "] texture: " << (tex ? tex->m_name : "NONE") << std::endl;
+							std::cout << "      Texture: " << (tex ? tex->m_name : "NONE") << std::endl;
 						}
 					}
 				}
 			}
 
-			std::cout << "=== 에미터 생성 완료, 동기화 시작 ===" << std::endl;
+			// 이펙트가 살아있는 동안 참조 유지를 위해 멤버로 저장
+			m_loadedEffect = std::move(loadedEffect); // 이 라인 추가!
 
-			// 중요: 로드된 에미터들에서 사용중인 리소스들을 에디터 리스트에 동기화
+			// 동기화
 			SyncResourcesFromLoadedEmitters();
 
 			std::cout << "Effect loaded from: " << filename << std::endl;
 			std::cout << "Loaded " << particleSystems.size() << " particle systems" << std::endl;
-			std::cout << "Final texture count: " << m_textures.size() << std::endl;
+			std::cout << "Synced " << m_textures.size() << " textures to editor" << std::endl;
 		}
 		else {
 			std::cerr << "Failed to deserialize effect from JSON" << std::endl;
@@ -927,21 +914,14 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 	catch (const std::exception& e) {
 		std::cerr << "Error loading effect: " << e.what() << std::endl;
 	}
-
-	std::cout << "=== LoadEffectFromJson END ===" << std::endl;
 }
 
-// 2. SyncResourcesFromLoadedEmitters도 더 상세하게
 void EffectEditor::SyncResourcesFromLoadedEmitters()
 {
-	std::cout << "=== SyncResourcesFromLoadedEmitters START ===" << std::endl;
-	std::cout << "TempEmitters count: " << m_tempEmitters.size() << std::endl;
-
 	int textureFoundCount = 0;
 
 	for (size_t i = 0; i < m_tempEmitters.size(); ++i) {
 		const auto& tempEmitter = m_tempEmitters[i];
-		std::cout << "\n--- Processing emitter " << i << ": " << tempEmitter.name << " ---" << std::endl;
 
 		if (!tempEmitter.particleSystem) {
 			std::cout << "ERROR: Emitter " << i << " has no particle system!" << std::endl;
@@ -949,19 +929,15 @@ void EffectEditor::SyncResourcesFromLoadedEmitters()
 		}
 
 		const auto& renderModules = tempEmitter.particleSystem->GetRenderModules();
-		std::cout << "Emitter " << i << " has " << renderModules.size() << " render modules" << std::endl;
 
 		for (size_t j = 0; j < renderModules.size(); ++j) {
 			const auto& renderModule = renderModules[j];
-			std::cout << "  Processing render module " << j << std::endl;
 
 			// MeshModuleGPU 체크
 			if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
-				std::cout << "    -> MeshModuleGPU found" << std::endl;
 
 				Texture* assignedTexture = meshModule->GetAssignedTexture();
 				if (assignedTexture) {
-					std::cout << "    -> Texture found: " << assignedTexture->m_name << " (ptr: " << assignedTexture << ")" << std::endl;
 					textureFoundCount++;
 					AddTextureToEditorList(assignedTexture);
 				}
@@ -980,7 +956,6 @@ void EffectEditor::SyncResourcesFromLoadedEmitters()
 
 			// BillboardModuleGPU 체크
 			if (auto* billboardModule = dynamic_cast<BillboardModuleGPU*>(renderModule)) {
-				std::cout << "    -> BillboardModuleGPU found" << std::endl;
 
 				Texture* assignedTexture = billboardModule->GetAssignedTexture();
 				if (assignedTexture) {
@@ -999,31 +974,23 @@ void EffectEditor::SyncResourcesFromLoadedEmitters()
 			}
 		}
 	}
-
-	std::cout << "\n=== SUMMARY ===" << std::endl;
-	std::cout << "Total textures found: " << textureFoundCount << std::endl;
-	std::cout << "Editor texture list size: " << m_textures.size() << std::endl;
-	std::cout << "=== SyncResourcesFromLoadedEmitters END ===" << std::endl;
 }
 
-// 3. AddTextureToEditorList도 더 자세하게
 void EffectEditor::AddTextureToEditorList(Texture* texture)
 {
-	std::cout << "\n*** AddTextureToEditorList called ***" << std::endl;
-
 	if (!texture) {
 		std::cout << "ERROR: texture is nullptr!" << std::endl;
 		return;
 	}
 
-	std::cout << "Trying to add texture: '" << texture->m_name << "' (ptr: " << texture << ")" << std::endl;
-	std::cout << "Current editor list size: " << m_textures.size() << std::endl;
+	if (texture->m_name.empty() ||
+		texture->m_name.find("texture") == 0) {
 
-	// 현재 리스트의 모든 텍스처 출력
-	for (size_t i = 0; i < m_textures.size(); ++i) {
-		std::cout << "  Existing[" << i << "]: '" << m_textures[i]->m_name << "' (ptr: " << m_textures[i] << ")" << std::endl;
+		// 이름 생성
+		texture->m_name = "LoadedTexture_" + std::to_string(m_textures.size());
+
+		std::cout << "Texture name was empty or default, set to: " << texture->m_name << std::endl;
 	}
-
 	// 중복 체크
 	for (const auto& existingTexture : m_textures) {
 		if (existingTexture->m_name == texture->m_name) {
@@ -1034,10 +1001,7 @@ void EffectEditor::AddTextureToEditorList(Texture* texture)
 
 	// 새로운 텍스처 추가
 	m_textures.push_back(texture);
-	std::cout << "SUCCESS: Texture added! New list size: " << m_textures.size() << std::endl;
-	std::cout << "*** AddTextureToEditorList end ***\n" << std::endl;
 }
-
 
 void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
 {
@@ -1868,8 +1832,6 @@ void EffectEditor::RenderUnifiedDragDropTarget()
 				std::cout << "Unsupported model format: " << extension << std::endl;
 			}
 		}
-
-
 
 		ImGui::EndDragDropTarget();
 	}

@@ -116,6 +116,8 @@ private:
     bool m_showSaveDialog = false;
     bool m_showLoadDialog = false;
 
+    std::unique_ptr<EffectBase> m_loadedEffect;
+
 private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
