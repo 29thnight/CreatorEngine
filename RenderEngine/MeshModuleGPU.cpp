@@ -16,6 +16,10 @@ MeshModuleGPU::MeshModuleGPU()
     m_isClippingAnimating = false;
     m_clippingAnimationSpeed = 1.0f;
 
+    m_worldMatrix = Mathf::Matrix::Identity;
+    m_invWorldMatrix = Mathf::Matrix::Identity;
+    m_useRelativeClipping = true;
+
     // 상수 버퍼 데이터도 초기화
     memset(&m_constantBufferData, 0, sizeof(MeshConstantBuffer));
 }
@@ -253,33 +257,30 @@ void MeshModuleGPU::CreateClippingBuffer()
 
 void MeshModuleGPU::UpdateClippingBuffer()
 {
-    if (!SupportsClipping())
+    if (!SupportsClipping() || !m_clippingBuffer)
         return;
 
-    // DirectX 디바이스가 준비되었는지 확인
     if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
         return;
 
-    // 버퍼가 없으면 생성
-    if (!m_clippingBuffer)
-    {
-        CreateClippingBuffer();
-        if (!m_clippingBuffer) // 생성 실패시 리턴
-            return;
-    }
-
     auto& deviceContext = DeviceState::g_pDeviceContext;
 
-    // 상수 버퍼 매핑
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr = deviceContext->Map(m_clippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
     if (SUCCEEDED(hr))
     {
-        // 클리핑 파라미터 복사
-        memcpy(mappedResource.pData, &GetClippingParams(), sizeof(ClippingParams));
+        ClippingParams* params = static_cast<ClippingParams*>(mappedResource.pData);
 
-        // 언맵
+        // 기본 클리핑 파라미터 복사
+        const auto& baseParams = GetClippingParams();
+        params->clippingProgress = baseParams.clippingProgress;
+        params->clippingAxis = baseParams.clippingAxis;
+        params->clippingEnabled = baseParams.clippingEnabled;
+
+        // 역변환 행렬 전달
+        params->invWorldMatrix = m_invWorldMatrix;
+
         deviceContext->Unmap(m_clippingBuffer.Get(), 0);
     }
 }
@@ -300,18 +301,14 @@ nlohmann::json MeshModuleGPU::SerializeData() const
         {"meshIndex", m_meshIndex}
     };
 
-    // 모델 정보 (모델의 경로나 이름 저장)
+    // 모델 정보
     json["model"] = {
         {"hasModel", m_model != nullptr}
     };
 
     if (m_model)
     {
-        // 모델 파일 경로나 이름을 저장 (Model 클래스에 GetPath() 같은 메소드가 있다고 가정)
-        // json["model"]["path"] = m_model->GetPath();
         json["model"]["name"] = m_model->name;
-
-        // 현재는 모델이 할당되어 있다는 정보만 저장
         json["model"]["assigned"] = true;
         json["model"]["meshIndex"] = m_meshIndex;
     }
@@ -327,7 +324,7 @@ nlohmann::json MeshModuleGPU::SerializeData() const
         json["texture"]["assigned"] = true;
     }
 
-    // 클리핑 관련 설정 (RenderModules 베이스 클래스에서 상속받은 클리핑 기능)
+    // 클리핑 관련 설정
     if (SupportsClipping())
     {
         json["clipping"] = {
@@ -336,7 +333,7 @@ nlohmann::json MeshModuleGPU::SerializeData() const
             {"animationSpeed", m_clippingAnimationSpeed}
         };
 
-        // 클리핑 파라미터
+        // 클리핑 파라미터 (상대 좌표계만 저장)
         const auto& clippingParams = GetClippingParams();
         json["clipping"]["params"] = {
             {"clippingProgress", clippingParams.clippingProgress},
@@ -344,16 +341,6 @@ nlohmann::json MeshModuleGPU::SerializeData() const
                 {"x", clippingParams.clippingAxis.x},
                 {"y", clippingParams.clippingAxis.y},
                 {"z", clippingParams.clippingAxis.z}
-            }},
-            {"boundsMin", {
-                {"x", clippingParams.boundsMin.x},
-                {"y", clippingParams.boundsMin.y},
-                {"z", clippingParams.boundsMin.z}
-            }},
-            {"boundsMax", {
-                {"x", clippingParams.boundsMax.x},
-                {"y", clippingParams.boundsMax.y},
-                {"z", clippingParams.boundsMax.z}
             }},
             {"clippingEnabled", clippingParams.clippingEnabled}
         };
@@ -483,30 +470,25 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 SetClippingAxis(axis);
             }
 
-            if (paramsJson.contains("boundsMin") && paramsJson.contains("boundsMax"))
-            {
-                const auto& minJson = paramsJson["boundsMin"];
-                const auto& maxJson = paramsJson["boundsMax"];
-
-                Mathf::Vector3 boundsMin(
-                    minJson.value("x", -1.0f),
-                    minJson.value("y", -1.0f),
-                    minJson.value("z", -1.0f)
-                );
-
-                Mathf::Vector3 boundsMax(
-                    maxJson.value("x", 1.0f),
-                    maxJson.value("y", 1.0f),
-                    maxJson.value("z", 1.0f)
-                );
-
-                SetClippingBounds(boundsMin, boundsMax);
-            }
+            // boundsMin/Max 관련 코드 제거됨 (상대 좌표계는 고정된 -1~1 범위 사용)
 
             if (paramsJson.contains("clippingEnabled"))
             {
                 float enabled = paramsJson["clippingEnabled"];
                 EnableClipping(enabled > 0.5f);
+            }
+        }
+
+        // 하위 호환성: 기존 boundsMin/Max가 있는 파일 처리
+        if (clippingJson.contains("params"))
+        {
+            const auto& paramsJson = clippingJson["params"];
+
+            // 기존 파일에 boundsMin/Max가 있어도 무시하고 경고 로그만 출력
+            if (paramsJson.contains("boundsMin") || paramsJson.contains("boundsMax"))
+            {
+                // 로그 출력 (옵션)
+                // Logger::Warning("Legacy boundsMin/Max detected in clipping data. Using relative coordinate system instead.");
             }
         }
     }
@@ -539,10 +521,9 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         }
     }
 
-    // 클리핑 버퍼 업데이트 (클리핑 설정이 변경된 경우)
+    // 클리핑 버퍼 업데이트
     if (IsClippingEnabled())
     {
-        // DirectX가 준비된 상태에서만 버퍼 업데이트
         if (DeviceState::g_pDevice && DeviceState::g_pDeviceContext)
         {
             UpdateClippingBuffer();
@@ -590,10 +571,13 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;
 
-    // 클리핑 애니메이션 처리 (매 프레임 실행)
+    // 월드 행렬 저장 및 역행렬 계산
+    m_worldMatrix = world;
+    m_invWorldMatrix = world.Invert();
+
+    // 클리핑 애니메이션 처리
     if (m_isClippingAnimating && IsClippingEnabled())
     {
-        // ImGui의 시간 함수 사용 (UI와 동일한 시간 기준)
         float currentTime = Time->GetTotalSeconds();
         float animatedProgress = (sin(currentTime * m_clippingAnimationSpeed) + 1.0f) * 0.5f;
         SetClippingProgress(animatedProgress);
@@ -606,9 +590,10 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
 
-    // 클리핑 상수 버퍼 바인딩 (1번)
+    // 클리핑 상수 버퍼 바인딩 및 업데이트
     if (IsClippingEnabled() && m_clippingBuffer)
     {
+        UpdateClippingBuffer();
         deviceContext->PSSetConstantBuffers(1, 1, m_clippingBuffer.GetAddressOf());
     }
 

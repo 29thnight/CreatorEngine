@@ -36,14 +36,11 @@ struct ModelConstantBuffer
 // 클리핑 파라미터 구조체
 struct ClippingParams
 {
-    float clippingProgress;        // 0.0 ~ 1.0
-    Mathf::Vector3 clippingAxis;   // 클리핑 방향
-
-    Mathf::Vector3 boundsMin;      // 바운딩 박스 최소값
-    float pad1;
-
-    Mathf::Vector3 boundsMax;      // 바운딩 박스 최대값
-    float clippingEnabled;         // 0.0 또는 1.0
+    float clippingProgress;
+    Mathf::Vector3 clippingAxis;
+    Mathf::Matrix invWorldMatrix;
+    float clippingEnabled;
+    Mathf::Vector3 pad;
 };
 
 class RenderModules

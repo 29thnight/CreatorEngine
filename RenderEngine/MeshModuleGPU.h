@@ -96,4 +96,9 @@ private:
 	// 파티클 관련
 	ID3D11ShaderResourceView* m_particleSRV;
 	UINT m_instanceCount;
+
+	// 상대 기반
+	Mathf::Matrix m_worldMatrix;
+	Mathf::Matrix m_invWorldMatrix;
+	bool m_useRelativeClipping;
 };
