@@ -12,6 +12,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     {
     case DLL_PROCESS_ATTACH:
         InitActionFactory();
+        InitConditionFactory();
 		InitModuleFactory();
         break;
     case DLL_THREAD_ATTACH:

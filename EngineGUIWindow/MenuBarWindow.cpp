@@ -1,4 +1,5 @@
 #ifndef DYNAMICCPP_EXPORTS
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "MenuBarWindow.h"
 #include "SceneRenderer.h"
 #include "SceneManager.h"
@@ -8,6 +9,8 @@
 #include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "AIManager.h"
+#include "BTBuildGraph.h"
 
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
@@ -334,6 +337,16 @@ void MenuBarWindow::RenderMenuBar()
                     }
                 }
 
+                if( ImGui::MenuItem("Behavior Tree Editor"))
+                {
+                    m_bShowBehaviorTreeWindow = true;
+				}
+
+                if (ImGui::MenuItem("Blackboard Editor"))
+                {
+					m_bShowBlackBoardWindow = true;
+				}
+
                 ImGui::EndMenu();
             }
 
@@ -415,6 +428,16 @@ void MenuBarWindow::RenderMenuBar()
     if (m_bShowLogWindow)
     {
         ShowLogWindow();
+    }
+
+    if (m_bShowBehaviorTreeWindow)
+    {
+        ShowBehaviorTreeWindow();
+	}
+
+    if (m_bShowBlackBoardWindow)
+    {
+        ShowBlackBoardWindow();
     }
 
     if (m_bShowProfileWindow)
@@ -601,5 +624,708 @@ void MenuBarWindow::ShowLogWindow()
 void MenuBarWindow::ShowLightMapWindow()
 {
     ImGui::GetContext("LightMap").Open();
+}
+
+ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };
+
+void MenuBarWindow::ShowBehaviorTreeWindow()
+{
+    static BTBuildGraph graph;
+    static bool showEditor = false;
+    static bool isfirstLoad = false;
+	static std::string BTName;
+
+    if (m_bShowBehaviorTreeWindow)
+    {
+        showEditor = true;
+    }
+
+    if (showEditor)
+    {
+        ImGui::Begin("Behavior Tree Editor", &showEditor);
+
+        if (ImGui::Button("Create"))
+        {
+            file::path BTSavePath = ShowSaveFileDialog(L"", L"Save Behavior Tree Asset",
+                PathFinder::Relative("BehaviorTree"));
+
+            if (!BTSavePath.empty())
+            {
+                BTName = BTSavePath.stem().string();
+                if (!file::exists(BTSavePath.parent_path()))
+                {
+                    file::create_directories(BTSavePath.parent_path());
+                }
+                graph.CleanUp();
+            }
+            else
+            {
+				Debug->LogError("Failed to create Behavior Tree.");
+            }
+        }
+		ImGui::SameLine();
+        if (ImGui::Button("Open"))
+        {
+            file::path fileName = ShowOpenFileDialog(
+                L"Behavior Tree Files (*.bt)\0*.bt\0",
+                L"Load Behavior Tree",
+                PathFinder::Relative("BehaviorTree").wstring()
+            );
+
+            if (!fileName.empty())
+            {
+                BTName = fileName.filename().string();
+                if (file::exists(fileName))
+                {
+                    graph.CleanUp();
+                    auto node = MetaYml::LoadFile(fileName.string());
+                    const YAML::Node& nodeList = node["NodeList"];
+                    if (nodeList && nodeList.IsSequence())
+                    {
+                        for (const auto& node : nodeList)
+                        {
+                            graph.DeserializeSingleNode(node);
+                        }
+                    }
+                }
+                else
+                {
+                    Debug->LogError("Behavior Tree file does not exist: " + fileName.string());
+                }
+            }
+            else
+            {
+                Debug->LogError("Failed to load Behavior Tree.");
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save"))
+        {
+            if (BTName.empty())
+            {
+                file::path fileName = ShowSaveFileDialog(
+                    L"Behavior Tree Files (*.bt)\0*.bt\0",
+                    L"Save Behavior Tree",
+                    PathFinder::Relative("BehaviorTree").wstring()
+				);
+
+                if (!fileName.empty())
+                {
+                    BTName = fileName.stem().string();
+                }
+                else
+                {
+                    Debug->LogError("Failed to save Behavior Tree.");
+				}
+            }
+
+            file::path BTPath = PathFinder::Relative("BehaviorTree\\" + BTName + ".bt");
+
+            if (!file::exists(BTPath.parent_path()))
+            {
+                file::create_directories(BTPath.parent_path());
+            }
+
+            for (auto& node : graph.NodeList)
+            {
+                node.Position = BT::ToMathfVec2(node.PositionEditor);
+            }
+
+            // Save the graph to a file
+            auto node = Meta::Serialize(&graph);
+
+            std::ofstream outFile(BTPath.string());
+
+            if (outFile.is_open())
+            {
+                outFile << node; // Pretty print with 4 spaces
+                outFile.close();
+            }
+            else
+            {
+                std::cerr << "Failed to open file for writing: " << BTPath.string() << std::endl;
+            }
+		}
+
+		ImGui::Separator();
+
+        static BTBuildNode*& selectNode = graph.SelectedNode;
+        bool nodeMenuOpen = false;
+		bool addScriptMenuOpen = false;
+
+        if (!s_MenuBarBTEditorContext)
+        {
+            // Ensure the file path is valid and exists
+            ed::Config config;
+            config.SettingsFile = nullptr;
+            isfirstLoad = true;
+            s_MenuBarBTEditorContext = ed::CreateEditor(&config);
+        }
+
+        static ed::NodeId s_SelectedNodeId = 0;
+        static ed::NodeId s_newNodeId = 0;
+        constexpr float rounding = 5.0f;
+        constexpr float padding = 15.0f;
+        constexpr ImVec2 insidePadding = { 8.f, 0.f };
+        static ImVec2 s_DragDelta{};
+        static ImVec2 s_DragStartNodePos{};
+
+        ed::SetCurrentEditor(s_MenuBarBTEditorContext);
+        ed::Begin("BTEditor");
+
+        for (auto& node : graph.NodeList)
+        {
+            ed::NodeId nid{ node.ID.m_ID_Data };
+            ImVec2 prev = BT::ToImVec2(node.Position);
+
+            ed::PinId inPin = node.InputPinId;
+            ed::PinId outPin = node.OutputPinId;
+            std::string nodeName = node.Name;
+
+            const ImVec4 pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
+            ImColor nodeBgColor = pinBackground + ImColor(15, 15, 15, 0);
+
+            ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(nodeBgColor));
+            ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(32, 32, 32, 200));
+            ed::PushStyleColor(ed::StyleColor_PinRect, ImColor(60, 180, 255, 150));
+            ed::PushStyleColor(ed::StyleColor_PinRectBorder, ImColor(60, 180, 255, 150));
+
+            ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(0, 0, 0, 0));
+            ed::PushStyleVar(ed::StyleVar_NodeRounding, rounding);
+            ed::PushStyleVar(ed::StyleVar_SourceDirection, ImVec2(0.0f, 1.0f));
+            ed::PushStyleVar(ed::StyleVar_TargetDirection, ImVec2(0.0f, -1.0f));
+            ed::PushStyleVar(ed::StyleVar_LinkStrength, 0.0f);
+            ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
+            ed::PushStyleVar(ed::StyleVar_PinRadius, 5.0f);
+
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
+
+            ImGui::BeginGroup();
+
+            ed::BeginNode(nid);
+
+            if (isfirstLoad)
+            {
+                ed::SetNodePosition(nid, prev);
+            }
+
+            if (0 != s_newNodeId.Get())
+            {
+				ed::SetNodePosition(s_newNodeId, s_DragStartNodePos + s_DragDelta);
+				s_newNodeId = 0;
+            }
+
+            ImRect inputsRect;
+            int inputAlpha = 200;
+            if (!node.IsRoot)
+            {
+                ImGui::Dummy(ImVec2(160, padding));
+                inputsRect = 
+                    ImRect(ImGui::GetItemRectMin() + 
+                        insidePadding, ImGui::GetItemRectMax() - insidePadding);
+
+                ed::PushStyleVar(ed::StyleVar_PinArrowSize, 10.0f);
+                ed::PushStyleVar(ed::StyleVar_PinArrowWidth, 10.0f);
+                ed::PushStyleVar(ed::StyleVar_PinCorners, ImDrawFlags_RoundCornersBottom);
+
+                ed::BeginPin(inPin, ed::PinKind::Input);
+                ed::PinPivotRect(inputsRect.GetTL(), inputsRect.GetBR());
+                ed::PinRect(inputsRect.GetTL(), inputsRect.GetBR());
+                ed::EndPin();
+                ed::PopStyleVar(3);
+            }
+            else
+                ImGui::Dummy(ImVec2(160, padding));
+
+            ImGui::Dummy(ImVec2(160, 10));
+            ImRect contentScriptRect;
+            ImVec2 textScriptSize;
+            ImVec2 textScriptPos;
+            bool isScriptNode = node.HasScript;
+            if (isScriptNode)
+            {
+                if (AIManagers->IsActionNodeRegistered(node.ScriptName)
+                    || AIManagers->IsConditionNodeRegistered(node.ScriptName))
+                {
+                    ImGui::Dummy(ImVec2(160, 50));
+                    contentScriptRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+                    textScriptSize = ImGui::CalcTextSize(node.ScriptName.c_str());
+                    textScriptPos = ImVec2(contentScriptRect.GetTL().x + (152 - textScriptSize.x) / 2, contentScriptRect.GetTL().y + (50 - textScriptSize.y) / 2);
+                    ImGui::GetWindowDrawList()->AddText(textScriptPos, IM_COL32_WHITE, node.ScriptName.c_str());
+                }
+            }
+
+            ImGui::Dummy(ImVec2(160, 50));
+            ImRect contentRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+            ImVec2 textSize = ImGui::CalcTextSize(node.Name.c_str());
+            ImVec2 textPos = ImVec2(contentRect.GetTL().x + (152 - textSize.x) / 2, contentRect.GetTL().y + (50 - textSize.y) / 2);
+            ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32_WHITE, node.Name.c_str());
+
+            ImRect outputsRect;
+            int outputAlpha = 200;
+
+            ImGui::Dummy(ImVec2(160, 10));
+
+            if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))
+            {
+                ImGui::Dummy(ImVec2(160, padding));
+                outputsRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
+
+                ed::PushStyleVar(ed::StyleVar_PinCorners, ImDrawFlags_RoundCornersTop);
+                ed::BeginPin(outPin, ed::PinKind::Output);
+                ed::PinPivotRect(outputsRect.GetTL(), outputsRect.GetBR());
+                ed::PinRect(outputsRect.GetTL(), outputsRect.GetBR());
+                ed::EndPin();
+                ed::PopStyleVar();
+            }
+            else
+                ImGui::Dummy(ImVec2(160, padding));
+
+            ed::EndNode();
+            ed::PopStyleVar(7);
+            ed::PopStyleColor(4);
+
+            ImGui::EndGroup();
+
+            ImGui::PopStyleVar(3);
+
+            auto drawList = ed::GetNodeBackgroundDrawList(nid);
+
+            const auto topRoundCornersFlags = ImDrawFlags_RoundCornersTop;
+            const auto bottomRoundCornersFlags = ImDrawFlags_RoundCornersBottom;
+
+            if (!node.IsRoot)
+            {
+                drawList->AddRectFilled(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, bottomRoundCornersFlags);
+                drawList->AddRect(inputsRect.GetTL() + ImVec2(0, 1), inputsRect.GetBR(),
+                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), inputAlpha), 4.0f, bottomRoundCornersFlags);
+            }
+
+            if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))
+            {
+                drawList->AddRectFilled(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, topRoundCornersFlags);
+                drawList->AddRect(outputsRect.GetTL(), outputsRect.GetBR() - ImVec2(0, 1),
+                    IM_COL32((int)(255 * pinBackground.x), (int)(255 * pinBackground.y), (int)(255 * pinBackground.z), outputAlpha), 4.0f, topRoundCornersFlags);
+            }
+
+            drawList->AddRectFilled(contentRect.GetTL(), contentRect.GetBR(), IM_COL32(170, 100, 255, 255), 0.0f);
+            drawList->AddRect(
+                contentRect.GetTL(),
+                contentRect.GetBR(),
+                IM_COL32(200, 140, 255, 255), 0.0f);
+
+            if (isScriptNode)
+            {
+                drawList->AddRectFilled(contentScriptRect.GetTL(), contentScriptRect.GetBR(), IM_COL32(100, 200, 255, 255), 0.0f);
+                drawList->AddRect(
+                    contentScriptRect.GetTL(),
+                    contentScriptRect.GetBR(),
+                    IM_COL32(140, 220, 255, 255), 0.0f);
+            }
+
+            static ed::PinId prevPinID{};
+            static ed::PinId m_DraggingPin = 0;
+            static BTBuildNode* waitRaw = nullptr;
+            static ImVec2 pinPos;
+
+            ed::PinId pinID = ed::GetHoveredPin();
+            if (pinID.Get() != 0 &&
+                prevPinID.Get() != pinID.Get() &&
+                ImGui::IsMouseDown(ImGuiMouseButton_Left)
+                )
+            {
+                s_SelectedNodeId = ed::NodeId(pinID.Get() >> 1);
+                m_DraggingPin = pinID;
+                prevPinID = pinID;
+                s_DragStartNodePos = ed::GetNodePosition(s_SelectedNodeId);
+                s_DragDelta = {};
+                pinPos = ImGui::GetMousePos();
+            }
+
+            if (m_DraggingPin.Get() != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+            {
+                m_DraggingPin = 0;
+                prevPinID = 0;
+                pinPos = {};
+
+                auto it = graph.Nodes.find(HashedGuid{ s_SelectedNodeId.Get() });
+                if (it != graph.Nodes.end())
+                {
+                    waitRaw = it->second;
+                }
+            }
+
+            if (waitRaw)
+            {
+                ed::Suspend();
+                ImGui::OpenPopup("NodeMenu");
+                if (node.ID == waitRaw->ID) {
+                    selectNode = &node;
+                    nodeMenuOpen = true;
+                    waitRaw = nullptr;
+                }
+                ed::Resume();
+            }
+
+            if (m_DraggingPin)
+            {
+                ImVec2 p1 = pinPos;
+                ImVec2 p2 = ImGui::GetMousePos();
+                ImVec2 dir = p2 - p1;
+                ImVec2 absDelta = dir;
+                float length = sqrt(dir.x * dir.x + dir.y * dir.y);
+                if (length > 0.f)
+                {
+                    ImVec2 normDir = ImVec2(dir.x / length, dir.y / length);
+                    ImVec2 perpendicular = ImVec2(-normDir.y, normDir.x);
+                    float offsetAmount = 5.0f;
+                    ImVec2 offset = perpendicular * offsetAmount;
+
+                    ImVec2 p1_offset = p1 + offset;
+                    ImVec2 p2_offset = p2 + offset;
+                    ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
+                    ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
+                    ImU32 color = IM_COL32(255, 255, 255, 125);
+                    float thickness = 3.0f;
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
+                    drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
+                }
+
+                if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                {
+                    s_DragDelta = absDelta;
+                }
+            }
+
+            if (ImGui::IsItemVisible() && ed::IsNodeSelected(nid))
+            {
+                if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                {
+                    ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+                    node.Position = { prev.x + delta.x, prev.y + delta.y };
+                }
+            }
+
+            node.PositionEditor = ed::GetNodePosition(nid);
+        }
+
+        for (auto& node : graph.NodeList)
+        {
+            if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))
+            {
+                for (const auto& childId : node.Children)
+                {
+                    auto childIt = graph.Nodes.find(childId);
+                    if (childIt != graph.Nodes.end())
+                    {
+                        BTBuildNode& child = *childIt->second;
+                        ed::Link(ed::LinkId(child.ID.m_ID_Data), node.OutputPinId, child.InputPinId);
+                    }
+                }
+            }
+        }
+
+        isfirstLoad = false;
+
+        ed::Suspend();
+        if (nodeMenuOpen)
+        {
+            ImGui::OpenPopup("NodeMenu");
+        }
+        ed::Resume();
+
+        ed::Suspend();
+        if (ImGui::BeginPopup("NodeMenu"))
+        {
+            if (selectNode)
+            {
+                if (!selectNode->Name.empty())
+                {
+                    ImGui::MenuItem(selectNode->Name.c_str(), nullptr, false, false);
+                }
+                ImGui::Separator();
+                if (BT::IsCompositeNode(selectNode->Type) || BT::IsDecoratorNode(selectNode->Type))
+                {
+                    auto& selectedNodeChildContainer = selectNode->Children;
+                    bool isNotAbleAddChild = BT::IsDecoratorNode(selectNode->Type) && 1 < selectedNodeChildContainer.size();
+
+                    if (ImGui::BeginMenu("Add Child", !isNotAbleAddChild))
+                    {
+                        for (auto& key : graph.GetRegisteredKey())
+                        {
+                            if (key != "Action" && key != "Condition")
+                            {
+                                if (ImGui::MenuItem(key.c_str()))
+                                {
+                                    BehaviorNodeType type = BT::StringToNodeType(key);
+                                    Mathf::Vector2 newPos =
+                                        BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                    BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
+                                    s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
+                                    graph.AddChildNode(newNode);
+                                }
+                            }
+                            else if (key == "Action")
+                            {
+                                if(ImGui::BeginMenu("Action"))
+                                {
+                                    for (auto& actionName : AIManagers->GetActionNodeNames())
+                                    {
+                                        if (ImGui::MenuItem(actionName.c_str()))
+                                        {
+                                            BehaviorNodeType type = BT::StringToNodeType(key);
+                                            Mathf::Vector2 newPos =
+                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                            BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
+                                            s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
+                                            graph.AddChildNode(newNode);
+                                            
+                                            newNode->HasScript = true;
+                                            newNode->ScriptName = actionName;
+                                        }
+                                    }
+                                    ImGui::Separator();
+                                    if (ImGui::MenuItem("Add Action"))
+                                    {
+                                        addScriptMenuOpen = true;
+                                    }
+                                    ImGui::EndMenu();
+
+                                }
+                            }
+                            else if (key == "Condition")
+                            {
+                                if (ImGui::BeginMenu("Condition"))
+                                {
+                                    for (auto& conditionName : AIManagers->GetConditionNodeNames())
+                                    {
+                                        if (ImGui::MenuItem(conditionName.c_str()))
+                                        {
+                                            BehaviorNodeType type = BT::StringToNodeType(key);
+                                            Mathf::Vector2 newPos =
+                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                            BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
+                                            s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
+
+                                            newNode->HasScript = true;
+                                            newNode->ScriptName = conditionName;
+                                        }
+                                    }
+                                    ImGui::Separator();
+                                    if (ImGui::MenuItem("Add Condition"))
+                                    {
+                                        addScriptMenuOpen = true;
+                                    }
+                                    ImGui::EndMenu();
+                                }
+                            }
+                            
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+                if (selectNode)
+                {
+                    bool isRoot = selectNode->IsRoot;
+                    bool notRoot = !isRoot;
+                    if (ImGui::MenuItem("Delete Node", nullptr, false, notRoot))
+                    {
+                        graph.DeleteNode(selectNode->ID);
+                        selectNode = nullptr;
+                    }
+                }
+            }
+            ImGui::EndPopup();
+        }
+        ed::Resume();
+
+        ed::Suspend();
+        if (addScriptMenuOpen)
+        {
+            ImGui::OpenPopup("AddScriptNode");
+            addScriptMenuOpen = false;
+		}
+        ed::Resume();
+
+        ed::Suspend();
+        if (ImGui::BeginPopup("AddScriptNode"))
+        {
+			static char newNodeName[256] = "";
+			static const char* scriptNodeTypes[2] = { "Action", "Condition" };
+			static int selectedNodeType = 0;
+            ImGui::Text("Select Node Type to Add:");
+            ImGui::Separator();
+			// Show a combo box to select the node type
+			ImGui::Combo("Node Type", 
+                &selectedNodeType, scriptNodeTypes, IM_ARRAYSIZE(scriptNodeTypes));
+			ImGui::SameLine();
+			ImGui::InputText("Node Name", newNodeName, IM_ARRAYSIZE(newNodeName));
+            
+            if (ImGui::Button("Add Script Node"))
+            {
+                switch (selectedNodeType)
+                {
+                case 0:
+                    ScriptManager->CreateActionNodeScript(newNodeName);
+					break;
+                case 1:
+					ScriptManager->CreateConditionNodeScript(newNodeName);
+					break;
+                default:
+                    break;
+                }
+
+                memset(newNodeName, 0, sizeof(newNodeName));
+				selectedNodeType = 0; // Reset to the first type
+            }
+
+            ImGui::EndPopup();
+        }
+        ed::Resume();
+
+        ed::End();
+        ed::SetCurrentEditor(nullptr);
+
+        ImGui::End();
+    }
+    else
+    {
+        if (s_MenuBarBTEditorContext)
+        {
+            ed::DestroyEditor(s_MenuBarBTEditorContext);
+            s_MenuBarBTEditorContext = nullptr;
+
+            file::path BTPath = PathFinder::Relative("BehaviorTree\\" + BTName + ".bt");
+
+            if (!file::exists(BTPath.parent_path()))
+            {
+                file::create_directories(BTPath.parent_path());
+            }
+
+            for (auto& node : graph.NodeList)
+            {
+                node.Position = BT::ToMathfVec2(node.PositionEditor);
+            }
+
+            // Save the graph to a file
+            auto node = Meta::Serialize(&graph);
+
+            std::ofstream outFile(BTPath.string());
+
+            if (outFile.is_open())
+            {
+                outFile << node; // Pretty print with 4 spaces
+                outFile.close();
+            }
+            else
+            {
+                std::cerr << "Failed to open file for writing: " << BTPath.string() << std::endl;
+            }
+
+            graph.Clear();
+			BTName.clear();
+			m_bShowBehaviorTreeWindow = false;
+        }
+    }
+}
+
+void MenuBarWindow::ShowBlackBoardWindow()
+{
+    static char newKeyBuffer[128] = "";
+    static int selectedTypeIndex = 0;
+    static bool showEditor = false;
+
+    if (m_bShowBlackBoardWindow)
+    {
+        showEditor = true;
+    }
+
+    //if(showEditor)
+    //{
+    //    ImGui::Begin("BlackBoard Editor");
+    //    ImGui::InputText("New Key", newKeyBuffer, IM_ARRAYSIZE(newKeyBuffer));
+    //    ImGui::SameLine();
+    //    if (ImGui::Button("Add Key"))
+    //    {
+    //        std::string key(newKeyBuffer);
+    //        if (!key.empty() && !blackboard.HasKey(key))
+    //        {
+    //            // 기본 타입으로 생성
+    //            blackboard.SetValueAsInt(key, 0);
+    //        }
+    //        newKeyBuffer[0] = '\0';
+    //    }
+
+    //    ImGui::Separator();
+
+    //    // 기존 키 목록
+    //    for (auto& [key, value] : blackboard.m_values)
+    //    {
+    //        ImGui::PushID(key.c_str());
+
+    //        ImGui::Text("Key: %s", key.c_str());
+    //        ImGui::SameLine();
+    //        if (ImGui::Button("Remove"))
+    //        {
+    //            blackboard.RemoveKey(key);
+    //            ImGui::PopID();
+    //            break;
+    //        }
+
+    //        // 타입 선택 (변경시 자동 변환은 생략)
+    //        int typeIndex = static_cast<int>(value.Type);
+    //        if (ImGui::Combo("Type", &typeIndex, "None\0Bool\0Int\0Float\0String\0Vector2\0Vector3\0Vector4\0GameObject\0Transform\0"))
+    //        {
+    //            value.Type = static_cast<BlackBoardType>(typeIndex);
+    //        }
+
+    //        // 값 편집 UI
+    //        switch (value.Type)
+    //        {
+    //        case BlackBoardType::Bool:
+    //            ImGui::Checkbox("Value", &value.BoolValue);
+    //            break;
+    //        case BlackBoardType::Int:
+    //            ImGui::InputInt("Value", &value.IntValue);
+    //            break;
+    //        case BlackBoardType::Float:
+    //            ImGui::InputFloat("Value", &value.FloatValue);
+    //            break;
+    //        case BlackBoardType::String:
+    //        case BlackBoardType::GameObject:
+    //        case BlackBoardType::Transform:
+    //        {
+    //            static char buf[256];
+    //            strncpy(buf, value.StringValue.c_str(), sizeof(buf));
+    //            if (ImGui::InputText("Value", buf, IM_ARRAYSIZE(buf)))
+    //            {
+    //                value.StringValue = buf;
+    //            }
+    //            break;
+    //        }
+    //        case BlackBoardType::Vector2:
+    //            ImGui::InputFloat2("Value", &value.Vec2Value.x);
+    //            break;
+    //        case BlackBoardType::Vector3:
+    //            ImGui::InputFloat3("Value", &value.Vec3Value.x);
+    //            break;
+    //        case BlackBoardType::Vector4:
+    //            ImGui::InputFloat4("Value", &value.Vec4Value.x);
+    //            break;
+    //        default:
+    //            ImGui::Text("Unsupported type");
+    //            break;
+    //        }
+
+    //        ImGui::Separator();
+    //        ImGui::PopID();
+    //    }
+
+    //    ImGui::End();
+    //}
 }
 #endif // DYNAMICCPP_EXPORTS

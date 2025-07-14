@@ -24,7 +24,7 @@ enum class PinKind
 	Input
 };
 
-enum class NodeType
+enum class BlueprintNodeType
 {
 	Blueprint,
 	Simple,

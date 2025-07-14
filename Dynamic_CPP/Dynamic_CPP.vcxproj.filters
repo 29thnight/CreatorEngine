@@ -8,11 +8,23 @@
 			<UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
 			<Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
 		</Filter>
-		<Filter Include="Script\CreateFactory">
+		<Filter Include="BehaviorTree">
 			<UniqueIdentifier>{096b2d56-0948-478a-8db2-9b30a0d8f72c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="BehaviorTree\Action">
+			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="BehaviorTree\Condition">
+			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227d}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="AnimationBehavior">
+			<UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
 		</Filter>
 		<Filter Include="Script\ScriptClass">
 			<UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01c}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="Script\CreateFactory">
+			<UniqueIdentifier>{72e7a335-2ce1-4b18-a6f4-d5730af5c01f}</UniqueIdentifier>
 		</Filter>
 		<Filter Include="Common\SourceFile">
 			<UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
@@ -21,12 +33,6 @@
 		<Filter Include="Common\HeaderFile">
 			<UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
 			<Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-		</Filter>
-		<Filter Include="Script\BTActionClass">
-			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227c}</UniqueIdentifier>
-		</Filter>
-		<Filter Include="Script\AnimationBehavior">
-			<UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
 		</Filter>
 	</ItemGroup>
 	<ItemGroup>
@@ -66,6 +72,12 @@
 		<ClInclude Include="funcMain.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
+		<ClInclude Include="BTConditionFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
+		<ClInclude Include="BTActionFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\GameManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -78,8 +90,11 @@
 		<ClInclude Include="Assets\Script\Swrod.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="BTActtionFactory.h">
-			<Filter>Script\CreateFactory</Filter>
+		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -118,6 +133,12 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Swrod.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

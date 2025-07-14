@@ -8,6 +8,7 @@
 #include "ReflectionYml.h"
 #include "ProgressWindow.h"
 #include "ReflectionRegister.h"
+#include "AIManager.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -264,6 +265,8 @@ void HotLoadSystem::Initialize()
 		RegisterScriptReflection(scriptName, tempPtr.get());
 	}
 
+	AIManagers->InitalizeBehaviorTreeSystem();
+
 }
 
 void HotLoadSystem::Shutdown()
@@ -340,6 +343,8 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		const char** scriptNames = nullptr;
 		int scriptCount = 0;
 		scriptNames = m_scriptNamesFunc(&scriptCount);
+
+		AIManagers->InitalizeBehaviorTreeSystem();
 
 		for (int i = 0; i < scriptCount; ++i)
 		{
@@ -888,6 +893,394 @@ void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
 	Meta::Registry::GetInstance()->UnRegister(name.data());
 }
 
+void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
+{
+	if (!file::exists(PathFinder::Relative("BehaviorTree")))
+	{
+		file::create_directories(PathFinder::Relative("BehaviorTree"));
+	}
+
+	if (!file::exists(PathFinder::Relative("BehaviorTree\\Action")))
+	{
+		file::create_directories(PathFinder::Relative("BehaviorTree\\Action"));
+	}
+
+	std::string actionHeaderFileName = std::string(name) + ".h";
+	std::string actionBodyFileName = std::string(name) + ".cpp";
+	std::string actionHeaderFilePath = PathFinder::Relative("BehaviorTree\\Action\\" 
+		+ actionHeaderFileName).string();
+	std::string actionBodyFilePath = PathFinder::Relative("BehaviorTree\\Action\\" 
+		+ actionBodyFileName).string();
+
+	std::string actionFactoryPath = PathFinder::DynamicSolutionPath("BTActionFactory.h").string();
+	std::string actionFactoryFuncPath = PathFinder::DynamicSolutionPath("funcMain.h").string();
+	std::string actionProjPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj").string();
+	std::string actionFilterPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj.filters").string();
+
+	std::ofstream actionFile(actionHeaderFilePath);
+	if (actionFile.is_open())
+	{
+		actionFile 
+			<< actionNodeIncludeString
+			<< name 
+			<< actionNodeInheritString
+			<< name
+			<< actionNodeEndString;
+		actionFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create action file");
+	}
+
+	std::ofstream actionBodyFile(actionBodyFilePath);
+	if (actionBodyFile.is_open())
+	{
+		actionBodyFile
+			<< actionNodeCPPString
+			<< name
+			<< actionNodeCPPEndString
+			<< name
+			<< actionNodeCPPEndBodyString;
+		actionBodyFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create action body file");
+	}
+
+	//Factory Add
+	std::ifstream actionFactoryFile(actionFactoryPath);
+	if (actionFactoryFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << actionFactoryFile.rdbuf();
+		std::string content = buffer.str();
+		actionFactoryFile.close();
+		size_t posHeader = content.find(markerActionFactoryHeaderString);
+		if (posHeader != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posHeader);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, actionFactoryIncludeString + actionHeaderFileName + "\"\n");
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in action factory file");
+		}
+		std::ofstream actionFactoryFileOut(actionFactoryPath);
+		if (actionFactoryFileOut.is_open())
+		{
+			actionFactoryFileOut << content;
+			actionFactoryFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create action factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create action factory file");
+	}
+
+	//Factory Func Add
+	std::ifstream actionFactoryFuncFile(actionFactoryFuncPath);
+	if (actionFactoryFuncFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << actionFactoryFuncFile.rdbuf();
+		std::string content = buffer.str();
+		actionFactoryFuncFile.close();
+		size_t posFunc = content.find(markerActionFactoryFuncString);
+		if (posFunc != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posFunc);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, actionFactoryFunctionString + name.data() + actionFactoryFunctionLambdaString + name.data() + actionFactoryFunctionEndString);
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in action factory file");
+		}
+		std::ofstream actionFactoryFuncFileOut(actionFactoryFuncPath);
+		if (actionFactoryFuncFileOut.is_open())
+		{
+			actionFactoryFuncFileOut << content;
+			actionFactoryFuncFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create action factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create action factory file");
+	}
+
+	{
+		//Filter Add
+		pugi::xml_document doc;
+		if (!doc.load_file(actionFilterPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+		std::vector<pugi::xml_node> itemGroups;
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\BehaviorTree\\Action\\" + actionHeaderFileName;
+		pugi::xml_node filterNodeHeader = newHeader.append_child("Filter");
+		filterNodeHeader.text().set("BehaviorTree\\Action");
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\BehaviorTree\\Action\\" + actionBodyFileName;
+		pugi::xml_node filterNodeSource = newSource.append_child("Filter");
+		filterNodeSource.text().set("BehaviorTree\\Action");
+		if (!doc.save_file(actionFilterPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+	{
+		pugi::xml_document doc;
+		if (!doc.load_file(actionProjPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+		std::vector<pugi::xml_node> itemGroups;
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\BehaviorTree\\Action\\" + actionHeaderFileName;
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\BehaviorTree\\Action\\" + actionBodyFileName;
+		pugi::xml_node additionalOptionsDebug = newSource.append_child("AdditionalOptions");
+		additionalOptionsDebug.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Debug|x64'";
+		additionalOptionsDebug.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+		pugi::xml_node additionalOptionsRelease = newSource.append_child("AdditionalOptions");
+		additionalOptionsRelease.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Release|x64'";
+		additionalOptionsRelease.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+		if (!doc.save_file(actionProjPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+}
+
+void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
+{
+	if (!file::exists(PathFinder::Relative("BehaviorTree")))
+	{
+		file::create_directories(PathFinder::Relative("BehaviorTree"));
+	}
+
+	if (!file::exists(PathFinder::Relative("BehaviorTree\\Condition")))
+	{
+		file::create_directories(PathFinder::Relative("BehaviorTree\\Condition"));
+	}
+
+	std::string conditionHeaderFileName = std::string(name) + ".h";
+	std::string conditionBodyFileName = std::string(name) + ".cpp";
+	std::string conditionHeaderFilePath = PathFinder::Relative("BehaviorTree\\Condition\\" 
+		+ conditionHeaderFileName).string();
+	std::string conditionBodyFilePath = PathFinder::Relative("BehaviorTree\\Condition\\"
+		+ conditionBodyFileName).string();
+
+	std::string conditionFactoryPath = PathFinder::DynamicSolutionPath("BTConditionFactory.h").string();
+	std::string conditionFactoryFuncPath = PathFinder::DynamicSolutionPath("funcMain.h").string();
+	std::string conditionProjPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj").string();
+	std::string conditionFilterPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj.filters").string();
+
+	std::ofstream conditionFile(conditionHeaderFilePath);
+	if (conditionFile.is_open())
+	{
+		conditionFile 
+			<< conditionNodeIncludeString
+			<< name 
+			<< conditionNodeInheritString
+			<< name
+			<< conditionNodeEndString;
+		conditionFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create condition file");
+	}
+
+	std::ofstream conditionBodyFile(conditionBodyFilePath);
+	if (conditionBodyFile.is_open())
+	{
+		conditionBodyFile
+			<< conditionNodeCPPString
+			<< name
+			<< conditionNodeCPPEndString
+			<< name
+			<< conditionNodeCPPEndBodyString;
+		conditionBodyFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create condition body file");
+	}
+
+	//Factory Add
+	std::ifstream conditionFactoryFile(conditionFactoryPath);
+	if (conditionFactoryFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << conditionFactoryFile.rdbuf();
+		std::string content = buffer.str();
+		conditionFactoryFile.close();
+		size_t posHeader = content.find(markerConditionFactoryHeaderString);
+		if (posHeader != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posHeader);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, conditionFactoryIncludeString + conditionHeaderFileName + "\"\n");
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in condition factory file");
+		}
+		std::ofstream conditionFactoryFileOut(conditionFactoryPath);
+		if (conditionFactoryFileOut.is_open())
+		{
+			conditionFactoryFileOut << content;
+			conditionFactoryFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create condition factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create condition factory file");
+	}
+
+	//Factory Func Add
+	std::ifstream conditionFactoryFuncFile(conditionFactoryFuncPath);
+	if (conditionFactoryFuncFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << conditionFactoryFuncFile.rdbuf();
+		std::string content = buffer.str();
+		conditionFactoryFuncFile.close();
+		size_t posFunc = content.find(markerConditionFactoryFuncString);
+		if (posFunc != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posFunc);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, conditionFactoryFunctionString + name.data() + conditionFactoryFunctionLambdaString + name.data() + conditionFactoryFunctionEndString);
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in condition factory file");
+		}
+		std::ofstream conditionFactoryFuncFileOut(conditionFactoryFuncPath);
+		if (conditionFactoryFuncFileOut.is_open())
+		{
+			conditionFactoryFuncFileOut << content;
+			conditionFactoryFuncFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create condition factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create condition factory file");
+	}
+	{
+		//Filter Add
+		pugi::xml_document doc;
+		if (!doc.load_file(conditionFilterPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+		
+		std::vector<pugi::xml_node> itemGroups;
+		
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\BehaviorTree\\Condition\\" + conditionHeaderFileName;
+		pugi::xml_node filterNodeHeader = newHeader.append_child("Filter");
+		filterNodeHeader.text().set("BehaviorTree\\Condition");
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\BehaviorTree\\Condition\\" + conditionBodyFileName;
+		pugi::xml_node filterNodeSource = newSource.append_child("Filter");
+		filterNodeSource.text().set("BehaviorTree\\Condition");
+		if (!doc.save_file(conditionFilterPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+	{
+		pugi::xml_document doc;
+		if (!doc.load_file(conditionProjPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+		
+		std::vector<pugi::xml_node> itemGroups;
+		
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\BehaviorTree\\Condition\\" + conditionHeaderFileName;
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\BehaviorTree\\Condition\\" + conditionBodyFileName;
+		pugi::xml_node additionalOptionsDebug = newSource.append_child("AdditionalOptions");
+		additionalOptionsDebug.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Debug|x64'";
+		additionalOptionsDebug.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+		pugi::xml_node additionalOptionsRelease = newSource.append_child("AdditionalOptions");
+		additionalOptionsRelease.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Release|x64'";
+		additionalOptionsRelease.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+		
+		if (!doc.save_file(conditionProjPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+}
+
 void HotLoadSystem::Compile()
 {
 	file::path scriptPath = PathFinder::Relative("Script\\");
@@ -903,6 +1296,8 @@ void HotLoadSystem::Compile()
 
 	if (hDll)
 	{
+		AIManagers->ClearTreeInAIComponent();
+
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
 			auto script = std::dynamic_pointer_cast<ModuleBehavior>(gameObject->m_components[index]);
@@ -980,7 +1375,7 @@ void HotLoadSystem::Compile()
 		g_progressWindow->SetStatusText(L"Failed to load library...");
 		throw std::runtime_error("Failed to load library");
 	}
-
+	// 스크립트 팩토리 함수 가져오기
 	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));
 	if (!m_scriptFactoryFunc)
 
@@ -990,6 +1385,16 @@ void HotLoadSystem::Compile()
 		throw std::runtime_error("Failed to get function address");
 	}
 
+	// 스크립트 힙영역 할당 해제 함수 가져오기
+	m_scriptDeleteFunc = reinterpret_cast<ModuleBehaviorDeleteFunc>(GetProcAddress(hDll, "DeleteModuleBehavior"));
+	if (!m_scriptDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	// 스크립트 이름 함수 가져오기
 	m_scriptNamesFunc = reinterpret_cast<GetScriptNamesFunc>(GetProcAddress(hDll, "ListModuleBehavior"));
 	if (!m_scriptNamesFunc)
 	{
@@ -997,7 +1402,7 @@ void HotLoadSystem::Compile()
 		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
-
+	// 씬 매니저 설정 함수 가져오기
 	m_setSceneManagerFunc = reinterpret_cast<SetSceneManagerFunc>(GetProcAddress(hDll, "SetSceneManager"));
 	if (!m_setSceneManagerFunc)
 	{
@@ -1005,13 +1410,62 @@ void HotLoadSystem::Compile()
 		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
 	}
-
+	// 행동 트리 노드 팩토리 함수 가져오기
 	m_setBTNodeFactoryFunc = reinterpret_cast<SetBTNodeFactoryFunc>(GetProcAddress(hDll, "SetNodeFactory"));
 	if (!m_setBTNodeFactoryFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address");
+	}
+	// 행동 트리 노드 함수 가져오기
+	m_btActionNodeFunc = reinterpret_cast<BTActionNodeFunc>(GetProcAddress(hDll, "CreateBTActionNode"));
+	if (!m_btActionNodeFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 할당 채제 함수 가져오기
+	m_btActionNodeDeleteFunc = reinterpret_cast<BTActionNodeDeleteFunc>(GetProcAddress(hDll, "DeleteBTActionNode"));
+	if (!m_btActionNodeDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 행동 트리 조건 노드 함수 가져오기
+	m_btConditionNodeFunc = reinterpret_cast<BTConditionNodeFunc>(GetProcAddress(hDll, "CreateBTConditionNode"));
+	if (!m_btConditionNodeFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 조건 노드 할당 해제 함수 가져오기
+	m_btConditionNodeDeleteFunc = reinterpret_cast<BTConditionNodeDeleteFunc>(GetProcAddress(hDll, "DeleteBTConditionNode"));
+	if (!m_btConditionNodeDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 액션 노드 이름 함수 가져오기
+	m_listBTActionNodeNamesFunc = reinterpret_cast<ListBTActionNodeNamesFunc>(GetProcAddress(hDll, "ListBTActionNode"));
+	if (!m_listBTActionNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 조건 노드 이름 함수 가져오기
+	m_listBTConditionNodeNamesFunc = reinterpret_cast<ListBTConditionNodeNamesFunc>(GetProcAddress(hDll, "ListBTConditionNode"));
+	if (!m_listBTConditionNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
 	}
 
 	m_isCompileEventInvoked = false;

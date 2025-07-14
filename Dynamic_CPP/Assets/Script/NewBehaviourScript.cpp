@@ -10,10 +10,6 @@
 
 void NewBehaviourScript::Start()
 {
-	auto behaviorTree = m_pOwner->GetComponent<BehaviorTreeComponent>();
-	behaviorTree->Initialize();
-	auto rootNode = behaviorTree->GetRoot();
-	auto actionNode = behaviorTree->CreateNode("Action");
 
 	//static_cast<BT::SequenceNode*>(rootNode.get())->AddChild(behaviorTree->CreateNode("ActionNode"), {name});
 }

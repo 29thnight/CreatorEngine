@@ -5,7 +5,6 @@
 #include "Material.h"
 #include "MaterialInfomation.h"
 #include "EntityAsis.h"
-
 #include "GameManager.h"
 
 using namespace Mathf;

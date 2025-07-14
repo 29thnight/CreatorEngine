@@ -45,6 +45,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDynamicDebugging>false</UseDynamicDebugging>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -52,6 +53,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -120,6 +122,8 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -157,12 +161,14 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AIManager.cpp" />
     <ClCompile Include="AnimationController.cpp" />
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BehaviorTreeComponent.cpp" />
+    <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="BoxColliderComponent.cpp" />
     <ClCompile Include="CapsuleColliderComponent.cpp" />
     <ClCompile Include="CharacterControllerComponent.cpp" />
@@ -177,8 +183,6 @@
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
-    <ClCompile Include="MonoManager.cpp" />
-    <ClCompile Include="MonoObjectBinding.cpp" />
     <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
     <ClCompile Include="NodeFactory.cpp" />
@@ -192,6 +196,11 @@
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
     <ClInclude Include="BehaviorTreeComponent.h" />
+    <ClInclude Include="BlackBoardEnum.h" />
+    <ClInclude Include="BLackBoardValue.h" />
+    <ClInclude Include="BTBuildGraph.h" />
+    <ClInclude Include="BTBuildNode.h" />
+    <ClInclude Include="BTEnum.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
@@ -266,8 +275,6 @@
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
-    <ClInclude Include="MonoManager.h" />
-    <ClInclude Include="MonoObjectBinding.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PrefabUtility.h" />

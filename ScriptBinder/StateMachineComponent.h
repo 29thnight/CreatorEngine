@@ -19,15 +19,18 @@ public:
 public:
    ReflectStateMachineComponent
 	[[Serializable(Inheritance:Component)]]
-   StateMachineComponent() {
-	   m_name = "StateMachineComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<StateMachineComponent>();
-   } virtual ~StateMachineComponent() = default;
+   StateMachineComponent() 
+   {
+	   m_name = "StateMachineComponent"; 
+	   m_typeID = TypeTrait::GUIDCreator::GetTypeID<StateMachineComponent>();
+   }
+   virtual ~StateMachineComponent() = default;
 
 	[[Property]]
 	std::string name;
 
 	void Initialize() override;
-	void Tick(float deltaTime) override;
+	//void Tick(float deltaTime) override;
 		
 	FSM::FSMState* AddState(const std::string& name);
 	void RemoveState(FSM::FSMState* state);
