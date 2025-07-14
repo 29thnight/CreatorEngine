@@ -5,8 +5,10 @@ ReflectionScriptField(AsisMove) \
 { \
 	PropertyField \
 	({ \
-		meta_property(moveSpeed) \
-		meta_property(currentPointIndex) \
+		meta_property(m_moveSpeed) \
+		meta_property(m_pathRadius) \
+		meta_property(m_predictNextTime) \
+		meta_property(m_rotateSpeed) \
 	}); \
 	FieldEnd(AsisMove, PropertyOnly) \
 };

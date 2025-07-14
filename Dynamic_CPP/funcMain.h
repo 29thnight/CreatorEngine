@@ -130,11 +130,12 @@ extern "C"
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("NewBehaviourScript", []() { return new NewBehaviourScript(); });
+		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
+		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
-		CreateFactory::GetInstance()->RegisterFactory("Temp", []() { return new Temp(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });

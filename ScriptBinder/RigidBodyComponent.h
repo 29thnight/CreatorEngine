@@ -5,7 +5,7 @@
 #include "IOnDistroy.h"
 #include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
-
+#include "EForceMode.h"
 class RigidBodyComponent : public Component, public IAwakable, public IOnDistroy
 {
 public:
@@ -39,12 +39,32 @@ public:
 	bool IsLockAngularY() const { return m_isLockAngularY; }
 	bool IsLockAngularZ() const { return m_isLockAngularZ; }
 
+	void SetAngularDamping(float _AngularDamping = 0.05f);
+	void SetLinearDamping(float _LinearDamping);
+	void AddForce(const Mathf::Vector3& force, EForceMode forceMode = EForceMode::FORCE);
+	void SetMass(float _mass);
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
+	Mathf::Vector3 velocity{};
+	EForceMode forceMode{ EForceMode::NONE };
+	float AngularDamping =0.05f;
+	[[Property]]
+	float LinearDamping = 0;
+	[[Property]]
+	float m_mass = 70.f;
+	[[Property]]
+	float maxLinearVelocity = 1e+16;
+	[[Property]]
+	float maxAngularVelocity = 100.f;
+	[[Property]]
+	float maxContactImpulse = 1e+32;
+	[[Property]]
+	float maxDepenetrationVelocity = 1e+32;
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;
+
 
 private:
 	bool m_isLockLinearX = false;
@@ -53,5 +73,7 @@ private:
 	bool m_isLockAngularX = false;
 	bool m_isLockAngularY = false;
 	bool m_isLockAngularZ = false;
+
+
 };
 

@@ -1,9 +1,12 @@
 #include "NodeEditor.h"
-
+#include "PathFinder.h"
 namespace ed = ax::NodeEditor;
 void NodeEditor::MakeEdit(std::string filePath)
 {
-    std::string _filepath = "NodeEditor\\" + filePath;
+    
+     file::path filepath = PathFinder::NodeEditorPath(filePath);
+     std::string  _filepath= filepath.string();
+    //std::string _filepath = "NodeEditor\\" + filePath;
     if (!m_nodeContext || m_filePath != _filepath)
     {
         if (m_nodeContext)

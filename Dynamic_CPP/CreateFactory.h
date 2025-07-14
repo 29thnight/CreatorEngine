@@ -5,11 +5,12 @@
 // Automation include ScriptClass header
 #include "TestTreeBehavior.h"
 #include "NewBehaviourScript.h"
+#include "Rock.h"
+#include "AsisFeed.h"
 #include "GameManager.h"
 #include "Swrod.h"
 #include "EntityItem.h"
 #include "EntityAsis.h"
-#include "Temp.h"
 #include "Entity.h"
 #include "Player.h"
 #include "TestBehavior.h"

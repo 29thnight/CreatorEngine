@@ -51,6 +51,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	if (isKinematic) {
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, false);
+		m_rigidDynamic->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
 	}
 	else {
 		m_rigidDynamic->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);

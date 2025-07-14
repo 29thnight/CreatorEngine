@@ -9,7 +9,6 @@
 class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
 {  
 public:  
-
    ReflectBoxColliderComponent
 	[[Serializable(Inheritance:Component)]]
     BoxColliderComponent() 
@@ -68,8 +67,6 @@ public:
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
    }  
-
-
    EColliderType GetColliderType() const  
    {  
 	   return m_type;
@@ -149,10 +146,9 @@ public:
     void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
 
     DirectX::SimpleMath::Quaternion GetRotationOffset() override;
-
     /*void SetIsTrigger(bool isTrigger) override;
     bool GetIsTrigger() override;*/
-
+    BoxColliderInfo m_Info;
 private:  
 
     void OnTriggerEnter(ICollider* other) override;
@@ -169,5 +165,4 @@ private:
 
     EColliderType m_type;
 	unsigned int m_collsionCount = 0;
-    BoxColliderInfo m_Info;
 };

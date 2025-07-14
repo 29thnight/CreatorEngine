@@ -2,11 +2,11 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-class Entity;
-class Temp : public ModuleBehavior
+class RigidBodyComponent;
+class AsisFeed : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(Temp)
+	MODULE_BEHAVIOR_BODY(AsisFeed)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -19,12 +19,9 @@ public:
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
-	virtual void OnDestroy() override;
+	virtual void OnDestroy() override  {}
 
-public:
-	void AddEntity(Entity* entity);
-	void RemoveEntity(Entity* entity);
-	std::vector<Entity*>& arrayEntities() { return m_Entities; }
-private:
-	std::vector<Entity*> m_Entities;
+
+
+	RigidBodyComponent* m_rigid = nullptr;
 };

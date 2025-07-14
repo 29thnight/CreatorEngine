@@ -203,6 +203,7 @@
     <ClInclude Include="BTEnum.h" />
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
+    <ClInclude Include="EForceMode.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />

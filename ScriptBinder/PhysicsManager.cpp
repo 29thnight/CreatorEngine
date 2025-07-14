@@ -108,22 +108,22 @@ void PhysicsManager::ProcessCallback()
 		switch (type)
 		{
 		case ECollisionEventType::ENTER_OVERLAP:
-			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
-			break;
-		case ECollisionEventType::ON_OVERLAP:
-			SceneManagers->GetActiveScene()->OnCollisionStay(collision);
-			break;
-		case ECollisionEventType::END_OVERLAP:
-			SceneManagers->GetActiveScene()->OnCollisionExit(collision);
-			break;
-		case ECollisionEventType::ENTER_COLLISION:
 			SceneManagers->GetActiveScene()->OnTriggerEnter(collision);
 			break;
-		case ECollisionEventType::ON_COLLISION:
+		case ECollisionEventType::ON_OVERLAP:
 			SceneManagers->GetActiveScene()->OnTriggerStay(collision);
 			break;
-		case ECollisionEventType::END_COLLISION:
+		case ECollisionEventType::END_OVERLAP:
 			SceneManagers->GetActiveScene()->OnTriggerExit(collision);
+			break;
+		case ECollisionEventType::ENTER_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionEnter(collision);
+			break;
+		case ECollisionEventType::ON_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionStay(collision);
+			break;
+		case ECollisionEventType::END_COLLISION:
+			SceneManagers->GetActiveScene()->OnCollisionExit(collision);
 			break;
 		default:
 			break;
@@ -228,7 +228,6 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
 	boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
-
 	//offset 계산
 	if (tranformOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
@@ -487,9 +486,10 @@ void PhysicsManager::SetPhysicData()
 		}
 
 		auto& transform = colliderInfo.gameObject->m_transform;
+		//colliderInfo.collider.
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
-
+		bool _isColliderEnabled = colliderInfo.collider->isEnabled;
 		//todo : CCT,Controller,ragdoll,capsule,차후 deformeSuface
 		if (colliderInfo.id == m_controllerTypeId)
 		{
@@ -537,6 +537,21 @@ void PhysicsManager::SetPhysicData()
 			data.isLockAngularX = rigidbody->IsLockAngularX();
 			data.isLockAngularY = rigidbody->IsLockAngularY();
 			data.isLockAngularZ = rigidbody->IsLockAngularZ();
+
+			data.maxAngularVelocity = rigidbody->maxAngularVelocity;
+			data.maxLinearVelocity = rigidbody->maxLinearVelocity;
+			data.maxContactImpulse = rigidbody->maxContactImpulse;
+			data.maxDepenetrationVelocity = rigidbody->maxDepenetrationVelocity;
+
+			data.forceMode = static_cast<int>(rigidbody->forceMode);
+			rigidbody->forceMode = EForceMode::NONE;
+			data.velocity = rigidbody->velocity;
+			data.AngularDamping = rigidbody->AngularDamping;
+			data.LinearDamping = rigidbody->LinearDamping;
+			data.mass = rigidbody->m_mass;
+
+			
+			data.isColliderEnabled = _isColliderEnabled;
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
