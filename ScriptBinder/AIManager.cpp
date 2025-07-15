@@ -135,6 +135,16 @@ void AIManager::InitalizeBehaviorTreeSystem()
 				});
 		});
 	}
+
+	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
+	{
+		if (aiComponent->GetAIType() == AIType::BT)
+		{
+			BehaviorTreeComponent* ptr = static_cast<BehaviorTreeComponent*>(aiComponent);
+			ptr->GraphToBuild();
+		}
+	}
+
 }
 
 #endif // DYNAMICCPP_EXPORTS

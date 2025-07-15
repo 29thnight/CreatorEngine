@@ -129,7 +129,6 @@ extern "C"
 	{
 		// Register the factory function for TestBehavior Automation
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
-		CreateFactory::GetInstance()->RegisterFactory("NewBehaviourScript", []() { return new NewBehaviourScript(); });
 		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });

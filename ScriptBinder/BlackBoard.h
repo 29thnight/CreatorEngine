@@ -3,6 +3,7 @@
 
 class GameObject;
 class Transform;
+class MenuBarWindow;
 class BlackBoard
 {
 public:
@@ -29,9 +30,11 @@ public:
 	const Transform& GetValueAsTransform(const std::string& key) const;
 
 	// Management
+	void AddKey(const std::string& key, const BlackBoardType& type);
 	bool HasKey(const std::string& key) const;
 	BlackBoardType GetType(const std::string& key) const;
 	void RemoveKey(const std::string& key);
+	void RenameKey(const std::string& curKey, const std::string& newKey);
 	void Clear();
 
 	// Serialization
@@ -39,6 +42,9 @@ public:
 	void Deserialize(const std::string_view& name);
 
 private:
+	friend class MenuBarWindow; // Allow MenuBarWindow to access private members
+
+	std::string m_name; // Name of the blackboard
 	std::unordered_map<std::string, BlackBoardValue> m_values;
 
 	BlackBoardValue& GetOrCreate(const std::string& key);

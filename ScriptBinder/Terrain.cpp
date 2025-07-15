@@ -459,7 +459,8 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	metaData["layers"] = json::array();
 	int index = 0;
-	for (const auto& layer : m_layers) {
+	for (const auto& layer : m_layers) 
+	{
 		json layerData;
 		layerData["layerID"] = layer.m_layerID;
 		layerData["layerName"] = layer.layerName;

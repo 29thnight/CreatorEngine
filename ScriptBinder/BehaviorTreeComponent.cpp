@@ -7,6 +7,19 @@ void BehaviorTreeComponent::Initialize()
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
 		//TODO: 블랙보드 인스턴스 생성 준비
+		m_pBlackboard = new BlackBoard();
+
+		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);
+		if (!file::exists(blackBoardPath))
+		{
+			Debug->LogError("Blackboard File not Exists");
+		}
+		else
+		{
+			std::string _blackBoardName = blackBoardPath.stem().string();
+			m_pBlackboard->Deserialize(_blackBoardName);
+		}
+
 	}
 	else
 	{
@@ -30,7 +43,7 @@ void BehaviorTreeComponent::Awake()
 
 void BehaviorTreeComponent::Update(float deltaSecond)
 {
-	if (m_root && m_pBlackboard)
+	if (m_root && m_pBlackboard && SceneManagers->m_isGameStart)
 	{
 		m_root->Tick(deltaSecond, *m_pBlackboard);
 	}
@@ -70,7 +83,14 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 
 	BTNode::NodePtr node;
 
-	node = AIManagers->CreateNode(buildNode->ScriptName);
+	if(!buildNode->ScriptName.empty())
+	{
+		node = AIManagers->CreateNode(buildNode->ScriptName);
+	}
+	else
+	{
+		node = AIManagers->CreateNode(buildNode->Name);
+	}
 
 	if (!node)
 		throw std::runtime_error("BTTreeBuilder: Failed to create node for: " + buildNode->Name);
@@ -110,6 +130,7 @@ void BehaviorTreeComponent::GraphToBuild()
 		const MetaYml::Node& nodeList = node["NodeList"];
 		if (nodeList && nodeList.IsSequence())
 		{
+			graph.CleanUp();
 			for (const auto& node : nodeList)
 			{
 				graph.DeserializeSingleNode(node);

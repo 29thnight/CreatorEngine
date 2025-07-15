@@ -140,6 +140,13 @@ const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
 	return gameObject->m_transform;
 }
 
+void BlackBoard::AddKey(const std::string& key, const BlackBoardType& type)
+{
+	if (HasKey(key)) return;
+
+	m_values[key].Type = type;
+}
+
 // Other
 bool BlackBoard::HasKey(const std::string& key) const
 {
@@ -159,8 +166,24 @@ void BlackBoard::RemoveKey(const std::string& key)
 	m_values.erase(key);
 }
 
+void BlackBoard::RenameKey(const std::string& curKey, const std::string& newKey)
+{
+	BlackBoardValue curValue;
+	if(m_values.find(curKey) != m_values.end())
+	{
+		curValue = m_values[curKey];
+		m_values.erase(curKey);
+		m_values[newKey] = curValue;
+	}
+}
+
 void BlackBoard::Serialize(const std::string_view& name)
 {
+	if (m_name != name)
+	{
+		m_name = name;
+	}
+
 	file::path filePath = PathFinder::Relative("BehaviorTree\\" + std::string(name) +".blackboard");
 	if (!file::exists(filePath.parent_path()))
 	{
@@ -168,9 +191,52 @@ void BlackBoard::Serialize(const std::string_view& name)
 	}
 
 	std::ofstream out(filePath.string());
+	if (!out.is_open())
+	{
+		throw std::runtime_error("Failed to open file for writing: " + filePath.string());
+	}
 
+	MetaYml::Node node;
+	for(auto& [key, value] : m_values)
+	{
+		MetaYml::Node entryNode;
+		entryNode["key"] = key;
+		entryNode["value"] = Meta::Serialize(&value);
+		node[m_name].push_back(entryNode);
+	}
+
+	out << node;
+
+	out.flush();
 }
 
 void BlackBoard::Deserialize(const std::string_view& name)
 {
+	if (m_name != name)
+	{
+		m_name = name;
+	}
+
+	file::path filePath = PathFinder::Relative("BehaviorTree\\" + std::string(name) + ".blackboard");
+	if (!file::exists(filePath))
+	{
+		throw std::runtime_error("Blackboard file not found: " + filePath.string());
+	}
+
+	MetaYml::Node node = MetaYml::LoadFile(filePath.string());
+	for (const auto& entry : node[m_name])
+	{
+		std::string key = entry["key"].as<std::string>();
+		if (key.empty() || m_values.find(key) != m_values.end())
+			continue; // Skip empty keys
+
+		BlackBoardValue& bbValue = m_values[key]; // Get or create the entry
+		Meta::Deserialize(&bbValue, entry["value"]);
+	}
+}
+
+void BlackBoard::Clear()
+{
+	m_name.clear();
+	m_values.clear();
 }

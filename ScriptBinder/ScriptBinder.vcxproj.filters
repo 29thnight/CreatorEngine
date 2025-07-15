@@ -142,6 +142,9 @@
     <Filter Include="Classes\GameAI\Core\Manager">
       <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\NewFilter1">
+      <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">

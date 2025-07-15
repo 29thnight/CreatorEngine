@@ -78,9 +78,6 @@
 		<ClInclude Include="Assets\Script\GameManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\NewBehaviourScript.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -123,9 +120,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\GameManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\NewBehaviourScript.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">

@@ -24,12 +24,8 @@ struct NodeLink
 {
 	Node* fromNode;
 	Node* toNode;
-	//std::string fromNode;
-	//std::string toNode;
 	bool haveReverse = false;
 };
-
-
 
 class NodeEditor
 {

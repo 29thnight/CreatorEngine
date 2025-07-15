@@ -12,6 +12,7 @@
 #include "NodeEditor.h"
 #include "InputActionComponent.h"
 #include "InvalidScriptComponent.h"
+#include "BehaviorTreeComponent.h"
 
 void ComponentFactory::Initialize()
 {
@@ -337,6 +338,12 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			{
 				Debug->LogError("Terrain component is missing m_trrainAssetGuid");
 			}
+		}
+		else if (componentType->typeID == type_guid(BehaviorTreeComponent))
+		{
+			auto behaviorTree = static_cast<BehaviorTreeComponent*>(component);
+			Meta::Deserialize(behaviorTree, itNode);
+			behaviorTree->SetOwner(obj);
 		}
 		else
 		{
