@@ -7,6 +7,8 @@
 class ModuleBehavior;
 class GameObject;
 class SceneManager;
+class PhysicsManager;
+class PhysicX;
 namespace BT
 {
 	class NodeFactory;
@@ -30,6 +32,8 @@ typedef const char** (*ListBTConditionNodeNamesFunc)(int*);
 // 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
 typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
+typedef void (*SetPhysicsManagerFunc)(Singleton<PhysicsManager>::FGetInstance);
+typedef void (*SetPhysxFunc)(Singleton<PhysicX>::FGetInstance);
 #pragma endregion
 
 class HotLoadSystem : public Singleton<HotLoadSystem>
@@ -70,6 +74,19 @@ public:
 		if (!m_setBTNodeFactoryFunc) return;
 
 		m_setBTNodeFactoryFunc(btNodeFactory);
+	}
+
+	void UpdatePhysicsManager(Singleton<PhysicsManager>::FGetInstance physicsManager) 
+	{
+		if (!m_setPhysicsManagerFunc) return;
+
+		m_setPhysicsManagerFunc(physicsManager);
+	}
+
+	void UpdatePhysx(Singleton<PhysicX>::FGetInstance physx) {
+		if (!m_setPhysxFunc) return;
+
+		m_setPhysxFunc(physx);
 	}
 
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
@@ -171,16 +188,19 @@ private:
 	void Compile();
 
 private:
-	HMODULE						hDll{};
-	ModuleBehaviorFunc			m_scriptFactoryFunc{};
+	HMODULE hDll{};
+	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
-	GetScriptNamesFunc			m_scriptNamesFunc{};
-	SetSceneManagerFunc			m_setSceneManagerFunc{};
-	SetBTNodeFactoryFunc		m_setBTNodeFactoryFunc{};
-	std::wstring				msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
-	std::wstring				command{};
-	std::wstring				rebuildCommand{};
-	std::atomic_bool			m_isStartUp{ false };
+	GetScriptNamesFunc m_scriptNamesFunc{};
+	SetSceneManagerFunc m_setSceneManagerFunc{};
+	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};
+	SetPhysicsManagerFunc m_setPhysicsManagerFunc{};
+	SetPhysxFunc m_setPhysxFunc{};
+
+	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
+	std::wstring command{};
+	std::wstring rebuildCommand{};
+	std::atomic_bool m_isStartUp{ false };
 
 private:
 #pragma region Script File String

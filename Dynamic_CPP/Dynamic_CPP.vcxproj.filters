@@ -96,6 +96,9 @@
 		<ClInclude Include="Assets\Script\Rock.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\InverseKinematic.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -138,6 +141,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Rock.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

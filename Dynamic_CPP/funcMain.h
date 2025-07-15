@@ -123,11 +123,22 @@ extern "C"
 		}
 	}
 
+
+	EXPORT_API void SetPhysicsManager(Singleton<PhysicsManager>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<PhysicsManager>&>(PhysicsManagers) = funcPtr();
+	}
+
+	EXPORT_API void SetPhysics(Singleton<PhysicX>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<PhysicX>&>(Physics) = funcPtr();
+	}
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("InverseKinematic", []() { return new InverseKinematic(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });

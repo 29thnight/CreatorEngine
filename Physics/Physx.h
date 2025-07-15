@@ -56,6 +56,8 @@ public:
 
 	//충돌 검사를 위한 레이캐스트
 	RayCastOutput RayCast(const RayCastInput& in, bool isStatic = false);
+	RayCastOutput Raycast(const RayCastInput& in);
+	RayCastOutput RaycastAll(const RayCastInput& in);
 
 	//==========================================================================================
 	//rigid body
@@ -75,9 +77,9 @@ public:
 
 
 	//StaticRigidBody* SettingStaticBody(physx::PxShape* shape,const ColliderInfo& colInfo,const  EColliderType& collideType,int* collisionMatrix,bool isGpuscene = false);
-	StaticRigidBody* SettingStaticBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix);
+	StaticRigidBody* SettingStaticBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, unsigned int* collisionMatrix);
 	//DynamicRigidBody* SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo,const EColliderType& collideType, int* collisionMatrix,bool isKinematic,bool isGpuscene = false);
-	DynamicRigidBody* SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix, bool isKinematic);
+	DynamicRigidBody* SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, unsigned int* collisionMatrix, bool isKinematic);
 
 	//반환
 	RigidBodyGetSetData GetRigidBodyData(unsigned int id);
@@ -158,12 +160,12 @@ public:
 	void CreateCollisionData(const unsigned int& id, CollisionData* data);
 	void RemoveCollisionData(const unsigned int& id);
 
-	void SetCollisionMatrix(int* collisionMatrix) {
+	void SetCollisionMatrix(unsigned int* collisionMatrix) {
 		for (int i = 0; i < 32; ++i) {
 			m_collisionMatrix[i] = collisionMatrix[i];
 		}
 	}
-	int* GetCollisionMatrix() { return m_collisionMatrix; } //충돌 매트릭스 반환
+	unsigned int* GetCollisionMatrix() { return m_collisionMatrix; } //충돌 매트릭스 반환
 	void SetCollisionMatrix(unsigned int layer, unsigned int other, bool isCollision)
 	{
 		if (layer >= 32 || other >= 32) return; // out-of-range 방지
@@ -207,7 +209,7 @@ private:
 	//===========================================================================================
 	PhysicsEventCallback* m_eventCallback;
 
-	int m_collisionMatrix[32];
+	unsigned int m_collisionMatrix[32];
 
 	std::vector<physx::PxActor*> m_removeActorList; //삭제할 액터들
 
@@ -268,7 +270,7 @@ public:
 	void PhysicsThreadFunc(float deltaTime);*/
 	//====================================================================================================
 
-
+	void DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath::Vector3 end);
 };
 
-inline static auto& Physics = PhysicX::GetInstance();
+static auto& Physics = PhysicX::GetInstance();

@@ -29,6 +29,8 @@ void SceneManager::Editor()
         CreateEditorOnlyPlayScene();
         ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
 		ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
+        ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
+        ScriptManager->UpdatePhysx(PhysicX::GetInstance);
         m_activeScene.load()->Reset();
 		m_isEditorSceneLoaded = true;
     }

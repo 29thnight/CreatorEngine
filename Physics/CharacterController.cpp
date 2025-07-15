@@ -16,7 +16,7 @@ CharacterController::~CharacterController()
 	}
 }
 
-void CharacterController::Initialize(const CharacterControllerInfo& info, const CharacterMovementInfo& moveInfo, physx::PxControllerManager* CCTManager, physx::PxMaterial* material, CollisionData* collisionData, int* collisionMatrix)
+void CharacterController::Initialize(const CharacterControllerInfo& info, const CharacterMovementInfo& moveInfo, physx::PxControllerManager* CCTManager, physx::PxMaterial* material, CollisionData* collisionData, unsigned int* collisionMatrix)
 {
 	m_id = info.id;
 	m_layerNumber = info.layerNumber;
@@ -96,7 +96,7 @@ void CharacterController::AddMovementInput(const DirectX::SimpleMath::Vector3& i
 	m_IsDynamic = isDynamic;
 }
 
-bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, int* collisionMatrix)
+bool CharacterController::ChangeLayerNumber(const unsigned int& newLayerNumber, unsigned int* collisionMatrix)
 {
 	if (newLayerNumber == UINT_MAX)
 	{

@@ -13,7 +13,7 @@ public:
 
 	void ChangeLayerNumber(const unsigned int& layerNumber, int* collisionMatrix);
 
-	void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix) override;
+	void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix) override;
 
 	physx::PxRigidStatic* GetRigidStatic() const { return m_rigidStatic; } // 
 

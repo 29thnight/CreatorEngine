@@ -1468,6 +1468,22 @@ void HotLoadSystem::Compile()
 		throw std::runtime_error("Failed to get function address...");
 	}
 
+	m_setPhysicsManagerFunc = reinterpret_cast<SetPhysicsManagerFunc>(GetProcAddress(hDll, "SetPhysicsManager"));
+	if (!m_setPhysicsManagerFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	m_setPhysxFunc = reinterpret_cast<SetPhysxFunc>(GetProcAddress(hDll, "SetPhysics"));
+	if (!m_setPhysxFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
 }

@@ -88,10 +88,42 @@ PxFilterFlags CustomFilterShader(
 
 }
 
-class RaycastQueryFilter : public physx::PxQueryFilterCallback
+class BlockRaycastQueryFilter : public physx::PxQueryFilterCallback {
+public:
+	virtual ~BlockRaycastQueryFilter() {}
+	physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& filterData,
+		const physx::PxShape* shape,
+		const physx::PxRigidActor* actor,
+		physx::PxHitFlags& queryFlags) override {
+
+		auto data = shape->getSimulationFilterData();
+
+		if (filterData.word1 & (1 << data.word0)) {
+			return physx::PxQueryHitType::eBLOCK;
+		}
+
+		return physx::PxQueryHitType::eNONE;
+
+	}
+
+	physx::PxQueryHitType::Enum postFilter(const physx::PxFilterData& filterData,
+		const physx::PxQueryHit& hit,
+		const physx::PxShape* shape,
+		const physx::PxRigidActor* actor) override {
+
+		auto data = shape->getSimulationFilterData();
+
+		if (filterData.word1 & (1 << data.word0)) {
+			return physx::PxQueryHitType::eBLOCK;
+		}
+		return physx::PxQueryHitType::eNONE;
+	}
+};
+
+class TouchRaycastQueryFilter : public physx::PxQueryFilterCallback
 {
 public:
-	virtual ~RaycastQueryFilter(){}
+	virtual ~TouchRaycastQueryFilter(){}
 	physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& filterData,
 		const physx::PxShape* shape,
 		const physx::PxRigidActor* actor,
@@ -216,6 +248,7 @@ bool PhysicX::Initialize()
 	filterData.word0 = 0;
 	filterData.word1 = 0xFFFFFFFF;
 	planeShape->setSimulationFilterData(filterData);
+	planeShape->setQueryFilterData(filterData);
 	plane->attachShape(*planeShape);
 	plane->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
 	plane->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
@@ -408,7 +441,7 @@ void PhysicX::ChangeScene()
 	//옷 시뮬레이션 삭제도 추가시 삭제
 }
 
-RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
+RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
@@ -440,7 +473,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 			| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	}
 
-	RaycastQueryFilter queryFilter;
+	TouchRaycastQueryFilter queryFilter;
 	
 	bool isAnyHit;
 		
@@ -458,6 +491,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
 			out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
 			CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
+			CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
 		}
 
 		unsigned int hitSize = hitBufferStruct.nbTouches;
@@ -467,18 +501,142 @@ RayCastOutput PhysicX::RayCast(const RayCastInput & in, bool isStatic)
 		{
 			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
 			physx::PxShape* shape = hit.shape;
+
+			if (shape->userData == nullptr) continue;
 			
 			DirectX::SimpleMath::Vector3 position;
+			DirectX::SimpleMath::Vector3 normal;
 			CopyVectorPxToDx(hit.position, position);
+			CopyVectorPxToDx(hit.normal, normal);
 			unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
 			unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
 			out.contectPoints.push_back(position);
+			out.contectNormals.push_back(normal);
 			out.hitLayerNumber.push_back(layerNumber);
 			out.hitId.push_back(id);
 		}
 	}
 	
+	return out;
+}
+
+// 단일 레이케스트, static dynamic 모두 검출, 
+RayCastOutput PhysicX::Raycast(const RayCastInput& in)
+{
+	physx::PxVec3 pxOrgin;
+	physx::PxVec3 pxDirection;
+	CopyVectorDxToPx(in.origin, pxOrgin);
+	CopyVectorDxToPx(in.direction, pxDirection);
+
+	// RaycastHit 
+	physx::PxRaycastBuffer hitBufferStruct;
+
+	//충돌 쿼리 정보
+	physx::PxQueryFilterData filterData;
+	filterData.data.word0 = in.layerNumber;
+	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+
+	filterData.flags = physx::PxQueryFlag::eSTATIC 
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
+
+	BlockRaycastQueryFilter queryFilter;
+
+	bool isAnyHit;
+
+	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
+
+	RayCastOutput out;
+
+	//hit가 있는 경우
+	if (isAnyHit)
+	{
+		out.hasBlock = hitBufferStruct.hasBlock;
+		if (out.hasBlock)
+		{
+			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
+			if (blockHit.shape->userData != nullptr) {
+				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
+				out.blockLayerNumber = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisLayerNumber;
+				CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
+				CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+			}
+			else {
+				out.hasBlock = false;
+				std::cout << "Not physx block userdata" << std::endl;
+			}
+		}
+	}
+
+	return out;
+}
+
+//PxQueryFlag::eNO_BLOCK 활성화시 block 처리x
+RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
+{
+	physx::PxVec3 pxOrgin;
+	physx::PxVec3 pxDirection;
+	CopyVectorDxToPx(in.origin, pxOrgin);
+	CopyVectorDxToPx(in.direction, pxDirection);
+
+	// RaycastHit 
+	const physx::PxU32 maxHits = 20;
+	physx::PxRaycastHit hitBuffer[maxHits];
+	physx::PxRaycastBuffer hitBufferStruct(hitBuffer, maxHits);
+
+	//충돌 쿼리 정보
+	physx::PxQueryFilterData filterData;
+	filterData.data.word0 = in.layerNumber;
+	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+
+	filterData.flags = physx::PxQueryFlag::eSTATIC
+		| physx::PxQueryFlag::eDYNAMIC
+		| physx::PxQueryFlag::ePREFILTER
+		| physx::PxQueryFlag::eNO_BLOCK
+		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
+	
+
+	TouchRaycastQueryFilter queryFilter;
+
+	bool isAnyHit;
+
+	isAnyHit = m_scene->raycast(pxOrgin, pxDirection, in.distance, hitBufferStruct, physx::PxHitFlag::eDEFAULT, filterData, &queryFilter);
+
+
+	RayCastOutput out;
+
+	//hit가 있는 경우
+	if (isAnyHit)
+	{
+		unsigned int hitSize = hitBufferStruct.nbTouches;
+		out.hitSize = hitSize;
+
+		for (unsigned int hitNum = 0; hitNum < hitSize; hitNum++)
+		{
+			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
+			physx::PxShape* shape = hit.shape;
+
+			if (shape->userData == nullptr) {
+				out.hitSize--;
+				continue;
+			}
+
+			DirectX::SimpleMath::Vector3 position;
+			DirectX::SimpleMath::Vector3 normal;
+			CopyVectorPxToDx(hit.position, position);
+			CopyVectorPxToDx(hit.normal, normal);
+			unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
+			unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
+
+			out.contectPoints.push_back(position);
+			out.contectNormals.push_back(normal);
+			out.hitLayerNumber.push_back(layerNumber);
+			out.hitId.push_back(id);
+		}
+	}
+
 	return out;
 }
 //==========================================================================================
@@ -650,7 +808,7 @@ void PhysicX::CreateDynamicBody(const HeightFieldColliderInfo & info, const ECol
 	shape->release();
 }
 
-StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix)
+StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, unsigned int* collisionMatrix)
 {
 	//filterData
 	physx::PxFilterData filterData;
@@ -658,6 +816,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	 //filterData.word1 = collisionMatrix[colInfo.layerNumber];
 	filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
+	shape->setQueryFilterData(filterData);
 	//collisionData
 	StaticRigidBody* staticBody = new StaticRigidBody(collideType,colInfo.id,colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
@@ -678,7 +837,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	return staticBody;
 }
 
-DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, int* collisionMatrix, bool isKinematic)
+DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, unsigned int* collisionMatrix, bool isKinematic)
 {
 	//필터데이터
 	physx::PxFilterData filterData;
@@ -1419,6 +1578,31 @@ void PhysicX::extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* 
 		debuPolygon.push_back(vertices);
 	}
 
+}
+
+void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath::Vector3 end)
+{
+	PxPvdSceneClient* pvdClient = m_scene->getScenePvdClient();
+	if (pvdClient && pvd->isConnected())
+	{
+		// 색상 설정
+		const PxU32 green = PxDebugColor::eARGB_GREEN;
+		const PxU32 red = PxDebugColor::eARGB_RED;
+
+		// 충돌 여부에 따라 다른 색
+		PxU32 color = green;
+
+		PxVec3 origin;
+		PxVec3 endpoint;
+
+		CopyVectorDxToPx(ori, origin);
+		CopyVectorDxToPx(end, endpoint);
+
+		// 선 하나만 그릴 것이므로 lineCount = 1
+		PxDebugLine line(origin, endpoint, color);
+
+		pvdClient->drawLines(&line, 1);
+	}
 }
 
 void PhysicX::ShowNotRelease()
