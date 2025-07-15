@@ -271,4 +271,4 @@ public:
 
 };
 
-inline static auto Physics = PhysicX::GetInstance();
+inline static auto& Physics = PhysicX::GetInstance();

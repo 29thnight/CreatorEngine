@@ -54,7 +54,7 @@ void NodeEditor::MakeNode(std::string nodeName)
 
 void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName)
 {
-	Link* newLink = new Link();
+	NodeLink* newLink = new NodeLink();
 	newLink->fromNode = FindNode(fromNodeName);
 	newLink->toNode = FindNode(toNodeName);
 

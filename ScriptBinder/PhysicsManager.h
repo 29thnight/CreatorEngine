@@ -189,6 +189,4 @@ private:
 	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
-
 static auto& PhysicsManagers = PhysicsManager::GetInstance();
-

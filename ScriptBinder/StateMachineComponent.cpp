@@ -4,35 +4,36 @@
 
 void StateMachineComponent::Initialize()
 {
+	m_aiType = AIType::FSM;
 	if (m_currentState)
 	{
 		m_currentState->Enter(m_localBB);
 	}
 }
 
-void StateMachineComponent::Tick(float deltaTime)
-{
-	if (!m_currentState && !m_states.empty())
-	{
-		m_currentState = m_states.front().get();
-	}
-
-	if (m_currentState)
-	{
-		m_currentState->Update(m_localBB, deltaTime);
-		// Check transitions
-		for (const auto& transition : m_transitions)
-		{
-			if (transition->GetFrom() == m_currentState && (*transition)(m_localBB))
-			{
-				m_currentState->Exit(m_localBB);
-				m_currentState = transition->GetTo();
-				m_currentState->Enter(m_localBB);
-				break; // Exit after a successful transition
-			}
-		}
-	}
-}
+//void StateMachineComponent::Tick(float deltaTime)
+//{
+//	if (!m_currentState && !m_states.empty())
+//	{
+//		m_currentState = m_states.front().get();
+//	}
+//
+//	if (m_currentState)
+//	{
+//		m_currentState->Update(m_localBB, deltaTime);
+//		// Check transitions
+//		for (const auto& transition : m_transitions)
+//		{
+//			if (transition->GetFrom() == m_currentState && (*transition)(m_localBB))
+//			{
+//				m_currentState->Exit(m_localBB);
+//				m_currentState = transition->GetTo();
+//				m_currentState->Enter(m_localBB);
+//				break; // Exit after a successful transition
+//			}
+//		}
+//	}
+//}
 
 FSM::FSMState* StateMachineComponent::AddState(const std::string& name)
 {
