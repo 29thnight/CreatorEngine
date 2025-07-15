@@ -28,7 +28,7 @@ public:
 	void Update(float deltaSecond) override;
 	void OnDistroy() override;
 
-	BlackBoard& GetBlackBoard() { return m_blackboard; }
+	BlackBoard& GetBlackBoard() { return *m_pBlackboard; }
 private:
 	// Behavior Tree 관련 메서드
 	BTNode::NodePtr BuildTree(const BTBuildGraph& graph);

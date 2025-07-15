@@ -1686,10 +1686,13 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		terrainComponent->Resize(editWidth, editHeight);
 	}
 
-
+	g_CurrentBrush->m_isEditMode = false;
 	// ImGui UI 예시 (에디터 툴 패널 내부)
 	if (ImGui::CollapsingHeader("Terrain Brush"))
 	{
+		//inspector가 화면에 뜨는 경우 브러시가 활성화된 상태로 설정
+		g_CurrentBrush->m_isEditMode = true; // 브러시가 활성화된 상태로 설정
+
 		// 모드 선택
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
@@ -1756,23 +1759,37 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				maskNames.push_back(name.c_str());
 			}
 
-			int selectedMaskIndex = 0;
+			static int selectedMaskIndex = -1;
+			int maskIndex = 0;
 			for (const auto& mask : g_CurrentBrush->m_masks) {
-				ImGui::Image((ImTextureID)mask.m_maskSRV,
-					ImVec2((float)100.0f, (float)100.0f));
+				if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f))) {
+					if (selectedMaskIndex != maskIndex) {
+						selectedMaskIndex = maskIndex;
+						uint32_t id = static_cast<uint32_t>(maskIndex);
+						g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
+					}
+					else {
+						selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
+						uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
+						g_CurrentBrush->SetMaskID(id); // No mask selected
+					}
+				}
+				maskIndex++;
+				/*ImGui::Image((ImTextureID)mask.m_maskSRV,
+					ImVec2((float)100.0f, (float)100.0f));*/
 			}
 
-			if (ImGui::Combo("Mask", &selectedMaskIndex, maskNames.data(), (int)maskNames.size()))
-			{
-				if (selectedMaskIndex == 0) {
-					uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
-					g_CurrentBrush->SetMaskID(id); // No mask selected
-				}
-				else {
-					uint32_t id = static_cast<uint32_t>(selectedMaskIndex - 1); // Adjust for "None" option
-					g_CurrentBrush->SetMaskID(id);
-				}
-			}
+			//if (ImGui::Combo("Mask", &selectedMaskIndex, maskNames.data(), (int)maskNames.size()))
+			//{
+			//	if (selectedMaskIndex == 0) {
+			//		uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
+			//		g_CurrentBrush->SetMaskID(id); // No mask selected
+			//	}
+			//	else {
+			//		uint32_t id = static_cast<uint32_t>(selectedMaskIndex - 1); // Adjust for "None" option
+			//		g_CurrentBrush->SetMaskID(id);
+			//	}
+			//}
 		}
 
 
