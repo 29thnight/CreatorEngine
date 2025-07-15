@@ -74,21 +74,3 @@ void RenderModules::SetClippingAxis(const Mathf::Vector3& axis)
 
 	UpdateClippingBuffer();
 }
-
-void RenderModules::SetClippingBounds(const Mathf::Vector3& min, const Mathf::Vector3& max)
-{
-	if (!SupportsClipping()) return;
-
-	// min과 max 값 검증 및 정렬
-	m_clippingParams.boundsMin.x = std::min(min.x, max.x);
-	m_clippingParams.boundsMin.y = std::min(min.y, max.y);
-	m_clippingParams.boundsMin.z = std::min(min.z, max.z);
-
-	m_clippingParams.boundsMax.x = std::max(min.x, max.x);
-	m_clippingParams.boundsMax.y = std::max(min.y, max.y);
-	m_clippingParams.boundsMax.z = std::max(min.z, max.z);
-
-	UpdateClippingBuffer();
-}
-
-

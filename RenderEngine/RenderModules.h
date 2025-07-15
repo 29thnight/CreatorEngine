@@ -38,7 +38,9 @@ struct ClippingParams
 {
     float clippingProgress;
     Mathf::Vector3 clippingAxis;
+
     Mathf::Matrix invWorldMatrix;
+
     float clippingEnabled;
     Mathf::Vector3 pad;
 };
@@ -70,7 +72,6 @@ public:
     void EnableClipping(bool enable);
     void SetClippingProgress(float progress);
     void SetClippingAxis(const Mathf::Vector3& axis);
-    void SetClippingBounds(const Mathf::Vector3& min, const Mathf::Vector3& max);
 
     bool IsClippingEnabled() const { return m_clippingEnabled && SupportsClipping(); }
     float GetClippingProgress() const { return m_clippingParams.clippingProgress; }

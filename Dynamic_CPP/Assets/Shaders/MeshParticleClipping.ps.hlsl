@@ -1,10 +1,9 @@
-// MeshParticleClippingPS.hlsl - 클리핑 기능이 있는 3D 메시 파티클 픽셀 셰이더
-
+// MeshParticleClippingPS.hlsl - 파티클 중심점 기반 클리핑
 cbuffer ClippingParams : register(b1)
 {
     float clippingProgress;
     float3 clippingAxis;
-    float4x4 invWorldMatrix;
+    float4x4 invWorldMatrix; // 사용 안함 (호환성 위해 유지)
     float clippingEnabled;
     float3 pad;
 };
@@ -13,6 +12,7 @@ struct PixelInput
 {
     float4 position : SV_POSITION;
     float3 worldPos : WORLD_POSITION;
+    float3 particleCenter : PARTICLE_CENTER; // 파티클 중심점 추가
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -34,8 +34,8 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    // 월드 좌표를 로컬 좌표로 변환
-    float3 localPos = mul(float4(input.worldPos, 1.0), invWorldMatrix).xyz;
+    // 파티클 중심 기준 로컬 좌표 계산
+    float3 localPos = input.worldPos - input.particleCenter;
     
     // 로컬 공간에서 정규화된 좌표 계산 (-1~1 범위를 0~1로 변환)
     float3 clippingPos = (localPos + 1.0) * 0.5;

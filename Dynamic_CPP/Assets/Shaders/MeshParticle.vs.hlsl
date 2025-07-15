@@ -1,4 +1,4 @@
-// MeshParticle.hlsl - 수정된 3D 메시 파티클 버텍스 셰이더
+// MeshParticle.hlsl - 파티클 중심점 추가된 버텍스 셰이더
 struct MeshParticleData
 {
     float3 position; // 12 bytes
@@ -59,6 +59,7 @@ struct VertexOutput
 {
     float4 position : SV_POSITION;
     float3 worldPos : WORLD_POSITION;
+    float3 particleCenter : PARTICLE_CENTER; // 파티클 중심점 추가
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -108,11 +109,13 @@ VertexOutput main(VertexInput input)
         // 비활성 파티클은 화면 밖으로 이동
         output.position = float4(0, 0, 0, 0);
         output.worldPos = float3(0, 0, 0);
+        output.particleCenter = float3(0, 0, 0);
         output.normal = float3(0, 0, 0);
         output.texCoord = float2(0, 0);
         output.color = float4(0, 0, 0, 0);
         output.viewDir = float3(0, 0, 0);
         output.alpha = 0.0;
+        output.renderMode = 0;
         return output;
     }
     
@@ -128,12 +131,16 @@ VertexOutput main(VertexInput input)
     // 최종 월드 매트릭스 적용 (gWorld는 전역 변환용)
     float4 worldPosition = mul(float4(worldPos, 1.0), gWorld);
     
+    // 파티클 중심점도 gWorld 변환 적용
+    float4 particleCenterWorld = mul(float4(particle.position, 1.0), gWorld);
+    
     // 뷰 및 프로젝션 변환
     float4 viewPosition = mul(worldPosition, gView);
     output.position = mul(viewPosition, gProjection);
     
     // 출력 설정
     output.worldPos = worldPosition.xyz;
+    output.particleCenter = particleCenterWorld.xyz; // 파티클 중심점 전달
     output.normal = normalize(mul(rotatedNormal, (float3x3) gWorld));
     output.texCoord = input.texCoord;
     output.color = particle.color;

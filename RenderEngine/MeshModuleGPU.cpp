@@ -18,7 +18,6 @@ MeshModuleGPU::MeshModuleGPU()
 
     m_worldMatrix = Mathf::Matrix::Identity;
     m_invWorldMatrix = Mathf::Matrix::Identity;
-    m_useRelativeClipping = true;
 
     // 상수 버퍼 데이터도 초기화
     memset(&m_constantBufferData, 0, sizeof(MeshConstantBuffer));
@@ -232,25 +231,16 @@ void MeshModuleGPU::CreateClippingBuffer()
     if (m_clippingBuffer)
         return;
 
-    // 클리핑 파라미터용 상수 버퍼 생성
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(ClippingParams);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    bufferDesc.MiscFlags = 0;
-    bufferDesc.StructureByteStride = 0;
 
-    // 초기 데이터로 현재 클리핑 파라미터 사용
-    D3D11_SUBRESOURCE_DATA initData = {};
-    initData.pSysMem = &GetClippingParams();
-    initData.SysMemPitch = 0;
-    initData.SysMemSlicePitch = 0;
-
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_clippingBuffer);
+    // 초기 데이터는 nullptr로 (나중에 Map으로 설정)
+    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_clippingBuffer);
     if (FAILED(hr))
     {
-        // 에러 처리
         m_clippingBuffer.Reset();
     }
 }
@@ -259,12 +249,10 @@ void MeshModuleGPU::UpdateClippingBuffer()
 {
     if (!SupportsClipping() || !m_clippingBuffer)
         return;
-
     if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
         return;
 
     auto& deviceContext = DeviceState::g_pDeviceContext;
-
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr = deviceContext->Map(m_clippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
@@ -272,13 +260,13 @@ void MeshModuleGPU::UpdateClippingBuffer()
     {
         ClippingParams* params = static_cast<ClippingParams*>(mappedResource.pData);
 
-        // 기본 클리핑 파라미터 복사
+        // 기존 파라미터에서 값 가져오기
         const auto& baseParams = GetClippingParams();
         params->clippingProgress = baseParams.clippingProgress;
         params->clippingAxis = baseParams.clippingAxis;
         params->clippingEnabled = baseParams.clippingEnabled;
 
-        // 역변환 행렬 전달
+        // 새로 추가된 역행렬 설정
         params->invWorldMatrix = m_invWorldMatrix;
 
         deviceContext->Unmap(m_clippingBuffer.Get(), 0);

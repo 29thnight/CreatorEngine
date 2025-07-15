@@ -213,9 +213,6 @@
     <Filter Include="RenderPass\EffectPass\333.Rendermodule">
       <UniqueIdentifier>{8bd1134d-0a6c-452f-9ee5-ab911ebf9e44}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RenderPass\EffectPass\Old.">
-      <UniqueIdentifier>{2e728c46-7e30-4219-b1d0-127edfe9db40}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\JobSystem\Animation">
       <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
     </Filter>
@@ -413,9 +410,6 @@
     <ClCompile Include="CullingManager.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
-    <ClCompile Include="EffectModules.cpp">
-      <Filter>RenderPass\EffectPass\Old.</Filter>
-    </ClCompile>
     <ClCompile Include="EaseInOut.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
@@ -517,9 +511,6 @@
     </ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="SparkleEffect.cpp">
-      <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -685,9 +676,6 @@
     <ClInclude Include="CullingManager.h">
       <Filter>Asset\ManagerSystem</Filter>
     </ClInclude>
-    <ClInclude Include="EffectModules.h">
-      <Filter>RenderPass\EffectPass\Old.</Filter>
-    </ClInclude>
     <ClInclude Include="EaseInOut.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
@@ -810,9 +798,6 @@
     </ClInclude>
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
-    </ClInclude>
-    <ClInclude Include="SparkleEffect.h">
-      <Filter>RenderPass\EffectPass\Old.</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
