@@ -242,6 +242,11 @@ void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 				textureName += ".png";
 			}
 			m_assignedTexture = DataSystems->LoadTexture(textureName);
+
+			if (m_assignedTexture) {
+				std::string nameWithoutExtension = file::path(textureName).stem().string();
+				m_assignedTexture->m_name = nameWithoutExtension;
+			}
 		}
 	}
 

@@ -134,6 +134,7 @@ public:
 	const Mathf::Vector3& GetPosition() const { return m_position; }
 	bool IsRunning() const { return m_isRunning; }
 
+	std::string m_name{};
 private:
 
 	void ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule);

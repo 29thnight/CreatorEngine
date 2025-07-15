@@ -101,6 +101,9 @@ void EffectEditor::RemoveEmitter(int index)
 {
 	if (index >= 0 && index < m_tempEmitters.size()) {
 		m_tempEmitters.erase(m_tempEmitters.begin() + index);
+		if (index < m_emitterTextureSelections.size()) {
+			m_emitterTextureSelections.erase(m_emitterTextureSelections.begin() + index);
+		}
 	}
 }
 
@@ -288,26 +291,29 @@ void EffectEditor::RenderMainEditor()
 					ImGui::Text("Assign Texture:");
 					ImGui::SameLine();
 					if (!m_textures.empty()) {
-						static int selectedTextureIndex = 0;
+						// 벡터 크기 확인 및 조정
+						if (m_emitterTextureSelections.size() <= i) {
+							m_emitterTextureSelections.resize(m_tempEmitters.size(), 0);
+						}
+
 						std::string comboLabel = "Texture##" + std::to_string(i);
 
-						// 현재 선택된 텍스처의 이름 표시
-						std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
-							? m_textures[selectedTextureIndex]->m_name
+						// 현재 에미터의 선택된 텍스처 이름 표시
+						std::string currentTextureName = (m_emitterTextureSelections[i] >= 0 && m_emitterTextureSelections[i] < m_textures.size())
+							? m_textures[m_emitterTextureSelections[i]]->m_name
 							: "None";
 
 						if (ImGui::BeginCombo(comboLabel.c_str(), currentTextureName.c_str())) {
 							for (int t = 0; t < m_textures.size(); ++t) {
-								bool isSelected = (selectedTextureIndex == t);
+								bool isSelected = (m_emitterTextureSelections[i] == t);
 								std::string textureLabel = m_textures[t]->m_name;
 
-								// 텍스처 이름이 비어있으면 기본 이름 사용
 								if (textureLabel.empty()) {
 									textureLabel = "Texture " + std::to_string(t);
 								}
 
 								if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-									selectedTextureIndex = t;
+									m_emitterTextureSelections[i] = t;  // 해당 에미터의 선택 인덱스 업데이트
 								}
 								if (isSelected) {
 									ImGui::SetItemDefaultFocus();
@@ -318,7 +324,7 @@ void EffectEditor::RenderMainEditor()
 
 						ImGui::SameLine();
 						if (ImGui::Button(("Assign##" + std::to_string(i)).c_str())) {
-							AssignTextureToEmitter(i, selectedTextureIndex);
+							AssignTextureToEmitter(i, m_emitterTextureSelections[i]);
 						}
 					}
 					else {
@@ -682,6 +688,8 @@ void EffectEditor::SaveCurrentEmitter(const std::string& name)
 		newEmitter.isPlaying = false;
 
 		m_tempEmitters.push_back(newEmitter);
+		m_emitterTextureSelections.push_back(0);
+
 		m_editingEmitter = nullptr;
 		m_isEditingEmitter = false;
 		m_emitterNameInitialized = false;
@@ -811,6 +819,8 @@ void EffectEditor::AddSelectedRender()
 
 void EffectEditor::SaveEffectToJson(const std::string& filename)
 {
+	m_saveFileName[0] = '\0';
+
 	if (m_tempEmitters.empty()) {
 		std::cout << "No emitters to save!" << std::endl;
 		return;
@@ -818,12 +828,29 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 
 	try {
 		// 임시 이펙트 생성
+		std::string basePath = "Dynamic_CPP/Assets/Effect/";
+
+		std::string finalFilename = filename;
+		if (finalFilename.find('.') == std::string::npos) {
+			finalFilename += ".json";
+		}
+
+		std::string fullPath = basePath + finalFilename;
+		std::filesystem::create_directories(std::filesystem::path(fullPath).parent_path());
+
+		std::string effectName = finalFilename;
+		size_t dotPos = effectName.find_last_of('.');
+		if (dotPos != std::string::npos) {
+			effectName = effectName.substr(0, dotPos);
+		}
+
 		auto tempEffect = std::make_unique<EffectBase>();
-		tempEffect->SetName("EditorEffect");
+		tempEffect->SetName(effectName);
 
 		// 모든 에미터를 이펙트에 추가
 		for (const auto& tempEmitter : m_tempEmitters) {
 			if (tempEmitter.particleSystem) {
+				tempEmitter.particleSystem->m_name = tempEmitter.name;
 				tempEffect->AddParticleSystem(tempEmitter.particleSystem);
 			}
 		}
@@ -832,14 +859,14 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 		nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
 
 		// 파일로 저장
-		std::ofstream file(filename);
+		std::ofstream file(fullPath);
 		if (file.is_open()) {
 			file << effectJson.dump(4); // 들여쓰기로 보기 좋게
 			file.close();
-			std::cout << "Effect saved to: " << filename << std::endl;
+			std::cout << "Effect saved to: " << fullPath << std::endl;
 		}
 		else {
-			std::cerr << "Failed to open file for writing: " << filename << std::endl;
+			std::cerr << "Failed to open file for writing: " << fullPath << std::endl;
 		}
 
 	}
@@ -850,10 +877,20 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 
 void EffectEditor::LoadEffectFromJson(const std::string& filename)
 {
+	m_loadFileName[0] = '\0';
+
 	try {
-		std::ifstream file(filename);
+		std::string basePath = "Dynamic_CPP/Assets/Effect/";
+		std::string finalFilename = filename;
+		if (finalFilename.find('.') == std::string::npos) {
+			finalFilename += ".json";
+		}
+
+		std::string fullPath = basePath + finalFilename;
+
+		std::ifstream file(fullPath);
 		if (!file.is_open()) {
-			std::cerr << "Failed to open file: " << filename << std::endl;
+			std::cerr << "Failed to open file: " << fullPath << std::endl;
 			return;
 		}
 
@@ -861,34 +898,28 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 		file >> effectJson;
 		file.close();
 
-		// JSON에서 이펙트 복원
 		auto loadedEffect = EffectSerializer::DeserializeEffect(effectJson);
-
 		if (loadedEffect) {
-			// 기존 임시 에미터들 클리어
 			m_tempEmitters.clear();
+			m_emitterTextureSelections.clear();
 
-			// 로드된 이펙트의 ParticleSystem들을 임시 에미터로 변환
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
-
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
+				m_emitterTextureSelections.push_back(0);
 				tempEmitter.particleSystem = particleSystems[i];
-				tempEmitter.name = "LoadedEmitter_" + std::to_string(i + 1);
+				std::string savedName = tempEmitter.particleSystem->m_name;
+				tempEmitter.name = savedName.empty() ? ("LoadedEmitter_" + std::to_string(i + 1)) : savedName;
 				tempEmitter.isPlaying = false;
-
 				m_tempEmitters.push_back(tempEmitter);
 
-				// 즉시 참조 확인
 				std::cout << "Emitter " << i << " added. Checking references..." << std::endl;
 				if (tempEmitter.particleSystem) {
 					const auto& renderModules = tempEmitter.particleSystem->GetRenderModules();
 					std::cout << "  RenderModules count: " << renderModules.size() << std::endl;
-
 					for (size_t j = 0; j < renderModules.size(); ++j) {
 						auto renderModule = renderModules[j];
 						std::cout << "    Module[" << j << "] ptr: " << renderModule << std::endl;
-
 						if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
 							Texture* tex = meshModule->GetAssignedTexture();
 							std::cout << "      Texture: " << (tex ? tex->m_name : "NONE") << std::endl;
@@ -897,13 +928,10 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 				}
 			}
 
-			// 이펙트가 살아있는 동안 참조 유지를 위해 멤버로 저장
-			m_loadedEffect = std::move(loadedEffect); // 이 라인 추가!
-
-			// 동기화
+			m_loadedEffect = std::move(loadedEffect);
 			SyncResourcesFromLoadedEmitters();
 
-			std::cout << "Effect loaded from: " << filename << std::endl;
+			std::cout << "Effect loaded from: " << fullPath << std::endl;
 			std::cout << "Loaded " << particleSystems.size() << " particle systems" << std::endl;
 			std::cout << "Synced " << m_textures.size() << " textures to editor" << std::endl;
 		}
@@ -983,18 +1011,10 @@ void EffectEditor::AddTextureToEditorList(Texture* texture)
 		return;
 	}
 
-	if (texture->m_name.empty() ||
-		texture->m_name.find("texture") == 0) {
-
-		// 이름 생성
-		texture->m_name = "LoadedTexture_" + std::to_string(m_textures.size());
-
-		std::cout << "Texture name was empty or default, set to: " << texture->m_name << std::endl;
-	}
-	// 중복 체크
+	// 중복 체크만 하고 이름은 그대로 유지
 	for (const auto& existingTexture : m_textures) {
-		if (existingTexture->m_name == texture->m_name) {
-			std::cout << "DUPLICATE found by name, skipping" << std::endl;
+		if (existingTexture == texture) {  // 포인터로 중복 체크
+			std::cout << "DUPLICATE texture pointer found, skipping" << std::endl;
 			return;
 		}
 	}

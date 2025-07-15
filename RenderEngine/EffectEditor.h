@@ -111,13 +111,15 @@ private:
     int m_selectedRenderForEdit = -1;
 
     // json 관련
-    char m_saveFileName[256] = "my_effect.json";
-    char m_loadFileName[256] = "my_effect.json";
+    char m_saveFileName[256] = {};
+    char m_loadFileName[256] = {};
     bool m_showSaveDialog = false;
     bool m_showLoadDialog = false;
 
     std::unique_ptr<EffectBase> m_loadedEffect;
 
+    // 각 에미터의 텍스처 선택 인덱스
+    std::vector<int> m_emitterTextureSelections;
 private:
     // UI 렌더링 메서드들
     void RenderMainEditor();

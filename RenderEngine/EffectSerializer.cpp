@@ -64,6 +64,7 @@ nlohmann::json EffectSerializer::SerializeParticleSystem(ParticleSystem& system)
 {
     nlohmann::json json;
 
+    json["name"] = system.m_name;
     json["maxParticles"] = system.GetMaxParticles();
     json["particleDataType"] = static_cast<int>(system.GetParticleDataType());
     json["position"] = SerializeVector3(system.GetPosition());
@@ -95,6 +96,11 @@ std::shared_ptr<ParticleSystem> EffectSerializer::DeserializeParticleSystem(cons
     ParticleDataType dataType = static_cast<ParticleDataType>(json["particleDataType"]);
 
     auto system = std::make_shared<ParticleSystem>(maxParticles, dataType);
+
+    if (json.contains("name"))
+    {
+        system->m_name = json["name"];
+    }
 
     if (json.contains("position"))
     {
