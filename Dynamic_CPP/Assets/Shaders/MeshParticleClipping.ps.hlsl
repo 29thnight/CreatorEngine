@@ -1,18 +1,23 @@
-// MeshParticleClippingPS.hlsl - 파티클 중심점 기반 클리핑
+// MeshParticleClippingPS.hlsl - 실제 메쉬 바운딩 박스 기반 클리핑
 cbuffer ClippingParams : register(b1)
 {
     float clippingProgress;
     float3 clippingAxis;
-    float4x4 invWorldMatrix; // 사용 안함 (호환성 위해 유지)
+    
     float clippingEnabled;
-    float3 pad;
+    float3 meshBoundingMin;
+
+    float3 meshBoundingMax;
+    float pad1;
 };
 
 struct PixelInput
 {
     float4 position : SV_POSITION;
     float3 worldPos : WORLD_POSITION;
-    float3 particleCenter : PARTICLE_CENTER; // 파티클 중심점 추가
+    float3 particleCenter : PARTICLE_CENTER;
+    float3 localPos : LOCAL_POSITION;
+    float3 particleScale : PARTICLE_SCALE;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -34,11 +39,17 @@ PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    // 파티클 중심 기준 로컬 좌표 계산
-    float3 localPos = input.worldPos - input.particleCenter;
+    // CPU에서 전달받은 실제 메쉬 바운딩 박스 사용
+    float3 boundingSize = meshBoundingMax - meshBoundingMin;
     
-    // 로컬 공간에서 정규화된 좌표 계산 (-1~1 범위를 0~1로 변환)
-    float3 clippingPos = (localPos + 1.0) * 0.5;
+    // 0으로 나누기 방지
+    boundingSize = max(boundingSize, float3(0.001, 0.001, 0.001));
+    
+    // 로컬 위치를 실제 바운딩 박스 기준으로 정규화 (0~1 범위)
+    float3 clippingPos = (input.localPos - meshBoundingMin) / boundingSize;
+    
+    // 안전하게 0~1 범위로 클램프
+    clippingPos = saturate(clippingPos);
     
     // 클리핑 축에 따른 진행도 계산
     float3 absAxis = abs(clippingAxis);
@@ -56,13 +67,16 @@ PixelOutput main(PixelInput input)
     bool reverseDirection = clippingProgress < 0.0;
     
     // 클리핑 수행
-    if (reverseDirection)
+    if (clippingEnabled > 0.5)
     {
-        clip(threshold - axisProgress);
-    }
-    else
-    {
-        clip(axisProgress - threshold);
+        if (reverseDirection)
+        {
+            clip(threshold - axisProgress);
+        }
+        else
+        {
+            clip(axisProgress - threshold);
+        }
     }
     
     // 노말 벡터 정규화

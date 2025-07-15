@@ -44,6 +44,9 @@ cbuffer SpawnParameters : register(b0)
     
     uint gMaxParticles; // 최대 파티클 수
     float3 gEmitterPosition; // 이미터 월드 위치
+    
+    float3 previousEmitterPosition;
+    uint forcePositionUpdate;
 }
 
 // 3D 메시 파티클 템플릿
@@ -231,6 +234,15 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.isActive = 1;
 }
 
+void UpdateExistingMeshParticlePosition(inout MeshParticleData particle)
+{
+    // 에미터 위치 변화량 계산
+    float3 positionDelta = gEmitterPosition - previousEmitterPosition;
+    
+    // 기존 파티클 위치에 변화량 적용
+    particle.position += positionDelta;
+}
+
 #define THREAD_GROUP_SIZE 1024
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -248,8 +260,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 기존 활성 파티클 업데이트
     if (particle.isActive == 1)
     {
+    // 에미터 위치가 변경되었다면 즉시 파티클 위치 업데이트
+        if (forcePositionUpdate == 1)
+        {
+            UpdateExistingMeshParticlePosition(particle);
+        }
+    
+        // 나이 증가
         particle.age += gDeltaTime;
-        
+    
         // 수명 체크
         if (particle.age >= particle.lifeTime)
         {

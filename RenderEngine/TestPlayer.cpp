@@ -11,6 +11,8 @@
 #include "CharacterControllerComponent.h"
 #include "InputActionComponent.h"
 #include "TestAniScprit.h"
+#include "EffectComponent.h"
+
 void TestPlayer::GetPlayer(GameObject* _player)
 {
 	player = _player;
@@ -77,8 +79,8 @@ void TestPlayer::Update(float deltaTime)
 {
 	auto _player = GameObject::Find("Punch");  
 	if (!_player) return;
-
-
+	
+	_player->GetComponent<EffectComponent>()->PlayEffectByName("gumgi");
 }
 
 void TestPlayer::Punch()
@@ -86,6 +88,7 @@ void TestPlayer::Punch()
 	auto _player = GameObject::Find("Punch");
 	auto animator = _player->GetComponent<Animator>();
 	animator->SetParameter("OnPunch" ,true);
+	
 }
 
 void TestPlayer::Move(Mathf::Vector2 _dir)

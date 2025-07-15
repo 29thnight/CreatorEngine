@@ -77,6 +77,8 @@ private:
 	void UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view,
 		const Mathf::Matrix& projection);
 
+	std::pair<Mathf::Vector3, Mathf::Vector3> GetCurrentMeshBounds() const;
+
 	bool m_isClippingAnimating = false;
 	float m_clippingAnimationSpeed = 1.0f;
 

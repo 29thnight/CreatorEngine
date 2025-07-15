@@ -237,7 +237,6 @@ void MeshModuleGPU::CreateClippingBuffer()
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    // 초기 데이터는 nullptr로 (나중에 Map으로 설정)
     HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_clippingBuffer);
     if (FAILED(hr))
     {
@@ -260,14 +259,16 @@ void MeshModuleGPU::UpdateClippingBuffer()
     {
         ClippingParams* params = static_cast<ClippingParams*>(mappedResource.pData);
 
-        // 기존 파라미터에서 값 가져오기
+        // 기존 파라미터
         const auto& baseParams = GetClippingParams();
         params->clippingProgress = baseParams.clippingProgress;
         params->clippingAxis = baseParams.clippingAxis;
         params->clippingEnabled = baseParams.clippingEnabled;
 
-        // 새로 추가된 역행렬 설정
-        params->invWorldMatrix = m_invWorldMatrix;
+        // 현재 메쉬의 바운딩 박스 설정
+        auto bounds = GetCurrentMeshBounds();
+        params->meshBoundingMin = bounds.first;
+        params->meshBoundingMax = bounds.second;
 
         deviceContext->Unmap(m_clippingBuffer.Get(), 0);
     }
@@ -551,6 +552,28 @@ void MeshModuleGPU::UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf
     m_constantBufferData.projection = projection;
 
     DirectX11::UpdateBuffer(m_constantBuffer.Get(), &m_constantBufferData);
+}
+
+std::pair<Mathf::Vector3, Mathf::Vector3> MeshModuleGPU::GetCurrentMeshBounds() const
+{
+    auto currentMesh = GetCurrentMesh();
+    if (!currentMesh) {
+        // 메쉬가 없으면 기본 큐브 크기 반환
+        return { Mathf::Vector3(-0.5f, -0.5f, -0.5f), Mathf::Vector3(0.5f, 0.5f, 0.5f) };
+    }
+
+    // 메쉬의 바운딩 박스 가져오기
+    BoundingBox boundingBox = currentMesh->GetBoundingBox();
+
+    // Center와 Extents에서 min, max 계산
+    // min = center - extents, max = center + extents
+    Mathf::Vector3 center(boundingBox.Center.x, boundingBox.Center.y, boundingBox.Center.z);
+    Mathf::Vector3 extents(boundingBox.Extents.x, boundingBox.Extents.y, boundingBox.Extents.z);
+
+    Mathf::Vector3 minBounds = center - extents;
+    Mathf::Vector3 maxBounds = center + extents;
+
+    return { minBounds, maxBounds };
 }
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)

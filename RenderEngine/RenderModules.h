@@ -39,11 +39,13 @@ struct ClippingParams
     float clippingProgress;
     Mathf::Vector3 clippingAxis;
 
-    Mathf::Matrix invWorldMatrix;
-
     float clippingEnabled;
-    Mathf::Vector3 pad;
+    Mathf::Vector3 meshBoundingMin;  // 메쉬 바운딩 박스 최소값
+
+    Mathf::Vector3 meshBoundingMax;  // 메쉬 바운딩 박스 최대값
+    float pad1;
 };
+
 
 class RenderModules
 {

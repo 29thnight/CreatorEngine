@@ -1,33 +1,25 @@
-// MeshParticle.hlsl - 파티클 중심점 추가된 버텍스 셰이더
+// MeshParticle.hlsl - 자동 바운딩 박스 계산
 struct MeshParticleData
 {
-    float3 position; // 12 bytes
-    float pad1; // 4 bytes -> 16 bytes total
-    
-    float3 velocity; // 12 bytes  
-    float pad2; // 4 bytes -> 32 bytes total
-    
-    float3 acceleration; // 12 bytes
-    float pad3; // 4 bytes -> 48 bytes total
-    
-    float3 rotation; // 12 bytes
-    float pad4; // 4 bytes -> 64 bytes total
-    
-    float3 rotationSpeed; // 12 bytes
-    float pad5; // 4 bytes -> 80 bytes total
-    
-    float3 scale; // 12 bytes
-    float pad6; // 4 bytes -> 96 bytes total
-    
-    float age; // 4 bytes
-    float lifeTime; // 4 bytes
-    uint isActive; // 4 bytes
-    uint renderMode; // 4 bytes -> 112 bytes total
-    
-    float4 color; // 16 bytes -> 128 bytes total
-    
-    uint textureIndex; // 4 bytes
-    float3 pad8; // 12 bytes -> 144 bytes total
+    float3 position;
+    float pad1;
+    float3 velocity;
+    float pad2;
+    float3 acceleration;
+    float pad3;
+    float3 rotation;
+    float pad4;
+    float3 rotationSpeed;
+    float pad5;
+    float3 scale;
+    float pad6;
+    float age;
+    float lifeTime;
+    uint isActive;
+    uint renderMode;
+    float4 color;
+    uint textureIndex;
+    float3 pad8;
 };
 
 cbuffer MeshConstantBuffer : register(b0)
@@ -51,7 +43,6 @@ struct VertexInput
     float3 binormal : BINORMAL;
     float4 blendIndices : BLENDINDICES;
     float4 blendWeight : BLENDWEIGHT;
-    
     uint instanceID : SV_InstanceID;
 };
 
@@ -59,7 +50,9 @@ struct VertexOutput
 {
     float4 position : SV_POSITION;
     float3 worldPos : WORLD_POSITION;
-    float3 particleCenter : PARTICLE_CENTER; // 파티클 중심점 추가
+    float3 particleCenter : PARTICLE_CENTER;
+    float3 localPos : LOCAL_POSITION; // 원본 로컬 위치
+    float3 particleScale : PARTICLE_SCALE;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -106,10 +99,11 @@ VertexOutput main(VertexInput input)
     
     if (particle.isActive == 0)
     {
-        // 비활성 파티클은 화면 밖으로 이동
         output.position = float4(0, 0, 0, 0);
         output.worldPos = float3(0, 0, 0);
         output.particleCenter = float3(0, 0, 0);
+        output.localPos = float3(0, 0, 0);
+        output.particleScale = float3(1, 1, 1);
         output.normal = float3(0, 0, 0);
         output.texCoord = float2(0, 0);
         output.color = float4(0, 0, 0, 0);
@@ -119,19 +113,18 @@ VertexOutput main(VertexInput input)
         return output;
     }
     
+    // 원본 로컬 위치 저장 (스케일/회전 적용 전)
+    output.localPos = input.position;
+    
     // 로컬 변환: 스케일 -> 회전
     float3x3 rotMatrix = CreateRotationMatrix(particle.rotation);
     float3 scaledPos = input.position * particle.scale;
     float3 rotatedPos = mul(scaledPos, rotMatrix);
     float3 rotatedNormal = mul(input.normal, rotMatrix);
     
-    // 월드 변환: 로컬 변환된 버텍스를 파티클 위치로 이동
+    // 월드 변환
     float3 worldPos = rotatedPos + particle.position;
-    
-    // 최종 월드 매트릭스 적용 (gWorld는 전역 변환용)
     float4 worldPosition = mul(float4(worldPos, 1.0), gWorld);
-    
-    // 파티클 중심점도 gWorld 변환 적용
     float4 particleCenterWorld = mul(float4(particle.position, 1.0), gWorld);
     
     // 뷰 및 프로젝션 변환
@@ -140,7 +133,8 @@ VertexOutput main(VertexInput input)
     
     // 출력 설정
     output.worldPos = worldPosition.xyz;
-    output.particleCenter = particleCenterWorld.xyz; // 파티클 중심점 전달
+    output.particleCenter = particleCenterWorld.xyz;
+    output.particleScale = particle.scale;
     output.normal = normalize(mul(rotatedNormal, (float3x3) gWorld));
     output.texCoord = input.texCoord;
     output.color = particle.color;

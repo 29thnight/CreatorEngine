@@ -4,6 +4,9 @@ struct PixelInput
 {
     float4 position : SV_POSITION;
     float3 worldPos : WORLD_POSITION;
+    float3 particleCenter : PARTICLE_CENTER;
+    float3 localPos : LOCAL_POSITION; // 원본 로컬 위치
+    float3 particleScale : PARTICLE_SCALE;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -11,7 +14,6 @@ struct PixelInput
     float alpha : ALPHA;
     uint renderMode : RENDER_MODE;
 };
-
 struct PixelOutput
 {
     float4 color : SV_Target;

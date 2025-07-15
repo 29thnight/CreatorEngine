@@ -64,6 +64,9 @@ private:
 	std::mt19937 m_randomGenerator;
 	std::uniform_real_distribution<float> m_uniform;
 
+	Mathf::Vector3 m_previousEmitterPosition;
+	bool m_forcePositionUpdate;
+
 public:
 	MeshSpawnModuleCS();
 	virtual ~MeshSpawnModuleCS();
@@ -73,6 +76,7 @@ public:
 	virtual void Update(float deltaTime) override;
 	virtual void Release() override;
 	virtual void OnSystemResized(UINT maxParticles) override;
+	virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) override;
 
 	void SetEmitterPosition(const Mathf::Vector3& position);
 
