@@ -56,7 +56,6 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("Rock", []() { return new Rock(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisFeed", []() { return new AsisFeed(); });
 		CreateFactory::GetInstance()->RegisterFactory("GameManager", []() { return new GameManager(); });
-		CreateFactory::GetInstance()->RegisterFactory("Swrod", []() { return new Swrod(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityItem", []() { return new EntityItem(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityAsis", []() { return new EntityAsis(); });
 		CreateFactory::GetInstance()->RegisterFactory("Entity", []() { return new Entity(); });

@@ -34,25 +34,74 @@ void Animation::InvokeEvent(Animator* _ownerAnimator)
 	if (m_keyFrameEvent.empty())
 		return;
 	GameObject* owner = _ownerAnimator->GetOwner();
-	TestAniScprit* Script = owner->GetComponent<TestAniScprit>();
-	auto typeName = Meta::Find(Script->GetTypeID());
-	void* voidPtr = static_cast<void*>(Script);
-	for (auto& event : m_keyFrameEvent)
+
+	std::vector<ModuleBehavior*> scripts{};
+	ModuleBehavior* script = nullptr;
+	for (auto& component : owner->m_components)
 	{
+		if (nullptr == component)
+			continue;
+		script =  dynamic_cast<ModuleBehavior*>(component.get()); 
+		if (script != nullptr) break;
+	}
+
+	if (script == nullptr) return;
+	auto typeName = Meta::Find(script->GetHashedName().ToString());
+	void* voidPtr = static_cast<void*>(script);
+	/*for (auto& event : m_keyFrameEvent)
+	{
+		bool shouldTrigger = false;
 		if (curAnimationProgress >= preAnimationProgress)
 		{
-			if (preAnimationProgress <= event.key && event.key < curAnimationProgress)
+			if (preAnimationProgress < event.key && event.key <= curAnimationProgress)
 			{
-				Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, { });
+				shouldTrigger = true;
 			}
 		}
 		else
 		{
-			if ((event.key >= preAnimationProgress && event.key <= 1.0f) ||
-				(event.key >= 0.0f && event.key < curAnimationProgress))
+			if ((event.key > preAnimationProgress && event.key <= 1.0f) ||
+				(event.key >= 0.0f && event.key <= curAnimationProgress))
 			{
-				Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, { });
+				shouldTrigger = true;
 			}
+		}
+
+		if (shouldTrigger)
+		{
+			Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, {});
+		}
+	}*/
+
+	for (const auto& event : m_keyFrameEvent)
+	{
+		bool shouldTrigger = false;
+
+		if (curAnimationProgress >= preAnimationProgress)
+		{
+			// 일반 진행
+			if (preAnimationProgress < event.key && event.key <= curAnimationProgress)
+			{
+				shouldTrigger = true;
+			}
+		}
+		else if (m_isLoop)
+		{
+			// 루프된 경우
+			if ((event.key > preAnimationProgress && event.key <= 1.0f) ||
+				(event.key >= 0.0f && event.key <= curAnimationProgress))
+			{
+				shouldTrigger = true;
+			}
+		}
+		else
+		{
+			// 루프 아님 + cur < pre 는 float 오차 → 무시
+		}
+
+		if (shouldTrigger)
+		{
+			Meta::InvokeMethodByMetaName(voidPtr, *typeName, event.m_funName, {});
 		}
 	}
 

@@ -72,9 +72,6 @@
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\Swrod.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
 		<ClInclude Include="BTActtionFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
@@ -114,9 +111,6 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Swrod.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\AsisFeed.cpp">

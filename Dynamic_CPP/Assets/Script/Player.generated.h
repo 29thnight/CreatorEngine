@@ -5,9 +5,18 @@ ReflectionScriptField(Player) \
 { \
 	PropertyField \
 	({ \
-		meta_property(HP) \
+		meta_property(maxHP) \
 		meta_property(ThrowPowerX) \
 		meta_property(ThrowPowerY) \
+		meta_property(m_comboTime) \
+		meta_property(m_dashPower) \
+		meta_property(m_dashCooldown) \
+		meta_property(m_dubbleDashTime) \
+		meta_property(m_maxDashCount) \
 	}); \
-	FieldEnd(Player, PropertyOnly) \
+	MethodField \
+	({ \
+		meta_method(OnPunch) \
+	}); \
+	FieldEnd(Player, PropertyAndMethod) \
 };

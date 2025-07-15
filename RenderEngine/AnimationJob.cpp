@@ -92,8 +92,9 @@ void AnimationJob::Update(float deltaTime)
                         }
                         
                     }
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].preAnimationProgress = skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress;
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].curAnimationProgress = animationcontroller->curAnimationProgress;
+                    auto& anim = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
+                    anim.preAnimationProgress = anim.curAnimationProgress;
+                    anim.curAnimationProgress = animationcontroller->curAnimationProgress;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
@@ -109,6 +110,7 @@ void AnimationJob::Update(float deltaTime)
 
                     skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
                 }
+                
                 XMMATRIX rootTransform = skeleton->m_rootTransform;
 
                 UpdateBoneLayer(skeleton->m_rootBone, *animator , rootTransform);
@@ -327,10 +329,39 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     std::string& boneName = bone->m_name;
     bool isCalculAnimate = true;
     XMMATRIX globalTransform{};
-   
+    
+    std::string& boneName2 = bone->m_name;
+    Animation* animation;
+
+
+
+
+    auto controller2 = animator.m_animationControllers[1];
+    if (controller2)
+    {
+        
+        animation = &skeleton->m_animations[controller2->GetAnimationIndex()];
+        //auto mask = controller2->GetAvatarMask();
+    }
+    else
+    {
+        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
+    }
+    auto it = animation->m_nodeAnimations.find(boneName2);
+    if (it == animation->m_nodeAnimations.end())
+    {
+        for (Bone* child : bone->m_children)
+        {
+            UpdateBoneLayer(child, animator, parentTransform);
+        }
+        return;
+    }
+ 
     for (auto& controller : animator.m_animationControllers)
     {
         auto mask = controller->GetAvatarMask();
+      
+
         if (mask != nullptr) //마스크 있으면
         {
 
@@ -340,6 +371,10 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 {
                     globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
                 }
+                else
+                {
+                    globalTransform = parentTransform;
+                }
             }
             else
             {
@@ -348,6 +383,10 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                     globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
                
                 }
+                else
+                {
+                    globalTransform = parentTransform;
+                }
             }
         }
         else
@@ -355,6 +394,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
             globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
         }
     }
+    //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
 
     if (skeleton->HasSocket())
@@ -368,6 +408,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
             }
         }
     }
+
     for (Bone* child : bone->m_children)
     {
         UpdateBoneLayer(child, animator,globalTransform);

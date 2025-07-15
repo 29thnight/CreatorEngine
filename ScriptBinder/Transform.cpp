@@ -200,6 +200,13 @@ Mathf::xVector Transform::GetWorldQuaternion() const
 	return m_worldQuaternion;
 }
 
+Mathf::Vector3 Transform::GetForward()
+{
+	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, GetWorldMatrix());
+	forward.Normalize();
+	return forward;
+}
+
 void Transform::SetDirty()
 {
 	m_dirty = true;
