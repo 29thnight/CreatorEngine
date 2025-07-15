@@ -373,7 +373,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 }
                 else
                 {
-                    globalTransform = parentTransform;
+                   // globalTransform = parentTransform;
                 }
             }
             else
@@ -385,7 +385,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
                 }
                 else
                 {
-                    globalTransform = parentTransform;
+                    //globalTransform = parentTransform;
                 }
             }
         }
