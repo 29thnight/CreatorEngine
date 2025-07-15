@@ -5,7 +5,7 @@
 enum class NodeStatus { Success, Failure, Running };
 AUTO_REGISTER_ENUM(NodeStatus);
 
-enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, Inverter, Condition, Parallel, Action };
+enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, Inverter, ConditionDecorator , Condition, Parallel, Action };
 AUTO_REGISTER_ENUM(BehaviorNodeType);
 
 enum class ParallelPolicy
