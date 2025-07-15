@@ -1797,10 +1797,6 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
 	if (!BTComponent) return;
 
-	static std::string BTName;
-
-	static char btName[255]{};
-
 	if (ImGui::Button("Set Behavior Tree")) 
 	{
 		file::path filePath = ShowOpenFileDialog(
@@ -1811,10 +1807,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 
 		if (!filePath.empty())
 		{
-			BTName = filePath.filename().string();
 			BTComponent->name = filePath.stem().string();
-			strcpy_s(btName, BTName.c_str());
-
 			FileGuid guid = DataSystems->GetFileGuid(filePath);
 			if (guid != nullFileGuid)
 			{
@@ -1822,15 +1815,45 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			}
 			else
 			{
-				Debug->LogError("Failed to get file GUID for Behavior Tree: %s" + filePath.string());
+				Debug->LogError("Failed to get file GUID for Behavior Tree: " + filePath.string());
+			}
+		}
+	}
+	ImGui::SameLine();
+
+	if (ImGui::Button("Set BlackBoard"))
+	{
+		file::path filePath = ShowOpenFileDialog(
+			L"BlackBoard Files (*.blackboard)\0*.blackboard\0",
+			L"Load BlackBoard",
+			PathFinder::Relative("BehaviorTree").wstring()
+		);
+
+		if (!filePath.empty())
+		{
+			BTComponent->blackBoardName = filePath.stem().string();
+			FileGuid guid = DataSystems->GetFileGuid(filePath);
+			if (guid != nullFileGuid)
+			{
+				BTComponent->m_BlackBoardGuid = guid;
+			}
+			else
+			{
+				Debug->LogError("Failed to get file GUID for Blackboard: " + filePath.string());
 			}
 		}
 	}
 
 	// Behavior Tree 이름 표시
-	if (!BTName.empty())
+	if (!BTComponent->name.empty())
 	{
-		ImGui::Text("Behavior Tree: %s", BTName.c_str());
+		ImGui::Text("Behavior Tree: %s", BTComponent->name.c_str());
+	}
+
+	//BlackBoard 이름 표시
+	if (!BTComponent->blackBoardName.empty())
+	{
+		ImGui::Text("BlackBoard: %s", BTComponent->blackBoardName.c_str());
 	}
 
 }

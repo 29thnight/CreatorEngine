@@ -19,8 +19,11 @@ public:
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(BehaviorTreeComponent)
 
+    //TODO : 에디터 영역으로 뺄 것!
 	[[Property]]
-	std::string name; // 스크립트 이름
+	std::string name; // BT 에셋 이름
+	[[Property]]
+	std::string blackBoardName;
 
 	// IAIComponent 인터페이스 구현
 	void Initialize() override;
@@ -28,7 +31,6 @@ public:
 	void Update(float deltaSecond) override;
 	void OnDistroy() override;
 
-	BlackBoard& GetBlackBoard() { return m_blackboard; }
 private:
 	// Behavior Tree 관련 메서드
 	BTNode::NodePtr BuildTree(const BTBuildGraph& graph);

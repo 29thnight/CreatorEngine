@@ -4,7 +4,6 @@
 
 // Automation include ScriptClass header
 #include "TestTreeBehavior.h"
-#include "NewBehaviourScript.h"
 #include "Rock.h"
 #include "AsisFeed.h"
 #include "GameManager.h"

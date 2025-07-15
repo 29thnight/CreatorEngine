@@ -28,7 +28,6 @@
     <ClInclude Include="IconsFontAwesome6.h" />
     <ClInclude Include="ImGui.h" />
     <ClInclude Include="ImGuiContext.h" />
-    <ClInclude Include="ImGuiMath.h" />
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />
     <ClInclude Include="NodeEditor.h" />
