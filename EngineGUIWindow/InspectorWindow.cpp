@@ -1754,27 +1754,61 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 			}
 		}
 
-		//save , load
-		if (ImGui::Button("Save Terrain"))
+		if (!g_CurrentBrush->m_masks.empty())
 		{
-			file::path savePath = ShowSaveFileDialog(L"", L"Save File",PathFinder::Relative("Terrain"));
-			if (savePath != L"") {
-				std::wstring folderPath = savePath.parent_path().wstring();
-				std::wstring fileName = savePath.filename().wstring();
-				terrainComponent->Save(folderPath, fileName);
+			std::vector<std::string>& maskNameVec = g_CurrentBrush->GetMaskNames();
+			std::vector<const char*> maskNames;
+			maskNames.reserve(maskNameVec.size());
+			for (const auto& name : maskNameVec) {
+				maskNames.push_back(name.c_str());
 			}
-		}
 
-		if (ImGui::Button("Load Terrain"))
-		{
-			//todo:
-			file::path loadPath = ShowOpenFileDialog(L"");
-			if (!loadPath.empty())
+			int selectedMaskIndex = 0;
+			for (const auto& mask : g_CurrentBrush->m_masks) {
+				ImGui::Image((ImTextureID)mask.m_maskSRV,
+					ImVec2((float)100.0f, (float)100.0f));
+			}
+
+			if (ImGui::Combo("Mask", &selectedMaskIndex, maskNames.data(), (int)maskNames.size()))
 			{
-				terrainComponent->Load(loadPath);
+				if (selectedMaskIndex == 0) {
+					uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
+					g_CurrentBrush->SetMaskID(id); // No mask selected
+				}
+				else {
+					uint32_t id = static_cast<uint32_t>(selectedMaskIndex - 1); // Adjust for "None" option
+					g_CurrentBrush->SetMaskID(id);
+				}
 			}
 		}
 
+
+		// 브러시 모양 선택
+		if (ImGui::Button("mask texture load")) {
+			file::path maskTexture = ShowOpenFileDialog(L"");
+			terrainComponent->SetBrushMaskTexture(g_CurrentBrush, maskTexture);
+		}
+	}
+
+	//save , load
+	if (ImGui::Button("Save Terrain"))
+	{
+		file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::Relative("Terrain"));
+		if (savePath != L"") {
+			std::wstring folderPath = savePath.parent_path().wstring();
+			std::wstring fileName = savePath.filename().wstring();
+			terrainComponent->Save(folderPath, fileName);
+		}
+	}
+
+	if (ImGui::Button("Load Terrain"))
+	{
+		//todo:
+		file::path loadPath = ShowOpenFileDialog(L"");
+		if (!loadPath.empty())
+		{
+			terrainComponent->Load(loadPath);
+		}
 	}
 }
 

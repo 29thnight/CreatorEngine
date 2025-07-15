@@ -200,6 +200,22 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 			{
 				float dist = std::sqrt(distSq);
 				float t = brush.m_strength * (1.0f - (dist / brush.m_radius));
+				//거리 비례 브러시 강도 -> mask 적용
+				if (brush.m_maskID != -1 && brush.m_masks.size() > brush.m_maskID)
+				{
+					const auto& mask = brush.m_masks[brush.m_maskID];
+
+					//distSq로 mask의 uv 좌표 계산
+					//uv 좌표 정규화
+					float u = (dx / (2.0f * brush.m_radius) + 0.5f);
+					float v = (dy / (2.0f * brush.m_radius) + 0.5f);
+					//mask의 uv 좌표 계산
+					int maskX = static_cast<int>(u * (mask.m_maskWidth - 1));
+					int maskY = static_cast<int>(v * (mask.m_maskHeight - 1));
+
+					float maskValue = mask.m_mask[maskY * mask.m_maskWidth + maskX] / 255.0f; //png 파일은 0~255 범위이므로 255로 나누어 0~1 범위로 변환
+					t = maskValue; // 브러시 강도에 마스크 적용
+				}
 				int idx = i * m_width + j;
 
 				switch (brush.m_mode)
@@ -862,6 +878,104 @@ void TerrainComponent::ClearLayers()
 	m_nextLayerID = 0;
 	
 	m_pMaterial->ClearLayers(); // 머티리얼에서 레이어 제거
+}
+
+/// 브러쉬 마스크 텍스쳐 로드
+bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask,int& dataWidth,int& dataHeight)
+{
+	auto pathUtf8 = Utf8Encode(path);
+
+	int width, height, channels;
+	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 1);
+	if (!data)
+		return false;
+
+	size_t N = static_cast<size_t>(width) * height;
+	outMask.assign(data, data + N);
+
+	stbi_image_free(data);
+	dataWidth = width;
+	dataHeight = height;
+
+	return true;
+}
+
+void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path)
+{
+	if (!brush) {
+		Debug->LogError("Brush is null");
+		return;
+	}
+	
+	if (path.empty()) {
+		Debug->LogError("Brush mask texture path is empty");
+		return;
+	}
+
+	TerrainBrush::BrushMask mask;
+	
+	if (!LoadBrushMaskTexture(path, mask.m_mask, mask.m_maskWidth, mask.m_maskHeight)) {
+		Debug->LogError("Failed to load brush mask texture: " + Utf8Encode(path));
+		return;
+	}
+
+	
+	
+	// 브러쉬 마스크 텍스쳐 생성
+	{
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = mask.m_maskWidth;
+		desc.Height = mask.m_maskHeight;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8_UNORM;
+		desc.SampleDesc.Count = 1;  // ← 여기
+		desc.SampleDesc.Quality = 0;  // ← 여기
+		desc.Usage = D3D11_USAGE_DYNAMIC;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		HRESULT hr =  DeviceState::g_pDevice->CreateTexture2D(&desc, nullptr, &mask.m_maskTexture);
+		if (FAILED(hr)) {
+			// 오류 처리
+			Debug->LogError("Mask Textrue CreateTexture2D Failed");
+			return;
+		}
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = desc.Format;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+		hr  = DeviceState::g_pDevice->CreateShaderResourceView(
+			mask.m_maskTexture, &srvDesc, &mask.m_maskSRV
+		);
+
+		if (FAILED(hr)) {
+			// 오류 처리
+			Debug->LogError("Mask Textrue CreateShaderResourceView Failed");
+			return;
+		}
+	}
+
+	D3D11_MAPPED_SUBRESOURCE M;
+	DeviceState::g_pDeviceContext->Map(
+		mask.m_maskTexture, 0,
+		D3D11_MAP_WRITE_DISCARD,
+		0, &M
+	);
+	for (int y = 0; y < mask.m_maskHeight; ++y)
+	{
+		memcpy(
+			(uint8_t*)M.pData + y * M.RowPitch,
+			mask.m_mask.data() + y * mask.m_maskWidth,
+			mask.m_maskWidth
+		);
+	}
+	DeviceState::g_pDeviceContext->Unmap(mask.m_maskTexture, 0);
+
+	brush->m_masks.push_back(mask);	
+	std::string maskName = "mask_" + std::to_string(brush->m_masks.size() - 1);
+	brush->m_maskNames.push_back(maskName);
 }
 
 
