@@ -124,8 +124,8 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
-	LuaEngine::Get().Initialize();
-    AIManagers->InitalizeBehaviorTreeSystem();
+	//LuaEngine::Get().Initialize();
+
 
     isGameToRender = true;
 

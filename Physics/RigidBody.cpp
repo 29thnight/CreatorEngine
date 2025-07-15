@@ -21,7 +21,7 @@ RigidBody::~RigidBody()
 
 
 
-void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, int* collisionMatrix, void* userData)
+void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData)
 {
 	physx::PxShape* newShape = physics->createShape(newGeometry, *material);
 	physx::PxFilterData filterData;

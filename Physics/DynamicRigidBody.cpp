@@ -70,7 +70,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	return true;
 }
 
-void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* collisionMatrix)
+void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, unsigned int* collisionMatrix)
 {
 	if (layerNumber == UINT_MAX)
 	{
@@ -93,7 +93,7 @@ void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* c
 	data->thisLayerNumber = m_layerNumber;
 }
 
-void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix)
+void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
 {
 	//현제 스케일이 NaN인지 체크
 	if (std::isnan(m_scale.x) || std::isnan(m_scale.y) || std::isnan(m_scale.z))

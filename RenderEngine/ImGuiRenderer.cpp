@@ -175,6 +175,8 @@ void ImGuiRenderer::BeginRender()
         ImGuiID dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
 
         ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
+		ImGui::DockBuilderDockWindow("Behavior Tree Editor", dock1);
+		ImGui::DockBuilderDockWindow("BlackBoard Editor", dock1);
         ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
         ImGui::DockBuilderDockWindow(ICON_FA_BARS_STAGGERED "  Hierarchy", dock2);
         ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock3);

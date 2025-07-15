@@ -576,6 +576,8 @@ void DataSystem::CloseContentsBrowser()
 
 void DataSystem::ShowDirectoryTree(const file::path& directory)
 {
+	static file::path MenuDirectory{};
+	static bool isRightClicked = false;
 	for (const auto& entry : file::directory_iterator(directory))
 	{
 		if (entry.is_directory())
@@ -591,12 +593,34 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 			{
 				currentDirectory = entry.path();
 			}
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				MenuDirectory = entry.path();
+				isRightClicked = true;
+			}
+
 			if (nodeOpen)
 			{
 				ShowDirectoryTree(entry.path());
 				ImGui::TreePop();
 			}
 		}
+	}
+
+	if(isRightClicked)
+	{
+		ImGui::OpenPopup("Context Menu");
+		isRightClicked = false;
+	}
+
+	if (ImGui::BeginPopup("Context Menu"))
+	{
+		if (ImGui::MenuItem("Open Save Directory"))
+		{
+			OpenExplorerSelectFile(MenuDirectory);
+			MenuDirectory.clear();
+		}
+		ImGui::EndPopup();
 	}
 }
 

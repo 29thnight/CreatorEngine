@@ -3,8 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "InverseKinematic.h"
 #include "TestTreeBehavior.h"
-#include "NewBehaviourScript.h"
 #include "Rock.h"
 #include "AsisFeed.h"
 #include "GameManager.h"

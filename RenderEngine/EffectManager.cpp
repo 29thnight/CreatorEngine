@@ -1,6 +1,5 @@
 #include "EffectManager.h"
 #include "../ShaderSystem.h"
-#include "SparkleEffect.h"
 #include "ImGuiRegister.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"

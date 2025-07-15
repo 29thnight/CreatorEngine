@@ -56,9 +56,6 @@
     <ClInclude Include="CustomCollapsingHeader.h">
       <Filter>소스 파일\CollapsingHeader</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiMath.h">
-      <Filter>소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
     <ClInclude Include="NodeEditor.h">
       <Filter>소스 파일\NodeEditior</Filter>
     </ClInclude>

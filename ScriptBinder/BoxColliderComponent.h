@@ -87,6 +87,9 @@ public:
            m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
        }
 
+       // 임시 콜리젼 레이어
+       m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
+
 	   return m_Info;
    }
 

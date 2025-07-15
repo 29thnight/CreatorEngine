@@ -538,43 +538,47 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
 			if (terrainComponent != nullptr) {
 				terrainComponent->SetTerrainBrush(terrainBrush);
-				if (ImGui::IsWindowHovered()) {
-					ImVec2 mousePos = ImGui::GetMousePos();
-					Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
+				if (terrainBrush->m_isEditMode)
+				{
 
-					//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
-					XMFLOAT3 origin = ray.origin;
-					XMFLOAT3 direction = ray.direction;
+					if (ImGui::IsWindowHovered()) {
+						ImVec2 mousePos = ImGui::GetMousePos();
+						Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
 
-					// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
-					if (direction.y < 0.0f)
-					{
-						// t 계산: Y=0 평면 얻기
-						float t = -origin.y / direction.y;
-						if (t >= 0.0f)
+						//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
+						XMFLOAT3 origin = ray.origin;
+						XMFLOAT3 direction = ray.direction;
+
+						// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
+						if (direction.y < 0.0f)
 						{
-							// 충돌 지점 P = origin + t * direction
-							XMFLOAT3 hitPos;
-							hitPos.x = origin.x + t * direction.x;
-							hitPos.y = 0.0f; // 당연히 y=0
-							hitPos.z = origin.z + t * direction.z;
+							// t 계산: Y=0 평면 얻기
+							float t = -origin.y / direction.y;
+							if (t >= 0.0f)
+							{
+								// 충돌 지점 P = origin + t * direction
+								XMFLOAT3 hitPos;
+								hitPos.x = origin.x + t * direction.x;
+								hitPos.y = 0.0f; // 당연히 y=0
+								hitPos.z = origin.z + t * direction.z;
 
-							// 4) 충돌 지점(P)의 XZ → HeightMap 인덱스(격자) 변환
-							//    TerrainComponent의 m_width, m_height, m_gridSize가 필요
-							float gridSize = 1.0f; // 예: 1.0f, 2.0f 등
-							int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
-							int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
+								// 4) 충돌 지점(P)의 XZ → HeightMap 인덱스(격자) 변환
+								//    TerrainComponent의 m_width, m_height, m_gridSize가 필요
+								float gridSize = 1.0f; // 예: 1.0f, 2.0f 등
+								int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
+								int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
 
-							//// 경계 검사
-							//if (!(tileX < 0 || tileX >= terrainComponent->m_width ||
-							//	tileY < 0 || tileY >= terrainComponent->m_height))
-							//{
-								terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
+								//// 경계 검사
+								//if (!(tileX < 0 || tileX >= terrainComponent->m_width ||
+								//	tileY < 0 || tileY >= terrainComponent->m_height))
+								//{
+									terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
-								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-									terrainComponent->ApplyBrush(*terrainBrush);
-								}
-							//}
+									if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+										terrainComponent->ApplyBrush(*terrainBrush);
+									}
+								//}
+							}
 						}
 					}
 				}

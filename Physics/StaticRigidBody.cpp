@@ -77,7 +77,7 @@ void StaticRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* co
 	userData->thisLayerNumber = layerNumber;
 }
 
-void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix)
+void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
 {
 	if (std::isnan(m_scale.x) || std::isnan(m_scale.y) || std::isnan(m_scale.z))
 	{

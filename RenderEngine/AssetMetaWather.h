@@ -202,7 +202,7 @@ private:
                 extension == ".png" || extension == ".dds" || extension == ".hdr" ||
                 extension == ".hlsl" || extension == ".cpp" || extension == ".glb" ||
                 extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
-                extension == ".terrain";
+                extension == ".terrain" || extension == ".bt" || extension == ".blackboard";
     }
 
     void HandleMoved(const std::filesystem::path& dir, const std::string& oldName, const std::string& newName) 

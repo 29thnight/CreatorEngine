@@ -1,6 +1,9 @@
 #pragma once
+#include <atomic>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
+#include <utility>
 
 class Noncopyable
 {
@@ -33,7 +36,6 @@ public:
 		});
 
 		return s_instance;
-
 	}
 
 	struct Deleter

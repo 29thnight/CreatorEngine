@@ -41,7 +41,7 @@ void RagdollPhysics::Update(float deltaTime)
 	}
 }
 
-bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const DirectX::SimpleMath::Vector3& extend)
+bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const DirectX::SimpleMath::Vector3& extend)
 {
 	RagdollLink* link = new RagdollLink();
 
@@ -80,7 +80,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisio
 	return true;
 }
 
-bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const float& radius)
+bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& radius)
 {
 	RagdollLink* link = new RagdollLink();
 	auto parentLink = m_linkContainer.find(linkInfo.parentBoneName);
@@ -113,7 +113,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisio
 	return true;
 }
 
-bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const float& halfHeight, const float& radius)
+bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& halfHeight, const float& radius)
 {
 	RagdollLink* link = new RagdollLink();
 	auto parentLink = m_linkContainer.find(linkInfo.parentBoneName);
@@ -146,7 +146,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, int* collisio
 	return true;
 }
 
-bool RagdollPhysics::AddArticulationLink(LinkInfo& linkInfo, int* collisionMatrix)
+bool RagdollPhysics::AddArticulationLink(LinkInfo& linkInfo, unsigned int* collisionMatrix)
 {
 	m_rootLink = new RagdollLink();
 
@@ -156,7 +156,7 @@ bool RagdollPhysics::AddArticulationLink(LinkInfo& linkInfo, int* collisionMatri
 	return true;
 }
 
-bool RagdollPhysics::ChangeLayerNumber(const unsigned int& newLayerNumber, int* collisionMatrix)
+bool RagdollPhysics::ChangeLayerNumber(const unsigned int& newLayerNumber, unsigned int* collisionMatrix)
 {
 	if (newLayerNumber == UINT_MAX) {
 		return false;

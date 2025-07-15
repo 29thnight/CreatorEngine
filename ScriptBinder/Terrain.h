@@ -90,6 +90,12 @@ public:
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
 
+    //브러시 마스크 관련
+    bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
+    void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
+    
+
+
     // Collider용 접근자
     int GetWidth()  const { return m_width; }
     int GetHeight() const { return m_height; }

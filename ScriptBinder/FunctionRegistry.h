@@ -10,7 +10,7 @@
 #include "BTHeader.h"
 #include "Blackboard.h"
 
-using ActionFunc = std::function<BT::NodeStatus(float, BlackBoard&)>;
+using ActionFunc = std::function<NodeStatus(float, BlackBoard&)>;
 
 class FunctionRegistry
 {

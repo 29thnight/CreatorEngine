@@ -1,9 +1,10 @@
+#pragma once
 //Avoid use pre-generated header files because they are not updated frequently
 
 // File: 'fa.ttf' (394668 bytes)
 // Exported using binary_to_compressed_c.cpp
-static const unsigned int FA_compressed_size = 234008;
-static const unsigned int FA_compressed_data[234008/4] =
+static inline const unsigned int FA_compressed_size = 234008;
+static inline const unsigned int FA_compressed_data[234008/4] =
 {
     0x0000bc57, 0x00000000, 0xac050600, 0x00000400, 0x00010037, 0x000a0000, 0x00030080, 0x2f534f20, 0x624b6132, 0x0100004b, 0x08158228, 0x6d636028, 
     0x20da7061, 0x00000c85, 0x00004417, 0x6c678248, 0xf6c06679, 0x00007073, 0x05008875, 0x6568443f, 0x80266461, 0x2b826a26, 0x0382ac20, 0x82683621, 

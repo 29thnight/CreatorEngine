@@ -101,6 +101,46 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 	return *this;
 }
 
+Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
+{
+	// TODO: 여기에 return 문을 삽입합니다.
+	if (m_parentID == 0)
+		return SetPosition(pos);
+	else {
+		auto parent = GameObject::FindIndex(m_parentID);
+		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
+		Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
+		return SetPosition(newLocalposition);
+	}
+}
+
+Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
+{
+	if (m_parentID == 0)
+		return SetRotation(quaternion);
+	else {
+		auto parent = GameObject::FindIndex(m_parentID);
+		Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
+		Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
+		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(parentWorldInverse, quaternion);
+		return SetRotation(newLocalrotation);
+	}
+}
+
+Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
+{
+	if (m_parentID == 0)
+		return SetScale(scale);
+	else {
+		auto parent = GameObject::FindIndex(m_parentID);
+		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
+		Mathf::Vector3 newLocalscale = XMVector3TransformCoord(scale, parentWorldInverse);
+		return SetPosition(newLocalscale);
+	}
+}
+
 Mathf::xMatrix Transform::GetLocalMatrix()
 {
 	if (m_dirty)

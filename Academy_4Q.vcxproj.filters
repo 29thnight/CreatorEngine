@@ -15,12 +15,6 @@
     <Filter Include="Dx11Main">
       <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utill">
-      <UniqueIdentifier>{bd2f311f-ba6c-4f45-a21a-ac8cec09e5b2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Utill\BT">
-      <UniqueIdentifier>{c114c291-5ed0-48e5-8886-2d770a7c424e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Window">
       <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
     </Filter>
@@ -92,12 +86,6 @@
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
       <Filter>Window\InspectorWindow</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\BT_Editor.h">
-      <Filter>Utill\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\BehaviorTree.h">
-      <Filter>Utill\BT</Filter>
-    </ClInclude>
     <ClInclude Include="EngineEntry\App.h">
       <Filter>App</Filter>
     </ClInclude>
@@ -141,12 +129,6 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
       <Filter>Window\SceneViewWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\BehaviorTree.cpp">
-      <Filter>Utill\BT</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\BT_Editor.cpp">
-      <Filter>Utill\BT</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\App.cpp">
       <Filter>App</Filter>
