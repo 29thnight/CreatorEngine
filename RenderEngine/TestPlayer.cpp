@@ -80,7 +80,6 @@ void TestPlayer::Update(float deltaTime)
 	auto _player = GameObject::Find("Punch");  
 	if (!_player) return;
 	
-	_player->GetComponent<EffectComponent>()->PlayEffectByName("gumgi");
 }
 
 void TestPlayer::Punch()
