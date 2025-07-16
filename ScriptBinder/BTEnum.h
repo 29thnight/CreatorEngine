@@ -2,7 +2,7 @@
 #include "Core.Minimal.h"
 #include "imgui-node-editor\imgui_node_editor.h"
 
-enum class NodeStatus { Success, Failure, Running };
+enum class NodeStatus { Success, Failure, Aborted, Running };
 AUTO_REGISTER_ENUM(NodeStatus);
 
 enum class BehaviorNodeType { Composite, Decorator, Sequence, Selector, Inverter, ConditionDecorator , Condition, Parallel, Action };
