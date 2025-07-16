@@ -61,8 +61,7 @@ public:
     float m_currentTime = 0.0f;
 
     [[Property]]
-    int num = 0;
-
+    bool m_useAbsolutePosition = false;
 private:
     // 실제 사용되는 고유 인스턴스 이름
     std::string m_effectInstanceName;

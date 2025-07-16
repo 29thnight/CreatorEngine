@@ -269,13 +269,20 @@ void EffectEditor::RenderMainEditor()
 
 					ImGui::Text("Emitter %d: %s", i, m_tempEmitters[i].name.c_str());
 
-					// 위치 설정
+					// 에미터 오프셋 설정 (이펙트 기준점에서의 상대 위치)
 					if (m_tempEmitters[i].particleSystem) {
 						Mathf::Vector3 currentPos = m_tempEmitters[i].particleSystem->GetPosition();
 						float pos[3] = { currentPos.x, currentPos.y, currentPos.z };
-						if (ImGui::DragFloat3("Position", pos, 0.1f)) {
+
+						if (ImGui::DragFloat3("Emitter Position", pos, 0.1f)) {
+							// ParticleSystem의 위치를 직접 설정 (이게 곧 상대 위치)
 							m_tempEmitters[i].particleSystem->SetPosition(Mathf::Vector3(pos[0], pos[1], pos[2]));
 						}
+
+						// 도움말 텍스트
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Relative to Effect Center)");
+
 
 						// 최대 파티클 수 설정
 						UINT currentMaxParticles = m_tempEmitters[i].particleSystem->GetMaxParticles();
@@ -313,7 +320,7 @@ void EffectEditor::RenderMainEditor()
 								}
 
 								if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
-									m_emitterTextureSelections[i] = t;  // 해당 에미터의 선택 인덱스 업데이트
+									m_emitterTextureSelections[i] = t;
 								}
 								if (isSelected) {
 									ImGui::SetItemDefaultFocus();
@@ -904,6 +911,8 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 			m_emitterTextureSelections.clear();
 
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
+
+			// 1. 먼저 모든 에미터 정보를 생성
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
 				m_emitterTextureSelections.push_back(0);
@@ -911,6 +920,7 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 				std::string savedName = tempEmitter.particleSystem->m_name;
 				tempEmitter.name = savedName.empty() ? ("LoadedEmitter_" + std::to_string(i + 1)) : savedName;
 				tempEmitter.isPlaying = false;
+
 				m_tempEmitters.push_back(tempEmitter);
 
 				std::cout << "Emitter " << i << " added. Checking references..." << std::endl;

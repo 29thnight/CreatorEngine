@@ -263,7 +263,7 @@ void MeshModuleGPU::UpdateClippingBuffer()
         const auto& baseParams = GetClippingParams();
         params->clippingProgress = baseParams.clippingProgress;
         params->clippingAxis = baseParams.clippingAxis;
-        params->clippingEnabled = baseParams.clippingEnabled;
+        params->clippingEnabled = baseParams.clippingEnabled; 
 
         // 현재 메쉬의 바운딩 박스 설정
         auto bounds = GetCurrentMeshBounds();
