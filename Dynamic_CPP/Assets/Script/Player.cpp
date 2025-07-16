@@ -30,9 +30,10 @@ void Player::Start()
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
-
+	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
+	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
-	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
+	/*playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
@@ -41,7 +42,7 @@ void Player::Start()
 	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {});
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, ',', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
 
 
 	m_animator = player->GetComponent<Animator>();
@@ -361,7 +362,7 @@ void Player::TestKnockBack()
 {
 	isKnockBack = true;
 	KnockBackTime = 1.5f;
-	KnockBackForce = 200.f;
+	KnockBackForce = 20.f;
 	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockbackPowerY);
 	m_animator->SetParameter("OnMove", false);
 }
