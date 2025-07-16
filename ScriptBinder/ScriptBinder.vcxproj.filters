@@ -142,9 +142,6 @@
     <Filter Include="Classes\GameAI\Core\Manager">
       <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\RenderableComponent\FoliageMeshComponent">
-      <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\RenderableComponent\Effect">
       <UniqueIdentifier>{e61b4c75-be3d-40bd-b5b6-16c30fbf5e33}</UniqueIdentifier>
     </Filter>
@@ -156,6 +153,12 @@
     </Filter>
     <Filter Include="Classes\Components\RenderableComponent\Sprite">
       <UniqueIdentifier>{03e64df8-e97c-4186-a606-87e87f25c97d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent">
+      <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\GPU">
+      <UniqueIdentifier>{af30516f-7274-46c4-a7ee-5f2132d12f1d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -285,8 +288,8 @@
     <ClCompile Include="AIManager.cpp">
       <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClCompile>
-    <ClCompile Include="FoliageMeshComponent.cpp">
-      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    <ClCompile Include="FoliageComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClCompile>
     <ClCompile Include="EffectComponent.cpp">
       <Filter>Classes\Components\RenderableComponent\Effect</Filter>
@@ -563,8 +566,8 @@
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
-    <ClInclude Include="FoliageMeshComponent.h">
-      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    <ClInclude Include="FoliageComponent.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
     </ClInclude>
     <ClInclude Include="EffectComponent.h">
       <Filter>Classes\Components\RenderableComponent\Effect</Filter>

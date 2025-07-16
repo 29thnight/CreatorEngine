@@ -112,3 +112,17 @@ Material& Material::ConvertToLinearSpace(bool32 convert)
 	
 	return *this;
 }
+
+Material& Material::SetWindVector(const Mathf::Vector4& windVector)
+{
+	m_flowInfo.m_windVector = windVector;
+
+	return *this;
+}
+
+Material& Material::SetUVScroll(const Mathf::Vector2& uvScroll)
+{
+	m_flowInfo.m_uvScroll = uvScroll;
+
+	return *this;
+}

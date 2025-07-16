@@ -78,21 +78,21 @@ void SubsurfaceScatteringPass::Execute(RenderScene& scene, Camera& camera)
 	}
 }
 
-void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* defferdPtr = defferdContext;
+	ID3D11DeviceContext* deferredPtr = deferredContext;
 
-	m_pso->Apply(defferdPtr);
+	m_pso->Apply(deferredPtr);
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(defferdPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
-	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_Buffer.GetAddressOf());
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
 
-	camera.UpdateBuffer(defferdPtr);
+	camera.UpdateBuffer(deferredPtr);
 
 	SubsurfaceScatteringBuffer buffer{};
 	buffer.CameraFOV	= camera.m_fov;
@@ -100,29 +100,29 @@ void SubsurfaceScatteringPass::CreateRenderCommandList(ID3D11DeviceContext* deff
 	buffer.width		= width;
 	buffer.direction	= direction;
 
-	DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &buffer);
+	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
 
-	DirectX11::CopyResource(defferdPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
 	ID3D11ShaderResourceView* srvs[3] = {
 		renderData->m_depthStencil->m_pSRV,
 		m_CopiedTexture->m_pSRV,
 		m_MetalRoughTexture->m_pSRV,
 	};
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 3, srvs);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, srvs);
 
-	DirectX11::Draw(defferdPtr, 4, 0);
+	DirectX11::Draw(deferredPtr, 4, 0);
 
 	ID3D11ShaderResourceView* nullSRV[3] = {
 		nullptr,
 		nullptr,
 		nullptr
 	};
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 3, nullSRV);
-	DirectX11::UnbindRenderTargets(defferdPtr);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, nullSRV);
+	DirectX11::UnbindRenderTargets(deferredPtr);
 
 	ID3D11CommandList* commandList{};
-	defferdPtr->FinishCommandList(false, &commandList);
+	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
 }
 

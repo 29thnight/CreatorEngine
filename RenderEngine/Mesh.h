@@ -90,6 +90,21 @@ struct Vertex
 	}
 };
 
+struct InstanceVertex
+{
+	Mathf::Vector3 position;
+	Mathf::Vector3 normal;
+	Mathf::Vector2 uv0;
+	Mathf::Vector2 uv1;
+	Mathf::Vector3 tangent;
+	Mathf::Vector3 bitangent;
+	uint32 instanceID;
+	InstanceVertex() = default;
+	InstanceVertex(const Vertex& vertex, uint32 id) :
+		position(vertex.position), normal(vertex.normal), uv0(vertex.uv0), uv1(vertex.uv1),
+		tangent(vertex.tangent), bitangent(vertex.bitangent), instanceID(id) {}
+};
+
 class Texture;
 class Material;
 class ModelLoader;
@@ -108,10 +123,12 @@ public:
 	void AssetInit();
 
 	void Draw();
-	void Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _deferredContext);
 
 	void DrawShadow();
-	void DrawShadow(ID3D11DeviceContext* _defferedContext);
+	void DrawShadow(ID3D11DeviceContext* _deferredContext);
+
+	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
 
 	std::string GetName() const { return m_name; }
 	std::string GetModelName() const { return m_modelName; }
@@ -163,7 +180,49 @@ private:
 
 	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
 	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
-	static constexpr uint32 m_stride = sizeof(Vertex);
+
+	size_t m_hashingMesh{};
+
+	static constexpr const uint32 m_stride = sizeof(Vertex);
+};
+
+struct HashingMesh
+{
+	size_t operator()(const Mesh& mesh)
+	{
+		size_t hash{};
+		for (const auto& vertex : mesh.GetVertices())
+		{
+			hash ^= std::hash<float>()(vertex.position.x);
+			hash ^= std::hash<float>()(vertex.position.y);
+			hash ^= std::hash<float>()(vertex.position.z);
+			hash ^= std::hash<float>()(vertex.normal.x);
+			hash ^= std::hash<float>()(vertex.normal.y);
+			hash ^= std::hash<float>()(vertex.normal.z);
+			hash ^= std::hash<float>()(vertex.uv0.x);
+			hash ^= std::hash<float>()(vertex.uv0.y);
+			hash ^= std::hash<float>()(vertex.uv1.x);
+			hash ^= std::hash<float>()(vertex.uv1.y);
+			hash ^= std::hash<float>()(vertex.tangent.x);
+			hash ^= std::hash<float>()(vertex.tangent.y);
+			hash ^= std::hash<float>()(vertex.bitangent.x);
+			hash ^= std::hash<float>()(vertex.bitangent.y);
+			hash ^= std::hash<float>()(vertex.boneIndices.x);
+			hash ^= std::hash<float>()(vertex.boneIndices.y);
+			hash ^= std::hash<float>()(vertex.boneIndices.z);
+			hash ^= std::hash<float>()(vertex.boneIndices.w);
+			hash ^= std::hash<float>()(vertex.boneWeights.x);
+			hash ^= std::hash<float>()(vertex.boneWeights.y);
+			hash ^= std::hash<float>()(vertex.boneWeights.z);
+			hash ^= std::hash<float>()(vertex.boneWeights.w);
+		}
+		for (const auto& index : mesh.GetIndices())
+		{
+			hash ^= std::hash<uint32>()(index);
+		}
+
+		return hash;
+	}
 };
 
 class PrimitiveCreator
@@ -250,7 +309,7 @@ public:
 	~UIMesh();
 
 	void Draw();
-	void Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _deferredContext);
 
 	const std::string& GetName() { return m_name; }
 private:

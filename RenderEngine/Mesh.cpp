@@ -45,6 +45,8 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 		vertex2.bitangent = bitangent;
 	}*/
 
+	m_hashingMesh = HashingMesh()(*this);
+
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
@@ -52,8 +54,10 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 }
 
 Mesh::Mesh(const std::string_view& _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
-	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices)) 
+	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices))
 {
+	m_hashingMesh = HashingMesh()(*this);
+
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
@@ -64,7 +68,18 @@ Mesh::Mesh(Mesh&& _other) noexcept :
 	m_vertices(std::move(_other.m_vertices)),
 	m_indices(std::move(_other.m_indices)),
 	m_vertexBuffer(std::move(_other.m_vertexBuffer)),
-	m_indexBuffer(std::move(_other.m_indexBuffer))
+	m_indexBuffer(std::move(_other.m_indexBuffer)),
+	m_name(std::move(_other.m_name)),
+	m_materialIndex(_other.m_materialIndex),
+	m_boundingBox(_other.m_boundingBox),
+	m_boundingSphere(_other.m_boundingSphere),
+	m_shadowVertices(std::move(_other.m_shadowVertices)),
+	m_shadowIndices(std::move(_other.m_shadowIndices)),
+	m_shadowVertexBuffer(std::move(_other.m_shadowVertexBuffer)),
+	m_shadowIndexBuffer(std::move(_other.m_shadowIndexBuffer)),
+	m_isShadowOptimized(_other.m_isShadowOptimized),
+	m_hashingMesh(_other.m_hashingMesh),
+	m_modelName(std::move(_other.m_modelName))
 {
 }
 
@@ -89,13 +104,13 @@ void Mesh::Draw()
 	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
 }
 
-void Mesh::Draw(ID3D11DeviceContext* _defferedContext)
+void Mesh::Draw(ID3D11DeviceContext* _deferredContext)
 {
 	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_defferedContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_defferedContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_defferedContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_defferedContext, m_indices.size(), 0, 0);
+	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
 }
 
 void Mesh::DrawShadow()
@@ -107,13 +122,22 @@ void Mesh::DrawShadow()
 	DirectX11::DrawIndexed(m_shadowIndices.size(), 0, 0);
 }
 
-void Mesh::DrawShadow(ID3D11DeviceContext* _defferedContext)
+void Mesh::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
 	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_defferedContext, 0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_defferedContext, m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_defferedContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_defferedContext, m_shadowIndices.size(), 0, 0);
+	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(_deferredContext, m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexed(_deferredContext, m_shadowIndices.size(), 0, 0);
+}
+
+void Mesh::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
+{
+	UINT offset = 0;
+	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexedInstanced(_deferredContext, m_indices.size(), static_cast<UINT>(instanceCount), 0, 0, 0);
 }
 
 void Mesh::MakeShadowOptimizedBuffer()
@@ -149,11 +173,11 @@ void UIMesh::Draw()
 	DirectX11::DrawIndexed(m_indices.size(), 0, 0);
 }
 
-void UIMesh::Draw(ID3D11DeviceContext* _defferedContext)
+void UIMesh::Draw(ID3D11DeviceContext* _deferredContext)
 {
 	UINT offset = 0;
-	DirectX11::IASetVertexBuffers(_defferedContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
-	DirectX11::IASetIndexBuffer(_defferedContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-	DirectX11::IASetPrimitiveTopology(_defferedContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	DirectX11::DrawIndexed(_defferedContext, m_indices.size(), 0, 0);
+	DirectX11::IASetVertexBuffers(_deferredContext, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(_deferredContext, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(_deferredContext, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexed(_deferredContext, m_indices.size(), 0, 0);
 }

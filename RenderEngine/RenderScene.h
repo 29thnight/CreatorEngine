@@ -75,9 +75,9 @@ public:
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }
 
-	void OnProxyDistroy();
+	void OnProxyDestroy();
 
-	static concurrent_queue<HashedGuid> RegisteredDistroyProxyGUIDs;
+	static concurrent_queue<HashedGuid> RegisteredDestroyProxyGUIDs;
 
 private:
 	friend class HierarchyWindow;

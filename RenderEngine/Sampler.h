@@ -8,7 +8,7 @@ public:
 	~Sampler();
 
 	void Use(uint32 slot);
-	void Use(ID3D11DeviceContext* defferedContext, uint32 slot);
+	void Use(ID3D11DeviceContext* deferredContext, uint32 slot);
 
 	std::string GetAddressAsString() const {
 		return std::to_string(reinterpret_cast<uintptr_t>(this));

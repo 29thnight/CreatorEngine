@@ -160,9 +160,9 @@ void ShadowMapPass::Resize(uint32_t width, uint32_t height)
 
 }
 
-void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
-	auto* defferdContextPtr1 = defferdContext;
+	auto* deferredContextPtr1 = deferredContext;
 
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
@@ -171,7 +171,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdC
 	{
 		for (int i = 0; i < cascadeCount; i++)
 		{
-			DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+			DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		}
 		return;
 	}
@@ -181,7 +181,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdC
 	auto& constant	= camera.m_shadowMapConstant;						//type = ShadowMapConstant
 	auto  projMat	= camera.CalculateProjection();						//type = Mathf::xMatrix
 
-	m_pso->Apply(defferdContextPtr1);
+	m_pso->Apply(deferredContextPtr1);
 
 	DevideCascadeEnd(camera);
 	DevideShadowInfo(camera, lightdir);
@@ -194,9 +194,9 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdC
 	constant.m_shadowMapWidth	= desc.m_textureWidth;
 	constant.m_shadowMapHeight  = desc.m_textureHeight;
 
-	scene.UseModel(defferdContextPtr1);
-	DirectX11::RSSetViewports(defferdContextPtr1, 1, &shadowViewport);
-	DirectX11::VSSetConstantBuffer(defferdContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
+	scene.UseModel(deferredContextPtr1);
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &shadowViewport);
+	DirectX11::VSSetConstantBuffer(deferredContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
 
 	HashedGuid currentAnimatorGuid{};
 	for (int i = 0; i < cascadeCount; i++)
@@ -211,30 +211,30 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdC
 		renderData->m_shadowCamera.m_farPlane	 = cascadeInfo.m_farPlane;
 		constant.m_lightViewProjection[i]		 = cascadeInfo.m_lightViewProjection;
 
-		DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
-		DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[i]);
-		renderData->m_shadowCamera.UpdateBuffer(defferdContextPtr1, true);
+		DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[i]);
+		renderData->m_shadowCamera.UpdateBuffer(deferredContextPtr1, true);
 
-		CreateCommandListProxyToShadow(defferdContext, scene, camera);
+		CreateCommandListProxyToShadow(deferredContext, scene, camera);
 	}
 
-	DirectX11::RSSetViewports(defferdContextPtr1, 1, &DeviceState::g_Viewport);
-	DirectX11::UnbindRenderTargets(defferdContextPtr1);
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
+	DirectX11::UnbindRenderTargets(deferredContextPtr1);
 
 	ID3D11CommandList* pCommandList;
-	DirectX11::FinishCommandList(defferdContextPtr1, false, &pCommandList);
+	DirectX11::FinishCommandList(deferredContextPtr1, false, &pCommandList);
 	PushQueue(camera.m_cameraIndex, pCommandList);
 }
 
-void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
-	auto defferdContextPtr1 = defferdContext;
+	auto deferredContextPtr1 = deferredContext;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
 	if (!m_abled)
 	{
-		DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+		DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
 		return;
 	}
 
@@ -242,7 +242,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* defferdCo
 	auto  desc				= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
 	auto& constantCopy		= camera.m_shadowMapConstant;						//type = ShadowMapConstant
 
-	m_pso->Apply(defferdContextPtr1);
+	m_pso->Apply(deferredContextPtr1);
 
 	DevideCascadeEnd(camera);
 	DevideShadowInfo(camera, lightdir);
@@ -259,26 +259,26 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* defferdCo
 	constantCopy.m_shadowMapHeight						= desc.m_textureHeight;
 	constantCopy.m_lightViewProjection[0]				= camera.m_cascadeinfo[2].m_lightViewProjection;
 
-	DirectX11::ClearDepthStencilView(defferdContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
-	DirectX11::OMSetRenderTargets(defferdContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[0]);
-	DirectX11::VSSetConstantBuffer(defferdContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
-	DirectX11::RSSetViewports(defferdContextPtr1, 1, &shadowViewport);
-	renderData->m_shadowCamera.UpdateBuffer(defferdContextPtr1, true);
-	scene.UseModel(defferdContextPtr1);
+	DirectX11::ClearDepthStencilView(deferredContextPtr1, renderData->m_shadowMapDSVarr[0], D3D11_CLEAR_DEPTH, 1.0f, 0);
+	DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[0]);
+	DirectX11::VSSetConstantBuffer(deferredContextPtr1, 3, 1, m_boneBuffer.GetAddressOf());
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &shadowViewport);
+	renderData->m_shadowCamera.UpdateBuffer(deferredContextPtr1, true);
+	scene.UseModel(deferredContextPtr1);
 
-	CreateCommandListProxyToShadow(defferdContext, scene, camera);
+	CreateCommandListProxyToShadow(deferredContext, scene, camera);
 
-	DirectX11::RSSetViewports(defferdContextPtr1, 1, &DeviceState::g_Viewport);
-	DirectX11::UnbindRenderTargets(defferdContextPtr1);
+	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
+	DirectX11::UnbindRenderTargets(deferredContextPtr1);
 
 	ID3D11CommandList* pd3dCommandList1;
-	defferdContextPtr1->FinishCommandList(false, &pd3dCommandList1);
+	deferredContextPtr1->FinishCommandList(false, &pd3dCommandList1);
 	PushQueue(camera.m_cameraIndex, pd3dCommandList1);
 }
 
-void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
-	auto defferdContextPtr1 = defferdContext;
+	auto deferredContextPtr1 = deferredContext;
 
 	auto renderData = RenderPassData::GetData(&camera);
 
@@ -286,19 +286,19 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdC
 
 	for (auto& PrimitiveRenderProxy : renderData->m_shadowRenderQueue)
 	{
-		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, defferdContextPtr1);
+		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, deferredContextPtr1);
 
 		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
 		{
 			if (animatorGuid != currentAnimatorGuid && PrimitiveRenderProxy->m_finalTransforms)
 			{
-				DirectX11::UpdateBuffer(defferdContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
+				DirectX11::UpdateBuffer(deferredContextPtr1, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
 				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
 			}
 		}
 
-		PrimitiveRenderProxy->DrawShadow(defferdContextPtr1);
+		PrimitiveRenderProxy->DrawShadow(deferredContextPtr1);
 	}
 }
 

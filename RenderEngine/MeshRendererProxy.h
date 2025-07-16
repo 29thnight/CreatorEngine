@@ -42,10 +42,11 @@ public:
 
 	void DrawShadow();
 	void DrawShadow(ID3D11DeviceContext* _deferredContext);
+	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
 
 	friend bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b);
 
-	void DistroyProxy();
+	void DestroyProxy();
 
 	void GenerateLODGroup();
 

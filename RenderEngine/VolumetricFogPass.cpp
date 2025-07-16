@@ -198,21 +198,21 @@ void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 	}
 }
 
-void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!isOn) return;
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 	auto& lightManager = scene.m_LightController;
-	ID3D11DeviceContext* defferdPtr = defferdContext;
+	ID3D11DeviceContext* deferredPtr = deferredContext;
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	ID3D11ShaderResourceView* nullSRVall[3] = { nullptr, nullptr, nullptr };
 	ID3D11UnorderedAccessView* nullUAV[1] = { nullptr };
 
-	DirectX11::CSSetShader(defferdPtr, m_pMainShader->GetShader(), nullptr, 0);
-	defferdPtr->CSSetSamplers(0, 1, &m_pClampSampler);
-	defferdPtr->CSSetSamplers(1, 1, &m_pWrapSampler);
-	defferdPtr->CSSetSamplers(2, 1, &m_pShadowSamper);
+	DirectX11::CSSetShader(deferredPtr, m_pMainShader->GetShader(), nullptr, 0);
+	deferredPtr->CSSetSamplers(0, 1, &m_pClampSampler);
+	deferredPtr->CSSetSamplers(1, 1, &m_pWrapSampler);
+	deferredPtr->CSSetSamplers(2, 1, &m_pShadowSamper);
 
 	int readIndex = mCurrentTexture3DRead;
 	int writeIndex = !mCurrentTexture3DRead;
@@ -242,46 +242,46 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdCont
 	data.ThicknessFactor = mThicknessFactor;
 	//GIT_COMBINE_WARN_END : shadowMapPass 코드 정리로 인한 로직 변경되었으니 병합 전 확인 바람. by Hero.P
 	if (lightManager->hasLightWithShadows) {
-		lightManager->CSBindCloudShadowMap(defferdPtr);
+		lightManager->CSBindCloudShadowMap(deferredPtr);
 	}
-	DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &data);
-	DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_Buffer.GetAddressOf());
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &renderData->m_shadowMapTexture->m_pSRV);
-	DirectX11::CSSetShaderResources(defferdPtr, 1, 1, &m_pBlueNoiseTexture->m_pSRV);
-	DirectX11::CSSetShaderResources(defferdPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);
-	DirectX11::Dispatch(defferdPtr,
+	DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &data);
+	DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
+	DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &renderData->m_shadowMapTexture->m_pSRV);
+	DirectX11::CSSetShaderResources(deferredPtr, 1, 1, &m_pBlueNoiseTexture->m_pSRV);
+	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
+	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &mTempVoxelInjectionTexture3DUAV[writeIndex], nullptr);
+	DirectX11::Dispatch(deferredPtr,
 		(UINT)ceil(mCurrentVoxelVolumeSizeX / 8.0f),
 		(UINT)ceil(mCurrentVoxelVolumeSizeY / 8.0f),
 		VOXEL_VOLUME_SIZE_Z
 	);
 
-	DirectX11::CSSetShaderResources(defferdPtr, 2, 1, nullSRV);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, nullUAV, nullptr);
+	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, nullSRV);
+	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, nullUAV, nullptr);
 	mCurrentTexture3DRead = !mCurrentTexture3DRead;
 
 	// accumulate
 	readIndex = mCurrentTexture3DRead;
-	DirectX11::CSSetShader(defferdPtr, m_pAccumulationShader->GetShader(), nullptr, 0);
-	defferdPtr->CSSetSamplers(0, 1, &m_pWrapSampler);
-	DirectX11::CSSetShaderResources(defferdPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &mFinalVoxelInjectionTexture3DUAV, nullptr);
-	DirectX11::Dispatch(defferdPtr,
+	DirectX11::CSSetShader(deferredPtr, m_pAccumulationShader->GetShader(), nullptr, 0);
+	deferredPtr->CSSetSamplers(0, 1, &m_pWrapSampler);
+	DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &mTempVoxelInjectionTexture3DSRV[readIndex]);
+	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &mFinalVoxelInjectionTexture3DUAV, nullptr);
+	DirectX11::Dispatch(deferredPtr,
 		(UINT)ceil(mCurrentVoxelVolumeSizeX / 8.0f),
 		(UINT)ceil(mCurrentVoxelVolumeSizeY / 8.0f),
 		1
 	);
 
-	DirectX11::CSSetShaderResources(defferdPtr, 0, 3, nullSRVall);
-	DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, nullUAV, nullptr);
+	DirectX11::CSSetShaderResources(deferredPtr, 0, 3, nullSRVall);
+	DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, nullUAV, nullptr);
 
 	mPrevViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
 
 	// composite
-	m_pso->Apply(defferdPtr);
+	m_pso->Apply(deferredPtr);
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(defferdPtr, 1, &view, nullptr);
-	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, nullptr);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 	CompositeCB compositeData{};
 	compositeData.ViewProj = XMMatrixTranspose(camera.CalculateView() * camera.CalculateProjection());
 	compositeData.InvView = camera.CalculateInverseView();
@@ -289,22 +289,22 @@ void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* defferdCont
 	compositeData.CameraNearFar = XMFLOAT4{ mCustomNearPlane, mCustomFarPlane, 0.0f, 0.0f };
 	compositeData.VolumeSize = data.VolumeSize;
 	compositeData.BlendingWithSceneColorFactor = mBlendingWithSceneColorFactor;
-	DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeData);
-	DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+	DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeData);
+	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
 
-	DirectX11::CopyResource(defferdPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+	DirectX11::CopyResource(deferredPtr, m_CopiedTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 	ID3D11ShaderResourceView* pTextures[3] = {
 		m_CopiedTexture->m_pSRV,
 		renderData->m_depthStencil->m_pSRV,
 		mFinalVoxelInjectionTexture3DSRV
 	};
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 3, pTextures);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, pTextures);
 
-	DirectX11::Draw(defferdPtr, 4, 0);
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 3, nullSRVall);
+	DirectX11::Draw(deferredPtr, 4, 0);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 3, nullSRVall);
 
 	ID3D11CommandList* commandList{};
-	defferdPtr->FinishCommandList(false, &commandList);
+	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
 }
 

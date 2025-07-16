@@ -491,6 +491,17 @@ namespace DirectX11
 	}
 
 	//[safe]
+	inline void DrawIndexedInstanced(ID3D11DeviceContext* deferredContext, uint32 indexCountPerInstance, uint32 instanceCount, uint32 startIndexLocation, int baseVertexLocation, uint32 startInstanceLocation)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+	}
+
+	//[safe]
 	inline void ClearRenderTargetView(ID3D11DeviceContext* deferredContext, ID3D11RenderTargetView* rtv, const float color[4])
 	{
 		if (!deferredContext)
@@ -647,6 +658,17 @@ namespace DirectX11
 	}
 
 	//[safe]
+	inline void VSSetShaderResources(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
+	{
+		if (!deferredContext)
+		{
+			Debug->LogError("[RenderEngine] -> DeviceContext is not initialized");
+			return;
+		}
+		deferredContext->VSSetShaderResources(startSlot, numViews, shaderResourceViews);
+	}
+
+	//[safe]
 	inline void PSSetShaderResources(ID3D11DeviceContext* deferredContext, uint32 startSlot, uint32 numViews, ID3D11ShaderResourceView* const* shaderResourceViews)
 	{
 		if (!deferredContext)
@@ -656,6 +678,7 @@ namespace DirectX11
 		}
 		deferredContext->PSSetShaderResources(startSlot, numViews, shaderResourceViews);
 	}
+
 
 	//[safe]
 	inline void IASetPrimitiveTopology(ID3D11DeviceContext* deferredContext, D3D11_PRIMITIVE_TOPOLOGY topology)

@@ -203,22 +203,22 @@ void LightMapPass::Execute(RenderScene& scene, Camera& camera)
 	}
 }
 
-void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* defferdPtr = defferdContext;
+	ID3D11DeviceContext* deferredPtr = deferredContext;
 
-	m_pso->Apply(defferdPtr);
+	m_pso->Apply(deferredPtr);
 
 	//DirectX11::ClearRenderTargetView(camera.m_renderTarget->GetRTV(), Colors::White);
-	DirectX11::ClearDepthStencilView(defferdPtr, renderData->m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	DirectX11::ClearDepthStencilView(deferredPtr, renderData->m_depthStencil->m_pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(defferdPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV); //뎁스를 사용 안하면 라이트맵은 나오지만 사용 시 뒤에 객체가 보이고, 사용하면 라이트맵이 안나오고
 
-	camera.UpdateBuffer(defferdPtr);
-	scene.UseModel(defferdPtr);
+	camera.UpdateBuffer(deferredPtr);
+	scene.UseModel(deferredPtr);
 
 	Animator* currentAnimator = nullptr;
 	Scene* activeScene = scene.GetScene();
@@ -231,59 +231,59 @@ void LightMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, 
 		buf.size = renderer->m_LightMapping.lightmapTiling;
 		buf.cameraPos = XMFLOAT3(camera.m_eyePosition.m128_f32[0], camera.m_eyePosition.m128_f32[1], camera.m_eyePosition.m128_f32[2]);
 		buf.lightmapIndex = renderer->m_LightMapping.lightmapIndex;
-		DirectX11::UpdateBuffer(defferdPtr, m_cbuffer.Get(), &buf);
-		DirectX11::PSSetConstantBuffer(defferdPtr, 1, 1, m_cbuffer.GetAddressOf());
+		DirectX11::UpdateBuffer(deferredPtr, m_cbuffer.Get(), &buf);
+		DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, m_cbuffer.GetAddressOf());
 
 		auto obj = renderer->GetOwner();
-		scene.UpdateModel(obj->m_transform.GetWorldMatrix(), defferdPtr);
+		scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
 		Animator* animator = scene.GetScene()->m_SceneObjects[obj->m_parentIndex]->GetComponent<Animator>();
 		if (nullptr != animator && animator->IsEnabled())
 		{
 			if (animator != currentAnimator)
 			{
-				DirectX11::UpdateBuffer(defferdPtr, m_boneBuffer.Get(), animator->m_FinalTransforms);
+				DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), animator->m_FinalTransforms);
 				currentAnimator = animator;
 			}
 		}
 
 		Material* mat = renderer->m_Material;
-		DirectX11::UpdateBuffer(defferdPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
-		DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_materialBuffer.GetAddressOf());
+		DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
+		DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
 
 		if (renderer->m_LightMapping.lightmapIndex >= 0) // 또는 라이트맵이 생성되고 있다면 취소하는 방식으로
 		{
 			if (m_plightmaps != nullptr && (*m_plightmaps).size() > renderer->m_LightMapping.lightmapIndex)
-				DirectX11::PSSetShaderResources(defferdPtr, 14, 1, &(*m_plightmaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
+				DirectX11::PSSetShaderResources(deferredPtr, 14, 1, &(*m_plightmaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
 			if (m_pDirectionalMaps != nullptr && (*m_pDirectionalMaps).size() > renderer->m_LightMapping.lightmapIndex)
-				DirectX11::PSSetShaderResources(defferdPtr, 15, 1, &(*m_pDirectionalMaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
+				DirectX11::PSSetShaderResources(deferredPtr, 15, 1, &(*m_pDirectionalMaps)[renderer->m_LightMapping.lightmapIndex]->m_pSRV);
 		}
 
 		if (mat->m_pBaseColor)
 		{
-			DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
+			DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
 		}
 		if (mat->m_pNormal)
 		{
-			DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &mat->m_pNormal->m_pSRV);
+			DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
 		}
 		if (mat->m_pOccRoughMetal)
 		{
-			DirectX11::PSSetShaderResources(defferdPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
+			DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
 		}
 		if (mat->m_AOMap)
 		{
-			DirectX11::PSSetShaderResources(defferdPtr, 3, 1, &mat->m_AOMap->m_pSRV);
+			DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
 		}
 		if (mat->m_pEmissive)
 		{
-			DirectX11::PSSetShaderResources(defferdPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
+			DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
 		}
 
-		renderer->m_Mesh->Draw(defferdPtr);
+		renderer->m_Mesh->Draw(deferredPtr);
 	}
 
 	ID3D11CommandList* commandList{};
-	defferdPtr->FinishCommandList(false, &commandList);
+	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
 }
 

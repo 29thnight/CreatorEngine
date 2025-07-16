@@ -796,6 +796,9 @@
     <ClInclude Include="AssetEntry.h">
       <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialFlowInformation.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
@@ -1001,6 +1004,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\MeshParticleClipping.ps.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\InstancedVertexShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

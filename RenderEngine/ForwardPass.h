@@ -12,7 +12,7 @@ public:
 	void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
 
 	void Execute(RenderScene& scene, Camera& camera);
-	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 private:
 	Texture* m_EnvironmentMap{};
