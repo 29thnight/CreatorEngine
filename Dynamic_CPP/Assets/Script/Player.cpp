@@ -10,8 +10,10 @@
 #include "Material.h"
 #include "RigidBodyComponent.h"
 #include "EntityItem.h"
-
+#include "RaycastHelper.h"
 #include "Skeleton.h"
+
+#include "TestEnemy.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -28,12 +30,14 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	playerMap->AddButtonAction("curweaponend", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::Y), KeyState::Down, [this]() { DeleteCurWeapon();});
+	playerMap->AddButtonAction("Stun", 0, InputType::KeyBoard, KeyBoard::P, KeyState::Down, [this]() { TestStun(); });
+	playerMap->AddButtonAction("KnockBack", 0, InputType::KeyBoard, KeyBoard::O, KeyState::Down, [this]() { TestKnockBack(); });
 	m_animator = player->GetComponent<Animator>();
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
 	
-	
+	player->m_collisionType = 2;
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
@@ -68,19 +72,54 @@ void Player::Update(float tick)
 	{
 		m_dubbleDashElapsedTime += tick;
 		m_dashCoolElapsedTime += tick;
-		if (m_dashCoolElapsedTime >= m_dashCooldown)
+		if (m_dashCoolElapsedTime >= dashCooldown)
 		{
 			m_curDashCount = 0;
 			m_dubbleDashElapsedTime = 0.f;
 		}
 	}
 
+	if (isStun)
+	{
+		
+		stunTime -= tick;
+		auto controller = player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
+		if (0.f >= stunTime)
+		{
+			isStun = false;
+		}
+	}
+
+
+	if (isKnockBack)
+	{
+		KnockBackElapsedTime += tick;
+
+		auto curKnockBackfoce = KnockBackForce;
+		if (KnockBackElapsedTime >= KnockBackTime)
+		{
+			
+			isKnockBack = false;
+			KnockBackElapsedTime = 0.f;
+			player->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+		}
+		else
+		{
+			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+			auto controller = player->GetComponent<CharacterControllerComponent>();
+			controller->Move({ -forward.x ,-forward.z});
+
+		}
+	}
 }
 
 void Player::Move(Mathf::Vector2 dir)
 {
+	if (isStun || isKnockBack) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
+	
 	controller->Move(dir);
 	if (controller->IsOnMove())
 	{
@@ -90,6 +129,7 @@ void Player::Move(Mathf::Vector2 dir)
 	{
 		m_animator->SetParameter("OnMove", false);
 	}
+	
 }
 
 void Player::CatchAndThrow()
@@ -131,15 +171,6 @@ void Player::Throw()
 	rigidbody->SetLockLinearZ(false);
 	auto& transform = GetOwner()->m_transform;
 	auto forward  = transform.GetForward();
-	//auto rotationOnly = q;
-	//rotationOnly.r[3] = XMVectorSet(0, 0, 0, 1); 
-	//rotationOnly.r[0] = XMVector3Normalize(rotationOnly.r[0]); 
-	//rotationOnly.r[1] = XMVector3Normalize(rotationOnly.r[1]); 
-	//rotationOnly.r[2] = XMVector3Normalize(rotationOnly.r[2]); 
-
-	//auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, q);
-	//forward.Normalize();
-	////forward = -forward;
 	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
 
 
@@ -155,8 +186,8 @@ void Player::Throw()
 
 void Player::Dash()
 {
-	if (m_curDashCount >= m_maxDashCount ) return;   //최대 대시횟수만큼했으면 못함
-	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= m_dubbleDashTime) return; //이미 대시했을떄 더블대시타임안에 다시안하면 못함
+	if (m_curDashCount >= dashAmount ) return;   //최대 대시횟수만큼했으면 못함
+	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //이미 대시했을떄 더블대시타임안에 다시안하면 못함
 
 	if (m_curDashCount == 0)
 	{
@@ -201,13 +232,35 @@ void Player::Charging()
 
 void Player::Attack()
 {
-
 	isCharging = false;
 	m_chargingTime = 0.f;
 
+
 	if (m_comboCount == 0)
 	{
+		std::vector<HitResult> hits;
+		auto world = player->m_transform.GetWorldPosition();
+		world.m128_f32[1] += 0.5f;
+		auto forward = player->m_transform.GetForward();
+		int size = RaycastAll(world, forward, 10.f, 1u, hits);
 
+		for (int i = 0; i < size; i++) 
+		{
+			auto object = hits[i].hitObject;
+			if (object == GetOwner()) continue;
+
+			std::cout << object->m_name.data() << std::endl;
+			auto enemy = object->GetComponent<TestEnemy>();
+			if (enemy)
+			{
+				enemy->curHP -= 10.f;
+				std::cout << enemy->curHP << std::endl;
+				auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
+				
+				rigid->AddForce({ forward.x * KnockbackPowerX,KnockbackPowerY,forward.z * KnockbackPowerX }, EForceMode::IMPULSE);
+			}
+			
+		}
 	}
 	else if (m_comboCount == 1)
 	{
@@ -278,14 +331,27 @@ void Player::DeleteCurWeapon()
 }
 
 
-void Player::Punch()
-{
-	std::cout << "ppppuuuunchhhhhhh" << std::endl;
-}
 
 void Player::OnPunch()
 {
 	std::cout << "ppppuuuunchhhhhhh" << std::endl;
+}
+
+void Player::TestStun()
+{
+	isStun = true;
+	stunTime = 1.5f;
+	m_animator->SetParameter("OnMove", false);
+	
+}
+
+void Player::TestKnockBack()
+{
+	isKnockBack = true;
+	KnockBackTime = 1.5f;
+	KnockBackForce = 200.f;
+	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockbackPowerY);
+	m_animator->SetParameter("OnMove", false);
 }
 
 void Player::FindNearObject(GameObject* gameObject)

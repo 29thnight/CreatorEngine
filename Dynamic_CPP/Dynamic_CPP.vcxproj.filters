@@ -83,8 +83,6 @@
 		</ClInclude>
 		<ClInclude Include="BTActtionFactory.h">
 			<Filter>Script\CreateFactory</Filter>
-		<ClInclude Include="Assets\Script\Swrod.h">
-			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -99,6 +97,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\InverseKinematic.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -130,9 +131,6 @@
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\Swrod.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
@@ -146,6 +144,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

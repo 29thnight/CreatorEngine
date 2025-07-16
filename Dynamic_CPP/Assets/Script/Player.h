@@ -45,7 +45,6 @@ public:
 	void DeleteWeapon(GameObject* weapon);
 	void FindNearObject(GameObject* gameObject);
 
-	void Punch();
 
 	[[Method]]
 	void OnPunch();
@@ -66,18 +65,33 @@ public:
 	bool isCharging = false;
 	[[Property]]
 	float m_dashPower = 1000.0f; // 대시이동거리
-	float m_dashImmuneTime = 1.f; //대시 무적시간
+	float dashGracePeriod = 1.f; //대시 무적시간
 	[[Property]]
-	float m_dashCooldown = 3.f; //대쉬 쿨타임
+	float dashCooldown = 3.f; //대쉬 쿨타임
 	float m_dashCoolElapsedTime = 0.f; //
 	[[Property]]
-	float m_dubbleDashTime = 0.5f; //더블대쉬 가능한시간
+	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간
 	float m_dubbleDashElapsedTime = 0.f;
 	[[Property]]
-	int   m_maxDashCount = 2;   //최대대시가능 횟수
+	int   dashAmount = 2;   //최대대시가능 횟수
 	int   m_curDashCount = 0;   //지금 연속대시한 횟수
-	
 
+	[[Property]]
+	float KnockbackPowerX = 200.f;
+	[[Property]]
+	float KnockbackPowerY = 20.f;
+
+
+	void TestStun();
+	void TestKnockBack();
+	bool isStun = false;
+	float stunTime = 0.f;
+	bool isKnockBack = false;
+	[[Property]]
+	float KnockBackForceY = 200.f;
+	float KnockBackForce = 0.f; //때린애가 나한테 줄 넉백힘
+	float KnockBackElapsedTime = 0.f;
+	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 	float m_nearDistance = FLT_MAX;
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon = nullptr;

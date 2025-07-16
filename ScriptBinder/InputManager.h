@@ -94,7 +94,8 @@ public:
 	void ResetMouseDelta();
 	int16 GetWheelDelta() const;
 	KeyboardState keyboardstate{};
-	std::vector<GameInputKeyState> GkeyStates = {};
+	IGameInputDevice* _keyBoardDevice = nullptr;
+	std::vector<GameInputKeyState> GkeyStates;
 	GameInputMouseState GmouseState{};
 	bool curkeyStates[KEYBOARD_COUNT] = {};
 

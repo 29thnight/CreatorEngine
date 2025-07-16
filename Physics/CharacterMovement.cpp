@@ -70,6 +70,7 @@ void CharacterMovement::Update(float deltaTime, const DirectX::SimpleMath::Vecto
 
 	if (input.y != 0 && !m_isFall)
 	{
+		m_jumpSpeed = input.y; //캐릭터 컴포넌트에서 넘겨줄값
 		Jump();
 	}
 

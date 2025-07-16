@@ -10,9 +10,12 @@ ReflectionScriptField(Player) \
 		meta_property(ThrowPowerY) \
 		meta_property(m_comboTime) \
 		meta_property(m_dashPower) \
-		meta_property(m_dashCooldown) \
-		meta_property(m_dubbleDashTime) \
-		meta_property(m_maxDashCount) \
+		meta_property(dashCooldown) \
+		meta_property(dubbleDashTime) \
+		meta_property(dashAmount) \
+		meta_property(KnockbackPowerX) \
+		meta_property(KnockbackPowerY) \
+		meta_property(KnockBackForceY) \
 	}); \
 	MethodField \
 	({ \
