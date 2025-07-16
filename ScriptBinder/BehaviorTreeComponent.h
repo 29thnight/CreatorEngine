@@ -6,13 +6,13 @@
 #include "BTHeader.h"
 #include "AIManager.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "BehaviorTreeComponent.generated.h"
 
 using namespace BT;
 
 class BehaviorTreeComponent : 
-	public Component, public IAIComponent, public IUpdatable, public IAwakable, public IOnDistroy
+	public Component, public IAIComponent, public IUpdatable, public IAwakable, public IOnDestroy
 {
 public:
    ReflectBehaviorTreeComponent
@@ -29,7 +29,7 @@ public:
 	void Initialize() override;
 	void Awake() override;
 	void Update(float deltaSecond) override;
-	void OnDistroy() override;
+	void OnDestroy() override;
 
 private:
 	// Behavior Tree 관련 메서드

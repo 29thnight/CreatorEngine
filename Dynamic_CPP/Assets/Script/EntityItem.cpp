@@ -35,8 +35,6 @@ void EntityItem::Start()
 	//GetComponent<BoxColliderComponent>().SetExtents({ 10.f, 10.f, 10.f });
 
 
-	asisTail = GameObject::Find("AsisTail");
-	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 
 }
 
@@ -60,7 +58,6 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
-	return;
 	if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
 		if (tailTransform)
@@ -93,23 +90,6 @@ void EntityItem::Update(float tick)
 						entityAsis->AddItem(this);
 				}
 				asisTail = nullptr;
-				GameManager* temp = GameObject::Find("GameManager")->GetComponent<GameManager>();
-				if (temp)
-				{
-					auto& array = temp->GetEntities();
-					for (auto& entity : array)
-					{
-						auto meshrenderer = entity->GetOwner()->GetComponent<MeshRenderer>();
-						if (meshrenderer)
-						{
-							auto material = meshrenderer->m_Material;
-							if (material)
-							{
-								material->m_materialInfo.m_bitflag = 8;
-							}
-						}
-					}
-				}
 			}
 		}
 	}
@@ -118,6 +98,8 @@ void EntityItem::Update(float tick)
 void EntityItem::SetThrowOwner(Player* player)
 {
 	throwOwner = player;
+	asisTail = GameObject::Find("AsisTail");
+	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 }
 
 Player* EntityItem::GetThrowOwner()

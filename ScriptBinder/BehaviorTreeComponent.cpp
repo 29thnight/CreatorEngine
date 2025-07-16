@@ -49,7 +49,7 @@ void BehaviorTreeComponent::Update(float deltaSecond)
 	}
 }
 
-void BehaviorTreeComponent::OnDistroy()
+void BehaviorTreeComponent::OnDestroy()
 {
 	if (m_pBlackboard)
 	{

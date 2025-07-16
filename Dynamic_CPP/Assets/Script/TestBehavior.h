@@ -27,4 +27,7 @@ public:
 	int testValue = 0;
 	[[Property]]
 	std::string testString = "TestBehavior";
+
+	Mathf::Vector2 moveDir{};
+	void Move(Mathf::Vector2 value);
 };

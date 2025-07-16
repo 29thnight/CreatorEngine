@@ -43,6 +43,7 @@ public:
 	Mathf::xMatrix GetInverseMatrix() const;
 
 	void UpdateLocalMatrix();
+	Mathf::xMatrix UpdateWorldMatrix();
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
 	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
 

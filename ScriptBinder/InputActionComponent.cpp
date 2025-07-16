@@ -11,7 +11,7 @@ void InputActionComponent::Update(float tick)
 	}
 }
 
-void InputActionComponent::OnDistroy()
+void InputActionComponent::OnDestroy()
 {
 }
 

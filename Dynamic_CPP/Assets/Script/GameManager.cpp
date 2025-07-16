@@ -112,14 +112,14 @@ void GameManager::CheatMiningResource()
 	auto cam = GameObject::Find("Main Camera");
 	if (!cam) return;
 
-	std::vector<HitResult> hits;
+	HitResult hit;
 	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
 	currentRotation.Normalize();
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
-	int size = RaycastAll(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hits);
+	bool size = Raycast(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hit);
 	for (int i = 0; i < size; i++) {
-		std::cout << hits[i].hitObject->m_name.data() << std::endl;
+		std::cout << hit.hitObject->m_name.data() << std::endl;
 	}
 
 	/*for (auto& resource : m_resourcePool) {

@@ -29,11 +29,25 @@ public:
 	ShadowMapConstant			m_settingConstant;
 	FrustumContainer			sliceFrustums;
 
+	UniqueTexturePtr				m_cloudShadowMapTexture{ nullptr };
+	ID3D11Buffer*					m_cloudShadowMapBuffer{ nullptr };
+
 	size_t m_cascadeRatioSize{ 2 };
 	bool m_useCascade{ true };
 
+	Mathf::Vector2 cloudSize = { 4,4 };
+	Mathf::Vector2 cloudDirection = { 1,1 };
+	float cloudMoveSpeed = 0.0003f;
+	bool isCloudOn = true;
+
 	void DevideCascadeEnd(Camera& camera);
 	void DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir);
+
+
+	void UseCloudShadowMap(const std::string_view& filename);
+	void UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, LightController* lightcontroller);
+	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn = true);
+	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn = true);
 
 private:
 	void CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera);

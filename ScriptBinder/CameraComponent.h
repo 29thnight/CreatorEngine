@@ -3,12 +3,12 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "IUpdatable.h"
 #include "Camera.h"
 #include "CameraComponent.generated.h"
 
-class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDistroy
+class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDestroy
 {
 public:
    ReflectCameraComponent
@@ -60,7 +60,7 @@ public:
 		}
 	}
 
-	void OnDistroy() override
+	void OnDestroy() override
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
 		if("PlayScene" != scene->m_sceneName.ToString())

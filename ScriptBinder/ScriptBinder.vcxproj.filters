@@ -398,7 +398,7 @@
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="IOnDistroy.h">
+    <ClInclude Include="IOnDestroy.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
