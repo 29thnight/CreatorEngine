@@ -205,6 +205,69 @@ void PhysicsManager::RayCast(RayEvent& rayEvent)
 
 }
 
+bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
+{
+	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	RayCastInput inputInfo;
+
+	inputInfo.origin = rayEvent.origin;
+	inputInfo.direction = rayEvent.direction;
+	inputInfo.distance = rayEvent.distance;
+	inputInfo.layerNumber = rayEvent.layerMask;
+
+	auto result = Physics->Raycast(inputInfo);
+
+	if (result.hasBlock)
+	{
+		hit.hitObject = Container[result.id].gameObject;
+		hit.hitPoint = result.blockPosition;
+		hit.hitNormal = result.blockNormal;
+		hit.hitObjectLayer = result.blockLayerNumber;
+		return true;
+	}
+
+	if (rayEvent.bUseDebugDraw)
+	{
+		//todo : debug draw
+		//origin , direction , distance
+		Physics->DrawPVDLine(rayEvent.origin, rayEvent.origin + rayEvent.direction * rayEvent.distance);
+	}
+	return false;
+
+}
+
+int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
+{
+	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	RayCastInput inputInfo;
+
+	inputInfo.origin = rayEvent.origin;
+	inputInfo.direction = rayEvent.direction;
+	inputInfo.distance = rayEvent.distance;
+	inputInfo.layerNumber = rayEvent.layerMask;
+
+	auto result = Physics->RaycastAll(inputInfo);
+
+	hits.reserve(result.hitSize);
+	for (int i = 0; i < result.hitSize; i++)
+	{
+		RaycastHit hit;
+		hit.hitObject = Container[result.hitId[i]].gameObject;
+		hit.hitPoint = result.contectPoints[i];
+		hit.hitNormal = result.contectNormals[i];
+		hit.hitObjectLayer = result.hitLayerNumber[i];
+		hits.push_back(hit);
+	}
+
+	if (rayEvent.bUseDebugDraw)
+	{
+		//todo : debug draw
+		//origin , direction , distance
+		Physics->DrawPVDLine(rayEvent.origin, rayEvent.origin + rayEvent.direction * rayEvent.distance);
+	}
+	return result.hitSize;
+}
+
 void PhysicsManager::AddCollider(BoxColliderComponent* box)
 {
 	if (!box) return;

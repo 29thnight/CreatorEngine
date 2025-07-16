@@ -28,7 +28,6 @@
     <ClInclude Include="IconsFontAwesome6.h" />
     <ClInclude Include="ImGui.h" />
     <ClInclude Include="ImGuiContext.h" />
-    <ClInclude Include="ImGuiMath.h" />
     <ClInclude Include="ImGuiRegister.h" />
     <ClInclude Include="ImGuiRegisterClass.h" />
     <ClInclude Include="NodeEditor.h" />
@@ -76,6 +75,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDynamicDebugging>false</UseDynamicDebugging>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -83,6 +83,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -151,6 +152,8 @@
       <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -171,6 +174,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>

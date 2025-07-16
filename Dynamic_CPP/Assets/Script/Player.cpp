@@ -13,7 +13,8 @@
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
-
+	
+	//pad
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
 	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
@@ -25,6 +26,20 @@ void Player::Start()
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
+
+	//keyboard
+	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { Punch();});
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
+		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
+	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
+	playerMap->AddButtonAction("ChargeAttack", 0, InputType::KeyBoard, 'K', KeyState::Released, [this]() {});
+	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {});
+	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, ',', KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+
+
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
@@ -41,8 +56,11 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-	if(m_nearObject)
-		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 16;
+	if (m_nearObject && m_nearObject != GetOwner()) {
+		auto mesh = m_nearObject->GetComponent<MeshRenderer>();
+		if(mesh)
+			mesh->m_Material->m_materialInfo.m_bitflag = 16;
+	}
 }
 
 void Player::Move(Mathf::Vector2 dir)

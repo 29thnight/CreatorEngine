@@ -107,14 +107,19 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 
 ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptName)
 {
-    std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(ScriptManager->CreateMonoBehavior(scriptName.data()));
+    std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(
+		ScriptManager->CreateMonoBehavior(scriptName.data()), 
+		[](ModuleBehavior* ptr) // Custom deleter to ensure proper cleanup
+		{
+			ScriptManager->DestroyMonoBehavior(ptr);
+		}
+	);
 	if (!component)
 	{
 		Debug->LogError("Failed to create script component: " + std::string(scriptName));
 		return nullptr;
 	}
 	component->SetOwner(this);
-	//ScriptManager->RegisterScriptReflection(scriptName.data(), component.get());
 
 	std::string scriptFile = std::string(scriptName) + ".cpp";
 

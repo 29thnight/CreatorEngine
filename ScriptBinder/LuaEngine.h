@@ -53,21 +53,21 @@ public :
 		};
 	}
 
-	std::function<BT::NodeStatus(float, BlackBoard&)> GetActionFunction(const std::string& functionName)
+	std::function<NodeStatus(float, BlackBoard&)> GetActionFunction(const std::string& functionName)
 	{
 		sol::function func = luaState[functionName];
 		if (!func.valid()) {
 			throw std::runtime_error("Action function not found: " + functionName);
 		}
-		return [func](float deltaTime, BlackBoard& blackboard) ->BT::NodeStatus{
+		return [func](float deltaTime, BlackBoard& blackboard) ->NodeStatus{
 			std::string result = func(deltaTime, blackboard);
 			if (result == "success") {
-				return BT::NodeStatus::Success;
+				return NodeStatus::Success;
 			}
 			if (result == "failure")  {
-				return BT::NodeStatus::Failure;
+				return NodeStatus::Failure;
 			}
-			return BT::NodeStatus::Running;
+			return NodeStatus::Running;
 		};
 	}
 

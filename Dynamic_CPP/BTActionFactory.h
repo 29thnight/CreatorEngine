@@ -4,7 +4,7 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
-
+#include "TestAction.h"
 
 class ActionCreateFactory : public Singleton<ActionCreateFactory>
 {

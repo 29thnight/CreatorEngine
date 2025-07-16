@@ -13,10 +13,10 @@ namespace BT
 		~NodeFactory() = default;
 
 	public:
-		using CreateNodeFunc = std::function<BTNode::NodePtr(const json&)>;
+		using CreateNodeFunc = std::function<BTNode::NodePtr()>;
 
 		void Register(const std::string& typeName, CreateNodeFunc func);
-		BTNode::NodePtr Create(const std::string& typeName, const json& data = {});
+		BTNode::NodePtr Create(const std::string& typeName);
 
 		std::vector<std::string> GetReisteredKeys() const
 		{
@@ -29,6 +29,16 @@ namespace BT
 			return keys;
 		}
 		
+		bool IsRegistered(const std::string& typeName) const
+		{
+			return m_registry.find(typeName) != m_registry.end();
+		}
+
+		void Clear()
+		{
+			m_registry.clear();
+		}
+
 	private :
 		std::map<std::string, CreateNodeFunc> m_registry;
 	};

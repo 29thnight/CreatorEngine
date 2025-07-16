@@ -47,9 +47,11 @@ TerrainGizmoPass::TerrainGizmoPass()
 
     auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
     auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto clampSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
 
     m_pso->m_samplers.push_back(linearSampler);
     m_pso->m_samplers.push_back(pointSampler);
+	m_pso->m_samplers.push_back(clampSampler);
 }
 
 void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
@@ -104,9 +106,35 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* defferdConte
                 auto terrainBrush = terrain->GetCurrentBrush();
                 if (terrainBrush != nullptr) 
                 {
+					uint32_t maskID = terrainBrush->m_maskID;
+					ID3D11ShaderResourceView* nullSRV = nullptr;
+                    if (maskID!= 0xFFFFFFFF)
+                    {
+						auto& mask = terrainBrush->m_masks[maskID];
+						if (mask.m_maskSRV)
+						{
+							DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &mask.m_maskSRV);
+							terrainGizmoBuffer.maskWidth = mask.m_maskWidth;
+							terrainGizmoBuffer.maskHeight = mask.m_maskHeight;
+						}
+                        else 
+                        {
+                            DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &nullSRV);
+							terrainGizmoBuffer.maskWidth = 0;
+							terrainGizmoBuffer.maskHeight = 0;
+                        }
+                    }
+                    else 
+                    {
+                        DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &nullSRV);
+						terrainGizmoBuffer.maskWidth = 0;
+						terrainGizmoBuffer.maskHeight = 0;
+                    }
                     terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
+					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
                     DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &terrainGizmoBuffer);
+
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix(), defferdPtr);
                     terrainMesh->Draw(defferdPtr);

@@ -6,7 +6,7 @@
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
 #include "ShaderSystem.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "IAwakable.h"
 #include "TerrainMesh.h"
 #include "TerrainMaterial.h"
@@ -15,7 +15,7 @@
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
 class ComponentFactory;
-class TerrainComponent : public Component, public IAwakable, public IOnDistroy
+class TerrainComponent : public Component, public IAwakable, public IOnDestroy
 {
 public:
     ReflectTerrainComponent
@@ -35,7 +35,7 @@ public:
     void Resize(int newWidth, int newHeight);
 
     virtual void Awake() override;
-    virtual void OnDistroy() override;
+    virtual void OnDestroy() override;
 
 	//에디터 save/load
     void Save(const std::wstring& assetRoot, const std::wstring& name);
@@ -89,6 +89,12 @@ public:
     // 현재 브러시 정보 저장/반환
     void SetTerrainBrush(TerrainBrush* brush) { m_currentBrush = brush; }
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
+
+    //브러시 마스크 관련
+    bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
+    void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
+    
+
 
     // Collider용 접근자
     int GetWidth()  const { return m_width; }

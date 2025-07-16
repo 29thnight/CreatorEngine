@@ -10,12 +10,12 @@ public:
 	CharacterController();
 	~CharacterController();
 
-	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData,int * collisionMatrix);
+	void Initialize(const CharacterControllerInfo& info,const CharacterMovementInfo& moveInfo,physx::PxControllerManager* CCTManager,physx::PxMaterial* material,CollisionData* collisionData, unsigned int* collisionMatrix);
 	void Update(float deltaTime);
 
 	void AddMovementInput(const DirectX::SimpleMath::Vector3& input, bool isDynamic);
 
-	bool ChangeLayerNumber(const unsigned int& newLayerNumber,int* collisionMatrix);
+	bool ChangeLayerNumber(const unsigned int& newLayerNumber, unsigned int* collisionMatrix);
 
 	void SetMoveRestrct(std::array<bool, 4> moveRestrict) {
 		m_bMoveRestrict = moveRestrict;

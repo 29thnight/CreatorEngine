@@ -1,12 +1,12 @@
 #pragma once  
 #include "Component.h"  
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "../physics/PhysicsCommon.h"  
 #include "../Physics/ICollider.h"
 #include "BoxColliderComponent.generated.h"
 
-class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
+class BoxColliderComponent : public Component, public ICollider, public IAwakable, public IOnDestroy
 {  
 public:  
    ReflectBoxColliderComponent
@@ -36,7 +36,7 @@ public:
         }  
    }
 
-   void OnDistroy() override  
+   void OnDestroy() override  
    {  
        auto scene = SceneManagers->GetActiveScene();  
        if (scene)  
@@ -86,6 +86,9 @@ public:
        else {
            m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
        }
+
+       // 임시 콜리젼 레이어
+       m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
 
 	   return m_Info;
    }

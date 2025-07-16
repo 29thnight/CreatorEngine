@@ -38,7 +38,7 @@ void MeshRenderer::Awake()
     }
 }
 
-void MeshRenderer::OnDistroy()
+void MeshRenderer::OnDestroy()
 {
     CullingManagers->Remove(this);
 	auto scene = SceneManagers->GetActiveScene();

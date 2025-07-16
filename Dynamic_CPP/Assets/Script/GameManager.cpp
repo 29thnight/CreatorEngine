@@ -8,6 +8,7 @@
 #include "MaterialInfomation.h"
 #include "InputManager.h"
 #include "RigidBodyComponent.h"
+#include "RaycastHelper.h"
 void GameManager::Awake()
 {
 	std::cout << "GameManager Awake" << std::endl;
@@ -54,6 +55,16 @@ void GameManager::Start()
 
 void GameManager::Update(float tick)
 {
+	auto cam = GameObject::Find("Main Camera");
+	if (!cam) return;
+
+	std::vector<HitResult> hits;
+	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
+	currentRotation.Normalize();
+	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
+
+	int size = RaycastAll(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1u, hits);
+
 }
 
 void GameManager::OnDisable()
@@ -98,10 +109,25 @@ const std::vector<Entity*>& GameManager::GetEntities()
 
 void GameManager::CheatMiningResource()
 {
-	for (auto& resource : m_resourcePool) {
-		auto& rb = resource->GetComponent<RigidBodyComponent>();
-		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 100.f, EForceMode::IMPULSE);
+	auto cam = GameObject::Find("Main Camera");
+	if (!cam) return;
+
+	HitResult hit;
+	Quaternion currentRotation = cam->m_transform.GetWorldQuaternion();
+	currentRotation.Normalize();
+	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
+
+	bool size = Raycast(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hit);
+	for (int i = 0; i < size; i++) {
+		std::cout << hit.hitObject->m_name.data() << std::endl;
 	}
+
+	/*for (auto& resource : m_resourcePool) {
+		auto& rb = resource->GetComponent<RigidBodyComponent>();
+		resource->GetOwner()->m_transform.SetScale(resource->GetOwner()->m_transform.GetWorldScale() * .3f);
+		
+		rb.AddForce((Mathf::Vector3::Up + Mathf::Vector3::Backward) * 300.f, EForceMode::IMPULSE);
+	}*/
 }
 
 void GameManager::Inputblabla()

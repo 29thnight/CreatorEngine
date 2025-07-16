@@ -76,14 +76,8 @@
     <Filter Include="Classes\Components\CSharpScriptComponent">
       <UniqueIdentifier>{e2c6af93-4c68-476b-bf4c-cf8e7a09dddc}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\MonoManager">
-      <UniqueIdentifier>{7eb49c68-a217-46ec-bd7c-580f066b3be3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Resources\Mono">
       <UniqueIdentifier>{f6f85cb4-3a05-4d13-886b-db21e155d7ba}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\MonoManager\MonoBindingFunction">
-      <UniqueIdentifier>{f67e27a4-7f8c-4409-b724-e48ff17528db}</UniqueIdentifier>
     </Filter>
     <Filter Include="Managers\InputManager">
       <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
@@ -135,6 +129,33 @@
     </Filter>
     <Filter Include="Managers\HotLoadSystem">
       <UniqueIdentifier>{b793f535-cea8-42fa-801c-4c533b824d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework\BT\Enum">
+      <UniqueIdentifier>{6df904d3-7338-4a89-8a21-fe00aa9203e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\AIFramework\BT\BuildEditHelper">
+      <UniqueIdentifier>{0ce6332c-a61d-4947-b31e-625fa7d3a79b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core\BlackBoard">
+      <UniqueIdentifier>{db0892ee-daed-4b8e-b416-5479dc5f7cbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\GameAI\Core\Manager">
+      <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\FoliageMeshComponent">
+      <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Effect">
+      <UniqueIdentifier>{e61b4c75-be3d-40bd-b5b6-16c30fbf5e33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Mesh">
+      <UniqueIdentifier>{de733d02-7606-40e6-9b64-e24bee7921a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Base">
+      <UniqueIdentifier>{fc957439-3d58-42d3-91fb-b9682f7f1f71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Sprite">
+      <UniqueIdentifier>{03e64df8-e97c-4186-a606-87e87f25c97d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -198,12 +219,6 @@
     <ClCompile Include="AvatarMask.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="MonoManager.cpp">
-      <Filter>Managers\MonoManager</Filter>
-    </ClCompile>
-    <ClCompile Include="MonoObjectBinding.cpp">
-      <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
-    </ClCompile>
     <ClCompile Include="BoxColliderComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
@@ -231,9 +246,6 @@
     <ClCompile Include="ActionMap.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
-    <ClCompile Include="MeshRenderer.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClCompile>
     <ClCompile Include="Component.cpp">
       <Filter>Classes\Components\ComponentBase</Filter>
     </ClCompile>
@@ -252,9 +264,6 @@
     <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClCompile>
-    <ClCompile Include="EffectComponent.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClCompile>
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClCompile>
@@ -269,6 +278,21 @@
     </ClCompile>
     <ClCompile Include="RigidBodyComponent.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="Blackboard.cpp">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClCompile>
+    <ClCompile Include="AIManager.cpp">
+      <Filter>Classes\GameAI\Core\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="FoliageMeshComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshRenderer.cpp">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -335,18 +359,6 @@
     <ClInclude Include="SoundManager.h">
       <Filter>Managers\SoundManager</Filter>
     </ClInclude>
-    <ClInclude Include="RenderableComponents.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="MeshRenderer.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="LightMapping.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="SpriteRenderer.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
     <ClInclude Include="AnimationController.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
@@ -386,7 +398,7 @@
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="IOnDistroy.h">
+    <ClInclude Include="IOnDestroy.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
@@ -398,17 +410,11 @@
     <ClInclude Include="GameObjectType.h">
       <Filter>Classes\GameObject</Filter>
     </ClInclude>
-    <ClInclude Include="MonoManager.h">
-      <Filter>Managers\MonoManager</Filter>
-    </ClInclude>
     <ClInclude Include="MonoBehaviorRecord.h">
       <Filter>Classes\Resources\Mono</Filter>
     </ClInclude>
     <ClInclude Include="CSharpScriptComponent.h">
       <Filter>Classes\Components\CSharpScriptComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="MonoObjectBinding.h">
-      <Filter>Managers\MonoManager\MonoBindingFunction</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
@@ -485,13 +491,7 @@
     <ClInclude Include="InputAction.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
-    <ClInclude Include="BlackBoard.h">
-      <Filter>Classes\GameAI\Core</Filter>
-    </ClInclude>
     <ClInclude Include="IAIComponent.h">
-      <Filter>Classes\GameAI\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AIManager.h">
       <Filter>Classes\GameAI\Core</Filter>
     </ClInclude>
     <ClInclude Include="IScriptedFSM.h">
@@ -511,9 +511,6 @@
     </ClInclude>
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
-    </ClInclude>
-    <ClInclude Include="EffectComponent.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
     <ClInclude Include="ISerializable.h">
       <Filter>Interfaces</Filter>
@@ -539,11 +536,50 @@
     <ClInclude Include="InvalidScriptComponent.h">
       <Filter>Classes\Components\CPPScriptComponentBase</Filter>
     </ClInclude>
+    <ClInclude Include="BTEnum.h">
+      <Filter>Classes\GameAI\AIFramework\BT\Enum</Filter>
+    </ClInclude>
+    <ClInclude Include="BTBuildNode.h">
+      <Filter>Classes\GameAI\AIFramework\BT\BuildEditHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="BTBuildGraph.h">
+      <Filter>Classes\GameAI\AIFramework\BT\BuildEditHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoard.h">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoardEnum.h">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="BLackBoardValue.h">
+      <Filter>Classes\GameAI\Core\BlackBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="AIManager.h">
+      <Filter>Classes\GameAI\Core\Manager</Filter>
+    </ClInclude>
     <ClInclude Include="FunctionRegistry.h">
-      <Filter>Classes\GameAI\Core</Filter>
+      <Filter>Classes\GameAI\Core\Manager</Filter>
     </ClInclude>
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageMeshComponent.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>Classes\Components\RenderableComponent\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRenderer.h">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="LightMapping.h">
+      <Filter>Classes\Components\RenderableComponent\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderableComponents.h">
+      <Filter>Classes\Components\RenderableComponent\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteRenderer.h">
+      <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

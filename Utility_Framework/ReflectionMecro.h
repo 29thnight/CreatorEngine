@@ -103,5 +103,32 @@ virtual const Meta::Type& ScriptReflect()\
         m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
     }\
     virtual ~T() = default; \
-    
+
+#define BT_ACTION_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ActionNode>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+
+#define BT_CONDITION_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ConditionNode>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+
+#define BT_CONDITIONDECORATOR_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ConditionDecoratorNode>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+
 #pragma endregion

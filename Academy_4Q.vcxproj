@@ -46,6 +46,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDynamicDebugging>false</UseDynamicDebugging>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -53,6 +54,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -118,9 +120,11 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -147,6 +151,9 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
       <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)Physics\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MinFilesInUnityFile>5</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -165,8 +172,6 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />
-    <ClInclude Include="EngineEntry\BehaviorTree.h" />
-    <ClInclude Include="EngineEntry\BT_Editor.h" />
     <ClInclude Include="EngineEntry\Dx11Main.h" />
     <ClInclude Include="EngineEntry\EngineSetting.h" />
     <ClInclude Include="EngineEntry\EngineVersion.h" />
@@ -186,8 +191,6 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
-    <ClCompile Include="EngineEntry\BehaviorTree.cpp" />
-    <ClCompile Include="EngineEntry\BT_Editor.cpp" />
     <ClCompile Include="EngineEntry\Dx11Main.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />

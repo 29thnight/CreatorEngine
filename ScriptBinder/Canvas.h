@@ -4,8 +4,8 @@
 #include "IRenderable.h"
 #include "IUpdatable.h"
 #include "Canvas.generated.h"
-#include "IOnDistroy.h"
-class Canvas : public Component, public IUpdatable, public IOnDistroy
+#include "IOnDestroy.h"
+class Canvas : public Component, public IUpdatable, public IOnDestroy
 {
 public:
    ReflectCanvas
@@ -13,7 +13,7 @@ public:
 	Canvas();
 	~Canvas() = default;
 
-	void OnDistroy() override;
+	void OnDestroy() override;
 
 	void AddUIObject(GameObject* obj);
 	virtual void Update(float tick) override;

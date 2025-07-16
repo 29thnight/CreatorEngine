@@ -46,7 +46,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
 	{
 		m_loadType = LoadType::OBJ;
 	}
-	else if (filepath.extension() == ".gltf")
+	else if (filepath.extension() == ".gltf" || filepath.extension() == ".glb")
 	{
 		m_loadType = LoadType::GLTF;
 	}

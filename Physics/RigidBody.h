@@ -20,7 +20,7 @@ public:
 	inline void SetExtent(const float& x, const float& y, const float& z) { m_Extent = { x,y,z }; }
 	inline void SetScale(const DirectX::SimpleMath::Vector3& scale) { m_scale = scale; }
 
-	virtual void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, int* collisionMatrix) abstract;
+	virtual void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix) abstract;
 
 	inline void SetOffsetTranslation(const DirectX::SimpleMath::Matrix offsetTranslation) {
 		m_offsetTranslation = offsetTranslation;
@@ -40,7 +40,7 @@ public:
 
 
 protected:
-	void UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, int* collisionMatrix, void* userData);
+	void UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData);
 
 protected:
 	unsigned int m_id; //자신 아이디

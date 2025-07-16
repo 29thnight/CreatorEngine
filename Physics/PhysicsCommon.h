@@ -344,13 +344,16 @@ struct RayCastOutput
 	//block이 발생한 경우
 	bool hasBlock = false;	//block이 발생했는지
 	unsigned int id = -1;	//block된 콜라이더 ID
+	unsigned int blockLayerNumber = 0;
 	DirectX::SimpleMath::Vector3 blockPosition = {};	//block된 지점
+	DirectX::SimpleMath::Vector3 blockNormal = {};	//block된 지점
 
 	//hit가 발생한 경우
 	unsigned int hitSize = 0;	//hit된 콜라이더 갯수
 	std::vector<unsigned int> hitId;	//hit된 콜라이더 ID
 	std::vector<unsigned int> hitLayerNumber;	//hit된 콜라이더 레이어 넘버
 	std::vector<DirectX::SimpleMath::Vector3> contectPoints;	//각 hit된 콜라이더의 접촉 지점
+	std::vector<DirectX::SimpleMath::Vector3> contectNormals;	//각 hit된 콜라이더의 접촉 지점
 };
 //==========================================================
 //todo : PxDeformableSuface 에 관한 정보

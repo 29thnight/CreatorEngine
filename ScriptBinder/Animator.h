@@ -4,7 +4,7 @@
 #include "IRenderable.h"
 #include "IUpdatable.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "AnimationController.h"
 #include "Animator.generated.h"
 constexpr uint32 MAX_BONES{ 512 };
@@ -12,7 +12,7 @@ constexpr uint32 MAX_BONES{ 512 };
 class Skeleton;
 class AnimationController;
 class Socket;
-class Animator : public Component, public IUpdatable, public IAwakable, public IOnDistroy
+class Animator : public Component, public IUpdatable, public IAwakable, public IOnDestroy
 {
 public:
     ReflectAnimator
@@ -33,7 +33,7 @@ public:
 
     void Awake() override;
     void Update(float tick) override;
-    void OnDistroy() override;
+    void OnDestroy() override;
     void SetAnimation(int index);
     [[Method]]
     void UpdateAnimation();

@@ -1,0 +1,31 @@
+NodeList:
+  - ID: 618094500
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [479946148]
+    Position: {x: 48, y: -93}
+  - ID: 479946148
+    Type: 2
+    Name: Sequence
+    ParentID: 618094500
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [348174352, 210260213]
+    Position: {x: 272, y: 67}
+  - ID: 210260213
+    Type: 8
+    Name: Action
+    ParentID: 479946148
+    IsRoot: false
+    HasScript: true
+    ScriptName: TestAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 560, y: 248}

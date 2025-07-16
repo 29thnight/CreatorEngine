@@ -10,7 +10,7 @@ Canvas::Canvas()
 	m_typeID = TypeTrait::GUIDCreator::GetTypeID<Canvas>();
 }
 
-void Canvas::OnDistroy()
+void Canvas::OnDestroy()
 {
 	
 	Scene* scene = SceneManagers->GetActiveScene();

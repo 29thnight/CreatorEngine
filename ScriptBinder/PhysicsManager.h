@@ -19,11 +19,13 @@ struct RayEvent {
 		bool hasBlock;
 		GameObject* blockObject;
 		DirectX::SimpleMath::Vector3 blockPoint;
+		DirectX::SimpleMath::Vector3 blockNormal;
 
 		unsigned int hitCount = -1;
 		std::vector<GameObject*> hitObjects;
 		std::vector<unsigned int> hitObjectLayer;
 		std::vector<DirectX::SimpleMath::Vector3> hitPoints;
+		std::vector<DirectX::SimpleMath::Vector3> hitNormals;
 	};
 
 	DirectX::SimpleMath::Vector3 origin = DirectX::SimpleMath::Vector3::Zero;
@@ -34,6 +36,13 @@ struct RayEvent {
 	ResultData* resultData = nullptr;
 	bool isStatic = false;
 	bool bUseDebugDraw = false;
+};
+
+struct RaycastHit {
+	GameObject* hitObject = nullptr;
+	DirectX::SimpleMath::Vector3 hitPoint{};
+	DirectX::SimpleMath::Vector3 hitNormal{};
+	unsigned int hitObjectLayer = 0;
 };
 
 struct ICollider;
@@ -107,11 +116,13 @@ public:
 
 
 	void RayCast(RayEvent& rayEvent);
+	bool Raycast(RayEvent& rayEvent, RaycastHit& hit);
+	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);
 	
 	//충돌 메트릭스 변경
 	void SetCollisionMatrix(std::vector<std::vector<uint8_t>> collisionGrid) {
 		m_collisionMatrix = std::move(collisionGrid);
-		int collisionMatrix[32] = { 0 };
+		unsigned int collisionMatrix[32] = { 0 };
 		for (int i = 0; i < 32; ++i) {
 			collisionMatrix[i] = 0; // 초기화
 			for (int j = 0; j < 32; ++j) {
@@ -189,6 +200,4 @@ private:
 	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
-
 static auto& PhysicsManagers = PhysicsManager::GetInstance();
-

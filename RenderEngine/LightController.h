@@ -31,8 +31,8 @@ public:
 
 	void UseCloudShadowMap(const std::string_view& filename);
 	void UpdateCloudBuffer(ID3D11DeviceContext* defferdContext);
-	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext);
-	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext);
+	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn = true);
+	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn = true);
 
 	const LightProperties& GetProperties() { return m_lightProperties; }
 
@@ -61,7 +61,4 @@ private:
 	bool							hasLightWithShadows{ false };
 	ID3D11Buffer*					m_shadowMapBuffer{ nullptr };
 	std::unique_ptr<ShadowMapPass>	m_shadowMapPass;
-
-	UniqueTexturePtr				m_cloudShadowMapTexture{ nullptr };
-	ID3D11Buffer*					m_cloudShadowMapBuffer{ nullptr };
 };

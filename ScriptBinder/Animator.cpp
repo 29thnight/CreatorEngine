@@ -31,7 +31,7 @@ void Animator::Update(float tick)
 	}
 }
 
-void Animator::OnDistroy()
+void Animator::OnDestroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	auto renderScene = SceneManagers->GetRenderScene();

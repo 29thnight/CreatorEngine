@@ -319,10 +319,21 @@ namespace Meta
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(*static_cast<std::string*>(element));
 						}
-						else if (ty_name == GUIDCreator::GetTypeID<HashingString>())
+						else if (ty_name == type_guid(HashingString))
 						{
 							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
 							arrayNode.push_back(static_cast<HashingString*>(element)->ToString());
+						}
+						else if (ty_name == type_guid(HashedGuid))
+						{
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(static_cast<HashedGuid*>(element)->m_ID_Data);
+						}
+						else if (ty_name == type_guid(FileGuid))
+						{
+							FileGuid fileGuid = *static_cast<FileGuid*>(element);
+							arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
+							arrayNode.push_back(fileGuid.ToString());
 						}
 						else
 						{
@@ -516,6 +527,24 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->emplace_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(HashedGuid))
+					{
+						auto vec = node[prop.name].as<std::vector<uint32_t>>();
+						auto castInstance = reinterpret_cast<std::vector<HashedGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						for (const auto& elem : vec)
+						{
+							castInstance->emplace_back(elem);
+						}
+					}
+					else if (prop.elementTypeID == type_guid(FileGuid))
+					{
+						auto vec = node[prop.name].as<std::vector<std::string>>();
+						auto castInstance = reinterpret_cast<std::vector<FileGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);

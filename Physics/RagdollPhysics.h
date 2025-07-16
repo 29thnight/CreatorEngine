@@ -12,12 +12,12 @@ public:
 	void Initialize(const ArticulationInfo& info,physx::PxPhysics* physics,CollisionData* collisionData);
 	void Update(float deltaTime);
 	
-	bool AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix,const DirectX::SimpleMath::Vector3& extend);
-	bool AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const float& radius);
-	bool AddArticulationLink(const LinkInfo& linkInfo, int* collisionMatrix, const float& halfHeight,const float& radius);
-	bool AddArticulationLink(LinkInfo& linkInfo, int* collisionMatrix);
+	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix,const DirectX::SimpleMath::Vector3& extend);
+	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& radius);
+	bool AddArticulationLink(const LinkInfo& linkInfo, unsigned int* collisionMatrix, const float& halfHeight,const float& radius);
+	bool AddArticulationLink(LinkInfo& linkInfo, unsigned int* collisionMatrix);
 
-	bool ChangeLayerNumber(const unsigned int& newLayerNumber, int* collisionMatrix);
+	bool ChangeLayerNumber(const unsigned int& newLayerNumber, unsigned int* collisionMatrix);
 
 	
 	inline const std::string& GetModelPath() const { return m_modelPath; }

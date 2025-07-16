@@ -44,6 +44,7 @@
 		<UseDebugLibraries>true</UseDebugLibraries>
 		<PlatformToolset>v143</PlatformToolset>
 		<CharacterSet>Unicode</CharacterSet>
+		<EnableUnitySupport>true</EnableUnitySupport>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
 		<ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -117,10 +118,10 @@
 			<SDLCheck>true</SDLCheck>
 			<PreprocessorDefinitions>_DEBUG;DYNAMICCPP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<ConformanceMode>true</ConformanceMode>
-			<PrecompiledHeader>NotUsing</PrecompiledHeader>
+			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>
@@ -128,7 +129,7 @@
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<EnableUAC>false</EnableUAC>
-			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
 		<PreBuildEvent>
 			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
@@ -146,7 +147,7 @@
 			<PrecompiledHeader>NotUsing</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>
@@ -159,14 +160,17 @@
 			<AdditionalDependencies>../Bin\Editor\ScriptBinder.lib;../Bin\Editor\Utility_Framework.lib;../Bin\Editor\\ImGuiHelper.lib;../Bin\Editor\RenderEngine.lib;../Bin\Editor\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
 		<PreBuildEvent>
-			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
-"../x64\HeaderTool\ScriptReflectionHeaderTool.exe"</Command>
+			<Command>"../Bin\HeaderTool\ScriptReflectionAndFactoryClear.exe"
+"../Bin\HeaderTool\ScriptReflectionHeaderTool.exe"</Command>
 		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
 		<ClInclude Include="Assets\Script\AsisMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
-		<ClInclude Include="BTActtionFactory.h" />
+		<ClInclude Include="BTConditionDecoratorFactory.h" />
+		<ClInclude Include="RaycastHelper.h" />
+		<ClInclude Include="BTActionFactory.h" />
+		<ClInclude Include="BTConditionFactory.h" />
 		<ClInclude Include="CreateFactory.h" />
 		<ClInclude Include="Export.h" />
 		<ClInclude Include="framework.h" />
@@ -177,15 +181,19 @@
 		<ClInclude Include="Assets\Script\EntityItem.h" />
 		<ClInclude Include="Assets\Script\Player.h" />
 		<ClInclude Include="Assets\Script\GameManager.h" />
-		<ClInclude Include="Assets\Script\NewBehaviourScript.h" />
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h" />
 		<ClInclude Include="Assets\Script\Swrod.h" />
 		<ClInclude Include="Assets\Script\AsisFeed.h" />
 		<ClInclude Include="Assets\Script\Rock.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h" />
+		<ClInclude Include="Assets\Script\InverseKinematic.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h" />
+		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
+		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
 		<ClCompile Include="pch.cpp">
 			<PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -209,10 +217,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\NewBehaviourScript.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -221,11 +225,27 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
 		<ClCompile Include="Assets\Script\AsisFeed.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\Rock.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

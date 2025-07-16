@@ -13,21 +13,19 @@ enum class SelectedType
 	Node,
 	Link,
 };
+
 struct Node
 {
 	int id;
 	std::string name;
 };
-struct Link
+
+struct NodeLink
 {
 	Node* fromNode;
 	Node* toNode;
-	//std::string fromNode;
-	//std::string toNode;
 	bool haveReverse = false;
 };
-
-
 
 class NodeEditor
 {
@@ -57,7 +55,7 @@ public:
 	ax::NodeEditor::EditorContext* m_nodeContext = nullptr;
 	std::string m_filePath;
 	std::vector<Node*> Nodes;
-	std::vector<Link*> Links;
+	std::vector<NodeLink*> Links;
 	
 	int* m_retrunIndex = nullptr; 
 	bool needMakeLink = false;

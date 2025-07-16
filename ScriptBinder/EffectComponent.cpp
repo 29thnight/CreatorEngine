@@ -55,7 +55,7 @@ void EffectComponent::Update(float tick)
     }
 }
 
-void EffectComponent::OnDistroy()
+void EffectComponent::OnDestroy()
 {
     // 현재 인스턴스가 있으면 삭제
     DestroyCurrentEffect();

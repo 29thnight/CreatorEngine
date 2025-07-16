@@ -32,6 +32,10 @@ public:
 	Transform& SetRotation(Mathf::Quaternion quaternion);
 	Transform& AddRotation(Mathf::Quaternion quaternion);
 
+	Transform& SetWorldPosition(Mathf::Vector3 pos);
+	Transform& SetWorldRotation(Mathf::Quaternion quaternion);
+	Transform& SetWorldScale(Mathf::Vector3 scale);
+
 	void SetOwner(GameObject* owner);
 
 	Mathf::xMatrix GetLocalMatrix();
@@ -39,6 +43,7 @@ public:
 	Mathf::xMatrix GetInverseMatrix() const;
 
 	void UpdateLocalMatrix();
+	Mathf::xMatrix UpdateWorldMatrix();
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
 	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
 

@@ -11,7 +11,7 @@ void RigidBodyComponent::Awake()
 	}
 }
 
-void RigidBodyComponent::OnDistroy()
+void RigidBodyComponent::OnDestroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	if (scene)
