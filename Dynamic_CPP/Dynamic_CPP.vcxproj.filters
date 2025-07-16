@@ -17,6 +17,9 @@
 		<Filter Include="BehaviorTree\Condition">
 			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f22bf63227d}</UniqueIdentifier>
 		</Filter>
+		<Filter Include="BehaviorTree\ConditionDecorator">
+			<UniqueIdentifier>{439a7493-32f1-4f5b-a1b4-6f23bf63227d}</UniqueIdentifier>
+		</Filter>
 		<Filter Include="AnimationBehavior">
 			<UniqueIdentifier>{1e668bdc-4705-49f9-bfff-68031c3321dc}</UniqueIdentifier>
 		</Filter>
@@ -72,6 +75,9 @@
 		<ClInclude Include="BTConditionFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
+		<ClInclude Include="BTConditionDecoratorFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
 		<ClInclude Include="BTActionFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
@@ -99,6 +105,15 @@
 		<ClInclude Include="Assets\Script\InverseKinematic.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="RaycastHelper.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -106,6 +121,9 @@
 		</ClCompile>
 		<ClCompile Include="pch.cpp">
 			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="RaycastHelper.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
@@ -145,6 +163,12 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

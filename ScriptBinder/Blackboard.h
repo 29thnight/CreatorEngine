@@ -1,5 +1,6 @@
 #pragma once
 #include "BlackBoardValue.h"
+#include "Delegate.h"
 
 class GameObject;
 class Transform;
@@ -46,6 +47,7 @@ private:
 
 	std::string m_name; // Name of the blackboard
 	std::unordered_map<std::string, BlackBoardValue> m_values;
+	Core::Delegate<void, const std::string&> m_valueChangedDelegate; // 값 변경에 대한 델리게이트
 
 	BlackBoardValue& GetOrCreate(const std::string& key);
 	const BlackBoardValue& GetChecked(const std::string& key, BlackBoardType expected) const;

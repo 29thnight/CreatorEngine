@@ -19,12 +19,17 @@ namespace BT
 {
 	static inline bool IsCompositeNode(BehaviorNodeType type)
 	{
-		return type == BehaviorNodeType::Composite || type == BehaviorNodeType::Selector || type == BehaviorNodeType::Sequence || type == BehaviorNodeType::Parallel;
+		return type == BehaviorNodeType::Composite || 
+				type == BehaviorNodeType::Selector || 
+				type == BehaviorNodeType::Sequence || 
+				type == BehaviorNodeType::Parallel;
 	}
 
 	static inline bool IsDecoratorNode(BehaviorNodeType type)
 	{
-		return type == BehaviorNodeType::Decorator || type == BehaviorNodeType::Inverter;
+		return type == BehaviorNodeType::Decorator			|| 
+			type == BehaviorNodeType::ConditionDecorator	|| 
+			type == BehaviorNodeType::Inverter;
 	}
 
 	static inline bool IsConditionNode(BehaviorNodeType type)
@@ -49,12 +54,13 @@ namespace BT
 
 	static inline BehaviorNodeType StringToNodeType(const std::string& str)
 	{
-		if (str == "Sequence") return BehaviorNodeType::Sequence;
-		if (str == "Selector") return BehaviorNodeType::Selector;
-		if (str == "Parallel") return BehaviorNodeType::Parallel;
-		if (str == "Inverter") return BehaviorNodeType::Inverter;
-		if (str == "Action") return BehaviorNodeType::Action;
-		if (str == "Condition") return BehaviorNodeType::Condition;
+		if (str == "Sequence")			 return BehaviorNodeType::Sequence;
+		if (str == "Selector")			 return BehaviorNodeType::Selector;
+		if (str == "Parallel")			 return BehaviorNodeType::Parallel;
+		if (str == "Inverter")			 return BehaviorNodeType::Inverter;
+		if (str == "ConditionDecorator") return BehaviorNodeType::ConditionDecorator;
+		if (str == "Action")			 return BehaviorNodeType::Action;
+		if (str == "Condition")			 return BehaviorNodeType::Condition;
 		return BehaviorNodeType::Composite; // Should not happen with GetRegisteredKey
 	}
 

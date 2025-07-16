@@ -3,6 +3,7 @@
 #include "CreateFactory.h"
 #include "BTActionFactory.h"
 #include "BTConditionFactory.h"
+#include "BTConditionDecoratorFactory.h"
 #include "SceneManager.h"
 #include "NodeFactory.h"
 
@@ -51,6 +52,12 @@ extern "C"
 		return ConditionCreateFactory::GetInstance()->CreateInstance(classNameStr);
 	}
 
+	EXPORT_API BT::ConditionDecoratorNode* CreateBTConditionDecoratorNode(const char* className)
+	{
+		std::string classNameStr(className);
+		return ConditionDecoratorCreateFactory::GetInstance()->CreateInstance(classNameStr);
+	}
+
 	EXPORT_API const char** ListBTActionNode(int* outCount)
 	{
 		static std::vector<std::string> nameVector;
@@ -77,6 +84,25 @@ extern "C"
 		nameVector.clear();
 		cstrs.clear();
 		for (const auto& [name, func] : ConditionCreateFactory::GetInstance()->factoryMap)
+		{
+			nameVector.push_back(name);
+		}
+		for (auto& name : nameVector)
+		{
+			cstrs.push_back(name.c_str());
+		}
+		if (outCount)
+			*outCount = static_cast<int>(cstrs.size());
+		return cstrs.data(); // 포인터 배열 반환
+	}
+
+	EXPORT_API const char** ListBTConditionDecoratorNode(int* outCount)
+	{
+		static std::vector<std::string> nameVector;
+		static std::vector<const char*> cstrs;
+		nameVector.clear();
+		cstrs.clear();
+		for (const auto& [name, func] : ConditionDecoratorCreateFactory::GetInstance()->factoryMap)
 		{
 			nameVector.push_back(name);
 		}
@@ -123,6 +149,13 @@ extern "C"
 		}
 	}
 
+	EXPORT_API void DeleteBTConditionDecoratorNode(BT::ConditionDecoratorNode* conditionDecoratorNode)
+	{
+		if (conditionDecoratorNode)
+		{
+			delete conditionDecoratorNode;
+		}
+	}
 
 	EXPORT_API void SetPhysicsManager(Singleton<PhysicsManager>::FGetInstance funcPtr)
 	{
@@ -161,6 +194,14 @@ extern "C"
 	EXPORT_API void InitConditionFactory()
 	{
 		// Register the factory function for BTCondition Automation
+		ConditionCreateFactory::GetInstance()->RegisterFactory("TestCon", []() { return new TestCon(); });
+
+	}
+
+	EXPORT_API void InitConditionDecoratorFactory()
+	{
+		// Register the factory function for BTConditionDecorator Automation
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("TestConCec", []() { return new TestConCec(); });
 
 	}
 }

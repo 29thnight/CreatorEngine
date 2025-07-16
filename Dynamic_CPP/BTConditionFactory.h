@@ -3,7 +3,8 @@
 #include "Export.h"
 #include "BTHeader.h"
 
-// Automation include ActionNodeClass header
+// Automation include ConditionNodeClass header
+#include "TestCon.h"
 
 
 class ConditionCreateFactory : public Singleton<ConditionCreateFactory>

@@ -105,12 +105,6 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 		{
 			composite->AddChild(childNode);
 		}
-		else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-		{
-			if (decorator->GetChild())
-				throw std::runtime_error("BTTreeBuilder: Decorator cannot have multiple children.");
-			decorator->SetChild(childNode);
-		}
 		else
 		{
 			// Action / Condition node → 자식 없음

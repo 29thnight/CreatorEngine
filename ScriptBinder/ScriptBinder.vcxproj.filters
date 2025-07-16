@@ -142,8 +142,20 @@
     <Filter Include="Classes\GameAI\Core\Manager">
       <UniqueIdentifier>{9b3af789-4659-41ce-a86d-8e7ce948a50d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\NewFilter1">
+    <Filter Include="Classes\Components\RenderableComponent\FoliageMeshComponent">
       <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Effect">
+      <UniqueIdentifier>{e61b4c75-be3d-40bd-b5b6-16c30fbf5e33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Mesh">
+      <UniqueIdentifier>{de733d02-7606-40e6-9b64-e24bee7921a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Base">
+      <UniqueIdentifier>{fc957439-3d58-42d3-91fb-b9682f7f1f71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\Sprite">
+      <UniqueIdentifier>{03e64df8-e97c-4186-a606-87e87f25c97d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -234,9 +246,6 @@
     <ClCompile Include="ActionMap.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
-    <ClCompile Include="MeshRenderer.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClCompile>
     <ClCompile Include="Component.cpp">
       <Filter>Classes\Components\ComponentBase</Filter>
     </ClCompile>
@@ -254,9 +263,6 @@
     </ClCompile>
     <ClCompile Include="StateMachineComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
-    </ClCompile>
-    <ClCompile Include="EffectComponent.cpp">
-      <Filter>Classes\Components\RenderableComponent</Filter>
     </ClCompile>
     <ClCompile Include="BehaviorTreeComponent.cpp">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
@@ -278,6 +284,15 @@
     </ClCompile>
     <ClCompile Include="AIManager.cpp">
       <Filter>Classes\GameAI\Core\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="FoliageMeshComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>Classes\Components\RenderableComponent\Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshRenderer.cpp">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -343,18 +358,6 @@
     </ClInclude>
     <ClInclude Include="SoundManager.h">
       <Filter>Managers\SoundManager</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderableComponents.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="MeshRenderer.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="LightMapping.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="SpriteRenderer.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
     </ClInclude>
     <ClInclude Include="AnimationController.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
@@ -509,9 +512,6 @@
     <ClInclude Include="BehaviorTreeComponent.h">
       <Filter>Classes\GameAI\AIFramework\BT</Filter>
     </ClInclude>
-    <ClInclude Include="EffectComponent.h">
-      <Filter>Classes\Components\RenderableComponent</Filter>
-    </ClInclude>
     <ClInclude Include="ISerializable.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -562,6 +562,24 @@
     </ClInclude>
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageMeshComponent.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageMeshComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>Classes\Components\RenderableComponent\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRenderer.h">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="LightMapping.h">
+      <Filter>Classes\Components\RenderableComponent\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderableComponents.h">
+      <Filter>Classes\Components\RenderableComponent\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteRenderer.h">
+      <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

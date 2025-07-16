@@ -26,6 +26,7 @@ void BlackBoard::SetValueAsBool(const std::string& key, bool value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Bool;
 	entry.BoolValue = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsInt(const std::string& key, int value)
@@ -33,6 +34,7 @@ void BlackBoard::SetValueAsInt(const std::string& key, int value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Int;
 	entry.IntValue = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsFloat(const std::string& key, float value)
@@ -40,6 +42,7 @@ void BlackBoard::SetValueAsFloat(const std::string& key, float value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Float;
 	entry.FloatValue = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsString(const std::string& key, const std::string& value)
@@ -47,6 +50,7 @@ void BlackBoard::SetValueAsString(const std::string& key, const std::string& val
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::String;
 	entry.StringValue = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector2(const std::string& key, const Mathf::Vector2& value)
@@ -54,6 +58,7 @@ void BlackBoard::SetValueAsVector2(const std::string& key, const Mathf::Vector2&
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector2;
 	entry.Vec2Value = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector3(const std::string& key, const Mathf::Vector3& value)
@@ -61,6 +66,7 @@ void BlackBoard::SetValueAsVector3(const std::string& key, const Mathf::Vector3&
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector3;
 	entry.Vec3Value = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector4(const std::string& key, const Mathf::Vector4& value)
@@ -68,6 +74,7 @@ void BlackBoard::SetValueAsVector4(const std::string& key, const Mathf::Vector4&
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector4;
 	entry.Vec4Value = value;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsGameObject(const std::string& key, const std::string& objectName)
@@ -75,6 +82,7 @@ void BlackBoard::SetValueAsGameObject(const std::string& key, const std::string&
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::GameObject;
 	entry.StringValue = objectName;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 void BlackBoard::SetValueAsTransform(const std::string& key, const std::string& transformPath)
@@ -82,6 +90,7 @@ void BlackBoard::SetValueAsTransform(const std::string& key, const std::string& 
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Transform;
 	entry.StringValue = transformPath;
+	m_valueChangedDelegate.Broadcast(key);
 }
 
 // Getters

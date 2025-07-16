@@ -64,7 +64,7 @@ struct BTBuildGraph
 		const auto& selectedNodeID = SelectedNode->ID;
 		auto& childNodeParentID = childNode->ParentID;
 
-		if (BT::IsDecoratorNode(selectedNodeType) && 1 < selectedNodeChildContainer.size()) return; // Decorator 노드는 자식이 최대 1개만 허용됨
+		if (BT::IsDecoratorNode(selectedNodeType) && 0 < selectedNodeChildContainer.size()) return; // Decorator 노드는 자식이 최대 1개만 허용됨
 
 		selectedNodeChildContainer.push_back(childNodeID);
 
@@ -155,6 +155,7 @@ struct BTBuildGraph
 			"Selector",
 			"Parallel",
 			"Inverter",
+			"ConditionDecorator",
 			"Action",
 			"Condition",
 		};
