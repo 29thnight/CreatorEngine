@@ -17,10 +17,10 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [348174352]
+    Children: [348174352, 210260213]
     Position: {x: 272, y: 67}
-  - ID: 348174352
-    Type: 7
+  - ID: 210260213
+    Type: 8
     Name: Action
     ParentID: 479946148
     IsRoot: false
@@ -28,4 +28,4 @@ NodeList:
     ScriptName: TestAction
     Policy: -858993460
     Children: ~
-    Position: {x: 528, y: 216}
+    Position: {x: 560, y: 248}

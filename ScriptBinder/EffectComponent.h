@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "EffectComponent.generated.h"
 
-class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDistroy
+class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDestroy
 {
 public:
     ReflectEffectComponent
@@ -12,7 +12,7 @@ public:
 
     void Awake() override;
     void Update(float tick) override;
-    void OnDistroy() override;
+    void OnDestroy() override;
 
     [[Method]]
     void Apply();

@@ -808,11 +808,12 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 				s_newNodeId = 0;
             }
 
+            constexpr int dummy_x = 180;
             ImRect inputsRect;
             int inputAlpha = 200;
             if (!node.IsRoot)
             {
-                ImGui::Dummy(ImVec2(160, padding));
+                ImGui::Dummy(ImVec2(dummy_x, padding));
                 inputsRect = 
                     ImRect(ImGui::GetItemRectMin() + 
                         insidePadding, ImGui::GetItemRectMax() - insidePadding);
@@ -828,40 +829,39 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 ed::PopStyleVar(3);
             }
             else
-                ImGui::Dummy(ImVec2(160, padding));
+                ImGui::Dummy(ImVec2(dummy_x, padding));
 
-            ImGui::Dummy(ImVec2(160, 10));
+            ImGui::Dummy(ImVec2(dummy_x, 10));
             ImRect contentScriptRect;
             ImVec2 textScriptSize;
             ImVec2 textScriptPos;
             bool isScriptNode = node.HasScript;
             if (isScriptNode)
             {
-                if (AIManagers->IsActionNodeRegistered(node.ScriptName)
-                    || AIManagers->IsConditionNodeRegistered(node.ScriptName))
+                if (AIManagers->IsScriptNodeRegistered(node.ScriptName))
                 {
-                    ImGui::Dummy(ImVec2(160, 50));
+                    ImGui::Dummy(ImVec2(dummy_x, 40));
                     contentScriptRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
                     textScriptSize = ImGui::CalcTextSize(node.ScriptName.c_str());
-                    textScriptPos = ImVec2(contentScriptRect.GetTL().x + (152 - textScriptSize.x) / 2, contentScriptRect.GetTL().y + (50 - textScriptSize.y) / 2);
+                    textScriptPos = ImVec2(contentScriptRect.GetTL().x + ((dummy_x - 8) - textScriptSize.x) / 2, contentScriptRect.GetTL().y + (40 - textScriptSize.y) / 2);
                     ImGui::GetWindowDrawList()->AddText(textScriptPos, IM_COL32_WHITE, node.ScriptName.c_str());
                 }
             }
 
-            ImGui::Dummy(ImVec2(160, 50));
+            ImGui::Dummy(ImVec2(dummy_x, 40));
             ImRect contentRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
             ImVec2 textSize = ImGui::CalcTextSize(node.Name.c_str());
-            ImVec2 textPos = ImVec2(contentRect.GetTL().x + (152 - textSize.x) / 2, contentRect.GetTL().y + (50 - textSize.y) / 2);
+            ImVec2 textPos = ImVec2(contentRect.GetTL().x + ((dummy_x - 8) - textSize.x) / 2, contentRect.GetTL().y + (40 - textSize.y) / 2);
             ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32_WHITE, node.Name.c_str());
 
             ImRect outputsRect;
             int outputAlpha = 200;
 
-            ImGui::Dummy(ImVec2(160, 10));
+            ImGui::Dummy(ImVec2(dummy_x, 10));
 
             if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))
             {
-                ImGui::Dummy(ImVec2(160, padding));
+                ImGui::Dummy(ImVec2(dummy_x, padding));
                 outputsRect = ImRect(ImGui::GetItemRectMin() + insidePadding, ImGui::GetItemRectMax() - insidePadding);
 
                 ed::PushStyleVar(ed::StyleVar_PinCorners, ImDrawFlags_RoundCornersTop);
@@ -872,7 +872,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 ed::PopStyleVar();
             }
             else
-                ImGui::Dummy(ImVec2(160, padding));
+                ImGui::Dummy(ImVec2(dummy_x, padding));
 
             ed::EndNode();
             ed::PopStyleVar(7);
@@ -1048,7 +1048,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                     {
                         for (auto& key : graph.GetRegisteredKey())
                         {
-                            if (key != "Action" && key != "Condition")
+                            if (key != "Action" && key != "Condition" && key != "ConditionDecorator")
                             {
                                 if (ImGui::MenuItem(key.c_str()))
                                 {
@@ -1101,6 +1101,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                                 BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
                                             BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
                                             s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
+                                            graph.AddChildNode(newNode);
 
                                             newNode->HasScript = true;
                                             newNode->ScriptName = conditionName;
@@ -1114,7 +1115,33 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                                     ImGui::EndMenu();
                                 }
                             }
-                            
+                            else if (key == "ConditionDecorator")
+                            {
+                                if (ImGui::BeginMenu("ConditionDecorator"))
+                                {
+                                    for (auto& conditionDecoratorName : AIManagers->GetConditionDecoratorNodeNames())
+                                    {
+                                        if (ImGui::MenuItem(conditionDecoratorName.c_str()))
+                                        {
+                                            BehaviorNodeType type = BT::StringToNodeType(key);
+                                            Mathf::Vector2 newPos =
+                                                BT::ToMathfVec2(s_DragStartNodePos + s_DragDelta);
+                                            BTBuildNode* newNode = graph.CreateNode(type, key, newPos);
+                                            s_newNodeId = ed::NodeId(newNode->ID.m_ID_Data);
+                                            graph.AddChildNode(newNode);
+
+                                            newNode->HasScript = true;
+                                            newNode->ScriptName = conditionDecoratorName;
+                                        }
+                                    }
+                                    ImGui::Separator();
+                                    if (ImGui::MenuItem("Add ConditionDecorator"))
+                                    {
+                                        addScriptMenuOpen = true;
+                                    }
+                                    ImGui::EndMenu();
+                                }
+                            }
                         }
                         ImGui::EndMenu();
                     }
@@ -1146,7 +1173,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
         if (ImGui::BeginPopup("AddScriptNode"))
         {
 			static char newNodeName[256] = "";
-			static const char* scriptNodeTypes[2] = { "Action", "Condition" };
+			static const char* scriptNodeTypes[3] = { "Action", "Condition", "ConditionDecorator" };
 			static int selectedNodeType = 0;
             ImGui::Text("Select Node Type to Add:");
             ImGui::Separator();
@@ -1166,12 +1193,16 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 case 1:
 					ScriptManager->CreateConditionNodeScript(newNodeName);
 					break;
+                case 2:
+                    ScriptManager->CreateConditionDecoratorNodeScript(newNodeName);
                 default:
                     break;
                 }
 
                 memset(newNodeName, 0, sizeof(newNodeName));
 				selectedNodeType = 0; // Reset to the first type
+
+                ImGui::CloseCurrentPopup();
             }
 
             ImGui::EndPopup();

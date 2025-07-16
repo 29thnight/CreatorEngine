@@ -14,6 +14,7 @@ namespace BT
 	class NodeFactory;
 	class ActionNode;
 	class ConditionNode;
+	class ConditionDecoratorNode;
 }
 #pragma region DLLFunctionPtr
 // 모듈 스크립트 관련 함수 포인터 정의
@@ -26,8 +27,11 @@ typedef BT::ActionNode* (*BTActionNodeFunc)(const char*);
 typedef void (*BTActionNodeDeleteFunc)(BT::ActionNode* actionNode);
 typedef BT::ConditionNode* (*BTConditionNodeFunc)(const char*);
 typedef void (*BTConditionNodeDeleteFunc)(BT::ConditionNode* conditionNode);
+typedef BT::ConditionDecoratorNode* (*BTConditionDecoratorNodeFunc)(const char*);
+typedef void (*BTConditionDecoratorNodeDeleteFunc)(BT::ConditionDecoratorNode* conditionNode);
 typedef const char** (*ListBTActionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionNodeNamesFunc)(int*);
+typedef const char** (*ListBTConditionDecoratorNodeNamesFunc)(int*);
 
 // 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
@@ -60,6 +64,7 @@ public:
 
 	void CreateActionNodeScript(const std::string_view& name);
 	void CreateConditionNodeScript(const std::string_view& name);
+	void CreateConditionDecoratorNodeScript(const std::string_view& name);
 
 #pragma region Script Build Helper
 	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
@@ -170,6 +175,18 @@ public:
 		m_btConditionNodeDeleteFunc(conditionNode);
 	}
 
+	BT::ConditionDecoratorNode* CreateConditionDecoratorNode(const char* name) const
+	{
+		if (!m_btConditionDecoratorNodeFunc) return nullptr;
+		return m_btConditionDecoratorNodeFunc(name);
+	}
+
+	void DestroyConditionDecoratorNode(BT::ConditionDecoratorNode* conditionNode) const
+	{
+		if (!m_btConditionDecoratorNodeDeleteFunc) return;
+		m_btConditionDecoratorNodeDeleteFunc(conditionNode);
+	}
+
 	const char** ListBTActionNodeNames(int* count) const
 	{
 		if (!m_listBTActionNodeNamesFunc) return nullptr;
@@ -180,6 +197,12 @@ public:
 	{
 		if (!m_listBTConditionNodeNamesFunc) return nullptr;
 		return m_listBTConditionNodeNamesFunc(count);
+	}
+
+	const char** ListBTConditionDecoratorNodeNames(int* count) const
+	{
+		if (!m_listBTConditionDecoratorNodeNamesFunc) return nullptr;
+		return m_listBTConditionDecoratorNodeNamesFunc(count);
 	}
 #pragma endregion
 
@@ -310,8 +333,11 @@ private:
 	BTActionNodeDeleteFunc			m_btActionNodeDeleteFunc{};
 	BTConditionNodeFunc				m_btConditionNodeFunc{};
 	BTConditionNodeDeleteFunc		m_btConditionNodeDeleteFunc{};
+	BTConditionDecoratorNodeFunc	m_btConditionDecoratorNodeFunc{};
+	BTConditionDecoratorNodeDeleteFunc m_btConditionDecoratorNodeDeleteFunc{};
 	ListBTActionNodeNamesFunc		m_listBTActionNodeNamesFunc{};
 	ListBTConditionNodeNamesFunc	m_listBTConditionNodeNamesFunc{};
+	ListBTConditionDecoratorNodeNamesFunc m_listBTConditionDecoratorNodeNamesFunc{};
 
 private:
 #pragma region Action and Condition Node String
@@ -367,6 +393,8 @@ private:
 		"#include \"BTHeader.h\"\n"
 		"\n"
 		"using namespace BT;\n"
+		"\n"
+		"class "
 	};
 
 	std::string conditionNodeInheritString
@@ -374,7 +402,7 @@ private:
 		" : public ConditionNode\n"
 		"{\n"
 		"public:\n"
-		"	BT_CONDITIONBODY("
+		"	BT_CONDITION_BODY("
 	};
 
 	std::string conditionNodeEndString
@@ -398,6 +426,52 @@ private:
 	};
 
 	std::string conditionNodeCPPEndBodyString
+	{
+		"::ConditionCheck(float deltatime, const BlackBoard& blackBoard)\n"
+		"{\n"
+		"	return false;\n"
+		"}\n"
+	};
+
+	std::string conditionDecoratorNodeIncludeString
+	{
+		"#include \"Core.Minimal.h\"\n"
+		"#include \"BTHeader.h\"\n"
+		"\n"
+		"using namespace BT;\n"
+		"\n"
+		"class "
+	};
+
+	std::string conditionDecoratorNodeInheritString
+	{
+		" : public ConditionDecoratorNode\n"
+		"{\n"
+		"public:\n"
+		"	BT_CONDITIONDECORATOR_BODY("
+	};
+
+	std::string conditionDecoratorNodeEndString
+	{
+		")\n"
+		"	virtual bool ConditionCheck(float deltatime, const BlackBoard& blackBoard) override;\n"
+		"};\n"
+	};
+
+	std::string conditionDecoratorNodeCPPString
+	{
+		"#include \""
+	};
+
+	std::string conditionDecoratorNodeCPPEndString
+	{
+		".h\"\n"
+		"#include \"pch.h\"\n"
+		"\n"
+		"bool "
+	};
+
+	std::string conditionDecoratorNodeCPPEndBodyString
 	{
 		"::ConditionCheck(float deltatime, const BlackBoard& blackBoard)\n"
 		"{\n"
@@ -445,6 +519,26 @@ private:
 		"(); });\n"
 	};
 
+	std::string conditionDecoratorFactoryIncludeString
+	{
+		"#include \""
+	};
+
+	std::string conditionDecoratorFactoryFunctionString
+	{
+		"	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory(\""
+	};
+
+	std::string conditionDecoratorFactoryFunctionLambdaString
+	{
+		"\", []() { return new "
+	};
+
+	std::string conditionDecoratorFactoryFunctionEndString
+	{
+		"(); });\n"
+	};
+
 	std::string markerActionFactoryHeaderString
 	{
 		"// Automation include ActionNodeClass header"
@@ -464,6 +558,17 @@ private:
 	{
 		"// Register the factory function for BTCondition Automation"
 	};
+
+	std::string markerConditionDecoratorFactoryHeaderString
+	{
+		"// Automation include ConditionDecoratorNodeClass header"
+	};
+
+	std::string markerConditionDecoratorFactoryFuncString
+	{
+		"// Register the factory function for BTConditionDecorator Automation"
+	};
+
 #pragma endregion
 
 private:

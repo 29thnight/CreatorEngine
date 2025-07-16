@@ -4,7 +4,7 @@
 #include "GameObject.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "IAwakable.h"
 #include "MeshRenderer.generated.h"
 
@@ -12,7 +12,7 @@ class Mesh;
 class Material;
 class Animator;
 class OctreeNode;
-class MeshRenderer : public Component, public IOnDistroy, public IAwakable
+class MeshRenderer : public Component, public IOnDestroy, public IAwakable
 {
 public:
    ReflectMeshRenderer
@@ -24,7 +24,7 @@ public:
    void SetNeedUpdateCulling(bool able) { m_isNeedUpdateCulling = able; }
 
    virtual void Awake() override;
-   virtual void OnDistroy() override;
+   virtual void OnDestroy() override;
 
    void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }

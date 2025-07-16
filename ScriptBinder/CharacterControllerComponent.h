@@ -3,7 +3,7 @@
 #include "GameObject.h"
 #include "Component.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "IStartable.h"
 #include "IFixedUpdatable.h"
 #include "ILateUpdatable.h"
@@ -16,7 +16,7 @@
 #include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
-class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDistroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
+class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDestroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
 {
 public:
    ReflectCharacterControllerComponent
@@ -47,7 +47,7 @@ public:
 	   OnLateUpdate(fixedDeltaTime);
    }
 
-   void OnDistroy() override
+   void OnDestroy() override
    {
 	   auto scene = SceneManagers->GetActiveScene();
 	   if (scene)

@@ -176,6 +176,7 @@
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
+    <ClCompile Include="FoliageMeshComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputAction.cpp" />
@@ -204,6 +205,7 @@
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EForceMode.h" />
+    <ClInclude Include="FoliageMeshComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="ISerializable.h" />
@@ -263,7 +265,7 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
     <ClInclude Include="IOnDisable.h" />
-    <ClInclude Include="IOnDistroy.h" />
+    <ClInclude Include="IOnDestroy.h" />
     <ClInclude Include="IOnEnable.h" />
     <ClInclude Include="IProjectSetting.h" />
     <ClInclude Include="IRenderable.h" />

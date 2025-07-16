@@ -1,0 +1,51 @@
+NodeList:
+  - ID: 3298839070
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1137837153]
+    Position: {x: 304, y: 35}
+  - ID: 1137837153
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 3298839070
+    IsRoot: false
+    HasScript: true
+    ScriptName: TestConCec
+    Policy: -858993460
+    Children: [2463137906]
+    Position: {x: 560, y: 216}
+  - ID: 2463137906
+    Type: 2
+    Name: Sequence
+    ParentID: 1137837153
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1369363908, 716073618]
+    Position: {x: 560, y: 392}
+  - ID: 1369363908
+    Type: 8
+    Name: Action
+    ParentID: 2463137906
+    IsRoot: false
+    HasScript: true
+    ScriptName: TestAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 323, y: 480}
+  - ID: 716073618
+    Type: 6
+    Name: Condition
+    ParentID: 2463137906
+    IsRoot: false
+    HasScript: true
+    ScriptName: TestCon
+    Policy: -858993460
+    Children: ~
+    Position: {x: 747, y: 438}

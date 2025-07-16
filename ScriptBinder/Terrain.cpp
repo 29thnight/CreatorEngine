@@ -807,7 +807,7 @@ void TerrainComponent::Awake()
 	}
 }
 
-void TerrainComponent::OnDistroy()
+void TerrainComponent::OnDestroy()
 {
 	auto scene = SceneManagers->GetActiveScene();
 	auto renderScene = SceneManagers->GetRenderScene();

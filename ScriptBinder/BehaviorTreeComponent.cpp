@@ -49,7 +49,7 @@ void BehaviorTreeComponent::Update(float deltaSecond)
 	}
 }
 
-void BehaviorTreeComponent::OnDistroy()
+void BehaviorTreeComponent::OnDestroy()
 {
 	if (m_pBlackboard)
 	{
@@ -104,12 +104,6 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 		if (auto composite = std::dynamic_pointer_cast<BT::CompositeNode>(node))
 		{
 			composite->AddChild(childNode);
-		}
-		else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
-		{
-			if (decorator->GetChild())
-				throw std::runtime_error("BTTreeBuilder: Decorator cannot have multiple children.");
-			decorator->SetChild(childNode);
 		}
 		else
 		{

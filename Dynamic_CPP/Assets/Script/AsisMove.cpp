@@ -71,7 +71,7 @@ void AsisMove::FixedUpdate(float fixedTick)
 	Vector3 endResult = points[nextPointIndex] - dir * m_pathRadius;
 	Vector3 startResult = points[currentPointIndex] + dir * m_pathRadius;
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
-	Vector3 predictClosestPosition = closestPoint + dir * m_predictNextTime * fixedTick;
+	Vector3 predictClosestPosition = GetBothPointAndLineClosestPoint(closestPoint + dir * m_predictNextTime * m_moveSpeed, startResult, endResult);
 
 	if (DebugPoint)
 		DebugPoint->m_transform.SetPosition(predictClosestPosition);

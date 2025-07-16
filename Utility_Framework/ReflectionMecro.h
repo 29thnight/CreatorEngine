@@ -122,4 +122,13 @@ virtual const Meta::Type& ScriptReflect()\
     }\
     virtual ~T() = default; \
 
+#define BT_CONDITIONDECORATOR_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<ConditionDecoratorNode>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+
 #pragma endregion

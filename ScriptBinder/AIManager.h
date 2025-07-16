@@ -46,6 +46,19 @@ public:
 			m_btConditionNodeNames.end(), conditionName) != m_btConditionNodeNames.end();
 	}
 
+	bool IsConditionDecoratorRegistered(const std::string& conditionDecName) const
+	{
+		return std::find(m_btConditionDecoratorNodeNames.begin(),
+			m_btConditionDecoratorNodeNames.end(), conditionDecName) != m_btConditionDecoratorNodeNames.end();
+	}
+
+	bool IsScriptNodeRegistered(const std::string& scriptName)
+	{
+		return	IsActionNodeRegistered(scriptName)				|| 
+				IsConditionNodeRegistered(scriptName)			|| 
+				IsConditionDecoratorRegistered(scriptName);
+	}
+
 	const std::vector<std::string>& GetActionNodeNames() const
 	{
 		return m_btActionNodeNames;
@@ -56,11 +69,17 @@ public:
 		return m_btConditionNodeNames;
 	}
 
+	const std::vector<std::string>& GetConditionDecoratorNodeNames() const
+	{
+		return m_btConditionDecoratorNodeNames;
+	}
+
 private:
 	friend class HotLoadSystem;
 
 	std::vector<std::string> m_btActionNodeNames{};
 	std::vector<std::string> m_btConditionNodeNames{};
+	std::vector<std::string> m_btConditionDecoratorNodeNames{};
 
 	BlackBoard m_globalBB;
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용

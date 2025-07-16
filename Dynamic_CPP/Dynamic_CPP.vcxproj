@@ -118,10 +118,10 @@
 			<SDLCheck>true</SDLCheck>
 			<PreprocessorDefinitions>_DEBUG;DYNAMICCPP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<ConformanceMode>true</ConformanceMode>
-			<PrecompiledHeader>NotUsing</PrecompiledHeader>
+			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>
@@ -167,6 +167,7 @@
 	<ItemGroup>
 		<ClInclude Include="Assets\Script\AsisMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
+		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="RaycastHelper.h" />
 		<ClInclude Include="BTActionFactory.h" />
 		<ClInclude Include="BTConditionFactory.h" />
@@ -185,6 +186,8 @@
 		<ClInclude Include="Assets\Script\Rock.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h" />
 		<ClInclude Include="Assets\Script\InverseKinematic.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h" />
+		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h" />
 		<ClInclude Include="Assets\Script\TestEnemy.h" />
 	</ItemGroup>
 	<ItemGroup>
@@ -231,6 +234,14 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

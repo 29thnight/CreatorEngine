@@ -46,6 +46,7 @@ namespace BT
 		BehaviorNodeType GetNodeType() const override { return BehaviorNodeType::Composite; }
 
 	protected:
+		std::vector<NodePtr> m_decorator;
 		std::vector<NodePtr> m_children;
 	};
 
@@ -160,6 +161,34 @@ namespace BT
 		BehaviorNodeType GetNodeType() const override { return BehaviorNodeType::Inverter; }
 	};
 
+	class ConditionDecoratorNode : public DecoratorNode
+	{
+	public:
+		using ConditionFunc = std::function<bool(float, const BlackBoard&)>;
+		ConditionDecoratorNode() = default;
+		ConditionDecoratorNode(const std::string& name, NodePtr child, ConditionFunc condition)
+			: DecoratorNode(name, child){
+
+		}
+		~ConditionDecoratorNode() override = default;
+		NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override
+		{
+			if (!m_child) return NodeStatus::Failure;
+			if (ConditionCheck(deltatime, blackBoard))
+			{
+				return m_child->Tick(deltatime, blackBoard);
+			}
+			return NodeStatus::Failure; // Condition not met
+		}
+
+		virtual bool ConditionCheck(float deltatime, const BlackBoard& blackBoard) abstract;
+
+		BehaviorNodeType GetNodeType() const override { return BehaviorNodeType::ConditionDecorator; }
+
+		HashedGuid m_typeID{};
+		HashedGuid m_scriptTypeID{};
+	};
+
 	class ConditionNode : public BTNode
 	{
 	public:
@@ -244,23 +273,4 @@ namespace BT
 		HashedGuid m_typeID{};
 		HashedGuid m_scriptTypeID{};
 	};
-
-	inline void DFS(const BTNode::NodePtr& node, std::function<void(const BTNode::NodePtr)> visit)
-	{
-		if (!node) return;
-		visit(node);
-		auto composite = std::dynamic_pointer_cast<CompositeNode>(node);
-		if (composite)
-		{
-			for (const auto& child : composite->GetChildren())
-			{
-				DFS(child, visit);
-			}
-		}
-		else if (auto decorator = std::dynamic_pointer_cast<DecoratorNode>(node))
-		{
-			auto child = decorator->GetChild();
-			DFS(child, visit);
-		}
-	}
 }

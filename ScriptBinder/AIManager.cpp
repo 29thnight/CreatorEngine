@@ -67,6 +67,9 @@ void AIManager::InitalizeBehaviorTreeSystem()
 {
 	// Behavior Tree 노드 팩토리 초기화
 	BTNodeFactory->Clear();
+	m_btActionNodeNames.clear();
+	m_btConditionNodeNames.clear();
+	m_btConditionDecoratorNodeNames.clear();
 
 	// 파라미터가 없는 노드 등록
 	BTNodeFactory->Register("RootSequence", []()
@@ -91,7 +94,7 @@ void AIManager::InitalizeBehaviorTreeSystem()
 		return std::make_shared<BT::InverterNode>("Inverter", nullptr);
 	});
 
-	//TODO :  DLL에서 노드 로드해서 등록할 것
+	//스크립트화 된 노드 클래스 이름 추출
 	int actionSize = 0;
 	auto nameArr = ScriptManager->ListBTActionNodeNames(&actionSize);
 
@@ -110,6 +113,15 @@ void AIManager::InitalizeBehaviorTreeSystem()
 		m_btConditionNodeNames.push_back(conditionName);
 	}
 
+	int conditionDecoratorSize = 0;
+	auto conditionDecoratorArr = ScriptManager->ListBTConditionDecoratorNodeNames(&conditionDecoratorSize);
+	for (int i = 0; i < conditionDecoratorSize; ++i)
+	{
+		const std::string& conditionDecoratorName = conditionDecoratorArr[i];
+		m_btConditionDecoratorNodeNames.push_back(conditionDecoratorName);
+	}
+
+	// Register the script-based nodes
 	for (const auto& actionName : m_btActionNodeNames)
 	{
 		BTNodeFactory->Register(actionName, [actionName]()
@@ -135,6 +147,20 @@ void AIManager::InitalizeBehaviorTreeSystem()
 				});
 		});
 	}
+
+	for (const auto& conditionDecoratorName : m_btConditionDecoratorNodeNames)
+	{
+		BTNodeFactory->Register(conditionDecoratorName, [conditionDecoratorName]()
+		{
+			return std::shared_ptr<BT::ConditionDecoratorNode>(
+				ScriptManager->CreateConditionDecoratorNode(conditionDecoratorName.c_str()),
+				[](BT::ConditionDecoratorNode* ptr)
+				{
+					ScriptManager->DestroyConditionDecoratorNode(ptr);
+				});
+		});
+	}
+
 
 	for (auto& [gameObject, aiComponent] : m_aiComponentMap)
 	{

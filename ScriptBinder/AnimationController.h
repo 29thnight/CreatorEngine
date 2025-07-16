@@ -6,7 +6,7 @@
 #include "AnimationController.generated.h"
 #include "AvatarMask.h"
 #include "imgui-node-editor/imgui_node_editor.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 class AniTransition;
 class AvatarMask;
 class Animator;
