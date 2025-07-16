@@ -31,6 +31,7 @@ struct NodeAnimation
 class KeyFrameEvent
 {
 public:
+	std::string m_eventName;
 	std::string m_scriptName;
 	std::string m_funName;
 	float key = 0;

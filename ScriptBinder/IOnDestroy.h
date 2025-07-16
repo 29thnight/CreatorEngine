@@ -5,33 +5,33 @@
 #include "GameObject.h"
 #include "Scene.h"
 
-interface IOnDistroy
+interface IOnDestroy
 {
-    IOnDistroy()
+    IOnDestroy()
     {
         subscribedScene = SceneManagers->GetActiveScene();
         if (!subscribedScene)
         {
             return;
         }
-        m_onDistroyEventHandle = subscribedScene->OnDestroyEvent.AddLambda([this]
+        m_OnDestroyEventHandle = subscribedScene->OnDestroyEvent.AddLambda([this]
         {
             auto ptr = dynamic_cast<Component*>(this);
             auto sceneObject = ptr->GetOwner();
             if(ptr && sceneObject && sceneObject->IsDestroyMark())
             {
-                OnDistroy();
+                OnDestroy();
             }
         });
     }
-    virtual ~IOnDistroy()
+    virtual ~IOnDestroy()
     {
-        subscribedScene->OnDestroyEvent.Remove(m_onDistroyEventHandle);
+        subscribedScene->OnDestroyEvent.Remove(m_OnDestroyEventHandle);
     }
 
-    virtual void OnDistroy() = 0;
+    virtual void OnDestroy() = 0;
 
 protected:
     Scene* subscribedScene{};
-    Core::DelegateHandle m_onDistroyEventHandle{};
+    Core::DelegateHandle m_OnDestroyEventHandle{};
 };

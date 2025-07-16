@@ -4,6 +4,7 @@
 #include "GizmoRenderer.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "ShaderSystem.h"
 
 RenderPassWindow::RenderPassWindow(SceneRenderer* ptr, GizmoRenderer* gizmo_ptr) : 
 	m_sceneRenderer(ptr),

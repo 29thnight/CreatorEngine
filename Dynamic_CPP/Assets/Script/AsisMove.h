@@ -36,7 +36,7 @@ private:
 	[[Property]]
 	float m_pathRadius = 1.f;
 	[[Property]]
-	float m_predictNextTime = 5.0f; // 예측 시간
+	float m_predictNextTime = 2.0f; // 예측 시간
 	[[Property]]
 	float m_rotateSpeed = 5.f;
 

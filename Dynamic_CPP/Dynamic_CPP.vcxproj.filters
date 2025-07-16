@@ -87,8 +87,8 @@
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\Swrod.h">
-			<Filter>Script\ScriptClass</Filter>
+		<ClInclude Include="BTActtionFactory.h">
+			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -113,6 +113,9 @@
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
 			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TestEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -146,9 +149,6 @@
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\Swrod.cpp">
-			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
@@ -169,6 +169,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TestEnemy.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

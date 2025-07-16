@@ -17,6 +17,7 @@ public:
 	virtual void Initialize() {}
 	virtual void Update(float delta) {}
 	virtual void Release() {}
+
 	void SetEasingType(EasingEffect type)
 	{
 		m_easingType = type;
@@ -69,6 +70,7 @@ public:
 	ID3D11UnorderedAccessView* GetOutputUAV() const { return m_outputUAV; }
 
 	virtual void OnSystemResized(UINT max) {}
+	virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) {}
 
 	// *****파이프라인을 스테이지 별로 해서 하기*****
 	ModuleStage GetStage() const { return m_stage; }

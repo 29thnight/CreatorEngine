@@ -2,11 +2,11 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
 #include "EForceMode.h"
-class RigidBodyComponent : public Component, public IAwakable, public IOnDistroy
+class RigidBodyComponent : public Component, public IAwakable, public IOnDestroy
 {
 public:
    ReflectRigidBodyComponent
@@ -14,7 +14,7 @@ public:
 	GENERATED_BODY(RigidBodyComponent)
 	
    void Awake() override;
-   void OnDistroy() override;
+   void OnDestroy() override;
 	
 	EBodyType GetBodyType() const { return m_bodyType; }
 	void SetBodyType(const EBodyType& bodyType) { m_bodyType = bodyType; }
@@ -50,7 +50,7 @@ public:
 	EForceMode forceMode{ EForceMode::NONE };
 	float AngularDamping =0.05f;
 	[[Property]]
-	float LinearDamping = 0;
+	float LinearDamping = 0.01f;
 	[[Property]]
 	float m_mass = 70.f;
 	[[Property]]

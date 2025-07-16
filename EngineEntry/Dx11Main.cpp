@@ -76,7 +76,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
     {
-        InputManagement->Update(deltaSecond);
         if (InputActionManagers == nullptr)
         {
             Debug->LogDebug("null입니다ㅏㅏ");
@@ -212,13 +211,14 @@ void DirectX11::Dx11Main::CreateWindowSizeDependentResources()
 void DirectX11::Dx11Main::Update()
 {
 	// EditorUpdate
-
     EngineSettingInstance->frameDeltaTime = m_timeSystem.GetElapsedSeconds();
 
     PROFILE_CPU_BEGIN("GameLogic");
     m_timeSystem.Tick([&]
     {
+
         InfoWindow();
+        InputManagement->Update(EngineSettingInstance->frameDeltaTime);
 #ifdef EDITOR
         if(!SceneManagers->m_isGameStart)
         {

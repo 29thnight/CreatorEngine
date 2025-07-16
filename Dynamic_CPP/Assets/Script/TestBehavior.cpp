@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "InputManager.h"
+#include "InputActionManager.h"
 #include "pch.h"
 #include <cmath>
 
@@ -13,6 +14,9 @@ void TestBehavior::Start()
 	// that this behavior is attached to.
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
+	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W'},
+		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 }
 
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -47,6 +51,10 @@ void TestBehavior::Update(float tick)
 {
 	SceneManagers->IsEditorSceneLoaded();
 
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	Mathf::Vector3 dir = { moveDir.x, 0.f, moveDir.y };
+	GetOwner()->m_transform.SetPosition(pos + 5.f * dir * tick);
+
 	auto Player = GameObject::Find("Punch");
 	if (Player)
 	{
@@ -71,4 +79,11 @@ void TestBehavior::Update(float tick)
 
 void TestBehavior::LateUpdate(float tick)
 {
+}
+
+void TestBehavior::Move(Mathf::Vector2 value)
+{
+	//std::cout << value.x << ", " << value.y << std::endl; 
+	moveDir.x = value.x;
+	moveDir.y = value.y;
 }

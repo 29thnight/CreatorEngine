@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "EffectComponent.generated.h"
 
-class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDistroy
+class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDestroy
 {
 public:
     ReflectEffectComponent
@@ -12,7 +12,7 @@ public:
 
     void Awake() override;
     void Update(float tick) override;
-    void OnDistroy() override;
+    void OnDestroy() override;
 
     [[Method]]
     void Apply();
@@ -61,8 +61,7 @@ public:
     float m_currentTime = 0.0f;
 
     [[Property]]
-    int num = 0;
-
+    bool m_useAbsolutePosition = false;
 private:
     // 실제 사용되는 고유 인스턴스 이름
     std::string m_effectInstanceName;

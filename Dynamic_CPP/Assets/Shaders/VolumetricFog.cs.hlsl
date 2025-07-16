@@ -33,9 +33,11 @@ cbuffer CloudShadowMapConstants : register(b1)
 {
     float4x4 viewProjection;
     float2 cloudMapSize;
+    float2 size;
     float2 direction;
     uint frameIndex;
     float moveSpeed;
+    int isOn;
 }
 
 float HenyeyGreensteinPhaseFunction(float3 viewDir, float3 lightDir, float g)
@@ -72,7 +74,7 @@ float GetCloudVisibility(float4 worldPosition)
     projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
     
     // (uv * size) + (time * moveSpeed * direction) = cloudMove
-    float2 uv = float2(projCoords.xy * 4 + frameIndex * 0.00003 * float2(1, 1) /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
+    float2 uv = float2(projCoords.xy * size + frameIndex * moveSpeed * direction /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
     float closestDepth = CloudShadowMap.SampleLevel(SamplerLinearWrap, uv, 0).r;
     float shadow = 0;
     shadow = closestDepth;

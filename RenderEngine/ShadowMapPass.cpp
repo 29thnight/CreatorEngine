@@ -12,6 +12,17 @@
 bool g_useCascade = true;
 constexpr size_t CASCADE_BEGIN_END_COUNT = 2;
 
+cbuffer CloudShadowMapBuffer
+{
+	Mathf::Matrix shadowViewProjection;
+	Mathf::Vector2 cloudMapSize;
+	Mathf::Vector2 size;
+	Mathf::Vector2 direction;
+	UINT frameIndex;
+	float moveSpeed;
+	bool32 isOn;
+};
+
 ShadowMapPass::ShadowMapPass()
 {
 	m_pso = std::make_unique<PipelineStateObject>();
@@ -52,7 +63,8 @@ ShadowMapPass::ShadowMapPass()
 
 	m_boneBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * Skeleton::MAX_BONES, D3D11_BIND_CONSTANT_BUFFER, nullptr);
 
-	//DeviceState::g_pDevice->CreateDeferredContext(0, &deferredContext1);
+	m_cloudShadowMapBuffer = DirectX11::CreateBuffer(sizeof(CloudShadowMapBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
+	//DeviceState::g_pDevice->CreateDeferredContext(0, &defferdContext1);
 }
 
 ShadowMapPass::~ShadowMapPass()
@@ -100,6 +112,11 @@ void ShadowMapPass::ControlPanel()
 	ImGui::Text("ShadowPass");
 	ImGui::Checkbox("Enable2", &m_abled);
 	ImGui::Checkbox("UseCasCade", &g_useCascade);
+
+	ImGui::Checkbox("Is Cloud On", &isCloudOn);
+	ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f);
+	ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f);
+	ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f");
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};
@@ -383,7 +400,71 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 	}
 }
 
-void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+void ShadowMapPass::UseCloudShadowMap(const std::string_view& filename)
+{
+	file::path path = file::path(filename);
+	if (file::exists(path))
+	{
+		m_cloudShadowMapTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(filename));
+		m_cloudShadowMapTexture->m_textureType = TextureType::ImageTexture;
+	}
+}
+
+void ShadowMapPass::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, LightController* lightcontroller)
+{
+	if (lightcontroller->m_lightCount <= 0)
+		return;
+	ID3D11DeviceContext* defferdPtr = defferdContext;
+
+	auto LightDir = lightcontroller->GetLight(0).m_direction;
+	Mathf::Vector3 shadowPos = Mathf::Vector3(LightDir.x, LightDir.y, LightDir.z) * -250;
+	Mathf::xMatrix lightView = DirectX::XMMatrixLookAtLH(shadowPos, Mathf::Vector3::Zero, { 0, 1, 0 });
+	Mathf::xMatrix lightProj = DirectX::XMMatrixOrthographicOffCenterLH(-512, 512, -512, 512, 0.1f, 500);
+
+	CloudShadowMapBuffer buffer{};
+	buffer.shadowViewProjection = lightView * lightProj;
+	buffer.cloudMapSize = m_cloudShadowMapTexture->GetImageSize();
+	buffer.size = cloudSize;
+	buffer.direction = cloudDirection;
+	buffer.frameIndex = Time->GetFrameCount();
+	buffer.moveSpeed = cloudMoveSpeed;
+	buffer.isOn = isCloudOn;
+	DirectX11::UpdateBuffer(defferdPtr, m_cloudShadowMapBuffer, &buffer);
+}
+
+void ShadowMapPass::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn)
+{
+	if (isOn) {
+		UpdateCloudBuffer(defferdContext, lightcontroller);
+		DirectX11::PSSetConstantBuffer(defferdContext, 4, 1, &m_cloudShadowMapBuffer);
+		DirectX11::PSSetShaderResources(defferdContext, 10, 1, &m_cloudShadowMapTexture->m_pSRV);
+	}
+	else {
+		UpdateCloudBuffer(defferdContext, lightcontroller);
+		ID3D11Buffer* nullbuf = nullptr;
+		ID3D11ShaderResourceView* nullsrv = nullptr;
+		DirectX11::PSSetConstantBuffer(defferdContext, 4, 1, &nullbuf);
+		DirectX11::PSSetShaderResources(defferdContext, 10, 1, &nullsrv);
+	}
+}
+
+void ShadowMapPass::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn)
+{
+	if (isOn) {
+		UpdateCloudBuffer(defferdContext, lightcontroller);
+		DirectX11::CSSetConstantBuffer(defferdContext, 1, 1, &m_cloudShadowMapBuffer);
+		DirectX11::CSSetShaderResources(defferdContext, 3, 1, &m_cloudShadowMapTexture->m_pSRV);
+	}
+	else {
+		UpdateCloudBuffer(defferdContext, lightcontroller);
+		ID3D11Buffer* nullbuf = nullptr;
+		ID3D11ShaderResourceView* nullsrv = nullptr;
+		DirectX11::CSSetConstantBuffer(defferdContext, 1, 1, &nullbuf);
+		DirectX11::CSSetShaderResources(defferdContext, 3, 1, &nullsrv);
+	}
+}
+
+void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
 {
 	scene.m_LightController->m_shadowMapConstant.useCasCade = g_useCascade;
 	camera.m_shadowMapConstant.useCasCade = g_useCascade;

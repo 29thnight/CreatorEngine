@@ -21,7 +21,7 @@ enum class ParticleDataType
 class ParticleSystem
 {
 public:
-	ParticleSystem(int maxParticles = 1000, ParticleDataType dataType = ParticleDataType::Standard);
+	ParticleSystem(int maxParticles = 1, ParticleDataType dataType = ParticleDataType::Standard);
 	~ParticleSystem();
 
 	template<typename T, typename... Args>
@@ -114,6 +114,8 @@ public:
 
 	void ResizeParticleSystem(UINT newMaxParticles);
 
+	void SetParticleDatatype(ParticleDataType type);
+
 	void ReleaseBuffers();
 
 	void ReleaseParticleBuffers();
@@ -132,6 +134,7 @@ public:
 	const Mathf::Vector3& GetPosition() const { return m_position; }
 	bool IsRunning() const { return m_isRunning; }
 
+	std::string m_name{};
 private:
 
 	void ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule);
@@ -141,8 +144,6 @@ private:
 private:
 
 	void InitializeParticleIndices();
-
-	void SetParticleDatatype(ParticleDataType type);
 
 	size_t GetParticleStructSize() const;
 
