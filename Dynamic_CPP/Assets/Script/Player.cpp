@@ -108,8 +108,6 @@ void Player::Update(float tick)
 	if (isKnockBack)
 	{
 		KnockBackElapsedTime += tick;
-
-		auto curKnockBackfoce = KnockBackForce;
 		if (KnockBackElapsedTime >= KnockBackTime)
 		{
 			
@@ -362,8 +360,7 @@ void Player::TestKnockBack()
 {
 	isKnockBack = true;
 	KnockBackTime = 1.5f;
-	KnockBackForce = 20.f;
-	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockbackPowerY);
+	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockBackForceY);
 	m_animator->SetParameter("OnMove", false);
 }
 
