@@ -10,6 +10,7 @@ protected:
     // Effect 기본 정보
     std::string m_name;
     Mathf::Vector3 m_position = Mathf::Vector3(0, 0, 0);
+    Mathf::Vector3 m_rotation = Mathf::Vector3(0, 0, 0);
     bool m_isPlaying = false;
     bool m_isPaused = false;
 
@@ -111,6 +112,19 @@ public:
             }
         }
     }
+
+    virtual void SetRotation(const Mathf::Vector3& newRotation) {
+        m_rotation = newRotation;
+
+        // 모든 ParticleSystem에 회전 적용
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->SetRotation(m_rotation);
+            }
+        }
+    }
+
+    const Mathf::Vector3& GetRotation() const { return m_rotation; }
 
     // ParticleSystem 관리
     void AddParticleSystem(std::shared_ptr<ParticleSystem> ps) {

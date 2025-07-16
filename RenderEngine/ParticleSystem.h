@@ -112,6 +112,10 @@ public:
 
 	Mathf::Vector3 GetPosition() { return m_position; }
 
+	void SetRotation(const Mathf::Vector3& rotation) { m_rotation = rotation; }
+	Mathf::Vector3 GetRotation() { return m_rotation; }
+	const Mathf::Vector3& GetRotation() const { return m_rotation; }
+
 	void ResizeParticleSystem(UINT newMaxParticles);
 
 	void SetParticleDatatype(ParticleDataType type);
@@ -160,6 +164,7 @@ protected:
 	int m_maxParticles;
 	std::vector<BillBoardInstanceData> m_instanceData;
 	Mathf::Vector3 m_position = { 0, 0, 0 };
+	Mathf::Vector3 m_rotation = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

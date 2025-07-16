@@ -150,6 +150,10 @@ void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 	}
 }
 
+void ParticleSystem::SetRotation(const Mathf::Vector3& rotation)
+{
+}
+
 void ParticleSystem::CreateParticleBuffer(UINT numParticles)
 {
 	D3D11_BUFFER_DESC bufferDesc = {};
