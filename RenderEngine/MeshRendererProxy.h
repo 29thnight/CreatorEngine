@@ -46,7 +46,7 @@ public:
 
 	friend bool SortByAnimationAndMaterialGuid(PrimitiveRenderProxy* a, PrimitiveRenderProxy* b);
 
-	void DistroyProxy();
+	void DestroyProxy();
 
 	void GenerateLODGroup();
 

@@ -189,9 +189,9 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
     }
 }
 
-void PrimitiveRenderProxy::DistroyProxy()
+void PrimitiveRenderProxy::DestroyProxy()
 {
-    RenderScene::RegisteredDistroyProxyGUIDs.push(m_instancedID);
+    RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
 }
 
 void PrimitiveRenderProxy::GenerateLODGroup()

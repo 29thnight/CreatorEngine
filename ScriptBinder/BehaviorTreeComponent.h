@@ -19,7 +19,6 @@ public:
 	[[Serializable(Inheritance:Component)]]
 	GENERATED_BODY(BehaviorTreeComponent)
 
-    //TODO : 에디터 영역으로 뺄 것!
 	[[Property]]
 	std::string name; // BT 에셋 이름
 	[[Property]]
@@ -49,11 +48,8 @@ public:
 	FileGuid m_BehaviorTreeGuid; // Behavior Tree의 GUID
 	[[Property]]
 	FileGuid m_BlackBoardGuid; // 블랙보드의 GUID
-
 private:
 	BlackBoard* m_pBlackboard; // 블랙보드 데이터
 	BTNode::NodePtr m_root; // 루트 노드
 	std::unordered_map<HashedGuid, BTNode::NodePtr> m_built; // 빌드된 노드들
-
 };
-//TODO : Open BT File, AIManager에서 BT 그래프 GUID 받아오기, 블랙보드도 마찬가지 -> Inspector에서 보여주기

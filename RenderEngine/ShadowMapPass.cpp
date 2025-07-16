@@ -470,10 +470,10 @@ void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext,
 	camera.m_shadowMapConstant.useCasCade = g_useCascade;
 	if (g_useCascade)
 	{
-		CreateCommandListCascadeShadow(deferredContext, scene, camera);
+		CreateCommandListCascadeShadow(defferdContext, scene, camera);
 	}
 	else
 	{
-		CreateCommandListNormalShadow(deferredContext, scene, camera);
+		CreateCommandListNormalShadow(defferdContext, scene, camera);
 	}
 }

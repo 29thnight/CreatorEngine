@@ -402,7 +402,7 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
-	m_renderScene->OnProxyDistroy();
+	m_renderScene->OnProxyDestroy();
 	PrepareRender();
 }
 

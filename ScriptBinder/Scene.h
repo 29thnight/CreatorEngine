@@ -141,7 +141,7 @@ public:
     std::pair<size_t, Light&> AddLight();
 	Light& GetLight(size_t index);
     void RemoveLight(size_t index);
-	void DistroyLight();
+	void DestroyLight();
 
 public:
 	void CollectMeshRenderer(MeshRenderer* ptr);

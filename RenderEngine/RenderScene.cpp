@@ -15,7 +15,7 @@
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
-concurrent_queue<HashedGuid> RenderScene::RegisteredDistroyProxyGUIDs;
+concurrent_queue<HashedGuid> RenderScene::RegisteredDestroyProxyGUIDs;
 
 ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
@@ -209,12 +209,12 @@ PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
 	return m_proxyMap[guid].get();
 }
 
-void RenderScene::OnProxyDistroy()
+void RenderScene::OnProxyDestroy()
 {
-	while (!RenderScene::RegisteredDistroyProxyGUIDs.empty())
+	while (!RenderScene::RegisteredDestroyProxyGUIDs.empty())
 	{
 		HashedGuid ID;
-		if (RenderScene::RegisteredDistroyProxyGUIDs.try_pop(ID))
+		if (RenderScene::RegisteredDestroyProxyGUIDs.try_pop(ID))
 		{
 			{
 				SpinLock lock(m_proxyMapFlag);
@@ -258,5 +258,5 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
-	m_proxyMap[meshRendererGuid]->DistroyProxy();
+	m_proxyMap[meshRendererGuid]->DestroyProxy();
 }

@@ -171,17 +171,17 @@ void LightController::UseCloudShadowMap(const std::string_view& filename)
 
 void LightController::UpdateCloudBuffer(ID3D11DeviceContext* deferredContext)
 {
-	m_shadowMapPass->UpdateCloudBuffer(defferdContext, this);
+	m_shadowMapPass->UpdateCloudBuffer(deferredContext, this);
 }
 
-void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn) 
+void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* deferredContext, bool isOn) 
 {
-	m_shadowMapPass->PSBindCloudShadowMap(defferdContext, this, isOn);
+	m_shadowMapPass->PSBindCloudShadowMap(deferredContext, this, isOn);
 }
 
-void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn)
+void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* deferredContext, bool isOn)
 {
-	m_shadowMapPass->CSBindCloudShadowMap(defferdContext, this, isOn);
+	m_shadowMapPass->CSBindCloudShadowMap(deferredContext, this, isOn);
 }
 
 //Texture* LightController::GetShadowMapTexture()
