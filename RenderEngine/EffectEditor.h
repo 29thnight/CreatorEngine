@@ -41,16 +41,27 @@ public:
     void StopEmitterPreview(int index);
     void RemoveEmitter(int index);
     void AssignTextureToEmitter(int emitterIndex, int textureIndex);
+    void RenderUnifiedDragDropTarget();
 
-    // spawn module용 설정 메서드
+    // 2D 모듈용 설정 메서드
     void StartModifyEmitter(int index);
     void SaveModifiedEmitter(const std::string& name = "");
     void CancelModifyEmitter();
-    void RenderModuleDetailEditor();
+
+    // 렌더 모듈용 설정 메서드
+    void RenderModuleDetailEditor();            // 2d
+    void RenderRenderModuleDetailEditor();      // 3d
+
+    // 2D 모듈용 설정 메서드
     void RenderSpawnModuleEditor(SpawnModuleCS* spawnModule);
     void RenderMovementModuleEditor(MovementModuleCS* movementModule);
     void RenderColorModuleEditor(ColorModuleCS* colorModule);
     void RenderSizeModuleEditor(SizeModuleCS* sizeModule);
+    void RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule);
+
+    // 3D 모듈용 설정 메서드
+    void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
+    void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
 
 private:
     // 미리보기용 임시 에미터들
@@ -100,11 +111,15 @@ private:
     int m_selectedRenderForEdit = -1;
 
     // json 관련
-    char m_saveFileName[256] = "my_effect.json";
-    char m_loadFileName[256] = "my_effect.json";
+    char m_saveFileName[256] = {};
+    char m_loadFileName[256] = {};
     bool m_showSaveDialog = false;
     bool m_showLoadDialog = false;
 
+    std::unique_ptr<EffectBase> m_loadedEffect;
+
+    // 각 에미터의 텍스처 선택 인덱스
+    std::vector<int> m_emitterTextureSelections;
 private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
@@ -112,14 +127,12 @@ private:
     void RenderExistingModules();
     void RenderPreviewControls();
     void RenderModifyEmitterEditor();
-    void RenderTextureDragDropTarget();
     void RenderJsonSaveLoadUI();
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();
     void SaveCurrentEmitter(const std::string& name);
     void CancelEditing();
-
 
     // 모듈 추가
     void AddSelectedModule();
@@ -128,4 +141,6 @@ private:
     // json 저장
     void SaveEffectToJson(const std::string& filename);
     void LoadEffectFromJson(const std::string& filename);
+    void SyncResourcesFromLoadedEmitters();
+    void AddTextureToEditorList(Texture* texture);
 };

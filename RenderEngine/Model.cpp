@@ -46,6 +46,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 			ModelLoader loader = ModelLoader(nullptr, assetPath.string());
 			model = loader.LoadModel();
 			model->path = path_;
+			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 
 			std::cout << asset.GetElapsedTime() << " ms to load model from asset file: " << assetPath.string() << std::endl;
 
@@ -115,6 +116,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 
 			model = loader.LoadModel(isCreateMeshCollider);
 			model->path = path_;
+			model->m_numTotalMeshes = static_cast<int>(model->m_Meshes.size());
 
 			std::cout << assimp.GetElapsedTime() << " ms to load model from assimp file: " << path_.string() << std::endl;
 
@@ -127,7 +129,6 @@ Model* Model::LoadModel(const std::string_view& filePath)
 		return nullptr;
 	}
 }
-
 
 Mesh* Model::GetMesh(const std::string_view& name)
 {

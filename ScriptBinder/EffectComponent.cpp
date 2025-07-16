@@ -37,16 +37,17 @@ void EffectComponent::Update(float tick)
         }
     }
 
-    // 위치 동기화는 이펙트가 재생 중이 아니어도 항상 체크
+    // 이펙트 전체 위치 동기화 (항상 컴포넌트 위치 기준)
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
         Mathf::Vector3 currentPos = Mathf::Vector3(worldPos.m128_f32[0], worldPos.m128_f32[1], worldPos.m128_f32[2]);
 
-        // 거리 기반 체크로 더 정확하게 (부동소수점 오차 방지)
         float distance = (m_lastPosition - currentPos).Length();
-        if (distance > 0.001f)  // 1mm 이상 차이날 때만 업데이트
+        if (distance > 0.001f)
         {
+            // 이펙트 전체 기준점을 컴포넌트 위치로 설정
+            // 각 에미터는 자동으로 (기준점 + 개별 오프셋) 위치로 계산됨
             auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
             EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
             m_lastPosition = currentPos;
@@ -169,5 +170,10 @@ void EffectComponent::ApplyEffectSettings()
     {
         auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, m_timeScale);
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(timeScaleCommand));
+
+        // 이펙트 기준점을 컴포넌트 위치로 설정
+        auto currentPos = GetOwner()->m_transform.GetWorldPosition();
+        auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
     }
 }

@@ -1,6 +1,7 @@
-﻿// MeshSpawnModuleCS.cpp - 주요 변경 부분들
+﻿// MeshSpawnModuleCS.cpp - emitterPosition 추가
 #include "MeshSpawnModuleCS.h"
 #include "ShaderSystem.h"
+#include "EffectSerializer.h"
 
 MeshSpawnModuleCS::MeshSpawnModuleCS()
     : m_computeShader(nullptr)
@@ -14,25 +15,30 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     , m_particleCapacity(0)
     , m_randomGenerator(m_randomDevice())
     , m_uniform(0.0f, 1.0f)
+    , m_forcePositionUpdate(false)
 {
-    // 스폰 파라미터 기본값 (동일)
+    // 스폰 파라미터 기본값
     m_spawnParams.spawnRate = 1.0f;
     m_spawnParams.deltaTime = 0.0f;
     m_spawnParams.currentTime = 0.0f;
     m_spawnParams.emitterType = static_cast<int>(EmitterType::point);
-    m_spawnParams.emitterSize = XMFLOAT3(0.5f, 0.5f, 0.5f);
     m_spawnParams.emitterRadius = 1.0f;
+    m_spawnParams.emitterSize = XMFLOAT3(0.5f, 0.5f, 0.5f);
     m_spawnParams.maxParticles = 0;
+    m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.forcePositionUpdate = 0;
+    m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
 
-    // 🔥 3D 메시 파티클 템플릿 기본값
+    // 3D 메시 파티클 템플릿 기본값
     m_meshParticleTemplate.lifeTime = 10.0f;
 
     // 3D 스케일 범위
-    m_meshParticleTemplate.minScale = XMFLOAT3(0.5f, 0.5f, 0.5f);
-    m_meshParticleTemplate.maxScale = XMFLOAT3(1.5f, 1.5f, 1.5f);
+    m_meshParticleTemplate.minScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_meshParticleTemplate.maxScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 회전 속도 범위
-    m_meshParticleTemplate.minRotationSpeed = XMFLOAT3(-1.0f, -1.0f, -1.0f);
+    m_meshParticleTemplate.minRotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_meshParticleTemplate.maxRotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 초기 회전 범위
@@ -46,6 +52,8 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.minVerticalVelocity = 0.0f;
     m_meshParticleTemplate.maxVerticalVelocity = 0.0f;
     m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
+    m_meshParticleTemplate.textureIndex = 0;
+    m_meshParticleTemplate.textureIndex = 0;
 }
 
 MeshSpawnModuleCS::~MeshSpawnModuleCS()
@@ -100,7 +108,9 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     // 파티클 용량 업데이트
     m_spawnParams.maxParticles = m_particleCapacity;
     m_spawnParams.deltaTime = deltaTime;
-    m_spawnParams.currentTime = currentTime;  // TimeSystem에서 가져온 시간
+    m_spawnParams.currentTime = currentTime;
+    m_spawnParams.forcePositionUpdate = m_forcePositionUpdate ? 1 : 0;
+
     m_spawnParamsDirty = true;
 
     // 디버깅: 시간 정보 출력
@@ -108,7 +118,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     if (debugCount < 5)
     {
         char debug[256];
-        sprintf_s(debug, "SpawnModule Frame %d: Rate=%.2f, DeltaTime=%.4f, CycleTime=%.2f/%.1f\n",
+        sprintf_s(debug, "MeshSpawnModule Frame %d: Rate=%.2f, DeltaTime=%.4f, CycleTime=%.2f/%.1f\n",
             debugCount, m_spawnParams.spawnRate, deltaTime, currentTime, maxCycleTime);
         OutputDebugStringA(debug);
         debugCount++;
@@ -128,7 +138,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
     DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
-    // 출력 리소스 바인딩 (스폰 타이머 버퍼 제거)
+    // 출력 리소스 바인딩
     ID3D11UnorderedAccessView* uavs[] = {
         m_outputUAV,        // u0: 파티클 출력
         m_randomStateUAV    // u1: 난수 상태
@@ -137,7 +147,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavs, initCounts);
 
     // 디스패치 실행
-    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;  // 64는 셰이더의 THREAD_GROUP_SIZE
+    UINT numThreadGroups = (m_particleCapacity + (THREAD_GROUP_SIZE - 1)) / THREAD_GROUP_SIZE;
     DeviceState::g_pDeviceContext->Dispatch(numThreadGroups, 1, 1);
 
     // 리소스 정리
@@ -153,6 +163,17 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
     DirectX11::EndEvent();
+
+    if (m_forcePositionUpdate)
+    {
+        m_forcePositionUpdate = false;
+        m_previousEmitterPosition = Mathf::Vector3(
+            m_spawnParams.emitterPosition.x,
+            m_spawnParams.emitterPosition.y,
+            m_spawnParams.emitterPosition.z
+        );
+        m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+    }
 }
 
 void MeshSpawnModuleCS::Release()
@@ -171,6 +192,145 @@ void MeshSpawnModuleCS::OnSystemResized(UINT maxParticles)
     }
 }
 
+void MeshSpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
+{
+    SetEmitterPosition(newPosition);
+}
+
+nlohmann::json MeshSpawnModuleCS::SerializeData() const
+{
+    nlohmann::json json;
+
+    // SpawnParams 직렬화
+    json["spawnParams"] = {
+        {"spawnRate", m_spawnParams.spawnRate},
+        {"emitterType", m_spawnParams.emitterType},
+        {"emitterSize", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterSize)},
+        {"emitterRadius", m_spawnParams.emitterRadius},
+        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)}
+    };
+
+    // MeshParticleTemplateParams 직렬화
+    json["meshParticleTemplate"] = {
+        {"lifeTime", m_meshParticleTemplate.lifeTime},
+        {"minScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minScale)},
+        {"maxScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxScale)},
+        {"minRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minRotationSpeed)},
+        {"maxRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxRotationSpeed)},
+        {"minInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minInitialRotation)},
+        {"maxInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxInitialRotation)},
+        {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
+        {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
+        {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
+        {"minVerticalVelocity", m_meshParticleTemplate.minVerticalVelocity},
+        {"maxVerticalVelocity", m_meshParticleTemplate.maxVerticalVelocity},
+        {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
+        {"textureIndex", m_meshParticleTemplate.textureIndex},
+        {"renderMode", m_meshParticleTemplate.renderMode}
+    };
+
+    // 상태 정보
+    json["state"] = {
+        {"isInitialized", m_isInitialized},
+        {"particleCapacity", m_particleCapacity}
+    };
+
+    return json;
+}
+
+
+void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
+{
+    // SpawnParams 복원
+    if (json.contains("spawnParams"))
+    {
+        const auto& spawnJson = json["spawnParams"];
+
+        if (spawnJson.contains("spawnRate"))
+            m_spawnParams.spawnRate = spawnJson["spawnRate"];
+
+        if (spawnJson.contains("emitterType"))
+            m_spawnParams.emitterType = spawnJson["emitterType"];
+
+        if (spawnJson.contains("emitterSize"))
+            m_spawnParams.emitterSize = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterSize"]);
+
+        if (spawnJson.contains("emitterRadius"))
+            m_spawnParams.emitterRadius = spawnJson["emitterRadius"];
+
+        if (spawnJson.contains("emitterPosition"))
+            m_spawnParams.emitterPosition = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterPosition"]);
+    }
+
+    // MeshParticleTemplateParams 복원
+    if (json.contains("meshParticleTemplate"))
+    {
+        const auto& templateJson = json["meshParticleTemplate"];
+
+        if (templateJson.contains("lifeTime"))
+            m_meshParticleTemplate.lifeTime = templateJson["lifeTime"];
+
+        if (templateJson.contains("minScale"))
+            m_meshParticleTemplate.minScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["minScale"]);
+
+        if (templateJson.contains("maxScale"))
+            m_meshParticleTemplate.maxScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxScale"]);
+
+        if (templateJson.contains("minRotationSpeed"))
+            m_meshParticleTemplate.minRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["minRotationSpeed"]);
+
+        if (templateJson.contains("maxRotationSpeed"))
+            m_meshParticleTemplate.maxRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxRotationSpeed"]);
+
+        if (templateJson.contains("minInitialRotation"))
+            m_meshParticleTemplate.minInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["minInitialRotation"]);
+
+        if (templateJson.contains("maxInitialRotation"))
+            m_meshParticleTemplate.maxInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxInitialRotation"]);
+
+        if (templateJson.contains("color"))
+            m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
+
+        if (templateJson.contains("velocity"))
+            m_meshParticleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
+
+        if (templateJson.contains("acceleration"))
+            m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
+
+        if (templateJson.contains("minVerticalVelocity"))
+            m_meshParticleTemplate.minVerticalVelocity = templateJson["minVerticalVelocity"];
+
+        if (templateJson.contains("maxVerticalVelocity"))
+            m_meshParticleTemplate.maxVerticalVelocity = templateJson["maxVerticalVelocity"];
+
+        if (templateJson.contains("horizontalVelocityRange"))
+            m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
+
+        if (templateJson.contains("textureIndex"))
+            m_meshParticleTemplate.textureIndex = templateJson["textureIndex"];
+
+        if (templateJson.contains("renderMode"))
+            m_meshParticleTemplate.renderMode = templateJson["renderMode"];
+    }
+
+    // 상태 정보 복원
+    if (json.contains("state"))
+    {
+        const auto& stateJson = json["state"];
+
+        if (stateJson.contains("particleCapacity"))
+            m_particleCapacity = stateJson["particleCapacity"];
+    }
+
+    // 변경사항을 적용하기 위해 더티 플래그 설정
+    m_spawnParamsDirty = true;
+    m_templateDirty = true;
+}
+
+std::string MeshSpawnModuleCS::GetModuleType() const
+{
+    return "MeshSpawnModuleCS";
+}
 
 bool MeshSpawnModuleCS::InitializeComputeShader()
 {
@@ -178,10 +338,9 @@ bool MeshSpawnModuleCS::InitializeComputeShader()
     return m_computeShader != nullptr;
 }
 
-// 상수 버퍼 생성: 크기만 변경
 bool MeshSpawnModuleCS::CreateConstantBuffers()
 {
-    // 스폰 파라미터 상수 버퍼 (동일)
+    // 스폰 파라미터 상수 버퍼
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(SpawnParams);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -192,7 +351,7 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
     if (FAILED(hr))
         return false;
 
-    // 🔥 메시 파티클 템플릿 상수 버퍼: 크기 변경
+    // 메시 파티클 템플릿 상수 버퍼
     bufferDesc.ByteWidth = sizeof(MeshParticleTemplateParams);
     hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_templateBuffer);
     if (FAILED(hr))
@@ -203,7 +362,7 @@ bool MeshSpawnModuleCS::CreateConstantBuffers()
 
 bool MeshSpawnModuleCS::CreateUtilityBuffers()
 {
-    // 난수 상태 버퍼만 생성 (스폰 타이머 버퍼 제거)
+    // 난수 상태 버퍼만 생성
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.ByteWidth = sizeof(UINT);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -232,16 +391,12 @@ bool MeshSpawnModuleCS::CreateUtilityBuffers()
     if (FAILED(hr))
         return false;
 
-    // 디버그 출력
-    //OutputDebugStringA("SpawnModule: Utility buffers created successfully\n");
-
     return true;
 }
 
-// 상수 버퍼 업데이트: 구조체 이름만 변경
 void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
 {
-    // 스폰 파라미터 업데이트 (동일)
+    // 스폰 파라미터 업데이트
     if (m_spawnParamsDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -255,7 +410,7 @@ void MeshSpawnModuleCS::UpdateConstantBuffers(float deltaTime)
         }
     }
 
-    // 메시 파티클 템플릿 업데이트: 구조체 변경
+    // 메시 파티클 템플릿 업데이트
     if (m_templateDirty)
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -277,6 +432,37 @@ void MeshSpawnModuleCS::ReleaseResources()
     if (m_templateBuffer) { m_templateBuffer->Release(); m_templateBuffer = nullptr; }
     if (m_randomStateBuffer) { m_randomStateBuffer->Release(); m_randomStateBuffer = nullptr; }
     if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
+}
+
+// emitterPosition 설정 메서드 추가
+void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
+{
+    Mathf::Vector3 newPos = position;
+
+    // 기존 위치와 비교하여 실제로 변경되었는지 확인
+    Mathf::Vector3 currentPos(
+        m_spawnParams.emitterPosition.x,
+        m_spawnParams.emitterPosition.y,
+        m_spawnParams.emitterPosition.z
+    );
+
+    // 위치 변화량이 임계값보다 클 때만 업데이트
+    float threshold = 0.001f;
+    if (abs(newPos.x - currentPos.x) > threshold ||
+        abs(newPos.y - currentPos.y) > threshold ||
+        abs(newPos.z - currentPos.z) > threshold)
+    {
+        // 이전 위치 저장
+        m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+        m_previousEmitterPosition = currentPos;
+
+        // 새 위치 설정
+        m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
+
+        // 강제 위치 업데이트 플래그 설정
+        m_forcePositionUpdate = true;
+        m_spawnParamsDirty = true;
+    }
 }
 
 void MeshSpawnModuleCS::SetSpawnRate(float rate)
@@ -335,7 +521,6 @@ void MeshSpawnModuleCS::SetParticleInitialRotationRange(const XMFLOAT3& minRot, 
     m_templateDirty = true;
 }
 
-// 🔥 기존 메서드들: 멤버 변수 이름만 변경
 void MeshSpawnModuleCS::SetParticleLifeTime(float lifeTime)
 {
     if (m_meshParticleTemplate.lifeTime != lifeTime)
@@ -371,13 +556,21 @@ void MeshSpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, f
     m_templateDirty = true;
 }
 
+void MeshSpawnModuleCS::SetTextureIndex(UINT textureIndex)
+{
+    if (m_meshParticleTemplate.textureIndex != textureIndex)
+    {
+        m_meshParticleTemplate.textureIndex = textureIndex;
+        m_templateDirty = true;
+    }
+}
 
-// ... 기타 Set 메서드들도 m_particleTemplate → m_meshParticleTemplate 로 변경
+void MeshSpawnModuleCS::SetRenderMode(UINT mode)
+{
+    if (m_meshParticleTemplate.renderMode != mode)
+    {
+        m_meshParticleTemplate.renderMode = mode;
+        m_templateDirty = true;
+    }
+}
 
-// 🔥 핵심 변경사항 요약:
-// 1. 멤버 변수: m_particleTemplate → m_meshParticleTemplate
-// 2. 구조체 타입: ParticleTemplateParams → MeshParticleTemplateParams  
-// 3. 상수 버퍼 크기: sizeof(MeshParticleTemplateParams)
-// 4. 컴퓨트 셰이더: "SpawnModule" → "MeshSpawnModule"
-// 5. Update 함수의 파라미터 타입: ParticleData → MeshParticleData
-// 6. 3D 관련 새로운 설정 메서드들 추가
