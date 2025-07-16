@@ -114,25 +114,25 @@ void PipelineStateObject::Apply()
 	}
 }
 
-void PipelineStateObject::Apply(ID3D11DeviceContext* defferdContext)
+void PipelineStateObject::Apply(ID3D11DeviceContext* deferredContext)
 {
-	defferdContext->IASetInputLayout(m_inputLayout);
-	defferdContext->IASetPrimitiveTopology(m_primitiveTopology);
+	deferredContext->IASetInputLayout(m_inputLayout);
+	deferredContext->IASetPrimitiveTopology(m_primitiveTopology);
 
-	PSOHelper::VSSetShader(defferdContext, m_vertexShader);
-	PSOHelper::PSSetShader(defferdContext, m_pixelShader);
-	PSOHelper::HSSetShader(defferdContext, m_hullShader);
-	PSOHelper::DSSetShader(defferdContext, m_domainShader);
-	PSOHelper::GSSetShader(defferdContext, m_geometryShader);
-	PSOHelper::CSSetShader(defferdContext, m_computeShader);
+	PSOHelper::VSSetShader(deferredContext, m_vertexShader);
+	PSOHelper::PSSetShader(deferredContext, m_pixelShader);
+	PSOHelper::HSSetShader(deferredContext, m_hullShader);
+	PSOHelper::DSSetShader(deferredContext, m_domainShader);
+	PSOHelper::GSSetShader(deferredContext, m_geometryShader);
+	PSOHelper::CSSetShader(deferredContext, m_computeShader);
 
-	defferdContext->RSSetState(m_rasterizerState);
-	defferdContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
-	defferdContext->OMSetDepthStencilState(m_depthStencilState, 0);
+	deferredContext->RSSetState(m_rasterizerState);
+	deferredContext->OMSetBlendState(m_blendState, nullptr, 0xffffffff);
+	deferredContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
 	for (uint32 i = 0; i < m_samplers.size(); ++i)
 	{
-		m_samplers[i]->Use(defferdContext, i);
+		m_samplers[i]->Use(deferredContext, i);
 	}
 }
 

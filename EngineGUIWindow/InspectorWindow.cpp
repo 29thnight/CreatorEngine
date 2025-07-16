@@ -22,7 +22,6 @@
 #include "NodeFactory.h"
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
-#include "LuaEngine.h"
 #include "FunctionRegistry.h"
 //----------------------------
 

@@ -183,11 +183,11 @@ void LightController::UseCloudShadowMap(const std::string_view& filename)
 	}
 }
 
-void LightController::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext)
+void LightController::UpdateCloudBuffer(ID3D11DeviceContext* deferredContext)
 {
 	if (m_lightCount <= 0)
 		return;
-	ID3D11DeviceContext* defferdPtr = defferdContext;
+	ID3D11DeviceContext* deferredPtr = deferredContext;
 
 	auto LightDir = GetLight(0).m_direction;
 	Mathf::Vector3 shadowPos = Mathf::Vector3(LightDir.x, LightDir.y, LightDir.z) * -250;
@@ -200,20 +200,20 @@ void LightController::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext)
 	buffer.direction = Mathf::Vector2(1.f, 0.f);
 	buffer.frameIndex = Time->GetFrameCount();
 	buffer.moveSpeed = 0.1f;
-	DirectX11::UpdateBuffer(defferdPtr, m_cloudShadowMapBuffer, &buffer);
+	DirectX11::UpdateBuffer(deferredPtr, m_cloudShadowMapBuffer, &buffer);
 }
 
-void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext) {
-	UpdateCloudBuffer(defferdContext);
-	DirectX11::PSSetConstantBuffer(defferdContext, 4, 1, &m_cloudShadowMapBuffer);
-	DirectX11::PSSetShaderResources(defferdContext, 10, 1, &m_cloudShadowMapTexture->m_pSRV);
+void LightController::PSBindCloudShadowMap(ID3D11DeviceContext* deferredContext) {
+	UpdateCloudBuffer(deferredContext);
+	DirectX11::PSSetConstantBuffer(deferredContext, 4, 1, &m_cloudShadowMapBuffer);
+	DirectX11::PSSetShaderResources(deferredContext, 10, 1, &m_cloudShadowMapTexture->m_pSRV);
 }
 
-void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext)
+void LightController::CSBindCloudShadowMap(ID3D11DeviceContext* deferredContext)
 {
-	UpdateCloudBuffer(defferdContext);
-	DirectX11::CSSetConstantBuffer(defferdContext, 1, 1, &m_cloudShadowMapBuffer);
-	DirectX11::CSSetShaderResources(defferdContext, 3, 1, &m_cloudShadowMapTexture->m_pSRV);
+	UpdateCloudBuffer(deferredContext);
+	DirectX11::CSSetConstantBuffer(deferredContext, 1, 1, &m_cloudShadowMapBuffer);
+	DirectX11::CSSetShaderResources(deferredContext, 3, 1, &m_cloudShadowMapTexture->m_pSRV);
 }
 
 //Texture* LightController::GetShadowMapTexture()

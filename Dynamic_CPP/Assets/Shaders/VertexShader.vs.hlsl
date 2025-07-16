@@ -18,8 +18,6 @@ cbuffer BoneTransformation : register(b3)
     matrix BoneTransforms[50];
 }
 
-
-
 StructuredBuffer<matrix> models : register(t0);
 StructuredBuffer<matrix> BoneTransforms2 : register(t1);
 

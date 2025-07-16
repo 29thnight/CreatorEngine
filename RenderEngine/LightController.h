@@ -30,9 +30,9 @@ public:
 	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
 	void UseCloudShadowMap(const std::string_view& filename);
-	void UpdateCloudBuffer(ID3D11DeviceContext* defferdContext);
-	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext);
-	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext);
+	void UpdateCloudBuffer(ID3D11DeviceContext* deferredContext);
+	void PSBindCloudShadowMap(ID3D11DeviceContext* deferredContext);
+	void CSBindCloudShadowMap(ID3D11DeviceContext* deferredContext);
 
 	const LightProperties& GetProperties() { return m_lightProperties; }
 

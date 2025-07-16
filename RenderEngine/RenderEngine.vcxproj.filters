@@ -793,6 +793,9 @@
     <ClInclude Include="AssetEntry.h">
       <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialFlowInformation.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -957,9 +960,6 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SSGI.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
-    <FxCompile Include="..\x64\Assets\Shaders\Sparkle.ps.hlsl">
-      <Filter>Shaders\Effect</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TerrainTexture.cs.hlsl">
       <Filter>Shaders\Common</Filter>
     </FxCompile>
@@ -995,6 +995,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BiliteralFilter.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\InstancedVertexShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

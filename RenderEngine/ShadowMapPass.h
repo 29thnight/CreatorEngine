@@ -20,7 +20,7 @@ public:
 
 	void Initialize(uint32 width, uint32 height);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	virtual void Resize(uint32_t width, uint32_t height) override;
 
@@ -36,9 +36,9 @@ public:
 	void DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir);
 
 private:
-	void CreateCommandListCascadeShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera);
-	void CreateCommandListNormalShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera);
-	void CreateCommandListProxyToShadow(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera);
+	void CreateCommandListCascadeShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void CreateCommandListNormalShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
+	void CreateCommandListProxyToShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
 };
 

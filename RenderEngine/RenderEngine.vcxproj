@@ -260,6 +260,7 @@
     <ClInclude Include="EffectSerializer.h" />
     <ClInclude Include="LODGroup.h" />
     <ClInclude Include="LODSetting.h" />
+    <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshModuleGPU.h" />
     <ClInclude Include="MeshOptimizer.h" />
     <ClInclude Include="MeshSpawnModuleCS.h" />
@@ -752,6 +753,10 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\InstancedVertexShader.vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\VertexShader.vs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

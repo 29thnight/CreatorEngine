@@ -27,10 +27,6 @@ void SceneManager::Editor()
     if(m_isGameStart && !m_isEditorSceneLoaded)
     {
         CreateEditorOnlyPlayScene();
-        ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
-		ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
-        ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
-        ScriptManager->UpdatePhysx(PhysicX::GetInstance);
         m_activeScene.load()->Reset();
 		m_isEditorSceneLoaded = true;
     }
@@ -43,6 +39,7 @@ void SceneManager::Editor()
     {
 		m_inputActionManager->ClearActionMaps();
         ScriptManager->ReloadDynamicLibrary();
+        m_isInitialized = false; // Reset initialization state for editor scene
 		m_activeScene.load()->Awake();
 	}
     PROFILE_CPU_END();
@@ -50,6 +47,15 @@ void SceneManager::Editor()
 
 void SceneManager::Initialization()
 {
+    if(!m_isInitialized)
+    {
+        ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
+        ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
+        ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
+        ScriptManager->UpdatePhysx(PhysicX::GetInstance);
+		m_isInitialized = true;
+    }
+
     PROFILE_CPU_BEGIN("Awake");
 	m_activeScene.load()->Awake();
     PROFILE_CPU_END();

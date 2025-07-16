@@ -394,35 +394,35 @@ void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
 	}
 }
 
-void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void SkyBoxPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!m_abled || !RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	ID3D11DeviceContext* defferdPtr = defferdContext;
+	ID3D11DeviceContext* deferredPtr = deferredContext;
 
-	m_pso->Apply(defferdPtr);
+	m_pso->Apply(deferredPtr);
 
 	ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(defferdPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
-	DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
-	camera.UpdateBuffer(defferdPtr);
-	scene.UseModel(defferdPtr);
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, renderData->m_depthStencil->m_pDSV);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	camera.UpdateBuffer(deferredPtr);
+	scene.UseModel(deferredPtr);
 
 	m_scaleMatrix = XMMatrixScaling(m_scale, m_scale, m_scale);
 	//auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(scene.m_MainCamera.m_eyePosition));
 	auto modelMatrix = XMMatrixMultiply(m_scaleMatrix, XMMatrixTranslationFromVector(camera.m_eyePosition));
 
-	scene.UpdateModel(modelMatrix, defferdPtr);
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &m_skyBoxCubeMap->m_pSRV);
-	m_skyBoxMesh->Draw(defferdPtr);
+	scene.UpdateModel(modelMatrix, deferredPtr);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_skyBoxCubeMap->m_pSRV);
+	m_skyBoxMesh->Draw(deferredPtr);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets(defferdPtr);
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
+	DirectX11::UnbindRenderTargets(deferredPtr);
 
 	ID3D11CommandList* commandList{};
-	defferdPtr->FinishCommandList(false, &commandList);
+	deferredPtr->FinishCommandList(false, &commandList);
 	PushQueue(camera.m_cameraIndex, commandList);
 }
 
