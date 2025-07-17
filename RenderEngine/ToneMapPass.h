@@ -1,6 +1,7 @@
 #pragma once
 #include "IRenderPass.h"
 #include "Texture.h"
+#include "directxtk/PostProcess.h"
 
 constexpr uint32 NUM_BINS = 256;
 
@@ -57,6 +58,8 @@ public:
 
 
 private:
+	std::unique_ptr<ToneMapPostProcess> m_pToneMapPostProcess;
+
     Texture* m_DestTexture{};
 	ComPtr<ID3D11Texture2D> luminanceTexture;
 	ComPtr<ID3D11UnorderedAccessView> luminanceUAV;
@@ -70,7 +73,7 @@ private:
 	ComputeShader* m_pAutoExposureHistogramCS{};
 	ComputeShader* m_pAutoExposureEvalCS{};
 
-	ToneMapType m_toneMapType{ ToneMapType::Reinhard };
+	ToneMapType m_toneMapType{ ToneMapType::ACES };
 
 	ID3D11Buffer* m_pHistogramBuffer{};
 	ID3D11Buffer* m_pLuminanceAverageBuffer{};

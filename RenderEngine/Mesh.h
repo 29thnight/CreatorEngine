@@ -120,6 +120,11 @@ public:
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
+	bool operator==(const Mesh& _other) const
+	{
+		return m_hashingMesh == _other.m_hashingMesh;
+	}
+
 	void AssetInit();
 
 	void Draw();
@@ -152,6 +157,7 @@ public:
 	ComPtr<ID3D11Buffer> GetShadowVertexBuffer() { return m_shadowVertexBuffer; }
 	ComPtr<ID3D11Buffer> GetShadowIndexBuffer() { return m_shadowIndexBuffer; }
 
+	HashedGuid m_hashingMesh{ make_guid() };
 private:
 	friend class ModelLoader;
 	friend class MeshOptimizer;
@@ -181,48 +187,8 @@ private:
 	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
 	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
 
-	size_t m_hashingMesh{};
 
 	static constexpr const uint32 m_stride = sizeof(Vertex);
-};
-
-struct HashingMesh
-{
-	size_t operator()(const Mesh& mesh)
-	{
-		size_t hash{};
-		for (const auto& vertex : mesh.GetVertices())
-		{
-			hash ^= std::hash<float>()(vertex.position.x);
-			hash ^= std::hash<float>()(vertex.position.y);
-			hash ^= std::hash<float>()(vertex.position.z);
-			hash ^= std::hash<float>()(vertex.normal.x);
-			hash ^= std::hash<float>()(vertex.normal.y);
-			hash ^= std::hash<float>()(vertex.normal.z);
-			hash ^= std::hash<float>()(vertex.uv0.x);
-			hash ^= std::hash<float>()(vertex.uv0.y);
-			hash ^= std::hash<float>()(vertex.uv1.x);
-			hash ^= std::hash<float>()(vertex.uv1.y);
-			hash ^= std::hash<float>()(vertex.tangent.x);
-			hash ^= std::hash<float>()(vertex.tangent.y);
-			hash ^= std::hash<float>()(vertex.bitangent.x);
-			hash ^= std::hash<float>()(vertex.bitangent.y);
-			hash ^= std::hash<float>()(vertex.boneIndices.x);
-			hash ^= std::hash<float>()(vertex.boneIndices.y);
-			hash ^= std::hash<float>()(vertex.boneIndices.z);
-			hash ^= std::hash<float>()(vertex.boneIndices.w);
-			hash ^= std::hash<float>()(vertex.boneWeights.x);
-			hash ^= std::hash<float>()(vertex.boneWeights.y);
-			hash ^= std::hash<float>()(vertex.boneWeights.z);
-			hash ^= std::hash<float>()(vertex.boneWeights.w);
-		}
-		for (const auto& index : mesh.GetIndices())
-		{
-			hash ^= std::hash<uint32>()(index);
-		}
-
-		return hash;
-	}
 };
 
 class PrimitiveCreator

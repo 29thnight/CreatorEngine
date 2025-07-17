@@ -45,8 +45,6 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 		vertex2.bitangent = bitangent;
 	}*/
 
-	m_hashingMesh = HashingMesh()(*this);
-
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());
@@ -56,8 +54,6 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 Mesh::Mesh(const std::string_view& _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
 	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices))
 {
-	m_hashingMesh = HashingMesh()(*this);
-
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());
 	DirectX::SetName(m_vertexBuffer.Get(), m_name + "VertexBuffer");
 	m_indexBuffer = DirectX11::CreateBuffer(sizeof(uint32) * m_indices.size(), D3D11_BIND_INDEX_BUFFER, m_indices.data());

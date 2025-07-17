@@ -22,6 +22,14 @@ public:
 	Material(Material&& material) noexcept;
 	~Material();
 
+	bool operator==(const Material& other) const
+	{
+		return m_materialGuid == other.m_materialGuid;
+	}
+
+	static Material* Instantiate(const Material* origin, const std::string_view& newName = {});
+	static std::shared_ptr<Material> InstantiateShared(const Material* origin, const std::string_view& newName = {});
+
 //initialize material chainable functions
 public:
 	Material& SetBaseColor(Mathf::Color3 color);

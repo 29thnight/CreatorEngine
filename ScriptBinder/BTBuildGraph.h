@@ -85,6 +85,20 @@ struct BTBuildGraph
 		auto it = Nodes.find(id);
 		if (it != Nodes.end())
 		{
+			BTBuildNode* node = it->second;
+			if (node->IsRoot) return; // 루트 노드는 삭제할 수 없음
+
+			// 모든 링크 제거
+			for (auto& [otherId, otherNode] : Nodes)
+			{
+				if (otherNode->ParentID == id)
+				{
+					otherNode->ParentID = HashedGuid(); // 부모 ID 초기화
+				}
+				std::erase_if(otherNode->Children, 
+					[&id](const HashedGuid& childId) { return childId == id; }); // 자식 ID 제거
+			}
+
 			NodeList.erase(std::remove_if(NodeList.begin(), NodeList.end(),
 				[&id](const BTBuildNode& node) { return node.ID == id; }), NodeList.end());
 			Nodes.erase(it);

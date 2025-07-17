@@ -117,6 +117,8 @@ ToneMapPass::ToneMapPass()
     readbackDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
     device->CreateTexture2D(&readbackDesc, nullptr, &readbackTexture);
+
+    m_pToneMapPostProcess = std::make_unique<ToneMapPostProcess>(device);
 }
 
 ToneMapPass::~ToneMapPass()
@@ -159,12 +161,16 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 		m_toneMapACESConstant.m_bUseFilmic = m_isAbleFilmic;
 		DirectX11::UpdateBuffer(m_pACESConstantBuffer, &m_toneMapACESConstant);
 		DirectX11::PSSetConstantBuffer(0, 1, &m_pACESConstantBuffer);
+
 	}
 
     m_pso->Apply();
 
     ID3D11RenderTargetView* renderTargets[] = { m_DestTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(1, renderTargets, nullptr);
+
+	//m_pToneMapPostProcess->SetHDRSourceTexture(renderData->m_renderTarget->m_pSRV);
+ //   m_pToneMapPostProcess->Process(DeviceState::g_pDeviceContext);
 
     DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
@@ -185,7 +191,7 @@ void ToneMapPass::ControlPanel()
     ImGui::Separator();
 	if (m_toneMapType == ToneMapType::ACES)
 	{
-		ImGui::Checkbox("Use Filmic", &m_isAbleFilmic);
+		ImGui::Checkbox("Use uncharted2_tonemap", &m_isAbleFilmic);
         ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
 	}
     if (m_toneMapType == ToneMapType::ACES && m_toneMapACESConstant.m_bUseFilmic)
