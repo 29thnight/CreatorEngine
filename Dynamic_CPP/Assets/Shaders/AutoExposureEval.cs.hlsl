@@ -31,8 +31,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
             uint2 sampleCoord = inputCoordStart + uint2(x, y);
             if (sampleCoord.x < inputDims.x && sampleCoord.y < inputDims.y)
             {
+                float luminance;
                 float4 sampledColor = g_InputTexture[sampleCoord];
-                float luminance = dot(sampledColor.rgb, LuminanceFactors);
+                
+                if (sampledColor.g != 0 && sampledColor.b != 0)
+                {
+                    luminance = dot(sampledColor.rgb, LuminanceFactors);
+                }
+                else
+                {
+                    luminance = sampledColor.r;
+                }
                 sumLuminance += luminance;
                 numSamples++;
             }

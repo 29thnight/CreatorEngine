@@ -110,36 +110,36 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    //if (m_isAbleAutoExposure && !m_downsampleTextures.empty())
-    //{
-    //    ID3D11ShaderResourceView* currentSRV = renderData->m_renderTarget->m_pSRV;
-    //    const UINT offsets[]{ 0 };
-    //    for (auto* tex : m_downsampleTextures)
-    //    {
-    //        uint32_t groupX = (tex->GetWidth() + 7) / 8;
-    //        uint32_t groupY = (tex->GetHeight() + 7) / 8;
+    if (m_isAbleAutoExposure && !m_downsampleTextures.empty())
+    {
+        ID3D11ShaderResourceView* currentSRV = renderData->m_renderTarget->m_pSRV;
+        const UINT offsets[]{ 0 };
+        for (auto* tex : m_downsampleTextures)
+        {
+            uint32_t groupX = (tex->GetWidth() + 7) / 8;
+            uint32_t groupY = (tex->GetHeight() + 7) / 8;
 
-    //        DirectX11::CSSetShader(m_pAutoExposureEvalCS->GetShader(), 0, 0);
-    //        DirectX11::CSSetShaderResources(0, 1, &currentSRV);
-    //        DirectX11::CSSetUnorderedAccessViews(0, 1, &tex->m_pUAV, offsets);
-    //        DirectX11::Dispatch(groupX, groupY, 1);
-    //        ID3D11ShaderResourceView* nullSRV = nullptr;
-    //        ID3D11UnorderedAccessView* nullUAV = nullptr;
-    //        DirectX11::CSSetShaderResources(0, 1, &nullSRV);
-    //        DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
-    //        currentSRV = tex->m_pSRV;
-    //    }
+            DirectX11::CSSetShader(m_pAutoExposureEvalCS->GetShader(), 0, 0);
+            DirectX11::CSSetShaderResources(0, 1, &currentSRV);
+            DirectX11::CSSetUnorderedAccessViews(0, 1, &tex->m_pUAV, offsets);
+            DirectX11::Dispatch(groupX, groupY, 1);
+            ID3D11ShaderResourceView* nullSRV = nullptr;
+            ID3D11UnorderedAccessView* nullUAV = nullptr;
+            DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+            DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+            currentSRV = tex->m_pSRV;
+        }
 
-    //    ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
-    //    DeviceState::g_pDeviceContext->CopyResource(readbackTexture.Get(), lastResource);
-    //    D3D11_MAPPED_SUBRESOURCE mapped{};
-    //    if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
-    //    {
-    //        float luminance = *reinterpret_cast<float*>(mapped.pData);
-    //        DeviceState::g_pDeviceContext->Unmap(readbackTexture.Get(), 0);
-    //        m_toneMapACESConstant.toneMapExposure = 0.5f / (luminance + 1e-4f);
-    //    }
-    //}
+        ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
+        DeviceState::g_pDeviceContext->CopyResource(readbackTexture.Get(), lastResource);
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(readbackTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+        {
+            float luminance = *reinterpret_cast<float*>(mapped.pData);
+            DeviceState::g_pDeviceContext->Unmap(readbackTexture.Get(), 0);
+            m_toneMapACESConstant.toneMapExposure = 0.5f / (luminance + 1e-4f);
+        }
+    }
 
 	if (m_toneMapType == ToneMapType::Reinhard)
 	{
@@ -203,7 +203,7 @@ void ToneMapPass::PrepareDownsampleTextures(uint32_t width, uint32_t height)
     m_downsampleTextures.clear();
 
     uint32_t ratio = 2;
-    while (width / ratio > 1 && height / ratio > 1)
+    while (width / ratio > 1 || height / ratio > 1)
     {
         std::string name = "AutoExposureDS" + std::to_string(ratio);
         auto* tex = Texture::Create(ratio, ratio, width, height, name, DXGI_FORMAT_R32_FLOAT,
