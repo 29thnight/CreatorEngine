@@ -95,21 +95,19 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float4 colour = Colour.Sample(PointSampler, IN.texCoord);
     float2 texelSize = float2(1.0f / 1920.0f, 1.0f / 1080.0f);
     float3 toneMapped = 0;
-    
-    float avgLuminance = toneMapExposure;
-    
+
     [branch]
     if (useTonemap)
     {
         [branch]
         if (useFilmic)
         {
-            toneMapped = uncharted2_filmic(colour.rgb * avgLuminance);
+            toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
             toneMapped = LINEARtoSRGB(toneMapped);
         }
         else
         {
-            toneMapped = ApplyACES_Full(colour.rgb * avgLuminance);
+            toneMapped = ApplyACES_Full(colour.rgb * toneMapExposure);
             toneMapped = LINEARtoSRGB(toneMapped);
         }
     }
