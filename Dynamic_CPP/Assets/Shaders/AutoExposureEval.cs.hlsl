@@ -1,70 +1,53 @@
-#define NUM_HISTOGRAM_BINS 256
+// 입력 HDR 텍스처 (예: 이전 렌더링 패스의 결과 또는 더 큰 밉 레벨)
+Texture2D<float4> g_InputTexture : register(t0);
 
-cbuffer LuminanceAverageData : register(b0)
+// 다운샘플링된 결과를 저장할 출력 텍스처 (예: 다음으로 작은 밉 레벨)
+RWTexture2D<float4> g_OutputTexture : register(u0);
+
+// 휘도 계산을 위한 상수 (표준 Rec. 709)
+static const float3 LuminanceFactors = float3(0.2126, 0.7152, 0.0722);
+
+// 아주 작은 값으로 0 방지
+static const float EPSILON = 1e-4f;
+
+[numthreads(8, 8, 1)]
+void main(uint3 DTid : SV_DispatchThreadID)
 {
-    uint pixelCount;
-    float minLogLuminance;
-    float logLuminanceRange;
-    float timeDelta;
-    float tau;
-};
+    uint2 inputDims;
+    g_InputTexture.GetDimensions(inputDims.x, inputDims.y);
 
-RWStructuredBuffer<uint> LuminanceHistogram : register(u0); // 입력 히스토그램
-RWTexture2D<float> LuminanceOutput : register(u1); // 출력 루미넌스 텍스처
+    uint2 outputDims;
+    g_OutputTexture.GetDimensions(outputDims.x, outputDims.y);
 
-groupshared float HistogramShared[NUM_HISTOGRAM_BINS];
+    uint2 inputCoordStart = DTid.xy * 2;
 
-[numthreads(16, 16, 1)]
-void main(uint groupIndex : SV_GroupIndex)
-{
-    float countForThisBin = (float) LuminanceHistogram[groupIndex];
-    HistogramShared[groupIndex] = countForThisBin * (float) groupIndex;
+    float sumLogLum = 0.0;
+    int numSamples = 0;
 
-    GroupMemoryBarrierWithGroupSync();
-
-    // Parallel reduction: sum weighted bin values
     [unroll]
-    for (uint histogramSampleIndex = (NUM_HISTOGRAM_BINS >> 1); histogramSampleIndex > 0; histogramSampleIndex >>= 1)
+    for (int y = 0; y < 2; ++y)
     {
-        if (groupIndex < histogramSampleIndex)
+        [unroll]
+        for (int x = 0; x < 2; ++x)
         {
-            HistogramShared[groupIndex] += HistogramShared[groupIndex + histogramSampleIndex];
-            
-            if (!isfinite(HistogramShared[groupIndex]))
-                HistogramShared[groupIndex] = 0.0f;
+            uint2 sampleCoord = inputCoordStart + uint2(x, y);
+
+            if (sampleCoord.x < inputDims.x && sampleCoord.y < inputDims.y)
+            {
+                float3 rgb = g_InputTexture[sampleCoord].rgb;
+                float lum = dot(rgb, LuminanceFactors);
+
+                // 로그 스페이스로 변환
+                sumLogLum += log2(lum + EPSILON);
+                numSamples++;
+            }
         }
-        GroupMemoryBarrierWithGroupSync();
     }
 
-    // 최종 평균 밝기 계산
-    if (groupIndex == 0)
-    {
-        float totalWeight = HistogramShared[0];
+    float avgLogLum = sumLogLum / max(1, numSamples);
 
-        // pixelCount - countForThisBin == 0 이면 division by zero 방지
-        float denom = max((float) pixelCount - countForThisBin, 1.0f);
+    // 로그 스페이스 평균을 다시 exp2로 되돌림
+    float logAverageLum = exp2(avgLogLum);
 
-        // 로그 평균 계산 (안전하게)
-        float weightedLogAverage = (totalWeight / denom) - 1.0f;
-
-        // 로그 평균이 NaN이면 기본값 사용
-        if (!isfinite(weightedLogAverage))
-            weightedLogAverage = 0.0f;
-
-        // log → linear 변환
-        float weightedAverageLuminance = exp2(((weightedLogAverage / 254.0f) * logLuminanceRange) + minLogLuminance);
-
-        // 이전 프레임의 값
-        float luminanceLastFrame = LuminanceOutput[uint2(0, 0)];
-
-        // 적응 계산 (지수 감쇠)
-        float adaptedLuminance = luminanceLastFrame + (weightedAverageLuminance - luminanceLastFrame) * (1.0f - exp(-timeDelta * tau));
-
-        // 결과가 유한하지 않으면 기본값 사용
-        if (!isfinite(adaptedLuminance))
-            adaptedLuminance = 1.0f;
-
-        // 저장
-        LuminanceOutput[uint2(0, 0)] = adaptedLuminance;
-    }
+    g_OutputTexture[DTid.xy] = float4(logAverageLum, logAverageLum, logAverageLum, 1.0);
 }

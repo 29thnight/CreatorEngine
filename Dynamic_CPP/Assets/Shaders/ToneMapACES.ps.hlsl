@@ -51,15 +51,6 @@ float3 aces_approx(float3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0f, 1.0f);
 }
 
-float3 ToneMapFilmicALU(float3 color)
-{
-    color = max(0, color - 0.004f);
-    color = (color * (6.2f * color + 0.5f)) / (color * (6.2f * color + 1.7f) + 0.06f);
-
-    // result has 1/2.2 baked in
-    return pow(color, 2.2f);
-}
-
 // Determines the color based on exposure settings
 float3 CalcExposedColor(float3 color, float avgLuminance, float threshold, out float exposure)
 {
@@ -93,14 +84,6 @@ float3 uncharted2_filmic(float3 v)
     return curr * white_scale;
 }
 
-float3 FilmToneMap(float3 color, float avgLuminance, float threshold, out float exposure)
-{
-    float pixelLuminance = CalcLuminance(color);
-    color = CalcExposedColor(color, avgLuminance, threshold, exposure);
-    color = ToneMapFilmicALU(color);
-    return color;
-}
-
 struct PixelShaderInput // see Fullscreen.vs.hlsl
 {
     float4 position : SV_POSITION;
@@ -113,18 +96,20 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float2 texelSize = float2(1.0f / 1920.0f, 1.0f / 1080.0f);
     float3 toneMapped = 0;
     
+    float avgLuminance = toneMapExposure;
+    
     [branch]
     if (useTonemap)
     {
         [branch]
         if (useFilmic)
         {
-            toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
+            toneMapped = uncharted2_filmic(colour.rgb * avgLuminance);
             toneMapped = LINEARtoSRGB(toneMapped);
         }
         else
         {
-            toneMapped = ToneMapFilmicALU(colour.rgb * toneMapExposure);
+            toneMapped = ApplyACES_Full(colour.rgb * avgLuminance);
             toneMapped = LINEARtoSRGB(toneMapped);
         }
     }
