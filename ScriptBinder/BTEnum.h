@@ -69,4 +69,9 @@ namespace BT
 	{
 		return ed::NodeId(reinterpret_cast<void*>((uintptr_t)pin.Get() >> 1));
 	}
+
+	inline bool IsInputPin(ed::PinId pin)
+	{
+		return (pin.Get() & 1) == 0; // Input pins have even IDs
+	}
 }

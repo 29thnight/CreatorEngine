@@ -3,12 +3,12 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "TestEnemy.h"
 #include "InverseKinematic.h"
 #include "TestTreeBehavior.h"
 #include "Rock.h"
 #include "AsisFeed.h"
 #include "GameManager.h"
-#include "Swrod.h"
 #include "EntityItem.h"
 #include "EntityAsis.h"
 #include "Entity.h"

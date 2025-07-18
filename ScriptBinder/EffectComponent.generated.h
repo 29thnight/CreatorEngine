@@ -12,7 +12,7 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_property(m_loop) \
 		meta_property(m_duration) \
 		meta_property(m_currentTime) \
-		meta_property(num) \
+		meta_property(m_useAbsolutePosition) \
 	}); \
 	MethodField \
 	({ \

@@ -321,7 +321,7 @@ void Scene::OnDisable()
 void Scene::OnDestroy()
 {
     OnDestroyEvent.Broadcast();
-    DistroyLight();
+    DestroyLight();
     DestroyComponents();
     DestroyGameObjects();
 }
@@ -413,7 +413,7 @@ void Scene::RemoveLight(size_t index)
 	}
 }
 
-void Scene::DistroyLight()
+void Scene::DestroyLight()
 {
     std::unordered_map<size_t, size_t> indexRemap;
     std::vector<Light> newLights;

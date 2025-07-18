@@ -125,7 +125,7 @@ void SSGIPass::Execute(RenderScene& scene, Camera& camera)
     }
 }
 
-void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
     if (!isOn) return;
 
@@ -140,13 +140,13 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     m_pLightEmissiveTexture->m_pSRV
     };
 
-    ID3D11DeviceContext* defferdPtr = defferdContext;
-    DirectX11::CSSetShader(defferdPtr, m_pSSGIShader->GetShader(), nullptr, 0);
-    DirectX11::CSSetSamplers(defferdPtr, 0, 1, &sample->m_SamplerState); // sampler 0
-    DirectX11::CSSetSamplers(defferdPtr, 1, 1, &pointSample->m_SamplerState); // sampler 1
+    ID3D11DeviceContext* deferredPtr = deferredContext;
+    DirectX11::CSSetShader(deferredPtr, m_pSSGIShader->GetShader(), nullptr, 0);
+    DirectX11::CSSetSamplers(deferredPtr, 0, 1, &sample->m_SamplerState); // sampler 0
+    DirectX11::CSSetSamplers(deferredPtr, 1, 1, &pointSample->m_SamplerState); // sampler 1
 
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 4, srv);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 4, srv);
+    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
     SSGIParams params;
     params.view = camera.CalculateView();
@@ -159,19 +159,19 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     params.ratio = ssratio;
     params.intensity = intensity;
 
-    camera.UpdateBuffer(defferdPtr);
-    DirectX11::UpdateBuffer(defferdPtr, m_SSGIBuffer.Get(), &params);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_SSGIBuffer.GetAddressOf());
+    camera.UpdateBuffer(deferredPtr);
+    DirectX11::UpdateBuffer(deferredPtr, m_SSGIBuffer.Get(), &params);
+    DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_SSGIBuffer.GetAddressOf());
 
     int ratioMulTread = ssratio * ssthreads;
-    DirectX11::Dispatch(defferdPtr,
+    DirectX11::Dispatch(deferredPtr,
         (DeviceState::g_Viewport.Width + ratioMulTread - 1) / (ratioMulTread),
         (DeviceState::g_Viewport.Height + ratioMulTread - 1) / (ratioMulTread), 1);
 
     ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
     ID3D11UnorderedAccessView* nulluav = nullptr;
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 4, nullsrv);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 4, nullsrv);
+    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 
     CompositeParams compositeParams;
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
@@ -179,111 +179,111 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, Rend
     compositeParams.useOnlySSGI = useOnlySSGI;
     if (useDualFilteringStep > 0) {
         // Down Dual Filtering
-        DirectX11::CSSetShader(defferdPtr, m_pDownDualFilteringShader->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
-        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+        DirectX11::CSSetShader(deferredPtr, m_pDownDualFilteringShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+        DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
 
         float tempThread = ssratio * ssthreads;
         float temp2NumThread = tempThread * 2;
-        DirectX11::Dispatch(defferdPtr,
+        DirectX11::Dispatch(deferredPtr,
             (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
             (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 
         if (useDualFilteringStep > 1) {
             // Down Dual Filtering +
-            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture3->m_pUAV, nullptr);
+            DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+            DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture3->m_pUAV, nullptr);
             compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
-            DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-            DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+            DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
+            DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
 
             float temp3NumThread = tempThread * 4;
-            DirectX11::Dispatch(defferdPtr,
+            DirectX11::Dispatch(deferredPtr,
                 (DeviceState::g_Viewport.Width + temp2NumThread - 1) / temp2NumThread,
                 (DeviceState::g_Viewport.Height + temp2NumThread - 1) / temp2NumThread, 1);
-            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+            DirectX11::CSSetShaderResources(deferredPtr, 0, 1, nullsrv);
+            DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 
             // Up Dual Filtering +
-            DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
-            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture3->m_pSRV);
-            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
+            DirectX11::CSSetShader(deferredPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
+            DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture3->m_pSRV);
+            DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture2->m_pUAV, nullptr);
             compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 4), (float)DeviceState::g_Viewport.Height / (ssratio * 4) };
-            DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-            DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-            DirectX11::Dispatch(defferdPtr,
+            DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
+            DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+            DirectX11::Dispatch(deferredPtr,
                 (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
                 (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
-            DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-            DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+            DirectX11::CSSetShaderResources(deferredPtr, 0, 1, nullsrv);
+            DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
         }
 
         // Up Dual Filtering
-        DirectX11::CSSetShader(defferdPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture2->m_pSRV);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
+        DirectX11::CSSetShader(deferredPtr, m_pUpDualFilteringShaeder->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture2->m_pSRV);
+        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
         compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio * 2), (float)DeviceState::g_Viewport.Height / (ssratio * 2) };
-        DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-        DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-        DirectX11::Dispatch(defferdPtr,
+        DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
+        DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+        DirectX11::Dispatch(deferredPtr,
             (DeviceState::g_Viewport.Width + tempThread - 1) / tempThread,
             (DeviceState::g_Viewport.Height + tempThread - 1) / tempThread, 1);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, nullsrv);
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, nullsrv);
+        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
     }
 
-    //DirectX11::CopyResource(defferdPtr, renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
+    //DirectX11::CopyResource(deferredPtr, renderData->m_renderTarget->m_pTexture, m_pTempTexture->m_pTexture);
     // Composite
-    DirectX11::CSSetShader(defferdPtr, m_pCompositeShader->GetShader(), nullptr, 0);
+    DirectX11::CSSetShader(deferredPtr, m_pCompositeShader->GetShader(), nullptr, 0);
 
     ID3D11ShaderResourceView* srv2[2] = {
         m_pTempTexture->m_pSRV,
         m_pDiffuseTexture->m_pSRV,
     };
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 2, srv2);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 2, srv2);
 
 
     // Set output texture
-    ID3D11UnorderedAccessView* defferdUAV = renderData->m_renderTarget->m_pUAV;
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &defferdUAV, nullptr);
+    ID3D11UnorderedAccessView* deferredUAV = renderData->m_renderTarget->m_pUAV;
+    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &deferredUAV, nullptr);
     compositeParams.inputTextureSize = { (float)DeviceState::g_Viewport.Width / (ssratio), (float)DeviceState::g_Viewport.Height / (ssratio) };
-    DirectX11::UpdateBuffer(defferdPtr, m_CompositeBuffer.Get(), &compositeParams);
-    DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
-    DirectX11::Dispatch(defferdPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
+    DirectX11::UpdateBuffer(deferredPtr, m_CompositeBuffer.Get(), &compositeParams);
+    DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
+    DirectX11::Dispatch(deferredPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
     // Clear resources
     ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
-    DirectX11::CSSetShaderResources(defferdPtr, 0, 2, nullSRV);
-    DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 2, nullSRV);
+    DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
     
    /* else {
-		DirectX11::CSSetShader(defferdPtr, m_pBilateralFilterShader->GetShader(), nullptr, 0);
-        DirectX11::CSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
-        DirectX11::CSSetShaderResources(defferdPtr, 1, 1, &m_pNormalTexture->m_pSRV);
-        DirectX11::CSSetShaderResources(defferdPtr, 2, 1, &m_pDiffuseTexture->m_pSRV);
-        ID3D11UnorderedAccessView* defferdUAV = renderData->m_renderTarget->m_pUAV;
-        DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &defferdUAV, nullptr);
+		DirectX11::CSSetShader(deferredPtr, m_pBilateralFilterShader->GetShader(), nullptr, 0);
+        DirectX11::CSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
+        DirectX11::CSSetShaderResources(deferredPtr, 1, 1, &m_pNormalTexture->m_pSRV);
+        DirectX11::CSSetShaderResources(deferredPtr, 2, 1, &m_pDiffuseTexture->m_pSRV);
+        ID3D11UnorderedAccessView* deferredUAV = renderData->m_renderTarget->m_pUAV;
+        DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &deferredUAV, nullptr);
 		BilateralParams bilateralParams;
 		bilateralParams.screenSize = { DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height };
 		bilateralParams.sigmaSpace = sigmaSpace;
 		bilateralParams.sigmaRange = sigmaRange;
-		DirectX11::UpdateBuffer(defferdPtr, m_BilateralBuffer.Get(), &bilateralParams);
-		DirectX11::CSSetConstantBuffer(defferdPtr, 0, 1, m_BilateralBuffer.GetAddressOf());
-		DirectX11::Dispatch(defferdPtr,
+		DirectX11::UpdateBuffer(deferredPtr, m_BilateralBuffer.Get(), &bilateralParams);
+		DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_BilateralBuffer.GetAddressOf());
+		DirectX11::Dispatch(deferredPtr,
 			(DeviceState::g_Viewport.Width + ssthreads - 1) / ssthreads,
 			(DeviceState::g_Viewport.Height + ssthreads - 1) / ssthreads, 1);
 		ID3D11ShaderResourceView* nullsrv[3] = { nullptr, nullptr, nullptr };
 		ID3D11UnorderedAccessView* nulluav = nullptr;
-		DirectX11::CSSetShaderResources(defferdPtr, 0, 3, nullsrv);
-		DirectX11::CSSetUnorderedAccessViews(defferdPtr, 0, 1, &nulluav, nullptr);
+		DirectX11::CSSetShaderResources(deferredPtr, 0, 3, nullsrv);
+		DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
     }*/
 
 
     ID3D11CommandList* commandList{};
-    defferdPtr->FinishCommandList(false, &commandList);
+    deferredPtr->FinishCommandList(false, &commandList);
     PushQueue(camera.m_cameraIndex, commandList);
 }
 

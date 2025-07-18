@@ -175,6 +175,23 @@ void Transform::UpdateLocalMatrix()
 	}
 }
 
+Mathf::xMatrix Transform::UpdateWorldMatrix()
+{
+	if (m_parentID != 0) {
+		auto parent = GameObject::FindIndex(m_parentID);
+		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
+		UpdateLocalMatrix();
+		XMMATRIX worldMatrix = XMMatrixMultiply(m_localMatrix, parentWorldMatrix);
+		SetAndDecomposeMatrix(worldMatrix);
+		return worldMatrix;
+	}
+	else {
+		UpdateLocalMatrix();
+		m_worldMatrix = m_localMatrix;
+		return m_worldMatrix;
+	}
+}
+
 void Transform::SetOwner(GameObject* owner)
 {
 	m_owner = owner;
@@ -238,6 +255,13 @@ Mathf::xVector Transform::GetWorldScale() const
 Mathf::xVector Transform::GetWorldQuaternion() const
 {
 	return m_worldQuaternion;
+}
+
+Mathf::Vector3 Transform::GetForward()
+{
+	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, GetWorldMatrix());
+	forward.Normalize();
+	return forward;
 }
 
 void Transform::SetDirty()

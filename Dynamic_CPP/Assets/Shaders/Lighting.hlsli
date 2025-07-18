@@ -65,9 +65,11 @@ cbuffer CloudShadowMapConstants : register(b4)
 {
     float4x4 viewProjection;
     float2 cloudMapSize;
+    float2 size;
     float2 direction;
     uint frameIndex;
     float moveSpeed;
+    int isOn;
 }
 
 cbuffer CameraView : register(b10)
@@ -104,21 +106,26 @@ float CloudShadowFactor(float4 worldPosition)
     //}
     //shadow /= 9.0;
     //return shadow;
-    float2 texelSize = float2(1, 1) / cloudMapSize;
+    if (isOn)
+    {
+        float2 texelSize = float2(1, 1) / cloudMapSize;
     
-    float4 lightSpacePosition = mul(viewProjection, worldPosition);
-    float3 projCoords = lightSpacePosition.xyz / lightSpacePosition.w;
-    float currentDepth = projCoords.z;
-    projCoords.y = -projCoords.y;
-    projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
+        float4 lightSpacePosition = mul(viewProjection, worldPosition);
+        float3 projCoords = lightSpacePosition.xyz / lightSpacePosition.w;
+        float currentDepth = projCoords.z;
+        projCoords.y = -projCoords.y;
+        projCoords.xy = (projCoords.xy * 0.5) + 0.5f;
     
-    // (uv * size) + (time * moveSpeed * direction) = cloudMove
-    float2 uv = float2(projCoords.xy * 4 + frameIndex * 0.00003 *float2(1, 1)  /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
-    float closestDepth = CloudShadowMap.Sample(LinearSampler, uv).r;
-    float shadow = 0;
-    shadow = closestDepth;
+        // (uv * size) + (time * moveSpeed * direction) = cloudMove
+        float2 uv = float2(projCoords.xy * size + frameIndex * moveSpeed * direction /** 0.003 + float2(1, 1) * 0.1f * frameIndex * texelSize*/);
+        float closestDepth = CloudShadowMap.Sample(LinearSampler, uv).r;
+        float shadow = 0;
+        shadow = closestDepth;
     
-    return shadow;
+        return shadow;
+    }
+    else 
+        return 1;
 }
 
 float ShadowFactor(float4 worldPosition) // assumes only one shadow map cbuffer

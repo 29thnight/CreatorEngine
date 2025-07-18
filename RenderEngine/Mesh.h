@@ -90,6 +90,21 @@ struct Vertex
 	}
 };
 
+struct InstanceVertex
+{
+	Mathf::Vector3 position;
+	Mathf::Vector3 normal;
+	Mathf::Vector2 uv0;
+	Mathf::Vector2 uv1;
+	Mathf::Vector3 tangent;
+	Mathf::Vector3 bitangent;
+	uint32 instanceID;
+	InstanceVertex() = default;
+	InstanceVertex(const Vertex& vertex, uint32 id) :
+		position(vertex.position), normal(vertex.normal), uv0(vertex.uv0), uv1(vertex.uv1),
+		tangent(vertex.tangent), bitangent(vertex.bitangent), instanceID(id) {}
+};
+
 class Texture;
 class Material;
 class ModelLoader;
@@ -105,13 +120,20 @@ public:
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
+	bool operator==(const Mesh& _other) const
+	{
+		return m_hashingMesh == _other.m_hashingMesh;
+	}
+
 	void AssetInit();
 
 	void Draw();
-	void Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _deferredContext);
 
 	void DrawShadow();
-	void DrawShadow(ID3D11DeviceContext* _defferedContext);
+	void DrawShadow(ID3D11DeviceContext* _deferredContext);
+
+	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
 
 	std::string GetName() const { return m_name; }
 	std::string GetModelName() const { return m_modelName; }
@@ -135,6 +157,7 @@ public:
 	ComPtr<ID3D11Buffer> GetShadowVertexBuffer() { return m_shadowVertexBuffer; }
 	ComPtr<ID3D11Buffer> GetShadowIndexBuffer() { return m_shadowIndexBuffer; }
 
+	HashedGuid m_hashingMesh{ make_guid() };
 private:
 	friend class ModelLoader;
 	friend class MeshOptimizer;
@@ -163,7 +186,9 @@ private:
 
 	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
 	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
-	static constexpr uint32 m_stride = sizeof(Vertex);
+
+
+	static constexpr const uint32 m_stride = sizeof(Vertex);
 };
 
 class PrimitiveCreator
@@ -250,7 +275,7 @@ public:
 	~UIMesh();
 
 	void Draw();
-	void Draw(ID3D11DeviceContext* _defferedContext);
+	void Draw(ID3D11DeviceContext* _deferredContext);
 
 	const std::string& GetName() { return m_name; }
 private:

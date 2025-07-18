@@ -50,7 +50,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
     m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
     m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
 {
-    GameObject* owner = GameObject::FindIndex(component->GetOwner()->m_parentIndex);
+    GameObject* owner = component->GetOwner();
     if (owner)
     {
         //m_materialGuid = m_Material->m_materialGuid;
@@ -79,7 +79,22 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_animatorGuid(other.m_animatorGuid),
     m_materialGuid(other.m_materialGuid),
     m_finalTransforms(other.m_finalTransforms),
-    m_worldPosition(other.m_worldPosition)
+    m_worldPosition(other.m_worldPosition),
+	m_proxyType(other.m_proxyType),
+    m_instancedID(other.m_instancedID),
+    m_isCulled(other.m_isCulled),
+    m_isStatic(other.m_isStatic),
+    m_EnableLOD(other.m_EnableLOD),
+    m_LODReductionRatio(other.m_LODReductionRatio),
+    m_MaxLODLevels(other.m_MaxLODLevels),
+	m_LODGroup(other.m_LODGroup ? std::make_unique<LODGroup>(*other.m_LODGroup) : nullptr),
+	m_LODDistance(other.m_LODDistance),
+    m_isAnimationEnabled(other.m_isAnimationEnabled),
+    m_isEnableShadow(other.m_isEnableShadow),
+	m_isInstanced(other.m_isInstanced),
+    m_terrainMesh(other.m_terrainMesh),
+	m_terrainMaterial(other.m_terrainMaterial),
+    m_isNeedUpdateCulling(other.m_isNeedUpdateCulling)
 {
 }
 
@@ -92,43 +107,91 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_animatorGuid(std::exchange(other.m_animatorGuid, {})),
     m_materialGuid(std::exchange(other.m_materialGuid, {})),
     m_finalTransforms(std::exchange(other.m_finalTransforms, nullptr)),
-    m_worldPosition(std::exchange(other.m_worldPosition, {}))
+    m_worldPosition(std::exchange(other.m_worldPosition, {})),
+	m_proxyType(other.m_proxyType),
+    m_instancedID(std::exchange(other.m_instancedID, {})),
+    m_isCulled(other.m_isCulled),
+    m_isStatic(other.m_isStatic),
+    m_EnableLOD(other.m_EnableLOD),
+    m_LODReductionRatio(other.m_LODReductionRatio),
+	m_MaxLODLevels(other.m_MaxLODLevels),
+	m_LODGroup(std::move(other.m_LODGroup)),
+    m_LODDistance(other.m_LODDistance),
+    m_isAnimationEnabled(other.m_isAnimationEnabled),
+	m_isEnableShadow(other.m_isEnableShadow),
+    m_isInstanced(other.m_isInstanced),
+	m_terrainMesh(std::exchange(other.m_terrainMesh, nullptr)),
+    m_terrainMaterial(std::exchange(other.m_terrainMaterial, nullptr)),
+	m_isNeedUpdateCulling(other.m_isNeedUpdateCulling)
 {
 }
 
 void PrimitiveRenderProxy::Draw()
 {
-    if (nullptr == m_Mesh) return;
+    switch (m_proxyType)
+    {
+    case PrimitiveProxyType::MeshRenderer:
+    {
+        if (nullptr == m_Mesh) return;
 
-    if (m_EnableLOD)
-    {
-        if (!m_LODGroup) return;
-        m_LODGroup->GetLODByDistance(m_LODDistance)->Draw();
+        if (m_EnableLOD)
+        {
+            if (!m_LODGroup) return;
+            m_LODGroup->GetLODByDistance(m_LODDistance)->Draw();
+        }
+        else
+        {
+            m_Mesh->Draw();
+        }
+        break;
     }
-    else
+    case PrimitiveProxyType::TerrainComponent:
     {
-        m_Mesh->Draw();
+		if (nullptr == m_terrainMesh || nullptr == m_terrainMaterial) return;
+
+        m_terrainMesh->Draw();
+        break;
+    }
+    default:
+        break;
+    }
+    
+}
+
+void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
+{
+    switch (m_proxyType)
+    {
+    case PrimitiveProxyType::MeshRenderer:
+    {
+        if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+
+        if (m_EnableLOD)
+        {
+            if (!m_LODGroup) return;
+            m_LODGroup->GetLODByDistance(m_LODDistance)->Draw(_deferredContext);
+        }
+        else
+        {
+            m_Mesh->Draw(_deferredContext);
+        }
+        break;
+    }
+    case PrimitiveProxyType::TerrainComponent:
+    {
+        if (nullptr == m_terrainMesh || nullptr == m_terrainMaterial) return;
+
+        m_terrainMesh->Draw(_deferredContext);
+        break;
+    }
+    default:
+        break;
     }
 }
 
-void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _defferedContext)
+void PrimitiveRenderProxy::DestroyProxy()
 {
-    if (nullptr == m_Mesh || nullptr == _defferedContext) return;
-
-    if (m_EnableLOD)
-    {
-        if (!m_LODGroup) return;
-        m_LODGroup->GetLODByDistance(m_LODDistance)->Draw(_defferedContext);
-    }
-    else
-    {
-        m_Mesh->Draw(_defferedContext);
-    }
-}
-
-void PrimitiveRenderProxy::DistroyProxy()
-{
-    RenderScene::RegisteredDistroyProxyGUIDs.push(m_instancedID);
+    RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
 }
 
 void PrimitiveRenderProxy::GenerateLODGroup()
@@ -183,24 +246,31 @@ void PrimitiveRenderProxy::DrawShadow()
 
 }
 
-void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _defferedContext)
+void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
-    if (nullptr == m_Mesh || nullptr == _defferedContext) return;
+    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
 
     if (m_EnableLOD)
     {
         if (!m_LODGroup) return;
-        m_LODGroup->GetLODByDistance(m_LODDistance)->DrawShadow(_defferedContext);
+        m_LODGroup->GetLODByDistance(m_LODDistance)->DrawShadow(_deferredContext);
     }
     else
     {
         if (m_Mesh->IsShadowOptimized())
         {
-            m_Mesh->DrawShadow(_defferedContext);
+            m_Mesh->DrawShadow(_deferredContext);
         }
         else
         {
-            m_Mesh->Draw(_defferedContext);
+            m_Mesh->Draw(_deferredContext);
         }
     }
+}
+
+void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
+{
+    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+
+    m_Mesh->DrawInstanced(_deferredContext, instanceCount);
 }

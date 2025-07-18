@@ -10,57 +10,138 @@
 #include "Material.h"
 #include "RigidBodyComponent.h"
 #include "EntityItem.h"
+#include "RaycastHelper.h"
+#include "Skeleton.h"
+
+#include "TestEnemy.h"
 void Player::Start()
 {
 	player = GameObject::Find("Punch");
-
+	
+	//pad
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
-	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
+	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  Attack();});
-	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() {});
-	playerMap->AddButtonAction("ChargeAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() {});
-	playerMap->AddButtonAction("Dash", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() {  });
+	playerMap->AddButtonAction("StartAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
+	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
+	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
+	playerMap->AddButtonAction("Dash", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+
+	//keyboard
+	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
+		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
+	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
+	playerMap->AddButtonAction("ChargeAttack", 0, InputType::KeyBoard, 'K', KeyState::Released, [this]() {});
+	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {});
+	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, ',', KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+
+
+	m_animator = player->GetComponent<Animator>();
+	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
 	
-	
+	player->m_collisionType = 2;
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
 	//	{ /*KeyBoard::LeftArrow,KeyBoard::RightArrow,KeyBoard::DownArrow,KeyBoard::UpArrow*/
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
-
+	m_animator->m_Skeleton->m_animations[3].SetEvent("Player", "OnPunch", 0.353);
 }
 
 void Player::Update(float tick)
 {
 	if(m_nearObject)
 		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 16;
+
+
+	if (m_comboCount != 0)
+	{
+		m_comboElapsedTime += tick;
+
+		if (m_comboElapsedTime > m_comboTime)
+		{
+			m_comboCount = 0;
+			m_comboElapsedTime = 0.f;
+		}
+	}
+	
+	if (isCharging)
+	{
+		m_chargingTime += tick;
+	}
+
+	if (m_curDashCount != 0)
+	{
+		m_dubbleDashElapsedTime += tick;
+		m_dashCoolElapsedTime += tick;
+		if (m_dashCoolElapsedTime >= dashCooldown)
+		{
+			m_curDashCount = 0;
+			m_dubbleDashElapsedTime = 0.f;
+		}
+	}
+
+	if (isStun)
+	{
+		
+		stunTime -= tick;
+		auto controller = player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
+		if (0.f >= stunTime)
+		{
+			isStun = false;
+		}
+	}
+
+
+	if (isKnockBack)
+	{
+		KnockBackElapsedTime += tick;
+
+		auto curKnockBackfoce = KnockBackForce;
+		if (KnockBackElapsedTime >= KnockBackTime)
+		{
+			
+			isKnockBack = false;
+			KnockBackElapsedTime = 0.f;
+			player->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+		}
+		else
+		{
+			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+			auto controller = player->GetComponent<CharacterControllerComponent>();
+			controller->Move({ -forward.x ,-forward.z});
+
+		}
+	}
 }
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	//실행끝나도 Move함수에 대한 bind는 남아서 지울껀지 플래그처리할껀지 &&&&&
-	player = GameObject::Find("Punch");
+	if (isStun || isKnockBack) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
+	
 	controller->Move(dir);
-	auto animator = player->GetComponent<Animator>();
 	if (controller->IsOnMove())
 	{
-		animator->SetParameter("OnMove", true);
+		m_animator->SetParameter("OnMove", true);
 	}
 	else
 	{
-		animator->SetParameter("OnMove", false);
+		m_animator->SetParameter("OnMove", false);
 	}
+	
 }
 
 void Player::CatchAndThrow()
@@ -77,27 +158,15 @@ void Player::CatchAndThrow()
 
 void Player::Catch()
 {
-	/*if (m_nearObject != nullptr)
-	{ 
-		player = GameObject::Find("Punch");
-		auto animator = player->GetComponent<Animator>();
-		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHand");
-		m_nearObject = GameObject::Find("plane");
-		righthand->AttachObject(m_nearObject);
-		catchedObject = m_nearObject;
-	}*/
-
-
 	if (m_nearObject != nullptr)
 	{
-		player = GameObject::Find("Punch");
-		auto animator = player->GetComponent<Animator>();
-		Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 		rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
+
 		if (m_curWeapon)
 			m_curWeapon->SetEnabled(false);
 	}
@@ -105,33 +174,17 @@ void Player::Catch()
 
 void Player::Throw()
 {
-	player = GameObject::Find("Punch");
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
 	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
 	rigidbody->SetBodyType(EBodyType::DYNAMIC);
-	rigidbody->SetLockAngularX(false);
-	rigidbody->SetLockAngularY(false);
-	rigidbody->SetLockAngularZ(false);
 	rigidbody->SetLockLinearX(false);
 	rigidbody->SetLockLinearY(false);
 	rigidbody->SetLockLinearZ(false);
 	auto& transform = GetOwner()->m_transform;
-	auto q = transform.GetWorldMatrix();
-	auto rotationOnly = q;
-	rotationOnly.r[3] = XMVectorSet(0, 0, 0, 1); 
-	rotationOnly.r[0] = XMVector3Normalize(rotationOnly.r[0]); 
-	rotationOnly.r[1] = XMVector3Normalize(rotationOnly.r[1]); 
-	rotationOnly.r[2] = XMVector3Normalize(rotationOnly.r[2]); 
-
-	auto forward = -Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, rotationOnly);
-	forward.Normalize();
-	forward = -forward;
-
-	// 4. 힘 적용
+	auto forward  = transform.GetForward();
 	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
-	std::cout << "awdwadadwad" << std::endl;
+
 
 	auto item = catchedObject->GetComponent<EntityItem>();
 	if (item) {
@@ -143,11 +196,98 @@ void Player::Throw()
 		m_curWeapon->SetEnabled(true);
 }
 
+void Player::Dash()
+{
+	if (m_curDashCount >= dashAmount ) return;   //최대 대시횟수만큼했으면 못함
+	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //이미 대시했을떄 더블대시타임안에 다시안하면 못함
+
+	if (m_curDashCount == 0)
+	{
+		std::cout << "Dash  " << std::endl;
+	}
+	else if (m_curDashCount == 1)
+	{
+		std::cout << "Dubble Dash  " << std::endl;
+	}
+	else if (m_curDashCount == 2)
+	{
+		std::cout << "Tripple Dash  " << std::endl;
+	}
+	else
+	{
+		std::cout << "multiple Dash  " << std::endl;
+	}
+	
+	//대쉬 애니메이션중엔 적통과
+	//m_animator->SetParameter("Dash", true);
+	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	controller->AddFinalMultiplierSpeed(m_dashPower);
+	m_dashCoolElapsedTime = 0.f;
+	m_dubbleDashElapsedTime = 0.f;
+	m_curDashCount++;
+}
+
+void Player::StartAttack()
+{
+	isCharging = true;
+}
+
+void Player::Charging()
+{
+	if (m_chargingTime >= 0.7f)
+	{
+		std::cout << "charginggggggg" << std::endl;
+	}
+	//m_animator->SetParameter("Charging", true);
+
+}
+
 void Player::Attack()
 {
-	player = GameObject::Find("Punch");
-	auto animator = player->GetComponent<Animator>();
-	animator->SetParameter("Attack", true);
+	isCharging = false;
+	m_chargingTime = 0.f;
+
+
+	if (m_comboCount == 0)
+	{
+		std::vector<HitResult> hits;
+		auto world = player->m_transform.GetWorldPosition();
+		world.m128_f32[1] += 0.5f;
+		auto forward = player->m_transform.GetForward();
+		int size = RaycastAll(world, forward, 10.f, 1u, hits);
+
+		for (int i = 0; i < size; i++) 
+		{
+			auto object = hits[i].hitObject;
+			if (object == GetOwner()) continue;
+
+			std::cout << object->m_name.data() << std::endl;
+			auto enemy = object->GetComponent<TestEnemy>();
+			if (enemy)
+			{
+				enemy->curHP -= 10.f;
+				std::cout << enemy->curHP << std::endl;
+				auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
+				
+				rigid->AddForce({ forward.x * KnockbackPowerX,KnockbackPowerY,forward.z * KnockbackPowerX }, EForceMode::IMPULSE);
+			}
+			
+		}
+	}
+	else if (m_comboCount == 1)
+	{
+
+	}
+	else if (m_comboCount == 2)
+	{
+
+	}
+	m_animator->SetParameter("Attack", true);
+	std::cout << "Attack!!" << std::endl;
+	std::cout << m_comboCount << "Combo Attack " << std::endl;
+	m_comboCount++;
+	m_comboElapsedTime = 0;
+
 }
 
 void Player::SwapWeaponLeft()
@@ -180,16 +320,50 @@ void Player::AddWeapon(GameObject* weapon)
 
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
+	m_curWeapon->SetEnabled(true);
 	auto animator = player->GetComponent<Animator>();
 	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->AttachObject(m_curWeapon);
 	
 }
 
+void Player::DeleteCurWeapon()
+{
+	if (!m_curWeapon)
+		return;
 
-void Player::Punch()
+	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
+
+	if (it != m_weaponInventory.end())
+	{
+		m_weaponInventory.erase(it);
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = nullptr;    
+	}
+}
+
+
+
+void Player::OnPunch()
 {
 	std::cout << "ppppuuuunchhhhhhh" << std::endl;
+}
+
+void Player::TestStun()
+{
+	isStun = true;
+	stunTime = 1.5f;
+	m_animator->SetParameter("OnMove", false);
+	
+}
+
+void Player::TestKnockBack()
+{
+	isKnockBack = true;
+	KnockBackTime = 1.5f;
+	KnockBackForce = 200.f;
+	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockbackPowerY);
+	m_animator->SetParameter("OnMove", false);
 }
 
 void Player::FindNearObject(GameObject* gameObject)

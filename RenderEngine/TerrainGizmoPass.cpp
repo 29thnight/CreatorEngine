@@ -72,25 +72,25 @@ void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
     }
 }
 
-void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera)
+void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    ID3D11DeviceContext* defferdPtr = defferdContext;
+    ID3D11DeviceContext* deferredPtr = deferredContext;
 
-    m_pso->Apply(defferdPtr);
+    m_pso->Apply(deferredPtr);
 
-    DirectX11::CopyResource(defferdPtr, m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
+    DirectX11::CopyResource(deferredPtr, m_pTempTexture->m_pTexture, renderData->m_renderTarget->m_pTexture);
 
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
-    DirectX11::OMSetRenderTargets(defferdPtr, 1, &rtv, nullptr);
-    DirectX11::RSSetViewports(defferdPtr, 1, &DeviceState::g_Viewport);
-    DirectX11::PSSetConstantBuffer(defferdPtr, 0, 1, m_Buffer.GetAddressOf());
-    DirectX11::PSSetShaderResources(defferdPtr, 0, 1, &m_pTempTexture->m_pSRV);
+    DirectX11::OMSetRenderTargets(deferredPtr, 1, &rtv, nullptr);
+    DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+    DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_Buffer.GetAddressOf());
+    DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &m_pTempTexture->m_pSRV);
 
-    camera.UpdateBuffer(defferdPtr);
-    scene.UseModel(defferdPtr);
+    camera.UpdateBuffer(deferredPtr);
+    scene.UseModel(deferredPtr);
     for (auto& obj : scene.GetScene()->m_SceneObjects) 
     {
         if (obj->IsDestroyMark()) continue;
@@ -113,41 +113,41 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* defferdConte
 						auto& mask = terrainBrush->m_masks[maskID];
 						if (mask.m_maskSRV)
 						{
-							DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &mask.m_maskSRV);
+							DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mask.m_maskSRV);
 							terrainGizmoBuffer.maskWidth = mask.m_maskWidth;
 							terrainGizmoBuffer.maskHeight = mask.m_maskHeight;
 						}
                         else 
                         {
-                            DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &nullSRV);
+                            DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRV);
 							terrainGizmoBuffer.maskWidth = 0;
 							terrainGizmoBuffer.maskHeight = 0;
                         }
                     }
                     else 
                     {
-                        DirectX11::PSSetShaderResources(defferdPtr, 1, 1, &nullSRV);
+                        DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &nullSRV);
 						terrainGizmoBuffer.maskWidth = 0;
 						terrainGizmoBuffer.maskHeight = 0;
                     }
                     terrainGizmoBuffer.gBrushPosition = terrain->GetCurrentBrush()->m_center;
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
 					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
-                    DirectX11::UpdateBuffer(defferdPtr, m_Buffer.Get(), &terrainGizmoBuffer);
+                    DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &terrainGizmoBuffer);
 
 
-                    scene.UpdateModel(obj->m_transform.GetWorldMatrix(), defferdPtr);
-                    terrainMesh->Draw(defferdPtr);
+                    scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
+                    terrainMesh->Draw(deferredPtr);
                 }
             }
         }
 
     }
     ID3D11RenderTargetView* nullrtv = nullptr;
-    DirectX11::OMSetRenderTargets(defferdPtr, 1, &nullrtv, nullptr);
+    DirectX11::OMSetRenderTargets(deferredPtr, 1, &nullrtv, nullptr);
 
     ID3D11CommandList* commandList{};
-    defferdPtr->FinishCommandList(false, &commandList);
+    deferredPtr->FinishCommandList(false, &commandList);
     PushQueue(camera.m_cameraIndex, commandList);
 }
 

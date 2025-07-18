@@ -1,12 +1,12 @@
 #pragma once
 #include "Component.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "SphereColliderComponent.generated.h"
 
-class SphereColliderComponent : public Component, public ICollider, public IAwakable, public IOnDistroy
+class SphereColliderComponent : public Component, public ICollider, public IAwakable, public IOnDestroy
 {
 public:
    ReflectSphereColliderComponent
@@ -22,7 +22,7 @@ public:
 	   }
    }
 
-   void OnDistroy() override
+   void OnDestroy() override
    {
 	   auto scene = SceneManagers->GetActiveScene();
 	   if (scene)

@@ -14,7 +14,8 @@ void AsisFeed::Start()
 	auto m_box = GetOwner()->GetComponent<BoxColliderComponent>();
 
 	m_box->SetRestitution(0.f);
-	m_box->SetDynamicFriction(5000.0f);
+	m_box->SetDynamicFriction(1.f);
+	m_box->SetStaticFriction(1.f);
 	m_box->m_Info.colliderInfo.layerNumber = 4;
 	std::cout << "asis start" << std::endl;
 }

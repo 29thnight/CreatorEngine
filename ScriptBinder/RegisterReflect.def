@@ -11,13 +11,15 @@
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
-#include "InvalidScriptComponent.h"
-#include "Skeleton.h"
+#include "UIComponent.h"
+#include "MaterialFlowInformation.h"
 #include "Camera.h"
 #include "MaterialInfomation.h"
 #include "Component.h"
 #include "Material.h"
 #include "Mesh.h"
+#include "InvalidScriptComponent.h"
+#include "Skeleton.h"
 #include "TestAniScprit.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
@@ -54,7 +56,6 @@
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
-#include "UIComponent.h"
 
 REFLECTION_REGISTER()
 {
@@ -89,6 +90,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(LightComponent);
     AUTO_REGISTER_CLASS(LightMapping);
     AUTO_REGISTER_CLASS(Material);
+    AUTO_REGISTER_CLASS(MaterialFlowInformation);
     AUTO_REGISTER_CLASS(MaterialInfomation);
     AUTO_REGISTER_CLASS(Mesh);
     AUTO_REGISTER_CLASS(MeshColliderComponent);

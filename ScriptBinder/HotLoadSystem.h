@@ -220,7 +220,7 @@ private:
 	SetPhysicsManagerFunc m_setPhysicsManagerFunc{};
 	SetPhysxFunc m_setPhysxFunc{};
 
-	std::wstring msbuildPath{ EngineSettingInstance->GetMsbuildPath() };
+	std::wstring msbuildPath{};
 	std::wstring command{};
 	std::wstring rebuildCommand{};
 	std::atomic_bool m_isStartUp{ false };

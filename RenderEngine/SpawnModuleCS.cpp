@@ -15,6 +15,7 @@ SpawnModuleCS::SpawnModuleCS()
 	, m_particleCapacity(0)
 	, m_randomGenerator(m_randomDevice())
 	, m_uniform(0.0f, 1.0f)
+	, m_forcePositionUpdate(false)
 {
 	// 기본값 설정
 	m_spawnParams.spawnRate = 1.0f;
@@ -25,6 +26,9 @@ SpawnModuleCS::SpawnModuleCS()
 	m_spawnParams.emitterRadius = 1.0f;
 	m_spawnParams.maxParticles = 0;
 	m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.forcePositionUpdate = 0;
+	m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
 
 	// 파티클 템플릿 기본값
 	m_particleTemplate.lifeTime = 10.0f;
@@ -91,6 +95,8 @@ void SpawnModuleCS::Update(float deltaTime)
 	m_spawnParams.maxParticles = m_particleCapacity;
 	m_spawnParams.deltaTime = deltaTime;
 	m_spawnParams.currentTime = currentTime;  // TimeSystem에서 가져온 시간
+	m_spawnParams.forcePositionUpdate = m_forcePositionUpdate ? 1 : 0;
+
 	m_spawnParamsDirty = true;
 
 	// 디버깅: 시간 정보 출력
@@ -143,6 +149,17 @@ void SpawnModuleCS::Update(float deltaTime)
 	DeviceState::g_pDeviceContext->CSSetShader(nullptr, nullptr, 0);
 
 	DirectX11::EndEvent();
+
+	if (m_forcePositionUpdate)
+	{
+		m_forcePositionUpdate = false;
+		m_previousEmitterPosition = Mathf::Vector3(
+			m_spawnParams.emitterPosition.x,
+			m_spawnParams.emitterPosition.y,
+			m_spawnParams.emitterPosition.z
+		);
+		m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+	}
 }
 
 void SpawnModuleCS::Release()
@@ -159,6 +176,11 @@ void SpawnModuleCS::OnSystemResized(UINT maxParticles)
 		m_spawnParams.maxParticles = maxParticles;
 		m_spawnParamsDirty = true;
 	}
+}
+
+void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
+{
+	SetEmitterPosition(newPosition);
 }
 
 bool SpawnModuleCS::InitializeComputeShader()
@@ -270,12 +292,27 @@ void SpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 {
 	Mathf::Vector3 newPos = position;
 
-	// 기존 위치와 다른 경우에만 업데이트
-	if (m_spawnParams.emitterPosition.x != newPos.x ||
-		m_spawnParams.emitterPosition.y != newPos.y ||
-		m_spawnParams.emitterPosition.z != newPos.z)
+	// 기존 위치와 비교하여 실제로 변경되었는지 확인
+	Mathf::Vector3 currentPos(
+		m_spawnParams.emitterPosition.x,
+		m_spawnParams.emitterPosition.y,
+		m_spawnParams.emitterPosition.z
+	);
+
+	float threshold = 0.001f;
+	if (abs(newPos.x - currentPos.x) > threshold ||
+		abs(newPos.y - currentPos.y) > threshold ||
+		abs(newPos.z - currentPos.z) > threshold)
 	{
-		m_spawnParams.emitterPosition = newPos;
+		// 이전 위치 저장
+		m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+		m_previousEmitterPosition = currentPos;
+
+		// 새 위치 설정
+		m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
+
+		// 강제 위치 업데이트 플래그 설정
+		m_forcePositionUpdate = true;
 		m_spawnParamsDirty = true;
 	}
 }

@@ -145,9 +145,6 @@
     <ClCompile Include="CharacterController.cpp">
       <Filter>Character</Filter>
     </ClCompile>
-    <ClCompile Include="CharacterMovement.cpp">
-      <Filter>Character</Filter>
-    </ClCompile>
     <ClCompile Include="RagdollPhysics.cpp">
       <Filter>Ragdoll</Filter>
     </ClCompile>
@@ -156,6 +153,9 @@
     </ClCompile>
     <ClCompile Include="RagdollLink.cpp">
       <Filter>Ragdoll</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterMovement.cpp">
+      <Filter>Character</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

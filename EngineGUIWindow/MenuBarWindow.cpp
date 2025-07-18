@@ -1004,6 +1004,62 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             node.PositionEditor = ed::GetNodePosition(nid);
         }
 
+        if (ed::BeginCreate())
+        {
+            ed::PinId startPinId, endPinId;
+            if (ed::QueryNewLink(&startPinId, &endPinId))
+            {
+                ed::PinId inputPinId, outputPinId;
+                if (BT::IsInputPin(startPinId))
+                {
+                    inputPinId = startPinId;
+                    outputPinId = endPinId;
+                }
+                else
+                {
+                    inputPinId = endPinId;
+                    outputPinId = startPinId;
+                }
+
+                if (inputPinId && outputPinId)
+                {
+                    if (ed::AcceptNewItem())
+                    {
+                        BTBuildNode* inputNodeRaw = nullptr;
+                        BTBuildNode* outputNodeRaw = nullptr;
+                        for (auto& node : graph.NodeList)
+                        {
+                            if (node.InputPinId == inputPinId)
+                                inputNodeRaw = &node;
+                            if (node.OutputPinId == outputPinId)
+                                outputNodeRaw = &node;
+                        }
+
+                        if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
+                        {
+                            bool hasParent = false;
+                            for (auto& p_node : graph.NodeList)
+                            {
+                                if (std::find(p_node.Children.begin(), p_node.Children.end(), inputNodeRaw->ID) != p_node.Children.end())
+                                {
+                                    hasParent = true;
+                                    break;
+                                }
+                            }
+
+                            bool canAcceptChild = !BT::IsDecoratorNode(outputNodeRaw->Type) || outputNodeRaw->Children.empty();
+
+                            if (!inputNodeRaw->IsRoot && !hasParent && canAcceptChild)
+                            {
+                                outputNodeRaw->Children.push_back(inputNodeRaw->ID);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ed::EndCreate();
+
         for (auto& node : graph.NodeList)
         {
             if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))

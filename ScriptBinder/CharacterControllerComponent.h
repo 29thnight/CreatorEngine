@@ -3,7 +3,7 @@
 #include "GameObject.h"
 #include "Component.h"
 #include "IAwakable.h"
-#include "IOnDistroy.h"
+#include "IOnDestroy.h"
 #include "IStartable.h"
 #include "IFixedUpdatable.h"
 #include "ILateUpdatable.h"
@@ -16,7 +16,7 @@
 #include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
-class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDistroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
+class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDestroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
 {
 public:
    ReflectCharacterControllerComponent
@@ -47,7 +47,7 @@ public:
 	   OnLateUpdate(fixedDeltaTime);
    }
 
-   void OnDistroy() override
+   void OnDestroy() override
    {
 	   auto scene = SceneManagers->GetActiveScene();
 	   if (scene)
@@ -193,6 +193,9 @@ public:
 		return m_collsionCount;
 	}
 
+	void Stun(float stunTime);
+	void SetKnockBack(float KnockBackPower, float yKnockBackPower);
+	void EndKnockBack();
 private: 
 
 	//collision event
@@ -221,10 +224,18 @@ private:
 	bool m_bOnMove{ false }; //이동중인지 체크
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
 
+	bool  m_isKnockBack = false;
+	bool  m_isStun = false;
+	float m_stunTime = 0.f;
+	float stunElapsedTime = 0.f;
+	[[Property]]
 	float m_fBaseSpeed{ 0.025f }; //기본 속도
+	float PreSpeed = m_fBaseSpeed;
+	float m_speed = 0.f; //변해서 쓸스피드
 	float m_fBaseAcceleration{ 1.0f }; //기본 가속도
+	[[Property]]
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
-
+	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
 
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;

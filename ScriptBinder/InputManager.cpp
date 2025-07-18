@@ -32,27 +32,37 @@ void InputManager::Update(float deltaTime)
 
 void InputManager::KeyBoardUpdate()
 {
-    ComPtr<IGameInputReading> reading;
-
-    //현재 키입력 초기화
     memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);
+
+    ComPtr<IGameInputReading> reading;
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, &reading);
-    if (FAILED(hr)) {
-        std::cout << "키보드 GetCurrentReading 실패!" << std::endl;
-    }
 
+    if (FAILED(hr) || !reading)
+        return;
+
+    // 현재 눌러진 키만 가져오기
     uint32_t keyCount = reading->GetKeyCount();
-    GkeyStates.resize(keyCount);
+    if (keyCount > 0)
+    {
+        GkeyStates.clear();
+        GkeyStates.resize(keyCount);
 
-    if (SUCCEEDED(reading->GetKeyState(keyCount, GkeyStates.data()))) {
+        reading->GetKeyState(keyCount, GkeyStates.data());
 
-        for (int i = 0; i < keyCount; i++)
+        for (uint32_t i = 0; i < keyCount; ++i)
         {
-            curkeyStates[GkeyStates[i].virtualKey] = true;
+            uint8_t virtualKey = GkeyStates[i].virtualKey;
+            if (virtualKey < KEYBOARD_COUNT)
+                curkeyStates[virtualKey] = true;
         }
     }
 
-    keyboardstate.Update();
+    // 이전/현재 키 상태 갱신
+    keyboardstate.Update(); // 사용자가 만든 내부 로직
+    if (IsKeyDown('M'))
+    {
+        std::cout <<"mmmmmmmmmmm" << std::endl;
+    }
 }
 
 bool InputManager::IsKeyDown(unsigned int key) const
@@ -88,25 +98,26 @@ bool InputManager::changeKeySet(KeyBoard& changekey)
 {
 
    
-    KeyBoardUpdate();
-    if (IsAnyKeyPressed())
-    {
-        for (auto& keyState : GkeyStates)
-        {
+    //KeyBoardUpdate();
+    //if (IsAnyKeyPressed())
+    //{
+    //    for (auto& keyState : GkeyStates)
+    //    {
 
-            pressKey = static_cast<KeyBoard>(keyState.virtualKey);
-            break;
-        }
-        if (pressKey != KeyBoard::None)
-        {
-            changekey = pressKey;
-            pressKey = KeyBoard::None;
-            std::cout << "키 변경 완료: " << std::endl;
-            //현재 키입력 초기화
-            memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);
-            return true;
-        }
-    }
+    //        pressKey = static_cast<KeyBoard>(keyState.virtualKey);
+    //        break;
+    //    }
+    //    if (pressKey != KeyBoard::None)
+    //    {
+    //        changekey = pressKey;
+    //        pressKey = KeyBoard::None;
+    //        std::cout << "키 변경 완료: " << std::endl;
+    //        //현재 키입력 초기화
+    //        memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);
+    //        return true;
+    //    }
+    //}
+    //return false;
     return false;
 }
 
@@ -256,6 +267,7 @@ void InputManager::PadUpdate()
             }
         }
     }
+
 }
 
 void InputManager::GamePadUpdate()

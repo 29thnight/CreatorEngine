@@ -43,6 +43,7 @@ public:
 	Mathf::xMatrix GetInverseMatrix() const;
 
 	void UpdateLocalMatrix();
+	Mathf::xMatrix UpdateWorldMatrix();
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
 	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
 
@@ -50,6 +51,7 @@ public:
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
 
+	Mathf::Vector3 GetForward();
 	void SetDirty();
 	bool IsDirty() const;
 

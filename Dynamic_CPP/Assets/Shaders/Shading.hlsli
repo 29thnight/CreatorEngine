@@ -149,18 +149,62 @@ LightingInfo EvalLightingInfo(SurfaceInfo surf, Light light)
 static const float GAMMA = 2.2;
 static const float INV_GAMMA = 1.0 / GAMMA;
 
-// linear to sRGB approximation
-// see http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
-float3 LINEARtoSRGB(float3 color)
+float LinearToSRGBColorChannel(float c)
 {
-    return pow(color, INV_GAMMA);
+    const float threshold = 0.0031308;
+    const float a = 0.055;
+    const float gamma = 1.0 / 2.4;
+    const float scale = 12.92;
+    const float beta = 1.055;
+    
+    return (c <= threshold) ? c * scale : (beta * pow(c, gamma) - a);
 }
 
-// sRGB to linear approximation
-// see http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
+float SRGBToLinearColorChannel(float c)
+{
+    const float threshold = 0.04045;
+    const float a = 0.055;
+    const float gamma = 2.4;
+    const float scale = 12.92;
+    const float beta = 1.055;
+
+    return (c <= threshold) ? c / scale : pow((c + a) / beta, gamma);
+}
+
+float3 LINEARtoSRGB(float3 color)
+{
+    //lagacy formula
+    //return pow(color, INV_GAMMA);
+    
+    //unity formula
+    //color = saturate(color);
+    //return max(1.055f * pow(color, 0.416666667f) - 0.055f, 0.0f);
+    
+    //optimized formula
+    // 각 채널(R,G,B)에 대해 적용
+    return float3(
+        LinearToSRGBColorChannel(color.r),
+        LinearToSRGBColorChannel(color.g),
+        LinearToSRGBColorChannel(color.b)
+    );
+}
+
 float4 SRGBtoLINEAR(float4 srgbIn)
 {
-    return float4(pow(srgbIn.xyz, GAMMA), srgbIn.w);
+    //lagacy formula
+    //return float4(pow(srgbIn.xyz, GAMMA), srgbIn.w);
+    
+    //unity formula
+    //return srgbIn * (srgbIn * (srgbIn * 0.305306011f + 0.682171111f) + 0.012522878f);
+    
+    //optimized formula
+    // 각 채널(R,G,B)에 대해 적용
+    return float4(
+        SRGBToLinearColorChannel(srgbIn.r),
+        SRGBToLinearColorChannel(srgbIn.g),
+        SRGBToLinearColorChannel(srgbIn.b),
+        srgbIn.w
+    );
 }
 
 float Square(float x)

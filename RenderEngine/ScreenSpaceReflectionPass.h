@@ -11,7 +11,7 @@ public:
 
 	void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
 	void Execute(RenderScene& scene, Camera& camera) override;
-	void CreateRenderCommandList(ID3D11DeviceContext* defferdContext, RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 private:
 	Texture* m_DiffuseTexture{};

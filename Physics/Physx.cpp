@@ -241,6 +241,8 @@ bool PhysicX::Initialize()
 	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
 	auto material = m_defaultMaterial;
 	material->setRestitution(0.0f);
+	material->setDynamicFriction(1.0f);
+	material->setStaticFriction(1.0f);
 	physx::PxShape* planeShape = m_physics->createShape(physx::PxPlaneGeometry(), *material);
 	planeShape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 	planeShape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
