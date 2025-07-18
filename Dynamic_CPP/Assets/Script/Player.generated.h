@@ -5,6 +5,7 @@ ReflectionScriptField(Player) \
 { \
 	PropertyField \
 	({ \
+		meta_property(playerIndex) \
 		meta_property(maxHP) \
 		meta_property(ThrowPowerX) \
 		meta_property(ThrowPowerY) \
@@ -16,6 +17,7 @@ ReflectionScriptField(Player) \
 		meta_property(KnockbackPowerX) \
 		meta_property(KnockbackPowerY) \
 		meta_property(KnockBackForceY) \
+		meta_property(KnockBackForce) \
 	}); \
 	MethodField \
 	({ \

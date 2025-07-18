@@ -97,6 +97,8 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 
 	m_built[nodeId] = node;
 
+	node->SetOwner(GetOwner());
+
 	for (const auto& childID : buildNode->Children)
 	{
 		BTNode::NodePtr childNode = BuildTreeRecursively(childID, graph);
@@ -105,11 +107,23 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 		{
 			composite->AddChild(childNode);
 		}
+		else if (auto decorator = std::dynamic_pointer_cast<BT::DecoratorNode>(node))
+		{
+			if (!decorator->IsOutpinConnected())
+			{
+				decorator->SetChild(childNode);
+			}
+			else
+			{
+				Debug->LogWarning("Decorator node already has a child: " + node->GetName());
+			}
+		}
 		else
 		{
 			// Action / Condition node → 자식 없음
 		}
 	}
+
 
 	return node;
 }

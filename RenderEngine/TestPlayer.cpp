@@ -9,7 +9,6 @@
 #include "Socket.h"
 #include "RigidBodyComponent.h"
 #include "CharacterControllerComponent.h"
-#include "InputActionComponent.h"
 #include "TestAniScprit.h"
 #include "EffectComponent.h"
 
@@ -20,7 +19,6 @@ void TestPlayer::GetPlayer(GameObject* _player)
 	player->AddComponent<RigidBodyComponent>();
 	player->AddComponent<CharacterControllerComponent>();
 	player->AddComponent<TestAniScprit>();
-	//auto input = player->AddComponent<InputActionComponent>();
 	AnimationFactorys->ReisterFactory("Idle", []() {return new IdleAni(); });
 	AnimationFactorys->ReisterFactory("Walk", []() {return new WalkAni(); });
 	AnimationFactorys->ReisterFactory("Run", []() {return new RunAni(); });

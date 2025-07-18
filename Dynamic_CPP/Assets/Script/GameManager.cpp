@@ -47,9 +47,9 @@ void GameManager::Start()
 {
 	std::cout << "GameManager Start" << std::endl;
 	playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
-	playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Inputblabla(); });
+	playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::N), KeyState::Down, [this]() { Inputblabla(); });
 	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
-	playerMap->AddButtonAction("CheatMineResource", 0, InputType::KeyBoard, KeyBoard::M, KeyState::Down, [this]() { CheatMiningResource();});
+	playerMap->AddButtonAction("CheatMineResource", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::M), KeyState::Down, [this]() { CheatMiningResource();});
 	//playerMap->AddValueAction("LoadScene", 0, InputValueType::Float, InputType::KeyBoard, { 'N', 'M' }, [this](float value) {Inputblabla(value);});
 }
 

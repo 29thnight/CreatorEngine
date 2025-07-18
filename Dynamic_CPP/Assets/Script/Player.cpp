@@ -16,23 +16,25 @@
 #include "TestEnemy.h"
 void Player::Start()
 {
-	player = GameObject::Find("Punch");
+	player = GetOwner();
 	
 	//pad
-	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Player");
+	std::string MapName = "Player" + std::to_string(playerIndex);
+	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
 	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
+	playerMap->AddValueAction("Move", playerIndex, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddButtonAction("StartAttack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
-	playerMap->AddButtonAction("AttackCharging", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
-	playerMap->AddButtonAction("Attack", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
-	playerMap->AddButtonAction("Dash", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
-	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
-	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
-
+	playerMap->AddButtonAction("StartAttack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
+	playerMap->AddButtonAction("AttackCharging", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
+	playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
+	playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
+	playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
+	playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
+	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
+	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
-	playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
+	/*playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
 	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
@@ -41,7 +43,7 @@ void Player::Start()
 	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {});
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, ',', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
 
 
 	m_animator = player->GetComponent<Animator>();
@@ -55,7 +57,7 @@ void Player::Start()
 	//		KeyBoard::UpArrow,KeyBoard::DownArrow,KeyBoard::LeftArrow,KeyBoard::RightArrow,
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
-	m_animator->m_Skeleton->m_animations[3].SetEvent("Player", "OnPunch", 0.353);
+	//m_animator->m_Skeleton->m_animations[3].SetEvent("Player", "OnPunch", 0.353);
 }
 
 void Player::Update(float tick)
@@ -107,8 +109,6 @@ void Player::Update(float tick)
 	if (isKnockBack)
 	{
 		KnockBackElapsedTime += tick;
-
-		auto curKnockBackfoce = KnockBackForce;
 		if (KnockBackElapsedTime >= KnockBackTime)
 		{
 			
@@ -361,8 +361,7 @@ void Player::TestKnockBack()
 {
 	isKnockBack = true;
 	KnockBackTime = 1.5f;
-	KnockBackForce = 200.f;
-	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockbackPowerY);
+	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockBackForceY);
 	m_animator->SetParameter("OnMove", false);
 }
 

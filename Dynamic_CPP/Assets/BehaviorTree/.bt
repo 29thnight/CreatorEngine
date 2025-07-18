@@ -1,0 +1,11 @@
+NodeList:
+  - ID: 959435327
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 0, y: 0}

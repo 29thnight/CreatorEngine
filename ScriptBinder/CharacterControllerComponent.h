@@ -236,6 +236,7 @@ private:
 	[[Property]]
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
+	Mathf::Vector3 preRotation;
 
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;
