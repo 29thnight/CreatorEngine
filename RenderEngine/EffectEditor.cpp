@@ -827,34 +827,19 @@ void EffectEditor::AddSelectedRender()
 void EffectEditor::SaveEffectToJson(const std::string& filename)
 {
 	m_saveFileName[0] = '\0';
-
 	if (m_tempEmitters.empty()) {
 		std::cout << "No emitters to save!" << std::endl;
 		return;
 	}
 
 	try {
-		// 임시 이펙트 생성
-		std::string basePath = "Dynamic_CPP/Assets/Effect/";
-
-		std::string finalFilename = filename;
-		if (finalFilename.find('.') == std::string::npos) {
-			finalFilename += ".json";
-		}
-
-		std::string fullPath = basePath + finalFilename;
-		std::filesystem::create_directories(std::filesystem::path(fullPath).parent_path());
-
-		std::string effectName = finalFilename;
-		size_t dotPos = effectName.find_last_of('.');
-		if (dotPos != std::string::npos) {
-			effectName = effectName.substr(0, dotPos);
-		}
+		file::path filepath = PathFinder::Relative("Effect\\") / filename;
+		filepath.replace_extension(".json");
+		std::string effectName = filepath.stem().string();
 
 		auto tempEffect = std::make_unique<EffectBase>();
 		tempEffect->SetName(effectName);
 
-		// 모든 에미터를 이펙트에 추가
 		for (const auto& tempEmitter : m_tempEmitters) {
 			if (tempEmitter.particleSystem) {
 				tempEmitter.particleSystem->m_name = tempEmitter.name;
@@ -862,20 +847,17 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 			}
 		}
 
-		// JSON으로 직렬화
 		nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
 
-		// 파일로 저장
-		std::ofstream file(fullPath);
+		std::ofstream file(filepath);
 		if (file.is_open()) {
-			file << effectJson.dump(4); // 들여쓰기로 보기 좋게
+			file << effectJson.dump(4);
 			file.close();
-			std::cout << "Effect saved to: " << fullPath << std::endl;
+			std::cout << "Effect saved to: " << filepath << std::endl;
 		}
 		else {
-			std::cerr << "Failed to open file for writing: " << fullPath << std::endl;
+			std::cerr << "Failed to open file for writing: " << filepath << std::endl;
 		}
-
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error saving effect: " << e.what() << std::endl;
@@ -885,19 +867,13 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 void EffectEditor::LoadEffectFromJson(const std::string& filename)
 {
 	m_loadFileName[0] = '\0';
-
 	try {
-		std::string basePath = "Dynamic_CPP/Assets/Effect/";
-		std::string finalFilename = filename;
-		if (finalFilename.find('.') == std::string::npos) {
-			finalFilename += ".json";
-		}
+		file::path filepath = PathFinder::Relative("Effect\\") / filename;
+		filepath.replace_extension(".json");
 
-		std::string fullPath = basePath + finalFilename;
-
-		std::ifstream file(fullPath);
+		std::ifstream file(filepath);
 		if (!file.is_open()) {
-			std::cerr << "Failed to open file: " << fullPath << std::endl;
+			std::cerr << "Failed to open file: " << filepath << std::endl;
 			return;
 		}
 
@@ -912,11 +888,11 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
 
-			// 1. 먼저 모든 에미터 정보를 생성
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
 				m_emitterTextureSelections.push_back(0);
 				tempEmitter.particleSystem = particleSystems[i];
+
 				std::string savedName = tempEmitter.particleSystem->m_name;
 				tempEmitter.name = savedName.empty() ? ("LoadedEmitter_" + std::to_string(i + 1)) : savedName;
 				tempEmitter.isPlaying = false;
@@ -941,7 +917,7 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 			m_loadedEffect = std::move(loadedEffect);
 			SyncResourcesFromLoadedEmitters();
 
-			std::cout << "Effect loaded from: " << fullPath << std::endl;
+			std::cout << "Effect loaded from: " << filepath << std::endl;
 			std::cout << "Loaded " << particleSystems.size() << " particle systems" << std::endl;
 			std::cout << "Synced " << m_textures.size() << " textures to editor" << std::endl;
 		}

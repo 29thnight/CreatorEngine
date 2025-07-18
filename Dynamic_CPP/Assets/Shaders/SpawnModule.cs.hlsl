@@ -37,6 +37,12 @@ cbuffer SpawnParameters : register(b0)
     // 즉시 위치 업데이트를 위한 새 변수들
     float3 gPreviousEmitterPosition;
     uint gForcePositionUpdate;
+    
+    float3 gEmitterRotation;
+    uint gForceRotationUpdate;
+    
+    float3 gPreviousEmitterRotation;
+    float padd1;
 }
 
 // 파티클 템플릿
@@ -84,6 +90,48 @@ float RandomRange(uint seed, float minVal, float maxVal)
     return lerp(minVal, maxVal, RandomFloat01(seed));
 }
 
+float3x3 CreateRotationMatrixX(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        1, 0, 0,
+        0, c, -s,
+        0, s, c
+    );
+}
+
+float3x3 CreateRotationMatrixY(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, 0, s,
+        0, 1, 0,
+        -s, 0, c
+    );
+}
+
+float3x3 CreateRotationMatrixZ(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float3x3(
+        c, -s, 0,
+        s, c, 0,
+        0, 0, 1
+    );
+}
+
+float3x3 CreateRotationMatrix(float3 rotation)
+{
+    float3x3 rotX = CreateRotationMatrixX(rotation.x);
+    float3x3 rotY = CreateRotationMatrixY(rotation.y);
+    float3x3 rotZ = CreateRotationMatrixZ(rotation.z);
+    
+    return mul(mul(rotZ, rotY), rotX);
+}
+
 // 이미터별 위치 생성
 float3 GenerateEmitterPosition(uint seed)
 {
@@ -100,7 +148,7 @@ float3 GenerateEmitterPosition(uint seed)
                 float theta = RandomFloat01(seed) * 6.28318530718;
                 float phi = RandomFloat01(seed + 1) * 3.14159265359;
                 float r = gEmitterRadius * pow(RandomFloat01(seed + 2), 0.33333);
-    
+
                 localPos = float3(
                 r * sin(phi) * cos(theta),
                 r * sin(phi) * sin(theta),
@@ -108,7 +156,7 @@ float3 GenerateEmitterPosition(uint seed)
             );
                 break;
             }
-
+        
         case 2: // Box Emitter
         {
                 localPos = float3(
@@ -118,14 +166,14 @@ float3 GenerateEmitterPosition(uint seed)
             );
                 break;
             }
-
+        
         case 3: // Cone Emitter
         {
                 float height = RandomFloat01(seed) * gEmitterSize.y;
                 float angle = RandomFloat01(seed + 1) * 6.28318530718;
                 float radiusAtHeight = gEmitterRadius * (1.0 - height / gEmitterSize.y);
                 float r = sqrt(RandomFloat01(seed + 2)) * radiusAtHeight;
-    
+
                 localPos = float3(
                 r * cos(angle),
                 height,
@@ -133,12 +181,12 @@ float3 GenerateEmitterPosition(uint seed)
             );
                 break;
             }
-
+        
         case 4: // Circle Emitter
         {
                 float angle = RandomFloat01(seed) * 6.28318530718;
                 float r = sqrt(RandomFloat01(seed + 1)) * gEmitterRadius;
-    
+
                 localPos = float3(
                 r * cos(angle),
                 0.0,
@@ -146,13 +194,17 @@ float3 GenerateEmitterPosition(uint seed)
             );
                 break;
             }
-
+        
         default:
             localPos = float3(0, 0, 0);
             break;
     }
     
-    return localPos + gEmitterPosition;
+    // 로컬 위치에 회전 적용
+    float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
+    float3 rotatedPos = mul(rotationMatrix, localPos);
+    
+    return rotatedPos + gEmitterPosition;
 }
 
 // 초기 속도 생성
@@ -173,7 +225,9 @@ float3 GenerateInitialVelocity(uint seed)
         );
     }
     
-    return velocity;
+    // 속도에도 회전 적용
+    float3x3 rotationMatrix = CreateRotationMatrix(gEmitterRotation);
+    return mul(rotationMatrix, velocity);
 }
 
 // 파티클 초기화
@@ -201,6 +255,22 @@ void UpdateExistingParticlePosition(inout ParticleData particle)
     particle.position += positionDelta;
 }
 
+void UpdateExistingParticleRotation(inout ParticleData particle)
+{
+    // 변화량만 계산
+    float3 rotationDelta = gEmitterRotation - gPreviousEmitterRotation;
+    
+    // 에미터 중심 기준 상대 위치
+    float3 relativePos = particle.position - gEmitterPosition;
+    
+    // 델타 회전만 적용
+    float3x3 deltaRotationMatrix = CreateRotationMatrix(rotationDelta);
+    float3 rotatedRelativePos = mul(deltaRotationMatrix, relativePos);
+    
+    particle.position = rotatedRelativePos + gEmitterPosition;
+    particle.velocity = mul(deltaRotationMatrix, particle.velocity);
+}
+
 #define THREAD_GROUP_SIZE 1024
 
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
@@ -221,10 +291,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
         {
             UpdateExistingParticlePosition(particle);
         }
-        
+    
+        // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트
+        if (gForceRotationUpdate == 1)
+        {
+            UpdateExistingParticleRotation(particle);
+        }
+    
         // 나이 증가
         particle.age += gDeltaTime;
-        
+    
         // 수명 체크
         if (particle.age >= particle.lifeTime)
         {
