@@ -4,6 +4,7 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "DamegeAction.h"
 #include "ChaseAction.h"
 #include "Idle.h"
 #include "AtteckAction.h"

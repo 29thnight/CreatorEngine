@@ -13,7 +13,8 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	float atkRange = blackBoard.GetValueAsFloat("eNorAtkRange");
 	
-	if (dir.Length() < atkRange) {
+	float len = dir.Length();
+	if (len < atkRange) {
 		return true;
 	}
 		
