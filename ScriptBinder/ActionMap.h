@@ -10,6 +10,7 @@ public:
 	ActionMap() = default;
 	~ActionMap();
 
+	void AddAction();
 	void AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action);
 	void AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, void (*_action)());
 

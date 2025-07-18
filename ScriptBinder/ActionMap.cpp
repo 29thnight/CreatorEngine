@@ -7,6 +7,22 @@ ActionMap::~ActionMap()
 {
 }
 
+void ActionMap::AddAction()
+{
+
+	std::string baseName = "NewAction";
+	std::string finalName = baseName;
+	int uniqueIndex = 0;
+	while (FindAction(finalName) != nullptr)
+	{
+		finalName = baseName + std::to_string(uniqueIndex);
+		uniqueIndex++;
+	}
+	InputAction* newAction = new InputAction();
+	newAction->actionName = finalName;
+	m_actions.push_back(newAction);
+}
+
 void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action)
 {
 	InputAction* inputAction = nullptr;

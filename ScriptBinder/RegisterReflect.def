@@ -27,7 +27,6 @@
 #include "Animator.h"
 #include "StateMachineComponent.h"
 #include "AniTransition.h"
-#include "InputActionComponent.h"
 #include "AvatarMask.h"
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
@@ -50,6 +49,7 @@
 #include "MeshCollider.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
+#include "PlayerInput.h"
 #include "UIButton.h"
 #include "Prefab.h"
 #include "RigidBodyComponent.h"
@@ -85,7 +85,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(GameObject);
     AUTO_REGISTER_CLASS(ImageComponent);
     AUTO_REGISTER_CLASS(InputAction);
-    AUTO_REGISTER_CLASS(InputActionComponent);
     AUTO_REGISTER_CLASS(InvalidScriptComponent);
     AUTO_REGISTER_CLASS(LightComponent);
     AUTO_REGISTER_CLASS(LightMapping);
@@ -97,6 +96,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
+    AUTO_REGISTER_CLASS(PlayerInput);
     AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RigidBodyComponent);

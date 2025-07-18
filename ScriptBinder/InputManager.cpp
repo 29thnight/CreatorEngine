@@ -3,6 +3,83 @@
 
 #pragma comment(lib, "GameInput.lib")
 using namespace Microsoft::WRL;
+std::vector<KeyBoard> keyboradsss =
+{
+    KeyBoard::A,
+    KeyBoard::B,
+    KeyBoard::C,
+    KeyBoard::D,
+    KeyBoard::E,
+    KeyBoard::F,
+    KeyBoard::G,
+    KeyBoard::H,
+    KeyBoard::I,
+    KeyBoard::J,
+    KeyBoard::K,
+    KeyBoard::L,
+    KeyBoard::M,
+    KeyBoard::N,
+    KeyBoard::O,
+    KeyBoard::P,
+    KeyBoard::Q,
+    KeyBoard::R,
+    KeyBoard::S,
+    KeyBoard::T,
+    KeyBoard::U,
+    KeyBoard::V,
+    KeyBoard::W,
+    KeyBoard::X,
+    KeyBoard::Y,
+    KeyBoard::Z,
+    KeyBoard::LeftArrow,
+    KeyBoard::UpArrow,
+    KeyBoard::RightArrow,
+    KeyBoard::DownArrow,
+    KeyBoard::Space,
+    KeyBoard::LeftControl,
+    KeyBoard::RightControl,
+    KeyBoard::LeftShift,
+    KeyBoard::RightShift,
+    KeyBoard::LeftAlt,
+    KeyBoard::RightAlt,
+    KeyBoard::Enter,
+    KeyBoard::Backspace,
+    KeyBoard::Tab,
+    KeyBoard::Escape,
+    KeyBoard::CapsLock,
+    KeyBoard::Insert,
+    KeyBoard::Delete,
+    KeyBoard::Home,
+    KeyBoard::End,
+    KeyBoard::PageUp,
+    KeyBoard::PageDown,
+    KeyBoard::NumLock,
+    KeyBoard::ScrollLock,
+    KeyBoard::F1,
+    KeyBoard::F2,
+    KeyBoard::F3,
+    KeyBoard::F4,
+    KeyBoard::F5,
+    KeyBoard::F6,
+    KeyBoard::F7,
+    KeyBoard::F8,
+    KeyBoard::F9,
+    KeyBoard::F10,
+    KeyBoard::F11,
+    KeyBoard::F12,
+    KeyBoard::Numpad0,
+    KeyBoard::Numpad1,
+    KeyBoard::Numpad2,
+    KeyBoard::Numpad3,
+    KeyBoard::Numpad4,
+    KeyBoard::Numpad5,
+    KeyBoard::Numpad6,
+    KeyBoard::Numpad7,
+    KeyBoard::Numpad8,
+    KeyBoard::Numpad9,
+    KeyBoard::None,
+};
+
 
 bool InputManager::Initialize(HWND _hwnd)
 {
@@ -57,12 +134,8 @@ void InputManager::KeyBoardUpdate()
         }
     }
 
-    // 이전/현재 키 상태 갱신
-    keyboardstate.Update(); // 사용자가 만든 내부 로직
-    if (IsKeyDown('M'))
-    {
-        std::cout <<"mmmmmmmmmmm" << std::endl;
-    }
+    keyboardstate.Update();
+    
 }
 
 bool InputManager::IsKeyDown(unsigned int key) const
