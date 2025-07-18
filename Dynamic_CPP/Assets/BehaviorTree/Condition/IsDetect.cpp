@@ -29,6 +29,7 @@ bool IsDetect::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 		return true;
 	}
 
+	outTime = 0.0f;
 	std::cout << "IsDetect ConditionCheck: out of range" << std::endl;
 
 	return false;
