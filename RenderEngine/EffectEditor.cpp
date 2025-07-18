@@ -1385,7 +1385,8 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	if (currentMeshType == MeshType::Model) {
 		ImGui::Text("Model Settings:");
 
-		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Drag & Drop FBX files here!");
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Drag & Drop model files here!");
+		ImGui::Text("Supported formats: FBX, OBJ, DAE, GLTF");
 		ImGui::Text("Or use manual load:");
 
 		// 현재 로드된 모델이 있으면 해당 이름을 기본값으로 설정
@@ -1705,6 +1706,196 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	else {
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Clipping Not Supported");
 	}
+
+	// Polar 클리핑 설정 UI
+	ImGui::Separator();
+	ImGui::Text("Polar Clipping Settings:");
+
+	if (meshModule->SupportsClipping()) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.8f, 1.0f), "Polar Clipping Supported");
+
+		// Polar 클리핑 활성화/비활성화
+		bool polarClippingEnabled = meshModule->IsPolarClippingEnabled();
+		if (ImGui::Checkbox("Enable Polar Clipping", &polarClippingEnabled)) {
+			meshModule->EnablePolarClipping(polarClippingEnabled);
+		}
+
+		if (polarClippingEnabled) {
+			ImGui::Indent();
+
+			// Polar 각도 진행도 (0.0 ~ 1.0)
+			const auto& polarParams = meshModule->GetPolarClippingParams();
+			float polarProgress = polarParams.polarAngleProgress;
+			if (ImGui::SliderFloat("Angle Progress", &polarProgress, 0.0f, 1.0f, "%.2f")) {
+				meshModule->SetPolarAngleProgress(polarProgress);
+			}
+
+			// 각도를 도 단위로도 표시
+			float progressInDegrees = polarProgress * 360.0f;
+			ImGui::Text("Angle Range: %.1f degrees", progressInDegrees);
+
+			// 극좌표 중심점 설정
+			float polarCenter[3] = {
+				polarParams.polarCenter.x,
+				polarParams.polarCenter.y,
+				polarParams.polarCenter.z
+			};
+
+			if (ImGui::DragFloat3("Polar Center", polarCenter, 0.1f)) {
+				meshModule->SetPolarCenter(Mathf::Vector3(polarCenter[0], polarCenter[1], polarCenter[2]));
+			}
+
+			// 극좌표 위쪽 축 설정
+			float polarUpAxis[3] = {
+				polarParams.polarUpAxis.x,
+				polarParams.polarUpAxis.y,
+				polarParams.polarUpAxis.z
+			};
+
+			if (ImGui::DragFloat3("Up Axis", polarUpAxis, 0.01f, -1.0f, 1.0f)) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(polarUpAxis[0], polarUpAxis[1], polarUpAxis[2]));
+			}
+
+			// 미리 설정된 Up 축 버튼들
+			ImGui::Text("Quick Up Axis:");
+			if (ImGui::Button("Y-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 1.0f, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("X-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(1.0f, 0.0f, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Z-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 0.0f, 1.0f));
+			}
+
+			// 시작 각도 설정 (라디안 및 도 단위)
+			float startAngleRadians = polarParams.polarStartAngle;
+			float startAngleDegrees = startAngleRadians * 180.0f / 3.14159265f;
+
+			if (ImGui::SliderFloat("Start Angle (Degrees)", &startAngleDegrees, 0.0f, 360.0f, "%.1f°")) {
+				startAngleRadians = startAngleDegrees * 3.14159265f / 180.0f;
+				meshModule->SetPolarStartAngle(startAngleRadians);
+			}
+
+			// 회전 방향 설정
+			float direction = polarParams.polarDirection;
+			bool clockwise = (direction > 0.0f);
+			if (ImGui::Checkbox("Clockwise Direction", &clockwise)) {
+				meshModule->SetPolarDirection(clockwise ? 1.0f : -1.0f);
+			}
+
+			// 극좌표 중심점 프리셋
+			ImGui::Separator();
+			ImGui::Text("Center Presets:");
+			if (ImGui::Button("Origin (0,0,0)")) {
+				meshModule->SetPolarCenter(Mathf::Vector3::Zero);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset to Mesh Center")) {
+				// 현재 메시의 바운딩 박스 중심으로 설정
+				auto bounds = meshModule->GetCurrentMeshBounds();
+				Mathf::Vector3 center = (bounds.first + bounds.second) * 0.5f;
+				meshModule->SetPolarCenter(center);
+			}
+
+			// 애니메이션 테스트
+			ImGui::Separator();
+			ImGui::Text("Polar Animation Test:");
+
+			bool animatePolarClipping = meshModule->IsPolarClippingAnimating();
+			if (ImGui::Checkbox("Animate Polar Progress", &animatePolarClipping)) {
+				meshModule->SetPolarClippingAnimation(animatePolarClipping, meshModule->GetPolarClippingAnimationSpeed());
+			}
+
+			if (animatePolarClipping) {
+				float polarAnimationSpeed = meshModule->GetPolarClippingAnimationSpeed();
+				if (ImGui::SliderFloat("Polar Animation Speed", &polarAnimationSpeed, 0.1f, 5.0f)) {
+					meshModule->SetPolarClippingAnimation(true, polarAnimationSpeed);
+				}
+
+				// 현재 진행도는 실시간으로 업데이트됨
+				float currentPolarProgress = meshModule->GetPolarClippingParams().polarAngleProgress;
+				ImGui::Text("Animated Polar Progress: %.2f", currentPolarProgress);
+			}
+
+			// 극좌표 시스템 설명
+			ImGui::Separator();
+			ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.8f, 1.0f), "Polar System Info:");
+			ImGui::BulletText("Clips based on angle from center point");
+			ImGui::BulletText("Up Axis defines the rotation plane");
+			ImGui::BulletText("Progress 0.0 = no clipping, 1.0 = full circle");
+			ImGui::BulletText("Works in world coordinate system");
+
+			// 현재 극좌표 클리핑 상태 정보
+			ImGui::Separator();
+			ImGui::Text("Polar Clipping Status:");
+			ImGui::Text("Progress: %.2f (%.1f°)", polarProgress, progressInDegrees);
+			ImGui::Text("Center: (%.2f, %.2f, %.2f)",
+				polarParams.polarCenter.x,
+				polarParams.polarCenter.y,
+				polarParams.polarCenter.z);
+			ImGui::Text("Up Axis: (%.2f, %.2f, %.2f)",
+				polarParams.polarUpAxis.x,
+				polarParams.polarUpAxis.y,
+				polarParams.polarUpAxis.z);
+			ImGui::Text("Start Angle: %.1f°", startAngleDegrees);
+			ImGui::Text("Direction: %s", clockwise ? "Clockwise" : "Counter-Clockwise");
+
+			// 복합 클리핑 정보
+			if (meshModule->IsClippingEnabled() && polarClippingEnabled) {
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Combined Clipping Active:");
+				ImGui::BulletText("Both axis and polar clipping enabled");
+				ImGui::BulletText("Result = Axis AND Polar intersection");
+			}
+
+			// 도움말 정보
+			if (ImGui::CollapsingHeader("Polar Clipping Help")) {
+				ImGui::TextWrapped("• Progress controls how much of the circle is visible");
+				ImGui::TextWrapped("• Center point is the pivot for angle calculation");
+				ImGui::TextWrapped("• Up Axis determines the rotation plane");
+				ImGui::TextWrapped("• Start Angle rotates the clipping boundary");
+				ImGui::TextWrapped("• Direction controls clockwise/counter-clockwise clipping");
+				ImGui::TextWrapped("• Combine with axis clipping for complex shapes");
+
+				ImGui::Separator();
+				ImGui::Text("Common Use Cases:");
+				ImGui::BulletText("Radar sweep effect (animate progress)");
+				ImGui::BulletText("Pie chart visualization");
+				ImGui::BulletText("Sectional reveals");
+				ImGui::BulletText("Angular masking effects");
+			}
+
+			ImGui::Unindent();
+		}
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Polar Clipping Not Supported");
+	}
+
+	// 전체 클리핑 시스템 요약
+	if (meshModule->SupportsClipping()) {
+		ImGui::Separator();
+		ImGui::TextColored(ImVec4(0.2f, 0.8f, 1.0f, 1.0f), "Clipping System Summary:");
+
+		bool axisEnabled = meshModule->IsClippingEnabled();
+		bool polarEnabled = meshModule->IsPolarClippingEnabled();
+
+		if (!axisEnabled && !polarEnabled) {
+			ImGui::Text("No clipping active");
+		}
+		else if (axisEnabled && !polarEnabled) {
+			ImGui::Text("Axis clipping only");
+		}
+		else if (!axisEnabled && polarEnabled) {
+			ImGui::Text("Polar clipping only");
+		}
+		else {
+			ImGui::Text("Combined axis + polar clipping");
+		}
+	}
 }
 
 void EffectEditor::RenderUnifiedDragDropTarget()
@@ -1769,7 +1960,9 @@ void EffectEditor::RenderUnifiedDragDropTarget()
 			std::string extension = filename.extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
 
-			if (extension == ".fbx" || extension == ".obj" || extension == ".dae") {
+			if (extension == ".fbx" || extension == ".obj" || extension == ".dae" ||
+				extension == ".gltf" || extension == ".glb") {
+
 				// LoadCashedModel로 로드 (자동으로 캐시 관리됨)
 				Model* loadedModel = DataSystems->LoadCashedModel(filename.filename().string());
 
@@ -1795,6 +1988,7 @@ void EffectEditor::RenderUnifiedDragDropTarget()
 			}
 			else {
 				std::cout << "Unsupported model format: " << extension << std::endl;
+				std::cout << "Supported formats: .fbx, .obj, .dae, .gltf, .glb" << std::endl;
 			}
 		}
 
