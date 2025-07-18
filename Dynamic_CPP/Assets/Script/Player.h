@@ -88,8 +88,9 @@ public:
 	float stunTime = 0.f;
 	bool isKnockBack = false;
 	[[Property]]
-	float KnockBackForceY = 200.f;
-	float KnockBackForce = 0.f; //때린애가 나한테 줄 넉백힘
+	float KnockBackForceY = 0.1f;
+	[[Property]]
+	float KnockBackForce = 0.05f; //때린애가 나한테 줄 넉백힘
 	float KnockBackElapsedTime = 0.f;
 	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 	float m_nearDistance = FLT_MAX;

@@ -106,9 +106,6 @@
     <Filter Include="Classes\Resources\Terrain">
       <UniqueIdentifier>{03804a7c-f5e7-415c-98c0-e6d2caea049d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\InputAction">
-      <UniqueIdentifier>{d51cb221-f891-48f1-abd0-f3aebcb322ce}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\GameAI">
       <UniqueIdentifier>{9f18c3ff-b84c-493f-95c2-5c4168131d95}</UniqueIdentifier>
     </Filter>
@@ -159,6 +156,9 @@
     </Filter>
     <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\GPU">
       <UniqueIdentifier>{af30516f-7274-46c4-a7ee-5f2132d12f1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\InputComponent">
+      <UniqueIdentifier>{13466114-f9ae-4851-b65c-0b0923c77d7d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -258,9 +258,6 @@
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
     </ClCompile>
-    <ClCompile Include="InputActionComponent.cpp">
-      <Filter>Classes\Components\InputAction</Filter>
-    </ClCompile>
     <ClCompile Include="InputAction.cpp">
       <Filter>Managers\InputActionManager</Filter>
     </ClCompile>
@@ -296,6 +293,9 @@
     </ClCompile>
     <ClCompile Include="MeshRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerInput.cpp">
+      <Filter>Classes\Components\InputComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -385,9 +385,6 @@
     </ClInclude>
     <ClInclude Include="TransCondition.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="ConditionParameter.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
@@ -488,9 +485,6 @@
     <ClInclude Include="TerrainBuffers.h">
       <Filter>Classes\Resources\Terrain</Filter>
     </ClInclude>
-    <ClInclude Include="InputActionComponent.h">
-      <Filter>Classes\Components\InputAction</Filter>
-    </ClInclude>
     <ClInclude Include="InputAction.h">
       <Filter>Managers\InputActionManager</Filter>
     </ClInclude>
@@ -583,6 +577,9 @@
     </ClInclude>
     <ClInclude Include="SpriteRenderer.h">
       <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerInput.h">
+      <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

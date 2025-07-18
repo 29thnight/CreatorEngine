@@ -10,7 +10,6 @@
 #include "Terrain.h"
 #include "Model.h"
 #include "NodeEditor.h"
-#include "InputActionComponent.h"
 #include "InvalidScriptComponent.h"
 #include "BehaviorTreeComponent.h"
 
@@ -289,35 +288,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
 			Meta::Deserialize(characterController, itNode);
 			characterController->SetOwner(obj);
-		}
-		else if (componentType->typeID == type_guid(InputActionComponent))
-		{
-			auto inputActionComponent = static_cast<InputActionComponent*>(component);
-			Meta::Deserialize(inputActionComponent, itNode);
-			inputActionComponent->SetOwner(obj);
-			if (itNode["m_actionMaps"])
-			{
-				auto& actionMaps = itNode["m_actionMaps"];
-
-				for (auto& actionMap : actionMaps)
-				{
-					ActionMap* _actionMap = new ActionMap();
-					Meta::Deserialize(_actionMap, actionMap);
-					inputActionComponent->m_actionMaps.push_back(_actionMap);
-
-					if (itNode["m_actions"])
-					{
-						auto& acitons = itNode["m_actions"];
-						for (auto& aciton : acitons)
-						{
-							InputAction* _action = new InputAction();
-							Meta::Deserialize(_action, aciton);
-							_actionMap->m_actions.push_back(_action);
-						}
-					}
-
-				}
-			}
 		}
 		else if(componentType->typeID == type_guid(TerrainComponent))
 		{

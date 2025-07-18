@@ -16,6 +16,7 @@ ReflectionScriptField(Player) \
 		meta_property(KnockbackPowerX) \
 		meta_property(KnockbackPowerY) \
 		meta_property(KnockBackForceY) \
+		meta_property(KnockBackForce) \
 	}); \
 	MethodField \
 	({ \

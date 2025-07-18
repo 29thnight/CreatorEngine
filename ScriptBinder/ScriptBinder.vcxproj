@@ -180,7 +180,6 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputAction.cpp" />
-    <ClCompile Include="InputActionComponent.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
@@ -189,6 +188,7 @@
     <ClCompile Include="NodeFactory.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
+    <ClCompile Include="PlayerInput.cpp" />
     <ClCompile Include="Prefab.cpp" />
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="RigidBodyComponent.cpp" />
@@ -212,6 +212,7 @@
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />
     <ClInclude Include="IStartable.h" />
+    <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
     <ClInclude Include="StateMachineComponent.h">
@@ -260,7 +261,6 @@
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="ActionMap.h" />
     <ClInclude Include="InputAction.h" />
-    <ClInclude Include="InputActionComponent.h" />
     <ClInclude Include="InputActionManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="IObject.h" />
@@ -285,7 +285,6 @@
     <ClInclude Include="RegisterReflect.def" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="ModuleBehavior.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
