@@ -62,8 +62,12 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
-	if(m_nearObject)
-		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 16;
+	if (m_nearObject)
+	{
+		auto mesh = m_nearObject->GetComponent<MeshRenderer>();
+		if(mesh)
+			mesh->m_Material->m_materialInfo.m_bitflag = 16;
+	}
 
 
 	if (m_comboCount != 0)
@@ -269,7 +273,7 @@ void Player::Attack()
 				std::cout << enemy->curHP << std::endl;
 				auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
 				
-				rigid->AddForce({ forward.x * KnockbackPowerX,KnockbackPowerY,forward.z * KnockbackPowerX }, EForceMode::IMPULSE);
+				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
 			}
 			
 		}
@@ -447,7 +451,9 @@ void Player::OnCollisionExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
+		auto mesh = m_nearObject->GetComponent<MeshRenderer>();
+		if(mesh)
+			mesh->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }

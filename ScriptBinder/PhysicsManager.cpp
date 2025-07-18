@@ -615,6 +615,7 @@ void PhysicsManager::SetPhysicData()
 			data.mass = rigidbody->m_mass;
 
 			
+			data.m_EColliderType = colliderInfo.collider->GetColliderType();
 			data.isColliderEnabled = _isColliderEnabled;
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
