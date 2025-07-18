@@ -12,10 +12,22 @@ const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoard
 {
 	auto it = m_values.find(key);
 	if (it == m_values.end())
+	{
+		// If the key does not exist, throw an error
+		Debug->LogError("BlackBoard key not found: " + key);
 		throw std::runtime_error("BlackBoard key not found: " + key);
+	}
 
 	if (it->second.Type != expected)
-		throw std::runtime_error("BlackBoard type mismatch for key: " + key);
+	{
+		Debug->LogError("BlackBoard type mismatch for key: " + key +
+			". Expected: " + BlackBoardTypeToString(expected) +
+			", Actual: " + BlackBoardTypeToString(it->second.Type));
+
+		throw std::runtime_error("BlackBoard type mismatch for key: " + key + 
+			". Expected: " + BlackBoardTypeToString(expected) + 
+			", Actual: " + BlackBoardTypeToString(it->second.Type));
+	}
 
 	return it->second;
 }
@@ -129,14 +141,18 @@ const Mathf::Vector4& BlackBoard::GetValueAsVector4(const std::string& key) cons
 	return GetChecked(key, BlackBoardType::Vector4).Vec4Value;
 }
 
-const GameObject& BlackBoard::GetValueAsGameObject(const std::string& key) const
+GameObject* BlackBoard::GetValueAsGameObject(const std::string& key) const
 {
 	auto& entry = GetChecked(key, BlackBoardType::GameObject);
 	auto gameObject = GameObject::Find(entry.StringValue);
 	if (!gameObject)
-		throw std::runtime_error("GameObject not found: " + entry.StringValue);
+	{
+		Debug->LogError("GameObject not found: " + entry.StringValue);
 
-	return *gameObject;
+		throw std::runtime_error("GameObject not found: " + entry.StringValue);
+	}
+
+	return gameObject;
 }
 
 const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
@@ -144,7 +160,11 @@ const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
 	auto& entry = GetChecked(key, BlackBoardType::Transform);
 	auto gameObject = GameObject::Find(entry.StringValue);
 	if (!gameObject)
+	{
+		Debug->LogError("GameObject not found: " + entry.StringValue);
+
 		throw std::runtime_error("GameObject not found: " + entry.StringValue);
+	}
 
 	return gameObject->m_transform;
 }
@@ -202,6 +222,8 @@ void BlackBoard::Serialize(const std::string_view& name)
 	std::ofstream out(filePath.string());
 	if (!out.is_open())
 	{
+		Debug->LogError("Failed to open file for writing: " + filePath.string());
+
 		throw std::runtime_error("Failed to open file for writing: " + filePath.string());
 	}
 
@@ -229,6 +251,8 @@ void BlackBoard::Deserialize(const std::string_view& name)
 	file::path filePath = PathFinder::Relative("BehaviorTree\\" + std::string(name) + ".blackboard");
 	if (!file::exists(filePath))
 	{
+		Debug->LogError("Blackboard file not found: " + filePath.string());
+
 		throw std::runtime_error("Blackboard file not found: " + filePath.string());
 	}
 

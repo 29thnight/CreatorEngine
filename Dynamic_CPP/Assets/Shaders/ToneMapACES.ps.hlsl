@@ -2,12 +2,16 @@
 #include "Shading.hlsli"
 #include "ACES.hlsli"
 
+static const int ToneMap_Reinhard   = 0;
+static const int ToneMap_ACES       = 1;
+static const int ToneMap_Uncharted2 = 2;
+static const int ToneMap_HDR10      = 3;
+
 Texture2D Colour : register(t0);
 
 cbuffer UseTonemap : register(b0)
 {
-    bool useTonemap;
-    bool useFilmic;
+    int m_operatorType;
     float filmSlope;
     float filmToe;
     float filmShoulder;
@@ -16,7 +20,12 @@ cbuffer UseTonemap : register(b0)
     float toneMapExposure;
 }
 
-float ColorToLuminance(float3 color)
+float CalcLuminance(float3 color)
+{
+    return max(dot(color, float3(0.299f, 0.587f, 0.114f)), 0.0001f);
+}
+
+float ColorToLuminanceReinhard(float3 color)
 {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
@@ -51,22 +60,16 @@ float3 aces_approx(float3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0f, 1.0f);
 }
 
-float3 HableToneMapping(float3 color)
+// Determines the color based on exposure settings
+float3 CalcExposedColor(float3 color, float avgLuminance, float threshold, out float exposure)
 {
-    float A = 0.15;
-    float B = 0.50;
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02;
-    float F = 0.30;
-    float W = 11.2;
-    float exposure = 2.;
-    color *= exposure;
-    color = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
-    float white = ((W * (A * W + C * B) + D * E) / (W * (A * W + B) + D * F)) - E / F;
-    color /= white;
-    color = pow(color, 1. / GAMMA);
-    return color;
+	// Use geometric mean
+    avgLuminance = max(avgLuminance, 0.001f);
+    float keyValue = filmSlope;
+    float linearExposure = (filmSlope / avgLuminance);
+    exposure = log2(max(linearExposure, 0.0001f));
+    exposure -= threshold;
+    return exp2(exposure) * color;
 }
 
 float3 uncharted2_tonemap_partial(float3 x)
@@ -90,85 +93,15 @@ float3 uncharted2_filmic(float3 v)
     return curr * white_scale;
 }
 
-float3 FilmToneMap(float3 LinearColor)
+float3 ReinhardToneMapping(float3 color)
 {
-    const float3x3 sRGB_2_AP0 = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, sRGB_2_XYZ_MAT));
-    const float3x3 sRGB_2_AP1 = mul(XYZ_2_AP1_MAT, mul(D65_2_D60_CAT, sRGB_2_XYZ_MAT));
-    const float3x3 AP1_2_sRGB = mul(XYZ_2_sRGB_MAT, mul(D60_2_D65_CAT, AP1_2_XYZ_MAT));
-	
-#if 1
-    float3 ACESColor = mul(sRGB_2_AP0, LinearColor);
-
-	// --- Red modifier --- //
-    const float RRT_RED_SCALE = 0.82;
-    const float RRT_RED_PIVOT = 0.03;
-    const float RRT_RED_HUE = 0;
-    const float RRT_RED_WIDTH = 135;
-
-    float saturation = rgb_2_saturation(ACESColor);
-    float hue = rgb_2_hue(ACESColor);
-    float centeredHue = center_hue(hue, RRT_RED_HUE);
-    float hueWeight = Square(smoothstep(0, 1, 1 - abs(2 * centeredHue / RRT_RED_WIDTH)));
-		
-    ACESColor.r += hueWeight * saturation * (RRT_RED_PIVOT - ACESColor.r) * (1. - RRT_RED_SCALE);
-
-	// Use ACEScg primaries as working space
-    float3 WorkingColor = mul(AP0_2_AP1_MAT, ACESColor);
-#else
-	// Use ACEScg primaries as working space
-	float3 WorkingColor = mul( sRGB_2_AP1, LinearColor );
-#endif
-
-    WorkingColor = max(0, WorkingColor);
-
-	// Pre desaturate
-    WorkingColor = lerp(dot(WorkingColor, AP1_RGB2Y), WorkingColor, 0.96);
-	
-    const half ToeScale = 1 + filmBlackClip - filmToe;
-    const half ShoulderScale = 1 + filmWhiteClip - filmShoulder;
-	
-    const float InMatch = 0.18;
-    const float OutMatch = 0.18;
-
-    float ToeMatch;
-    if (filmToe > 0.8)
-    {
-		// 0.18 will be on straight segment
-        ToeMatch = (1 - filmToe - OutMatch) / filmSlope + log10(InMatch);
-    }
-    else
-    {
-		// 0.18 will be on toe segment
-
-		// Solve for ToeMatch such that input of InMatch gives output of OutMatch.
-        const float bt = (OutMatch + filmBlackClip) / ToeScale - 1;
-        ToeMatch = log10(InMatch) - 0.5 * log((1 + bt) / (1 - bt)) * (ToeScale / filmSlope);
-    }
-
-    float StraightMatch = (1 - filmToe) / filmSlope - ToeMatch;
-    float ShoulderMatch = filmShoulder / filmSlope - StraightMatch;
-	
-    half3 LogColor = log10(WorkingColor);
-    half3 StraightColor = filmSlope * (LogColor + StraightMatch);
-	
-    half3 ToeColor = (-filmBlackClip) + (2 * ToeScale) / (1 + exp((-2 * filmSlope / ToeScale) * (LogColor - ToeMatch)));
-    half3 ShoulderColor = (1 + filmWhiteClip) - (2 * ShoulderScale) / (1 + exp((2 * filmSlope / ShoulderScale) * (LogColor - ShoulderMatch)));
-
-    ToeColor = LogColor < ToeMatch ? ToeColor : StraightColor;
-    ShoulderColor = LogColor > ShoulderMatch ? ShoulderColor : StraightColor;
-
-    half3 t = saturate((LogColor - ToeMatch) / (ShoulderMatch - ToeMatch));
-    t = ShoulderMatch < ToeMatch ? 1 - t : t;
-    t = (3 - 2 * t) * t * t;
-    half3 ToneColor = lerp(ToeColor, ShoulderColor, t);
-
-	// Post desaturate
-    ToneColor = lerp(dot(ToneColor, AP1_RGB2Y), ToneColor, 0.93);
-
-    ToneColor = mul(AP1_2_sRGB, ToneColor);
-
-	return saturate( ToneColor );
-    //return max(0, ToneColor);
+    float luma = ColorToLuminanceReinhard(color);
+    float toneMappedLuma = luma / (1. + luma);
+    if (luma > 1e-6)
+        color *= toneMappedLuma / luma;
+    
+    color = pow(color, 1. / GAMMA);
+    return color;
 }
 
 struct PixelShaderInput // see Fullscreen.vs.hlsl
@@ -177,31 +110,51 @@ struct PixelShaderInput // see Fullscreen.vs.hlsl
     float2 texCoord : TEXCOORD0;
 };
 
+float ComputeEV100(float aperture, float shutterTime)
+{
+    aperture = max(aperture, 1e-4f);
+    shutterTime = max(shutterTime, 1e-6f);
+    return log2((aperture * aperture) / shutterTime);
+}
+
+float ApplyExposureCompensation(float ev100, float exposureCompensation)
+{
+    return ev100 - exposureCompensation;
+}
+
+float ComputeLuminanceFromEV100(float ev100)
+{
+    return 1.2f * exp2(ev100);
+}
+
+float ComputeExposureMultiplier(float luminance)
+{
+    return 1.0f / (luminance + 1e-4f);
+}
+
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float4 colour = Colour.Sample(PointSampler, IN.texCoord);
-    float2 texelSize = float2(1.0f / 1920.0f, 1.0f / 1080.0f);
     float3 toneMapped = 0;
-    
+
     [branch]
-    if (useTonemap)
+    switch(m_operatorType)
     {
-        [branch]
-        if (useFilmic)
-        {
+    case ToneMap_Reinhard:
+            toneMapped = ReinhardToneMapping(colour.rgb * toneMapExposure);
+        break;
+    case ToneMap_ACES:
+            toneMapped = ApplyACES_Full(colour.rgb * toneMapExposure);
+        break;
+    case ToneMap_Uncharted2:
             toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
-            toneMapped = LINEARtoSRGB(toneMapped);
-        }
-        else
-        {
-            toneMapped = FilmToneMap(colour.rgb * toneMapExposure);
-            toneMapped = LINEARtoSRGB(toneMapped);
-        }
-    }
-    else
-    {
-        toneMapped = colour.rgb;
-        toneMapped = LinearToPQ(toneMapped);
+        break;
+    case ToneMap_HDR10:
+            toneMapped = LinearToPQ(colour.rgb * toneMapExposure);
+        break;
+    default:
+            toneMapped = colour.rgb; // No tonemapping
+        break;
     }
 
     return float4(toneMapped, 1.f);

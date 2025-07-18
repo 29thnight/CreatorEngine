@@ -5,7 +5,7 @@
 #include "KeyState.h"
 
 //일단 테스트용으로 몇개만 넣어둠
-enum  KeyBoard
+enum class KeyBoard
 {
 	A = 0x41,
 	B = 0x42,
@@ -39,10 +39,50 @@ enum  KeyBoard
 	DownArrow = 0x28,
 	Space = 0x20,
 	LeftControl = 0xA2,
+	RightControl = 0xA3,
+	LeftShift = 0xA0,
+	RightShift = 0xA1,
+	LeftAlt = 0xA4,
+	RightAlt = 0xA5,
+	Enter = 0x0D,
+	Backspace = 0x08,
+	Tab = 0x09,
+	Escape = 0x1B,
+	CapsLock = 0x14,
+	Insert = 0x2D,
+	Delete = 0x2E,
+	Home = 0x24,
+	End = 0x23,
+	PageUp = 0x21,
+	PageDown = 0x22,
+	NumLock = 0x90,
+	ScrollLock = 0x91,
+	F1 = 0x70,
+	F2 = 0x71,
+	F3 = 0x72,
+	F4 = 0x73,
+	F5 = 0x74,
+	F6 = 0x75,
+	F7 = 0x76,
+	F8 = 0x77,
+	F9 = 0x78,
+	F10 = 0x79,
+	F11 = 0x7A,
+	F12 = 0x7B,
+	Numpad0 = 0x60,
+	Numpad1 = 0x61,
+	Numpad2 = 0x62,
+	Numpad3 = 0x63,
+	Numpad4 = 0x64,
+	Numpad5 = 0x65,
+	Numpad6 = 0x66,
+	Numpad7 = 0x67,
+	Numpad8 = 0x68,
+	Numpad9 = 0x69,
 	None = 9999,
-
 };
 
+extern std::vector<KeyBoard> keyboradsss;
 
 
 using namespace Microsoft::WRL;

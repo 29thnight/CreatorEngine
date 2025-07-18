@@ -150,7 +150,7 @@ void LightController::SetLightWithShadows(uint32 index, ShadowMapRenderDesc& des
 
 void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 {
-	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
+	if (hasLightWithShadows && !camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::ShadowPass))
 	{
 		m_shadowMapPass->Execute(scene, camera);
 	}
@@ -158,7 +158,7 @@ void LightController::RenderAnyShadowMap(RenderScene& scene, Camera& camera)
 
 void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
-	if (hasLightWithShadows && true == camera.m_applyRenderPipelinePass.m_ShadowPass)
+	if (hasLightWithShadows && !camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::ShadowPass))
 	{
 		m_shadowMapPass->CreateRenderCommandList(deferredContext, scene, camera);
 	}

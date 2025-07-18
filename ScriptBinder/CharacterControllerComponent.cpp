@@ -74,17 +74,20 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 
 	float inputSquare = input.LengthSquared();
 
-	if (inputSquare >= rotationOffsetSquare) {
-		DirectX::SimpleMath::Vector3 flatInput = input;
-		flatInput.y = 0.f; // ← 여기 중요
-		flatInput.Normalize();
-		//input.Normalize();
+	if (!m_isKnockBack) //&&&&& 넉백당하면어케할지 상의필요
+	{
+		if (inputSquare >= rotationOffsetSquare) {
+			DirectX::SimpleMath::Vector3 flatInput = input;
+			flatInput.y = 0.f; 
+			flatInput.Normalize();
+			//input.Normalize();
 
-		if (flatInput == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f }) {
-			m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,-1.0f,0.0f }));
-		}
-		else if (flatInput != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
-			m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,1.0f,0.0f }));
+			if (flatInput == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f }) {
+				m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,-1.0f,0.0f }));
+			}
+			else if (flatInput != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
+				m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,1.0f,0.0f }));
+			}
 		}
 	}
 
@@ -107,6 +110,7 @@ void CharacterControllerComponent::Stun(float stunTime)
 
 void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKnockBackPower)
 {
+	preRotation = m_transform->GetForward();
 	PreSpeed = m_fBaseSpeed;
 	m_fBaseSpeed = KnockBackPower;
 	JumpPower = yKnockBackPower;
@@ -120,6 +124,14 @@ void CharacterControllerComponent::EndKnockBack()
 	m_fBaseSpeed = PreSpeed;
 	m_moveInput.y = 0;
 	m_isKnockBack = false;
+	if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
+	{
+		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,-1.0f,0.0f }));
+	}
+	else if (preRotation != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
+		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,1.0f,0.0f }));
+	}
+
 }
 
 void CharacterControllerComponent::OnTriggerEnter(ICollider* other)

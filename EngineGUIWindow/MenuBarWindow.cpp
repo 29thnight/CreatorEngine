@@ -12,7 +12,7 @@
 #include "AIManager.h"
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
-
+#include "InputActionManager.h"
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
     float usagePercent = (float)usedVRAM / (float)budgetVRAM;
@@ -348,6 +348,11 @@ void MenuBarWindow::RenderMenuBar()
 					m_bShowBlackBoardWindow = true;
 				}
 
+                if (ImGui::MenuItem("InputAction Maps"))
+                {
+                    m_bShowInputActionMapWindow = true;
+                }
+
                 ImGui::EndMenu();
             }
 
@@ -433,7 +438,7 @@ void MenuBarWindow::RenderMenuBar()
 
     ShowBehaviorTreeWindow();
     ShowBlackBoardWindow();
-
+    SHowInputActionMap();
     if (m_bShowProfileWindow)
     {
         ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);
@@ -1004,6 +1009,62 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             node.PositionEditor = ed::GetNodePosition(nid);
         }
 
+        if (ed::BeginCreate())
+        {
+            ed::PinId startPinId, endPinId;
+            if (ed::QueryNewLink(&startPinId, &endPinId))
+            {
+                ed::PinId inputPinId, outputPinId;
+                if (BT::IsInputPin(startPinId))
+                {
+                    inputPinId = startPinId;
+                    outputPinId = endPinId;
+                }
+                else
+                {
+                    inputPinId = endPinId;
+                    outputPinId = startPinId;
+                }
+
+                if (inputPinId && outputPinId)
+                {
+                    if (ed::AcceptNewItem())
+                    {
+                        BTBuildNode* inputNodeRaw = nullptr;
+                        BTBuildNode* outputNodeRaw = nullptr;
+                        for (auto& node : graph.NodeList)
+                        {
+                            if (node.InputPinId == inputPinId)
+                                inputNodeRaw = &node;
+                            if (node.OutputPinId == outputPinId)
+                                outputNodeRaw = &node;
+                        }
+
+                        if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
+                        {
+                            bool hasParent = false;
+                            for (auto& p_node : graph.NodeList)
+                            {
+                                if (std::find(p_node.Children.begin(), p_node.Children.end(), inputNodeRaw->ID) != p_node.Children.end())
+                                {
+                                    hasParent = true;
+                                    break;
+                                }
+                            }
+
+                            bool canAcceptChild = !BT::IsDecoratorNode(outputNodeRaw->Type) || outputNodeRaw->Children.empty();
+
+                            if (!inputNodeRaw->IsRoot && !hasParent && canAcceptChild)
+                            {
+                                outputNodeRaw->Children.push_back(inputNodeRaw->ID);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ed::EndCreate();
+
         for (auto& node : graph.NodeList)
         {
             if (BT::IsCompositeNode(node.Type) || BT::IsDecoratorNode(node.Type))
@@ -1559,6 +1620,383 @@ void MenuBarWindow::ShowBlackBoardWindow()
             blackBoardName.clear();
             selectedKey.clear();
 		}
+    }
+}
+void MenuBarWindow::SHowInputActionMap()
+{
+    static int preseletedActionMapIndex = -1;
+    static int seletedActionMapIndex = -1;
+    static int editingMapIndex = -1;
+    static int preseletedActionIndex = -1;
+    static int seletedActionIndex = -1;
+    static int editingActionIndex = -1;
+   
+    if (m_bShowInputActionMapWindow)
+    {
+        ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+
+        bool open = ImGui::Begin("InputActionMaps", &m_bShowInputActionMapWindow);
+
+        if (open && ImGui::IsWindowAppearing())
+        {
+            preseletedActionMapIndex = -1;
+            seletedActionMapIndex = -1;
+            editingMapIndex = -1;
+            preseletedActionIndex = -1;
+            seletedActionIndex = -1;
+            editingActionIndex = -1;
+        }
+        ImGui::Separator();
+
+        ImGui::BeginChild("ActionMaps", ImVec2(200, 0), true); // 왼쪽
+        ImGui::Text("Action Maps");
+        ImGui::SameLine();  // 바로 옆에 버튼 배치
+        if (ImGui::Button("+"))
+        {
+            InputActionManagers->AddActionMap();
+        }
+        ImGui::Separator();
+        ImGui::Separator();
+       
+        for (int i = 0; i < InputActionManagers->m_actionMaps.size(); ++i)
+        {
+            if (editingMapIndex != -1 && editingMapIndex ==i)
+            {
+                char buffer[128];
+                strcpy_s(buffer, InputActionManagers->m_actionMaps[editingMapIndex]->m_name.c_str());
+                buffer[sizeof(buffer) - 1] = '\0';
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                {
+                    // 엔터 눌러서 이름 확정
+                    InputActionManagers->m_actionMaps[editingMapIndex]->m_name = buffer;
+                    editingMapIndex = -1;
+                }
+
+                if (ImGui::IsMouseClicked(0) && !ImGui::IsItemHovered())
+                {
+                    InputActionManagers->m_actionMaps[editingMapIndex]->m_name = buffer;
+                    editingMapIndex = -1;
+                }
+            }
+            else
+            {
+                if (ImGui::Selectable(InputActionManagers->m_actionMaps[i]->m_name.c_str(), true, 0, ImVec2(200, 0)))
+                {
+                    preseletedActionMapIndex = seletedActionMapIndex;
+                    seletedActionMapIndex = i;
+                }
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                {
+                    editingMapIndex = i;
+                    ImGui::SetKeyboardFocusHere();
+             
+                }
+                if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                {
+                    ImGui::OpenPopup("RightClickMenuActinMaps");
+                    preseletedActionMapIndex = seletedActionMapIndex;
+                    seletedActionMapIndex = i;
+                }
+                if (ImGui::BeginPopup("RightClickMenuActinMaps"))
+                {
+                    if (ImGui::MenuItem("Delete ActionMap"))
+                    {
+                        InputActionManagers->DeleteActionMap(InputActionManagers->m_actionMaps[seletedActionMapIndex]->m_name);
+                        seletedActionMapIndex = -1;
+                    }
+                    ImGui::EndPopup();
+                }
+            }
+        }
+        
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+
+        ImGui::BeginChild("Actions", ImVec2(300, 0), true); 
+        ImGui::Text("Actions");
+        ImGui::SameLine();
+        if (ImGui::Button("+"))
+        {
+            if (seletedActionMapIndex != -1)
+            {
+                InputActionManagers->m_actionMaps[seletedActionMapIndex]->AddAction();
+            }
+        }
+        ImGui::Separator();
+        ImGui::Separator();
+        if (preseletedActionMapIndex != seletedActionMapIndex)
+        {
+            preseletedActionMapIndex = seletedActionMapIndex;
+            seletedActionIndex = -1;
+        }
+        if (seletedActionMapIndex != -1)
+        {
+            auto map = InputActionManagers->m_actionMaps[seletedActionMapIndex];
+            for (int i = 0; i < map->m_actions.size(); ++i)
+            {
+                if (editingActionIndex != -1 && editingActionIndex == i)
+                {
+                    char buffer[128];
+                    strcpy_s(buffer, map->m_actions[editingActionIndex]->actionName.c_str());
+                    buffer[sizeof(buffer) - 1] = '\0';
+                    ImGui::SetNextItemWidth(300);
+                    if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                    {
+                        // 엔터 눌러서 이름 확정
+                        map->m_actions[editingActionIndex]->actionName = buffer;
+                        editingActionIndex = -1;
+                    }
+
+                    if (ImGui::IsMouseClicked(0) && !ImGui::IsItemHovered())
+                    {
+                        map->m_actions[editingActionIndex]->actionName = buffer;
+                        editingActionIndex = -1;
+                    }
+                }
+                else
+                {
+                    if (ImGui::Selectable(map->m_actions[i]->actionName.c_str(), true, 0, ImVec2(200, 0)))
+                    {
+                        preseletedActionIndex = seletedActionIndex;
+                        seletedActionIndex = i;
+                    }
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                    {
+                        editingActionIndex = i;
+                        ImGui::SetKeyboardFocusHere();
+
+                    }
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                    {
+                        preseletedActionIndex = seletedActionIndex;
+                        seletedActionIndex = i;
+                        ImGui::OpenPopup("RightClickMenuAction");
+                        
+                    }
+                    if (ImGui::BeginPopup("RightClickMenuAction"))
+                    {
+                        if (ImGui::MenuItem("Delete Action"))
+                        {
+                            
+                            seletedActionIndex = -1;
+                        }
+                        ImGui::EndPopup();
+                    }
+                }
+            }
+            
+        }
+        ImGui::EndChild();
+        ImGui::SameLine();
+        ImGui::BeginChild("ActinSetting", ImVec2(0, 0), true); 
+        ImGui::Text("ActionSetting");
+        ImGui::Separator();
+        ImGui::Separator();
+        if (seletedActionMapIndex != -1 && seletedActionIndex != -1)
+        {
+            auto action = InputActionManagers->m_actionMaps[seletedActionMapIndex]->m_actions[seletedActionIndex];
+           
+            int floatId = 0;
+            if (ImGui::CollapsingHeader("Action Type"))
+            {
+                if (ImGui::Button(ActionTypeString(action->actionType).c_str()))
+                {
+                    ImGui::OpenPopup("SelectActionType");
+                }
+            }
+            if (ImGui::BeginPopup("SelectActionType"))
+            {
+                if (ImGui::MenuItem("Button"))
+                    action->SetActionType(ActionType::Button);
+                else if (ImGui::MenuItem("Value"))
+                    action->SetActionType(ActionType::Value);
+                ImGui::EndPopup();
+            }
+
+            if (ImGui::CollapsingHeader("Key Bind"))
+            {
+                ImGui::Text("Input Type : ");
+                ImGui::SameLine();
+                if (ImGui::Button(InputTypeString(action->inputType).c_str()))
+                {
+                    ImGui::OpenPopup("SelectInputType");
+                }
+                //value 면 state무시하고 pressed만받고 value 에 vector2에 컨트롤러면 왼스틱,오른스틱  float이면 왼오,트리거만 받게끔 키보드는 다가능 // 키보드는 다가능 4개받게끔 0,1,2,3순 
+
+                //Key State는 value타입일경우 출력x
+                ImGui::Text("Key State : ");
+                ImGui::SameLine();
+                if(ImGui::Button(KeyStateString(action->keystate).c_str()))
+                {
+                    ImGui::OpenPopup("SelectKeyState");
+                }
+
+                if (action->actionType == ActionType::Button)
+                {
+                    ImGui::Text("Key : ");
+                    ImGui::SameLine();
+                    if (action->inputType == InputType::KeyBoard)
+                    {
+                        if (ImGui::Button("KeyBoard Key chull"))
+                        {
+
+                        }
+                    }
+                    else if (action->inputType == InputType::GamePad)
+                    {
+                        if (ImGui::Button("GamePad Key chull"))
+                        {
+
+                        }
+                    }
+                    else if (action->inputType == InputType::Mouse)
+                    {
+                        if (ImGui::Button("Mouse Key chull"))
+                        {
+
+                        }
+                    }
+                }
+                else if (action->actionType == ActionType::Value)
+                {
+                    
+                    if (action->valueType == InputValueType::Float)
+                    {
+                        //나중에 구현
+                    }
+                    else if (action->valueType == InputValueType::Vector2)
+                    {
+                        if (action->inputType == InputType::KeyBoard)
+                        {
+                            ImGui::Text("LeftKey : ");
+                            ImGui::SameLine();
+                            ImGui::PushID(1);
+                            if (ImGui::Button("123213"))
+                            {
+                                //첫번째키
+                                floatId = 1;
+                                ImGui::OpenPopup("KeyBaordButtonFloat1");
+                            }
+                            ImGui::PopID();
+                            ImGui::Text("RightKey : ");
+                            ImGui::SameLine();
+                            ImGui::PushID(2);
+                            if (ImGui::Button("KeyBoard"))
+                            {
+                                //2번째키
+                                floatId = 2;
+                                ImGui::OpenPopup("KeyBaordButtonFloat2");
+                            }
+                            ImGui::PopID();
+                            ImGui::Text("DownKey : ");
+                            ImGui::SameLine();
+                            ImGui::PushID(3);
+                            if (ImGui::Button("KeyBoard Key chull"))
+                            {
+                                //3번째키
+                                floatId = 3;
+                                ImGui::OpenPopup("KeyBaordButtonFloat3");
+                            }
+                            ImGui::PopID();
+                            ImGui::Text("UpKey : ");
+                            ImGui::SameLine();
+                            ImGui::PushID(4);
+                            if (ImGui::Button("KeyBoard Key chull"))
+                            {
+                                //4번째 키
+                                floatId = 4;
+                                ImGui::OpenPopup("KeyBaordButtonFloat4");
+                            }
+                            ImGui::PopID();
+
+                        }
+                        else if (action->inputType == InputType::GamePad)
+                        {
+                            ImGui::Text("Key : ");
+                            ImGui::SameLine();
+                            if (ImGui::Button(ControllerButtonString(action->m_controllerButton).c_str()))
+                            {
+                                //게임패드는 left 스틱 light 스틱 만 넣게끔
+                                ImGui::OpenPopup("ControllerButtonFlaot4");
+                            }
+                        }
+                    }
+                    
+                }
+
+
+            }
+            if (ImGui::BeginPopup("SelectInputType"))
+            {
+                if (ImGui::MenuItem("KeyBoard"))
+                    action->SetInputType(InputType::KeyBoard);
+                else if (ImGui::MenuItem("GamePad"))
+                    action->SetInputType(InputType::GamePad);
+                else if (ImGui::MenuItem("Mouse"))
+                    action->SetInputType(InputType::Mouse);
+                ImGui::EndPopup();
+            }
+
+            if (ImGui::BeginPopup("SelectKeyState"))
+            {
+                if (ImGui::MenuItem("Down"))
+                    action->SetKeyState(KeyState::Down);
+                else if (ImGui::MenuItem("Pressed"))
+                    action->SetKeyState(KeyState::Pressed);
+                else if (ImGui::MenuItem("Released"))
+                    action->SetKeyState(KeyState::Released);
+                ImGui::EndPopup();
+            }
+
+            std::string popupName = "KeyBaordButtonFloat" + floatId;
+            if (ImGui::BeginPopup(popupName.c_str()))
+            {
+                static int index = 0;
+                if (InputManagement->IsWheelDown())
+                {
+                    
+                    index++;
+                    int maxIndex = static_cast<int>(keyboradsss.size()) - 10;
+                    if (index > maxIndex)
+                        index = maxIndex;
+                }
+                else if(InputManagement->IsWheelUp())
+                {
+                    index--;
+                    if (index < 0)
+                    {
+                        index = 0;
+                    }
+                }
+                for (int i = 0; i < 10; i++)
+                {
+                    int realIndex = index + i;
+                    if (realIndex >= keyboradsss.size())
+                        break; 
+                    if (ImGui::MenuItem(KeyBoardString(keyboradsss[realIndex]).c_str()))
+                    {
+
+                    }
+                }
+                ImGui::EndPopup();
+            }
+
+            if (ImGui::BeginPopup("ControllerButtonFlaot4"))
+            {
+                if (ImGui::MenuItem("LEFT_Thumbstick"))
+                    action->SetControllerButton(ControllerButton::LEFT_Thumbstick);
+                else if (ImGui::MenuItem("RIGHT_Thumbstick"))
+                    action->SetControllerButton(ControllerButton::RIGHT_Thumbstick);
+                ImGui::EndPopup();
+            }
+            
+        }
+        ImGui::EndChild();
+
+
+        ImGui::End();
     }
 }
 #endif // DYNAMICCPP_EXPORTS

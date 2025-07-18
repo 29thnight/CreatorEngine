@@ -4,6 +4,7 @@
 #include "DeviceState.h"
 #include "Camera.h"
 #include "TimeSystem.h"
+#include "ResourceAllocator.h"
 
 ToneMapPass::ToneMapPass()
 {
@@ -11,7 +12,6 @@ ToneMapPass::ToneMapPass()
 
     m_pso->m_vertexShader = &ShaderSystem->VertexShaders["Fullscreen"];
     m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapACES"];
-	m_pAutoExposureHistogramCS = &ShaderSystem->ComputeShaders["AutoExposureHistogram"];
     m_pAutoExposureEvalCS = &ShaderSystem->ComputeShaders["AutoExposureEval"];
     m_pso->m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 
@@ -42,55 +42,15 @@ ToneMapPass::ToneMapPass()
     m_pso->m_samplers.push_back(linearSampler);
     m_pso->m_samplers.push_back(pointSampler);
 
-	m_pACESConstantBuffer = DirectX11::CreateBuffer(
-        sizeof(ToneMapACESConstant), 
+    m_pToneMapConstantBuffer = DirectX11::CreateBuffer(
+        sizeof(ToneMapConstant),
         D3D11_BIND_CONSTANT_BUFFER, 
-        &m_toneMapACESConstant
+        &m_toneMapConstant
     );
 
-	DirectX::SetName(m_pACESConstantBuffer, "ToneMapACESConstantBuffer");
-
-	m_pReinhardConstantBuffer = DirectX11::CreateBuffer(
-		sizeof(ToneMapReinhardConstant),
-		D3D11_BIND_CONSTANT_BUFFER,
-		&m_toneMapReinhardConstant
-	);
-
-	DirectX::SetName(m_pReinhardConstantBuffer, "ToneMapReinhardConstantBuffer");
+	DirectX::SetName(m_pToneMapConstantBuffer, "ToneMapConstantBuffer");
 
     auto& device = DeviceState::g_pDevice;
-
-    D3D11_BUFFER_DESC cbDesc0 = {};
-    cbDesc0.ByteWidth = sizeof(LuminanceHistogramData);
-    cbDesc0.Usage = D3D11_USAGE_DYNAMIC;
-    cbDesc0.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    cbDesc0.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    device->CreateBuffer(&cbDesc0, nullptr, &m_pAutoExposureConstantBuffer);
-
-    D3D11_BUFFER_DESC bufDesc = {};
-    bufDesc.ByteWidth = sizeof(UINT) * NUM_BINS;
-    bufDesc.Usage = D3D11_USAGE_DEFAULT;
-    bufDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-    bufDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    bufDesc.StructureByteStride = sizeof(UINT);
-
-    device->CreateBuffer(&bufDesc, nullptr, &m_pHistogramBuffer);
-
-    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc0 = {};
-    uavDesc0.Format = DXGI_FORMAT_UNKNOWN;
-    uavDesc0.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-    uavDesc0.Buffer.NumElements = 256;
-
-    device->CreateUnorderedAccessView(m_pHistogramBuffer, &uavDesc0, &m_exposureUAV);
-
-    D3D11_BUFFER_DESC cbDesc1 = {};
-    cbDesc1.ByteWidth = sizeof(LuminanceAverageData);
-    cbDesc1.Usage = D3D11_USAGE_DYNAMIC;
-    cbDesc1.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    cbDesc1.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    device->CreateBuffer(&cbDesc1, nullptr, &m_pLuminanceAverageBuffer);
 
     D3D11_TEXTURE2D_DESC texDesc = {};
     texDesc.Width = 1;
@@ -102,30 +62,29 @@ ToneMapPass::ToneMapPass()
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 
-    device->CreateTexture2D(&texDesc, nullptr, &luminanceTexture);
-
-    // UAV ìƒì„±
-    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc1 = {};
-    uavDesc1.Format = texDesc.Format;
-    uavDesc1.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-
-    device->CreateUnorderedAccessView(luminanceTexture.Get(), &uavDesc1, &luminanceUAV);
-
     D3D11_TEXTURE2D_DESC readbackDesc = texDesc;
     readbackDesc.Usage = D3D11_USAGE_STAGING;
     readbackDesc.BindFlags = 0;
     readbackDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
-    device->CreateTexture2D(&readbackDesc, nullptr, &readbackTexture);
+    for(int i = 0; i < 2; ++i)
+    {
+        device->CreateTexture2D(&readbackDesc, nullptr, &m_readbackTexture[i]);
+    }
+
+    PrepareDownsampleTextures(DeviceState::g_ClientRect.width, DeviceState::g_ClientRect.height);
 }
 
 ToneMapPass::~ToneMapPass()
 {
-	Memory::SafeDelete(m_pACESConstantBuffer);
-    Memory::SafeDelete(m_pReinhardConstantBuffer);
+	Memory::SafeDelete(m_pToneMapConstantBuffer);
 
-	Memory::SafeDelete(m_pHistogramBuffer);
-	Memory::SafeDelete(m_pAutoExposureConstantBuffer);
+    for (auto* tex : m_downsampleTextures)
+    {
+        DeallocateResource(tex);
+    }
+    m_downsampleTextures.clear();
+
 	//Memory::SafeDelete(m_pAutoExposureReadBuffer);
 }
 
@@ -145,21 +104,85 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-	if (m_toneMapType == ToneMapType::Reinhard)
-	{
-        m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapReinhard"];
-		m_toneMapReinhardConstant.m_bUseToneMap = m_isAbleToneMap;
-		DirectX11::UpdateBuffer(m_pReinhardConstantBuffer, &m_toneMapReinhardConstant);
-		DirectX11::PSSetConstantBuffer(0, 1, &m_pReinhardConstantBuffer);
-	}
-	else if (m_toneMapType == ToneMapType::ACES)
-	{
-        m_pso->m_pixelShader = &ShaderSystem->PixelShaders["ToneMapACES"];
-		m_toneMapACESConstant.m_bUseToneMap = m_isAbleToneMap;
-		m_toneMapACESConstant.m_bUseFilmic = m_isAbleFilmic;
-		DirectX11::UpdateBuffer(m_pACESConstantBuffer, &m_toneMapACESConstant);
-		DirectX11::PSSetConstantBuffer(0, 1, &m_pACESConstantBuffer);
-	}
+	float deltaTime = Time->GetElapsedSeconds();
+	static float elapsedTime = 0.0f;
+	static float targetExposure = 1.0f;
+	static float currentExposure = 1.0f;
+
+    elapsedTime += deltaTime;
+
+	if (!camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::AutoExposurePass))
+    {
+        if (elapsedTime >= 1.0f)
+        {
+            elapsedTime = 0.0f;
+            DirectX11::CSSetShader(m_pAutoExposureEvalCS->GetShader(), 0, 0);
+
+            if (m_isAbleAutoExposure && !m_downsampleTextures.empty())
+            {
+                ID3D11ShaderResourceView* currentSRV = renderData->m_renderTarget->m_pSRV;
+                const UINT offsets[]{ 0 };
+                for (auto* tex : m_downsampleTextures)
+                {
+                    uint32_t groupX = (tex->GetWidth() + 31) / 32;
+                    uint32_t groupY = (tex->GetHeight() + 31) / 32;
+
+                    DirectX11::CSSetShaderResources(0, 1, &currentSRV);
+                    DirectX11::CSSetUnorderedAccessViews(0, 1, &tex->m_pUAV, offsets);
+                    DirectX11::Dispatch(groupX, groupY, 1);
+                    ID3D11ShaderResourceView* nullSRV = nullptr;
+                    ID3D11UnorderedAccessView* nullUAV = nullptr;
+                    DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+                    DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+                    currentSRV = tex->m_pSRV;
+                }
+
+                ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
+                DeviceState::g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
+                D3D11_MAPPED_SUBRESOURCE mapped{};
+                if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+                {
+                    const float lumEpsilon = 0.05f;
+                    float luminance = *reinterpret_cast<float*>(mapped.pData);
+                    DeviceState::g_pDeviceContext->Unmap(m_readbackTexture[m_readIndex].Get(), 0);
+
+                    float EV100 = log2((m_fNumber * m_fNumber) / m_shutterTime * (100.0f / m_ISO));
+                    float exposureManual = 1.0f / pow(2.0f, EV100 + m_exposureCompensation);
+                    float targetLuminance = 0.5f; // Áß°£ È¸»ö ±âÁØ°ª (¿øÇÏ´Â °ªÀ¸·Î Á¶Á¤ °¡´É)
+                    float exposureAuto = targetLuminance / (luminance + 1e-4f);
+
+                    float exposureFinal = exposureManual * exposureAuto;
+
+                    if (fabs(exposureFinal - targetExposure) > lumEpsilon)
+                    {
+                        targetExposure = exposureFinal;
+                    }
+                }
+
+                std::swap(m_readIndex, m_writeIndex);
+            }
+        }
+    }
+
+    constexpr float lerpSpeed = 1.5f; // Adjust this value to control the lerp speed
+    constexpr float epsilon = 0.01f; // Small value to avoid oscillation
+    float diff = fabs(targetExposure - m_toneMapConstant.toneMapExposure);
+
+    if (diff > epsilon)
+    {
+        currentExposure = Mathf::Lerp(m_toneMapConstant.toneMapExposure, targetExposure, lerpSpeed * deltaTime);
+    }
+    else
+    {
+		currentExposure = targetExposure; // Snap to target if close enough
+    }
+
+    m_toneMapConstant.toneMapExposure = currentExposure;
+	m_toneMapConstant.toneMapExposure = std::max(m_toneMapConstant.toneMapExposure, 0.01f); // Ensure exposure is not zero
+    m_toneMapConstant.operatorType = (int)m_toneMapType;
+
+    DirectX11::UpdateBuffer(m_pToneMapConstantBuffer, &m_toneMapConstant);
+    DirectX11::PSSetConstantBuffer(0, 1, &m_pToneMapConstantBuffer);
 
     m_pso->Apply();
 
@@ -181,18 +204,45 @@ void ToneMapPass::ControlPanel()
     ImGui::PushID(this);
     ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap);
     ImGui::SetNextWindowFocus();
-    ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0");
+    ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10");
     ImGui::Separator();
-	if (m_toneMapType == ToneMapType::ACES)
-	{
-		ImGui::Checkbox("Use Filmic", &m_isAbleFilmic);
-        ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
-	}
-    if (m_toneMapType == ToneMapType::ACES && m_toneMapACESConstant.m_bUseFilmic)
-    {
-		//ImGui::DragFloat("ToneMap Exposure", &m_toneMapACESConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
-    }
+    ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
+	ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f);
+	ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f);
+	ImGui::DragFloat("ISO", &m_ISO, 1.0f, 50.0f, 6400.0f);
+	ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f);
     ImGui::PopID();
+}
+
+void ToneMapPass::PrepareDownsampleTextures(uint32_t width, uint32_t height)
+{
+    for (auto* tex : m_downsampleTextures)
+    {
+        DeallocateResource(tex);
+    }
+    m_downsampleTextures.clear();
+
+    uint32_t ratio = 2;
+    while (width / ratio > 1 && height / ratio > 1)
+    {
+        std::string name = "AutoExposureDS" + std::to_string(ratio);
+        auto* tex = Texture::Create(ratio, ratio, width, height, name, DXGI_FORMAT_R32_FLOAT,
+            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+        tex->CreateSRV(DXGI_FORMAT_R32_FLOAT);
+        tex->CreateUAV(DXGI_FORMAT_R32_FLOAT);
+        m_downsampleTextures.push_back(tex);
+        ratio *= 2;
+    }
+    // ensure final 1x1 texture exists
+    if (m_downsampleTextures.empty() ||
+        (m_downsampleTextures.back()->GetWidth() != 1 || m_downsampleTextures.back()->GetHeight() != 1))
+    {
+        auto* tex = Texture::Create(1, 1, "AutoExposureDS1", DXGI_FORMAT_R32_FLOAT,
+            D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
+        tex->CreateSRV(DXGI_FORMAT_R32_FLOAT);
+        tex->CreateUAV(DXGI_FORMAT_R32_FLOAT);
+        m_downsampleTextures.push_back(tex);
+    }
 }
 
 void ToneMapPass::Resize(uint32_t width, uint32_t height)

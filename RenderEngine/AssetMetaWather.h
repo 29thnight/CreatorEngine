@@ -261,6 +261,15 @@ private:
 
     void HandleCreated(const std::filesystem::path& filePath)
     {
+        if (filePath.extension() == ".meta")
+        {
+            FileGuid guid = LoadGuidFromMeta(filePath);
+            std::filesystem::path targetFile = RemoveMetaExtension(filePath);
+            m_assetMetaRegistry->Register(guid, targetFile);
+
+            return;
+        }
+
         if (!IsTargetFile(filePath))
             return;
 
@@ -271,13 +280,6 @@ private:
         {
             CreateYamlMeta(filePath);
             std::cout << "[Meta Created] " << metaPath << std::endl;
-        }
-
-        if (filePath.extension() == ".meta")
-        {
-            FileGuid guid = LoadGuidFromMeta(filePath);
-            std::filesystem::path targetFile = RemoveMetaExtension(filePath);
-            m_assetMetaRegistry->Register(guid, targetFile);
         }
     }
 

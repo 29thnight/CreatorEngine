@@ -140,6 +140,9 @@ public:
 		m_desc.Height = static_cast<uint32>(m_size.y / m_sizeRatio.y);
 	}
 
+	float GetWidth() const { return m_desc.Width; }
+	float GetHeight() const { return m_desc.Height; }
+
 private:
 	float2 m_size{};
 	float2 m_sizeRatio{ 1.f, 1.f };

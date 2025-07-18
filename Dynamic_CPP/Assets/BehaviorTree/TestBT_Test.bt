@@ -7,45 +7,125 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1137837153]
-    Position: {x: 304, y: 35}
-  - ID: 1137837153
-    Type: 5
-    Name: ConditionDecorator
+    Children: [686063297]
+    Position: {x: -154, y: -67}
+  - ID: 686063297
+    Type: 3
+    Name: Selector
     ParentID: 3298839070
-    IsRoot: false
-    HasScript: true
-    ScriptName: TestConCec
-    Policy: -858993460
-    Children: [2463137906]
-    Position: {x: 560, y: 216}
-  - ID: 2463137906
-    Type: 2
-    Name: Sequence
-    ParentID: 1137837153
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1369363908, 716073618]
-    Position: {x: 560, y: 392}
-  - ID: 1369363908
-    Type: 8
-    Name: Action
-    ParentID: 2463137906
+    Children: [3909499465, 3825938343]
+    Position: {x: 54, y: 61}
+  - ID: 3909499465
+    Type: 2
+    Name: Sequence
+    ParentID: 686063297
     IsRoot: false
     HasScript: true
-    ScriptName: TestAction
+    ScriptName: ""
     Policy: -858993460
-    Children: ~
-    Position: {x: 323, y: 480}
-  - ID: 716073618
+    Children: [1191098861, 1220802128]
+    Position: {x: -282, y: 205}
+  - ID: 1191098861
     Type: 6
     Name: Condition
-    ParentID: 2463137906
+    ParentID: 3909499465
     IsRoot: false
     HasScript: true
-    ScriptName: TestCon
+    ScriptName: IsDaed
     Policy: -858993460
     Children: ~
-    Position: {x: 747, y: 438}
+    Position: {x: -426, y: 360}
+  - ID: 1220802128
+    Type: 8
+    Name: Action
+    ParentID: 3909499465
+    IsRoot: false
+    HasScript: true
+    ScriptName: DaedAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: -154, y: 376}
+  - ID: 3825938343
+    Type: 3
+    Name: Selector
+    ParentID: 686063297
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [700856674, 3380368976, 2108044870]
+    Position: {x: 390, y: 109}
+  - ID: 700856674
+    Type: 2
+    Name: Sequence
+    ParentID: 3825938343
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1558418268, 1856270841]
+    Position: {x: 246, y: 269}
+  - ID: 1558418268
+    Type: 6
+    Name: Condition
+    ParentID: 700856674
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsAtteck
+    Policy: -858993460
+    Children: ~
+    Position: {x: 214, y: 408}
+  - ID: 3380368976
+    Type: 2
+    Name: Sequence
+    ParentID: 3825938343
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [574968042, 3513064655]
+    Position: {x: 470, y: 264}
+  - ID: 574968042
+    Type: 6
+    Name: Condition
+    ParentID: 3380368976
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsDetect
+    Policy: -858993460
+    Children: ~
+    Position: {x: 470, y: 408}
+  - ID: 2108044870
+    Type: 8
+    Name: Action
+    ParentID: 3825938343
+    IsRoot: false
+    HasScript: true
+    ScriptName: Idle
+    Policy: -858993460
+    Children: ~
+    Position: {x: 822, y: 248}
+  - ID: 1856270841
+    Type: 8
+    Name: Action
+    ParentID: 700856674
+    IsRoot: false
+    HasScript: true
+    ScriptName: AtteckAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 230, y: 568}
+  - ID: 3513064655
+    Type: 8
+    Name: Action
+    ParentID: 3380368976
+    IsRoot: false
+    HasScript: true
+    ScriptName: ChaseAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 486, y: 568}

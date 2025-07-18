@@ -73,7 +73,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
-	m_pEditorCamera->m_applyRenderPipelinePass.m_GridPass = true;
+	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::GridPass);
+	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
@@ -422,13 +423,13 @@ void SceneRenderer::SceneRendering()
 
 		if (camera != m_pEditorCamera.get())
 		{
-			if(EngineSettingInstance->IsGameView())
+			if (EngineSettingInstance->IsGameView())
 			{
-				camera->m_applyRenderPipelinePass.m_BlitPass = true;
+				camera->m_avoidRenderPass.Clear((flag)RenderPipelinePass::BlitPass);
 			}
 			else
 			{
-				camera->m_applyRenderPipelinePass.m_BlitPass = false;
+				camera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 			}
 		}
 

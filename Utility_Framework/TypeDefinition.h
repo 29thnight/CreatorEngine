@@ -96,7 +96,7 @@ public:
     {
         m_flag ^= 1U << flag;
     }
-    constexpr bool32 Test(flag flag) const noexcept
+    constexpr bool Test(flag flag) const noexcept
     {
         return m_flag & (1U << flag);
     }

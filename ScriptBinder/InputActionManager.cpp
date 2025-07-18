@@ -13,6 +13,27 @@ void InputActionManager::Update(float tick)
 	}
 }
 
+void InputActionManager::AddActionMap()
+{
+	std::string baseName = "NewActionMap";
+	std::string finalName = baseName;
+
+	int uniqueIndex = 0;
+
+	// 이미 존재하는 이름이 있는 동안 반복
+	while (FindActionMap(finalName) != nullptr)
+	{
+		finalName = baseName + std::to_string(uniqueIndex);
+		uniqueIndex++;
+	}
+
+	ActionMap* newActionMap = new ActionMap();
+	newActionMap->m_name = finalName;
+	m_actionMaps.push_back(newActionMap);
+
+
+}
+
 ActionMap* InputActionManager::AddActionMap(std::string name)
 {
 	for (auto& actionMap : m_actionMaps)
