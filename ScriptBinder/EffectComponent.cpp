@@ -1,3 +1,4 @@
+#include "ParticleSystem.h"
 #include "EffectComponent.h"
 #include "EffectManagerProxy.h"
 #include "EffectProxyController.h"

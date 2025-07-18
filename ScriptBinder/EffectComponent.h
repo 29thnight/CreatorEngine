@@ -1,5 +1,4 @@
 #pragma once
-#include "ParticleSystem.h"
 #include "Component.h"
 #include "EffectComponent.generated.h"
 
