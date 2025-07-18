@@ -77,9 +77,9 @@ public:
 	int   m_curDashCount = 0;   //지금 연속대시한 횟수
 
 	[[Property]]
-	float KnockbackPowerX = 200.f;
+	float AttackPowerX = 500.f;
 	[[Property]]
-	float KnockbackPowerY = 20.f;
+	float AttackPowerY = 20.f;
 
 
 	void TestStun();
