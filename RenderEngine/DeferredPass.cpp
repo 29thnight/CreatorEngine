@@ -189,7 +189,7 @@ void DeferredPass::ControlPanel()
 		m_UseAmbientOcclusion = true;
 		m_UseEnvironmentMap = true;
 		m_UseLightWithShadows = true;
-		m_envMapIntensity = 0.2f;
+		m_envMapIntensity = 1.f;
     }
     ImGui::PopID();
 }

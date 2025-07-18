@@ -65,9 +65,11 @@ SkyBoxPass::SkyBoxPass()
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	auto clampSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	m_pso->m_samplers.push_back(linearSampler);
 	m_pso->m_samplers.push_back(pointSampler);
+	m_pso->m_samplers.push_back(clampSampler);
 }
 
 SkyBoxPass::~SkyBoxPass()
@@ -251,6 +253,7 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 	DirectX11::VSSetShader(m_pso->m_vertexShader->GetShader(), nullptr, 0);
 	DirectX11::PSSetShader(m_irradiancePS->GetShader(), nullptr, 0);
 	DirectX11::PSSetShaderResources(0, 1, &m_skyBoxCubeMap->m_pSRV);
+	deviceContext->PSSetSamplers(2, 1, &m_pso->m_samplers[2]->m_SamplerState);
 	scene.UseModel();
 
 	for (int i = 0; i < 6; ++i)

@@ -7,18 +7,14 @@ constexpr uint32 NUM_BINS = 256;
 enum class ToneMapType
 {
 	Reinhard,
-	ACES
+	ACES,
+	Uncharted2,
+	HDR10
 };
 
-cbuffer ToneMapReinhardConstant
+cbuffer ToneMapConstant
 {
-    bool32 m_bUseToneMap{ true };
-};
-
-cbuffer ToneMapACESConstant
-{
-	bool32 m_bUseToneMap{ true };
-	bool32 m_bUseFilmic{ true };
+	int	  operatorType{ static_cast<int>(ToneMapType::ACES) };
     float filmSlope{ 0.88f };
     float filmToe{ 0.55f };
     float filmShoulder{ 0.26f };
@@ -42,19 +38,26 @@ public:
 
 private:
     Texture* m_DestTexture{};
-	ComPtr<ID3D11Texture2D> readbackTexture;
+	ComPtr<ID3D11Texture2D> m_readbackTexture[2];
 
 	bool m_isAbleAutoExposure{ true };
 	bool m_isAbleToneMap{ true };
-	bool m_isAbleFilmic{ true };
+	// Auto Exposure Settings
+	float m_fNumber{ 8.f };
+	float m_shutterTime{ 16.f }; // 1/100s
+	float m_ISO{ 100.f };
+	float m_exposureCompensation{};
+	float m_speedBrightness{ 1.5f };
+	float m_speedDarkness{ 0.7f };
+
+	uint32 m_readIndex{ 0 };
+	uint32 m_writeIndex{ 1 };
 
 	ComputeShader* m_pAutoExposureEvalCS{};
 	std::vector<Texture*> m_downsampleTextures;
 	ToneMapType m_toneMapType{ ToneMapType::ACES };
 
-	ID3D11Buffer* m_pReinhardConstantBuffer{};
-	ID3D11Buffer* m_pACESConstantBuffer{};
+	ID3D11Buffer* m_pToneMapConstantBuffer{};
 
-	ToneMapReinhardConstant m_toneMapReinhardConstant{};
-	ToneMapACESConstant m_toneMapACESConstant{};
+	ToneMapConstant m_toneMapConstant{};
 };

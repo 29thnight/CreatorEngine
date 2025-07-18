@@ -12,8 +12,6 @@ struct PixelShaderInput
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float4 sRGBColor = float4(SkyboxTexture.SampleLevel(LinearSampler, IN.texCoord, 0.0).rgb, 1);
-    
-    float4 gammaColor = SRGBtoLINEAR(sRGBColor);
-    
-    return gammaColor;
+  
+    return sRGBColor;
 }

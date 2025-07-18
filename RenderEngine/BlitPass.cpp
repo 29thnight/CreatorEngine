@@ -51,7 +51,7 @@ void BlitPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-    if(false == camera.m_applyRenderPipelinePass.m_BlitPass) return;
+    if(camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::BlitPass)) return;
 
     m_pso->Apply();
 
