@@ -22,9 +22,11 @@ namespace BT
 		virtual bool IsOutpinConnected() const { return false; }
 
 		virtual BehaviorNodeType GetNodeType() const = 0;
-
+		void SetOwner(GameObject* owner) { m_owner = owner; }
+		GameObject* GetOwner() const { return m_owner; }
 	protected:
 		std::string m_name;
+		GameObject* m_owner{ nullptr }; // Node가 소속된 GameObject
 		bool m_isOutpinConnected{ false };
 	};
 
