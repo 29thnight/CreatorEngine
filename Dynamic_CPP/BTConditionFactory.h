@@ -4,6 +4,9 @@
 #include "BTHeader.h"
 
 // Automation include ConditionNodeClass header
+#include "IsDetect.h"
+#include "IsAtteck.h"
+#include "IsDaed.h"
 #include "TestCon.h"
 
 

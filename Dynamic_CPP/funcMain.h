@@ -188,12 +188,19 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+	ActionCreateFactory::GetInstance()->RegisterFactory("ChaseAction", []() { return new ChaseAction(); });
+	ActionCreateFactory::GetInstance()->RegisterFactory("Idle", []() { return new Idle(); });
+	ActionCreateFactory::GetInstance()->RegisterFactory("AtteckAction", []() { return new AtteckAction(); });
+	ActionCreateFactory::GetInstance()->RegisterFactory("DaedAction", []() { return new DaedAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("TestAction", []() { return new TestAction(); });
 	}
 
 	EXPORT_API void InitConditionFactory()
 	{
 		// Register the factory function for BTCondition Automation
+	ConditionCreateFactory::GetInstance()->RegisterFactory("IsDetect", []() { return new IsDetect(); });
+	ConditionCreateFactory::GetInstance()->RegisterFactory("IsAtteck", []() { return new IsAtteck(); });
+	ConditionCreateFactory::GetInstance()->RegisterFactory("IsDaed", []() { return new IsDaed(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("TestCon", []() { return new TestCon(); });
 
 	}
