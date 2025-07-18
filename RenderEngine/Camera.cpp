@@ -208,35 +208,62 @@ void Camera::HandleMovement(float deltaTime)
 	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT))
 	{
 		// 마우스 이동량 가져오기
-		float deltaPitch = InputManagement->GetMouseDelta().y * 0.01f;
-		float deltaYaw = InputManagement->GetMouseDelta().x * 0.01f;
+		deltaPitch += InputManagement->GetMouseDelta().y * 0.01f;
+		deltaYaw += InputManagement->GetMouseDelta().x * 0.01f;
 
-		// 현재 회전 기준 축을 얻음
-		XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+		XMVECTOR qYaw = XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), deltaYaw);
 
-		// 프레임당 변화량만 적용
-		XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
-		XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
+		// qYaw 기준으로 회전된 로컬 X축
+		XMVECTOR right = XMVector3Rotate(XMVectorSet(1, 0, 0, 0), qYaw);
 
-		// Yaw를 먼저 적용 -> Pitch를 적용
-		XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
-		m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
-		m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
-		m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
+		XMVECTOR qPitch = XMQuaternionRotationAxis(right, deltaPitch);
 
-		// 새로운 방향 벡터 계산
-		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
+		// 최종 쿼터니언 = Yaw → Pitch
+		XMVECTOR cameraRot = XMQuaternionMultiply(qYaw, qPitch);
 
-		// Right 벡터 업데이트 (UP을 기준으로 다시 계산)
-		m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+		// Forward 벡터 구하기
+		m_forward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), cameraRot);
+		m_up = XMVector3Rotate(XMVectorSet(0, 1, 0, 0), cameraRot);
+		m_right = XMVector3Cross(m_up, m_forward);
+		rotate = cameraRot;
 
-		m_up = XMVector3Cross(m_forward, m_right);
+		/*XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), rotate);
 
-			float sign = XMVectorGetY(m_up) > 0 ? 1.0f : -1.0f;
-			m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
-			m_up = XMQuaternionNormalize(m_up);
+		XMVECTOR q1 = XMQuaternionRotationAxis(forward, deltaYaw);
+		forward = XMVector3Rotate(forward, q1);
 
-		rotate = m_rotationQuat;
+		XMVECTOR q2 = XMQuaternionRotationAxis(forward, deltaPitch);
+		rotate = q2;
+		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, rotate));
+		m_right = XMVector3Normalize(XMVector3Rotate(RIGHT, rotate));
+		m_up = XMVector3Normalize(XMVector3Rotate(UP, rotate));*/
+
+		//// 현재 회전 기준 축을 얻음
+		//XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+
+		//// 프레임당 변화량만 적용
+		//XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
+		//XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
+
+		//// Yaw를 먼저 적용 -> Pitch를 적용
+		//XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
+		//m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
+		//m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
+		//m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
+
+		//// 새로운 방향 벡터 계산
+		//m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
+
+		//// Right 벡터 업데이트 (UP을 기준으로 다시 계산)
+		//m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
+
+		//m_up = XMVector3Cross(m_forward, m_right);
+
+		//	float sign = XMVectorGetY(m_up) > 0 ? 1.0f : -1.0f;
+		//	m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
+		//	m_up = XMQuaternionNormalize(m_up);
+
+		//rotate = m_rotationQuat;
 	}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;

@@ -58,7 +58,7 @@ public:
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
 
 	[[Property]]
-	Mathf::Vector4 rotate{ XMQuaternionIdentity() };
+	Mathf::Quaternion rotate{ XMQuaternionIdentity() };
 
 	static constexpr Mathf::xVector FORWARD = { 0.f, 0.f, 1.f };
 	static constexpr Mathf::xVector RIGHT = { 1.f, 0.f, 0.f };
@@ -88,7 +88,8 @@ public:
 
 	int m_monitorIndex{ 0 };
 	int m_cameraIndex{ -1 };
-
+	float deltaPitch = 0.f;
+	float deltaYaw = 0.f;
 	bool m_isLinkRenderData;
 
 	Mathf::Vector4 m_rayDirection{ 0.f, 0.f, 0.f, 0.f };
