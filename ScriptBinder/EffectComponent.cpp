@@ -6,8 +6,11 @@ void EffectComponent::Awake()
 {
     // Awake에서는 기본 설정만 하고 이펙트는 생성하지 않음
     m_lastPosition = GetOwner()->m_transform.GetWorldPosition();
+    auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
+    float pitch, yaw, roll;
+    Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
+    m_lastRotation = Mathf::Vector3(pitch, yaw, roll);
 
-    // 기본 템플릿이 설정되어 있으면 자동 재생
     if (!m_effectTemplateName.empty())
     {
         PlayEffectByName(m_effectTemplateName);
@@ -18,17 +21,14 @@ void EffectComponent::Update(float tick)
 {
     if (!m_effectInstanceName.empty() && m_isPlaying)
     {
-        // 시간 업데이트
         m_currentTime += tick * m_timeScale;
 
-        // 지속시간 체크
         if (!m_loop && m_duration > 0 && m_currentTime >= m_duration)
         {
             StopEffect();
             return;
         }
 
-        // 루프 처리
         if (m_loop && m_duration > 0 && m_currentTime >= m_duration)
         {
             m_currentTime = 0.0f;
@@ -37,20 +37,31 @@ void EffectComponent::Update(float tick)
         }
     }
 
-    // 이펙트 전체 위치 동기화 (항상 컴포넌트 위치 기준)
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
+        auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
+
         Mathf::Vector3 currentPos = Mathf::Vector3(worldPos.m128_f32[0], worldPos.m128_f32[1], worldPos.m128_f32[2]);
 
-        float distance = (m_lastPosition - currentPos).Length();
-        if (distance > 0.001f)
+        float pitch, yaw, roll;
+        Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
+        Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
+
+        float posDistance = (m_lastPosition - currentPos).Length();
+        if (posDistance > 0.001f)
         {
-            // 이펙트 전체 기준점을 컴포넌트 위치로 설정
-            // 각 에미터는 자동으로 (기준점 + 개별 오프셋) 위치로 계산됨
             auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
             EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
             m_lastPosition = currentPos;
+        }
+
+        float rotDistance = (m_lastRotation - currentRot).Length();
+        if (rotDistance > 0.001f)
+        {
+            auto rotationCommand = EffectManagerProxy::CreateSetRotationCommand(m_effectInstanceName, currentRot);
+            EffectProxyController::GetInstance()->PushEffectCommand(std::move(rotationCommand));
+            m_lastRotation = currentRot;
         }
     }
 }

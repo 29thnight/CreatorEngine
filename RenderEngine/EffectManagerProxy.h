@@ -14,6 +14,7 @@ enum class EffectCommandType
     RemoveEffect,
     UpdateEffectProperty,
     CreateInstance,
+    SetRotation,
 };
 
 class EffectManagerProxy
@@ -88,6 +89,20 @@ public:
         cmd.m_executeFunction = [effectName, timeScale]() {
             if (auto* effect = efm->GetEffect(effectName)) {
                 effect->SetTimeScale(timeScale);
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 회전 설정 명령
+    static EffectManagerProxy CreateSetRotationCommand(const std::string& effectName, const Mathf::Vector3& rotation)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::SetRotation;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName, rotation]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                effect->SetRotation(rotation);
             }
             };
         return cmd;

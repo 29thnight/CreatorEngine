@@ -21,6 +21,20 @@ struct MeshConstantBuffer
 	float padding;
 };
 
+struct PolarClippingParams
+{
+	float polarClippingEnabled = 0.0f;    // 극좌표 클리핑 활성화 여부
+	float polarAngleProgress = 0.0f;      // 0~1: 각도 진행도
+	float polarStartAngle = 0.0f;         // 시작 각도 (라디안)
+	float polarDirection = 1.0f;          // 1: 시계방향, -1: 반시계방향
+
+	Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // 극좌표 중심점 (월드 좌표)
+	float pad2 = 0.0f;
+
+	Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // 극좌표 위쪽 축
+	float pad3 = 0.0f;
+};
+
 class MeshModuleGPU : public RenderModules, public ISerializable
 {
 public:
@@ -65,11 +79,26 @@ public:
 	bool IsClippingAnimating() const { return m_isClippingAnimating; }
 	float GetClippingAnimationSpeed() const { return m_clippingAnimationSpeed; }
 
+	void CreatePolarClippingBuffer();
+	void UpdatePolarClippingBuffer();
+	void EnablePolarClipping(bool enable);
+	bool IsPolarClippingEnabled() const;
+	void SetPolarAngleProgress(float progress);
+	void SetPolarCenter(const Mathf::Vector3& center);
+	void SetPolarUpAxis(const Mathf::Vector3& upAxis);
+	void SetPolarStartAngle(float angleRadians);
+	void SetPolarDirection(float direction); // 1.0f: 시계방향, -1.0f: 반시계방향
+	void SetPolarClippingAnimation(bool enable, float speed = 1.0f);
+
+	const PolarClippingParams& GetPolarClippingParams() const { return m_polarClippingParams; }
+	bool IsPolarClippingAnimating() const { return m_isPolarClippingAnimating; }
+	float GetPolarClippingAnimationSpeed() const { return m_polarClippingAnimationSpeed; }
+
 public:
 	virtual nlohmann::json SerializeData() const override;
 	virtual void DeserializeData(const nlohmann::json& json) override;
 	virtual std::string GetModuleType() const override;
-
+	std::pair<Mathf::Vector3, Mathf::Vector3> GetCurrentMeshBounds() const;
 private:
 	// 내부 함수들
 	void CreateCubeMesh();
@@ -77,7 +106,7 @@ private:
 	void UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view,
 		const Mathf::Matrix& projection);
 
-	std::pair<Mathf::Vector3, Mathf::Vector3> GetCurrentMeshBounds() const;
+
 
 	bool m_isClippingAnimating = false;
 	float m_clippingAnimationSpeed = 1.0f;
@@ -103,4 +132,10 @@ private:
 	Mathf::Matrix m_worldMatrix;
 	Mathf::Matrix m_invWorldMatrix;
 	bool m_useRelativeClipping;
+
+	ComPtr<ID3D11Buffer> m_polarClippingBuffer;
+	PolarClippingParams m_polarClippingParams;
+	bool m_isPolarClippingAnimating = false;
+	float m_polarClippingAnimationSpeed = 1.0f;
+
 };
