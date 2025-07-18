@@ -193,4 +193,4 @@ private:
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
 };
 
-static inline auto& EngineSettingInstance = EngineSetting::GetInstance();
+static auto& EngineSettingInstance = EngineSetting::GetInstance();
