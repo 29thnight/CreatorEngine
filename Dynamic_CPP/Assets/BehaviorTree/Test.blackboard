@@ -1,7 +1,17 @@
 Test:
-  - key: testInt
+  - key: Asis
     value:
-      Type: 2
+      Type: 9
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Asis
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorAsis
+    value:
+      Type: 1
       BoolValue: false
       IntValue: 0
       FloatValue: 0
@@ -9,23 +19,73 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: testFloat
+  - key: eNorTargetRange
     value:
       Type: 3
       BoolValue: false
       IntValue: 0
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorHP
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 100
       FloatValue: 0
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: TestGameObject
+  - key: eNorSpeed
     value:
-      Type: 8
+      Type: 3
       BoolValue: false
       IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorDmg
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 1
       FloatValue: 0
-      StringValue: Main Camera
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorAtkRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 1
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorChaseRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 30
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorChaseOutDuration
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}

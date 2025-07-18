@@ -27,7 +27,7 @@ public:
 	const Mathf::Vector2& GetValueAsVector2(const std::string& key) const;
 	const Mathf::Vector3& GetValueAsVector3(const std::string& key) const;
 	const Mathf::Vector4& GetValueAsVector4(const std::string& key) const;
-	const GameObject* GetValueAsGameObject(const std::string& key) const;
+	GameObject* GetValueAsGameObject(const std::string& key) const;
 	const Transform& GetValueAsTransform(const std::string& key) const;
 
 	// Management

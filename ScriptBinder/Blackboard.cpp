@@ -141,7 +141,7 @@ const Mathf::Vector4& BlackBoard::GetValueAsVector4(const std::string& key) cons
 	return GetChecked(key, BlackBoardType::Vector4).Vec4Value;
 }
 
-const GameObject* BlackBoard::GetValueAsGameObject(const std::string& key) const
+GameObject* BlackBoard::GetValueAsGameObject(const std::string& key) const
 {
 	auto& entry = GetChecked(key, BlackBoardType::GameObject);
 	auto gameObject = GameObject::Find(entry.StringValue);

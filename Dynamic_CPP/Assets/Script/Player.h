@@ -46,6 +46,9 @@ public:
 	void FindNearObject(GameObject* gameObject);
 
 
+	[[Property]]
+	int playerIndex = 0;
+
 	[[Method]]
 	void OnPunch();
 	int m_weaponIndex = 0;

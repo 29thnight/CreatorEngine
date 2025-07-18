@@ -4,6 +4,10 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "ChaseAction.h"
+#include "Idle.h"
+#include "AtteckAction.h"
+#include "DaedAction.h"
 #include "TestAction.h"
 
 class ActionCreateFactory : public Singleton<ActionCreateFactory>
