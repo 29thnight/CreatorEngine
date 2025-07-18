@@ -140,7 +140,8 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
                 ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
                 DeviceState::g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
                 D3D11_MAPPED_SUBRESOURCE mapped{};
-                if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+                if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(
+                    m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
                 {
                     const float lumEpsilon = 0.05f;
                     float luminance = *reinterpret_cast<float*>(mapped.pData);
@@ -164,13 +165,14 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
         }
     }
 
-    constexpr float lerpSpeed = 1.5f; // Adjust this value to control the lerp speed
     constexpr float epsilon = 0.01f; // Small value to avoid oscillation
     float diff = fabs(targetExposure - m_toneMapConstant.toneMapExposure);
 
     if (diff > epsilon)
     {
-        currentExposure = Mathf::Lerp(m_toneMapConstant.toneMapExposure, targetExposure, lerpSpeed * deltaTime);
+        float speed = (targetExposure > m_toneMapConstant.toneMapExposure) ? m_speedBrightness : m_speedDarkness;
+
+        currentExposure = Mathf::Lerp(m_toneMapConstant.toneMapExposure, targetExposure, speed * deltaTime);
     }
     else
     {
@@ -206,11 +208,17 @@ void ToneMapPass::ControlPanel()
     ImGui::SetNextWindowFocus();
     ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10");
     ImGui::Separator();
-    ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f);
+    ImGui::Text("Auto Exposure Settings");
+	ImGui::Checkbox("Use Auto Exposure", &m_isAbleAutoExposure);
+    ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", ImGuiSliderFlags_NoInput);
+    ImGui::Separator();
+	ImGui::Text("Auto Exposure Settings");
 	ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f);
 	ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f);
-	ImGui::DragFloat("ISO", &m_ISO, 1.0f, 50.0f, 6400.0f);
+	ImGui::DragFloat("ISO", &m_ISO, 50.0f, 50.0f, 6400.0f);
 	ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f);
+	ImGui::DragFloat("Speed Brightness", &m_speedBrightness, 0.01f, 0.1f, 10.0f);
+	ImGui::DragFloat("Speed Darkness", &m_speedDarkness, 0.01f, 0.1f, 10.0f);
     ImGui::PopID();
 }
 
