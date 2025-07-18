@@ -37,7 +37,7 @@ void SceneManager::Editor()
 
     if (!m_isGameStart)
     {
-		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트떄 한번만 초기화하고 다시들어가게
+		m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트떄 한번만 초기화하고 다시들어가게
         ScriptManager->ReloadDynamicLibrary();
         m_isInitialized = false; // Reset initialization state for editor scene
 		m_activeScene.load()->Awake();
