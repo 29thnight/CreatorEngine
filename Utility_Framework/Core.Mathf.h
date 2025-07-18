@@ -58,6 +58,11 @@ namespace Mathf
         return _val;
     }
 
+    template<typename T> T Lerp(const T& a, const T& b, float t) noexcept
+    {
+        return a + (b - a) * t;
+	}
+
     inline Vector3 Lerp(const Vector3& a, const Vector3& b, float t) noexcept
     {
         return Vector3::Lerp(a, b, t);

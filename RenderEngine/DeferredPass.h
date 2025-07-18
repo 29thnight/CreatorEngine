@@ -33,7 +33,7 @@ private:
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };
 	bool m_UseLightWithShadows{ true };
-	float m_envMapIntensity{ 0.2f };
+	float m_envMapIntensity{ 1.f };
 
     ComPtr<ID3D11Buffer> m_Buffer{};
     ComPtr<ID3D11Buffer> m_shadowcamBuffer{};

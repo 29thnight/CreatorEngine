@@ -100,7 +100,7 @@ public:
 
 	bool m_isActive{ true };
 	bool m_isOrthographic{ false };
-	ApplyRenderPipelinePass m_applyRenderPipelinePass{}; //TODO : Bitflag로 변경예정
+	BitFlag m_avoidRenderPass{};
 
 	ComPtr<ID3D11Buffer>	m_ViewBuffer;
 	ComPtr<ID3D11Buffer>	m_ProjBuffer;

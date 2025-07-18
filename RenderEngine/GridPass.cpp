@@ -102,7 +102,7 @@ void GridPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-	if (camera.m_applyRenderPipelinePass.m_GridPass == false) return;
+	if (camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::GridPass)) return;
 
     m_pso->Apply();
 
