@@ -64,7 +64,7 @@ SpritePass::~SpritePass()
 
 void SpritePass::Execute(RenderScene& scene, Camera& camera)
 {
-	if (false == camera.m_applyRenderPipelinePass.m_SpritePass)
+	if (camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::SpritePass))
 	{
 		return;
 	}

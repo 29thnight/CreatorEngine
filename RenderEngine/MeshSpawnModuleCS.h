@@ -79,6 +79,7 @@ public:
 	virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) override;
 
 	void SetEmitterPosition(const Mathf::Vector3& position);
+	void SetEmitterRotation(const Mathf::Vector3& rotation);
 
 	// 스폰 설정 메서드들
 	void SetSpawnRate(float rate);

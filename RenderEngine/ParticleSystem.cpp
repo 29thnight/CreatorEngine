@@ -124,28 +124,57 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 	}
 }
 
+void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition)
+{
+	m_effectBasePosition = newBasePosition;
+
+	// 실제 emitter 월드 위치 = Effect 기준점 + 이 ParticleSystem의 상대위치
+	Mathf::Vector3 finalWorldPosition = m_effectBasePosition + m_position;
+
+	// SpawnModule들에 최종 계산된 위치 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+
+		SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module);
+		if (spawnModule) {
+			spawnModule->SetEmitterPosition(finalWorldPosition);
+			continue;
+		}
+
+		MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module);
+		if (meshSpawnModule) {
+			meshSpawnModule->SetEmitterPosition(finalWorldPosition);
+			continue;
+		}
+	}
+}
+
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {
-	m_position = position;
-	// 모든 스폰 모듈에 위치 업데이트 알림
+	m_position = position;  // 상대좌표 저장
+
+	// Effect 기준점이 설정되어 있다면 즉시 업데이트
+	UpdateEffectBasePosition(m_effectBasePosition);
+}
+
+void ParticleSystem::SetRotation(const Mathf::Vector3& rotation)
+{
+	m_rotation = rotation;
+
+	// SpawnModule들에 회전값 전달
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
 	{
 		ParticleModule& module = *it;
 
-		// SpawnModuleCS 체크
-		SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module);
-		if (spawnModule)
+		// SpawnModuleCS인지 확인
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module))
 		{
-			spawnModule->SetEmitterPosition(position);
-			continue; // 하나 찾았으면 다음으로
+			spawnModule->SetEmitterRotation(rotation);
 		}
-
-		// MeshSpawnModuleCS 체크
-		MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module);
-		if (meshSpawnModule)
+		// MeshSpawnModuleCS인지 확인
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module))
 		{
-			meshSpawnModule->SetEmitterPosition(position);
-			continue;
+			meshSpawnModule->SetEmitterRotation(rotation);
 		}
 	}
 }

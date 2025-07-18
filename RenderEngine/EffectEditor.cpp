@@ -827,34 +827,19 @@ void EffectEditor::AddSelectedRender()
 void EffectEditor::SaveEffectToJson(const std::string& filename)
 {
 	m_saveFileName[0] = '\0';
-
 	if (m_tempEmitters.empty()) {
 		std::cout << "No emitters to save!" << std::endl;
 		return;
 	}
 
 	try {
-		// 임시 이펙트 생성
-		std::string basePath = "Dynamic_CPP/Assets/Effect/";
-
-		std::string finalFilename = filename;
-		if (finalFilename.find('.') == std::string::npos) {
-			finalFilename += ".json";
-		}
-
-		std::string fullPath = basePath + finalFilename;
-		std::filesystem::create_directories(std::filesystem::path(fullPath).parent_path());
-
-		std::string effectName = finalFilename;
-		size_t dotPos = effectName.find_last_of('.');
-		if (dotPos != std::string::npos) {
-			effectName = effectName.substr(0, dotPos);
-		}
+		file::path filepath = PathFinder::Relative("Effect\\") / filename;
+		filepath.replace_extension(".json");
+		std::string effectName = filepath.stem().string();
 
 		auto tempEffect = std::make_unique<EffectBase>();
 		tempEffect->SetName(effectName);
 
-		// 모든 에미터를 이펙트에 추가
 		for (const auto& tempEmitter : m_tempEmitters) {
 			if (tempEmitter.particleSystem) {
 				tempEmitter.particleSystem->m_name = tempEmitter.name;
@@ -862,20 +847,17 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 			}
 		}
 
-		// JSON으로 직렬화
 		nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
 
-		// 파일로 저장
-		std::ofstream file(fullPath);
+		std::ofstream file(filepath);
 		if (file.is_open()) {
-			file << effectJson.dump(4); // 들여쓰기로 보기 좋게
+			file << effectJson.dump(4);
 			file.close();
-			std::cout << "Effect saved to: " << fullPath << std::endl;
+			std::cout << "Effect saved to: " << filepath << std::endl;
 		}
 		else {
-			std::cerr << "Failed to open file for writing: " << fullPath << std::endl;
+			std::cerr << "Failed to open file for writing: " << filepath << std::endl;
 		}
-
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error saving effect: " << e.what() << std::endl;
@@ -885,19 +867,13 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 void EffectEditor::LoadEffectFromJson(const std::string& filename)
 {
 	m_loadFileName[0] = '\0';
-
 	try {
-		std::string basePath = "Dynamic_CPP/Assets/Effect/";
-		std::string finalFilename = filename;
-		if (finalFilename.find('.') == std::string::npos) {
-			finalFilename += ".json";
-		}
+		file::path filepath = PathFinder::Relative("Effect\\") / filename;
+		filepath.replace_extension(".json");
 
-		std::string fullPath = basePath + finalFilename;
-
-		std::ifstream file(fullPath);
+		std::ifstream file(filepath);
 		if (!file.is_open()) {
-			std::cerr << "Failed to open file: " << fullPath << std::endl;
+			std::cerr << "Failed to open file: " << filepath << std::endl;
 			return;
 		}
 
@@ -912,11 +888,11 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 
 			const auto& particleSystems = loadedEffect->GetAllParticleSystems();
 
-			// 1. 먼저 모든 에미터 정보를 생성
 			for (size_t i = 0; i < particleSystems.size(); ++i) {
 				TempEmitterInfo tempEmitter;
 				m_emitterTextureSelections.push_back(0);
 				tempEmitter.particleSystem = particleSystems[i];
+
 				std::string savedName = tempEmitter.particleSystem->m_name;
 				tempEmitter.name = savedName.empty() ? ("LoadedEmitter_" + std::to_string(i + 1)) : savedName;
 				tempEmitter.isPlaying = false;
@@ -941,7 +917,7 @@ void EffectEditor::LoadEffectFromJson(const std::string& filename)
 			m_loadedEffect = std::move(loadedEffect);
 			SyncResourcesFromLoadedEmitters();
 
-			std::cout << "Effect loaded from: " << fullPath << std::endl;
+			std::cout << "Effect loaded from: " << filepath << std::endl;
 			std::cout << "Loaded " << particleSystems.size() << " particle systems" << std::endl;
 			std::cout << "Synced " << m_textures.size() << " textures to editor" << std::endl;
 		}
@@ -1409,7 +1385,8 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	if (currentMeshType == MeshType::Model) {
 		ImGui::Text("Model Settings:");
 
-		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Drag & Drop FBX files here!");
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Drag & Drop model files here!");
+		ImGui::Text("Supported formats: FBX, OBJ, DAE, GLTF");
 		ImGui::Text("Or use manual load:");
 
 		// 현재 로드된 모델이 있으면 해당 이름을 기본값으로 설정
@@ -1729,6 +1706,196 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	else {
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Clipping Not Supported");
 	}
+
+	// Polar 클리핑 설정 UI
+	ImGui::Separator();
+	ImGui::Text("Polar Clipping Settings:");
+
+	if (meshModule->SupportsClipping()) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.8f, 1.0f), "Polar Clipping Supported");
+
+		// Polar 클리핑 활성화/비활성화
+		bool polarClippingEnabled = meshModule->IsPolarClippingEnabled();
+		if (ImGui::Checkbox("Enable Polar Clipping", &polarClippingEnabled)) {
+			meshModule->EnablePolarClipping(polarClippingEnabled);
+		}
+
+		if (polarClippingEnabled) {
+			ImGui::Indent();
+
+			// Polar 각도 진행도 (0.0 ~ 1.0)
+			const auto& polarParams = meshModule->GetPolarClippingParams();
+			float polarProgress = polarParams.polarAngleProgress;
+			if (ImGui::SliderFloat("Angle Progress", &polarProgress, 0.0f, 1.0f, "%.2f")) {
+				meshModule->SetPolarAngleProgress(polarProgress);
+			}
+
+			// 각도를 도 단위로도 표시
+			float progressInDegrees = polarProgress * 360.0f;
+			ImGui::Text("Angle Range: %.1f degrees", progressInDegrees);
+
+			// 극좌표 중심점 설정
+			float polarCenter[3] = {
+				polarParams.polarCenter.x,
+				polarParams.polarCenter.y,
+				polarParams.polarCenter.z
+			};
+
+			if (ImGui::DragFloat3("Polar Center", polarCenter, 0.1f)) {
+				meshModule->SetPolarCenter(Mathf::Vector3(polarCenter[0], polarCenter[1], polarCenter[2]));
+			}
+
+			// 극좌표 위쪽 축 설정
+			float polarUpAxis[3] = {
+				polarParams.polarUpAxis.x,
+				polarParams.polarUpAxis.y,
+				polarParams.polarUpAxis.z
+			};
+
+			if (ImGui::DragFloat3("Up Axis", polarUpAxis, 0.01f, -1.0f, 1.0f)) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(polarUpAxis[0], polarUpAxis[1], polarUpAxis[2]));
+			}
+
+			// 미리 설정된 Up 축 버튼들
+			ImGui::Text("Quick Up Axis:");
+			if (ImGui::Button("Y-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 1.0f, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("X-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(1.0f, 0.0f, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Z-Up")) {
+				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 0.0f, 1.0f));
+			}
+
+			// 시작 각도 설정 (라디안 및 도 단위)
+			float startAngleRadians = polarParams.polarStartAngle;
+			float startAngleDegrees = startAngleRadians * 180.0f / 3.14159265f;
+
+			if (ImGui::SliderFloat("Start Angle (Degrees)", &startAngleDegrees, 0.0f, 360.0f, "%.1f°")) {
+				startAngleRadians = startAngleDegrees * 3.14159265f / 180.0f;
+				meshModule->SetPolarStartAngle(startAngleRadians);
+			}
+
+			// 회전 방향 설정
+			float direction = polarParams.polarDirection;
+			bool clockwise = (direction > 0.0f);
+			if (ImGui::Checkbox("Clockwise Direction", &clockwise)) {
+				meshModule->SetPolarDirection(clockwise ? 1.0f : -1.0f);
+			}
+
+			// 극좌표 중심점 프리셋
+			ImGui::Separator();
+			ImGui::Text("Center Presets:");
+			if (ImGui::Button("Origin (0,0,0)")) {
+				meshModule->SetPolarCenter(Mathf::Vector3::Zero);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset to Mesh Center")) {
+				// 현재 메시의 바운딩 박스 중심으로 설정
+				auto bounds = meshModule->GetCurrentMeshBounds();
+				Mathf::Vector3 center = (bounds.first + bounds.second) * 0.5f;
+				meshModule->SetPolarCenter(center);
+			}
+
+			// 애니메이션 테스트
+			ImGui::Separator();
+			ImGui::Text("Polar Animation Test:");
+
+			bool animatePolarClipping = meshModule->IsPolarClippingAnimating();
+			if (ImGui::Checkbox("Animate Polar Progress", &animatePolarClipping)) {
+				meshModule->SetPolarClippingAnimation(animatePolarClipping, meshModule->GetPolarClippingAnimationSpeed());
+			}
+
+			if (animatePolarClipping) {
+				float polarAnimationSpeed = meshModule->GetPolarClippingAnimationSpeed();
+				if (ImGui::SliderFloat("Polar Animation Speed", &polarAnimationSpeed, 0.1f, 5.0f)) {
+					meshModule->SetPolarClippingAnimation(true, polarAnimationSpeed);
+				}
+
+				// 현재 진행도는 실시간으로 업데이트됨
+				float currentPolarProgress = meshModule->GetPolarClippingParams().polarAngleProgress;
+				ImGui::Text("Animated Polar Progress: %.2f", currentPolarProgress);
+			}
+
+			// 극좌표 시스템 설명
+			ImGui::Separator();
+			ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.8f, 1.0f), "Polar System Info:");
+			ImGui::BulletText("Clips based on angle from center point");
+			ImGui::BulletText("Up Axis defines the rotation plane");
+			ImGui::BulletText("Progress 0.0 = no clipping, 1.0 = full circle");
+			ImGui::BulletText("Works in world coordinate system");
+
+			// 현재 극좌표 클리핑 상태 정보
+			ImGui::Separator();
+			ImGui::Text("Polar Clipping Status:");
+			ImGui::Text("Progress: %.2f (%.1f°)", polarProgress, progressInDegrees);
+			ImGui::Text("Center: (%.2f, %.2f, %.2f)",
+				polarParams.polarCenter.x,
+				polarParams.polarCenter.y,
+				polarParams.polarCenter.z);
+			ImGui::Text("Up Axis: (%.2f, %.2f, %.2f)",
+				polarParams.polarUpAxis.x,
+				polarParams.polarUpAxis.y,
+				polarParams.polarUpAxis.z);
+			ImGui::Text("Start Angle: %.1f°", startAngleDegrees);
+			ImGui::Text("Direction: %s", clockwise ? "Clockwise" : "Counter-Clockwise");
+
+			// 복합 클리핑 정보
+			if (meshModule->IsClippingEnabled() && polarClippingEnabled) {
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Combined Clipping Active:");
+				ImGui::BulletText("Both axis and polar clipping enabled");
+				ImGui::BulletText("Result = Axis AND Polar intersection");
+			}
+
+			// 도움말 정보
+			if (ImGui::CollapsingHeader("Polar Clipping Help")) {
+				ImGui::TextWrapped("• Progress controls how much of the circle is visible");
+				ImGui::TextWrapped("• Center point is the pivot for angle calculation");
+				ImGui::TextWrapped("• Up Axis determines the rotation plane");
+				ImGui::TextWrapped("• Start Angle rotates the clipping boundary");
+				ImGui::TextWrapped("• Direction controls clockwise/counter-clockwise clipping");
+				ImGui::TextWrapped("• Combine with axis clipping for complex shapes");
+
+				ImGui::Separator();
+				ImGui::Text("Common Use Cases:");
+				ImGui::BulletText("Radar sweep effect (animate progress)");
+				ImGui::BulletText("Pie chart visualization");
+				ImGui::BulletText("Sectional reveals");
+				ImGui::BulletText("Angular masking effects");
+			}
+
+			ImGui::Unindent();
+		}
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Polar Clipping Not Supported");
+	}
+
+	// 전체 클리핑 시스템 요약
+	if (meshModule->SupportsClipping()) {
+		ImGui::Separator();
+		ImGui::TextColored(ImVec4(0.2f, 0.8f, 1.0f, 1.0f), "Clipping System Summary:");
+
+		bool axisEnabled = meshModule->IsClippingEnabled();
+		bool polarEnabled = meshModule->IsPolarClippingEnabled();
+
+		if (!axisEnabled && !polarEnabled) {
+			ImGui::Text("No clipping active");
+		}
+		else if (axisEnabled && !polarEnabled) {
+			ImGui::Text("Axis clipping only");
+		}
+		else if (!axisEnabled && polarEnabled) {
+			ImGui::Text("Polar clipping only");
+		}
+		else {
+			ImGui::Text("Combined axis + polar clipping");
+		}
+	}
 }
 
 void EffectEditor::RenderUnifiedDragDropTarget()
@@ -1793,7 +1960,9 @@ void EffectEditor::RenderUnifiedDragDropTarget()
 			std::string extension = filename.extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
 
-			if (extension == ".fbx" || extension == ".obj" || extension == ".dae") {
+			if (extension == ".fbx" || extension == ".obj" || extension == ".dae" ||
+				extension == ".gltf" || extension == ".glb") {
+
 				// LoadCashedModel로 로드 (자동으로 캐시 관리됨)
 				Model* loadedModel = DataSystems->LoadCashedModel(filename.filename().string());
 
@@ -1819,6 +1988,7 @@ void EffectEditor::RenderUnifiedDragDropTarget()
 			}
 			else {
 				std::cout << "Unsupported model format: " << extension << std::endl;
+				std::cout << "Supported formats: .fbx, .obj, .dae, .gltf, .glb" << std::endl;
 			}
 		}
 

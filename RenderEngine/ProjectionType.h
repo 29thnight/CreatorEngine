@@ -8,6 +8,22 @@ enum class ProjectionType
 };
 AUTO_REGISTER_ENUM(ProjectionType)
 
+enum class RenderPipelinePass : flag
+{
+	ShadowPass = 0,
+	GBufferPass = 1,
+	SSAOPass = 2,
+	DeferredPass = 3,
+	SkyBoxPass = 4,
+	ToneMapPass = 5,
+	SpritePass = 6,
+	WireFramePass = 7,
+	GridPass = 8,
+	BlitPass = 9,
+	TerrainGizmoPass = 10,
+	AutoExposurePass = 11,
+};
+
 struct ApplyRenderPipelinePass
 {
 	bool m_ShadowPass{ true };
@@ -21,4 +37,5 @@ struct ApplyRenderPipelinePass
 	bool m_GridPass{ false };
 	bool m_BlitPass{ false };
 	bool m_TerrainGizmoPass{ false };
+	bool m_autoExposurePass{ true };
 };

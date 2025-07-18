@@ -2,12 +2,16 @@
 #include "Shading.hlsli"
 #include "ACES.hlsli"
 
+static const int ToneMap_Reinhard   = 0;
+static const int ToneMap_ACES       = 1;
+static const int ToneMap_Uncharted2 = 2;
+static const int ToneMap_HDR10      = 3;
+
 Texture2D Colour : register(t0);
 
 cbuffer UseTonemap : register(b0)
 {
-    bool useTonemap;
-    bool useFilmic;
+    int m_operatorType;
     float filmSlope;
     float filmToe;
     float filmShoulder;
@@ -19,6 +23,11 @@ cbuffer UseTonemap : register(b0)
 float CalcLuminance(float3 color)
 {
     return max(dot(color, float3(0.299f, 0.587f, 0.114f)), 0.0001f);
+}
+
+float ColorToLuminanceReinhard(float3 color)
+{
+    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
 float3 LinearToPQ(float3 color)
@@ -84,37 +93,68 @@ float3 uncharted2_filmic(float3 v)
     return curr * white_scale;
 }
 
+float3 ReinhardToneMapping(float3 color)
+{
+    float luma = ColorToLuminanceReinhard(color);
+    float toneMappedLuma = luma / (1. + luma);
+    if (luma > 1e-6)
+        color *= toneMappedLuma / luma;
+    
+    color = pow(color, 1. / GAMMA);
+    return color;
+}
+
 struct PixelShaderInput // see Fullscreen.vs.hlsl
 {
     float4 position : SV_POSITION;
     float2 texCoord : TEXCOORD0;
 };
 
+float ComputeEV100(float aperture, float shutterTime)
+{
+    aperture = max(aperture, 1e-4f);
+    shutterTime = max(shutterTime, 1e-6f);
+    return log2((aperture * aperture) / shutterTime);
+}
+
+float ApplyExposureCompensation(float ev100, float exposureCompensation)
+{
+    return ev100 - exposureCompensation;
+}
+
+float ComputeLuminanceFromEV100(float ev100)
+{
+    return 1.2f * exp2(ev100);
+}
+
+float ComputeExposureMultiplier(float luminance)
+{
+    return 1.0f / (luminance + 1e-4f);
+}
+
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
     float4 colour = Colour.Sample(PointSampler, IN.texCoord);
-    float2 texelSize = float2(1.0f / 1920.0f, 1.0f / 1080.0f);
     float3 toneMapped = 0;
 
     [branch]
-    if (useTonemap)
+    switch(m_operatorType)
     {
-        [branch]
-        if (useFilmic)
-        {
-            toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
-            toneMapped = LINEARtoSRGB(toneMapped);
-        }
-        else
-        {
+    case ToneMap_Reinhard:
+            toneMapped = ReinhardToneMapping(colour.rgb * toneMapExposure);
+        break;
+    case ToneMap_ACES:
             toneMapped = ApplyACES_Full(colour.rgb * toneMapExposure);
-            toneMapped = LINEARtoSRGB(toneMapped);
-        }
-    }
-    else
-    {
-        toneMapped = colour.rgb * toneMapExposure;
-        toneMapped = LinearToPQ(toneMapped);
+        break;
+    case ToneMap_Uncharted2:
+            toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
+        break;
+    case ToneMap_HDR10:
+            toneMapped = LinearToPQ(colour.rgb * toneMapExposure);
+        break;
+    default:
+            toneMapped = colour.rgb; // No tonemapping
+        break;
     }
 
     return float4(toneMapped, 1.f);
