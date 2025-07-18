@@ -42,11 +42,13 @@ private:
 
 	bool m_isAbleAutoExposure{ true };
 	bool m_isAbleToneMap{ true };
-
-	float m_fNumber{ 2.5f };
-	float m_shutterTime{ 0.01f }; // 1/100s
+	// Auto Exposure Settings
+	float m_fNumber{ 8.f };
+	float m_shutterTime{ 16.f }; // 1/100s
 	float m_ISO{ 100.f };
 	float m_exposureCompensation{};
+	float m_speedBrightness{ 1.5f };
+	float m_speedDarkness{ 0.7f };
 
 	uint32 m_readIndex{ 0 };
 	uint32 m_writeIndex{ 1 };

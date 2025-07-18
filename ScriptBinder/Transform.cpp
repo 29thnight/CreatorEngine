@@ -214,7 +214,7 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 
 	XMStoreFloat4(&position, _position);
 	XMStoreFloat4(&scale, _scale);
-	XMStoreFloat4(&rotation, _rotation);
+	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
 
 	m_dirty = false;
 }
@@ -226,6 +226,7 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 
 	m_worldMatrix = matrix;
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
+	m_worldQuaternion = DirectX::XMVector4Normalize(m_worldQuaternion);
 
 	GameObject* parentObject = GameObject::FindIndex(m_parentID);
 	if (!parentObject)
