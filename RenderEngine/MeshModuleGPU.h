@@ -21,20 +21,6 @@ struct MeshConstantBuffer
 	float padding;
 };
 
-struct PolarClippingParams
-{
-	float polarClippingEnabled = 0.0f;    // 극좌표 클리핑 활성화 여부
-	float polarAngleProgress = 0.0f;      // 0~1: 각도 진행도
-	float polarStartAngle = 0.0f;         // 시작 각도 (라디안)
-	float polarDirection = 1.0f;          // 1: 시계방향, -1: 반시계방향
-
-	Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // 극좌표 중심점 (월드 좌표)
-	float pad2 = 0.0f;
-
-	Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // 극좌표 위쪽 축
-	float pad3 = 0.0f;
-};
-
 class MeshModuleGPU : public RenderModules, public ISerializable
 {
 public:
@@ -93,6 +79,7 @@ public:
 	const PolarClippingParams& GetPolarClippingParams() const { return m_polarClippingParams; }
 	bool IsPolarClippingAnimating() const { return m_isPolarClippingAnimating; }
 	float GetPolarClippingAnimationSpeed() const { return m_polarClippingAnimationSpeed; }
+	void SetPolarReferenceDirection(const Mathf::Vector3& referenceDir);
 
 public:
 	virtual nlohmann::json SerializeData() const override;

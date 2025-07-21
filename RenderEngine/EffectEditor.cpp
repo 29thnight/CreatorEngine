@@ -1674,120 +1674,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 
 	// 클리핑 설정 UI
 	ImGui::Separator();
-	ImGui::Text("Clipping Settings:");
-
-	if (meshModule->SupportsClipping()) {
-		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Clipping Supported (Relative Coordinates)");
-
-		// 클리핑 활성화/비활성화
-		bool clippingEnabled = meshModule->IsClippingEnabled();
-		if (ImGui::Checkbox("Enable Clipping", &clippingEnabled)) {
-			meshModule->EnableClipping(clippingEnabled);
-		}
-
-		if (clippingEnabled) {
-			ImGui::Indent();
-
-			// 클리핑 진행도 (0.0 ~ 1.0)
-			float clippingProgress = meshModule->GetClippingProgress();
-			if (ImGui::SliderFloat("Clipping Progress", &clippingProgress, 0.0f, 1.0f, "%.2f")) {
-				meshModule->SetClippingProgress(clippingProgress);
-			}
-
-			// 클리핑 축 방향
-			const auto& clippingParams = meshModule->GetClippingParams();
-			float clippingAxis[3] = {
-				clippingParams.clippingAxis.x,
-				clippingParams.clippingAxis.y,
-				clippingParams.clippingAxis.z
-			};
-
-			if (ImGui::DragFloat3("Clipping Axis", clippingAxis, 0.01f, -1.0f, 1.0f)) {
-				meshModule->SetClippingAxis(Mathf::Vector3(clippingAxis[0], clippingAxis[1], clippingAxis[2]));
-			}
-
-			// 미리 설정된 축 버튼들
-			ImGui::Text("Quick Axis:");
-			if (ImGui::Button("+X")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(1.0f, 0.0f, 0.0f));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("-X")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(-1.0f, 0.0f, 0.0f));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("+Y")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(0.0f, 1.0f, 0.0f));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("-Y")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(0.0f, -1.0f, 0.0f));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("+Z")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(0.0f, 0.0f, 1.0f));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("-Z")) {
-				meshModule->SetClippingAxis(Mathf::Vector3(0.0f, 0.0f, -1.0f));
-			}
-
-			// 애니메이션 테스트
-			ImGui::Separator();
-			ImGui::Text("Animation Test:");
-
-			bool animateClipping = meshModule->IsClippingAnimating();
-			if (ImGui::Checkbox("Animate Progress", &animateClipping)) {
-				meshModule->SetClippingAnimation(animateClipping, meshModule->GetClippingAnimationSpeed());
-			}
-
-			if (animateClipping) {
-				float animationSpeed = meshModule->GetClippingAnimationSpeed();
-				if (ImGui::SliderFloat("Animation Speed", &animationSpeed, 0.1f, 5.0f)) {
-					meshModule->SetClippingAnimation(true, animationSpeed);
-				}
-
-				// 현재 진행도는 실시간으로 업데이트됨
-				float currentProgress = meshModule->GetClippingProgress();
-				ImGui::Text("Animated Progress: %.2f", currentProgress);
-			}
-
-			// 상대 좌표계 설명
-			ImGui::Separator();
-			ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Coordinate System Info:");
-			ImGui::BulletText("Uses local object space (-1 to +1 range)");
-			ImGui::BulletText("Clipping follows object transformation");
-			ImGui::BulletText("Independent of world position/rotation");
-
-			// 현재 클리핑 상태 정보
-			ImGui::Separator();
-			ImGui::Text("Clipping Status:");
-			ImGui::Text("Progress: %.2f", clippingProgress);
-			ImGui::Text("Axis: (%.2f, %.2f, %.2f)",
-				clippingParams.clippingAxis.x,
-				clippingParams.clippingAxis.y,
-				clippingParams.clippingAxis.z);
-			ImGui::Text("Local Bounds: (-1, -1, -1) ~ (1, 1, 1) [Fixed]");
-
-			// 도움말 정보
-			if (ImGui::CollapsingHeader("Help")) {
-				ImGui::TextWrapped("• Progress 0.0: No clipping applied");
-				ImGui::TextWrapped("• Progress 1.0: Full clipping along axis");
-				ImGui::TextWrapped("• Negative axis values reverse clipping direction");
-				ImGui::TextWrapped("• Clipping works in object's local coordinate system");
-				ImGui::TextWrapped("• Animation cycles progress between 0.0 and 1.0");
-			}
-
-			ImGui::Unindent();
-		}
-	}
-
-	else {
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Clipping Not Supported");
-	}
-
-	// Polar 클리핑 설정 UI
-	ImGui::Separator();
 	ImGui::Text("Polar Clipping Settings:");
 
 	if (meshModule->SupportsClipping()) {
@@ -1802,149 +1688,116 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 		if (polarClippingEnabled) {
 			ImGui::Indent();
 
-			// Polar 각도 진행도 (0.0 ~ 1.0)
+			// Polar 각도 진행도
 			const auto& polarParams = meshModule->GetPolarClippingParams();
 			float polarProgress = polarParams.polarAngleProgress;
 			if (ImGui::SliderFloat("Angle Progress", &polarProgress, 0.0f, 1.0f, "%.2f")) {
 				meshModule->SetPolarAngleProgress(polarProgress);
 			}
 
-			// 각도를 도 단위로도 표시
 			float progressInDegrees = polarProgress * 360.0f;
-			ImGui::Text("Angle Range: %.1f degrees", progressInDegrees);
+			ImGui::SameLine();
+			ImGui::Text("(%.0f°)", progressInDegrees);
 
-			// 극좌표 중심점 설정
+			// 극좌표 중심점
 			float polarCenter[3] = {
 				polarParams.polarCenter.x,
 				polarParams.polarCenter.y,
 				polarParams.polarCenter.z
 			};
-
-			if (ImGui::DragFloat3("Polar Center", polarCenter, 0.1f)) {
+			if (ImGui::DragFloat3("Center", polarCenter, 0.1f)) {
 				meshModule->SetPolarCenter(Mathf::Vector3(polarCenter[0], polarCenter[1], polarCenter[2]));
 			}
 
-			// 극좌표 위쪽 축 설정
+			// 기준 방향 설정 (새로 추가)
+			float polarReferenceDir[3] = {
+				polarParams.polarReferenceDir.x,
+				polarParams.polarReferenceDir.y,
+				polarParams.polarReferenceDir.z
+			};
+			if (ImGui::DragFloat3("Reference Direction", polarReferenceDir, 0.01f, -1.0f, 1.0f)) {
+				meshModule->SetPolarReferenceDirection(Mathf::Vector3(polarReferenceDir[0], polarReferenceDir[1], polarReferenceDir[2]));
+			}
+
+			// 기준 방향 프리셋
+			ImGui::Text("Quick Reference:");
+			if (ImGui::Button("+X")) meshModule->SetPolarReferenceDirection(Mathf::Vector3(1, 0, 0));
+			ImGui::SameLine();
+			if (ImGui::Button("-X")) meshModule->SetPolarReferenceDirection(Mathf::Vector3(-1, 0, 0));
+			ImGui::SameLine();
+			if (ImGui::Button("+Z")) meshModule->SetPolarReferenceDirection(Mathf::Vector3(0, 0, 1));
+			ImGui::SameLine();
+			if (ImGui::Button("-Z")) meshModule->SetPolarReferenceDirection(Mathf::Vector3(0, 0, -1));
+
+			// Up 축
 			float polarUpAxis[3] = {
 				polarParams.polarUpAxis.x,
 				polarParams.polarUpAxis.y,
 				polarParams.polarUpAxis.z
 			};
-
 			if (ImGui::DragFloat3("Up Axis", polarUpAxis, 0.01f, -1.0f, 1.0f)) {
 				meshModule->SetPolarUpAxis(Mathf::Vector3(polarUpAxis[0], polarUpAxis[1], polarUpAxis[2]));
 			}
 
-			// 미리 설정된 Up 축 버튼들
-			ImGui::Text("Quick Up Axis:");
-			if (ImGui::Button("Y-Up")) {
-				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 1.0f, 0.0f));
-			}
+			// Up 축 프리셋
+			ImGui::Text("Up Axis:");
+			if (ImGui::Button("Y-Up")) meshModule->SetPolarUpAxis(Mathf::Vector3(0, 1, 0));
 			ImGui::SameLine();
-			if (ImGui::Button("X-Up")) {
-				meshModule->SetPolarUpAxis(Mathf::Vector3(1.0f, 0.0f, 0.0f));
-			}
+			if (ImGui::Button("X-Up")) meshModule->SetPolarUpAxis(Mathf::Vector3(1, 0, 0));
 			ImGui::SameLine();
-			if (ImGui::Button("Z-Up")) {
-				meshModule->SetPolarUpAxis(Mathf::Vector3(0.0f, 0.0f, 1.0f));
-			}
+			if (ImGui::Button("Z-Up")) meshModule->SetPolarUpAxis(Mathf::Vector3(0, 0, 1));
 
-			// 시작 각도 설정 (라디안 및 도 단위)
+			// 시작 각도
 			float startAngleRadians = polarParams.polarStartAngle;
 			float startAngleDegrees = startAngleRadians * 180.0f / 3.14159265f;
-
-			if (ImGui::SliderFloat("Start Angle (Degrees)", &startAngleDegrees, 0.0f, 360.0f, "%.1f°")) {
+			if (ImGui::SliderFloat("Start Angle", &startAngleDegrees, 0.0f, 360.0f, "%.0f°")) {
 				startAngleRadians = startAngleDegrees * 3.14159265f / 180.0f;
 				meshModule->SetPolarStartAngle(startAngleRadians);
 			}
 
-			// 회전 방향 설정
+			// 회전 방향
 			float direction = polarParams.polarDirection;
 			bool clockwise = (direction > 0.0f);
-			if (ImGui::Checkbox("Clockwise Direction", &clockwise)) {
+			if (ImGui::Checkbox("Clockwise", &clockwise)) {
 				meshModule->SetPolarDirection(clockwise ? 1.0f : -1.0f);
 			}
 
-			// 극좌표 중심점 프리셋
+			// 애니메이션
 			ImGui::Separator();
-			ImGui::Text("Center Presets:");
-			if (ImGui::Button("Origin (0,0,0)")) {
-				meshModule->SetPolarCenter(Mathf::Vector3::Zero);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Reset to Mesh Center")) {
-				// 현재 메시의 바운딩 박스 중심으로 설정
-				auto bounds = meshModule->GetCurrentMeshBounds();
-				Mathf::Vector3 center = (bounds.first + bounds.second) * 0.5f;
-				meshModule->SetPolarCenter(center);
-			}
-
-			// 애니메이션 테스트
-			ImGui::Separator();
-			ImGui::Text("Polar Animation Test:");
-
 			bool animatePolarClipping = meshModule->IsPolarClippingAnimating();
-			if (ImGui::Checkbox("Animate Polar Progress", &animatePolarClipping)) {
+			if (ImGui::Checkbox("Animate", &animatePolarClipping)) {
 				meshModule->SetPolarClippingAnimation(animatePolarClipping, meshModule->GetPolarClippingAnimationSpeed());
 			}
 
 			if (animatePolarClipping) {
 				float polarAnimationSpeed = meshModule->GetPolarClippingAnimationSpeed();
-				if (ImGui::SliderFloat("Polar Animation Speed", &polarAnimationSpeed, 0.1f, 5.0f)) {
+				if (ImGui::SliderFloat("Speed", &polarAnimationSpeed, 0.1f, 5.0f)) {
 					meshModule->SetPolarClippingAnimation(true, polarAnimationSpeed);
 				}
-
-				// 현재 진행도는 실시간으로 업데이트됨
-				float currentPolarProgress = meshModule->GetPolarClippingParams().polarAngleProgress;
-				ImGui::Text("Animated Polar Progress: %.2f", currentPolarProgress);
 			}
 
-			// 극좌표 시스템 설명
+			// 프리셋
 			ImGui::Separator();
-			ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.8f, 1.0f), "Polar System Info:");
-			ImGui::BulletText("Clips based on angle from center point");
-			ImGui::BulletText("Up Axis defines the rotation plane");
-			ImGui::BulletText("Progress 0.0 = no clipping, 1.0 = full circle");
-			ImGui::BulletText("Works in world coordinate system");
-
-			// 현재 극좌표 클리핑 상태 정보
-			ImGui::Separator();
-			ImGui::Text("Polar Clipping Status:");
-			ImGui::Text("Progress: %.2f (%.1f°)", polarProgress, progressInDegrees);
-			ImGui::Text("Center: (%.2f, %.2f, %.2f)",
-				polarParams.polarCenter.x,
-				polarParams.polarCenter.y,
-				polarParams.polarCenter.z);
-			ImGui::Text("Up Axis: (%.2f, %.2f, %.2f)",
-				polarParams.polarUpAxis.x,
-				polarParams.polarUpAxis.y,
-				polarParams.polarUpAxis.z);
-			ImGui::Text("Start Angle: %.1f°", startAngleDegrees);
-			ImGui::Text("Direction: %s", clockwise ? "Clockwise" : "Counter-Clockwise");
-
-			// 복합 클리핑 정보
-			if (meshModule->IsClippingEnabled() && polarClippingEnabled) {
-				ImGui::Separator();
-				ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Combined Clipping Active:");
-				ImGui::BulletText("Both axis and polar clipping enabled");
-				ImGui::BulletText("Result = Axis AND Polar intersection");
+			ImGui::Text("Presets:");
+			if (ImGui::Button("Radar Sweep")) {
+				meshModule->SetPolarCenter(Mathf::Vector3::Zero);
+				meshModule->SetPolarReferenceDirection(Mathf::Vector3(1, 0, 0));
+				meshModule->SetPolarUpAxis(Mathf::Vector3(0, 1, 0));
+				meshModule->SetPolarDirection(1.0f);
+				meshModule->SetPolarClippingAnimation(true, 1.0f);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Half Circle")) {
+				meshModule->SetPolarAngleProgress(0.5f);
+				meshModule->SetPolarStartAngle(0.0f);
 			}
 
-			// 도움말 정보
-			if (ImGui::CollapsingHeader("Polar Clipping Help")) {
-				ImGui::TextWrapped("• Progress controls how much of the circle is visible");
-				ImGui::TextWrapped("• Center point is the pivot for angle calculation");
-				ImGui::TextWrapped("• Up Axis determines the rotation plane");
-				ImGui::TextWrapped("• Start Angle rotates the clipping boundary");
-				ImGui::TextWrapped("• Direction controls clockwise/counter-clockwise clipping");
-				ImGui::TextWrapped("• Combine with axis clipping for complex shapes");
-
-				ImGui::Separator();
-				ImGui::Text("Common Use Cases:");
-				ImGui::BulletText("Radar sweep effect (animate progress)");
-				ImGui::BulletText("Pie chart visualization");
-				ImGui::BulletText("Sectional reveals");
-				ImGui::BulletText("Angular masking effects");
+			// 도움말
+			if (ImGui::CollapsingHeader("Help")) {
+				ImGui::BulletText("Progress: 0.0 = point, 1.0 = full circle");
+				ImGui::BulletText("Reference Direction: 0° starting point");
+				ImGui::BulletText("Up Axis: rotation plane normal");
+				ImGui::BulletText("Start Angle: rotates the boundary");
 			}
 
 			ImGui::Unindent();
@@ -1952,28 +1805,6 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	}
 	else {
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Polar Clipping Not Supported");
-	}
-
-	// 전체 클리핑 시스템 요약
-	if (meshModule->SupportsClipping()) {
-		ImGui::Separator();
-		ImGui::TextColored(ImVec4(0.2f, 0.8f, 1.0f, 1.0f), "Clipping System Summary:");
-
-		bool axisEnabled = meshModule->IsClippingEnabled();
-		bool polarEnabled = meshModule->IsPolarClippingEnabled();
-
-		if (!axisEnabled && !polarEnabled) {
-			ImGui::Text("No clipping active");
-		}
-		else if (axisEnabled && !polarEnabled) {
-			ImGui::Text("Axis clipping only");
-		}
-		else if (!axisEnabled && polarEnabled) {
-			ImGui::Text("Polar clipping only");
-		}
-		else {
-			ImGui::Text("Combined axis + polar clipping");
-		}
 	}
 }
 

@@ -33,19 +33,23 @@ struct ModelConstantBuffer
     Mathf::Matrix projection;
 };
 
-// 클리핑 파라미터 구조체
-struct ClippingParams
+struct PolarClippingParams
 {
-    float clippingProgress;
-    Mathf::Vector3 clippingAxis;
+    float polarClippingEnabled = 0.0f;    // 극좌표 클리핑 활성화 여부
+    float polarAngleProgress = 0.0f;      // 0~1: 각도 진행도
+    float polarStartAngle = 0.0f;         // 시작 각도 (라디안)
+    float polarDirection = 1.0f;          // 1: 시계방향, -1: 반시계방향
 
-    float clippingEnabled;
-    Mathf::Vector3 meshBoundingMin;  // 메쉬 바운딩 박스 최소값
+    Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // 극좌표 중심점 (월드 좌표)
+    float pad2 = 0.0f;
 
-    Mathf::Vector3 meshBoundingMax;  // 메쉬 바운딩 박스 최대값
-    float pad1;
+    Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // 극좌표 위쪽 축
+    float pad3 = 0.0f;
+
+    Mathf::Vector3 polarReferenceDir = Mathf::Vector3::Zero;
+    float pad4;
+
 };
-
 
 class RenderModules
 {
@@ -76,8 +80,8 @@ public:
     void SetClippingAxis(const Mathf::Vector3& axis);
 
     bool IsClippingEnabled() const { return m_clippingEnabled && SupportsClipping(); }
-    float GetClippingProgress() const { return m_clippingParams.clippingProgress; }
-    const ClippingParams& GetClippingParams() const { return m_clippingParams; }
+    float GetClippingProgress() const { return m_clippingParams.polarAngleProgress; }
+    const PolarClippingParams& GetClippingParams() const { return m_clippingParams; }
 
     Texture* GetAssignedTexture() const { return m_assignedTexture; }
 
@@ -92,7 +96,7 @@ protected:
     std::unique_ptr<PipelineStateObject> m_pso;
 
     // 클리핑 관련 데이터를 부모에서 관리
-    ClippingParams m_clippingParams = {};
+    PolarClippingParams m_clippingParams = {};
     bool m_clippingEnabled = false;
 
     // 클리핑 상수 버퍼 (필요한 자식 클래스에서만 생성)

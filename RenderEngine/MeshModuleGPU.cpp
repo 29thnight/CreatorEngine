@@ -227,54 +227,6 @@ void MeshModuleGPU::OnClippingStateChanged()
     }
 }
 
-void MeshModuleGPU::CreateClippingBuffer()
-{
-    if (m_clippingBuffer)
-        return;
-
-    D3D11_BUFFER_DESC bufferDesc = {};
-    bufferDesc.ByteWidth = sizeof(ClippingParams);
-    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_clippingBuffer);
-    if (FAILED(hr))
-    {
-        m_clippingBuffer.Reset();
-    }
-}
-
-void MeshModuleGPU::UpdateClippingBuffer()
-{
-    if (!SupportsClipping() || !m_clippingBuffer)
-        return;
-    if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
-        return;
-
-    auto& deviceContext = DeviceState::g_pDeviceContext;
-    D3D11_MAPPED_SUBRESOURCE mappedResource;
-    HRESULT hr = deviceContext->Map(m_clippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-
-    if (SUCCEEDED(hr))
-    {
-        ClippingParams* params = static_cast<ClippingParams*>(mappedResource.pData);
-
-        // 기존 파라미터
-        const auto& baseParams = GetClippingParams();
-        params->clippingProgress = baseParams.clippingProgress;
-        params->clippingAxis = baseParams.clippingAxis;
-        params->clippingEnabled = baseParams.clippingEnabled; 
-
-        // 현재 메쉬의 바운딩 박스 설정
-        auto bounds = GetCurrentMeshBounds();
-        params->meshBoundingMin = bounds.first;
-        params->meshBoundingMax = bounds.second;
-
-        deviceContext->Unmap(m_clippingBuffer.Get(), 0);
-    }
-}
-
 void MeshModuleGPU::SetClippingAnimation(bool enable, float speed)
 {
     m_isClippingAnimating = enable;
@@ -361,6 +313,13 @@ void MeshModuleGPU::SetPolarClippingAnimation(bool enable, float speed)
     m_polarClippingAnimationSpeed = speed;
 }
 
+void MeshModuleGPU::SetPolarReferenceDirection(const Mathf::Vector3& referenceDir)
+{
+    Mathf::Vector3 normalized = referenceDir;
+    normalized.Normalize();
+    m_polarClippingParams.polarReferenceDir = normalized;
+}
+
 nlohmann::json MeshModuleGPU::SerializeData() const
 {
     nlohmann::json json;
@@ -402,18 +361,6 @@ nlohmann::json MeshModuleGPU::SerializeData() const
             {"animating", m_isClippingAnimating},
             {"animationSpeed", m_clippingAnimationSpeed}
         };
-
-        // 클리핑 파라미터 (상대 좌표계만 저장)
-        const auto& clippingParams = GetClippingParams();
-        json["clipping"]["params"] = {
-            {"clippingProgress", clippingParams.clippingProgress},
-            {"clippingAxis", {
-                {"x", clippingParams.clippingAxis.x},
-                {"y", clippingParams.clippingAxis.y},
-                {"z", clippingParams.clippingAxis.z}
-            }},
-            {"clippingEnabled", clippingParams.clippingEnabled}
-        };
     }
 
     if (IsPolarClippingEnabled())
@@ -435,6 +382,11 @@ nlohmann::json MeshModuleGPU::SerializeData() const
                     {"x", m_polarClippingParams.polarUpAxis.x},
                     {"y", m_polarClippingParams.polarUpAxis.y},
                     {"z", m_polarClippingParams.polarUpAxis.z}
+                }},
+                {"polarReferenceDir", {
+                    {"x", m_polarClippingParams.polarReferenceDir.x},
+                    {"y", m_polarClippingParams.polarReferenceDir.y},
+                    {"z", m_polarClippingParams.polarReferenceDir.z}
                 }}
             }}
         };
@@ -659,6 +611,17 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                     upAxisJson.value("z", 0.0f)
                 );
                 SetPolarUpAxis(upAxis);
+            }
+
+            if (paramsJson.contains("polarReferenceDir"))
+            {
+                const auto& refDirJson = paramsJson["polarReferenceDir"];
+                Mathf::Vector3 referenceDir(
+                    refDirJson.value("x", 1.0f),
+                    refDirJson.value("y", 0.0f),
+                    refDirJson.value("z", 0.0f)
+                );
+                SetPolarReferenceDirection(referenceDir);
             }
         }
     }
