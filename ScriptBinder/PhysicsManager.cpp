@@ -712,6 +712,7 @@ void PhysicsManager::GetPhysicData()
 				matrix._41 = pos.x;
 				matrix._42 = pos.y;
 				matrix._43 = pos.z;
+				transform.SetPosition(pos);
 
 			}
 
