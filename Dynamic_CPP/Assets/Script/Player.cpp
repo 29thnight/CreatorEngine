@@ -35,16 +35,16 @@ void Player::Start()
 	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
 	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
-	/*playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::U, KeyState::Down, [this]() { OnPunch();});
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
+
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
 	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
 	playerMap->AddButtonAction("ChargeAttack", 0, InputType::KeyBoard, 'K', KeyState::Released, [this]() {});
-	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {});
-	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, ',', KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {Dash();});
+	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, 'J', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
 
 
 	m_animator = player->GetComponent<Animator>();
@@ -59,15 +59,16 @@ void Player::Start()
 	//	},
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
 	//m_animator->m_Skeleton->m_animations[3].SetEvent("Player", "OnPunch", 0.353);
+
+	camera = GameObject::Find("Main Camera");
 }
 
 void Player::Update(float tick)
 {
-	if (m_nearObject)
-	{
-		auto mesh = m_nearObject->GetComponent<MeshRenderer>();
-		if(mesh)
-			mesh->m_Material->m_materialInfo.m_bitflag = 16;
+	if (m_nearObject) {
+		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
+		if(nearMesh)
+			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
 
 
@@ -137,7 +138,14 @@ void Player::Move(Mathf::Vector2 dir)
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 	
-	controller->Move(dir);
+	auto worldRot = camera->m_transform.GetWorldQuaternion();
+	Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
+	Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
+
+	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + dir.y * Vector2(forward.x, forward.z);
+	moveDir.Normalize();
+
+	controller->Move(moveDir);
 	if (controller->IsOnMove())
 	{
 		m_animator->SetParameter("OnMove", true);
@@ -432,7 +440,9 @@ void Player::OnTriggerExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		m_nearObject->GetComponent<MeshRenderer>()->m_Material->m_materialInfo.m_bitflag = 0;
+		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
+		if(nearMesh)
+			nearMesh->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
 		//abc
 	}
@@ -461,9 +471,9 @@ void Player::OnCollisionExit(const Collision& collision)
 {
 	if (m_nearObject == collision.otherObj)
 	{
-		auto mesh = m_nearObject->GetComponent<MeshRenderer>();
-		if(mesh)
-			mesh->m_Material->m_materialInfo.m_bitflag = 0;
+		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
+		if (nearMesh)
+			nearMesh->m_Material->m_materialInfo.m_bitflag = 0;
 		m_nearObject = nullptr;
 	}
 }

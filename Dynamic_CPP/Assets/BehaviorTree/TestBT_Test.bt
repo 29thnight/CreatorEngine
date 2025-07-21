@@ -17,7 +17,7 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [3909499465, 3825938343]
+    Children: [3909499465, 3825938343, 1608338673]
     Position: {x: 54, y: 61}
   - ID: 3909499465
     Type: 2
@@ -129,3 +129,23 @@ NodeList:
     Policy: -858993460
     Children: ~
     Position: {x: 486, y: 568}
+  - ID: 1608338673
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 686063297
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsDamege
+    Policy: -858993460
+    Children: [3264712637]
+    Position: {x: 6, y: 213}
+  - ID: 3264712637
+    Type: 8
+    Name: Action
+    ParentID: 1608338673
+    IsRoot: false
+    HasScript: true
+    ScriptName: DamegeAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: -10, y: 536}

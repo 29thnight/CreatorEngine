@@ -238,6 +238,9 @@ private:
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
 	Mathf::Vector3 preRotation;
 
+	[[Property]]
+	float m_rotationSpeed{ 0.1f }; //회전 속도
+
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;
 

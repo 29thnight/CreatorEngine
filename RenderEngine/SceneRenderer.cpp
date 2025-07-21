@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
+#include "EngineSetting.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 #include "Benchmark.hpp"
@@ -73,7 +74,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
-	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::GridPass);
+	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
@@ -98,6 +99,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
         m_normalTexture.get(),
 		m_diffuseTexture.get()
     );
+    m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
 
     //deferredPass
     m_pDeferredPass = std::make_unique<DeferredPass>();
@@ -108,6 +110,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
         m_emissiveTexture.get(),
 		m_bitmaskTexture.get()
     );
+    m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
 
 	//forwardPass
 	m_pForwardPass = std::make_unique<ForwardPass>();
@@ -122,6 +125,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_toneMappedColourTexture.get()
 	);
 
+    m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
 	//spritePass
 	m_pSpritePass = std::make_unique<SpritePass>();
 	//m_pSpritePass->Initialize(m_toneMappedColourTexture.get());
@@ -152,10 +156,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//Vignette
 	m_pVignettePass = std::make_unique<VignettePass>();
+    m_pVignettePass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().vignette);
 
 	//ColorGrading
 	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
 	m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
+    m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
 
 	//VolumetricFog
 	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
@@ -166,8 +172,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
+    m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
 
 	m_pPostProcessingPass = std::make_unique<PostProcessingPass>();
+    m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
 
 	//lightmapPass
 	m_pLightMapPass = std::make_unique<LightMapPass>();
@@ -176,6 +184,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//SSGIPass
 	m_pSSGIPass = std::make_unique<SSGIPass>();
 	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get());
+    m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
 
 	//BitmaskPass
 	m_pBitMaskPass = std::make_unique<BitMaskPass>();

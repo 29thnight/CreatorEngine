@@ -13,6 +13,7 @@
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
+
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
     float usagePercent = (float)usedVRAM / (float)budgetVRAM;
@@ -1652,6 +1653,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
 		}
     }
 }
+
 void MenuBarWindow::SHowInputActionMap()
 {
     static int preseletedActionMapIndex = -1;

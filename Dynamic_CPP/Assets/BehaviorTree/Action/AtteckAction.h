@@ -1,5 +1,6 @@
 #include "Core.Minimal.h"
 #include "BTHeader.h"
+#include "CharacterControllerComponent.h"
 
 using namespace BT;
 

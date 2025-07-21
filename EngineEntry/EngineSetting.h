@@ -1,11 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "EngineVersion.h"
-#include "Core.Mathf.h"
 #include "SpinLock.h"
 #include "Core.Fence.h"
 #include "Core.Barrier.h"
-
+#include "RenderPassSettings.h"
 #include <yaml-cpp/yaml.h>
 namespace MetaYml = YAML;
 
@@ -24,48 +23,9 @@ private:
 	~EngineSetting() = default;
 
 public:
-	bool Initialize()
-	{
-		bool isSuccess = LoadSettings();
-		char* vcInstallDir = nullptr;
-		size_t len = 0;
+	bool Initialize();
 
-		std::string output = ExecuteVsWhere();
-
-		if (output.empty())
-		{
-			std::cout << "Visual Studio not found.\n";
-			return false;
-		}
-
-		// ÁÙ¹Ù²Þ Á¦°Å
-		output.erase(std::remove(output.begin(), output.end(), '\r'), output.end());
-		output.erase(std::remove(output.begin(), output.end(), '\n'), output.end());
-
-		std::cout << "VS Install Path: " << output << std::endl;
-
-		if (output.find("Preview") != std::string::npos)
-		{
-			m_msvcVersion = MSVCVersion::Comunity2022Preview;
-		}
-		else if (output.find("2022") != std::string::npos)
-		{
-			m_msvcVersion = MSVCVersion::Comunity2022;
-		}
-		else
-		{
-			m_msvcVersion = MSVCVersion::None;
-			std::cout << "Unsupported Visual Studio version.\n";
-			return false;
-		}
-
-		return isSuccess;
-	}
-
-	MSVCVersion GetMSVCVersion() const
-	{
-		return m_msvcVersion;
-	}
+	MSVCVersion GetMSVCVersion() const { return m_msvcVersion; }
 
 	std::wstring GetMsbuildPath()
 	{
@@ -80,47 +40,17 @@ public:
 		}
 	}
 
-	bool IsEditorMode() const
-	{
-		return m_isEditorMode;
-	}
-
-	void SetEditorMode(bool isEditorMode)
-	{
-		m_isEditorMode = isEditorMode;
-	}
-
-    bool IsGameView() const
-    {
-        return m_isGameView.load();
-    }
-
-    void ToggleGameView()
-    {
-        m_isGameView.store(!m_isGameView.load());
-    }
-
+	bool IsEditorMode() const { return m_isEditorMode; }
+	void SetEditorMode(bool isEditorMode) { m_isEditorMode = isEditorMode; }
+    bool IsGameView() const { return m_isGameView.load(); }
+    void ToggleGameView() { m_isGameView.store(!m_isGameView.load()); }
     std::string GetGitVersionHash() { return m_currentEngineGitHash; }
-
-	void SetMinimized(bool isMinimized)
-	{
-		m_isMinimized = isMinimized;
-	}
-
-	bool IsMinimized() const
-	{
-		return m_isMinimized;
-	}
-
-	void SetWindowSize(Mathf::Vector2 size)
-	{
-		m_lastWindowSize = size;
-	}
-
-	Mathf::Vector2 GetWindowSize() const
-	{
-		return m_lastWindowSize;
-	}
+	void SetMinimized(bool isMinimized) { m_isMinimized = isMinimized; }
+	bool IsMinimized() const { return m_isMinimized; }
+	void SetWindowSize(Mathf::Vector2 size) { m_lastWindowSize = size; }
+	Mathf::Vector2 GetWindowSize() const { return m_lastWindowSize; }
+    RenderPassSettings& GetRenderPassSettings() { return m_renderPassSettings; }
+    const RenderPassSettings& GetRenderPassSettings() const { return m_renderPassSettings; }
 
 	void SetImGuiInitialized(bool isInitialized)
 	{
@@ -132,48 +62,8 @@ public:
 		return m_isImGuiInitialized;
 	}
 
-	bool SaveSettings()
-	{
-		// Implement saving logic here
-		file::path eingineSettingsPath = PathFinder::ProjectSettingPath("settings.asset");
-
-		std::ofstream settingsFile(eingineSettingsPath);
-		MetaYml::Node rootNode;
-
-		rootNode["lastWindowSize"]["x"] = m_lastWindowSize.x;
-		rootNode["lastWindowSize"]["y"] = m_lastWindowSize.y;
-		rootNode["msvcVersion"] = static_cast<int>(m_msvcVersion);
-
-		settingsFile << rootNode;
-
-		settingsFile.close();
-		
-		return true;
-	}
-
-	bool LoadSettings()
-	{
-		bool isSuccess = true;
-		// Implement loading logic here
-		file::path eingineSettingsPath = PathFinder::ProjectSettingPath("settings.asset");
-
-		if (!file::exists(eingineSettingsPath))
-		{
-			//initialize default settings
-			isSuccess = SaveSettings();
-		}
-
-		MetaYml::Node rootNode = MetaYml::LoadFile(eingineSettingsPath.string());
-
-		m_lastWindowSize = 
-		{ 
-			rootNode["lastWindowSize"]["x"].as<float>(), 
-			rootNode["lastWindowSize"]["y"].as<float>() 
-		};
-		m_msvcVersion = static_cast<MSVCVersion>(rootNode["msvcVersion"].as<int>());
-		
-		return isSuccess;
-	}
+	bool SaveSettings();
+	bool LoadSettings();
 
 	std::atomic<bool> m_isRenderPaused{ false };
 
@@ -190,6 +80,7 @@ private:
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };
+    RenderPassSettings m_renderPassSettings{};
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
 };
 
