@@ -18,7 +18,16 @@
 void Player::Start()
 {
 	player = GetOwner();
-	
+	auto childred = player->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
+		if (animator)
+		{
+			m_animator = animator;
+		}
+
+	}
 	//pad
 	std::string MapName = "Player" + std::to_string(playerIndex);
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
@@ -47,7 +56,7 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
 
 
-	m_animator = player->GetComponent<Animator>();
+	//m_animator = player->GetComponent<Animator>();
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.05f, 0.05f, 0.05f);
