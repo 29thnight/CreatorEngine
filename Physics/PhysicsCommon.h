@@ -101,6 +101,8 @@ struct RigidBodyGetSetData
 	bool isColliderEnabled = true;
 	DirectX::SimpleMath::Vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
+
+	EColliderType m_EColliderType;
 };
 
 //CharacterController의 GetSetData를 위한 구조체

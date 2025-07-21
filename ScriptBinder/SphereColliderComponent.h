@@ -51,14 +51,14 @@ public:
 		m_Info.radius = radius;
 		this->radius = m_Info.radius;
 	}
-	EColliderType GetColliderType() const
+	/*EColliderType GetColliderType() const
 	{
 		return m_type;
 	}
 	void SetColliderType(EColliderType type)
 	{
 		m_type = type;
-	}
+	}*/
 	SphereColliderInfo GetSphereInfo()
 	{
 		if (radius != 0.0f)
@@ -79,7 +79,7 @@ public:
 	DirectX::SimpleMath::Quaternion GetRotationOffset() override { return m_rotOffset; }
 
 private:
-	EColliderType m_type;
+	//EColliderType m_type;
 	unsigned int m_collsionCount = 0;
 	SphereColliderInfo m_Info;
 	// ICollider을(를) 통해 상속됨

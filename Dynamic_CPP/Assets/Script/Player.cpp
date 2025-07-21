@@ -13,6 +13,7 @@
 #include "RaycastHelper.h"
 #include "Skeleton.h"
 
+#include "EffectComponent.h"
 #include "TestEnemy.h"
 void Player::Start()
 {
@@ -262,6 +263,15 @@ void Player::Attack()
 
 	if (m_comboCount == 0)
 	{
+		auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
+		if (obj)
+		{
+			auto effect = obj->AddComponent<EffectComponent>();
+			if (effect)
+			{
+
+			}
+		}
 		std::vector<HitResult> hits;
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;
@@ -281,7 +291,7 @@ void Player::Attack()
 				std::cout << enemy->curHP << std::endl;
 				auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
 				
-				rigid->AddForce({ forward.x * KnockbackPowerX,KnockbackPowerY,forward.z * KnockbackPowerX }, EForceMode::IMPULSE);
+				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
 			}
 			
 		}

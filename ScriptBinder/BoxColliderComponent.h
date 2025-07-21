@@ -67,7 +67,7 @@ public:
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
    }  
-   EColliderType GetColliderType() const  
+  /* EColliderType GetColliderType() const  
    {  
 	   return m_type;
    }  
@@ -75,7 +75,7 @@ public:
    void SetColliderType(EColliderType type)
    {
 	   m_type = type;
-   }
+   }*/
 
    BoxColliderInfo GetBoxInfo()
    {
@@ -166,6 +166,6 @@ private:
 
     void OnCollisionExit(ICollider* other) override;
 
-    EColliderType m_type;
+    //EColliderType m_type;
 	unsigned int m_collsionCount = 0;
 };
