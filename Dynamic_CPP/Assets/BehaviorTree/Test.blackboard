@@ -9,16 +9,6 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorAsis
-    value:
-      Type: 1
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 0
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: eNorTargetRange
     value:
       Type: 3
@@ -39,12 +29,22 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorAsis
+    value:
+      Type: 1
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: eNorSpeed
     value:
       Type: 3
       BoolValue: false
       IntValue: 0
-      FloatValue: 2
+      FloatValue: 3
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
@@ -59,22 +59,22 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorAtkRange
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 1
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: eNorChaseRange
     value:
       Type: 3
       BoolValue: false
       IntValue: 0
-      FloatValue: 30
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eNorAtkRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}

@@ -188,6 +188,7 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+	ActionCreateFactory::GetInstance()->RegisterFactory("DamegeAction", []() { return new DamegeAction(); });
 	ActionCreateFactory::GetInstance()->RegisterFactory("ChaseAction", []() { return new ChaseAction(); });
 	ActionCreateFactory::GetInstance()->RegisterFactory("Idle", []() { return new Idle(); });
 	ActionCreateFactory::GetInstance()->RegisterFactory("AtteckAction", []() { return new AtteckAction(); });
@@ -208,6 +209,7 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
+	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsDamege", []() { return new IsDamege(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("TestConCec", []() { return new TestConCec(); });
 
 	}

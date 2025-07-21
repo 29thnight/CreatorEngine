@@ -1,12 +1,11 @@
 #include "Core.Minimal.h"
 #include "BTHeader.h"
-#include "CharacterControllerComponent.h"
 
 using namespace BT;
 
-class ChaseAction : public ActionNode
+class DamegeAction : public ActionNode
 {
 public:
-	BT_ACTION_BODY(ChaseAction)
+	BT_ACTION_BODY(DamegeAction)
 	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;
 };
