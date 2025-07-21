@@ -99,6 +99,11 @@ struct BTBuildGraph
 					[&id](const HashedGuid& childId) { return childId == id; }); // 자식 ID 제거
 			}
 
+			ed::BreakLinks(ed::NodeId(id.m_ID_Data)); // 에디터에서 링크 제거
+			node->Children.clear(); // 자식 노드 목록 초기화
+
+
+			// 노드 삭제
 			NodeList.erase(std::remove_if(NodeList.begin(), NodeList.end(),
 				[&id](const BTBuildNode& node) { return node.ID == id; }), NodeList.end());
 			Nodes.erase(it);

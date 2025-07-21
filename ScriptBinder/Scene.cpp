@@ -80,7 +80,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 
 	if (!newObj->m_tag.ToString().empty())
 	{
-		TagManager::GetInstance()->AddObjectToLayer(newObj->m_tag.ToString(), newObj.get());
+		TagManager::GetInstance()->AddTagToObject(newObj->m_tag.ToString(), newObj.get());
 	}
 
 	if (!newObj->m_layer.ToString().empty())
@@ -235,61 +235,55 @@ void Scene::FixedUpdate(float deltaSecond)
 
 void Scene::OnTriggerEnter(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
-        OnTriggerEnterEvent.TargetInvoke(
-            target->m_onTriggerEnterEventHandle,collider);
-    }
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
+		OnTriggerEnterEvent.TargetInvoke(
+			t->m_onTriggerEnterEventHandle, collider);
+	}
 }
 
 void Scene::OnTriggerStay(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
         OnTriggerStayEvent.TargetInvoke(
-            target->m_onTriggerStayEventHandle, collider);
+            t->m_onTriggerStayEventHandle, collider);
     }
 }
 
 void Scene::OnTriggerExit(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
         OnTriggerExitEvent.TargetInvoke(
-            target->m_onTriggerExitEventHandle, collider);
+            t->m_onTriggerExitEventHandle, collider);
     }
 }
 
 void Scene::OnCollisionEnter(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
         OnCollisionEnterEvent.TargetInvoke(
-            target->m_onCollisionEnterEventHandle, collider);
+            t->m_onCollisionEnterEventHandle, collider);
     }
 }
 
 void Scene::OnCollisionStay(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
         OnCollisionStayEvent.TargetInvoke(
-            target->m_onCollisionStayEventHandle, collider);
+            t->m_onCollisionStayEventHandle, collider);
     }
 }
 
 void Scene::OnCollisionExit(const Collision& collider)
 {
-    auto target = collider.thisObj->GetComponent<ModuleBehavior>();
-    if (nullptr != target)
-    {
+    auto target = collider.thisObj->GetComponents<ModuleBehavior>();
+	for (auto& t : target) {
         OnCollisionExitEvent.TargetInvoke(
-            target->m_onCollisionExitEventHandle, collider);
+            t->m_onCollisionExitEventHandle, collider);
     }
 }
 
