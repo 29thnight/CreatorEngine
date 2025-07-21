@@ -28,6 +28,9 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.forcePositionUpdate = 0;
+    m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.forceRotationUpdate = 0;
+    m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
 
     // 3D 메시 파티클 템플릿 기본값
@@ -173,6 +176,11 @@ void MeshSpawnModuleCS::Update(float deltaTime)
             m_spawnParams.emitterPosition.z
         );
         m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+    }
+
+    if (m_spawnParams.forceRotationUpdate)
+    {
+        m_spawnParams.forceRotationUpdate = 0;
     }
 }
 
@@ -461,6 +469,32 @@ void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 
         // 강제 위치 업데이트 플래그 설정
         m_forcePositionUpdate = true;
+        m_spawnParamsDirty = true;
+    }
+}
+
+void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
+{
+    Mathf::Vector3 newRot = rotation;
+
+    // 기존 회전과 비교하여 실제로 변경되었는지 확인
+    Mathf::Vector3 currentRot(
+        m_spawnParams.emitterRotation.x,
+        m_spawnParams.emitterRotation.y,
+        m_spawnParams.emitterRotation.z
+    );
+
+    float threshold = 0.001f;
+    if (abs(newRot.x - currentRot.x) > threshold ||
+        abs(newRot.y - currentRot.y) > threshold ||
+        abs(newRot.z - currentRot.z) > threshold)
+    {
+        m_spawnParams.previousEmitterRotation = m_spawnParams.emitterRotation;
+
+        // 새 회전값 설정
+        m_spawnParams.emitterRotation = XMFLOAT3(newRot.x, newRot.y, newRot.z);
+
+        m_spawnParams.forceRotationUpdate = 1;
         m_spawnParamsDirty = true;
     }
 }

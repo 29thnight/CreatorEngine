@@ -70,6 +70,7 @@ private:
     inline static int m_instanceCounter = 0;
 
     Mathf::Vector3 m_lastPosition;
+    Mathf::Vector3 m_lastRotation;
 
     void ApplyEffectSettings();
     void DestroyCurrentEffect();

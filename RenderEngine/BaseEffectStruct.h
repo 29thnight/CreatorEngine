@@ -100,9 +100,14 @@ struct alignas(16) SpawnParams
 	float emitterRadius;
 
 	UINT maxParticles;
-
 	Mathf::Vector3 emitterPosition;
 
 	Mathf::Vector3 previousEmitterPosition;
 	UINT forcePositionUpdate;
+
+	Mathf::Vector3 emitterRotation;
+	UINT forceRotationUpdate;
+
+	Mathf::Vector3 previousEmitterRotation;
+	float pad1;
 };

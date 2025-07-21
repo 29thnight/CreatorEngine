@@ -10,6 +10,7 @@ protected:
     // Effect 기본 정보
     std::string m_name;
     Mathf::Vector3 m_position = Mathf::Vector3(0, 0, 0);
+    Mathf::Vector3 m_rotation = Mathf::Vector3(0, 0, 0);
     bool m_isPlaying = false;
     bool m_isPaused = false;
 
@@ -98,19 +99,28 @@ public:
     // 위치 설정 (모든 ParticleSystem에 적용)
     virtual void SetPosition(const Mathf::Vector3& newBasePosition) {
         // 이전 기준점에서 새 기준점으로의 변화량 계산
-        Mathf::Vector3 deltaPosition = newBasePosition - m_position;
-
-        // 기준점 업데이트
         m_position = newBasePosition;
 
         // 모든 ParticleSystem을 변화량만큼 이동 (상대 위치 관계 유지)
         for (auto& ps : m_particleSystems) {
             if (ps) {
-                Mathf::Vector3 currentPos = ps->GetPosition();
-                ps->SetPosition(currentPos + deltaPosition);
+                ps->UpdateEffectBasePosition(newBasePosition);  // 절대 위치로 설정
             }
         }
     }
+
+    virtual void SetRotation(const Mathf::Vector3& newRotation) {
+        m_rotation = newRotation;
+
+        // 모든 ParticleSystem에 회전 적용
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->SetRotation(m_rotation);
+            }
+        }
+    }
+
+    const Mathf::Vector3& GetRotation() const { return m_rotation; }
 
     // ParticleSystem 관리
     void AddParticleSystem(std::shared_ptr<ParticleSystem> ps) {
