@@ -1,6 +1,7 @@
 #include "EffectComponent.h"
 #include "EffectManagerProxy.h"
 #include "EffectProxyController.h"
+#include "ParticleSystem.h"
 
 void EffectComponent::Awake()
 {
@@ -13,30 +14,25 @@ void EffectComponent::Awake()
 
     if (!m_effectTemplateName.empty())
     {
+        float templateTimeScale, templateDuration;
+        bool templateLoop;
+
+        if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
+        {
+            // JSON에서 로드된 원본 설정으로 컴포넌트 변수 업데이트
+            m_timeScale = templateTimeScale;
+            m_loop = templateLoop;
+            m_duration = templateDuration;
+        }
+
+        // 이제 동기화된 설정으로 Effect 재생
         PlayEffectByName(m_effectTemplateName);
     }
 }
 
 void EffectComponent::Update(float tick)
 {
-    if (!m_effectInstanceName.empty() && m_isPlaying)
-    {
-        m_currentTime += tick * m_timeScale;
-
-        if (!m_loop && m_duration > 0 && m_currentTime >= m_duration)
-        {
-            StopEffect();
-            return;
-        }
-
-        if (m_loop && m_duration > 0 && m_currentTime >= m_duration)
-        {
-            m_currentTime = 0.0f;
-            auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-            EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
-        }
-    }
-
+    // 시간 관리 부분 완전 제거
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
@@ -93,6 +89,16 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
         DestroyCurrentEffect();
     }
 
+    float templateTimeScale, templateDuration;
+    bool templateLoop;
+
+    if (EffectManagerProxy::GetTemplateSettings(effectName, templateTimeScale, templateLoop, templateDuration))
+    {
+        m_timeScale = templateTimeScale;
+        m_loop = templateLoop;
+        m_duration = templateDuration;
+    }
+
     // 새로운 고유 인스턴스 이름 생성
     m_effectInstanceName = effectName + "_" + std::to_string(GetInstanceID()) + "_" + std::to_string(m_instanceCounter++);
 
@@ -114,7 +120,6 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
 
     m_lastPosition = currentPos;
     m_isPlaying = true;
-    m_currentTime = 0.0f;
 }
 
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
@@ -138,7 +143,6 @@ void EffectComponent::StopEffect()
         auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(stopCommand));
         m_isPlaying = false;
-        m_currentTime = 0.0f;
     }
 }
 
@@ -146,21 +150,23 @@ void EffectComponent::PauseEffect()
 {
     if (!m_effectInstanceName.empty() && m_isPlaying && !m_isPaused)
     {
-        auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(stopCommand));
+        auto pauseCommand = EffectManagerProxy::CreatePauseCommand(m_effectInstanceName);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(pauseCommand));
         m_isPaused = true;
     }
 }
+
 
 void EffectComponent::ResumeEffect()
 {
     if (!m_effectInstanceName.empty() && m_isPlaying && m_isPaused)
     {
-        auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
+        auto resumeCommand = EffectManagerProxy::CreateResumeCommand(m_effectInstanceName);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(resumeCommand));
         m_isPaused = false;
     }
 }
+
 
 void EffectComponent::DestroyCurrentEffect()
 {
@@ -171,7 +177,6 @@ void EffectComponent::DestroyCurrentEffect()
         m_effectInstanceName.clear();
         m_isPlaying = false;
         m_isPaused = false;
-        m_currentTime = 0.0f;
     }
 }
 
@@ -179,12 +184,61 @@ void EffectComponent::ApplyEffectSettings()
 {
     if (!m_effectInstanceName.empty())
     {
+        // 타임스케일 설정
         auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, m_timeScale);
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(timeScaleCommand));
 
-        // 이펙트 기준점을 컴포넌트 위치로 설정
+        // 루프 설정
+        auto loopCommand = EffectManagerProxy::CreateSetLoopCommand(m_effectInstanceName, m_loop);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(loopCommand));
+
+        // 지속시간 설정
+        auto durationCommand = EffectManagerProxy::CreateSetDurationCommand(m_effectInstanceName, m_duration);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(durationCommand));
+
+        // 위치 설정
         auto currentPos = GetOwner()->m_transform.GetWorldPosition();
         auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
+    }
+}
+
+void EffectComponent::SetLoop(bool loop)
+{
+    m_loop = loop;
+    if (!m_effectInstanceName.empty())
+    {
+        auto loopCommand = EffectManagerProxy::CreateSetLoopCommand(m_effectInstanceName, loop);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(loopCommand));
+    }
+}
+
+void EffectComponent::SetDuration(float duration)
+{
+    m_duration = duration;
+    if (!m_effectInstanceName.empty())
+    {
+        auto durationCommand = EffectManagerProxy::CreateSetDurationCommand(m_effectInstanceName, duration);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(durationCommand));
+    }
+}
+
+void EffectComponent::SetTimeScale(float timeScale)
+{
+    m_timeScale = timeScale;
+    if (!m_effectInstanceName.empty())
+    {
+        auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, timeScale);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(timeScaleCommand));
+    }
+}
+
+void EffectComponent::ForceFinishEffect()
+{
+    if (!m_effectInstanceName.empty())
+    {
+        auto finishCommand = EffectManagerProxy::CreateForceFinishCommand(m_effectInstanceName);
+        EffectProxyController::GetInstance()->PushEffectCommand(std::move(finishCommand));
+        m_isPlaying = false;
     }
 }

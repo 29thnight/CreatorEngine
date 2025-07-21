@@ -14,6 +14,7 @@
 #include "Skeleton.h"
 
 #include "TestEnemy.h"
+#include "EffectComponent.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -247,7 +248,12 @@ void Player::Attack()
 	isCharging = false;
 	m_chargingTime = 0.f;
 
+	auto gg = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
 
+	auto ggg = gg->AddComponent<EffectComponent>();
+	
+	ggg->PlayEffectByName("gumgi2");
+	
 	if (m_comboCount == 0)
 	{
 		std::vector<HitResult> hits;

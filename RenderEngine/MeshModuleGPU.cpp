@@ -769,18 +769,36 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     // 기존 클리핑 애니메이션 처리
     if (m_isClippingAnimating && IsClippingEnabled())
     {
-        float currentTime = Time->GetTotalSeconds();
-        float animatedProgress = (sin(currentTime * m_clippingAnimationSpeed) + 1.0f) * 0.5f;
-        SetClippingProgress(animatedProgress);
+        float progress = 0.f;
+
+        if (m_useEffectProgress) {
+            // Effect 진행률 사용
+            progress = m_effectProgress;
+        }
+        else {
+            // 기존 sin 애니메이션 사용
+            float currentTime = Time->GetTotalSeconds();
+            progress = (sin(currentTime * m_clippingAnimationSpeed) + 1.0f) * 0.5f;
+        }
+
+        SetClippingProgress(progress);
         UpdateClippingBuffer();
     }
 
     // Polar 클리핑 애니메이션 처리
     if (m_isPolarClippingAnimating && IsPolarClippingEnabled())
     {
-        float currentTime = Time->GetTotalSeconds();
-        float animatedProgress = (sin(currentTime * m_polarClippingAnimationSpeed) + 1.0f) * 0.5f;
-        SetPolarAngleProgress(animatedProgress);
+        float progress = 0.f;
+        if (m_useEffectProgress) {
+            // Effect 진행률 사용
+            progress = m_effectProgress;
+        }
+        else {
+            // 기존 sin 애니메이션 사용
+            float currentTime = Time->GetTotalSeconds();
+            progress = (sin(currentTime * m_polarClippingAnimationSpeed) + 1.0f) * 0.5f;
+        }
+        SetPolarAngleProgress(progress);
         UpdatePolarClippingBuffer();
     }
 

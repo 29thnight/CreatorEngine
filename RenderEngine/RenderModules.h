@@ -81,6 +81,13 @@ public:
 
     Texture* GetAssignedTexture() const { return m_assignedTexture; }
 
+    void SetEffectProgress(float progress) {
+        m_effectProgress = progress;
+        m_useEffectProgress = true;
+    }
+
+    void SetUseEffectProgress(bool use) { m_useEffectProgress = use; }
+
 protected:
     std::unique_ptr<PipelineStateObject> m_pso;
 
@@ -94,6 +101,9 @@ protected:
     virtual void UpdateClippingBuffer() {}
 
     Texture* m_assignedTexture;
+
+    float m_effectProgress = 0.0f;
+    bool m_useEffectProgress = false;
 private:
     ID3D11DepthStencilState* m_prevDepthState = nullptr;
     UINT m_prevStencilRef = 0;

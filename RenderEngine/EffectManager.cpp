@@ -3,6 +3,7 @@
 #include "ImGuiRegister.h"
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
+#include "EffectSerializer.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -10,7 +11,31 @@ std::unordered_map<std::string, std::unique_ptr<EffectBase>> EffectManager::effe
 
 void EffectManager::Initialize()
 {
+	std::filesystem::path effectPath = PathFinder::Relative("Effect\\");
 
+	for (const auto& entry : std::filesystem::directory_iterator(effectPath))
+	{
+		if (entry.is_regular_file() && entry.path().extension() == ".json")
+		{
+			try {
+				std::ifstream file(entry.path());
+				if (file.is_open()) {
+					nlohmann::json effectJson;
+					file >> effectJson;
+					file.close();
+
+					auto effect = EffectSerializer::DeserializeEffect(effectJson);
+					if (effect) {
+						std::string effectName = entry.path().stem().string();
+						effects[effectName] = std::move(effect);
+					}
+				}
+			}
+			catch (const std::exception& e) {
+				std::cerr << "Error loading effect: " << entry.path() << " - " << e.what() << std::endl;
+			}
+		}
+	}
 }
 
 void EffectManager::Execute(RenderScene& scene, Camera& camera)

@@ -15,6 +15,11 @@ enum class EffectCommandType
     UpdateEffectProperty,
     CreateInstance,
     SetRotation,
+    SetLoop,
+    SetDuration,
+    GetState,
+    IsFinished,
+    ForceFinish
 };
 
 class EffectManagerProxy
@@ -131,6 +136,94 @@ public:
             efm->RemoveEffect(effectName);
             };
         return cmd;
+    }
+
+    // 이펙트 루프 설정 명령
+    static EffectManagerProxy CreateSetLoopCommand(const std::string& effectName, bool loop)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::SetLoop;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName, loop]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                effect->SetLoop(loop);
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 지속시간 설정 명령
+    static EffectManagerProxy CreateSetDurationCommand(const std::string& effectName, float duration)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::SetDuration;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName, duration]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                effect->SetDuration(duration);
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 일시정지 명령
+    static EffectManagerProxy CreatePauseCommand(const std::string& effectName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::Pause;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                effect->Pause();
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 재개 명령
+    static EffectManagerProxy CreateResumeCommand(const std::string& effectName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::Resume;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                effect->Resume();
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 강제 완료 명령 (Finished 상태로 만들기)
+    static EffectManagerProxy CreateForceFinishCommand(const std::string& effectName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::ForceFinish;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName]() {
+            if (auto* effect = efm->GetEffect(effectName)) {
+                // EffectBase에 ForceFinish() 메서드가 있다고 가정
+                // 또는 직접 상태를 변경하는 방법
+                effect->SetLoop(false);
+                effect->SetDuration(0.001f); // 아주 짧은 시간으로 설정해서 바로 종료되도록
+            }
+            };
+        return cmd;
+    }
+
+    static bool GetTemplateSettings(const std::string& templateName,
+        float& outTimeScale,
+        bool& outLoop,
+        float& outDuration)
+    {
+        auto* templateEffect = efm->GetEffect(templateName);
+        if (templateEffect) {
+            outTimeScale = templateEffect->GetTimeScale();
+            outLoop = templateEffect->IsLooping();
+            outDuration = templateEffect->GetDuration();
+            return true;
+        }
+        return false;
     }
 
     // 이펙트 인스턴스 생성

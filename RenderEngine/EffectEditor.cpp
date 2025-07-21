@@ -4,11 +4,40 @@
 
 EffectEditor::EffectEditor()
 {
+	// 이펙트 리스트 창 등록
+	ImGui::ContextRegister("EffectList", false, [&]() {
+		// 제목과 X 버튼을 같은 줄에
+		ImGui::Text("All Effects:");
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 30);
+		if (ImGui::SmallButton(ICON_FA_X))
+		{
+			ImGui::GetContext("EffectList").Close();
+		}
+
+		// 리스트박스
+		if (ImGui::BeginListBox("##EffectList"))
+		{
+			for (const auto& pair : efm->GetEffects()) {
+				if (ImGui::Selectable(pair.first.c_str())) {
+					// 선택했을 때 처리할 로직
+					std::cout << "Selected effect: " << pair.first << std::endl;
+				}
+			}
+			ImGui::EndListBox();
+		}
+		ImGui::GetContext("EffectList").Close();
+		});
+
+	// 메인 에디터 창 등록
 	ImGui::ContextRegister("EffectEdit", false, [&]() {
 		if (ImGui::BeginMenuBar())
 		{
 			ImGui::Text("Effect Editor");
-
+			if (ImGui::Button("Effect List"))
+			{
+				ImGui::GetContext("EffectList").Open(); // 리스트 창 열기
+			}
 			ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 30);
 			if (ImGui::SmallButton(ICON_FA_X))
 			{
@@ -16,7 +45,6 @@ EffectEditor::EffectEditor()
 			}
 			ImGui::EndMenuBar();
 		}
-
 		RenderMainEditor();
 		}, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar);
 	ImGui::GetContext("EffectEdit").Close();
@@ -234,6 +262,9 @@ void EffectEditor::RenderMainEditor()
 			if (ImGui::Button("Create New Emitter")) {
 				StartCreateEmitter();
 			}
+
+			ImGui::Separator();
+			RenderEffectPlaybackSettings();
 
 			// JSON 저장/로드 UI를 항상 표시
 			ImGui::Separator();
@@ -563,6 +594,48 @@ void EffectEditor::RenderJsonSaveLoadUI()
 	}
 }
 
+void EffectEditor::RenderEffectPlaybackSettings()
+{
+	if (ImGui::CollapsingHeader("Effect Playback Settings")) {
+		ImGui::DragFloat("Time Scale", &m_effectTimeScale, 0.01f, 0.1f, 5.0f);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Controls the playback speed of the entire effect");
+		}
+
+		if (ImGui::Checkbox("Loop", &m_effectLoop)) {
+			// 루프가 켜지면 duration을 -1로 설정
+			if (m_effectLoop) {
+				m_effectDuration = -1.0f;
+			}
+			// 루프가 꺼지면 기본 duration 값으로 설정
+			else {
+				m_effectDuration = 1.0f; 
+			}
+		}
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Whether the effect should loop when it finishes");
+		}
+
+		// 루프가 꺼져있을 때만 duration 설정 가능
+		if (!m_effectLoop) {
+			ImGui::DragFloat("Duration", &m_effectDuration, 0.1f, 0.1f, 100.0f);
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("How long the effect should play (seconds)");
+			}
+		}
+		else {
+			// 루프가 켜져있으면 duration을 비활성화 상태로 표시
+			ImGui::BeginDisabled();
+			float disabledDuration = -1.0f;
+			ImGui::DragFloat("Duration", &disabledDuration, 0.1f, -1.0f, 100.0f);
+			ImGui::EndDisabled();
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Duration is infinite when loop is enabled");
+			}
+		}
+	}
+}
+
 void EffectEditor::StartModifyEmitter(int index)
 {
 	if (index >= 0 && index < m_tempEmitters.size()) {
@@ -839,6 +912,9 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 
 		auto tempEffect = std::make_unique<EffectBase>();
 		tempEffect->SetName(effectName);
+		tempEffect->SetTimeScale(m_effectTimeScale);
+		tempEffect->SetLoop(m_effectLoop);
+		tempEffect->SetDuration(m_effectDuration);
 
 		for (const auto& tempEmitter : m_tempEmitters) {
 			if (tempEmitter.particleSystem) {

@@ -434,6 +434,18 @@ ID3D11ShaderResourceView* ParticleSystem::GetCurrentRenderingSRV() const
 	return finalIsBufferA ? m_particleSRV_A : m_particleSRV_B;
 }
 
+void ParticleSystem::SetEffectProgress(float progress)
+{
+	m_effectProgress = progress;
+
+	// 모든 렌더 모듈에 진행률 전달
+	for (auto* renderModule : m_renderModules) {
+		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+			meshModule->SetEffectProgress(progress);
+		}
+	}
+}
+
 void ParticleSystem::ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule)
 {
 	// Update 함수에서 직접 처리하므로 이 함수는 필요 없을 수 있음 

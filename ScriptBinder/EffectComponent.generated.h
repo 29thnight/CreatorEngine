@@ -11,7 +11,6 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_property(m_timeScale) \
 		meta_property(m_loop) \
 		meta_property(m_duration) \
-		meta_property(m_currentTime) \
 		meta_property(m_useAbsolutePosition) \
 	}); \
 	MethodField \
@@ -23,6 +22,10 @@ ReflectionFieldInheritance(EffectComponent, Component) \
 		meta_method(ResumeEffect) \
 		meta_method(ChangeEffect, "std", "newEffectName") \
 		meta_method(PlayEffectByName, "std", "effectName") \
+		meta_method(SetLoop, "loop") \
+		meta_method(SetDuration, "duration") \
+		meta_method(SetTimeScale, "timeScale") \
+		meta_method(ForceFinishEffect) \
 	}); \
 	FieldEnd(EffectComponent, PropertyAndMethodInheritance) \
 };

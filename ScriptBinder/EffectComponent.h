@@ -1,5 +1,4 @@
 #pragma once
-#include "ParticleSystem.h"
 #include "Component.h"
 #include "EffectComponent.generated.h"
 
@@ -7,7 +6,7 @@ class EffectComponent : public Component, public IUpdatable, public IAwakable, p
 {
 public:
     ReflectEffectComponent
-    [[Serializable(Inheritance:Component)]]
+        [[Serializable(Inheritance:Component)]]
     GENERATED_BODY(EffectComponent)
 
     void Awake() override;
@@ -37,7 +36,19 @@ public:
     [[Method]]
     void PlayEffectByName(const std::string& effectName);
 
-    // 에디터에서 선택할 템플릿 이펙트 이름 (런타임에서 변경 가능)
+    // 런타임에서 이펙트 설정 변경
+    [[Method]]
+    void SetLoop(bool loop);
+
+    [[Method]]
+    void SetDuration(float duration);
+
+    [[Method]]
+    void SetTimeScale(float timeScale);
+
+    [[Method]]
+    void ForceFinishEffect();
+
     [[Property]]
     std::string m_effectTemplateName = "Null";
 
@@ -58,10 +69,8 @@ public:
     float m_duration = -1.0f;
 
     [[Property]]
-    float m_currentTime = 0.0f;
-
-    [[Property]]
     bool m_useAbsolutePosition = false;
+
 private:
     // 실제 사용되는 고유 인스턴스 이름
     std::string m_effectInstanceName;
