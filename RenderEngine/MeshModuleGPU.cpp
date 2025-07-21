@@ -106,6 +106,7 @@ void MeshModuleGPU::Initialize()
     // 클리핑 버퍼 생성
     CreateClippingBuffer();
 
+    CreatePolarClippingBuffer();
     // 기본 큐브 메시 설정
     if (m_meshType == MeshType::None) {
         SetMeshType(MeshType::Cube);
@@ -280,6 +281,86 @@ void MeshModuleGPU::SetClippingAnimation(bool enable, float speed)
     m_clippingAnimationSpeed = speed;
 }
 
+void MeshModuleGPU::CreatePolarClippingBuffer()
+{
+    if (m_polarClippingBuffer)
+        return;
+
+    D3D11_BUFFER_DESC bufferDesc = {};
+    bufferDesc.ByteWidth = sizeof(PolarClippingParams);
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    HRESULT hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_polarClippingBuffer);
+    if (FAILED(hr))
+    {
+        m_polarClippingBuffer.Reset();
+    }
+}
+
+void MeshModuleGPU::UpdatePolarClippingBuffer()
+{
+    if (!m_polarClippingBuffer)
+        return;
+    if (!DeviceState::g_pDevice || !DeviceState::g_pDeviceContext)
+        return;
+
+    auto& deviceContext = DeviceState::g_pDeviceContext;
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    HRESULT hr = deviceContext->Map(m_polarClippingBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
+    if (SUCCEEDED(hr))
+    {
+        PolarClippingParams* params = static_cast<PolarClippingParams*>(mappedResource.pData);
+        *params = m_polarClippingParams;
+        deviceContext->Unmap(m_polarClippingBuffer.Get(), 0);
+    }
+}
+
+void MeshModuleGPU::EnablePolarClipping(bool enable)
+{
+    m_polarClippingParams.polarClippingEnabled = enable ? 1.0f : 0.0f;
+}
+
+bool MeshModuleGPU::IsPolarClippingEnabled() const
+{
+    return m_polarClippingParams.polarClippingEnabled > 0.5f;
+}
+
+void MeshModuleGPU::SetPolarAngleProgress(float progress)
+{
+    m_polarClippingParams.polarAngleProgress = std::clamp(progress, 0.0f, 1.0f);
+}
+
+void MeshModuleGPU::SetPolarCenter(const Mathf::Vector3& center)
+{
+    m_polarClippingParams.polarCenter = center;
+}
+
+void MeshModuleGPU::SetPolarUpAxis(const Mathf::Vector3& upAxis)
+{
+    Mathf::Vector3 normalization = upAxis;
+    normalization.Normalize();
+    m_polarClippingParams.polarUpAxis = normalization;
+}
+
+void MeshModuleGPU::SetPolarStartAngle(float angleRadians)
+{
+    m_polarClippingParams.polarStartAngle = angleRadians;
+}
+
+void MeshModuleGPU::SetPolarDirection(float direction)
+{
+    m_polarClippingParams.polarDirection = (direction >= 0.0f) ? 1.0f : -1.0f;
+}
+
+void MeshModuleGPU::SetPolarClippingAnimation(bool enable, float speed)
+{
+    m_isPolarClippingAnimating = enable;
+    m_polarClippingAnimationSpeed = speed;
+}
+
 nlohmann::json MeshModuleGPU::SerializeData() const
 {
     nlohmann::json json;
@@ -335,6 +416,30 @@ nlohmann::json MeshModuleGPU::SerializeData() const
         };
     }
 
+    if (IsPolarClippingEnabled())
+    {
+        json["polarClipping"] = {
+            {"enabled", IsPolarClippingEnabled()},
+            {"animating", m_isPolarClippingAnimating},
+            {"animationSpeed", m_polarClippingAnimationSpeed},
+            {"params", {
+                {"polarAngleProgress", m_polarClippingParams.polarAngleProgress},
+                {"polarStartAngle", m_polarClippingParams.polarStartAngle},
+                {"polarDirection", m_polarClippingParams.polarDirection},
+                {"polarCenter", {
+                    {"x", m_polarClippingParams.polarCenter.x},
+                    {"y", m_polarClippingParams.polarCenter.y},
+                    {"z", m_polarClippingParams.polarCenter.z}
+                }},
+                {"polarUpAxis", {
+                    {"x", m_polarClippingParams.polarUpAxis.x},
+                    {"y", m_polarClippingParams.polarUpAxis.y},
+                    {"z", m_polarClippingParams.polarUpAxis.z}
+                }}
+            }}
+        };
+    }
+
     // 상수 버퍼 데이터
     json["constantBuffer"] = {
         {"cameraPosition", {
@@ -361,10 +466,22 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         if (modelJson.contains("name"))
         {
             std::string modelName = modelJson["name"];
+
+            // 확장자가 없는 경우에만 기본 확장자 추가
+            // 다양한 모델 형식 지원 (fbx, gltf, obj, dae)
             if (modelName.find('.') == std::string::npos)
             {
-                modelName += ".fbx";
+                // 여러 확장자를 순서대로 시도
+                std::vector<std::string> extensions = { ".gltf", ".fbx" };
+
+                for (const auto& ext : extensions)
+                {
+                    std::string testName = modelName + ext;
+                    m_model = DataSystems->LoadCashedModel(testName);
+                    if (m_model) break;
+                }
             }
+
             m_model = DataSystems->LoadCashedModel(modelName);
 
             if (m_model) {
@@ -403,10 +520,13 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         if (textureJson.contains("name"))
         {
             std::string textureName = textureJson["name"];
+
+            // 텍스처도 마찬가지로 확장자가 없는 경우만 png 추가
             if (textureName.find('.') == std::string::npos)
             {
                 textureName += ".png";
             }
+
             m_assignedTexture = DataSystems->LoadTexture(textureName);
 
             if (m_assignedTexture) {
@@ -459,8 +579,6 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
                 SetClippingAxis(axis);
             }
 
-            // boundsMin/Max 관련 코드 제거됨 (상대 좌표계는 고정된 -1~1 범위 사용)
-
             if (paramsJson.contains("clippingEnabled"))
             {
                 float enabled = paramsJson["clippingEnabled"];
@@ -478,6 +596,69 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
             {
                 // 로그 출력 (옵션)
                 // Logger::Warning("Legacy boundsMin/Max detected in clipping data. Using relative coordinate system instead.");
+            }
+        }
+    }
+
+    if (json.contains("polarClipping"))
+    {
+        const auto& polarClippingJson = json["polarClipping"];
+
+        if (polarClippingJson.contains("enabled"))
+        {
+            bool enabled = polarClippingJson["enabled"];
+            EnablePolarClipping(enabled);
+        }
+
+        if (polarClippingJson.contains("animating"))
+        {
+            m_isPolarClippingAnimating = polarClippingJson["animating"];
+        }
+
+        if (polarClippingJson.contains("animationSpeed"))
+        {
+            m_polarClippingAnimationSpeed = polarClippingJson["animationSpeed"];
+        }
+
+        if (polarClippingJson.contains("params"))
+        {
+            const auto& paramsJson = polarClippingJson["params"];
+
+            if (paramsJson.contains("polarAngleProgress"))
+            {
+                SetPolarAngleProgress(paramsJson["polarAngleProgress"]);
+            }
+
+            if (paramsJson.contains("polarStartAngle"))
+            {
+                SetPolarStartAngle(paramsJson["polarStartAngle"]);
+            }
+
+            if (paramsJson.contains("polarDirection"))
+            {
+                SetPolarDirection(paramsJson["polarDirection"]);
+            }
+
+            if (paramsJson.contains("polarCenter"))
+            {
+                const auto& centerJson = paramsJson["polarCenter"];
+                Mathf::Vector3 center(
+                    centerJson.value("x", 0.0f),
+                    centerJson.value("y", 0.0f),
+                    centerJson.value("z", 0.0f)
+                );
+                SetPolarCenter(center);
+            }
+
+            if (paramsJson.contains("polarUpAxis"))
+            {
+                const auto& upAxisJson = paramsJson["polarUpAxis"];
+                Mathf::Vector3 upAxis(
+                    upAxisJson.value("x", 0.0f),
+                    upAxisJson.value("y", 1.0f),
+                    upAxisJson.value("z", 0.0f)
+                );
+                SetPolarUpAxis(upAxis);
             }
         }
     }
@@ -582,11 +763,10 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;
 
-    // 월드 행렬 저장 및 역행렬 계산
     m_worldMatrix = world;
     m_invWorldMatrix = world.Invert();
 
-    // 클리핑 애니메이션 처리
+    // 기존 클리핑 애니메이션 처리
     if (m_isClippingAnimating && IsClippingEnabled())
     {
         float currentTime = Time->GetTotalSeconds();
@@ -595,17 +775,33 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         UpdateClippingBuffer();
     }
 
+    // Polar 클리핑 애니메이션 처리
+    if (m_isPolarClippingAnimating && IsPolarClippingEnabled())
+    {
+        float currentTime = Time->GetTotalSeconds();
+        float animatedProgress = (sin(currentTime * m_polarClippingAnimationSpeed) + 1.0f) * 0.5f;
+        SetPolarAngleProgress(animatedProgress);
+        UpdatePolarClippingBuffer();
+    }
+
     auto& deviceContext = DeviceState::g_pDeviceContext;
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffer(world, view, projection);
     deviceContext->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
 
-    // 클리핑 상수 버퍼 바인딩 및 업데이트
+    // 기존 클리핑 상수 버퍼 바인딩 (register b1)
     if (IsClippingEnabled() && m_clippingBuffer)
     {
         UpdateClippingBuffer();
         deviceContext->PSSetConstantBuffers(1, 1, m_clippingBuffer.GetAddressOf());
+    }
+
+    // Polar 클리핑 상수 버퍼 바인딩 (register b2)
+    if (IsPolarClippingEnabled() && m_polarClippingBuffer)
+    {
+        UpdatePolarClippingBuffer();
+        deviceContext->PSSetConstantBuffers(2, 1, m_polarClippingBuffer.GetAddressOf());
     }
 
     // 파티클 SRV 바인딩
@@ -652,6 +848,12 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         ID3D11Buffer* nullBuffer[1] = { nullptr };
         deviceContext->PSSetConstantBuffers(1, 1, nullBuffer);
     }
+
+    if (IsPolarClippingEnabled())
+    {
+        ID3D11Buffer* nullBuffer[1] = { nullptr };
+        deviceContext->PSSetConstantBuffers(2, 1, nullBuffer);
+    }
 }
 
 void MeshModuleGPU::SetTexture(Texture* texture)
@@ -670,6 +872,7 @@ void MeshModuleGPU::Release()
 
     m_constantBuffer.Reset();
     m_clippingBuffer.Reset();
+    m_polarClippingBuffer.Reset();
     m_model = nullptr;
     m_meshIndex = 0;
     m_particleSRV = nullptr;

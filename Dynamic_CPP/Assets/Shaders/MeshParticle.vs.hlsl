@@ -91,6 +91,39 @@ float3x3 CreateRotationMatrix(float3 rotation)
     return mul(mul(rotZ, rotY), rotX);
 }
 
+float4 EulerToQuaternion(float3 euler)
+{
+    float3 c = cos(euler * 0.5);
+    float3 s = sin(euler * 0.5);
+    
+    return float4(
+        s.x * c.y * c.z - c.x * s.y * s.z, // x
+        c.x * s.y * c.z + s.x * c.y * s.z, // y  
+        c.x * c.y * s.z - s.x * s.y * c.z, // z
+        c.x * c.y * c.z + s.x * s.y * s.z  // w
+    );
+}
+
+// 쿼터니언을 회전 행렬로 변환
+float3x3 QuaternionToMatrix(float4 q)
+{
+    float xx = q.x * q.x;
+    float yy = q.y * q.y;
+    float zz = q.z * q.z;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float yz = q.y * q.z;
+    float wx = q.w * q.x;
+    float wy = q.w * q.y;
+    float wz = q.w * q.z;
+    
+    return float3x3(
+        1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy),
+        2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx),
+        2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy)
+    );
+}
+
 VertexOutput main(VertexInput input)
 {
     VertexOutput output;
@@ -113,18 +146,25 @@ VertexOutput main(VertexInput input)
         return output;
     }
     
-    // 원본 로컬 위치 저장 (스케일/회전 적용 전)
     output.localPos = input.position;
     
-    // 로컬 변환: 스케일 -> 회전
-    float3x3 rotMatrix = CreateRotationMatrix(particle.rotation);
+    // 쿼터니언 방식으로 회전 처리
+    float4 quaternion = EulerToQuaternion(particle.rotation);
+    float3x3 rotMatrix = QuaternionToMatrix(quaternion);
+    
+    // 1. 스케일 적용
     float3 scaledPos = input.position * particle.scale;
+    float3 scaledNormal = normalize(input.normal);
+    
+    // 2. 회전 적용
     float3 rotatedPos = mul(scaledPos, rotMatrix);
-    float3 rotatedNormal = mul(input.normal, rotMatrix);
+    float3 rotatedNormal = mul(scaledNormal, rotMatrix);
+    
+    // 3. 파티클 위치로 이동
+    float3 finalPos = rotatedPos + particle.position;
     
     // 월드 변환
-    float3 worldPos = rotatedPos + particle.position;
-    float4 worldPosition = mul(float4(worldPos, 1.0), gWorld);
+    float4 worldPosition = mul(float4(finalPos, 1.0), gWorld);
     float4 particleCenterWorld = mul(float4(particle.position, 1.0), gWorld);
     
     // 뷰 및 프로젝션 변환

@@ -108,9 +108,25 @@ public:
 
 	virtual void Render(RenderScene& scene, Camera& camera);
 
+	void UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition);
+
 	void SetPosition(const Mathf::Vector3& position);
 
-	Mathf::Vector3 GetPosition() { return m_position; }
+	Mathf::Vector3 GetWorldPosition() const {
+		return m_effectBasePosition + m_position;
+	}
+
+	Mathf::Vector3 GetRelativePosition() const {
+		return m_position;
+	}
+
+	Mathf::Vector3 GetEffectBasePosition() const {
+		return m_effectBasePosition;
+	}
+
+	void SetRotation(const Mathf::Vector3& rotation);
+
+	Mathf::Vector3 GetRotation() { return m_rotation; }
 
 	void ResizeParticleSystem(UINT newMaxParticles);
 
@@ -160,6 +176,8 @@ protected:
 	int m_maxParticles;
 	std::vector<BillBoardInstanceData> m_instanceData;
 	Mathf::Vector3 m_position = { 0, 0, 0 };
+	Mathf::Vector3 m_effectBasePosition = { 0, 0, 0 };
+	Mathf::Vector3 m_rotation = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

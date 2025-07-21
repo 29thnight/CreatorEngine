@@ -1,4 +1,4 @@
-// MeshParticleClippingPS.hlsl - 실제 메쉬 바운딩 박스 기반 클리핑
+// MeshParticleClippingPS.hlsl - 실제 메쉬 바운딩 박스 기반 클리핑 + Polar Angle 클리핑
 cbuffer ClippingParams : register(b1)
 {
     float clippingProgress;
@@ -6,9 +6,22 @@ cbuffer ClippingParams : register(b1)
     
     float clippingEnabled;
     float3 meshBoundingMin;
-
     float3 meshBoundingMax;
     float pad1;
+};
+
+cbuffer PolarClippingParams : register(b2)
+{
+    float polarClippingEnabled; // 극좌표 클리핑 활성화 여부
+    float polarAngleProgress; // 0~1: 각도 진행도
+    float polarStartAngle; // 시작 각도 (라디안)
+    float polarDirection; // 1: 시계방향, -1: 반시계방향
+    
+    float3 polarCenter; // 극좌표 중심점 (월드 좌표)
+    float pad2;
+    
+    float3 polarUpAxis; // 극좌표 위쪽 축 (일반적으로 Y축)
+    float pad3;
 };
 
 struct PixelInput
@@ -35,38 +48,102 @@ Texture2D gDiffuseTexture : register(t0);
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
 
+// 각도를 0~2π 범위로 정규화하는 함수
+float normalizeAngle(float angle)
+{
+    const float TWO_PI = 6.28318530718;
+    angle = fmod(angle, TWO_PI);
+    if (angle < 0.0)
+        angle += TWO_PI;
+    return angle;
+}
+
+// Polar angle 클리핑 계산 함수
+bool shouldClipPolarAngle(float3 worldPos)
+{
+    if (polarClippingEnabled < 0.5)
+        return false;
+    
+    // 중심점으로부터의 벡터 계산
+    float3 toPixel = worldPos - polarCenter;
+    
+    // Up 축을 기준으로 한 평면에서의 각도 계산
+    float3 upAxis = normalize(polarUpAxis);
+    
+    // Up 축에 수직인 평면으로 투영
+    float3 projectedVector = toPixel - dot(toPixel, upAxis) * upAxis;
+    
+    // 투영된 벡터의 길이가 너무 작으면 클리핑하지 않음
+    float projectedLength = length(projectedVector);
+    if (projectedLength < 0.001)
+        return false;
+    
+    projectedVector = normalize(projectedVector);
+    
+    // 기준 벡터 설정 (X축 또는 적절한 기준)
+    float3 referenceVector = float3(1.0, 0.0, 0.0);
+    
+    // 기준 벡터가 Up 축과 평행하면 다른 축 사용
+    if (abs(dot(referenceVector, upAxis)) > 0.9)
+        referenceVector = float3(0.0, 0.0, 1.0);
+    
+    // 기준 벡터를 같은 평면으로 투영
+    referenceVector = referenceVector - dot(referenceVector, upAxis) * upAxis;
+    referenceVector = normalize(referenceVector);
+    
+    // 각도 계산
+    float dotProduct = dot(projectedVector, referenceVector);
+    dotProduct = clamp(dotProduct, -1.0, 1.0);
+    float angle = acos(dotProduct);
+    
+    // 방향 결정을 위한 외적 계산
+    float3 crossProduct = cross(referenceVector, projectedVector);
+    float direction = dot(crossProduct, upAxis);
+    
+    if (direction < 0.0)
+        angle = 6.28318530718 - angle; // 2π - angle
+    
+    // 시작 각도 적용
+    angle = normalizeAngle(angle - polarStartAngle);
+    
+    // 진행도에 따른 클리핑 각도 계산
+    float clipAngle = polarAngleProgress * 6.28318530718; // 2π
+    
+    // 방향에 따른 클리핑 판정
+    if (polarDirection > 0.0) // 시계방향
+    {
+        return angle > clipAngle;
+    }
+    else // 반시계방향
+    {
+        return angle < (6.28318530718 - clipAngle);
+    }
+}
+
 PixelOutput main(PixelInput input)
 {
     PixelOutput output;
     
-    // CPU에서 전달받은 실제 메쉬 바운딩 박스 사용
+    // 기존 바운딩 박스 클리핑
     float3 boundingSize = meshBoundingMax - meshBoundingMin;
-    
-    // 0으로 나누기 방지
     boundingSize = max(boundingSize, float3(0.001, 0.001, 0.001));
     
-    // 로컬 위치를 실제 바운딩 박스 기준으로 정규화 (0~1 범위)
     float3 clippingPos = (input.localPos - meshBoundingMin) / boundingSize;
-    
-    // 안전하게 0~1 범위로 클램프
     clippingPos = saturate(clippingPos);
     
-    // 클리핑 축에 따른 진행도 계산
     float3 absAxis = abs(clippingAxis);
     float axisProgress = dot(clippingPos, absAxis);
     
-    // 축이 음수인지 확인하여 진행 방향 결정
     bool axisIsNegative = any(clippingAxis < 0.0);
     if (axisIsNegative)
     {
         axisProgress = 1.0 - axisProgress;
     }
     
-    // 클리핑 임계값 계산
     float threshold = clippingProgress >= 0.0 ? clippingProgress : (1.0 + clippingProgress);
     bool reverseDirection = clippingProgress < 0.0;
     
-    // 클리핑 수행
+    // 기존 축 기반 클리핑
     if (clippingEnabled > 0.5)
     {
         if (reverseDirection)
@@ -77,6 +154,12 @@ PixelOutput main(PixelInput input)
         {
             clip(axisProgress - threshold);
         }
+    }
+    
+    // Polar angle 클리핑
+    if (shouldClipPolarAngle(input.worldPos))
+    {
+        discard;
     }
     
     // 노말 벡터 정규화

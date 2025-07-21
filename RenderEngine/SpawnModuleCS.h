@@ -78,6 +78,8 @@ public:
 
     // 스폰 설정 메서드들
     void SetEmitterPosition(const Mathf::Vector3& position);
+    void SetEmitterRotation(const Mathf::Vector3& rotation);
+
     void SetSpawnRate(float rate);
     void SetEmitterType(EmitterType type);
     void SetEmitterSize(const XMFLOAT3& size);
