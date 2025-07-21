@@ -52,6 +52,8 @@ public:
 	Mathf::xVector GetWorldQuaternion() const;
 
 	Mathf::Vector3 GetForward();
+	Mathf::Vector3 GetRight();
+	Mathf::Vector3 GetUp();
 	void SetDirty();
 	bool IsDirty() const;
 

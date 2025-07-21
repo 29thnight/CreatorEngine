@@ -26,7 +26,6 @@ public:
 	bool Initialize();
 
 	MSVCVersion GetMSVCVersion() const { return m_msvcVersion; }
-
 	std::wstring GetMsbuildPath()
 	{
 		switch (m_msvcVersion)
@@ -39,7 +38,6 @@ public:
 			return L"";
 		}
 	}
-
 	bool IsEditorMode() const { return m_isEditorMode; }
 	void SetEditorMode(bool isEditorMode) { m_isEditorMode = isEditorMode; }
     bool IsGameView() const { return m_isGameView.load(); }

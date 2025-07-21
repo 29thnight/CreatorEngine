@@ -3,6 +3,16 @@
 #include "Entity.h"
 
 class Player;
+
+enum EItemState
+{
+	NONE = 0,
+	ACQUIERED,  // 아이템 획득
+	THROWN,     // 아이템 던짐
+	DESTROYED   // 아이템 파괴
+	// Add more item types as needed
+};
+
 class EntityItem : public Entity
 {
 public:

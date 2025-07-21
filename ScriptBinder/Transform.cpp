@@ -212,6 +212,12 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	m_localMatrix = matrix;
 	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, m_localMatrix);
 
+	/*if (std::isnan(_scale.m128_f32[0]) || std::isnan(_scale.m128_f32[1]) || std::isnan(_scale.m128_f32[2]) ||
+		std::isnan(_rotation.m128_f32[0]) || std::isnan(_rotation.m128_f32[1]) || std::isnan(_rotation.m128_f32[2]) ||
+		std::isnan(_position.m128_f32[0]) || std::isnan(_position.m128_f32[1]) || std::isnan(_position.m128_f32[2])) {
+		std::cout << "Nan transform" << std::endl;
+	}*/
+
 	XMStoreFloat4(&position, _position);
 	XMStoreFloat4(&scale, _scale);
 	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
@@ -256,6 +262,20 @@ Mathf::Vector3 Transform::GetForward()
 	auto forward = Mathf::Vector3::TransformNormal(Mathf::Vector3::Forward, GetWorldMatrix());
 	forward.Normalize();
 	return forward;
+}
+
+Mathf::Vector3 Transform::GetRight()
+{
+	auto right = Mathf::Vector3::TransformNormal(Mathf::Vector3::Right, GetWorldMatrix());
+	right.Normalize();
+	return right;
+}
+
+Mathf::Vector3 Transform::GetUp()
+{
+	auto up = Mathf::Vector3::TransformNormal(Mathf::Vector3::Up, GetWorldMatrix());
+	up.Normalize();
+	return up;
 }
 
 void Transform::SetDirty()
