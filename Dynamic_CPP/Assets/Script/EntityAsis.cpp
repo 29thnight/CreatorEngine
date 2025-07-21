@@ -130,6 +130,18 @@ bool EntityAsis::AddItem(EntityItem* item)
 	
 	m_EntityItemQueue.push(item);
 	m_currentEntityItemCount++;
+
+	auto queue = m_EntityItemQueue;
+	while (!queue.empty()) {
+		auto i = queue.front();
+		queue.pop();
+		if (item == i)
+		{
+			std::cout << "EntityAsis: Item already exists in the queue." << std::endl;
+			return false; // 이미 큐에 존재하는 아이템은 추가하지 않음.
+		}
+	}
+
 	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
 	return true;
 }
