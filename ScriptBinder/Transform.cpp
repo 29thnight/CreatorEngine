@@ -104,10 +104,10 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 {
 	// TODO: 여기에 return 문을 삽입합니다.
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetPosition(pos);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
 		Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
@@ -117,23 +117,23 @@ Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 
 Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 {
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetRotation(quaternion);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
 		Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
-		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(parentWorldInverse, quaternion);
+		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(quaternion, parentWorldInverse);
 		return SetRotation(newLocalrotation);
 	}
 }
 
 Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 {
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetScale(scale);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
 		Mathf::Vector3 newLocalscale = XMVector3TransformCoord(scale, parentWorldInverse);
@@ -177,8 +177,8 @@ void Transform::UpdateLocalMatrix()
 
 Mathf::xMatrix Transform::UpdateWorldMatrix()
 {
-	if (m_parentID != 0) {
-		auto parent = GameObject::FindIndex(m_parentID);
+	if (m_owner->m_parentIndex != 0) {
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();
 		XMMATRIX worldMatrix = XMMatrixMultiply(m_localMatrix, parentWorldMatrix);
@@ -234,12 +234,18 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
 	m_worldQuaternion = DirectX::XMVector4Normalize(m_worldQuaternion);
 
-	GameObject* parentObject = GameObject::FindIndex(m_parentID);
+	GameObject* parentObject = GameObject::FindIndex(m_owner->m_parentIndex);
 	if (!parentObject)
 	{
 		m_parentID = m_owner->m_parentIndex;
 		parentObject = GameObject::FindIndex(m_parentID);
 	}
+
+	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
+
+	SetLocalMatrix(newLocalMatrix);
 }
 
 Mathf::xVector Transform::GetWorldPosition() const
