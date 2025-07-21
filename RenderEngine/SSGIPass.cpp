@@ -1,5 +1,6 @@
 #include "SSGIPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
 
 //#define SSGI_Ratio 1
@@ -13,9 +14,9 @@ cbuffer SSGIParams
     XMMATRIX view;
     XMMATRIX proj;
     XMMATRIX inverseProjection;
-    float2 screenSize; // È­¸é Å©±â
-    float radius; // »ùÇÃ¸µ ¹İ°æ
-    float thickness; // µÎ²²
+    float2 screenSize; // í™”ë©´ í¬ê¸°
+    float radius; // ìƒ˜í”Œë§ ë°˜ê²½
+    float thickness; // ë‘ê»˜
     UINT frameIndex;
     int ratio;
     float intensity;
@@ -326,4 +327,15 @@ void SSGIPass::ControlPanel()
 
 void SSGIPass::Resize(uint32_t width, uint32_t height)
 {
+}
+
+void SSGIPass::ApplySettings(const SSGIPassSetting& setting)
+{
+    isOn = setting.isOn;
+    useOnlySSGI = setting.useOnlySSGI;
+    useDualFilteringStep = setting.useDualFilteringStep;
+    radius = setting.radius;
+    thickness = setting.thickness;
+    intensity = setting.intensity;
+    ssratio = setting.ssratio;
 }

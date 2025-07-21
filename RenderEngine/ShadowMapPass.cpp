@@ -1,5 +1,6 @@
 #include "ShadowMapPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -476,4 +477,14 @@ void ShadowMapPass::CreateRenderCommandList(ID3D11DeviceContext* defferdContext,
 	{
 		CreateCommandListNormalShadow(defferdContext, scene, camera);
 	}
+}
+
+void ShadowMapPass::ApplySettings(const ShadowMapPassSetting& setting)
+{
+    g_useCascade = setting.useCascade;
+    isCloudOn = setting.isCloudOn;
+    cloudSize = setting.cloudSize;
+    cloudDirection = setting.cloudDirection;
+    cloudMoveSpeed = setting.cloudMoveSpeed;
+    m_settingConstant._epsilon = setting.epsilon;
 }
