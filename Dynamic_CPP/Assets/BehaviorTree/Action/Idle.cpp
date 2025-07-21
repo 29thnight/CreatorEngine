@@ -3,12 +3,19 @@
 
 NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
 	// Perform idle behavior, such as waiting or doing nothing
 	// This is a placeholder for actual idle logic
-	
+	if (movement)
+	{
+		movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during idle
+		std::cout << "Idle action executed. Stopping movement." << std::endl;
+	}
 	// Return success to indicate that the idle action completed successfully
 	// In a real implementation, you might check conditions or perform actions here
 	bool isAnime = blackBoard.HasKey("AnimeState");
+	auto animation = m_owner->GetComponent<Animator>();
+	
 	if (isAnime)
 	{
 		std::string state = blackBoard.GetValueAsString("AnimeState");
@@ -19,6 +26,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
+			animation->SetParameter("IdleOn", true);
 			blackBoard.SetValueAsString("AnimeState", "Idle");
 			std::cout << "Switching to Idle state." << std::endl;
 		}
