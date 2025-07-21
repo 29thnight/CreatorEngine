@@ -44,11 +44,11 @@ private:
 	bool m_isAbleToneMap{ true };
 	// Auto Exposure Settings
 	float m_fNumber{ 8.f };
-	float m_shutterTime{ 16.f }; // 1/100s
+	float m_shutterTime{ 8.f }; // 1/100s
 	float m_ISO{ 100.f };
 	float m_exposureCompensation{};
-	float m_speedBrightness{ 1.5f };
-	float m_speedDarkness{ 0.7f };
+	float m_speedBrightness{ 3.f };
+	float m_speedDarkness{ 1.7f };
 
 	uint32 m_readIndex{ 0 };
 	uint32 m_writeIndex{ 1 };
