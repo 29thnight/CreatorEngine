@@ -66,6 +66,7 @@ private:
 	friend class InspectorWindow;
 
 	GameObject* m_owner{ nullptr };
+	[[Property]]
 	uint32 m_parentID{ 0 };
 
 	[[Property]]
