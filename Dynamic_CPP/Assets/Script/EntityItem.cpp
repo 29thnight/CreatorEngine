@@ -71,7 +71,7 @@ void EntityItem::Update(float tick)
 			
 			Vector3 pC = tailTransform->GetWorldPosition();
 			Vector3 pB = ((pC - startPos) / 2) + startPos;
-			pB.y += 35.f;
+			pB.y += 5.f;
 			Vector3 pA = startPos;
 
 			timer += tick * speed; // 10sec

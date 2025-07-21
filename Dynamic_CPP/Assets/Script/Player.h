@@ -100,9 +100,10 @@ public:
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
-	GameObject* camera = nullptr;
 	GameObject* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
 	Animator* m_animator = nullptr;
+
+	GameObject* camera = nullptr;
 };
