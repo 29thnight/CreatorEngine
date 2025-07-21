@@ -1,6 +1,6 @@
 #include "SceneRenderer.h"
 #include "DeviceState.h"
-#include "../EngineEntry/EngineSetting.h"
+#include "EngineSetting.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
 #include "Benchmark.hpp"
@@ -175,7 +175,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
 
 	m_pPostProcessingPass = std::make_unique<PostProcessingPass>();
-    m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().post);
+    m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
 
 	//lightmapPass
 	m_pLightMapPass = std::make_unique<LightMapPass>();

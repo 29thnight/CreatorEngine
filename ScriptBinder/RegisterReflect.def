@@ -7,26 +7,38 @@
 #include "TerrainCollider.h"
 #include "CameraComponent.h"
 #include "Animation.h"
+#include "TextComponent.h"
+#include "RenderPassSettings.h"
+#include "SSGIPassSetting.h"
+#include "Camera.h"
+#include "UIComponent.h"
+#include "MaterialFlowInformation.h"
+#include "AAPassSetting.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
-#include "UIComponent.h"
-#include "MaterialFlowInformation.h"
-#include "Camera.h"
-#include "MaterialInfomation.h"
+#include "BloomSetting.h"
+#include "RigidBodyComponent.h"
+#include "ColorGradingPassSetting.h"
+#include "DeferredPassSetting.h"
 #include "Component.h"
 #include "Material.h"
+#include "MaterialInfomation.h"
 #include "Mesh.h"
+#include "ToneMapPassSetting.h"
+#include "TestAniScprit.h"
+#include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
-#include "TestAniScprit.h"
+#include "StateMachineComponent.h"
+#include "AniTransition.h"
+#include "SSAOPassSetting.h"
+#include "VignettePassSetting.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "Animator.h"
-#include "StateMachineComponent.h"
-#include "AniTransition.h"
 #include "AvatarMask.h"
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
@@ -52,13 +64,12 @@
 #include "PlayerInput.h"
 #include "UIButton.h"
 #include "Prefab.h"
-#include "RigidBodyComponent.h"
 #include "Terrain.h"
-#include "TextComponent.h"
 #include "TransCondition.h"
 
 REFLECTION_REGISTER()
 {
+    AUTO_REGISTER_CLASS(AAPassSetting);
     AUTO_REGISTER_CLASS(ActionMap);
     AUTO_REGISTER_CLASS(AniTransition);
     AUTO_REGISTER_CLASS(Animation);
@@ -72,6 +83,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(BTBuildNode);
     AUTO_REGISTER_CLASS(BehaviorTreeComponent);
     AUTO_REGISTER_CLASS(BlackBoardValue);
+    AUTO_REGISTER_CLASS(BloomPassSetting);
     AUTO_REGISTER_CLASS(BoneMask);
     AUTO_REGISTER_CLASS(BoxColliderComponent);
     AUTO_REGISTER_CLASS(Camera);
@@ -79,8 +91,10 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(Canvas);
     AUTO_REGISTER_CLASS(CapsuleColliderComponent);
     AUTO_REGISTER_CLASS(CharacterControllerComponent);
+    AUTO_REGISTER_CLASS(ColorGradingPassSetting);
     AUTO_REGISTER_CLASS(Component);
     AUTO_REGISTER_CLASS(ConditionParameter);
+    AUTO_REGISTER_CLASS(DeferredPassSetting);
     AUTO_REGISTER_CLASS(EffectComponent);
     AUTO_REGISTER_CLASS(GameObject);
     AUTO_REGISTER_CLASS(ImageComponent);
@@ -99,8 +113,12 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(PlayerInput);
     AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
+    AUTO_REGISTER_CLASS(RenderPassSettings);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
+    AUTO_REGISTER_CLASS(SSAOPassSetting);
+    AUTO_REGISTER_CLASS(SSGIPassSetting);
     AUTO_REGISTER_CLASS(Scene);
+    AUTO_REGISTER_CLASS(ShadowMapPassSetting);
     AUTO_REGISTER_CLASS(Skeleton);
     AUTO_REGISTER_CLASS(SphereColliderComponent);
     AUTO_REGISTER_CLASS(SpriteRenderer);
@@ -109,8 +127,10 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(TerrainComponent);
     AUTO_REGISTER_CLASS(TestAniScprit);
     AUTO_REGISTER_CLASS(TextComponent);
+    AUTO_REGISTER_CLASS(ToneMapPassSetting);
     AUTO_REGISTER_CLASS(TransCondition);
     AUTO_REGISTER_CLASS(Transform);
     AUTO_REGISTER_CLASS(UIButton);
     AUTO_REGISTER_CLASS(UIComponent);
+    AUTO_REGISTER_CLASS(VignettePassSetting);
 }

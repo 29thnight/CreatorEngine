@@ -1,6 +1,6 @@
 #include "PostProcessingPass.h"
 #include "ShaderSystem.h"
-#include "../EngineEntry/RenderPassSettings.h"
+#include "BloomSetting.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -89,6 +89,14 @@ void PostProcessingPass::ControlPanel()
 	}
 	ImGui::PopID();
 
+}
+
+void PostProcessingPass::ApplySettings(const BloomPassSetting& setting)
+{
+	m_PostProcessingApply.m_Bloom = setting.applyBloom;
+	m_bloomThreshold.threshold = setting.threshold;
+	m_bloomThreshold.knee = setting.knee;
+	m_bloomComposite.coeddicient = setting.coefficient;
 }
 
 void PostProcessingPass::PrepaerShaderState()
@@ -244,12 +252,4 @@ void PostProcessingPass::GaussianBlurComputeKernel()
 
 void PostProcessingPass::Resize(uint32_t width, uint32_t height)
 {
-}
-
-void PostProcessingPass::ApplySettings(const PostProcessingPassSetting& setting)
-{
-    m_PostProcessingApply.m_Bloom = setting.applyBloom;
-    m_bloomThreshold.threshold = setting.threshold;
-    m_bloomThreshold.knee = setting.knee;
-    m_bloomComposite.coeddicient = setting.coefficient;
 }

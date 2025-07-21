@@ -1,6 +1,6 @@
 #include "ToneMapPass.h"
 #include "ShaderSystem.h"
-#include "../EngineEntry/RenderPassSettings.h"
+#include "ToneMapPassSetting.h"
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
 #include "Camera.h"
@@ -268,7 +268,7 @@ void ToneMapPass::ApplySettings(const ToneMapPassSetting& setting)
     m_exposureCompensation = setting.exposureCompensation;
     m_speedBrightness = setting.speedBrightness;
     m_speedDarkness = setting.speedDarkness;
-    m_toneMapType = setting.toneMapType;
+    m_toneMapType = ToneMapType(setting.toneMapType);
     m_toneMapConstant.filmSlope = setting.filmSlope;
     m_toneMapConstant.filmToe = setting.filmToe;
     m_toneMapConstant.filmShoulder = setting.filmShoulder;

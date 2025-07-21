@@ -37,6 +37,7 @@ public:
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = 0);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
+	void AddRootGameObject(const std::string_view& name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 
@@ -108,7 +109,7 @@ public:
 	{
 		Scene* allocScene = new Scene();
 		allocScene->m_sceneName = sceneName.data();
-		allocScene->CreateGameObject(sceneName);
+		allocScene->AddRootGameObject(sceneName);
 		return allocScene;
 	}
 

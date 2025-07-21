@@ -7,7 +7,7 @@ struct PostProcessingApply
 	bool m_Bloom{ true };
 };
 
-struct PostProcessingPassSetting;
+struct BloomPassSetting;
 class PostProcessingPass final : public IRenderPass
 {
 public:
@@ -16,7 +16,7 @@ public:
 
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-        void ApplySettings(const PostProcessingPassSetting& setting);
+    void ApplySettings(const BloomPassSetting& setting);
 	void Resize(uint32_t width, uint32_t height) override;
 
 private:

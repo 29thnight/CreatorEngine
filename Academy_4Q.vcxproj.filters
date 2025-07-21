@@ -116,6 +116,9 @@
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>Window\ProjectSettingWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\RenderPassSettings.h">
+      <Filter>Settings\EngineSetting</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -144,6 +147,9 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\ProjectSetting.cpp">
       <Filter>Settings\ProjectSetting</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EngineSetting.cpp">
+      <Filter>Settings\EngineSetting</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
