@@ -90,6 +90,7 @@ void EntityItem::Update(float tick)
 						entityAsis->AddItem(this);
 				}
 				asisTail = nullptr;
+				timer = 0.f;
 			}
 		}
 	}
