@@ -15,6 +15,7 @@ struct alignas(16) SSAOBuffer
 	UINT m_frameIndex;
 };
 
+struct SSAOPassSetting;
 class SSAOPass final : public IRenderPass
 {
 public:
@@ -25,6 +26,7 @@ public:
 	void ReloadDSV(ID3D11ShaderResourceView* depth);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+        void ApplySettings(const SSAOPassSetting& setting);
 	void Resize(uint32_t width, uint32_t height) override;
 
 private:

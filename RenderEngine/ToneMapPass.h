@@ -23,6 +23,7 @@ cbuffer ToneMapConstant
 	float toneMapExposure{ 1.f };
 };
 
+struct ToneMapPassSetting;
 class ToneMapPass final : public IRenderPass
 {
 public:
@@ -32,6 +33,7 @@ public:
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+        void ApplySettings(const ToneMapPassSetting& setting);
 	void PrepareDownsampleTextures(uint32_t width, uint32_t height);
 	void Resize(uint32_t width, uint32_t height) override;
 

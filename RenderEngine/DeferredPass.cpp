@@ -1,5 +1,6 @@
 #include "DeferredPass.h"
 #include "Scene.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "LightController.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
@@ -197,4 +198,12 @@ void DeferredPass::ControlPanel()
 void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)
 {
     m_LightEmissiveTexture = lightEmissive;
+}
+
+void DeferredPass::ApplySettings(const DeferredPassSetting& setting)
+{
+    m_UseAmbientOcclusion = setting.useAmbientOcclusion;
+    m_UseEnvironmentMap = setting.useEnvironmentMap;
+    m_UseLightWithShadows = setting.useLightWithShadows;
+    m_envMapIntensity = setting.envMapIntensity;
 }
