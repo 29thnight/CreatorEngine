@@ -1,5 +1,6 @@
 #include "PostProcessingPass.h"
 #include "ShaderSystem.h"
+#include "BloomSetting.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
@@ -88,6 +89,14 @@ void PostProcessingPass::ControlPanel()
 	}
 	ImGui::PopID();
 
+}
+
+void PostProcessingPass::ApplySettings(const BloomPassSetting& setting)
+{
+	m_PostProcessingApply.m_Bloom = setting.applyBloom;
+	m_bloomThreshold.threshold = setting.threshold;
+	m_bloomThreshold.knee = setting.knee;
+	m_bloomComposite.coeddicient = setting.coefficient;
 }
 
 void PostProcessingPass::PrepaerShaderState()

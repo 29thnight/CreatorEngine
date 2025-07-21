@@ -802,6 +802,33 @@
     <ClInclude Include="SpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
     </ClInclude>
+    <ClInclude Include="AAPassSetting.h">
+      <Filter>RenderPass\AAPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SSAOPassSetting.h">
+      <Filter>RenderPass\SSAOPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowMapPassSetting.h">
+      <Filter>RenderPass\ShadowMapPass</Filter>
+    </ClInclude>
+    <ClInclude Include="DeferredPassSetting.h">
+      <Filter>RenderPass\DeferredPass</Filter>
+    </ClInclude>
+    <ClInclude Include="BloomSetting.h">
+      <Filter>RenderPass\PostProcessingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SSGIPassSetting.h">
+      <Filter>RenderPass\SSGIPass</Filter>
+    </ClInclude>
+    <ClInclude Include="VignettePassSetting.h">
+      <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
+    </ClInclude>
+    <ClInclude Include="ColorGradingPassSetting.h">
+      <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
+    </ClInclude>
+    <ClInclude Include="ToneMapPassSetting.h">
+      <Filter>RenderPass\ToneMapPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">

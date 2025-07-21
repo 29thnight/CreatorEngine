@@ -80,9 +80,9 @@ public:
 	int   m_curDashCount = 0;   //지금 연속대시한 횟수
 
 	[[Property]]
-	float KnockbackPowerX = 200.f;
+	float AttackPowerX = 500.f;
 	[[Property]]
-	float KnockbackPowerY = 20.f;
+	float AttackPowerY = 20.f;
 
 
 	void TestStun();
@@ -100,6 +100,7 @@ public:
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
+	GameObject* camera = nullptr;
 	GameObject* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;

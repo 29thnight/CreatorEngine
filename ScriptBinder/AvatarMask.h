@@ -29,7 +29,7 @@ public:
 	[[Property]]
 	bool isHumanoid = true; 
 	[[Property]]
-	bool useAll = true;
+	bool useAll = false;
 	[[Property]]
 	bool useUpper = true;
 	[[Property]]

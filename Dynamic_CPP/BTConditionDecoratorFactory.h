@@ -4,6 +4,7 @@
 #include "BTHeader.h"
 
 // Automation include ConditionDecoratorNodeClass header
+#include "IsDamege.h"
 #include "TestConCec.h"
 
 

@@ -17,22 +17,28 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
 	m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
 {
-    GameObject* owner = GameObject::FindIndex(component->GetOwner()->m_parentIndex);
-    if(owner)
+    GameObject::Index animatorOwnerIndex = component->GetOwner()->m_parentIndex;
+    while(animatorOwnerIndex != GameObject::INVALID_INDEX)
     {
-        Animator* animator = owner->GetComponent<Animator>();
-        if (nullptr != animator && animator->IsEnabled())
+        GameObject* animatorOwner = GameObject::FindIndex(animatorOwnerIndex);
+        if (animatorOwner)
         {
-            m_isAnimationEnabled = true;
-            m_animatorGuid = animator->GetInstanceID();
+            Animator* animator = animatorOwner->GetComponent<Animator>();
+            if (animator && animator->IsEnabled())
+            {
+                m_isAnimationEnabled = true;
+                m_animatorGuid = animator->GetInstanceID();
+                break;
+            }
         }
+        animatorOwnerIndex = animatorOwner ? animatorOwner->m_parentIndex : GameObject::INVALID_INDEX;
+	}
 
-        if(nullptr != m_Material)
-        {
-            m_materialGuid = m_Material->m_materialGuid;
-        }
-        m_instancedID = component->GetInstanceID();
+    if (nullptr != m_Material)
+    {
+        m_materialGuid = m_Material->m_materialGuid;
     }
+    m_instancedID = component->GetInstanceID();
 
     if (!m_isSkinnedMesh)
     {

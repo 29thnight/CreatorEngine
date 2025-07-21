@@ -22,6 +22,16 @@ struct ICollider
 	virtual void SetEnabled(bool able) { isEnabled = able; };
 	bool isEnabled = true;
 
+	EColliderType GetColliderType() const
+	{
+		return m_type;
+	}
+
+	void SetColliderType(EColliderType type)
+	{
+		m_type = type;
+	}
+	EColliderType m_type;
 	virtual void OnTriggerEnter(ICollider* other) = 0;
 	virtual void OnTriggerStay(ICollider* other) = 0;
 	virtual void OnTriggerExit(ICollider* other) = 0;

@@ -907,10 +907,15 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 			}
 			if(showControllersWindow)
 			{
-				ImGui::Begin("Animation Controllers", &showControllersWindow);
+		
+
+
+
+
+				bool open = ImGui::Begin("Animation Controllers", &showControllersWindow);
 				int i = 0;
-				static int selectedControllerIndex = 0;
-				static int preSelectIndex = 0;
+				static int selectedControllerIndex = -1;
+				static int preSelectIndex = -1;
 				static int linkIndex = -1;
 				static int ClickNodeIndex = -1;
 				static int targetNodeIndex = -1;
@@ -918,6 +923,20 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
 				static int AvatarControllerIndex = -1;
 				static bool showAvatarMaskWindow = false;
+
+				if (open && ImGui::IsWindowAppearing())
+				{
+					static int selectedControllerIndex = -1;
+					static int preSelectIndex = -1;
+					static int linkIndex = -1;
+					static int ClickNodeIndex = -1;
+					static int targetNodeIndex = -1;
+					static int selectedTransitionIndex = -1;
+					static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+					static int AvatarControllerIndex = -1;
+					static bool showAvatarMaskWindow = false;
+				}
+
 				auto& controllers = animator->m_animationControllers;
 				ImGui::BeginChild("Leftpanel", ImVec2(200, 500), false); 
 				if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
@@ -933,6 +952,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 							if (ImGui::Selectable(controller->name.c_str(), true,0,ImVec2(150,0)))
 							{
+								preSelectIndex = selectedControllerIndex;
 								selectedControllerIndex = index;
 							}
 
@@ -1017,6 +1037,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								ImGui::Separator();
 								if (avatarMask->isHumanoid)
 								{
+									ImGui::Checkbox("UseAll", &avatarMask->useAll);
 									ImGui::Checkbox("UseUpper", &avatarMask->useUpper);
 									ImGui::Checkbox("UseLower", &avatarMask->useLower);
 								}
@@ -1269,6 +1290,14 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), false);
 					ImGui::Text("Inspector");
 					ImGui::Separator();
+					if (preSelectIndex != selectedControllerIndex)
+					{
+						linkIndex = -1;
+						ClickNodeIndex = -1;
+						targetNodeIndex = -1;
+						preSelectIndex = selectedControllerIndex;
+						
+					}
 					if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Link && linkIndex != -1)
 					{
 						if (preInspectorIndex != linkIndex)
@@ -1419,7 +1448,9 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 							if (ImGui::Button("Delete Transition All"))
 							{
 								linkIndex = -1;
+								selectedTransitionIndex = -1;
 								controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
+
 							}
 						}
 						

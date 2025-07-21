@@ -261,7 +261,10 @@ void NodeEditor::MakeNewLink(int* returnIndex)
 
 void NodeEditor::ReNameJson(std::string filepath)
 {
-    std::string _filepath = "NodeEditor\\" + filepath;
+
+    file::path __filepath = PathFinder::NodeEditorPath(filepath);
+    std::string  _filepath = __filepath.string();
+   // std::string _filepath = "NodeEditor\\" + filepath;
 
     // 이전 파일이 존재하면 새 경로로 복사 or 이동
     if (std::filesystem::exists(m_filePath))

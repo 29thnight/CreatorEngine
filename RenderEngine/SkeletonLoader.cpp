@@ -2,19 +2,25 @@
 #include "ResourceAllocator.h"
 
 SkeletonLoader::SkeletonLoader(const aiScene* scene) :
-	m_scene(scene)
+    m_scene(scene)
 {
 }
 
 SkeletonLoader::~SkeletonLoader()
 {
-	m_boneMap.clear();
+    m_boneMap.clear();
 }
 
 Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
 {
     Skeleton* skeleton = AllocateResource<Skeleton>();
     aiNode* boneRoot = FindBoneRoot(root);
+
+    if (boneRoot == nullptr)
+    {
+        LoadAnimations(skeleton);
+        return skeleton;
+    }
 
     // Parent is not a bone recorded
     Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
@@ -43,19 +49,27 @@ int SkeletonLoader::AddBone(aiBone* _bone)
     return m_boneMap[boneName]->m_index;
 }
 
-void SkeletonLoader::ProcessBones(aiNode* node, Bone* bone)
+void SkeletonLoader::ProcessBones(aiNode* node, Bone* parentBone)
 {
-    bone->m_children.reserve(node->mNumChildren);
-
     for (UINT i = 0; i < node->mNumChildren; ++i)
     {
-        aiNode* child = node->mChildren[i];
-        if (m_boneMap.find(child->mName.data) != m_boneMap.end())
+        aiNode* childNode = node->mChildren[i];
+        Bone* nextParentBone = parentBone; // Keep the same parent by default
+
+        // Check if the child node is a registered bone
+        auto it = m_boneMap.find(childNode->mName.data);
+        if (it != m_boneMap.end())
         {
-            Bone* childBone = m_boneMap[child->mName.data];
-            bone->m_children.push_back(childBone);
-            ProcessBones(child, childBone);
+            // If it is a bone, add it as a child to the current parent
+            // and set it as the new parent for subsequent recursive calls.
+            Bone* childBone = it->second;
+            parentBone->m_children.push_back(childBone);
+            nextParentBone = childBone;
         }
+
+        // Continue traversal down the hierarchy, regardless of whether the child
+        // was a bone or not.
+        ProcessBones(childNode, nextParentBone);
     }
 }
 
@@ -67,7 +81,7 @@ void SkeletonLoader::LoadAnimations(Skeleton* skeleton)
     {
         std::optional<Animation> anim = m_animationLoader.LoadAnimation(m_scene->mAnimations[i]);
 
-		if (anim.has_value())
+        if (anim.has_value())
         {
             skeleton->m_animations.push_back(anim.value());
         }
@@ -76,24 +90,46 @@ void SkeletonLoader::LoadAnimations(Skeleton* skeleton)
 
 aiNode* SkeletonLoader::FindBoneRoot(aiNode* root)
 {
+    if (!root)
+    {
+        return nullptr;
+    }
+
     std::queue<aiNode*> queue;
     queue.push(root);
 
     while (!queue.empty())
     {
-        aiNode* node = queue.front();
-        queue.pop();
+        // Process one level at a time
+        int levelSize = queue.size();
+        std::vector<aiNode*> bonesOnThisLevel;
 
-        std::string_view nodeName(node->mName.data);
-        if (m_boneMap.find(nodeName.data()) != m_boneMap.end())
+        for (int i = 0; i < levelSize; ++i)
         {
-            return node->mParent;
+            aiNode* node = queue.front();
+            queue.pop();
+
+            // Check if the current node is a bone
+            if (m_boneMap.count(node->mName.data))
+            {
+                bonesOnThisLevel.push_back(node);
+            }
+
+            // Enqueue children for the next level
+            for (UINT j = 0; j < node->mNumChildren; ++j)
+            {
+                queue.push(node->mChildren[j]);
+            }
         }
-        for (UINT i = 0; i < node->mNumChildren; ++i)
+
+        // If we found any bones on this level, this is the highest level
+        // with bones. The parent of the first one is our root.
+        if (!bonesOnThisLevel.empty())
         {
-            aiNode* childNode = node->mChildren[i];
-            queue.push(childNode);
+            return bonesOnThisLevel[0]->mParent;
         }
     }
+
+    // No bones were found in the entire hierarchy
     return nullptr;
 }

@@ -13,6 +13,7 @@
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
+
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
     float usagePercent = (float)usedVRAM / (float)budgetVRAM;
@@ -926,6 +927,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             static ed::PinId prevPinID{};
             static ed::PinId m_DraggingPin = 0;
             static BTBuildNode* waitRaw = nullptr;
+            static ed::LinkId selectedLink;
             static ImVec2 pinPos;
 
             ed::PinId pinID = ed::GetHoveredPin();
@@ -941,6 +943,50 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 s_DragDelta = {};
                 pinPos = ImGui::GetMousePos();
             }
+
+            
+            if(0 == selectedLink.Get())
+            {
+                if (ed::IsLinkSelected(node.ID.m_ID_Data))
+                {
+                    selectedLink = ed::LinkId(node.ID);
+                }
+            }
+
+            if(0 < selectedLink.Get() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+            {
+				ed::PinId out_dPin, in_dPin;
+				ed::GetLinkPins(selectedLink, &out_dPin, &in_dPin);
+
+				ed::NodeId inputNodeId = BT::GetTreeNodeIdFromPin(in_dPin);
+				ed::NodeId outputNodeId = BT::GetTreeNodeIdFromPin(out_dPin);
+
+                BTBuildNode* inputNodeRaw = nullptr;
+				BTBuildNode* outputNodeRaw = nullptr;
+
+                if(graph.Nodes.find(inputNodeId.Get()) != graph.Nodes.end())
+                {
+                    inputNodeRaw = graph.Nodes[inputNodeId.Get()];
+				}
+
+                if (graph.Nodes.find(outputNodeId.Get()) != graph.Nodes.end())
+                {
+					outputNodeRaw = graph.Nodes[outputNodeId.Get()];
+                }
+
+                if (inputNodeRaw && outputNodeRaw && inputNodeRaw != outputNodeRaw)
+                {
+                    inputNodeRaw->ParentID = 0;
+                    outputNodeRaw->Children.erase(
+                        std::remove(outputNodeRaw->Children.begin(), outputNodeRaw->Children.end(), inputNodeRaw->ID),
+                        outputNodeRaw->Children.end()
+                    );
+
+                    ed::DeleteLink(selectedLink);
+                    selectedLink = 0;
+                }
+
+			}
 
             if (m_DraggingPin.Get() != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
             {
@@ -973,23 +1019,6 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 ImVec2 p2 = ImGui::GetMousePos();
                 ImVec2 dir = p2 - p1;
                 ImVec2 absDelta = dir;
-                float length = sqrt(dir.x * dir.x + dir.y * dir.y);
-                if (length > 0.f)
-                {
-                    ImVec2 normDir = ImVec2(dir.x / length, dir.y / length);
-                    ImVec2 perpendicular = ImVec2(-normDir.y, normDir.x);
-                    float offsetAmount = 5.0f;
-                    ImVec2 offset = perpendicular * offsetAmount;
-
-                    ImVec2 p1_offset = p1 + offset;
-                    ImVec2 p2_offset = p2 + offset;
-                    ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
-                    ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
-                    ImU32 color = IM_COL32(255, 255, 255, 125);
-                    float thickness = 3.0f;
-                    ImDrawList* drawList = ImGui::GetWindowDrawList();
-                    drawList->AddBezierCubic(p1_offset, cp1, cp2, p2_offset, color, thickness);
-                }
 
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
                 {
@@ -1213,6 +1242,8 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                     bool notRoot = !isRoot;
                     if (ImGui::MenuItem("Delete Node", nullptr, false, notRoot))
                     {
+                        ed::BreakLinks(ed::NodeId(selectNode->ID.m_ID_Data));
+
                         graph.DeleteNode(selectNode->ID);
                         selectNode = nullptr;
                     }
@@ -1622,6 +1653,7 @@ void MenuBarWindow::ShowBlackBoardWindow()
 		}
     }
 }
+
 void MenuBarWindow::SHowInputActionMap()
 {
     static int preseletedActionMapIndex = -1;
