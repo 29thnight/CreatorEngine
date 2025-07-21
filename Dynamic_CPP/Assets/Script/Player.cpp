@@ -15,11 +15,12 @@
 
 #include "EffectComponent.h"
 #include "TestEnemy.h"
+#include "BoxColliderComponent.h"
 void Player::Start()
 {
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
-	for (auto& child : childred)
+	/*for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
 		if (animator)
@@ -27,7 +28,7 @@ void Player::Start()
 			m_animator = animator;
 		}
 
-	}
+	}*/
 	//pad
 	std::string MapName = "Player" + std::to_string(playerIndex);
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
@@ -39,6 +40,7 @@ void Player::Start()
 	playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
 	playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
 	playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
+	playerMap->AddButtonAction("DeleteWeapone", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::Y), KeyState::Down, [this]() {DeleteCurWeapon();});
 	playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
 	playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
 	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
@@ -56,7 +58,7 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
 
 
-	//m_animator = player->GetComponent<Animator>();
+	m_animator = player->GetComponent<Animator>();
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.015f, 0.015f, 0.015f);
@@ -74,6 +76,20 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
+	if (catchedObject)
+	{
+		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
+		auto world = GetOwner()->m_transform.GetWorldPosition(); // XMVECTOR
+
+		XMVECTOR forwardVec = XMLoadFloat3(&forward); // Vector3 ¡æ XMVECTOR
+
+		XMVECTOR offsetPos = world + forwardVec * 1.0f;
+		offsetPos.m128_f32[1] = 3.0f; // Y °íÁ¤
+
+		catchedObject->GetComponent<Transform>()->SetPosition(offsetPos);
+	}
+
+
 	if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if(nearMesh)
@@ -182,13 +198,13 @@ void Player::Catch()
 {
 	if (m_nearObject != nullptr)
 	{
-		Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-		righthand->AttachObject(m_nearObject);
+		//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		//righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
-		rigidbody->SetBodyType(EBodyType::STATIC);
+		//rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
-
+		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
 		if (m_curWeapon)
 			m_curWeapon->SetEnabled(false);
 	}
@@ -205,7 +221,7 @@ void Player::Throw()
 	rigidbody->SetLockLinearZ(false);
 	auto& transform = GetOwner()->m_transform;
 	auto forward  = transform.GetForward();
-	rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
+	//rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
 
 
 	auto item = catchedObject->GetComponent<EntityItem>();
@@ -374,7 +390,10 @@ void Player::DeleteCurWeapon()
 	if (it != m_weaponInventory.end())
 	{
 		m_weaponInventory.erase(it);
-		m_curWeapon->SetEnabled(false);
+		//m_curWeapon->SetEnabled(false);
+		m_animator = player->GetComponent<Animator>();
+		Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		righthand->DetachAllObject();
 		m_curWeapon = nullptr;    
 	}
 }

@@ -148,6 +148,8 @@ void EntityAsis::Purification(float tick)
 			if (weapon)
 			{
 				auto player = item->GetThrowOwner();
+				item->GetComponent<Transform>().SetPosition({2000,0,2000});
+				item->SetThrowOwner(nullptr);
 				if (player)
 				{
 					player->AddWeapon(weapon);
