@@ -3,6 +3,7 @@
 #include "Texture.h"
 
 class Camera;
+struct DeferredPassSetting;
 class DeferredPass final : public IRenderPass
 {
 public:
@@ -15,6 +16,7 @@ public:
     void Execute(RenderScene& scene, Camera& camera) override;
     void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+        void ApplySettings(const DeferredPassSetting& setting);
 
     void UseLightAndEmissiveRTV(Texture* lightEmissive);
 private:

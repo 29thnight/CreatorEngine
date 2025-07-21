@@ -3,6 +3,7 @@
 #include "Texture.h"
 
 class Camera;
+struct ColorGradingPassSetting;
 class ColorGradingPass final : public IRenderPass
 {
 public:
@@ -12,6 +13,7 @@ public:
 	void Initialize(const std::string_view& fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+        void ApplySettings(const ColorGradingPassSetting& setting);
 
 	UniqueTexturePtr m_pColorGradingTexture{};
 private:

@@ -1,5 +1,6 @@
 #include "AAPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "Material.h"
 #include "Skeleton.h"
 #include "Scene.h"
@@ -92,4 +93,12 @@ void AAPass::ControlPanel()
 		m_FXAAParameters.SpanMax = 8.0f;
 	}
 	ImGui::PopID();
+}
+
+void AAPass::ApplySettings(const AAPassSetting& setting)
+{
+    m_isApply = setting.isApply;
+    m_FXAAParameters.Bias = setting.bias;
+    m_FXAAParameters.BiasMin = setting.biasMin;
+    m_FXAAParameters.SpanMax = setting.spanMax;
 }

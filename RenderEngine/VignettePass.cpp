@@ -1,5 +1,6 @@
 #include "VignettePass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 
 struct alignas(16) CBData {
 	float radius;
@@ -90,4 +91,11 @@ void VignettePass::ControlPanel()
 	}
 
 	ImGui::PopID();
+}
+
+void VignettePass::ApplySettings(const VignettePassSetting& setting)
+{
+    isOn = setting.isOn;
+    radius = setting.radius;
+    softness = setting.softness;
 }

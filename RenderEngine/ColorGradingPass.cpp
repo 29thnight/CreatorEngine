@@ -1,5 +1,6 @@
 #include "ColorGradingPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "TimeSystem.h"
 
 struct alignas(16) CBData {
@@ -102,4 +103,10 @@ void ColorGradingPass::ControlPanel()
 	}
 
 	ImGui::PopID();
+}
+
+void ColorGradingPass::ApplySettings(const ColorGradingPassSetting& setting)
+{
+    isOn = setting.isOn;
+    lerp = setting.lerp;
 }
