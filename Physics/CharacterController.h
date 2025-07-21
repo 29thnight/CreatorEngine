@@ -61,7 +61,8 @@ protected:
 class PhysicsControllerFilterCallback : public PxQueryFilterCallback
 {
 public:
-	PhysicsControllerFilterCallback() = default;
+	PhysicsControllerFilterCallback(unsigned int characterLayer, const unsigned int* matrix)
+		: m_characterLayer(characterLayer), m_collisionMatrix(matrix) {}
 	~PhysicsControllerFilterCallback() = default;
 
 	virtual PxQueryHitType::Enum preFilter(
@@ -71,14 +72,22 @@ public:
 		PxHitFlags& queryFlags) override
 	{
 		
-		// 특정 조건에 따라 통과 처리
-		if (shape->getQueryFilterData().word0 == 4) { //&&&&&sewhan controller
-			return PxQueryHitType::eNONE;  //
+		unsigned int otherLayer = shape->getSimulationFilterData().word0;
+		if (m_collisionMatrix[m_characterLayer] & (1 << otherLayer)) {
+
+			// 충돌해야 한다면 BLOCK
+			return PxQueryHitType::eBLOCK;
 		}
-		return PxQueryHitType::eBLOCK;    // 막힘
+		// 충돌하지 않아야 한다면 NONE
+		return PxQueryHitType::eNONE;
+
 	}
 	virtual PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor)
 	{
 		return PxQueryHitType::eBLOCK;
 	}
+
+private:
+	unsigned int m_characterLayer; // 캐릭터 레이어
+	const unsigned int* m_collisionMatrix; //physics collision matrix ptr
 };
