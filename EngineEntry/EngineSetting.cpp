@@ -38,19 +38,6 @@ bool EngineSetting::Initialize()
 	return isSuccess;
 }
 
-std::wstring EngineSetting::GetMsbuildPath()
-{
-	switch (m_msvcVersion)
-	{
-	case MSVCVersion::Comunity2022:
-		return PathFinder::MsbuildPath();
-	case MSVCVersion::Comunity2022Preview:
-		return PathFinder::MsbuildPreviewPath();
-	default:
-		return L"";
-	}
-}
-
 bool EngineSetting::SaveSettings()
 {
 	// Implement saving logic here

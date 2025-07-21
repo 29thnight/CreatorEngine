@@ -5,7 +5,6 @@
 #include "Core.Fence.h"
 #include "Core.Barrier.h"
 #include "RenderPassSettings.h"
-
 #include <yaml-cpp/yaml.h>
 namespace MetaYml = YAML;
 
@@ -27,7 +26,20 @@ public:
 	bool Initialize();
 
 	MSVCVersion GetMSVCVersion() const { return m_msvcVersion; }
-	std::wstring GetMsbuildPath();
+
+	std::wstring GetMsbuildPath()
+	{
+		switch (m_msvcVersion)
+		{
+		case MSVCVersion::Comunity2022:
+			return PathFinder::MsbuildPath();
+		case MSVCVersion::Comunity2022Preview:
+			return PathFinder::MsbuildPreviewPath();
+		default:
+			return L"";
+		}
+	}
+
 	bool IsEditorMode() const { return m_isEditorMode; }
 	void SetEditorMode(bool isEditorMode) { m_isEditorMode = isEditorMode; }
     bool IsGameView() const { return m_isGameView.load(); }
