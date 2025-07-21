@@ -74,7 +74,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
-	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::GridPass);
+	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);

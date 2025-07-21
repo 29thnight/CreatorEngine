@@ -48,12 +48,6 @@
     <Filter Include="Window\ProjectSettingWindow">
       <UniqueIdentifier>{39d0c6ea-3529-4a2c-b0bf-edd8f131f5fd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\NodeEditorWindow%28작성예정%29">
-      <UniqueIdentifier>{d7d3d37d-4f45-4181-9e2f-64059b8fc331}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Window\NodeEditorWindow%28작성예정%29\BluePrint">
-      <UniqueIdentifier>{a3693c80-6976-44ff-ab63-9f0d5d91b87e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Settings\EngineSetting">
       <UniqueIdentifier>{b298e48b-fdbc-428f-ac7f-495645492ba9}</UniqueIdentifier>
     </Filter>
