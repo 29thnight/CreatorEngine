@@ -51,7 +51,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     
     if (parentIndex >= m_SceneObjects.size())
     {
-        parentIndex = 0;
+        parentIndex = -1; //&&&&&
     }
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);

@@ -9,7 +9,7 @@ GameObject::GameObject() :
 	Object("GameObject"),
 	m_gameObjectType(GameObjectType::Empty),
 	m_index(0),
-	m_parentIndex(0)
+	m_parentIndex(-1)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
