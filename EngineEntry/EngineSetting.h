@@ -7,6 +7,7 @@
 #include "Core.Barrier.h"
 
 #include <yaml-cpp/yaml.h>
+#include "RenderPassSettings.h"
 namespace MetaYml = YAML;
 
 enum class MSVCVersion
@@ -38,7 +39,7 @@ public:
 			return false;
 		}
 
-		// �ٹٲ� ����
+		// ÁÙ¹Ù²Þ Á¦°Å
 		output.erase(std::remove(output.begin(), output.end(), '\r'), output.end());
 		output.erase(std::remove(output.begin(), output.end(), '\n'), output.end());
 
@@ -120,7 +121,10 @@ public:
 	Mathf::Vector2 GetWindowSize() const
 	{
 		return m_lastWindowSize;
-	}
+        }
+
+        RenderPassSettings& GetRenderPassSettings() { return m_renderPassSettings; }
+        const RenderPassSettings& GetRenderPassSettings() const { return m_renderPassSettings; }
 
 	void SetImGuiInitialized(bool isInitialized)
 	{
@@ -143,6 +147,7 @@ public:
 		rootNode["lastWindowSize"]["x"] = m_lastWindowSize.x;
 		rootNode["lastWindowSize"]["y"] = m_lastWindowSize.y;
 		rootNode["msvcVersion"] = static_cast<int>(m_msvcVersion);
+        rootNode["renderPassSettings"] = Meta::Serialize(&m_renderPassSettings);
 
 		settingsFile << rootNode;
 
@@ -171,6 +176,8 @@ public:
 			rootNode["lastWindowSize"]["y"].as<float>() 
 		};
 		m_msvcVersion = static_cast<MSVCVersion>(rootNode["msvcVersion"].as<int>());
+                if (rootNode["renderPassSettings"])
+                        Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
 		
 		return isSuccess;
 	}
@@ -190,7 +197,7 @@ private:
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };
+    RenderPassSettings m_renderPassSettings{};
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
 };
 
-static auto& EngineSettingInstance = EngineSetting::GetInstance();

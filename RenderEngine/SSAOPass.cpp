@@ -1,5 +1,6 @@
 #include "SSAOPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
 #include <random>
 
@@ -152,4 +153,10 @@ void SSAOPass::ControlPanel()
 
 void SSAOPass::Resize(uint32_t width, uint32_t height)
 {
+}
+
+void SSAOPass::ApplySettings(const SSAOPassSetting& setting)
+{
+    radius = setting.radius;
+    thickness = setting.thickness;
 }

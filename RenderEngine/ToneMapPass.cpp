@@ -1,5 +1,6 @@
 #include "ToneMapPass.h"
 #include "ShaderSystem.h"
+#include "../EngineEntry/RenderPassSettings.h"
 #include "ImGuiRegister.h"
 #include "DeviceState.h"
 #include "Camera.h"
@@ -149,7 +150,7 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
                     float EV100 = log2((m_fNumber * m_fNumber) / m_shutterTime * (100.0f / m_ISO));
                     float exposureManual = 1.0f / pow(2.0f, EV100 + m_exposureCompensation);
-                    float targetLuminance = 0.5f; // Áß°£ È¸»ö ±âÁØ°ª (¿øÇÏ´Â °ªÀ¸·Î Á¶Á¤ °¡´É)
+                    float targetLuminance = 0.5f; // ì¤‘ê°„ íšŒìƒ‰ ê¸°ì¤€ê°’ (ì›í•˜ëŠ” ê°’ìœ¼ë¡œ ì¡°ì • ê°€ëŠ¥)
                     float exposureAuto = targetLuminance / (luminance + 1e-4f);
 
                     float exposureFinal = exposureManual * exposureAuto;
@@ -255,4 +256,23 @@ void ToneMapPass::PrepareDownsampleTextures(uint32_t width, uint32_t height)
 
 void ToneMapPass::Resize(uint32_t width, uint32_t height)
 {
+}
+
+void ToneMapPass::ApplySettings(const ToneMapPassSetting& setting)
+{
+    m_isAbleAutoExposure = setting.isAbleAutoExposure;
+    m_isAbleToneMap = setting.isAbleToneMap;
+    m_fNumber = setting.fNumber;
+    m_shutterTime = setting.shutterTime;
+    m_ISO = setting.ISO;
+    m_exposureCompensation = setting.exposureCompensation;
+    m_speedBrightness = setting.speedBrightness;
+    m_speedDarkness = setting.speedDarkness;
+    m_toneMapType = setting.toneMapType;
+    m_toneMapConstant.filmSlope = setting.filmSlope;
+    m_toneMapConstant.filmToe = setting.filmToe;
+    m_toneMapConstant.filmShoulder = setting.filmShoulder;
+    m_toneMapConstant.filmBlackClip = setting.filmBlackClip;
+    m_toneMapConstant.filmWhiteClip = setting.filmWhiteClip;
+    m_toneMapConstant.toneMapExposure = setting.toneMapExposure;
 }

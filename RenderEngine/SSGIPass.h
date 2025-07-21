@@ -2,6 +2,7 @@
 #include "IRenderPass.h"
 #include "Texture.h"
 
+struct SSGIPassSetting;
 class SSGIPass final : public IRenderPass
 {
 public:
@@ -12,6 +13,7 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
+        void ApplySettings(const SSGIPassSetting& setting);
 	void Resize(uint32_t width, uint32_t height) override;
 
 private:
