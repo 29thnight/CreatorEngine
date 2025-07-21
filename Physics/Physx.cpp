@@ -24,54 +24,20 @@ PxFilterFlags CustomFilterShader(
 	PxFilterData fd1,
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
-	//&&&&& 충돌매트릭스 조건 먼가이상함 
-	//if (physx::PxFilterObjectIsTrigger(at0) || physx::PxFilterObjectIsTrigger(at1))
-	//{
-	//	if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
-	//		pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT
-	//			| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-	//			| physx::PxPairFlag::eNOTIFY_TOUCH_LOST;
-	//		return physx::PxFilterFlag::eDEFAULT;
-	//	}
-	//}
-
-	//if (((((1 << fd0.word0) & fd1.word1)) > 0) && (((1 << fd1.word0) & fd0.word1) > 0)) {
-	//	pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT
-	//		| physx::PxPairFlag::eDETECT_CCD_CONTACT
-	//		| physx::PxPairFlag::eNOTIFY_TOUCH_CCD
-	//		| physx::PxPairFlag::eNOTIFY_TOUCH_FOUND
-	//		| physx::PxPairFlag::eNOTIFY_TOUCH_LOST
-	//		| physx::PxPairFlag::eNOTIFY_CONTACT_POINTS
-	//		| physx::PxPairFlag::eCONTACT_EVENT_POSE
-	//		| physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	//	return physx::PxFilterFlag::eDEFAULT;
-	//}
-	//else 
-	//{
-	//	pairFlags &= ~physx::PxPairFlag::eCONTACT_DEFAULT;
-	//	return physx::PxFilterFlag::eSUPPRESS; //&&&&&sehwan
-	//}
 	
+	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1)) {
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+		return PxFilterFlag::eDEFAULT;
+	}
 
-	//if (fd0.word0 == 5)
-	//{
-	//	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
-	//	{
-	//		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
-	//			| PxPairFlag::eNOTIFY_TOUCH_FOUND
-	//			| PxPairFlag::eNOTIFY_TOUCH_LOST;
-	//		return PxFilterFlag::eDEFAULT;
-	//	}
+	if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_CONTACT_POINTS;
+		return PxFilterFlag::eDEFAULT;
+	}
 
-	//	pairFlags =  PxPairFlag::eNOTIFY_TOUCH_FOUND
-	//		| PxPairFlag::eNOTIFY_TOUCH_LOST
-	//		| PxPairFlag::eNOTIFY_CONTACT_POINTS
-	//		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	//	return PxFilterFlag::eDEFAULT;
-
-	//}
+	return PxFilterFlag::eSUPPRESS;
 	
-	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
+	/*if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
 		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
 			| PxPairFlag::eNOTIFY_TOUCH_FOUND
@@ -84,7 +50,7 @@ PxFilterFlags CustomFilterShader(
 		| PxPairFlag::eNOTIFY_TOUCH_LOST
 		| PxPairFlag::eNOTIFY_CONTACT_POINTS
 		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	return PxFilterFlag::eDEFAULT;
+	return PxFilterFlag::eDEFAULT;*/
 
 }
 
@@ -815,8 +781,8 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	//filterData
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
-	 //filterData.word1 = collisionMatrix[colInfo.layerNumber];
-	filterData.word1 = 0xFFFFFFFF;
+	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	//filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
 	//collisionData
@@ -844,8 +810,8 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//필터데이터
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
-	//filterData.word1 = collisionMatrix[colInfo.layerNumber];
-	filterData.word1 = 0xFFFFFFFF;
+	filterData.word1 = collisionMatrix[colInfo.layerNumber];
+	//filterData.word1 = 0xFFFFFFFF;
 	shape->setSimulationFilterData(filterData);
 	shape->setQueryFilterData(filterData);
 	//collisionData

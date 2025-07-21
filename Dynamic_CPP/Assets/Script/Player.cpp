@@ -19,7 +19,7 @@ void Player::Start()
 {
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
-	for (auto& child : childred)
+	/*for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
 		if (animator)
@@ -27,25 +27,25 @@ void Player::Start()
 			m_animator = animator;
 		}
 
-	}
+	}*/
 	//pad
 	std::string MapName = "Player" + std::to_string(playerIndex);
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
-	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
-	playerMap->AddValueAction("Move", playerIndex, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
-		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddButtonAction("StartAttack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
-	playerMap->AddButtonAction("AttackCharging", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
-	playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
-	playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
-	playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
-	playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
-	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
-	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
+	////playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
+	//playerMap->AddValueAction("Move", playerIndex, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
+	//	[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	//playerMap->AddButtonAction("StartAttack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
+	//playerMap->AddButtonAction("AttackCharging", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
+	//playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
+	//playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
+	//playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
+	//playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
+	//playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
+	//playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
+	//playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
 
-	/*playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
 	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
@@ -53,10 +53,10 @@ void Player::Start()
 	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {Dash();});
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, 'J', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
 
 
-	//m_animator = player->GetComponent<Animator>();
+	m_animator = player->GetComponent<Animator>();
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.015f, 0.015f, 0.015f);

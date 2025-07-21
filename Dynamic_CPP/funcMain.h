@@ -171,7 +171,6 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
-		CreateFactory::GetInstance()->RegisterFactory("CameraMove", []() { return new CameraMove(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityResource", []() { return new EntityResource(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEnemy", []() { return new TestEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("InverseKinematic", []() { return new InverseKinematic(); });
