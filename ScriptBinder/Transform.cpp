@@ -137,7 +137,7 @@ Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
 		Mathf::Vector3 newLocalscale = XMVector3TransformCoord(scale, parentWorldInverse);
-		return SetPosition(newLocalscale);
+		return SetScale(newLocalscale);
 	}
 }
 
@@ -234,13 +234,6 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 		m_parentID = m_owner->m_parentIndex;
 		parentObject = GameObject::FindIndex(m_parentID);
 	}
-	
-	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
-	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
-	m_localMatrix = newLocalMatrix;
-
-	SetLocalMatrix(m_localMatrix);
 }
 
 Mathf::xVector Transform::GetWorldPosition() const
@@ -277,7 +270,21 @@ bool Transform::IsDirty() const
 
 void Transform::SetParentID(uint32 id)
 {
+	XMMATRIX oldWorld = GetWorldMatrix();
 	m_parentID = id;
+
+	XMMATRIX parentWorldMatrix = XMMatrixIdentity();
+	if (m_parentID != 0)
+	{
+		if (auto parent = GameObject::FindIndex(m_parentID))
+		{
+			parentWorldMatrix = parent->m_transform.GetWorldMatrix();
+		}
+	}
+
+	XMMATRIX parentInverse = XMMatrixInverse(nullptr, parentWorldMatrix);
+	XMMATRIX newLocal = XMMatrixMultiply(oldWorld, parentInverse);
+	SetDirty();
 }
 
 void Transform::TransformReset()
