@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "EffectManager.h"
+#include "EffectBase.h"
 
 enum class EffectCommandType
 {

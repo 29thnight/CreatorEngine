@@ -2,7 +2,6 @@
 #include "EffectComponent.h"
 #include "EffectManagerProxy.h"
 #include "EffectProxyController.h"
-#include "ParticleSystem.h"
 
 void EffectComponent::Awake()
 {

@@ -1,12 +1,15 @@
 #pragma once
 #include "Component.h"
 #include "EffectComponent.generated.h"
+#include "IOnDestroy.h"
+#include "IAwakable.h"
+#include "IUpdatable.h"
 
 class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDestroy
 {
 public:
     ReflectEffectComponent
-        [[Serializable(Inheritance:Component)]]
+    [[Serializable(Inheritance:Component)]]
     GENERATED_BODY(EffectComponent)
 
     void Awake() override;

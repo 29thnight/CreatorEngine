@@ -1,8 +1,8 @@
 #pragma once
 #include "IRenderPass.h"
-#include "ParticleSystem.h"
-#include "EffectBase.h"
 
+class EffectBase;
+class ParticleSystem;
 class EffectManager : public IRenderPass, public Singleton<EffectManager>
 {
 private:

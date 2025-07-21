@@ -4,8 +4,7 @@
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
-
-namespace ed = ax::NodeEditor;
+#include "EffectBase.h"
 
 std::unordered_map<std::string, std::unique_ptr<EffectBase>> EffectManager::effects;
 

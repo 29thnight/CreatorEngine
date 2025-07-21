@@ -1,6 +1,7 @@
 ﻿#include "EffectEditor.h"
 #include "IconsFontAwesome6.h"
 #include "EffectManager.h"
+#include "EffectBase.h"
 
 EffectEditor::EffectEditor()
 {
@@ -924,6 +925,8 @@ void EffectEditor::SaveEffectToJson(const std::string& filename)
 		}
 
 		nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
+
+		ExportToManager(tempEffect->GetName());
 
 		std::ofstream file(filepath);
 		if (file.is_open()) {
