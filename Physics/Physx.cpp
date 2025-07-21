@@ -957,7 +957,6 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 	{
 		return;
 	}
-
 	auto body = m_rigidBodyContainer.find(id)->second;
 
 	//dynamicBody 의 경우
@@ -1017,17 +1016,19 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 			else 
 			{
 				
-			/*	if () //&&&&&키는거 만드는중
+				if (rigidBodyData.m_EColliderType == EColliderType::COLLISION) //&&&&&키는거 만드는중
 				{
-
+					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
+					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 				}
-				else
+				else if(rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
 				{
+					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
+				}
 
-				}*/
 
-
-
+				
 			}
 
 		}

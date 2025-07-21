@@ -14,8 +14,6 @@ ReflectionScriptField(Player) \
 		meta_property(dashCooldown) \
 		meta_property(dubbleDashTime) \
 		meta_property(dashAmount) \
-		meta_property(KnockbackPowerX) \
-		meta_property(KnockbackPowerY) \
 		meta_property(KnockBackForceY) \
 		meta_property(KnockBackForce) \
 	}); \
