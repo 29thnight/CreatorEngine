@@ -152,6 +152,14 @@ public:
 
 	void SetEffectProgress(float progress);
 
+	void SetShouldRender(bool shouldRender) { m_shouldRender = shouldRender; }
+
+	void StopSpawning() { m_shouldSpawn = false; }
+
+	void UpdateTransformOnly();
+
+	void UpdateParticleSimulation(float delta);
+
 	std::string m_name{};
 private:
 
@@ -191,6 +199,9 @@ protected:
 	ID3D11ShaderResourceView* m_particleSRV_B = nullptr;
 
 	bool m_usingBufferA = true; // 현재 A 버퍼를 입력으로 사용 중인지 여부
+
+	bool m_shouldRender = true;
+	bool m_shouldSpawn = true;
 };
 
 using EmitterContainer = std::vector<std::shared_ptr<ParticleSystem>>;

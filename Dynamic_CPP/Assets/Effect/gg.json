@@ -25,7 +25,7 @@
                                 "z": 1.0
                             },
                             "horizontalVelocityRange": 0.0,
-                            "lifeTime": 10.0,
+                            "lifeTime": 1.0,
                             "maxInitialRotation": {
                                 "x": 0.0,
                                 "y": 0.0,
