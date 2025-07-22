@@ -20,15 +20,20 @@ void Player::Start()
 {
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
-	/*for (auto& child : childred)
+	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
 		if (animator)
 		{
 			m_animator = animator;
+			break;
 		}
 
-	}*/
+	}
+	if (!m_animator)
+	{
+		m_animator = player->GetComponent<Animator>();
+	}
 	//pad
 	std::string MapName = "Player" + std::to_string(playerIndex);
 	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
@@ -58,7 +63,7 @@ void Player::Start()
 	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
 
 
-	m_animator = player->GetComponent<Animator>();
+	//m_animator = player->GetComponent<Animator>();
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachAllObject();
 	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.015f, 0.015f, 0.015f);
@@ -124,6 +129,25 @@ void Player::Update(float tick)
 		}
 	}
 
+	if (isDashing)
+	{
+		m_dashElapsedTime += tick;
+		if (m_dashElapsedTime >= m_dashTime)
+		{
+
+			isDashing = false;
+			m_dashElapsedTime = 0.f;
+			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+		}
+		else
+		{
+			auto forward = player->m_transform.GetForward(); 
+			auto controller = player->GetComponent<CharacterControllerComponent>();
+			controller->Move({ forward.x ,forward.z });
+
+		}
+
+	}
 	if (isStun)
 	{
 		
@@ -157,6 +181,16 @@ void Player::Update(float tick)
 	}
 }
 
+void Player::OnDestroy()
+{
+	for (auto& socket : m_animator->m_Skeleton->m_sockets)
+	{
+		m_animator->m_Skeleton->DeleteSocket(socket->m_name);
+	}
+	
+
+}
+
 void Player::Move(Mathf::Vector2 dir)
 {
 	if (isStun || isKnockBack) return;
@@ -173,10 +207,14 @@ void Player::Move(Mathf::Vector2 dir)
 	controller->Move(moveDir);
 	if (controller->IsOnMove())
 	{
+		if(m_curWeapon)
+			m_curWeapon->SetEnabled(false);
 		m_animator->SetParameter("OnMove", true);
 	}
 	else
 	{
+		if (m_curWeapon)
+			m_curWeapon->SetEnabled(true);
 		m_animator->SetParameter("OnMove", false);
 	}
 	
@@ -257,14 +295,14 @@ void Player::Dash()
 	//m_animator->SetParameter("Dash", true);
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 
-	//isKnockBack = true;
-	//KnockBackTime = 0.5f;
+	isDashing = true;
 
-	//controller->SetKnockBack(-KnockBackForce, 0.1f);
+	controller->SetKnockBack(m_dashPower, 0.f);
 	m_animator->SetParameter("OnMove", false);
-	controller->AddFinalMultiplierSpeed(m_dashPower);
+	//controller->AddFinalMultiplierSpeed(m_dashPower);
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
+	m_dashElapsedTime = 0.f;
 	m_curDashCount++;
 }
 
@@ -371,8 +409,7 @@ void Player::AddWeapon(GameObject* weapon)
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
 	m_curWeapon->SetEnabled(true);
-	auto animator = player->GetComponent<Animator>();
-	Socket* righthand = animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->AttachObject(m_curWeapon);
 	
 }
@@ -387,8 +424,7 @@ void Player::DeleteCurWeapon()
 	if (it != m_weaponInventory.end())
 	{
 		m_weaponInventory.erase(it);
-		//m_curWeapon->SetEnabled(false);
-		m_animator = player->GetComponent<Animator>();
+		m_curWeapon->SetEnabled(false);
 		Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		righthand->DetachAllObject();
 		m_curWeapon = nullptr;    
@@ -413,7 +449,7 @@ void Player::TestStun()
 void Player::TestKnockBack()
 {
 	isKnockBack = true;
-	KnockBackTime = 1.5f;
+	KnockBackTime = 0.5f;
 	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce,KnockBackForceY);
 	m_animator->SetParameter("OnMove", false);
 }
