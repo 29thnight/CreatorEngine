@@ -14,6 +14,8 @@ enum class EffectCommandType
     UpdateEffectProperty,
     CreateInstance,
     SetRotation,
+    SetLoop,
+    SetDuration,
 };
 
 AUTO_REGISTER_ENUM(EffectCommandType)

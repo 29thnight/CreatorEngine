@@ -1,9 +1,10 @@
 #pragma once
 #include "IRenderPass.h"
+#include "DLLAcrossSingleton.h"
+#include "EffectBase.h"
+#include "ParticleSystem.h"
 
-class EffectBase;
-class ParticleSystem;
-class EffectManager : public IRenderPass, public Singleton<EffectManager>
+class EffectManager : public IRenderPass, public DLLCore::Singleton<EffectManager>
 {
 private:
 	friend class DLLCore::Singleton<EffectManager>;

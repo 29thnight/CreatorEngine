@@ -46,8 +46,6 @@ public:
     static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::SetTimeScale;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, timeScale]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetTimeScale(timeScale);
@@ -68,18 +66,6 @@ public:
         return cmd;
     }
 
-    // 이펙트 타임스케일 설정 명령
-    static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::CreateEffect;
-        cmd.m_effectName = effectName;
-        cmd.m_executeFunction = [effectName, emitters]() {
-            EffectManagers->RegisterCustomEffect(effectName, emitters);
-            };
-        return cmd;
-    }
-
     // 이펙트 제거 명령
     static EffectManagerProxy CreateRemoveEffectCommand(const std::string& effectName)
     {
@@ -90,12 +76,34 @@ public:
         return cmd;
     }
 
+    static EffectManagerProxy CreateSetLoopCommand(const std::string& effectName, bool isLoop)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [effectName, isLoop]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetLoop(isLoop);
+            }
+            };
+        return cmd;
+    }
+
+    static EffectManagerProxy CreateSetDurationCommand(const std::string& effectName, float duration)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [effectName, duration]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetDuration(duration);
+            }
+            };
+        return cmd;
+    }
+
     // 이펙트 강제 완료 명령
     static EffectManagerProxy CreateForceFinishCommand(const std::string& effectName)
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetLoop(false);
                 effect->SetDuration(0.001f);
             }
@@ -119,7 +127,7 @@ public:
         bool& outLoop,
         float& outDuration)
     {
-        auto* templateEffect = efm->GetEffect(templateName);
+        auto* templateEffect = EffectManagers->GetEffect(templateName);
         if (templateEffect) {
             outTimeScale = templateEffect->GetTimeScale();
             outLoop = templateEffect->IsLooping();

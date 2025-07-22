@@ -4,7 +4,6 @@
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "EffectProxyController.h"
 #include "EffectSerializer.h"
-#include "EffectBase.h"
 
 void EffectManager::Initialize()
 {

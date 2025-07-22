@@ -229,7 +229,10 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
+
+	EffectManagers->Initialize();
 	m_EffectEditor = std::make_unique<EffectEditor>();
+
 	//m_pEffectPass->MakeEffects(Effect::Sparkle, "asd", float3(0, 0, 0));
     m_newSceneCreatedEventHandle	= newSceneCreatedEvent.AddRaw(this, &SceneRenderer::NewCreateSceneInitialize);
 	m_trimEventHandle				= resourceTrimEvent.AddRaw(this, &SceneRenderer::ResourceTrim);

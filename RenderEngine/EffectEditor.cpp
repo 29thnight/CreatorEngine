@@ -19,7 +19,7 @@ EffectEditor::EffectEditor()
 		// 리스트박스
 		if (ImGui::BeginListBox("##EffectList"))
 		{
-			for (const auto& pair : efm->GetEffects()) {
+			for (const auto& pair : EffectManagers->GetEffects()) {
 				if (ImGui::Selectable(pair.first.c_str())) {
 					// 선택했을 때 처리할 로직
 					std::cout << "Selected effect: " << pair.first << std::endl;
@@ -27,8 +27,8 @@ EffectEditor::EffectEditor()
 			}
 			ImGui::EndListBox();
 		}
-		ImGui::GetContext("EffectList").Close();
 		});
+	ImGui::GetContext("EffectList").Close();
 
 	// 메인 에디터 창 등록
 	ImGui::ContextRegister("EffectEdit", false, [&]() {

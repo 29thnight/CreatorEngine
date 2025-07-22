@@ -38,26 +38,6 @@ void EffectComponent::Update(float tick)
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
-    if (!m_effectInstanceName.empty() && m_isPlaying)
-    {
-        m_currentTime += tick * m_timeScale;
-
-        if (!m_loop && m_duration > 0 && m_currentTime >= m_duration)
-        {
-            StopEffect();
-            return;
-        }
-
-        if (m_loop && m_duration > 0 && m_currentTime >= m_duration)
-        {
-            m_currentTime = 0.0f;
-            
-            proxy->PushCommand(EffectCommandType::Play);
-            //auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-            //EffectCommandQueue->PushEffectCommand(std::move(playCommand));
-        }
-    }
-
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
@@ -143,6 +123,9 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     //auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
     //EffectCommandQueue->PushEffectCommand(std::move(playCommand));
     proxy->PushCommand(EffectCommandType::Play);
+
+    float templateTimeScale, templateDuration;
+    bool templateLoop;
 
     if (EffectManagerProxy::GetTemplateSettings(effectName, templateTimeScale, templateLoop, templateDuration))
     {
@@ -268,12 +251,13 @@ void EffectComponent::ApplyEffectSettings()
         proxy->PushCommand(EffectCommandType::SetTimeScale);
 
         // 루프 설정
-        auto loopCommand = EffectManagerProxy::CreateSetLoopCommand(m_effectInstanceName, m_loop);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(loopCommand));
+        //proxy->UpdateTimeScale(m_timeScale);
+        proxy->PushCommand(EffectCommandType::SetLoop);
 
         // 지속시간 설정
-        auto durationCommand = EffectManagerProxy::CreateSetDurationCommand(m_effectInstanceName, m_duration);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(durationCommand));
+        //proxy->UpdateTimeScale(m_timeScale);
+        proxy->PushCommand(EffectCommandType::SetDuration);
+
 
         // 위치 설정
         auto currentPos = GetOwner()->m_transform.GetWorldPosition();
