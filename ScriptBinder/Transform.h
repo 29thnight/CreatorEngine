@@ -45,7 +45,7 @@ public:
 	void UpdateLocalMatrix();
 	Mathf::xMatrix UpdateWorldMatrix();
 	void SetLocalMatrix(const Mathf::xMatrix& matrix);
-	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix);
+	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal = false);
 
 	Mathf::xVector GetWorldPosition() const;
 	Mathf::xVector GetWorldScale() const;

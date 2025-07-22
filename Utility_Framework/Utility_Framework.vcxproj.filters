@@ -91,6 +91,9 @@
     <Filter Include="WindowsApplication\WinProcProxy">
       <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.CircleQueue">
+      <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -273,6 +276,9 @@
     </ClInclude>
     <ClInclude Include="WinProcProxy.h">
       <Filter>WindowsApplication\WinProcProxy</Filter>
+    </ClInclude>
+    <ClInclude Include="CircleQueue.hpp">
+      <Filter>Core.CircleQueue</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
