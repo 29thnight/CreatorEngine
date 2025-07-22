@@ -107,6 +107,18 @@ const std::vector<Entity*>& GameManager::GetEntities()
 	return m_entities;
 }
 
+std::vector<Entity*>& GameManager::GetResourcePool()
+{
+	// TODO: 여기에 return 문을 삽입합니다.
+	return m_resourcePool;
+}
+
+std::vector<Entity*>& GameManager::GetWeaponPiecePool()
+{
+	// TODO: 여기에 return 문을 삽입합니다.
+	return m_weaponPiecePool;
+}
+
 void GameManager::CheatMiningResource()
 {
 	auto cam = GameObject::Find("Main Camera");

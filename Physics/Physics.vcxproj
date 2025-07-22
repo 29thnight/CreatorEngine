@@ -129,7 +129,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
@@ -167,7 +167,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>

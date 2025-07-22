@@ -121,7 +121,7 @@
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>
@@ -129,7 +129,7 @@
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<EnableUAC>false</EnableUAC>
-			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;../$(Platform)\$(Configuration)\SingletonManager.lib;../$(Platform)\$(Configuration)\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
 		<PreBuildEvent>
 			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
@@ -147,7 +147,7 @@
 			<PrecompiledHeader>NotUsing</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>
@@ -157,7 +157,7 @@
 			<OptimizeReferences>true</OptimizeReferences>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<EnableUAC>false</EnableUAC>
-			<AdditionalDependencies>../Bin\Editor\ScriptBinder.lib;../Bin\Editor\Utility_Framework.lib;../Bin\Editor\\ImGuiHelper.lib;../Bin\Editor\RenderEngine.lib;../Bin\Editor\Physics.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalDependencies>../Bin\Editor\ScriptBinder.lib;../Bin\Editor\Utility_Framework.lib;../Bin\Editor\\ImGuiHelper.lib;../Bin\Editor\RenderEngine.lib;../Bin\Editor\Physics.lib;../Bin\Editor\SingletonManager.lib;../Bin\Editor\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
 		</Link>
 		<PreBuildEvent>
 			<Command>"../Bin\HeaderTool\ScriptReflectionAndFactoryClear.exe"

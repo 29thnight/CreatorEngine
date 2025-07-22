@@ -6,8 +6,6 @@
 
 namespace ed = ax::NodeEditor;
 
-std::unordered_map<std::string, std::unique_ptr<EffectBase>> EffectManager::effects;
-
 void EffectManager::Initialize()
 {
 
@@ -61,6 +59,16 @@ void EffectManager::RegisterCustomEffect(const std::string& name, const std::vec
 
 void EffectManager::CreateEffectInstance(const std::string& templateName, const std::string& instanceName)
 {
+	if(templateName.empty() || instanceName.empty()) {
+		return; // 템플릿 이름이나 인스턴스 이름이 비어있으면 아무 작업도 하지 않음
+	}
+
+	auto instnaceIt = effects.find(instanceName);
+	if (instnaceIt != effects.end()) {
+		// 이미 같은 이름의 인스턴스가 존재하면 아무 작업도 하지 않음
+		return;
+	}
+
 	auto templateIt = effects.find(templateName);
 	if (templateIt != effects.end()) {
 		// 템플릿을 복사해서 새 인스턴스 생성

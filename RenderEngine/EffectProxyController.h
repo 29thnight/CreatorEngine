@@ -3,38 +3,28 @@
 #include "EffectManagerProxy.h"
 #include "concurrent_queue.h"
 
-class EffectProxyController: public Singleton<EffectProxyController>
+class EffectRenderProxy;
+class EffectComponent;
+class EffectProxyController: public DLLCore::Singleton<EffectProxyController>
 {
 private:
 	friend class Singleton;
 	using ImplEffectCommandQueue = concurrent_queue<EffectManagerProxy>;
 	using EffectCommandQueueArray = std::array<ImplEffectCommandQueue, 3>;
+	using EffectRenderProxyContainer = std::unordered_map<HashedGuid, EffectRenderProxy*>;
 
 private:
 	EffectProxyController() = default;
 	~EffectProxyController() = default;
 
 public:
-	void ExecuteEffectCommands()
-	{
-		auto& currFrameQueue = PrepareFrameEffectCommands();
-		while (!currFrameQueue.empty())
-		{
-			EffectManagerProxy command;
-			if (currFrameQueue.try_pop(command))
-			{
-				try
-				{
-					command.Execute();
-				}
-				catch (const std::exception& e)
-				{
-					Debug->LogWarning("Effect command execution failed: " + std::string(e.what()));
-					continue;
-				}
-			}
-		}
-	}
+	void PrepareCommandBehavior();
+	void ExecuteEffectCommands();
+
+	EffectRenderProxy* RegisterProxy(EffectComponent* component);
+	void UnRegisterProxy(EffectComponent* component);
+	EffectRenderProxy* GetProxy(EffectComponent* component);
+
 
 	// 게임 로직 스레드에서 호출 - 이펙트 명령 추가
 	void PushEffectCommand(EffectManagerProxy&& effectCommand)
@@ -62,9 +52,12 @@ private:
 		return m_effectFrameCommands[prevFrame];
 	}
 
+	void CommandBehavior(EffectRenderProxy* proxy);
+
 private:
 	EffectCommandQueueArray m_effectFrameCommands;
+	EffectRenderProxyContainer m_proxyContainer;
 	std::atomic_ullong m_frame{};
 };
 
-static auto& EffectCommandQueue = EffectProxyController::GetInstance();
+static auto EffectCommandQueue = EffectProxyController::GetInstance();

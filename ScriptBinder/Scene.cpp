@@ -323,6 +323,8 @@ void Scene::Update(float deltaSecond)
 	AllUpdateWorldMatrix();
 
     UpdateEvent.Broadcast(deltaSecond);
+
+	AllUpdateWorldMatrix();
 }
 
 void Scene::YieldNull()
@@ -1027,7 +1029,13 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
 		if (bone)
 		{
-			obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+			model = XMMatrixMultiply(bone->m_localTransform, model);
+			obj->m_transform.SetAndDecomposeMatrix(model);
+			//obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
+		}
+		else {
+			model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
+			obj->m_transform.SetAndDecomposeMatrix(model);
 		}
 	}
 	else

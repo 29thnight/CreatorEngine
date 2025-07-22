@@ -123,7 +123,7 @@ Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
 		Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
-		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(quaternion, parentWorldInverse);
+		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(parentWorldInverse, quaternion);
 		return SetRotation(newLocalrotation);
 	}
 }

@@ -10,6 +10,7 @@
 #include "InputActionManager.h"
 #include "NodeFactory.h"
 #include "TagManager.h"
+#include "GameObjectPool.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -53,6 +54,7 @@ void SceneManager::Initialization()
         ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
         ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
         ScriptManager->UpdatePhysx(PhysicX::GetInstance);
+		ScriptManager->UpdateObjectAllocFunc(GameObjectPool::GetInstance);
 		m_isInitialized = true;
     }
 

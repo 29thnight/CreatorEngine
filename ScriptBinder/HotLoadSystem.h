@@ -8,6 +8,7 @@ class ModuleBehavior;
 class GameObject;
 class SceneManager;
 class PhysicsManager;
+class GameObjectPool;
 class PhysicX;
 namespace BT
 {
@@ -17,6 +18,9 @@ namespace BT
 	class ConditionDecoratorNode;
 }
 #pragma region DLLFunctionPtr
+//Object Pool 관련 함수 포인터 정의
+typedef void (*SetObjectAllocFunc)(Singleton<GameObjectPool>::FGetInstance);
+
 // 모듈 스크립트 관련 함수 포인터 정의
 typedef ModuleBehavior* (*ModuleBehaviorFunc)(const char*);
 typedef void (*ModuleBehaviorDeleteFunc)(ModuleBehavior* behavior);
@@ -65,6 +69,13 @@ public:
 	void CreateActionNodeScript(const std::string_view& name);
 	void CreateConditionNodeScript(const std::string_view& name);
 	void CreateConditionDecoratorNodeScript(const std::string_view& name);
+
+	void UpdateObjectAllocFunc(Singleton<GameObjectPool>::FGetInstance objectPool)
+	{
+		if (!m_setObjectAllocFunc) return;
+
+		m_setObjectAllocFunc(objectPool);
+	}
 
 #pragma region Script Build Helper
 	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
@@ -212,6 +223,7 @@ private:
 
 private:
 	HMODULE hDll{};
+	SetObjectAllocFunc m_setObjectAllocFunc{};
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
 	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
