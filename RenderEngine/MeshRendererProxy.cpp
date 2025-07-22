@@ -63,6 +63,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
         m_instancedID = component->GetInstanceID();
     }
 
+PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
+    m_isSkinnedMesh(false),
+    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
+    m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
+{
+    m_instancedID = component->GetInstanceID();
+    m_proxyType = PrimitiveProxyType::FoliageComponent;
+}
+
     if (!m_isSkinnedMesh)
     {
         //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
@@ -158,6 +167,10 @@ void PrimitiveRenderProxy::Draw()
         m_terrainMesh->Draw();
         break;
     }
+    case PrimitiveProxyType::FoliageComponent:
+        if (nullptr == m_Mesh) return;
+        m_Mesh->Draw();
+        break;
     default:
         break;
     }
@@ -190,6 +203,12 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
         m_terrainMesh->Draw(_deferredContext);
         break;
     }
+    case PrimitiveProxyType::FoliageComponent:
+    {
+        if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+        m_Mesh->Draw(_deferredContext);
+        break;
+    }
     default:
         break;
     }
@@ -203,7 +222,7 @@ void PrimitiveRenderProxy::DestroyProxy()
 void PrimitiveRenderProxy::GenerateLODGroup()
 {
     if (nullptr == m_Mesh || nullptr == m_Material) return;
-	bool isTerrain = (m_proxyType == PrimitiveProxyType::TerrainComponent);
+	bool isTerrain = (m_proxyType == PrimitiveProxyType::TerrainComponent || m_proxyType == PrimitiveProxyType::FoliageComponent);
 
 	if (isTerrain || m_isSkinnedMesh) return;
     m_EnableLOD = LODSettings::IsLODEnabled();
