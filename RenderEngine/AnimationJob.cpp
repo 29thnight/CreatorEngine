@@ -246,6 +246,7 @@ void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator, AnimationCont
     
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     bone->m_globalTransform = globalTransform;
+    bone->m_localTransform = blendTransform;
 
     if (skeleton->HasSocket())
     {
@@ -297,6 +298,7 @@ void AnimationJob::UpdateBone(Bone* bone, Animator& animator, AnimationControlle
     XMMATRIX globalTransform = nodeTransform * parentTransform;
     
     bone->m_globalTransform = globalTransform;
+    bone->m_localTransform = nodeTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     if (skeleton->HasSocket())
     {

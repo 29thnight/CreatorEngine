@@ -20,5 +20,5 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	virtual void Attack(Entity* sender) override;
+	virtual void Attack(Entity* sender, int damage) override;
 };
