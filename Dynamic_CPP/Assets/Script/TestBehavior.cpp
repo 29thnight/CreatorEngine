@@ -3,12 +3,14 @@
 #include "RenderScene.h"
 #include "InputManager.h"
 #include "InputActionManager.h"
-#include "EffectComponent.h"
+
 #include "pch.h"
 #include <cmath>
 
-GameObject* testObject = nullptr;
-EffectComponent* effectComponent = nullptr;
+#include "BoxColliderComponent.h"
+
+
+BoxColliderComponent* boxCollider = nullptr;
 
 void TestBehavior::Start()
 {
@@ -18,10 +20,8 @@ void TestBehavior::Start()
 	// that this behavior is attached to.
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
-
-	testObject = SceneManagers->GetActiveScene()->CreateGameObject("TestObject").get();
-	effectComponent = testObject->AddComponent<EffectComponent>();
-	effectComponent->m_effectTemplateName = "Eft";
+	
+	boxCollider = m_pOwner->GetComponent<BoxColliderComponent>();
 }
   
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -54,10 +54,28 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-	if(!effectComponent->m_isPlaying)
+	m_chargingTime += tick;
+	m_chargingTime > 20.f ? m_chargingTime = 0.f : m_chargingTime;
+
+	EColliderType colliderType = boxCollider->GetColliderType();
+
+	if (testValue< m_chargingTime)
 	{
-		effectComponent->Apply();
+		if (colliderType == EColliderType::COLLISION)
+		{
+			boxCollider->SetColliderType(EColliderType::TRIGGER);
+		}
 	}
+
+	if (testValue> m_chargingTime)
+	{
+
+		if (colliderType == EColliderType::TRIGGER)
+		{
+			boxCollider->SetColliderType(EColliderType::COLLISION);
+		}
+	}
+
 
 }
 
