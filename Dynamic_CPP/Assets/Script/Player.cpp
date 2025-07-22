@@ -253,7 +253,7 @@ void Player::Catch()
 		//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		//righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
-		rigidbody->SetBodyType(EBodyType::STATIC);
+		//rigidbody->SetBodyType(EBodyType::STATIC);
 		
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;

@@ -43,7 +43,7 @@ PxFilterFlags CustomFilterShader(
 		return PxFilterFlag::eSUPPRESS;
 	}
 	
-	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
+	/*if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
 		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
 			| PxPairFlag::eNOTIFY_TOUCH_FOUND
@@ -56,7 +56,7 @@ PxFilterFlags CustomFilterShader(
 		| PxPairFlag::eNOTIFY_TOUCH_LOST
 		| PxPairFlag::eNOTIFY_CONTACT_POINTS
 		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	return PxFilterFlag::eDEFAULT;
+	return PxFilterFlag::eDEFAULT;*/
 
 }
 
