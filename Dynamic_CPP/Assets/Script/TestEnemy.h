@@ -21,6 +21,7 @@ public:
 	virtual void OnDestroy() override  {}
 
 
+	GameObject* Owner;
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;

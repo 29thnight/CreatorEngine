@@ -47,7 +47,7 @@ void Player::Start()
 	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
 
-	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
+	/*playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
 	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
@@ -55,7 +55,7 @@ void Player::Start()
 	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {Dash();});
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, 'J', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
 
 
 	m_animator = player->GetComponent<Animator>();
@@ -201,7 +201,7 @@ void Player::Catch()
 		//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		//righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
-		//rigidbody->SetBodyType(EBodyType::STATIC);
+		rigidbody->SetBodyType(EBodyType::STATIC);
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
 		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
@@ -215,12 +215,9 @@ void Player::Throw()
 	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 	righthand->DetachObject(catchedObject);
 	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
-	rigidbody->SetBodyType(EBodyType::DYNAMIC);
-	rigidbody->SetLockLinearX(false);
-	rigidbody->SetLockLinearY(false);
-	rigidbody->SetLockLinearZ(false);
-	auto& transform = GetOwner()->m_transform;
-	auto forward  = transform.GetForward();
+	//rigidbody->SetBodyType(EBodyType::DYNAMIC);
+	//auto& transform = GetOwner()->m_transform;
+	//auto forward  = transform.GetForward();
 	//rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
 
 
