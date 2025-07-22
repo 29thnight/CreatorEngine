@@ -32,6 +32,7 @@ namespace DLLCore
 		static std::mutex mu;
 	protected:
 		Singleton() = default;
+		~Singleton() = default;
 	public:
 		static auto GetInstance() -> T*;
 		static void Destroy();

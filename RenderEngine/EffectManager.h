@@ -7,12 +7,11 @@
 class EffectManager : public IRenderPass, public DLLCore::Singleton<EffectManager>
 {
 private:
-	friend class Singleton<EffectManager>;
-
-public:
+	friend class DLLCore::Singleton<EffectManager>;
 	EffectManager() = default;
 	~EffectManager() = default;
 
+public:
 	void Initialize();
 
 	virtual void Execute(RenderScene& scene, Camera& camera);
@@ -41,4 +40,4 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
 };
 
-static inline auto efm = EffectManager::GetInstance();
+static inline auto EffectManagers = EffectManager::GetInstance();

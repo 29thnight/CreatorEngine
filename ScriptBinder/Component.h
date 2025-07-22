@@ -2,11 +2,12 @@
 #include "Object.h"
 #include "TypeTrait.h"
 #include "Reflection.hpp"
+#include "ManagedHeapObject.h"
 #include "Component.generated.h"
 
 class GameObject;
 class Transform;
-class Component : public Object
+class Component : public Object, public ManagedHeapObject
 {
 public:
    ReflectComponent

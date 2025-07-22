@@ -500,9 +500,6 @@
     <ClCompile Include="EffectEditor.cpp">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClCompile>
-    <ClCompile Include="EffectManagerProxy.cpp">
-      <Filter>RenderPass\EffectPass\999.Manager</Filter>
-    </ClCompile>
     <ClCompile Include="EffectProxyController.cpp">
       <Filter>RenderPass\EffectPass\999.Manager</Filter>
     </ClCompile>

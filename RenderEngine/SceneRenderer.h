@@ -107,7 +107,6 @@ private:
 	std::unique_ptr<BlitPass>					m_pBlitPass{};
 	std::unique_ptr<AAPass>						m_pAAPass{};
 	std::unique_ptr<PostProcessingPass>			m_pPostProcessingPass{};
-	std::unique_ptr<EffectManager>				m_pEffectPass{};
 	std::unique_ptr<EffectEditor>				m_EffectEditor;
 
 	std::unique_ptr<PositionMapPass>			m_pPositionMapPass{};

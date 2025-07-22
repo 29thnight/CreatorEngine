@@ -120,7 +120,7 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -148,7 +148,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Utility_Framework\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;%(AdditionalIncludeDirectories);$*(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)EngineGUIWindow\;$(SolutionDir)EngineEntry\;$(SolutionDir)ManagedHeap\ManagedHeap\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)Physics\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)RenderEngine\Effect\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -208,6 +208,9 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
   <ItemGroup>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">
       <Project>{81ff579e-def8-47fc-b8c6-1ad59e98494c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="ManagedHeap\ManagedHeap\ManagedHeap.vcxproj">
+      <Project>{c4628f56-6af1-4c05-8ac8-76f039c059f9}</Project>
     </ProjectReference>
     <ProjectReference Include="Physics\Physics.vcxproj">
       <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>

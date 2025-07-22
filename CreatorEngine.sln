@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImGuiHelper", "ImGuiHelper\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SingletonManager", "SingletonManager\SingletonManager\SingletonManager.vcxproj", "{A5DE002C-1670-418C-B843-49EEC7E51C38}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ManagedHeap", "ManagedHeap\ManagedHeap\ManagedHeap.vcxproj", "{C4628F56-6AF1-4C05-8AC8-76F039C059F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -87,6 +89,14 @@ Global
 		{A5DE002C-1670-418C-B843-49EEC7E51C38}.Release|x64.Build.0 = Release|x64
 		{A5DE002C-1670-418C-B843-49EEC7E51C38}.Release|x86.ActiveCfg = Release|Win32
 		{A5DE002C-1670-418C-B843-49EEC7E51C38}.Release|x86.Build.0 = Release|Win32
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Debug|x64.ActiveCfg = Debug|x64
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Debug|x64.Build.0 = Debug|x64
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Debug|x86.ActiveCfg = Debug|Win32
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Debug|x86.Build.0 = Debug|Win32
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x64.ActiveCfg = Release|x64
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x64.Build.0 = Release|x64
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x86.ActiveCfg = Release|Win32
+		{C4628F56-6AF1-4C05-8AC8-76F039C059F9}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

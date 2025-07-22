@@ -9,8 +9,7 @@ inline T* GameObject::AddComponent()
         return nullptr;
     }
 
-    //T* component = new T();
-    std::shared_ptr<T> component = std::make_shared<T>();
+    std::shared_ptr<T> component = shared_alloc<T>();
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;
@@ -26,8 +25,7 @@ inline T* GameObject::AddComponent(Args && ...args)
         return nullptr;
     }
 
-    //T* component = new T(std::forward<Args>(args)...);
-    std::shared_ptr<T> component = std::make_shared<T>(std::forward<Args>(args)...);
+    std::shared_ptr<T> component = shared_alloc<T>(std::forward<Args>(args)...);
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;
