@@ -42,8 +42,8 @@ public:
         bool isInfinite = (m_duration < 0);
 
         if (isInfinite) {
-            // 무한 재생 모드
-            progressRatio = (std::sin(m_currentTime) + 1.0f) * 0.5f;
+            // 무한 재생 모드 - 고정된 주기로 0~1 반복 (예: 1초 주기)
+            progressRatio = std::fmod(m_currentTime, 1.0f);
         }
         else if (m_duration > 0) {
             progressRatio = std::clamp(m_currentTime / m_duration, 0.0f, 1.0f);
@@ -57,20 +57,9 @@ public:
             }
         }
 
-        // 종료 처리 (무한 재생이 아닌 경우에만)
+        // duration이 끝나면 바로 Stop
         if (!isInfinite && m_duration > 0 && m_currentTime >= m_duration) {
-            if (m_loop) {
-                m_currentTime = 0.0f;
-                for (auto& ps : m_particleSystems) {
-                    if (ps) {
-                        ps->Stop();
-                        ps->Play();
-                    }
-                }
-            }
-            else {
-                m_state = EffectState::Stopped;
-            }
+            Stop();
         }
     }
 

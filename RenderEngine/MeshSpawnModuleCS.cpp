@@ -447,23 +447,27 @@ void MeshSpawnModuleCS::ReleaseResources()
 void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 {
     Mathf::Vector3 newPos = position;
-
-    // 이전 위치 저장
-    m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
-    m_previousEmitterPosition = Mathf::Vector3(
+    Mathf::Vector3 currentPos(
         m_spawnParams.emitterPosition.x,
         m_spawnParams.emitterPosition.y,
         m_spawnParams.emitterPosition.z
     );
 
-    // 새 위치 설정 (threshold 검사 제거)
-    m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
+    float threshold = 0.001f;
+    if (abs(newPos.x - currentPos.x) > threshold ||
+        abs(newPos.y - currentPos.y) > threshold ||
+        abs(newPos.z - currentPos.z) > threshold)
+    {
+        // 이전 위치 저장
+        m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
 
-    // 강제 위치 업데이트 플래그 설정
-    m_forcePositionUpdate = true;
-    m_spawnParamsDirty = true;
+        // 새 위치 설정
+        m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
+
+        m_forcePositionUpdate = true;
+        m_spawnParamsDirty = true;
+    }
 }
-
 
 void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 {

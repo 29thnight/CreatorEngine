@@ -252,10 +252,12 @@ void EffectComponent::ApplyEffectSettings()
 
         // 루프 설정
         //proxy->UpdateTimeScale(m_timeScale);
+        proxy->UpdateLoop(m_loop);
         proxy->PushCommand(EffectCommandType::SetLoop);
 
         // 지속시간 설정
         //proxy->UpdateTimeScale(m_timeScale);
+        proxy->UpdateDuration(m_duration);
         proxy->PushCommand(EffectCommandType::SetDuration);
 
 
