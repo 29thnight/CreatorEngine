@@ -722,7 +722,7 @@ void PhysicsManager::GetPhysicData()
 
 			}
 
-			transform.SetAndDecomposeMatrix(matrix);
+			transform.SetAndDecomposeMatrix(matrix, true);
 
 		}
 	}

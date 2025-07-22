@@ -83,8 +83,10 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 				command = EffectManagerProxy::CreateStopCommand(proxy->GetName());
 				break;
 			case EffectCommandType::Pause:
+				command = EffectManagerProxy::CreateStopCommand(proxy->GetName());
 				break;
 			case EffectCommandType::Resume:
+				command = EffectManagerProxy::CreatePlayCommand(proxy->GetName());
 				break;
 			case EffectCommandType::SetPosition:
 				command = EffectManagerProxy::CreateSetPositionCommand(proxy->GetName(), proxy->GetPostion());

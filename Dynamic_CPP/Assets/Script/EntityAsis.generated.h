@@ -5,6 +5,7 @@ ReflectionScriptField(EntityAsis) \
 { \
 	PropertyField \
 	({ \
+		meta_property(radius) \
 		meta_property(maxHP) \
 		meta_property(moveSpeed) \
 		meta_property(graceperiod) \

@@ -25,17 +25,23 @@ PxFilterFlags CustomFilterShader(
 	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
 	
-	/*if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1)) {
-		pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1)) {
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
+			| PxPairFlag::eNOTIFY_TOUCH_FOUND
+			| PxPairFlag::eNOTIFY_TOUCH_LOST;
 		return PxFilterFlag::eDEFAULT;
 	}
-
-	if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {
-		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_CONTACT_POINTS;
-		return PxFilterFlag::eDEFAULT;
+	else {
+		if ((fd0.word1 & (1 << fd1.word0)) && (fd1.word1 & (1 << fd0.word0))) {
+			pairFlags = PxPairFlag::eCONTACT_DEFAULT
+				| PxPairFlag::eNOTIFY_CONTACT_POINTS
+				| PxPairFlag::eNOTIFY_TOUCH_FOUND
+				| PxPairFlag::eNOTIFY_TOUCH_LOST
+				| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;;
+			return PxFilterFlag::eDEFAULT;
+		}
+		return PxFilterFlag::eSUPPRESS;
 	}
-
-	return PxFilterFlag::eSUPPRESS;*/
 	
 	if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
@@ -1019,8 +1025,8 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 				
 				if (rigidBodyData.m_EColliderType == EColliderType::COLLISION) //&&&&&키는거 만드는중
 				{
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 				}
 				else if(rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
 				{

@@ -18,7 +18,13 @@ interface IOnDestroy
         {
             auto ptr = dynamic_cast<Component*>(this);
             auto sceneObject = ptr->GetOwner();
-            if(ptr && sceneObject && sceneObject->IsDestroyMark())
+            if (nullptr == ptr || nullptr == sceneObject)
+            {
+				Debug->LogCritical("IOnDestroy::OnDestroy called on invalid component or scene object.");
+				return;
+            }
+
+            if(sceneObject->IsDestroyMark() || ptr->IsDestroyMark())
             {
                 OnDestroy();
             }

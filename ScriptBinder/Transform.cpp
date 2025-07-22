@@ -225,7 +225,7 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	m_dirty = false;
 }
 
-void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
+void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal)
 {
 	Mathf::Matrix compareMat = matrix;
 	if (compareMat == m_worldMatrix) return;
@@ -241,11 +241,13 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 		parentObject = GameObject::FindIndex(m_parentID);
 	}
 
-	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
-	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-	XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
+	if (setLocal) {
+		XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
+		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+		XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
 
-	SetLocalMatrix(newLocalMatrix);
+		SetLocalMatrix(newLocalMatrix);
+	}
 }
 
 Mathf::xVector Transform::GetWorldPosition() const

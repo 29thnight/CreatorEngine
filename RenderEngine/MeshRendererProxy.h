@@ -10,6 +10,7 @@
 enum class PrimitiveProxyType
 {
    MeshRenderer,
+   FoliageComponent,
    TerrainComponent
 };
 
@@ -20,10 +21,12 @@ class MeshRenderer;
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
+class FoliageComponent;
 class PrimitiveRenderProxy
 {
 public:
 	PrimitiveRenderProxy(MeshRenderer* component);
+    PrimitiveRenderProxy(FoliageComponent* component);
 	PrimitiveRenderProxy(TerrainComponent* component);
 	~PrimitiveRenderProxy();
 
@@ -51,7 +54,6 @@ public:
 	void GenerateLODGroup();
 
 public:
-	//공통
 	PrimitiveProxyType	m_proxyType{ PrimitiveProxyType::MeshRenderer };
 	Mathf::Vector3		m_worldPosition{ 0.0f, 0.0f, 0.0f };
 	Mathf::xMatrix		m_worldMatrix{ XMMatrixIdentity() };
@@ -68,7 +70,7 @@ public:
 	HashedGuid					m_materialGuid{};
 	Mathf::xMatrix*				m_finalTransforms{};
 	LightMapping				m_LightMapping;
-	//TODO : bitflag 처리
+
 	bool                        m_isEnableShadow{ true };
 	bool						m_isSkinnedMesh{ false };
 	bool						m_isAnimationEnabled{ false };

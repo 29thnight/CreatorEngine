@@ -407,7 +407,6 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	//TODO : 시연용 Player주석 코드
 	player.Update(deltaTime);
-	EffectManagers->Update(deltaTime);
 	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
@@ -570,7 +569,6 @@ void SceneRenderer::SceneRendering()
 		
 		if (m_pEditorCamera.get() != camera)
 		{
-
 			//VolumetricFog or VolumetricLight
 			PROFILE_CPU_BEGIN("VolumetricFogPass");
 			DirectX11::BeginEvent(L"VolumetricFogPass");
@@ -651,6 +649,8 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_BEGIN("EffectPass");
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
+			float deltaTime = Time->GetElapsedSeconds();
+			EffectManagers->Update(deltaTime);
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
 			RenderStatistics->UpdateRenderState("EffectPass", banch.GetElapsedTime());
