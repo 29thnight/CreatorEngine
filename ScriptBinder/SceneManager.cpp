@@ -58,6 +58,27 @@ void SceneManager::Initialization()
 		m_isInitialized = true;
     }
 
+    if (m_loadingSceneFuture.valid() &&
+        m_loadingSceneFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    {
+        try
+        {
+            // .get() retrieves the result. It will re-throw any exception caught in the async task.
+            Scene* loadedScene = m_loadingSceneFuture.get();
+            if (loadedScene)
+            {
+                // The scene is loaded, now activate it on the main thread.
+                ActivateScene(loadedScene);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError("Failed to activate loaded scene.");
+            // Handle loading failure
+        }
+        // The future is now invalid after .get(), so this block won't run again until a new scene is loaded.
+    }
+
     PROFILE_CPU_BEGIN("Awake");
 	m_activeScene.load()->Awake();
     PROFILE_CPU_END();
@@ -138,6 +159,9 @@ void SceneManager::Decommissioning()
     m_activeScene.load()->OnDisable();
     m_activeScene.load()->AllDestroyMark();
     m_activeScene.load()->OnDestroy();
+
+    Memory::SafeDelete(m_inputActionManager);
+    Memory::SafeDelete(m_threadPool);
 }
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
@@ -171,7 +195,7 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
     return allocScene;
 }
 
-Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
+Scene* SceneManager::SaveScene(const std::string_view& name)
 {
 	std::string fileStem = name.data();
 	//std::string fileExtension = ".creator";
@@ -198,7 +222,7 @@ Scene* SceneManager::SaveScene(const std::string_view& name, bool isAsync)
     sceneFileOut.close();
 }
 
-Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
+Scene* SceneManager::LoadScene(const std::string_view& name)
 {
 	std::string loadSceneName = name.data();
 
@@ -254,7 +278,6 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
-
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
 	}
@@ -264,6 +287,65 @@ Scene* SceneManager::LoadScene(const std::string_view& name, bool isAsync)
 		return nullptr;
 	}
 	return m_activeScene;
+}
+
+void SceneManager::SaveSceneAsync(const std::string_view& name)
+{
+}
+
+std::future<Scene*> SceneManager::LoadSceneAsync(const std::string_view& name)
+{
+    // std::launch::async ensures the task runs on a new thread immediately.
+    return std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
+        try
+        {
+            // This code runs in a background thread.
+            MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
+            Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
+
+            for (const auto& objNode : sceneNode["m_SceneObjects"])
+            {
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type) {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
+                DesirealizeGameObject(newScene, type, objNode);
+            }
+            newScene->AllUpdateWorldMatrix();
+            return newScene;
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError(e.what());
+            // Returning nullptr indicates failure. The exception is also stored in the future.
+            return nullptr;
+        }
+    });
+}
+
+void SceneManager::ActivateScene(Scene* sceneToActivate)
+{
+    if (!sceneToActivate) return;
+
+    Scene* oldScene = m_activeScene.load();
+    if (oldScene)
+    {
+        sceneUnloadedEvent.Broadcast();
+        oldScene->AllDestroyMark();
+        oldScene->OnDisable();
+        oldScene->OnDestroy();
+        std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+        delete oldScene;
+    }
+
+    resourceTrimEvent.Broadcast();
+    m_activeScene = sceneToActivate;
+    m_scenes.push_back(m_activeScene);
+    m_activeSceneIndex = m_scenes.size() - 1;
+
+    activeSceneChangedEvent.Broadcast();
+    sceneLoadedEvent.Broadcast();
 }
 
 void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
@@ -350,6 +432,49 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
     if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
     {
         auto obj = m_activeScene.load()->LoadGameObject(
+            itNode["m_instanceID"].as<size_t>(),
+            itNode["m_name"].as<std::string>(),
+            GameObjectType::Empty,
+            itNode["m_parentIndex"].as<GameObject::Index>()
+        ).get();
+
+        if (obj)
+        {
+            Meta::Deserialize(obj, itNode);
+            if (!obj->m_tag.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+            }
+
+            if (!obj->m_layer.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+            }
+        }
+
+        if (itNode["m_components"])
+        {
+            for (const auto& componentNode : itNode["m_components"])
+            {
+                try
+                {
+                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(e.what());
+                    continue;
+                }
+            }
+        }
+    }
+}
+
+void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+{
+    if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
+    {
+        auto obj = targetScene->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
             GameObjectType::Empty,

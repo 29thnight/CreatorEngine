@@ -21,6 +21,7 @@ interface IOnDestroy
             if (nullptr == ptr || nullptr == sceneObject)
             {
 				Debug->LogCritical("IOnDestroy::OnDestroy called on invalid component or scene object.");
+				return;
             }
 
             if(sceneObject->IsDestroyMark() || ptr->IsDestroyMark())

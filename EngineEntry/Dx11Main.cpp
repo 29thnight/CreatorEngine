@@ -27,7 +27,6 @@
 #include "imgui_impl_dx11.h"
 //#include "SwapEvent.h"
 
-
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 std::atomic<bool> isGameToRender = false;
 
@@ -126,8 +125,6 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
 	PhysicsManagers->Initialize();
     EffectManager::GetInstance();
     EffectProxyController::GetInstance();
-	//LuaEngine::Get().Initialize();
-
 
     isGameToRender = true;
 

@@ -110,10 +110,10 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 	m_updateFunction = [=]()
-		{
-			proxyObject->m_worldMatrix = worldMatrix;
-			proxyObject->m_worldPosition = worldPosition;
-		};
+	{
+		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_worldPosition = worldPosition;
+	};
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :
