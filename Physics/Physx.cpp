@@ -409,6 +409,41 @@ void PhysicX::ChangeScene()
 	//옷 시뮬레이션 삭제도 추가시 삭제
 }
 
+void PhysicX::DestroyActor(unsigned int id)
+{
+	//컨테이너에 엑터 확인
+	auto iter = m_rigidBodyContainer.find(id);
+	if (iter == m_rigidBodyContainer.end())
+	{
+		Debug->LogError("PhysicX::DestroyActor : Actor not found with id " + std::to_string(id));
+		return;
+	}
+
+	RigidBody* body = iter->second;
+
+	if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
+	{
+		//동적 바디인 경우
+		m_removeActorList.push_back(dynamicBody->GetRigidDynamic());
+	}
+	else if (auto* staticBody = dynamic_cast<StaticRigidBody*>(body))
+	{
+		//정적 바디인 경우
+		m_removeActorList.push_back(staticBody->GetRigidStatic());
+	}
+	else
+	{
+		Debug->LogError("PhysicX::DestroyActor : Actor is not a valid RigidBody type");
+		return;
+	}
+
+	delete body; // 메모리 해제
+	m_rigidBodyContainer.erase(iter); // 컨테이너에서 제거
+
+	// 콜리전 데이터 제거
+	RemoveCollisionData(id);
+}
+
 RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 {
 	physx::PxVec3 pxOrgin;
