@@ -21,10 +21,13 @@ public:
 	virtual void OnDestroy() override  {}
 public:
 	virtual void Interact() {}
-	virtual void Attack(Entity* sender) {}
+	virtual void Attack(Entity* sender, int damage) {}
 
 	[[Property]]
 	int m_currentHP{ 0 };
 	[[Property]]
 	int m_maxHP{ 1 };
+
+	Core::Delegate<void> m_onDeathEvent;
+	Core::Delegate<void> m_onDamageEvent;
 };
