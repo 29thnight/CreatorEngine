@@ -42,18 +42,42 @@ void ParticleSystem::Play()
 
 void ParticleSystem::Update(float delta)
 {
-	// 1. 위치/Transform 업데이트는 항상 수행 (렌더링/실행 상태와 무관)
-	UpdateTransformOnly();
-
-	// 2. 파티클 시스템이 실행 중이 아니면 시뮬레이션 중단
-	if (!m_isRunning) {
+	if (!m_isRunning)
 		return;
+
+	// 현재 읽기/쓰기 버퍼 결정
+	ID3D11UnorderedAccessView* inputUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
+	ID3D11ShaderResourceView* inputSRV = m_usingBufferA ? m_particleSRV_A : m_particleSRV_B;
+	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
+	ID3D11ShaderResourceView* outputSRV = m_usingBufferA ? m_particleSRV_B : m_particleSRV_A;
+
+	// 모든 모듈 실행
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// 버퍼 설정 및 실행
+		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
+		module.Update(delta);
+
+		// 다음 모듈을 위해 입력↔출력 스왑
+		std::swap(inputUAV, outputUAV);
+		std::swap(inputSRV, outputSRV);
 	}
 
-	// 3. 파티클 시뮬레이션 수행
-	UpdateParticleSimulation(delta);
+	// 최종 버퍼 스왑 (모듈 개수가 홀수면 결과적으로 버퍼가 바뀜)
+	if (m_moduleList.size() % 2 == 1) {
+		m_usingBufferA = !m_usingBufferA;
+	}
 
+	DeviceState::g_pDeviceContext->Flush();
 
+#ifdef _DEBUG
+	//static int frameCount = 0;
+	//if (++frameCount % 60 == 0) {
+	//	std::cout << "Particle system running..." << std::endl;
+	//}
+#endif
 }
 
 void ParticleSystem::Render(RenderScene& scene, Camera& camera)
@@ -426,91 +450,6 @@ void ParticleSystem::SetEffectProgress(float progress)
 			meshModule->SetEffectProgress(progress);
 		}
 	}
-}
-
-void ParticleSystem::UpdateTransformOnly()
-{
-	// 최종 월드 위치 계산
-	Mathf::Vector3 finalWorldPosition = m_effectBasePosition + m_position;
-
-	// 1. 렌더링 모듈 위치 업데이트
-	for (auto* renderModule : m_renderModules) {
-		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
-			meshModule->SetPolarCenter(finalWorldPosition);
-		}
-	}
-
-	// 2. SpawnModule들의 emitter 위치 업데이트
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
-		ParticleModule& module = *it;
-
-		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
-			spawnModule->SetEmitterPosition(finalWorldPosition);
-		}
-		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
-			meshSpawnModule->SetEmitterPosition(finalWorldPosition);
-		}
-	}
-}
-
-void ParticleSystem::UpdateParticleSimulation(float delta)
-{
-	// 현재 읽기/쓰기 버퍼 결정
-	ID3D11UnorderedAccessView* inputUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
-	ID3D11ShaderResourceView* inputSRV = m_usingBufferA ? m_particleSRV_A : m_particleSRV_B;
-	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
-	ID3D11ShaderResourceView* outputSRV = m_usingBufferA ? m_particleSRV_B : m_particleSRV_A;
-
-	// 모든 모듈 실행 (스폰 상태에 따라)
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
-	{
-		ParticleModule& module = *it;
-
-		// 버퍼 설정
-		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
-
-		// 스폰 모듈인 경우 스폰 가능 여부 체크
-		if (auto* spawnModule = dynamic_cast<SpawnModuleCS*>(&module)) {
-			if (m_shouldSpawn) {
-				spawnModule->Update(delta);
-			}
-			else {
-				// 새로운 파티클 생성 없이 기존 파티클만 업데이트하는 로직
-				// spawnRate를 임시로 0으로 설정
-				float originalSpawnRate = spawnModule->GetSpawnRate();
-				spawnModule->SetSpawnRate(0.0f);
-				spawnModule->Update(delta);
-				spawnModule->SetSpawnRate(originalSpawnRate);
-			}
-		}
-		else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module)) {
-			if (m_shouldSpawn) {
-				meshSpawnModule->Update(delta);
-			}
-			else {
-				// 새로운 파티클 생성 없이 기존 파티클만 업데이트하는 로직
-				float originalSpawnRate = meshSpawnModule->GetSpawnRate();
-				meshSpawnModule->SetSpawnRate(0.0f);
-				meshSpawnModule->Update(delta);
-				meshSpawnModule->SetSpawnRate(originalSpawnRate);
-			}
-		}
-		else {
-			// 다른 모듈들은 항상 업데이트
-			module.Update(delta);
-		}
-
-		// 다음 모듈을 위해 입력↔출력 스왑
-		std::swap(inputUAV, outputUAV);
-		std::swap(inputSRV, outputSRV);
-	}
-
-	// 최종 버퍼 스왑 (모듈 개수가 홀수면 결과적으로 버퍼가 바뀜)
-	if (m_moduleList.size() % 2 == 1) {
-		m_usingBufferA = !m_usingBufferA;
-	}
-
-	DeviceState::g_pDeviceContext->Flush();
 }
 
 void ParticleSystem::ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule)

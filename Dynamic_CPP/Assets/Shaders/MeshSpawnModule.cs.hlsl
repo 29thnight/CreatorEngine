@@ -329,25 +329,27 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 파티클 데이터 복사
     MeshParticleData particle = gParticlesInput[particleIndex];
     
-    // 🔥 위치/회전 업데이트를 활성 상태와 무관하게 먼저 수행
-    if (gForcePositionUpdate == 1)
-    {
-        UpdateExistingMeshParticlePosition(particle);
-    }
-    
-    if (gForceRotationUpdate == 1)
-    {
-        UpdateExistingMeshParticleRotation(particle);
-    }
-    else
-    {
-        // 회전도 항상 에미터 회전 유지
-        particle.rotation = gEmitterRotation;
-    }
-    
-    // 기존 활성 파티클 시뮬레이션 업데이트
+    // 기존 활성 파티클 업데이트
     if (particle.isActive == 1)
     {
+    // 에미터 위치가 변경되었다면 즉시 파티클 위치 업데이트
+        if (gForcePositionUpdate == 1)
+        {
+            UpdateExistingMeshParticlePosition(particle);
+        }
+    
+    // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
+        if (gForceRotationUpdate == 1)
+        {
+            UpdateExistingMeshParticleRotation(particle);
+        }
+        else
+        {
+        // 위치처럼 회전도 항상 에미터 회전 유지
+        // (forceRotationUpdate가 0이어도 계속 적용)
+            particle.rotation = gEmitterRotation;
+        }
+
         // 나이 증가
         particle.age += gDeltaTime;
 
