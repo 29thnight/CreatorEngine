@@ -6,6 +6,7 @@
 #include "Skeleton.h"
 #include "LightController.h"
 #include "Benchmark.hpp"
+#include "FoliageComponent.h"
 #include "MeshRenderer.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
@@ -180,6 +181,20 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 	m_proxyMap[meshRendererGuid] = managedCommand;
 }
 
+void RenderScene::RegisterCommand(FoliageComponent* foliagePtr)
+{
+        if (nullptr == foliagePtr) return;
+
+        HashedGuid guid = foliagePtr->GetInstanceID();
+
+        SpinLock lock(m_proxyMapFlag);
+
+        if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
+
+        auto managed = std::make_shared<PrimitiveRenderProxy>(foliagePtr);
+        m_proxyMap[guid] = managed;
+}
+
 bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 {
 	if (nullptr == meshRendererPtr || meshRendererPtr->IsDestroyMark()) return false;
@@ -198,6 +213,26 @@ bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 	if (nullptr == proxyObject) return false;
 
 	return true;
+}
+
+bool RenderScene::InvaildCheckFoliage(FoliageComponent* foliagePtr)
+{
+        if (nullptr == foliagePtr || foliagePtr->IsDestroyMark()) return false;
+
+        auto owner = foliagePtr->GetOwner();
+        if (nullptr == owner || owner->IsDestroyMark()) return false;
+
+        HashedGuid guid = foliagePtr->GetInstanceID();
+
+        SpinLock lock(m_proxyMapFlag);
+
+        if (m_proxyMap.find(guid) == m_proxyMap.end()) return false;
+
+        auto& proxyObject = m_proxyMap[guid];
+
+        if (nullptr == proxyObject) return false;
+
+        return true;
 }
 
 PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
@@ -233,8 +268,14 @@ void RenderScene::OnProxyDestroy()
 
 void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
 {
-	ProxyCommand moveCommand = MakeProxyCommand(meshRendererPtr);
-	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+        ProxyCommand moveCommand = MakeProxyCommand(meshRendererPtr);
+        ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+void RenderScene::UpdateCommand(FoliageComponent* foliagePtr)
+{
+        ProxyCommand moveCommand = MakeProxyCommand(foliagePtr);
+        ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
 }
 
 ProxyCommand RenderScene::MakeProxyCommand(MeshRenderer* meshRendererPtr)
@@ -244,8 +285,19 @@ ProxyCommand RenderScene::MakeProxyCommand(MeshRenderer* meshRendererPtr)
 		throw std::runtime_error("InvaildCheckMeshRenderer");
 	}
 
-	ProxyCommand command(meshRendererPtr);
-	return command;
+        ProxyCommand command(meshRendererPtr);
+        return command;
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(FoliageComponent* foliagePtr)
+{
+        if (!InvaildCheckFoliage(foliagePtr))
+        {
+                throw std::runtime_error("InvaildCheckFoliage");
+        }
+
+        ProxyCommand command(foliagePtr);
+        return command;
 }
 
 void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
@@ -258,5 +310,18 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
 	
 	if (m_proxyMap.find(meshRendererGuid) == m_proxyMap.end()) return;
 
-	m_proxyMap[meshRendererGuid]->DestroyProxy();
+        m_proxyMap[meshRendererGuid]->DestroyProxy();
+}
+
+void RenderScene::UnregisterCommand(FoliageComponent* foliagePtr)
+{
+        if (nullptr == foliagePtr) return;
+
+        HashedGuid guid = foliagePtr->GetInstanceID();
+
+        SpinLock lock(m_proxyMapFlag);
+
+        if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
+
+        m_proxyMap[guid]->DestroyProxy();
 }

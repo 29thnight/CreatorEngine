@@ -7,6 +7,7 @@
 #include "SceneManager.h"
 #include "InputActionManager.h"
 #include "RigidBodyComponent.h"
+#include "BoxColliderComponent.h"
 
 #include "Player.h"
 
@@ -92,22 +93,17 @@ void EntityAsis::Update(float tick)
 	Vector3 tailPos = tailTr->GetWorldPosition();
 	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
 
-	std::queue<EntityItem*> tempQueue = m_EntityItemQueue;
-
-	int i = 0;
-	while (!tempQueue.empty()) {
-		auto item = tempQueue.front();
-		tempQueue.pop();
-
-
-		float orbitAngle = angle + XM_PI * 2.f * i / 3.f;;
-		float r = radius + sinf(timer) * 3.f;
-		Vector3 localOrbit = Vector3(cos(orbitAngle) * r, 0.f, sin(orbitAngle) * r);
-		XMMATRIX axisRotation = XMMatrixRotationAxis(tailForward, 0.0f);
+	auto& arr = m_EntityItemQueue.getArray();
+	int size = arr.size();
+	for (int i = 0; i < size; i++) {
+		if (arr[i] == nullptr) continue; // nullptr 체크
+		float orbitAngle = angle + XM_PI * 2.f * i / 3.f;
+		Vector3 localOrbit = Vector3(cos(orbitAngle) * radius, 0.f, sin(orbitAngle) * radius);
+		XMMATRIX axisRotation = XMMatrixRotationAxis(Vector3::Forward, 0.0f);
 		XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
 
 		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
-		item->GetComponent<Transform>().SetPosition(finalPos);
+		arr[i]->GetComponent<Transform>().SetPosition(finalPos);
 		i++;
 	}
 
@@ -128,19 +124,19 @@ bool EntityAsis::AddItem(EntityItem* item)
 		return false;
 	}
 	
-	m_EntityItemQueue.push(item);
-	m_currentEntityItemCount++;
-
 	auto queue = m_EntityItemQueue;
-	while (!queue.empty()) {
-		auto i = queue.front();
-		queue.pop();
+	while (!queue.isEmpty()) {
+		auto i = queue.dequeue();
 		if (item == i)
 		{
 			std::cout << "EntityAsis: Item already exists in the queue." << std::endl;
 			return false; // 이미 큐에 존재하는 아이템은 추가하지 않음.
 		}
 	}
+
+	m_EntityItemQueue.enqueue(item);
+	m_currentEntityItemCount++;
+	item->GetComponent<BoxColliderComponent>().SetColliderType(EColliderType::TRIGGER);
 
 	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
 	return true;
@@ -175,8 +171,7 @@ EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()
 		return nullptr;
 
 	m_currentEntityItemCount--;
-	EntityItem* purificationItem = m_EntityItemQueue.front();
-	m_EntityItemQueue.pop();
+	EntityItem* purificationItem = m_EntityItemQueue.dequeue();
 
 	return purificationItem;
 }
