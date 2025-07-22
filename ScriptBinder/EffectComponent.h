@@ -86,4 +86,5 @@ private:
 
     void ApplyEffectSettings();
     void DestroyCurrentEffect();
+    void ForeceUpdatePosition();
 };

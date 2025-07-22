@@ -58,15 +58,13 @@ public:
 	bool SupportsClipping() const override { return true; }
 
 	void OnClippingStateChanged() override;
-	void CreateClippingBuffer() override;
-	void UpdateClippingBuffer() override;
 
 	void SetClippingAnimation(bool enable, float speed = 1.0f);
 	bool IsClippingAnimating() const { return m_isClippingAnimating; }
 	float GetClippingAnimationSpeed() const { return m_clippingAnimationSpeed; }
 
-	void CreatePolarClippingBuffer();
-	void UpdatePolarClippingBuffer();
+	virtual void CreateClippingBuffer();
+	virtual void UpdateClippingBuffer();
 	void EnablePolarClipping(bool enable);
 	bool IsPolarClippingEnabled() const;
 	void SetPolarAngleProgress(float progress);

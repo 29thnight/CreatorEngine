@@ -112,6 +112,7 @@ void MeshSpawnModuleCS::Update(float deltaTime)
     m_spawnParams.maxParticles = m_particleCapacity;
     m_spawnParams.deltaTime = deltaTime;
     m_spawnParams.currentTime = currentTime;
+
     m_spawnParams.forcePositionUpdate = m_forcePositionUpdate ? 1 : 0;
 
     m_spawnParamsDirty = true;
@@ -447,31 +448,22 @@ void MeshSpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 {
     Mathf::Vector3 newPos = position;
 
-    // 기존 위치와 비교하여 실제로 변경되었는지 확인
-    Mathf::Vector3 currentPos(
+    // 이전 위치 저장
+    m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
+    m_previousEmitterPosition = Mathf::Vector3(
         m_spawnParams.emitterPosition.x,
         m_spawnParams.emitterPosition.y,
         m_spawnParams.emitterPosition.z
     );
 
-    // 위치 변화량이 임계값보다 클 때만 업데이트
-    float threshold = 0.001f;
-    if (abs(newPos.x - currentPos.x) > threshold ||
-        abs(newPos.y - currentPos.y) > threshold ||
-        abs(newPos.z - currentPos.z) > threshold)
-    {
-        // 이전 위치 저장
-        m_spawnParams.previousEmitterPosition = m_spawnParams.emitterPosition;
-        m_previousEmitterPosition = currentPos;
+    // 새 위치 설정 (threshold 검사 제거)
+    m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
 
-        // 새 위치 설정
-        m_spawnParams.emitterPosition = XMFLOAT3(newPos.x, newPos.y, newPos.z);
-
-        // 강제 위치 업데이트 플래그 설정
-        m_forcePositionUpdate = true;
-        m_spawnParamsDirty = true;
-    }
+    // 강제 위치 업데이트 플래그 설정
+    m_forcePositionUpdate = true;
+    m_spawnParamsDirty = true;
 }
+
 
 void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 {

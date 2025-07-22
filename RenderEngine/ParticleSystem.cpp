@@ -147,6 +147,12 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 			continue;
 		}
 	}
+
+	for (auto* renderModule : m_renderModules) {
+		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+			meshModule->SetPolarCenter(finalWorldPosition);
+		}
+	}
 }
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)

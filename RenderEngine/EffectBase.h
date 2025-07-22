@@ -38,9 +38,18 @@ public:
         m_currentTime += delta * m_timeScale;
 
         // 진행률 계산
-        float progressRatio = (m_duration > 0) ? std::clamp(m_currentTime / m_duration, 0.0f, 1.0f) : 0.0f;
+        float progressRatio = 0.0f;
+        bool isInfinite = (m_duration < 0);
 
-        // 먼저 현재 진행률로 업데이트
+        if (isInfinite) {
+            // 무한 재생 모드
+            progressRatio = (std::sin(m_currentTime) + 1.0f) * 0.5f;
+        }
+        else if (m_duration > 0) {
+            progressRatio = std::clamp(m_currentTime / m_duration, 0.0f, 1.0f);
+        }
+
+        // ParticleSystem 업데이트
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->SetEffectProgress(progressRatio);
@@ -48,11 +57,10 @@ public:
             }
         }
 
-        // 그 다음에 종료 처리
-        if (m_duration > 0 && m_currentTime >= m_duration) {
+        // 종료 처리 (무한 재생이 아닌 경우에만)
+        if (!isInfinite && m_duration > 0 && m_currentTime >= m_duration) {
             if (m_loop) {
                 m_currentTime = 0.0f;
-                // 다음 프레임에서 0.0부터 다시 시작
                 for (auto& ps : m_particleSystems) {
                     if (ps) {
                         ps->Stop();
@@ -62,7 +70,6 @@ public:
             }
             else {
                 m_state = EffectState::Stopped;
-                // 이미 1.0으로 업데이트됨
             }
         }
     }
