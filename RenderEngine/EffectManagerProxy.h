@@ -30,7 +30,7 @@ public:
         cmd.m_commandType = EffectCommandType::Play;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = EffectManager->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Play();
             }
             };
@@ -44,7 +44,7 @@ public:
         cmd.m_commandType = EffectCommandType::Stop;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = EffectManager->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Stop();
             }
             };
@@ -58,7 +58,7 @@ public:
         cmd.m_commandType = EffectCommandType::SetPosition;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, position]() {
-            if (auto* effect = EffectManager->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetPosition(position);
             }
             };
@@ -72,7 +72,7 @@ public:
         cmd.m_commandType = EffectCommandType::SetTimeScale;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, timeScale]() {
-            if (auto* effect = EffectManager->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetTimeScale(timeScale);
             }
             };
@@ -86,7 +86,7 @@ public:
         cmd.m_commandType = EffectCommandType::SetRotation;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, rotation]() {
-            if (auto* effect = EffectManager->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetRotation(rotation);
             }
             };
@@ -101,7 +101,7 @@ public:
         cmd.m_commandType = EffectCommandType::CreateEffect;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, emitters]() {
-            EffectManager->RegisterCustomEffect(effectName, emitters);
+            EffectManagers->RegisterCustomEffect(effectName, emitters);
             };
         return cmd;
     }
@@ -113,7 +113,7 @@ public:
         cmd.m_commandType = EffectCommandType::RemoveEffect;
         cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
-            EffectManager->RemoveEffect(effectName);
+            EffectManagers->RemoveEffect(effectName);
             };
         return cmd;
     }
@@ -125,7 +125,7 @@ public:
         cmd.m_commandType = EffectCommandType::CreateInstance;
         cmd.m_effectName = instanceName;
         cmd.m_executeFunction = [templateName, instanceName]() {
-            EffectManager->CreateEffectInstance(templateName, instanceName);
+            EffectManagers->CreateEffectInstance(templateName, instanceName);
             };
         return cmd;
     }
