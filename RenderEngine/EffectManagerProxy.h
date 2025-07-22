@@ -1,26 +1,7 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "EffectCommandType.h"
 #include "EffectManager.h"
 #include "EffectBase.h"
-
-enum class EffectCommandType
-{
-    Play,
-    Stop,
-    Pause,
-    Resume,
-    SetPosition,
-    SetTimeScale,
-    RemoveEffect,
-    UpdateEffectProperty,
-    CreateInstance,
-    SetRotation,
-    SetLoop,
-    SetDuration,
-    GetState,
-    IsFinished,
-    ForceFinish
-};
 
 class EffectManagerProxy
 {
@@ -30,7 +11,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Play();
             }
             };
@@ -42,7 +23,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Stop();
             }
             };
@@ -54,8 +35,22 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName, position]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetPosition(position);
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 타임스케일 설정 명령
+    static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_commandType = EffectCommandType::SetTimeScale;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName, timeScale]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetTimeScale(timeScale);
             }
             };
         return cmd;
@@ -66,7 +61,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName, rotation]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetRotation(rotation);
             }
             };
@@ -77,58 +72,10 @@ public:
     static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, timeScale]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
-                effect->SetTimeScale(timeScale);
-            }
-            };
-        return cmd;
-    }
-
-    // 이펙트 루프 설정 명령
-    static EffectManagerProxy CreateSetLoopCommand(const std::string& effectName, bool loop)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, loop]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
-                effect->SetLoop(loop);
-            }
-            };
-        return cmd;
-    }
-
-    // 이펙트 지속시간 설정 명령
-    static EffectManagerProxy CreateSetDurationCommand(const std::string& effectName, float duration)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, duration]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
-                effect->SetDuration(duration);
-            }
-            };
-        return cmd;
-    }
-
-    // 이펙트 일시정지 명령
-    static EffectManagerProxy CreatePauseCommand(const std::string& effectName)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
-                effect->Pause();
-            }
-            };
-        return cmd;
-    }
-
-    // 이펙트 재개 명령
-    static EffectManagerProxy CreateResumeCommand(const std::string& effectName)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = efm->GetEffect(effectName)) {
-                effect->Resume();
-            }
+        cmd.m_commandType = EffectCommandType::CreateEffect;
+        cmd.m_effectName = effectName;
+        cmd.m_executeFunction = [effectName, emitters]() {
+            EffectManagers->RegisterCustomEffect(effectName, emitters);
             };
         return cmd;
     }
@@ -138,7 +85,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [effectName]() {
-            efm->RemoveEffect(effectName);
+            EffectManagers->RemoveEffect(effectName);
             };
         return cmd;
     }
@@ -161,7 +108,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [templateName, instanceName]() {
-            efm->CreateEffectInstance(templateName, instanceName);
+            EffectManagers->CreateEffectInstance(templateName, instanceName);
             };
         return cmd;
     }

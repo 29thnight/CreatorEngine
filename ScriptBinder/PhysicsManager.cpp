@@ -481,6 +481,7 @@ void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 	{
 		auto ID = box->GetBoxInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
+		Physics->DestroyActor(ID);
 	}
 }
 
@@ -491,6 +492,7 @@ void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 	{
 		auto ID = sphere->GetSphereInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
+		Physics->DestroyActor(ID);
 	}
 }
 
@@ -501,6 +503,7 @@ void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 	{
 		auto ID = capsule->GetCapsuleInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
+		Physics->DestroyActor(ID);
 	}
 }
 
@@ -511,6 +514,7 @@ void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 	{
 		auto ID = mesh->GetMeshInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
+		Physics->DestroyActor(ID);
 	}
 }
 
@@ -521,6 +525,7 @@ void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 	{
 		auto ID = controller->GetControllerInfo().id;
 		Container[ID].bIsDestroyed = true;
+		Physics->RemoveCCT(ID);
 	}
 }
 
@@ -531,6 +536,7 @@ void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 	{
 		auto ID = terrain->GetColliderID();
 		Container[ID].bIsDestroyed = true;
+		Physics->DestroyActor(ID);
 	}
 }
 

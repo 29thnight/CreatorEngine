@@ -1499,6 +1499,7 @@ void HotLoadSystem::Compile()
 			auto script = std::dynamic_pointer_cast<ModuleBehavior>(gameObject->m_components[index]);
 			if (nullptr != script)
 			{
+				script->OnDestroy();
 				// 스크립트 재 컴파일 할 경우 복원할 이전 값 직렬화
 				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
 				auto& type = script->ScriptReflect();
@@ -1700,6 +1701,14 @@ void HotLoadSystem::Compile()
 
 	m_setPhysxFunc = reinterpret_cast<SetPhysxFunc>(GetProcAddress(hDll, "SetPhysics"));
 	if (!m_setPhysxFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	m_setObjectAllocFunc = reinterpret_cast<SetObjectAllocFunc>(GetProcAddress(hDll, "SetObjectAllocator"));
+	if (!m_setObjectAllocFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");

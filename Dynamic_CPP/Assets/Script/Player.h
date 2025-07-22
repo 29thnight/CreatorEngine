@@ -57,9 +57,9 @@ public:
 	float maxHP = 100;
 	float curHP = maxHP;
 	[[Property]]
-	float ThrowPowerX = 2.0;
+	float ThrowPowerX = 0.0001;
 	[[Property]]
-	float ThrowPowerY = 10.0;
+	float ThrowPowerY = 0.0001;
 	int m_comboCount = 0;            //ÇöÀç ÄÞº¸È½¼ö
 	[[Property]]
 	float m_comboTime = 0.5f;        //ÄÞº¸À¯Áö½Ã°£
@@ -100,9 +100,10 @@ public:
 	std::vector<GameObject*> m_weaponInventory;
 	GameObject* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
-	GameObject* camera = nullptr;
 	GameObject* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
 	Animator* m_animator = nullptr;
+
+	GameObject* camera = nullptr;
 };

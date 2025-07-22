@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "EntityResource.h"
 #include "TestEnemy.h"
 #include "InverseKinematic.h"
 #include "TestTreeBehavior.h"

@@ -6,6 +6,7 @@
 #include "BTConditionDecoratorFactory.h"
 #include "SceneManager.h"
 #include "NodeFactory.h"
+#include "GameObjectPool.h"
 
 extern "C"
 {
@@ -166,11 +167,18 @@ extern "C"
 	{
 		const_cast<std::shared_ptr<PhysicX>&>(Physics) = funcPtr();
 	}
+
+	EXPORT_API void SetObjectAllocator(Singleton<GameObjectPool>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<GameObjectPool>&>(GameObjectPoolInstance) = funcPtr();
+	}
+
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EntityResource", []() { return new EntityResource(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEnemy", []() { return new TestEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("InverseKinematic", []() { return new InverseKinematic(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestTreeBehavior", []() { return new TestTreeBehavior(); });

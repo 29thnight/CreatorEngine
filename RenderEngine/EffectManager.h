@@ -6,12 +6,11 @@ class ParticleSystem;
 class EffectManager : public IRenderPass, public Singleton<EffectManager>
 {
 private:
-	friend class Singleton<EffectManager>;
-
-public:
+	friend class DLLCore::Singleton<EffectManager>;
 	EffectManager() = default;
 	~EffectManager() = default;
 
+public:
 	void Initialize();
 
 	virtual void Execute(RenderScene& scene, Camera& camera);
@@ -39,7 +38,7 @@ private:
 	ComPtr<ID3D11Buffer> m_InstanceBuffer;
 	ComPtr<ID3D11Buffer> m_ModelBuffer;			// world view projÀü¿ë
 	
-	static std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
+	std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
 };
 
-static inline auto& efm = EffectManager::GetInstance();
+static inline auto EffectManagers = EffectManager::GetInstance();

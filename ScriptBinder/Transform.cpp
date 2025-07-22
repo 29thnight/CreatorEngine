@@ -104,10 +104,10 @@ Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 {
 	// TODO: 여기에 return 문을 삽입합니다.
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetPosition(pos);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
 		Mathf::Vector3 newLocalposition = XMVector3TransformCoord(pos, parentWorldInverse);
@@ -117,10 +117,10 @@ Transform& Transform::SetWorldPosition(Mathf::Vector3 pos)
 
 Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 {
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetRotation(quaternion);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		Mathf::Quaternion parentWorldQua = parent->m_transform.GetWorldQuaternion();
 		Mathf::Quaternion parentWorldInverse = XMQuaternionInverse(parentWorldQua);
 		Mathf::Quaternion newLocalrotation = XMQuaternionMultiply(parentWorldInverse, quaternion);
@@ -130,14 +130,14 @@ Transform& Transform::SetWorldRotation(Mathf::Quaternion quaternion)
 
 Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 {
-	if (m_parentID == 0)
+	if (m_owner->m_parentIndex == 0)
 		return SetScale(scale);
 	else {
-		auto parent = GameObject::FindIndex(m_parentID);
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMat = parent->m_transform.GetWorldMatrix();
 		XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorldMat);
 		Mathf::Vector3 newLocalscale = XMVector3TransformCoord(scale, parentWorldInverse);
-		return SetPosition(newLocalscale);
+		return SetScale(newLocalscale);
 	}
 }
 
@@ -177,8 +177,8 @@ void Transform::UpdateLocalMatrix()
 
 Mathf::xMatrix Transform::UpdateWorldMatrix()
 {
-	if (m_parentID != 0) {
-		auto parent = GameObject::FindIndex(m_parentID);
+	if (m_owner->m_parentIndex != 0) {
+		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();
 		XMMATRIX worldMatrix = XMMatrixMultiply(m_localMatrix, parentWorldMatrix);
@@ -212,6 +212,12 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	m_localMatrix = matrix;
 	DirectX::XMMatrixDecompose(&_scale, &_rotation, &_position, m_localMatrix);
 
+	/*if (std::isnan(_scale.m128_f32[0]) || std::isnan(_scale.m128_f32[1]) || std::isnan(_scale.m128_f32[2]) ||
+		std::isnan(_rotation.m128_f32[0]) || std::isnan(_rotation.m128_f32[1]) || std::isnan(_rotation.m128_f32[2]) ||
+		std::isnan(_position.m128_f32[0]) || std::isnan(_position.m128_f32[1]) || std::isnan(_position.m128_f32[2])) {
+		std::cout << "Nan transform" << std::endl;
+	}*/
+
 	XMStoreFloat4(&position, _position);
 	XMStoreFloat4(&scale, _scale);
 	XMStoreFloat4(&rotation, DirectX::XMVector4Normalize(_rotation));
@@ -228,19 +234,18 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 	XMMatrixDecompose(&m_worldScale, &m_worldQuaternion, &m_worldPosition, m_worldMatrix);
 	m_worldQuaternion = DirectX::XMVector4Normalize(m_worldQuaternion);
 
-	GameObject* parentObject = GameObject::FindIndex(m_parentID);
+	GameObject* parentObject = GameObject::FindIndex(m_owner->m_parentIndex);
 	if (!parentObject)
 	{
 		m_parentID = m_owner->m_parentIndex;
 		parentObject = GameObject::FindIndex(m_parentID);
 	}
-	
+
 	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
 	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
-	XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
-	m_localMatrix = newLocalMatrix;
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(matrix, parentWorldInverse);
 
-	SetLocalMatrix(m_localMatrix);
+	SetLocalMatrix(newLocalMatrix);
 }
 
 Mathf::xVector Transform::GetWorldPosition() const
@@ -265,6 +270,20 @@ Mathf::Vector3 Transform::GetForward()
 	return forward;
 }
 
+Mathf::Vector3 Transform::GetRight()
+{
+	auto right = Mathf::Vector3::TransformNormal(Mathf::Vector3::Right, GetWorldMatrix());
+	right.Normalize();
+	return right;
+}
+
+Mathf::Vector3 Transform::GetUp()
+{
+	auto up = Mathf::Vector3::TransformNormal(Mathf::Vector3::Up, GetWorldMatrix());
+	up.Normalize();
+	return up;
+}
+
 void Transform::SetDirty()
 {
 	m_dirty = true;
@@ -277,7 +296,21 @@ bool Transform::IsDirty() const
 
 void Transform::SetParentID(uint32 id)
 {
+	XMMATRIX oldWorld = GetWorldMatrix();
 	m_parentID = id;
+
+	XMMATRIX parentWorldMatrix = XMMatrixIdentity();
+	if (m_parentID != 0)
+	{
+		if (auto parent = GameObject::FindIndex(m_parentID))
+		{
+			parentWorldMatrix = parent->m_transform.GetWorldMatrix();
+		}
+	}
+
+	XMMATRIX parentInverse = XMMatrixInverse(nullptr, parentWorldMatrix);
+	XMMATRIX newLocal = XMMatrixMultiply(oldWorld, parentInverse);
+	SetDirty();
 }
 
 void Transform::TransformReset()

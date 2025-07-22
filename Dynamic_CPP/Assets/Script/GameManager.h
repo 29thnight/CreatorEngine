@@ -30,6 +30,8 @@ public:
 	void PushEntity(Entity* entity);
 	const std::vector<Entity*>& GetEntities();
 
+	std::vector<Entity*>& GetResourcePool();
+	std::vector<Entity*>& GetWeaponPiecePool();
 private:
 	std::vector<Entity*> m_entities;
 	ActionMap* playerMap{ nullptr };

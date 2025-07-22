@@ -23,15 +23,16 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     }
 
     // Parent is not a bone recorded
-    Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
+    Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixTranspose(XMMATRIX(&root->mTransformation.a1)));
+    //Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
     m_bones.push_back(parent);
 
     skeleton->m_rootBone = parent;
     ProcessBones(boneRoot, parent);
     skeleton->m_bones = std::move(m_bones);
-    skeleton->m_rootTransform = XMMATRIX(&boneRoot->mTransformation.a1);
+    skeleton->m_rootTransform = XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1));
 
-    skeleton->m_globalInverseTransform = XMMatrixInverse(NULL, XMMATRIX(&boneRoot->mTransformation.a1));
+    skeleton->m_globalInverseTransform = XMMatrixInverse(NULL, XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1)));
 
     LoadAnimations(skeleton);
     return skeleton;

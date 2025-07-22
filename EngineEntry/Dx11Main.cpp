@@ -18,8 +18,9 @@
 #include "InputActionManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
-
+#include "EffectManager.h"
 #include "AIManager.h"
+#include "EffectProxyController.h"
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -123,6 +124,8 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
 	PhysicsManagers->Initialize();
+    EffectManager::GetInstance();
+    EffectProxyController::GetInstance();
 	//LuaEngine::Get().Initialize();
 
 
@@ -177,7 +180,8 @@ DirectX11::Dx11Main::~Dx11Main()
     isGameToRender = false;
 	m_deviceResources->RegisterDeviceNotify(nullptr);
     SceneManagers->Decommissioning();
-
+    EffectManager::Destroy();
+	EffectProxyController::Destroy();
     PROFILER_SHUTDOWN();
 }
 //test code

@@ -119,7 +119,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -142,7 +142,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;$(ProjectDir)Interfaces\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(ProjectDir)Effect\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -170,8 +170,8 @@
     <ClCompile Include="EffectBase.cpp" />
     <ClCompile Include="EffectEditor.cpp" />
     <ClCompile Include="EffectManager.cpp" />
-    <ClCompile Include="EffectManagerProxy.cpp" />
     <ClCompile Include="EffectProxyController.cpp" />
+    <ClCompile Include="EffectRenderProxy.cpp" />
     <ClCompile Include="EffectSerializer.cpp" />
     <ClCompile Include="LODGroup.cpp" />
     <ClCompile Include="LODSetting.cpp" />
@@ -257,10 +257,12 @@
     <ClInclude Include="DeferredPassSetting.h" />
     <ClInclude Include="EaseInOut.h" />
     <ClInclude Include="EffectBase.h" />
+    <ClInclude Include="EffectCommandType.h" />
     <ClInclude Include="EffectEditor.h" />
     <ClInclude Include="EffectManager.h" />
     <ClInclude Include="EffectManagerProxy.h" />
     <ClInclude Include="EffectProxyController.h" />
+    <ClInclude Include="EffectRenderProxy.h" />
     <ClInclude Include="EffectSerializer.h" />
     <ClInclude Include="LODGroup.h" />
     <ClInclude Include="LODSetting.h" />
