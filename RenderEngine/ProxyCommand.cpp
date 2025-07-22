@@ -98,23 +98,22 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 			proxyObject->m_materialGuid = originMatGuid;
 		}
 	};
-
-ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
-        m_proxyGUID(pComponent->GetInstanceID())
-{
-        auto renderScene = SceneManagers->GetRenderScene();
-        auto owner = pComponent->GetOwner();
-        if(!owner) return;
-        Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
-        Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
-        auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
-        m_updateFunction = [=]()
-        {
-                proxyObject->m_worldMatrix = worldMatrix;
-                proxyObject->m_worldPosition = worldPosition;
-        };
 }
 
+ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
+	m_proxyGUID(pComponent->GetInstanceID())
+{
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!owner) return;
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	m_updateFunction = [=]()
+		{
+			proxyObject->m_worldMatrix = worldMatrix;
+			proxyObject->m_worldPosition = worldPosition;
+		};
 }
 
 ProxyCommand::ProxyCommand(const ProxyCommand& other) :

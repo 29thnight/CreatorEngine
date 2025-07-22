@@ -147,7 +147,7 @@
 			<PrecompiledHeader>NotUsing</PrecompiledHeader>
 			<PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
 			<LanguageStandard>stdcpp20</LanguageStandard>
-			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>../EngineEntry\;../Fmod\inc\;../ImGuiHelper\;../RenderEngine\;../ScriptBinder\;../ManagedHeap\ManagedHeap\;../SingletonManager\SingletonManager\;../Utility_Framework\;$(SolutionDir);$(SolutionDir)Assets\Script\;$(SolutionDir)Assets\BehaviorTree\Action\;$(SolutionDir)Assets\BehaviorTree\Condition\;$(SolutionDir)Assets\BehaviorTree\ConditionDecorator\</AdditionalIncludeDirectories>
 			<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<MultiProcessorCompilation>true</MultiProcessorCompilation>
 		</ClCompile>

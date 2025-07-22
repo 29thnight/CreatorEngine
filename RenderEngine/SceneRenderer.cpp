@@ -569,7 +569,6 @@ void SceneRenderer::SceneRendering()
 		
 		if (m_pEditorCamera.get() != camera)
 		{
-
 			//VolumetricFog or VolumetricLight
 			PROFILE_CPU_BEGIN("VolumetricFogPass");
 			DirectX11::BeginEvent(L"VolumetricFogPass");

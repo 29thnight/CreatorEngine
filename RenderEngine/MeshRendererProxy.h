@@ -26,7 +26,7 @@ class PrimitiveRenderProxy
 {
 public:
 	PrimitiveRenderProxy(MeshRenderer* component);
-        PrimitiveRenderProxy(FoliageComponent* component);
+    PrimitiveRenderProxy(FoliageComponent* component);
 	PrimitiveRenderProxy(TerrainComponent* component);
 	~PrimitiveRenderProxy();
 
@@ -54,7 +54,6 @@ public:
 	void GenerateLODGroup();
 
 public:
-	//°øÅë
 	PrimitiveProxyType	m_proxyType{ PrimitiveProxyType::MeshRenderer };
 	Mathf::Vector3		m_worldPosition{ 0.0f, 0.0f, 0.0f };
 	Mathf::xMatrix		m_worldMatrix{ XMMatrixIdentity() };

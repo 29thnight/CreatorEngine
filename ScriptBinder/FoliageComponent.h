@@ -44,6 +44,7 @@ public:
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }
 
 private:
+    [[Property]]
     FileGuid m_foliageAssetGuid{};
     std::vector<FoliageType> m_foliageTypes{};
     std::vector<FoliageInstance> m_foliageInstances{};

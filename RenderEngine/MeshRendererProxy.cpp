@@ -3,6 +3,7 @@
 #include "Mesh.h"
 #include "RenderScene.h"
 #include "Material.h"
+#include "FoliageComponent.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
 #include "Terrain.h"
@@ -49,7 +50,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     }
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) : 
+PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
     m_terrainMaterial(component->GetMaterial()),
     m_terrainMesh(component->GetMesh()),
     m_isSkinnedMesh(false),
@@ -62,6 +63,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
         //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
+}
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
     m_isSkinnedMesh(false),
@@ -70,15 +72,6 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
 {
     m_instancedID = component->GetInstanceID();
     m_proxyType = PrimitiveProxyType::FoliageComponent;
-}
-
-    if (!m_isSkinnedMesh)
-    {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
-        //CullingManagers->Insert(this);
-
-        m_isNeedUpdateCulling = true;
-    }
 }
 
 PrimitiveRenderProxy::~PrimitiveRenderProxy()
