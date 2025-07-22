@@ -64,9 +64,9 @@ void Player::Start()
 
 
 	//m_animator = player->GetComponent<Animator>();
-	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	righthand->DetachAllObject();
-	righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.015f, 0.015f, 0.015f);
+	//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	//righthand->DetachAllObject();
+	//righthand->m_offset = Mathf::Matrix::CreateTranslation(0.f,0.f,0.f) * Mathf::Matrix::CreateScale(0.015f, 0.015f, 0.015f);
 	
 	player->m_collisionType = 2;
 	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard,
@@ -183,10 +183,13 @@ void Player::Update(float tick)
 
 void Player::OnDestroy()
 {
-	for (auto& socket : m_animator->m_Skeleton->m_sockets)
+	/*if (m_animator)
 	{
-		m_animator->m_Skeleton->DeleteSocket(socket->m_name);
-	}
+		for (auto& socket : m_animator->m_Skeleton->m_sockets)
+		{
+			m_animator->m_Skeleton->DeleteSocket(socket->m_name);
+		}
+	}*/
 	
 
 }
@@ -203,6 +206,17 @@ void Player::Move(Mathf::Vector2 dir)
 
 	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + -dir.y * Vector2(forward.x, forward.z);
 	moveDir.Normalize();
+
+	/*if (dir.Length() > 0.00001f)
+	{
+		m_animator->SetParameter("OnMove", true);
+	}
+	else
+	{
+		m_animator->SetParameter("OnMove", false);
+	}*/
+
+
 
 	controller->Move(moveDir);
 	if (controller->IsOnMove())
@@ -240,6 +254,7 @@ void Player::Catch()
 		//righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 		rigidbody->SetBodyType(EBodyType::STATIC);
+		
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
 		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
@@ -250,9 +265,9 @@ void Player::Catch()
 
 void Player::Throw()
 {
-	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	righthand->DetachObject(catchedObject);
-	auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
+	//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	//righthand->DetachObject(catchedObject);
+	//auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
 	//rigidbody->SetBodyType(EBodyType::DYNAMIC);
 	//auto& transform = GetOwner()->m_transform;
 	//auto forward  = transform.GetForward();
@@ -409,8 +424,8 @@ void Player::AddWeapon(GameObject* weapon)
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
 	m_curWeapon->SetEnabled(true);
-	Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	righthand->AttachObject(m_curWeapon);
+	//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+	//righthand->AttachObject(m_curWeapon);
 	
 }
 
@@ -425,8 +440,8 @@ void Player::DeleteCurWeapon()
 	{
 		m_weaponInventory.erase(it);
 		m_curWeapon->SetEnabled(false);
-		Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-		righthand->DetachAllObject();
+		//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
+		//righthand->DetachAllObject();
 		m_curWeapon = nullptr;    
 	}
 }

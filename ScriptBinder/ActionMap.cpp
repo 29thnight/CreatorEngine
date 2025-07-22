@@ -153,6 +153,7 @@ void ActionMap::CheckAction()
 	{
 		if (action->actionType == ActionType::Button)
 		{
+			if (action->key.size() == 0) continue;
 			switch (action->inputType)
 			{
 			case InputType::KeyBoard:
