@@ -26,17 +26,19 @@ private:
     MemoryPool<GameObject, 4096> m_pool;
 };
 
+static auto& GameObjectPoolInstance = GameObjectPool::GetInstance();
+
 namespace ObjectPool
 {
     template<typename T, typename... Args>
     T* Allocate(Args&&... args)
     {
-        return GameObjectPool::GetInstance()->GameObjectAllocate<T>(std::forward<Args>(args)...);
+        return GameObjectPoolInstance->GameObjectAllocate<T>(std::forward<Args>(args)...);
     }
 
     template<typename T>
     void Deallocate(T * obj)
     {
-        GameObjectPool::GetInstance()->GameObjectDeallocate(obj);
+        GameObjectPoolInstance->GameObjectDeallocate(obj);
     }
 }

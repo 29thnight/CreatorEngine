@@ -191,3 +191,4 @@ protected:
 	bool m_usingBufferA = true; // 현재 A 버퍼를 입력으로 사용 중인지 여부
 };
 
+using EmitterContainer = std::vector<std::shared_ptr<ParticleSystem>>;

@@ -34,7 +34,7 @@ void EffectComponent::Update(float tick)
         {
             m_currentTime = 0.0f;
             auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-            EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
+            EffectCommandQueue->PushEffectCommand(std::move(playCommand));
         }
     }
 
@@ -53,7 +53,7 @@ void EffectComponent::Update(float tick)
         if (posDistance > 0.001f)
         {
             auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-            EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
+            EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
             m_lastPosition = currentPos;
         }
 
@@ -61,7 +61,7 @@ void EffectComponent::Update(float tick)
         if (rotDistance > 0.001f)
         {
             auto rotationCommand = EffectManagerProxy::CreateSetRotationCommand(m_effectInstanceName, currentRot);
-            EffectProxyController::GetInstance()->PushEffectCommand(std::move(rotationCommand));
+            EffectCommandQueue->PushEffectCommand(std::move(rotationCommand));
             m_lastRotation = currentRot;
         }
     }
@@ -99,19 +99,19 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
 
     // 템플릿에서 인스턴스 생성
     auto createCommand = EffectManagerProxy::CreateEffectInstanceCommand(effectName, m_effectInstanceName);
-    EffectProxyController::GetInstance()->PushEffectCommand(std::move(createCommand));
+    EffectCommandQueue->PushEffectCommand(std::move(createCommand));
 
     // 이펙트 설정 적용
     ApplyEffectSettings();
 
     // 이펙트 재생
     auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-    EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
+    EffectCommandQueue->PushEffectCommand(std::move(playCommand));
 
     // 위치 설정
     auto currentPos = GetOwner()->m_transform.GetWorldPosition();
     auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-    EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
+    EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
 
     m_lastPosition = currentPos;
     m_isPlaying = true;
@@ -137,7 +137,7 @@ void EffectComponent::StopEffect()
     if (!m_effectInstanceName.empty() && m_isPlaying)
     {
         auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(stopCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(stopCommand));
         m_isPlaying = false;
         m_currentTime = 0.0f;
     }
@@ -148,7 +148,7 @@ void EffectComponent::PauseEffect()
     if (!m_effectInstanceName.empty() && m_isPlaying && !m_isPaused)
     {
         auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(stopCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(stopCommand));
         m_isPaused = true;
     }
 }
@@ -158,7 +158,7 @@ void EffectComponent::ResumeEffect()
     if (!m_effectInstanceName.empty() && m_isPlaying && m_isPaused)
     {
         auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(playCommand));
         m_isPaused = false;
     }
 }
@@ -168,7 +168,7 @@ void EffectComponent::DestroyCurrentEffect()
     if (!m_effectInstanceName.empty())
     {
         auto removeCommand = EffectManagerProxy::CreateRemoveEffectCommand(m_effectInstanceName);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(removeCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(removeCommand));
         m_effectInstanceName.clear();
         m_isPlaying = false;
         m_isPaused = false;
@@ -181,11 +181,11 @@ void EffectComponent::ApplyEffectSettings()
     if (!m_effectInstanceName.empty())
     {
         auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, m_timeScale);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(timeScaleCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(timeScaleCommand));
 
         // 이펙트 기준점을 컴포넌트 위치로 설정
         auto currentPos = GetOwner()->m_transform.GetWorldPosition();
         auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-        EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
+        EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
     }
 }

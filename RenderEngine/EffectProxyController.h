@@ -3,7 +3,7 @@
 #include "EffectManagerProxy.h"
 #include "concurrent_queue.h"
 
-class EffectProxyController: public Singleton<EffectProxyController>
+class EffectProxyController: public DLLCore::Singleton<EffectProxyController>
 {
 private:
 	friend class Singleton;
@@ -67,4 +67,4 @@ private:
 	std::atomic_ullong m_frame{};
 };
 
-static auto& EffectCommandQueue = EffectProxyController::GetInstance();
+static auto EffectCommandQueue = EffectProxyController::GetInstance();

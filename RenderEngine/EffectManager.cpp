@@ -6,8 +6,6 @@
 
 namespace ed = ax::NodeEditor;
 
-std::unordered_map<std::string, std::unique_ptr<EffectBase>> EffectManager::effects;
-
 void EffectManager::Initialize()
 {
 

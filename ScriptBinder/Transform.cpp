@@ -234,6 +234,13 @@ void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix)
 		m_parentID = m_owner->m_parentIndex;
 		parentObject = GameObject::FindIndex(m_parentID);
 	}
+
+	XMMATRIX parentMat = parentObject->m_transform.GetWorldMatrix();
+	XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentMat);
+	XMMATRIX newLocalMatrix = XMMatrixMultiply(parentWorldInverse, matrix);
+	m_localMatrix = newLocalMatrix;
+
+	SetLocalMatrix(m_localMatrix);
 }
 
 Mathf::xVector Transform::GetWorldPosition() const

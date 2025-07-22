@@ -21,36 +21,33 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2584186c-912c-4e2f-a8a3-f79a22591bca}</ProjectGuid>
-    <RootNamespace>Physics</RootNamespace>
+    <ProjectGuid>{a5de002c-1670-418c-b843-49eec7e51c38}</ProjectGuid>
+    <RootNamespace>SingletonManager</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <CudaToolkitCustomDir>
-    </CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseDynamicDebugging>false</UseDynamicDebugging>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -59,7 +56,6 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -76,11 +72,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PublicIncludeDirectories>
-    </PublicIncludeDirectories>
-    <AllProjectBMIsArePublic>false</AllProjectBMIsArePublic>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
   </PropertyGroup>
@@ -88,15 +79,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;SINGLETONMANAGER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
-      <SubSystem>
-      </SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -105,139 +96,70 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;SINGLETONMANAGER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
-      <SubSystem>
-      </SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SINGLETONMANAGER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
-      <SubSystem>
-      </SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
     </Link>
-    <Lib>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)$(CudaToolkitLibDir);</AdditionalLibraryDirectories>
-    </Lib>
-    <CudaLink>
-      <AdditionalDependencies>
-      </AdditionalDependencies>
-    </CudaLink>
-    <CudaCompile>
-      <Include>
-      </Include>
-      <AdditionalDeps>
-      </AdditionalDeps>
-      <CudaRuntime>Static</CudaRuntime>
-      <AdditionalOptions>-std=c++20 %(AdditionalOptions)</AdditionalOptions>
-    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SINGLETONMANAGER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)ImGuiHelper\;$(SolutionDir)ScriptBinder\;$(SolutionDir)Utility_Framework\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinFilesInUnityFile>5</MinFilesInUnityFile>
-      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
-      <SubSystem>
-      </SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CharacterController.h" />
-    <ClInclude Include="CharacterMovement.h" />
-    <ClInclude Include="ColliderDebugData.h" />
-    <ClInclude Include="ConvexMeshResource.h" />
-    <ClInclude Include="DynamicRigidBody.h" />
+    <ClInclude Include="DLLAcrossSingleton.h" />
+    <ClInclude Include="Export.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="HeightFieldResource.h" />
-    <ClInclude Include="ICollider.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="PhysicsCommon.h" />
-    <ClInclude Include="PhysicsDebug.h" />
-    <ClInclude Include="PhysicsEventCallback.h" />
-    <ClInclude Include="PhysicsHelper.h" />
-    <ClInclude Include="Physx.h" />
-    <ClInclude Include="RagdollJoint.h" />
-    <ClInclude Include="RagdollLink.h" />
-    <ClInclude Include="RagdollPhysics.h" />
-    <ClInclude Include="ResourceBase.h" />
-    <ClInclude Include="RigidBody.h" />
-    <ClInclude Include="StaticRigidBody.h" />
-    <ClInclude Include="TriangleMeshResource.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CharacterController.cpp" />
-    <ClCompile Include="CharacterMovement.cpp" />
-    <ClCompile Include="ConvexMeshResource.cpp" />
-    <ClCompile Include="DynamicRigidBody.cpp" />
-    <ClCompile Include="HeightFieldResource.cpp" />
+    <ClCompile Include="DLLAcrossSingleton.cpp" />
+    <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Physics.cpp" />
-    <ClCompile Include="PhysicsDebug.cpp" />
-    <ClCompile Include="PhysicsEventCallback.cpp" />
-    <ClCompile Include="PhysicsHelper.cpp" />
-    <ClCompile Include="Physx.cpp" />
-    <ClCompile Include="RagdollJoint.cpp" />
-    <ClCompile Include="RagdollLink.cpp" />
-    <ClCompile Include="RagdollPhysics.cpp" />
-    <ClCompile Include="ResourceBase.cpp" />
-    <ClCompile Include="RigidBody.cpp" />
-    <ClCompile Include="StaticRigidBody.cpp" />
-    <ClCompile Include="TriangleMeshResource.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
-      <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="PhysicsFlags.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.targets" />
   </ImportGroup>
 </Project>

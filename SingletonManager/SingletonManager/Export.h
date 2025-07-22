@@ -1,0 +1,12 @@
+#pragma once
+
+#ifndef SINGLETON_EXPORTS
+#define SINGLETON_EXPORTS __declspec(dllexport)
+#define SINGLETON_IMPORTS __declspec(dllimport)
+#endif // !SINGLETON_EXPORTS
+
+#ifdef SINGLETONMANAGER_EXPORTS
+#define SINGLETON_API SINGLETON_EXPORTS
+#else
+#define SINGLETON_API SINGLETON_IMPORTS
+#endif // !SINGLETONMANAGER_EXPORTS

@@ -2,8 +2,9 @@
 #include "IRenderPass.h"
 #include "ParticleSystem.h"
 #include "EffectBase.h"
+#include "DLLAcrossSingleton.h"
 
-class EffectManager : public IRenderPass, public Singleton<EffectManager>
+class EffectManager : public IRenderPass, public DLLCore::Singleton<EffectManager>
 {
 private:
 	friend class Singleton<EffectManager>;
@@ -37,7 +38,7 @@ private:
 	ComPtr<ID3D11Buffer> m_InstanceBuffer;
 	ComPtr<ID3D11Buffer> m_ModelBuffer;			// world view projÀü¿ë
 	
-	static std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
+	std::unordered_map<std::string, std::unique_ptr<EffectBase>> effects;
 };
 
-static inline auto& efm = EffectManager::GetInstance();
+static inline auto efm = EffectManager::GetInstance();

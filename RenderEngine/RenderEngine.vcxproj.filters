@@ -276,6 +276,9 @@
     <Filter Include="Shaders\Effect\3D">
       <UniqueIdentifier>{645a5163-93cf-46df-bfd2-10113873934a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\EffectPass\999.Extension">
+      <UniqueIdentifier>{2da88463-c92b-416c-86ed-4776ab989d97}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -511,6 +514,9 @@
     </ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectRenderProxy.cpp">
+      <Filter>RenderPass\EffectPass\999.Extension</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -828,6 +834,12 @@
     </ClInclude>
     <ClInclude Include="ToneMapPassSetting.h">
       <Filter>RenderPass\ToneMapPass</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectRenderProxy.h">
+      <Filter>RenderPass\EffectPass\999.Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectCommandType.h">
+      <Filter>RenderPass\EffectPass\1.Base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -6,6 +6,7 @@
 #include "BTConditionDecoratorFactory.h"
 #include "SceneManager.h"
 #include "NodeFactory.h"
+#include "GameObjectPool.h"
 
 extern "C"
 {
@@ -166,6 +167,12 @@ extern "C"
 	{
 		const_cast<std::shared_ptr<PhysicX>&>(Physics) = funcPtr();
 	}
+
+	EXPORT_API void SetObjectAllocator(Singleton<GameObjectPool>::FGetInstance funcPtr)
+	{
+		const_cast<std::shared_ptr<GameObjectPool>&>(GameObjectPoolInstance) = funcPtr();
+	}
+
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
