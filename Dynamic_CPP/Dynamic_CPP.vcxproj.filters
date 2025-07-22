@@ -165,6 +165,9 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\DamegeAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityResource.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -268,6 +271,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityResource.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

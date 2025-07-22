@@ -31,16 +31,11 @@ public:
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
 private:
-	void Inputblabla(Mathf::Vector2 dir);
-
-private:
-	std::vector<EntityItem*>		m_EntityItemQueue;
+	std::queue<EntityItem*>			m_EntityItemQueue;
 
 	std::vector<GameObject*>		m_fakeItemQueue;
 
-	int								m_EntityItemQueueIndex = 0;
 	int								m_currentEntityItemCount = 0;
-	int								m_currentEntityItemIndex = 0;
 	GameObject* asisTail{ nullptr };
 	GameObject* asisHead{ nullptr };
 	float angle = 0.f;

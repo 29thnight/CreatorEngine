@@ -54,6 +54,10 @@ public:
 	//씬 체인지 시에 씬에 있는 모든 물리엔진 객체 삭제
 	void ChangeScene();
 
+	//개별 엑터 삭제
+	void DestroyActor(unsigned int id);
+
+
 	//충돌 검사를 위한 레이캐스트
 	RayCastOutput RayCast(const RayCastInput& in, bool isStatic = false);
 	RayCastOutput Raycast(const RayCastInput& in);
@@ -86,8 +90,9 @@ public:
 	RigidBody* GetRigidBody(const unsigned int& id);
 	//수정
 	void SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData); //&&&&& RigidBodyGetSetData const 지웠음sehwan
-	//삭제
+	//내부용 삭제
 	void RemoveRigidBody(const unsigned int& id,physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
+	
 	//전체 삭제
 	void RemoveAllRigidBody(physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
 	//==============================================
