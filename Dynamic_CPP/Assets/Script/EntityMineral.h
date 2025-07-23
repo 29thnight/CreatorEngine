@@ -18,5 +18,7 @@ public:
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
-	virtual void OnDestroy() override  {}
+	virtual void OnDestroy() override;
+
+
 };

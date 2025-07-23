@@ -35,6 +35,7 @@ public:
 		newTrans.SetValue(ownerValueName);
 		newTrans.SetCondition(ownerValueName);
 		conditions.push_back(newTrans);
+		
 	}
 
 	void DeleteCondition(int _index);

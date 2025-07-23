@@ -70,6 +70,8 @@ void AniTransition::SetNextState(AnimationState* _nextState)
 
 std::string AniTransition::GetCurState()
 {
+	if (curState == nullptr)
+		return "None";
 	return curState->m_name;
 }
 std::string AniTransition::GetNextState()

@@ -1,10 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Entity.h"
 #include "Player.generated.h"
-
 class Animator;
-class Player : public ModuleBehavior
+class Player : public Entity
 {
 public:
    ReflectPlayer
@@ -67,12 +67,12 @@ public:
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	[[Property]]
-	float m_dashPower = 0.05f; // 대시이동거리
+	float m_dashPower = 5.f; // 대시이동거리
 	float dashGracePeriod = 1.f; //대시 무적시간
 	bool isDashing = false; //대쉬중
 	float m_dashElapsedTime = 0.f;
 	[[Property]]
-	float m_dashTime = 0.5f;
+	float m_dashTime = 0.15f;
 	[[Property]]
 	float dashCooldown = 3.f; //대쉬 쿨타임
 	float m_dashCoolElapsedTime = 0.f; //
@@ -80,7 +80,7 @@ public:
 	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간
 	float m_dubbleDashElapsedTime = 0.f;
 	[[Property]]
-	int   dashAmount = 2;   //최대대시가능 횟수
+	int   dashAmount = 1;   //최대대시가능 횟수
 	int   m_curDashCount = 0;   //지금 연속대시한 횟수
 
 	[[Property]]

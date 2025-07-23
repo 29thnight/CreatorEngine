@@ -15,8 +15,8 @@
 
 #include "EffectComponent.h"
 #include "TestEnemy.h"
-#include "EffectComponent.h"
 #include "BoxColliderComponent.h"
+#include "EntityResource.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -211,13 +211,15 @@ void Player::Move(Mathf::Vector2 dir)
 	{
 		if(m_curWeapon)
 			m_curWeapon->SetEnabled(false);
-		m_animator->SetParameter("OnMove", true);
+		if(m_animator)
+			m_animator->SetParameter("OnMove", true);
 	}
 	else
 	{
 		if (m_curWeapon)
 			m_curWeapon->SetEnabled(true);
-		m_animator->SetParameter("OnMove", false);
+		if (m_animator)
+			m_animator->SetParameter("OnMove", false);
 	}
 	
 }
@@ -329,24 +331,27 @@ void Player::Attack()
 	isCharging = false;
 	m_chargingTime = 0.f;
 
-	auto gg = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
-
-	auto ggg = gg->AddComponent<EffectComponent>();
-	
-	ggg->PlayEffectByName("gumgi2");
 	
 	if (m_comboCount == 0)
 	{
-		/*auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
+		auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
+		auto pos = GetOwner()->m_transform.GetWorldPosition();
+		auto forward2 = GetOwner()->m_transform.GetForward();
+		auto offset{ 2 };
+		auto offset2 = forward2 * offset;
+		pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
+		pos.m128_f32[1] = 1;
+		pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
+		obj->m_transform.SetPosition(pos);
 		if (obj)
 		{
 			auto effect = obj->AddComponent<EffectComponent>();
-			effect->m_effectTemplateName = "gumgi";
 			if (effect)
 			{
-				effect->Apply();
+				effect->m_effectTemplateName = "gg";
+				effect->PlayEffectByName("gg");
 			}
-		}*/
+		}
 		std::vector<HitResult> hits;
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;
@@ -368,6 +373,14 @@ void Player::Attack()
 				
 				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
 			}
+			else if (auto resource = object->GetComponent<EntityResource>())
+			{
+				resource->Attack(this,10);//&&&&&현재 무기의 공격력등으로 수정
+				///mineral->m_currentHP -= 10.f; 
+
+			}
+
+
 			
 		}
 	}

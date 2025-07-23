@@ -36,7 +36,7 @@ void EntityResource::Attack(Entity* sender, int damage)
 					item->GetOwner()->m_transform.SetPosition(spawnPos);
 					item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 10.f, 0.f }, EForceMode::IMPULSE);
 				}
-				GetOwner()->Destroy();
+				//GetOwner()->Destroy();
 			}
 		}
 	}

@@ -901,6 +901,15 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 		{
 			ImGui::Text("Controllers ");
 			ImGui::SameLine();
+			static int selectedControllerIndex = -1;
+			static int preSelectIndex = -1;
+			static int linkIndex = -1;
+			static int ClickNodeIndex = -1;
+			static int targetNodeIndex = -1;
+			static int selectedTransitionIndex = -1;
+			static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+			static int AvatarControllerIndex = -1;
+			static bool showAvatarMaskWindow = false;
 			if (ImGui::Button(ICON_FA_BOX))
 			{
 				showControllersWindow = !showControllersWindow;
@@ -913,28 +922,19 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 
 				bool open = ImGui::Begin("Animation Controllers", &showControllersWindow);
-				int i = 0;
-				static int selectedControllerIndex = -1;
-				static int preSelectIndex = -1;
-				static int linkIndex = -1;
-				static int ClickNodeIndex = -1;
-				static int targetNodeIndex = -1;
-				static int selectedTransitionIndex = -1;
-				static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
-				static int AvatarControllerIndex = -1;
-				static bool showAvatarMaskWindow = false;
+				//int i = 0;
 
 				if (open && ImGui::IsWindowAppearing())
 				{
-					static int selectedControllerIndex = -1;
-					static int preSelectIndex = -1;
-					static int linkIndex = -1;
-					static int ClickNodeIndex = -1;
-					static int targetNodeIndex = -1;
-					static int selectedTransitionIndex = -1;
-					static int preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
-					static int AvatarControllerIndex = -1;
-					static bool showAvatarMaskWindow = false;
+					selectedControllerIndex = -1;
+					preSelectIndex = -1;
+					linkIndex = -1;
+					ClickNodeIndex = -1;
+					targetNodeIndex = -1;
+					selectedTransitionIndex = -1;
+					preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+					AvatarControllerIndex = -1;
+					showAvatarMaskWindow = false;
 				}
 
 				auto& controllers = animator->m_animationControllers;
@@ -968,6 +968,14 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								{  
 									animator->DeleteController(selectedControllerIndex);
 									selectedControllerIndex = -1;
+									preSelectIndex = -1;
+									linkIndex = -1;
+									ClickNodeIndex = -1;
+									targetNodeIndex = -1;
+									selectedTransitionIndex = -1;
+									preInspectorIndex = -1; //ÀÎ½ºÆåÅÍ¿¡¶Ù¿î ÀÎµ¦½º¹øÈ£ 
+									AvatarControllerIndex = -1;
+									showAvatarMaskWindow = false;
 								}
 								ImGui::EndPopup();
 							}
@@ -1158,7 +1166,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 				 NodeEditor* nodeEdtior = nullptr;
 					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Controller Info", ImVec2(1200, 500), false);
+					ImGui::BeginChild("Controller Info", ImVec2(900, 500), false);
 					if(!animator->m_animationControllers.empty() && selectedControllerIndex != -1)
 						controller= animator->m_animationControllers[selectedControllerIndex].get();
 					std::string controllerName;
@@ -1203,6 +1211,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 									controller->m_nodeEditor->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);	
 								}
 							}
+
 							controller->m_nodeEditor->DrawLink(&linkIndex);
 							controller->m_nodeEditor->DrawNode(&ClickNodeIndex);
 							controller->m_nodeEditor->Update();
@@ -1311,146 +1320,153 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 						std::string toNode = controller->m_nodeEditor->Links[linkIndex]->toNode->name;
 						auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
 
-						for (auto& transition : transitions)
+						if (!transitions.empty())
 						{
-							std::string curStateName = transition->GetCurState();
-							std::string nextStateName = transition->GetNextState();
-							std::string transitionName = curStateName + " to " + nextStateName;
-							if (ImGui::Selectable(transitionName.c_str(), true))
+							for (int i = 0; i < transitions.size(); ++i)
 							{
-								selectedTransitionIndex = i;
-							}
+								auto& transition = transitions[i];
+								std::string curStateName = transition->GetCurState();
+								std::string nextStateName = transition->GetNextState();
+								std::string transitionName = curStateName + " to " + nextStateName;
 
-							if (selectedTransitionIndex != -1)
-							{
-								auto& conditions = transition->conditions;
-								ImGui::Separator();
-								ImGui::Checkbox("HasExitTIme", &transition->hasExitTime);
-								ImGui::SliderFloat("ExitTime", &transition->exitTime, 0.1f, 1.0f);
-								ImGui::InputFloat("Transition Duration", &transition->blendTime);
-								ImGui::Separator();
-								ImGui::Separator();
-								ImGui::Text("Conditions");
-								ImGui::Separator();
-								if (conditions.empty())
+								bool isSelected = (selectedTransitionIndex == i);
+								if (ImGui::Selectable(transitions[i]->m_name.c_str(), isSelected))
 								{
-									ImGui::Text("Empty Conditions");
+									selectedTransitionIndex = i;
 								}
-								else
-								{
-									for (int i = 0; i < conditions.size(); ++i)
-									{
-										ImGui::PushID(i);
-										auto& condition = conditions[i];
-										auto parameter = condition.valueParameter;
-										std::string parameterName;
-										if (parameter == nullptr)
-										{
-											parameterName = "NoParameter";
-										}
-										else
-										{
-											parameterName = parameter->name;
-										}
-										auto& compareParameter = condition.CompareParameter;
 
-										if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
-										{
-											ImGui::OpenPopup("ConditionIndexSelect");
-										}
-										ImGui::SameLine();
-										if (parameter != nullptr)
-										{
-											if (parameter->vType != ValueType::Trigger)
-											{
-												if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
-												{
-													ImGui::OpenPopup("ConditionTypeMenu");
-												}
-											}
-											ImGui::SameLine();
-											ImGui::SetNextItemWidth(120);
-											if (parameter->vType == ValueType::Int)
-											{
 
-												ImGui::InputInt("##", &compareParameter.iValue);
-											}
-											else if (parameter->vType == ValueType::Float)
-											{
-												ImGui::InputFloat("##", &compareParameter.fValue);
-											}
-											else if (parameter->vType == ValueType::Bool)
-											{
-												ImGui::Checkbox("##", &compareParameter.bValue);
-											}
-											else if (parameter->vType == ValueType::Trigger)
-											{
-												ImGui::Text("trigger");
-											}
-										}
-										else
-										{
-											ImGui::Text("No Parmeter", ImVec2(70, 0));
-										}
-										if (ImGui::BeginPopup("ConditionIndexSelect"))
-										{
-											for (auto& param : animator->Parameters)
-											{
-												if (ImGui::MenuItem(param->name.c_str()))
-												{
-													condition.SetCondition(param->name);
-												}
-											}
-											ImGui::EndPopup();
-										}
-										if (ImGui::BeginPopup("ConditionTypeMenu"))
-										{
-											if (parameter->vType == ValueType::Int || parameter->vType == ValueType::Float)
-											{
-												if (ImGui::MenuItem("Greater"))
-													condition.SetConditionType(ConditionType::Greater);
-												else if (ImGui::MenuItem("Less"))
-													condition.SetConditionType(ConditionType::Less);
-												else if (ImGui::MenuItem("Equal"))
-													condition.SetConditionType(ConditionType::Equal);
-												else if (ImGui::MenuItem("NotEqual"))
-													condition.SetConditionType(ConditionType::NotEqual);
-											}
-											else if (parameter->vType == ValueType::Bool)
-											{
-												if (ImGui::MenuItem("True"))
-													condition.SetConditionType(ConditionType::True);
-												else if (ImGui::MenuItem("False"))
-													condition.SetConditionType(ConditionType::False);
-											}
-											ImGui::EndPopup();
-										}
-										ImGui::SameLine();
-										if (ImGui::Button("-"))
-										{
-											transition->DeleteCondition(i);
-										}
-										ImGui::PopID();
-									}
-								}
-								if (ImGui::Button("+"))
+								if (selectedTransitionIndex != -1)
 								{
-									if (animator->Parameters.empty())
+									auto& conditions = transition->conditions;
+									ImGui::Separator();
+									ImGui::Checkbox("HasExitTIme", &transition->hasExitTime);
+									ImGui::SliderFloat("ExitTime", &transition->exitTime, 0.1f, 1.0f);
+									ImGui::InputFloat("Transition Duration", &transition->blendTime);
+									ImGui::Separator();
+									ImGui::Separator();
+									ImGui::Text("Conditions");
+									ImGui::Separator();
+									if (conditions.empty())
 									{
+										ImGui::Text("Empty Conditions");
 									}
 									else
 									{
-										auto firstParam = animator->Parameters[0];
-										transition->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
+										for (int i = 0; i < conditions.size(); ++i)
+										{
+											ImGui::PushID(i);
+											auto& condition = conditions[i];
+											auto parameter = condition.valueParameter;
+											std::string parameterName = condition.valueName;
+											if (parameter == nullptr)
+											{
+												parameterName = "NoParameter";
+											}
+											else
+											{
+												parameterName = parameter->name;
+											}
+											auto& compareParameter = condition.CompareParameter;
+
+											if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
+											{
+												ImGui::OpenPopup("ConditionIndexSelect");
+											}
+											ImGui::SameLine();
+											if (parameter != nullptr)
+											{
+												if (parameter->vType != ValueType::Trigger)
+												{
+													if (ImGui::Button(condition.GetConditionType().c_str(), ImVec2(70, 0)))
+													{
+														ImGui::OpenPopup("ConditionTypeMenu");
+													}
+												}
+												ImGui::SameLine();
+												ImGui::SetNextItemWidth(120);
+												if (parameter->vType == ValueType::Int)
+												{
+
+													ImGui::InputInt("##", &compareParameter.iValue);
+												}
+												else if (parameter->vType == ValueType::Float)
+												{
+													ImGui::InputFloat("##", &compareParameter.fValue);
+												}
+												else if (parameter->vType == ValueType::Bool)
+												{
+													ImGui::Checkbox("##", &compareParameter.bValue);
+												}
+												else if (parameter->vType == ValueType::Trigger)
+												{
+													ImGui::Text("trigger");
+												}
+											}
+											else
+											{
+												ImGui::Text("No Parmeter", ImVec2(70, 0));
+											}
+											if (ImGui::BeginPopup("ConditionIndexSelect"))
+											{
+												for (auto& param : animator->Parameters)
+												{
+													if (ImGui::MenuItem(param->name.c_str()))
+													{
+														condition.SetCondition(param->name);
+													}
+												}
+												ImGui::EndPopup();
+											}
+											if (ImGui::BeginPopup("ConditionTypeMenu"))
+											{
+												if (parameter->vType == ValueType::Int || parameter->vType == ValueType::Float)
+												{
+													if (ImGui::MenuItem("Greater"))
+														condition.SetConditionType(ConditionType::Greater);
+													else if (ImGui::MenuItem("Less"))
+														condition.SetConditionType(ConditionType::Less);
+													else if (ImGui::MenuItem("Equal"))
+														condition.SetConditionType(ConditionType::Equal);
+													else if (ImGui::MenuItem("NotEqual"))
+														condition.SetConditionType(ConditionType::NotEqual);
+												}
+												else if (parameter->vType == ValueType::Bool)
+												{
+													if (ImGui::MenuItem("True"))
+														condition.SetConditionType(ConditionType::True);
+													else if (ImGui::MenuItem("False"))
+														condition.SetConditionType(ConditionType::False);
+												}
+												ImGui::EndPopup();
+											}
+											ImGui::SameLine();
+											if (ImGui::Button("-"))
+											{
+												transition->DeleteCondition(i);
+											}
+											ImGui::PopID();
+										}
+									}
+									if (ImGui::Button("+"))
+									{
+										if (animator->Parameters.empty())
+										{
+										}
+										else
+										{
+											auto firstParam = animator->Parameters[0];
+											transition->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
+										}
 									}
 								}
-							}
-							if (ImGui::Button("Delete Transition All"))
-							{
-								linkIndex = -1;
-								selectedTransitionIndex = -1;
-								controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
+								if (ImGui::Button("Delete Transition All"))
+								{
+									linkIndex = -1;
+									selectedTransitionIndex = -1;
+									controller->DeleteTransiton(transition->GetCurState(), transition->GetNextState());
 
+								}
 							}
 						}
 						

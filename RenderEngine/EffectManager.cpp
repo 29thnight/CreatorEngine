@@ -62,7 +62,7 @@ void EffectManager::Update(float delta)
 {
 	for (auto& [key, effect] : effects) {
 		effect->Update(delta);
-		std::cout << effect->GetName();
+		//std::cout << effect->GetName();
 	}
 }
 

@@ -209,9 +209,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 										{
 											TransCondition newcondition;
 											Meta::Deserialize(&newcondition, condition);
+
 											newcondition.m_ownerController = animationController.get();
-											sharedTransition->conditions.push_back(newcondition);
 											newcondition.SetValue(newcondition.valueName);
+											sharedTransition->conditions.push_back(newcondition);
+											
 				
 										}
 									}

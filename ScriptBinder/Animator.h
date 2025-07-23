@@ -52,6 +52,7 @@ public:
     float m_TimeElapsed{};
     [[Property]]
     uint32_t m_AnimIndexChosen{};
+    DirectX::XMMATRIX m_localTransforms[MAX_BONES]{};
     DirectX::XMMATRIX m_FinalTransforms[MAX_BONES]{};
     bool m_isBlend = false;
     float blendT = 0;
@@ -124,6 +125,7 @@ public:
     template<typename T>
     void SetParameter(const std::string valuename, T Value)
     {
+        if (Parameters.empty()) return;
         for (auto& param : Parameters)
         {
             if (param->name == valuename)

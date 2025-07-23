@@ -40,6 +40,7 @@ public:
 	void ClearTree() 
 	{
 		m_root.reset(); // Clear the root node
+		m_built.clear();
 	}
 
 public:

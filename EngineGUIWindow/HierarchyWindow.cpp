@@ -215,8 +215,9 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			}
 			else if (ImGui::TreeNodeEx(SceneIcon.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				for (auto& obj : scene->m_SceneObjects)
+				for (/*auto& obj : scene->m_SceneObjects*/int i = 1; i < scene->m_SceneObjects.size(); ++i)
 				{
+					auto& obj = scene->m_SceneObjects[i];
 					if (!obj || 0 == obj->m_index || obj->m_parentIndex > 0) continue;
 
 					ImGui::PushID((int)&obj);
