@@ -522,9 +522,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		isRelative = true;
 	}
 
-
-
-
 	//.meta -> json 읽기
 
 	std::ifstream ifs(metaPath);
@@ -703,7 +700,6 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath,float 
     
 }
 
-
 void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
 {
 	int w = m_width;
@@ -726,7 +722,6 @@ void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
 		throw std::runtime_error("Failed to save splat map to PNG: " + utf8Path);
 	}
 }
-
 
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out)
 {
@@ -801,6 +796,7 @@ void TerrainComponent::Awake()
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
+		renderScene->RegisterCommand(this);
 	}
 }
 
@@ -811,12 +807,12 @@ void TerrainComponent::OnDestroy()
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
+		renderScene->UnregisterCommand(this);
 	}
 }
 
 void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
 {
-
 	TerrainLayer newLayer;
 	newLayer.m_layerID = m_nextLayerID++;
 	newLayer.tilling = tilling;
@@ -917,8 +913,6 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 		return;
 	}
 
-	
-	
 	// 브러쉬 마스크 텍스쳐 생성
 	{
 		D3D11_TEXTURE2D_DESC desc = {};

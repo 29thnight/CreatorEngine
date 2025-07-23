@@ -39,6 +39,7 @@ public:
 	void GraphToBuild();
 	void ClearTree() 
 	{
+		m_built.clear(); // Clear the built nodes map
 		m_root.reset(); // Clear the root node
 	}
 

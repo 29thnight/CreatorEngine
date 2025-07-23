@@ -15,6 +15,7 @@
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
 class ComponentFactory;
+class ProxyCommand;
 class TerrainComponent : public Component, public IAwakable, public IOnDestroy
 {
 public:
@@ -109,6 +110,8 @@ public:
     std::wstring m_terrainTargetPath{};
 
 private:
+    friend class ProxyCommand;
+
 	uint32 m_terrainID{ 0 }; // 지형 ID
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;

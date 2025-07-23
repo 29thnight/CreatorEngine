@@ -110,8 +110,13 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+
+	if (!proxyObject) return;
+
 	m_updateFunction = [=]()
 	{
+		proxyObject->m_terrainMesh = pComponent->m_pMesh;
+		proxyObject->m_terrainMaterial = pComponent->m_pMaterial;
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 	};

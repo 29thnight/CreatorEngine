@@ -138,13 +138,16 @@ void RenderPassData::ClearRenderTarget()
 
 void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 {
-	PrimitiveProxyType proxyType = proxy->m_proxyType;
+	PrimitiveProxyType	proxyType = proxy->m_proxyType;
+	Material*			mat{ nullptr };
+	Mesh*				mesh{ nullptr };
+	TerrainMaterial*	terrainMat{ nullptr };
 
 	switch (proxyType)
 	{
 	case PrimitiveProxyType::MeshRenderer:
-		Material* mat = proxy->m_Material;
-		Mesh* mesh = proxy->m_Mesh;
+		mat = proxy->m_Material;
+		mesh = proxy->m_Mesh;
 		if (nullptr == mat || nullptr == mesh) {
 			Debug->LogError("Material or Mesh is null in RenderPassData::PushRenderQueue");
 			return;
@@ -164,7 +167,7 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 	case PrimitiveProxyType::FoliageComponent:
 		break;
 	case PrimitiveProxyType::TerrainComponent:
-		TerrainMaterial* terrainMat = proxy->m_terrainMaterial;
+		terrainMat = proxy->m_terrainMaterial;
 		if (terrainMat != nullptr) {
 			// Not assigned RenderingMode.
 			m_terrainQueue.push_back(proxy);
@@ -201,6 +204,7 @@ void RenderPassData::ClearRenderQueue()
 {
 	m_deferredQueue.clear();
 	m_forwardQueue.clear();
+	m_terrainQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)

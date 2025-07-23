@@ -18,6 +18,7 @@
 #include "InputManager.h"
 #include "LightComponent.h"
 #include "CameraComponent.h"
+#include "Terrain.h"
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -866,15 +867,20 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> allMeshes = m_currentScene->GetMeshRenderers();
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
-
-	m_threadPool->Enqueue([renderScene, allMeshes, m_currentScene]
+	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
+	
+	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, m_currentScene]
 	{
+		for (auto& terrain : terrainComponents)
+		{
+			renderScene->UpdateCommand(terrain);
+		}
+
 		for (auto& mesh : allMeshes)
 		{
 			renderScene->UpdateCommand(mesh);
 		}
 	});
-
 
 	EffectProxyController::GetInstance()->PrepareCommandBehavior();
 	//for (auto& mesh : staticMeshes)
@@ -895,7 +901,7 @@ void SceneRenderer::PrepareRender()
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-		m_threadPool->Enqueue([camera, allMeshes, data, staticMeshes, skinnedMeshes, renderScene]
+		m_threadPool->Enqueue([camera, allMeshes, data, terrainComponents, staticMeshes, skinnedMeshes, renderScene]
 		{
 			for (auto& mesh : allMeshes)
 			{
@@ -923,6 +929,18 @@ void SceneRenderer::PrepareRender()
 				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 				{
 					data->PushCullData(skinnedMesh->GetInstanceID());
+				}
+			}
+
+			for (auto& terrainComponent : terrainComponents)
+			{
+				if (terrainComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
+					if(proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
 				}
 			}
 

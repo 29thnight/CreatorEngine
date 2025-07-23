@@ -63,6 +63,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
         //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
+    m_proxyType = PrimitiveProxyType::TerrainComponent;
 }
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
