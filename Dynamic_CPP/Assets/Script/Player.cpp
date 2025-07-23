@@ -15,6 +15,7 @@
 
 #include "EffectComponent.h"
 #include "TestEnemy.h"
+#include "EffectComponent.h"
 #include "BoxColliderComponent.h"
 void Player::Start()
 {
@@ -341,7 +342,12 @@ void Player::Attack()
 	isCharging = false;
 	m_chargingTime = 0.f;
 
+	auto gg = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
 
+	auto ggg = gg->AddComponent<EffectComponent>();
+	
+	ggg->PlayEffectByName("gumgi2");
+	
 	if (m_comboCount == 0)
 	{
 		auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");

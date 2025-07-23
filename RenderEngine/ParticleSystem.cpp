@@ -147,6 +147,12 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 			continue;
 		}
 	}
+
+	for (auto* renderModule : m_renderModules) {
+		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+			meshModule->SetPolarCenter(finalWorldPosition);
+		}
+	}
 }
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
@@ -432,6 +438,18 @@ ID3D11ShaderResourceView* ParticleSystem::GetCurrentRenderingSRV() const
 	}
 
 	return finalIsBufferA ? m_particleSRV_A : m_particleSRV_B;
+}
+
+void ParticleSystem::SetEffectProgress(float progress)
+{
+	m_effectProgress = progress;
+
+	// 모든 렌더 모듈에 진행률 전달
+	for (auto* renderModule : m_renderModules) {
+		if (auto* meshModule = dynamic_cast<MeshModuleGPU*>(renderModule)) {
+			meshModule->SetEffectProgress(progress);
+		}
+	}
 }
 
 void ParticleSystem::ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule)

@@ -1,8 +1,8 @@
 #pragma once
 #include "IRenderPass.h"
-#include "ParticleSystem.h"
-#include "EffectBase.h"
 #include "DLLAcrossSingleton.h"
+#include "EffectBase.h"
+#include "ParticleSystem.h"
 
 class EffectManager : public IRenderPass, public DLLCore::Singleton<EffectManager>
 {
@@ -28,6 +28,8 @@ public:
 
 	void CreateEffectInstance(const std::string& templateName, const std::string& instanceName);
 
+	// 읽기만 effects에 접근은 오로지 매니저에서만
+	const std::unordered_map<std::string, std::unique_ptr<EffectBase>>& GetEffects() const { return effects; }
 protected:
 	ComPtr<ID3D11Buffer> m_constantBuffer{};
 private:

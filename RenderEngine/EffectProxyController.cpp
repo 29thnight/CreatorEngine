@@ -107,6 +107,12 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 			case EffectCommandType::SetRotation:
 				command = EffectManagerProxy::CreateSetRotationCommand(proxy->GetName(), proxy->GetRotation());
 				break;
+			case EffectCommandType::SetLoop:
+				command = EffectManagerProxy::CreateSetLoopCommand(proxy->GetName(), proxy->GetLoop());
+				break;
+			case EffectCommandType::SetDuration:
+				command = EffectManagerProxy::CreateSetLoopCommand(proxy->GetName(), proxy->GetDuration());
+				break;
 			default:
 				break;
 			}
