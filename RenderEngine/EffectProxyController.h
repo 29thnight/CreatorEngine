@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "EffectManagerProxy.h"
 #include "concurrent_queue.h"
+#include "DLLAcrossSingleton.h"
 
 class EffectRenderProxy;
 class EffectComponent;

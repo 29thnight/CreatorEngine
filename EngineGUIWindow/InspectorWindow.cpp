@@ -709,7 +709,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				if (ImGui::MenuItem("		Remove Component"))
 				{
-					selectedSceneObject->RemoveComponent(selectedComponent);
+					if (selectedComponent) {
+						selectedSceneObject->RemoveComponent(selectedComponent);
+					}
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
 				}
@@ -1535,8 +1537,14 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								}
 							}
 						}
+
+						if (state->Transitions.size() <= selectedTransitionIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
 						if (selectedTransitionIndex != -1)
 						{
+							
 							auto& transition = state->Transitions[selectedTransitionIndex];
 							auto& conditions = transition->conditions;
 							ImGui::Separator();

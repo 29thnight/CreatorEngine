@@ -1830,7 +1830,7 @@ void MenuBarWindow::SHowInputActionMap()
         {
             auto action = InputActionManagers->m_actionMaps[seletedActionMapIndex]->m_actions[seletedActionIndex];
            
-            int floatId = 0;
+            static int floatId = 0;
             if (ImGui::CollapsingHeader("Action Type"))
             {
                 if (ImGui::Button(ActionTypeString(action->actionType).c_str()))
@@ -1905,43 +1905,59 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("LeftKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(1);
-                            if (ImGui::Button("123213"))
+                            if (ImGui::Button("KeyBoard1"))
                             {
+                                ImGui::PopID();
                                 //첫번째키
-                                floatId = 1;
-                                ImGui::OpenPopup("KeyBaordButtonFloat1");
+                                floatId = 0;
+                                ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
-                            ImGui::PopID();
+                            else
+                            {
+                                ImGui::PopID();
+                            }
                             ImGui::Text("RightKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(2);
-                            if (ImGui::Button("KeyBoard"))
+                            if (ImGui::Button("KeyBoard2"))
                             {
+                                ImGui::PopID();
                                 //2번째키
-                                floatId = 2;
-                                ImGui::OpenPopup("KeyBaordButtonFloat2");
+                                floatId = 1;
+                                ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
-                            ImGui::PopID();
+                            else
+                            {
+                                ImGui::PopID();
+                            }
                             ImGui::Text("DownKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(3);
-                            if (ImGui::Button("KeyBoard Key chull"))
+                            if (ImGui::Button("KeyBoard3"))
                             {
-                                //3번째키
-                                floatId = 3;
-                                ImGui::OpenPopup("KeyBaordButtonFloat3");
+                                ImGui::PopID();
+                                //2번째키
+                                floatId = 2;
+                                ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
-                            ImGui::PopID();
+                            else
+                            {
+                                ImGui::PopID();
+                            }
                             ImGui::Text("UpKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(4);
-                            if (ImGui::Button("KeyBoard Key chull"))
+                            if (ImGui::Button("KeyBoard4"))
                             {
-                                //4번째 키
-                                floatId = 4;
-                                ImGui::OpenPopup("KeyBaordButtonFloat4");
+                                ImGui::PopID();
+                                //2번째키
+                                floatId = 3;
+                                ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
-                            ImGui::PopID();
+                            else
+                            {
+                                ImGui::PopID();
+                            }
 
                         }
                         else if (action->inputType == InputType::GamePad)
@@ -1982,7 +1998,7 @@ void MenuBarWindow::SHowInputActionMap()
                 ImGui::EndPopup();
             }
 
-            std::string popupName = "KeyBaordButtonFloat" + floatId;
+            std::string popupName = "KeyBaordButtonFloat";
             if (ImGui::BeginPopup(popupName.c_str()))
             {
                 static int index = 0;
@@ -2009,7 +2025,8 @@ void MenuBarWindow::SHowInputActionMap()
                         break; 
                     if (ImGui::MenuItem(KeyBoardString(keyboradsss[realIndex]).c_str()))
                     {
-
+                        action->key[floatId] = static_cast<size_t>(keyboradsss[realIndex]);
+                        
                     }
                 }
                 ImGui::EndPopup();

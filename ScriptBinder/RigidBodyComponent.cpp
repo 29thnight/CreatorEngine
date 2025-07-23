@@ -20,6 +20,32 @@ void RigidBodyComponent::OnDestroy()
 	}
 }
 
+void RigidBodyComponent::LockLinearXZ()
+{
+	m_isLockLinearX = true;
+	m_isLockLinearZ = true;
+}
+
+void RigidBodyComponent::UnLockLinearXZ()
+{
+	m_isLockLinearX = false;
+	m_isLockLinearZ = false;
+}
+
+void RigidBodyComponent::LockAngularXYZ()
+{
+	m_isLockAngularX = true;
+	m_isLockAngularY = true;
+	m_isLockAngularZ = true;
+}
+
+void RigidBodyComponent::UnLockAngularXYZ()
+{
+	m_isLockAngularX = false;
+	m_isLockAngularY = false;
+	m_isLockAngularZ = false;
+}
+
 void RigidBodyComponent::SetAngularDamping(float _AngularDamping)
 {
 	AngularDamping = _AngularDamping;

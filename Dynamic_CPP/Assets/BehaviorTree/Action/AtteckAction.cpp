@@ -16,14 +16,14 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 			{
 				elapsedTime = 0.0f; // Reset elapsed time after attack
 				//animation->SetParameter("AtteckOn", false); // Reset attack parameter
-				std::cout << "AtteckAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
+				//std::cout << "AtteckAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
 				std::cout << "Attack completed." << std::endl;
 				return NodeStatus::Success; // Attack action completed successfully
 			}
 			else
 			{
 				elapsedTime += deltatime; // Increment elapsed time
-				std::cout << "Attacking... Elapsed time: " << elapsedTime << std::endl;
+				//std::cout << "Attacking... Elapsed time: " << elapsedTime << std::endl;
 				return NodeStatus::Running; // Continue running while attacking
 			}
 			//std::cout << "Atteck action already in progress." << std::endl;

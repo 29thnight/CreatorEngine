@@ -120,6 +120,10 @@ private:
 
     // 각 에미터의 텍스처 선택 인덱스
     std::vector<int> m_emitterTextureSelections;
+
+    float m_effectTimeScale = 1.0f;
+    bool m_effectLoop = true;
+    float m_effectDuration = -1.0f;
 private:
     // UI 렌더링 메서드들
     void RenderMainEditor();
@@ -128,6 +132,7 @@ private:
     void RenderPreviewControls();
     void RenderModifyEmitterEditor();
     void RenderJsonSaveLoadUI();
+    void RenderEffectPlaybackSettings();
 
     // 에미터 생성/편집 관련
     void StartCreateEmitter();

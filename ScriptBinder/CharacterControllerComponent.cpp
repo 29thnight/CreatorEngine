@@ -77,7 +77,7 @@ void CharacterControllerComponent::OnLateUpdate(float fixedDeltaTime)
 	m_movementInfo.maxSpeed = m_fBaseSpeed * m_fFinalMultiplierSpeed;
 	m_movementInfo.acceleration = m_fBaseAcceleration * m_fFinalMultiplierSpeed;
 
-	m_fFinalMultiplierSpeed = 1.0f;
+	//m_fFinalMultiplierSpeed = 1.0f; 
 }
 
 void CharacterControllerComponent::Stun(float stunTime)
@@ -91,9 +91,12 @@ void CharacterControllerComponent::SetKnockBack(float KnockBackPower, float yKno
 {
 	preRotation = m_transform->GetForward();
 	PreSpeed = m_fBaseSpeed;
-	m_fBaseSpeed = KnockBackPower;
+	m_fFinalMultiplierSpeed = KnockBackPower;
+	//m_fBaseSpeed = KnockBackPower;
 	JumpPower = yKnockBackPower;
 	m_isKnockBack = true;
+	
+
 }
 
 
@@ -110,6 +113,7 @@ void CharacterControllerComponent::EndKnockBack()
 	else if (preRotation != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
 		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,1.0f,0.0f }));
 	}
+	m_fFinalMultiplierSpeed = 1.0f;
 
 }
 

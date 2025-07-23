@@ -42,7 +42,7 @@ PxFilterFlags CustomFilterShader(
 		}
 		return PxFilterFlag::eSUPPRESS;
 	}
-	
+
 	/*if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
 	{
 		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
@@ -654,7 +654,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 void PhysicX::CreateStaticBody(const BoxColliderInfo & info, const EColliderType & colliderType)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxBoxGeometry(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z), *material);
+	physx::PxShape* shape = m_physics->createShape(PxBoxGeometry(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 
@@ -670,7 +670,7 @@ void PhysicX::CreateStaticBody(const BoxColliderInfo & info, const EColliderType
 void PhysicX::CreateStaticBody(const SphereColliderInfo & info, const EColliderType & colliderType)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material);
+	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 
@@ -685,7 +685,7 @@ void PhysicX::CreateStaticBody(const SphereColliderInfo & info, const EColliderT
 void PhysicX::CreateStaticBody(const CapsuleColliderInfo & info, const EColliderType & colliderType)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material);
+	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 
@@ -704,7 +704,7 @@ void PhysicX::CreateStaticBody(const ConvexMeshColliderInfo & info, const EColli
 	physx::PxConvexMesh* pxConvexMesh = convexMesh->GetConvexMesh();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material);
+	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 	shape->release();
@@ -716,7 +716,7 @@ void PhysicX::CreateStaticBody(const TriangleMeshColliderInfo & info, const ECol
 	physx::PxTriangleMesh* pxTriangleMesh = triangleMesh->GetTriangleMesh();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material);
+	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 
@@ -729,7 +729,7 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED), *material);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
 	staticBody->SetOffsetRotation(DirectX::SimpleMath::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
@@ -742,7 +742,7 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 void PhysicX::CreateDynamicBody(const BoxColliderInfo & info, const EColliderType & colliderType,  bool isKinematic)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxBoxGeometry(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z), *material);
+	physx::PxShape* shape = m_physics->createShape(PxBoxGeometry(info.boxExtent.x, info.boxExtent.y, info.boxExtent.z), *material, true);
 
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 
@@ -757,7 +757,7 @@ void PhysicX::CreateDynamicBody(const BoxColliderInfo & info, const EColliderTyp
 void PhysicX::CreateDynamicBody(const SphereColliderInfo & info, const EColliderType & colliderType,  bool isKinematic)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material);
+	physx::PxShape* shape = m_physics->createShape(PxSphereGeometry(info.radius), *material, true);
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 	shape->release();
 	if (dynamicBody != nullptr)
@@ -769,7 +769,7 @@ void PhysicX::CreateDynamicBody(const SphereColliderInfo & info, const ECollider
 void PhysicX::CreateDynamicBody(const CapsuleColliderInfo & info, const EColliderType & colliderType,  bool isKinematic)
 {
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material);
+	physx::PxShape* shape = m_physics->createShape(PxCapsuleGeometry(info.radius, info.height), *material, true);
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 	shape->release();
 	if (dynamicBody != nullptr)
@@ -788,7 +788,7 @@ void PhysicX::CreateDynamicBody(const ConvexMeshColliderInfo & info, const EColl
 	physx::PxConvexMesh* pxConvexMesh = convexMesh->GetConvexMesh();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material);
+	physx::PxShape* shape = m_physics->createShape(PxConvexMeshGeometry(pxConvexMesh), *material, true);
 
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 	shape->release();
@@ -800,7 +800,7 @@ void PhysicX::CreateDynamicBody(const TriangleMeshColliderInfo & info, const ECo
 	physx::PxTriangleMesh* pxTriangleMesh = triangleMesh->GetTriangleMesh();
 
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material);
+	physx::PxShape* shape = m_physics->createShape(PxTriangleMeshGeometry(pxTriangleMesh), *material, true);
 
 	shape->setFlag(physx::PxShapeFlag::eSCENE_QUERY_SHAPE,true);
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
@@ -812,7 +812,7 @@ void PhysicX::CreateDynamicBody(const HeightFieldColliderInfo & info, const ECol
 	HeightFieldResource* heightField = new HeightFieldResource(m_physics, info.heightMep, info.numCols, info.numRows);
 	physx::PxHeightField* pxHeightField = heightField->GetHeightField();
 	physx::PxMaterial* material = m_physics->createMaterial(info.colliderInfo.staticFriction, info.colliderInfo.dynamicFriction, info.colliderInfo.restitution);
-	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material);
+	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField), *material, true);
 	DynamicRigidBody* dynamicBody = SettingDynamicBody(shape, info.colliderInfo, colliderType, m_collisionMatrix, isKinematic);
 	shape->release();
 }
@@ -1027,7 +1027,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
 				}
-				else if(rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
+				else if (rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
 				{
 					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
 					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
