@@ -3,6 +3,7 @@
 #include "Mesh.h"
 #include "RenderScene.h"
 #include "Material.h"
+#include "FoliageComponent.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
 #include "Terrain.h"
@@ -49,7 +50,7 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     }
 }
 
-PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) : 
+PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
     m_terrainMaterial(component->GetMaterial()),
     m_terrainMesh(component->GetMesh()),
     m_isSkinnedMesh(false),
@@ -62,14 +63,15 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
         //m_materialGuid = m_Material->m_materialGuid;
         m_instancedID = component->GetInstanceID();
     }
+}
 
-    if (!m_isSkinnedMesh)
-    {
-        //TODO : Change CullingManager Collect Class : MeshRenderer -> PrimitiveRenderProxy
-        //CullingManagers->Insert(this);
-
-        m_isNeedUpdateCulling = true;
-    }
+PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
+    m_isSkinnedMesh(false),
+    m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
+    m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
+{
+    m_instancedID = component->GetInstanceID();
+    m_proxyType = PrimitiveProxyType::FoliageComponent;
 }
 
 PrimitiveRenderProxy::~PrimitiveRenderProxy()
@@ -158,6 +160,10 @@ void PrimitiveRenderProxy::Draw()
         m_terrainMesh->Draw();
         break;
     }
+    case PrimitiveProxyType::FoliageComponent:
+        if (nullptr == m_Mesh) return;
+        m_Mesh->Draw();
+        break;
     default:
         break;
     }
@@ -190,6 +196,12 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
         m_terrainMesh->Draw(_deferredContext);
         break;
     }
+    case PrimitiveProxyType::FoliageComponent:
+    {
+        if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+        m_Mesh->Draw(_deferredContext);
+        break;
+    }
     default:
         break;
     }
@@ -203,7 +215,7 @@ void PrimitiveRenderProxy::DestroyProxy()
 void PrimitiveRenderProxy::GenerateLODGroup()
 {
     if (nullptr == m_Mesh || nullptr == m_Material) return;
-	bool isTerrain = (m_proxyType == PrimitiveProxyType::TerrainComponent);
+	bool isTerrain = (m_proxyType == PrimitiveProxyType::TerrainComponent || m_proxyType == PrimitiveProxyType::FoliageComponent);
 
 	if (isTerrain || m_isSkinnedMesh) return;
     m_EnableLOD = LODSettings::IsLODEnabled();

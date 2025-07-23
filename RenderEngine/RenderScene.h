@@ -29,6 +29,7 @@ class LightController;
 class HierarchyWindow;
 class InspectorWindow;
 class MeshRenderer;
+class FoliageComponent;
 class ProxyCommand;
 class RenderScene
 {
@@ -66,11 +67,17 @@ public:
 	void RegisterAnimator(Animator* animatorPtr);
 	void UnregisterAnimator(Animator* animatorPtr);
 
-	void RegisterCommand(MeshRenderer* meshRendererPtr);
-	bool InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr);
-	void UpdateCommand(MeshRenderer* meshRendererPtr);
-	ProxyCommand MakeProxyCommand(MeshRenderer* meshRendererPtr);
-	void UnregisterCommand(MeshRenderer* meshRendererPtr);
+        void RegisterCommand(MeshRenderer* meshRendererPtr);
+        bool InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr);
+        void UpdateCommand(MeshRenderer* meshRendererPtr);
+        ProxyCommand MakeProxyCommand(MeshRenderer* meshRendererPtr);
+        void UnregisterCommand(MeshRenderer* meshRendererPtr);
+
+        void RegisterCommand(FoliageComponent* foliagePtr);
+        bool InvaildCheckFoliage(FoliageComponent* foliagePtr);
+        void UpdateCommand(FoliageComponent* foliagePtr);
+        ProxyCommand MakeProxyCommand(FoliageComponent* foliagePtr);
+        void UnregisterCommand(FoliageComponent* foliagePtr);
 
 	PrimitiveRenderProxy* FindProxy(size_t guid);
 	Scene* GetScene() { return m_currentScene; }

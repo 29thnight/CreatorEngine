@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "CircleQueue.hpp"
 #include "Entity.h"
 #include "EntityAsis.generated.h"
 
@@ -31,14 +32,14 @@ public:
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
 private:
-	std::queue<EntityItem*>			m_EntityItemQueue;
-
+	CircularQueue<EntityItem*>		m_EntityItemQueue;
 	std::vector<GameObject*>		m_fakeItemQueue;
 
 	int								m_currentEntityItemCount = 0;
 	GameObject* asisTail{ nullptr };
 	GameObject* asisHead{ nullptr };
 	float angle = 0.f;
+	[[Property]]
 	float radius = 5.f;
 	float timer = 0.f;
 	Mathf::Vector2 dir{ 0.f,0.f };

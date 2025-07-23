@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Benchmark.hpp" />
+    <ClInclude Include="CircleQueue.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
     <ClInclude Include="Core.Barrier.h" />

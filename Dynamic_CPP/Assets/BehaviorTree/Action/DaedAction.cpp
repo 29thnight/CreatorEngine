@@ -11,6 +11,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 		std::string state = blackBoard.GetValueAsString("AnimeState");
 		if (state == "Daed")
 		{
+			
 			std::cout << "Daed action already in progress." << std::endl;
 			//return NodeStatus::Running; // Continue running if already in daed state
 		}

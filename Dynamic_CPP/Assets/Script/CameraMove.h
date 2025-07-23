@@ -2,10 +2,10 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-class TestEnemy : public ModuleBehavior
+class CameraMove : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(TestEnemy)
+	MODULE_BEHAVIOR_BODY(CameraMove)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,9 +20,6 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-
-	GameObject* Owner;
-	[[Property]]
-	float maxHP = 100;
-	float curHP = maxHP;
+private:
+	GameObject* asis = nullptr;
 };

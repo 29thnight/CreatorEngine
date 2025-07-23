@@ -520,10 +520,26 @@ void Scene::CollectTerrainComponent(TerrainComponent* ptr)
 
 void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
 {
-	if (ptr)
-	{
-		std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
-	}
+        if (ptr)
+        {
+                std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
+        }
+}
+
+void Scene::CollectFoliageComponent(FoliageComponent* ptr)
+{
+        if (ptr)
+        {
+                m_foliageComponents.push_back(ptr);
+        }
+}
+
+void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
+{
+        if (ptr)
+        {
+                std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
+        }
 }
 
 void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)

@@ -1535,8 +1535,14 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 								}
 							}
 						}
+
+						if (state->Transitions.size() <= selectedTransitionIndex)
+						{
+							selectedTransitionIndex = -1;
+						}
 						if (selectedTransitionIndex != -1)
 						{
+							
 							auto& transition = state->Transitions[selectedTransitionIndex];
 							auto& conditions = transition->conditions;
 							ImGui::Separator();

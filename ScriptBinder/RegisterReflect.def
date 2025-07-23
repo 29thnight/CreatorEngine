@@ -4,8 +4,8 @@
 
 #include "BLackBoardValue.h"
 #include "AssetEntry.h"
-#include "TerrainCollider.h"
 #include "CameraComponent.h"
+#include "TerrainCollider.h"
 #include "Animation.h"
 #include "TextComponent.h"
 #include "RenderPassSettings.h"
@@ -13,9 +13,8 @@
 #include "RigidBodyComponent.h"
 #include "SSGIPassSetting.h"
 #include "Camera.h"
-#include "UIComponent.h"
-#include "MaterialFlowInformation.h"
 #include "AAPassSetting.h"
+#include "MaterialFlowInformation.h"
 #include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
@@ -31,8 +30,8 @@
 #include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
-#include "StateMachineComponent.h"
 #include "AniTransition.h"
+#include "StateMachineComponent.h"
 #include "SSAOPassSetting.h"
 #include "VignettePassSetting.h"
 #include "ActionMap.h"
@@ -43,8 +42,8 @@
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
 #include "BoxColliderComponent.h"
-#include "SphereColliderComponent.h"
 #include "BTBuildGraph.h"
+#include "SphereColliderComponent.h"
 #include "Canvas.h"
 #include "BTBuildNode.h"
 #include "CharacterControllerComponent.h"
@@ -53,12 +52,13 @@
 #include "ConditionParameter.h"
 #include "Scene.h"
 #include "EffectComponent.h"
+#include "MeshCollider.h"
+#include "RagdollComponent.h"
+#include "FoliageComponent.h"
 #include "GameObject.h"
 #include "InputAction.h"
 #include "LightComponent.h"
 #include "LightMapping.h"
-#include "RagdollComponent.h"
-#include "MeshCollider.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
 #include "PlayerInput.h"
@@ -66,6 +66,7 @@
 #include "Prefab.h"
 #include "Terrain.h"
 #include "TransCondition.h"
+#include "UIComponent.h"
 
 REFLECTION_REGISTER()
 {
@@ -96,6 +97,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(ConditionParameter);
     AUTO_REGISTER_CLASS(DeferredPassSetting);
     AUTO_REGISTER_CLASS(EffectComponent);
+    AUTO_REGISTER_CLASS(FoliageComponent);
     AUTO_REGISTER_CLASS(GameObject);
     AUTO_REGISTER_CLASS(ImageComponent);
     AUTO_REGISTER_CLASS(InputAction);

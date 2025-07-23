@@ -14,6 +14,7 @@ struct ICollider;
 class Texture;
 class RigidBodyComponent;
 class TerrainComponent;
+class FoliageComponent;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -157,6 +158,11 @@ public:
     std::vector<TerrainComponent*>& GetTerrainComponent() { return m_terrainComponents; }
 
 public:
+    void CollectFoliageComponent(FoliageComponent* ptr);
+    void UnCollectFoliageComponent(FoliageComponent* ptr);
+    std::vector<FoliageComponent*>& GetFoliageComponents() { return m_foliageComponents; }
+
+public:
 	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
 	void UnCollectRigidBodyComponent(RigidBodyComponent* ptr);
 
@@ -200,8 +206,9 @@ private:
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
-	std::vector<Light>              m_lights;
+        std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
+    std::vector<FoliageComponent*>  m_foliageComponents;
 
 private:
 	friend class PhysicsManager;

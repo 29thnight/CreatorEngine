@@ -73,8 +73,10 @@ void AsisMove::FixedUpdate(float fixedTick)
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
 	Vector3 predictClosestPosition = GetBothPointAndLineClosestPoint(closestPoint + dir * m_predictNextTime * m_moveSpeed, startResult, endResult);
 
+#ifdef _DEBUG
 	if (DebugPoint)
 		DebugPoint->m_transform.SetPosition(predictClosestPosition);
+#endif // _DEBUG
 
 	Mathf::Vector3 direction = currentForward;
 	float rotDownSpeed = 1.f;

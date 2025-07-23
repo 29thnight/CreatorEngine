@@ -58,9 +58,6 @@
     <Filter Include="INILoader">
       <UniqueIdentifier>{10a74b62-715e-498d-8216-efd46b990009}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Profiler">
-      <UniqueIdentifier>{8e625e3d-b297-4292-84e1-24290e648c3a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ImGuiLogger">
       <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
     </Filter>
@@ -90,6 +87,9 @@
     </Filter>
     <Filter Include="WindowsApplication\WinProcProxy">
       <UniqueIdentifier>{55aca1da-4552-4b1a-acbc-ece6e62d9cb0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.CircleQueue">
+      <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -273,6 +273,9 @@
     </ClInclude>
     <ClInclude Include="WinProcProxy.h">
       <Filter>WindowsApplication\WinProcProxy</Filter>
+    </ClInclude>
+    <ClInclude Include="CircleQueue.hpp">
+      <Filter>Core.CircleQueue</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

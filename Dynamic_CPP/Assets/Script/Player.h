@@ -26,7 +26,7 @@ public:
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override {}
-	virtual void OnDestroy() override {}
+	virtual void OnDestroy() override;
 
 	void Move(Mathf::Vector2 dir);
 	void CatchAndThrow();
@@ -67,8 +67,12 @@ public:
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	[[Property]]
-	float m_dashPower = 1000.0f; // 대시이동거리
+	float m_dashPower = 0.05f; // 대시이동거리
 	float dashGracePeriod = 1.f; //대시 무적시간
+	bool isDashing = false; //대쉬중
+	float m_dashElapsedTime = 0.f;
+	[[Property]]
+	float m_dashTime = 0.5f;
 	[[Property]]
 	float dashCooldown = 3.f; //대쉬 쿨타임
 	float m_dashCoolElapsedTime = 0.f; //
