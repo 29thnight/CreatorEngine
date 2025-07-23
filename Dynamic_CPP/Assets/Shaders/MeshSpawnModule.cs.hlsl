@@ -340,12 +340,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
     
     // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
-        if (gForceRotationUpdate == 1)
-        {
-            UpdateExistingMeshParticleRotation(particle);
-        }
-        else
-        {
+    if (gForceRotationUpdate == 1)
+    {
+        UpdateExistingMeshParticleRotation(particle);
+    }
+    else
+    {
         // 위치처럼 회전도 항상 에미터 회전 유지
         // (forceRotationUpdate가 0이어도 계속 적용)
         particle.rotation = gEmitterRotation;
