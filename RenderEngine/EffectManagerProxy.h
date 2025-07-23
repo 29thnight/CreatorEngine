@@ -1,34 +1,15 @@
 #pragma once
 #include "EffectCommandType.h"
 #include "EffectManager.h"
+#include "EffectBase.h"
 
 class EffectManagerProxy
 {
 public:
-    EffectManagerProxy() = default;
-
-    // 복사 생성자 추가
-    EffectManagerProxy(const EffectManagerProxy& other) :
-        m_executeFunction(other.m_executeFunction),
-        m_commandType(other.m_commandType),
-        m_effectName(other.m_effectName)
-    {
-    }
-
-    // 이동 생성자 추가
-    EffectManagerProxy(EffectManagerProxy&& other) noexcept :
-        m_executeFunction(std::move(other.m_executeFunction)),
-        m_commandType(other.m_commandType),
-        m_effectName(std::move(other.m_effectName))
-    {
-    }
-
     // 이펙트 재생 명령
     static EffectManagerProxy CreatePlayCommand(const std::string& effectName)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::Play;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Play();
@@ -41,8 +22,6 @@ public:
     static EffectManagerProxy CreateStopCommand(const std::string& effectName)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::Stop;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->Stop();
@@ -55,8 +34,6 @@ public:
     static EffectManagerProxy CreateSetPositionCommand(const std::string& effectName, const Mathf::Vector3& position)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::SetPosition;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, position]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetPosition(position);
@@ -69,8 +46,6 @@ public:
     static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::SetTimeScale;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, timeScale]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetTimeScale(timeScale);
@@ -83,8 +58,6 @@ public:
     static EffectManagerProxy CreateSetRotationCommand(const std::string& effectName, const Mathf::Vector3& rotation)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::SetRotation;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName, rotation]() {
             if (auto* effect = EffectManagers->GetEffect(effectName)) {
                 effect->SetRotation(rotation);
@@ -93,27 +66,47 @@ public:
         return cmd;
     }
 
-    // 새 이펙트 생성 명령
-    static EffectManagerProxy CreateRegisterEffectCommand(const std::string& effectName,
-        const std::vector<std::shared_ptr<ParticleSystem>>& emitters)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::CreateEffect;
-        cmd.m_effectName = effectName;
-        cmd.m_executeFunction = [effectName, emitters]() {
-            EffectManagers->RegisterCustomEffect(effectName, emitters);
-            };
-        return cmd;
-    }
-
     // 이펙트 제거 명령
     static EffectManagerProxy CreateRemoveEffectCommand(const std::string& effectName)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::RemoveEffect;
-        cmd.m_effectName = effectName;
         cmd.m_executeFunction = [effectName]() {
             EffectManagers->RemoveEffect(effectName);
+            };
+        return cmd;
+    }
+
+    static EffectManagerProxy CreateSetLoopCommand(const std::string& effectName, bool isLoop)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [effectName, isLoop]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetLoop(isLoop);
+            }
+            };
+        return cmd;
+    }
+
+    static EffectManagerProxy CreateSetDurationCommand(const std::string& effectName, float duration)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [effectName, duration]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetDuration(duration);
+            }
+            };
+        return cmd;
+    }
+
+    // 이펙트 강제 완료 명령
+    static EffectManagerProxy CreateForceFinishCommand(const std::string& effectName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [effectName]() {
+            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+                effect->SetLoop(false);
+                effect->SetDuration(0.001f);
+            }
             };
         return cmd;
     }
@@ -122,34 +115,26 @@ public:
     static EffectManagerProxy CreateEffectInstanceCommand(const std::string& templateName, const std::string& instanceName)
     {
         EffectManagerProxy cmd;
-        cmd.m_commandType = EffectCommandType::CreateInstance;
-        cmd.m_effectName = instanceName;
         cmd.m_executeFunction = [templateName, instanceName]() {
             EffectManagers->CreateEffectInstance(templateName, instanceName);
             };
         return cmd;
     }
 
-    // 복사 대입 연산자
-    EffectManagerProxy& operator=(const EffectManagerProxy& other)
+    // 템플릿 설정 가져오기 (정적 함수로 직접 처리)
+    static bool GetTemplateSettings(const std::string& templateName,
+        float& outTimeScale,
+        bool& outLoop,
+        float& outDuration)
     {
-        if (this != &other) {
-            m_executeFunction = other.m_executeFunction;
-            m_commandType = other.m_commandType;
-            m_effectName = other.m_effectName;
+        auto* templateEffect = EffectManagers->GetEffect(templateName);
+        if (templateEffect) {
+            outTimeScale = templateEffect->GetTimeScale();
+            outLoop = templateEffect->IsLooping();
+            outDuration = templateEffect->GetDuration();
+            return true;
         }
-        return *this;
-    }
-
-    // 이동 대입 연산자
-    EffectManagerProxy& operator=(EffectManagerProxy&& other) noexcept
-    {
-        if (this != &other) {
-            m_executeFunction = std::move(other.m_executeFunction);
-            m_commandType = other.m_commandType;
-            m_effectName = std::move(other.m_effectName);
-        }
-        return *this;
+        return false;
     }
 
     // 명령 실행
@@ -160,11 +145,6 @@ public:
         }
     }
 
-    EffectCommandType GetCommandType() const { return m_commandType; }
-    const std::string& GetEffectName() const { return m_effectName; }
-
 private:
     std::function<void()> m_executeFunction;
-    EffectCommandType m_commandType;
-    std::string m_effectName;
 };

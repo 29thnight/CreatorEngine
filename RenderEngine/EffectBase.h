@@ -1,6 +1,13 @@
 #pragma once
 #include "ParticleSystem.h"
 
+enum class EffectState {
+    Stopped,    // 정지됨 (렌더링 안함)
+    Playing,    // 재생 중
+    Paused,     // 일시정지
+    Finished    // 종료됨 (렌더링은 함)
+};
+
 // Effect의 기본 인터페이스
 class EffectBase {
 protected:
@@ -11,8 +18,7 @@ protected:
     std::string m_name;
     Mathf::Vector3 m_position = Mathf::Vector3(0, 0, 0);
     Mathf::Vector3 m_rotation = Mathf::Vector3(0, 0, 0);
-    bool m_isPlaying = false;
-    bool m_isPaused = false;
+    EffectState m_state = EffectState::Stopped;
 
     // Effect 전체 설정
     float m_timeScale = 1.0f;
@@ -26,32 +32,40 @@ public:
 
     // 핵심 인터페이스
     virtual void Update(float delta) {
-        if (!m_isPlaying || m_isPaused) return;
+        if (m_state != EffectState::Playing) return;
 
         // 시간 업데이트
         m_currentTime += delta * m_timeScale;
 
-        // 지속시간 체크
-        if (m_duration > 0 && m_currentTime >= m_duration) {
-            if (m_loop) {
-                m_currentTime = 0.0f;
-            }
-            else {
-                Stop();
-                return;
+        // 진행률 계산
+        float progressRatio = 0.0f;
+        bool isInfinite = (m_duration < 0);
+
+        if (isInfinite) {
+            // 무한 재생 모드 - 고정된 주기로 0~1 반복 (예: 1초 주기)
+            progressRatio = std::fmod(m_currentTime, 1.0f);
+        }
+        else if (m_duration > 0) {
+            progressRatio = std::clamp(m_currentTime / m_duration, 0.0f, 1.0f);
+        }
+
+        // ParticleSystem 업데이트
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->SetEffectProgress(progressRatio);
+                ps->Update(delta * m_timeScale);
             }
         }
 
-        // 모든 ParticleSystem 업데이트
-        for (auto& ps : m_particleSystems) {
-            if (ps) {
-                ps->Update(delta * m_timeScale);
-            }
+        // duration이 끝나면 바로 Stop
+        if (!isInfinite && m_duration > 0 && m_currentTime >= m_duration) {
+            Stop();
         }
     }
 
     virtual void Render(RenderScene& scene, Camera& camera) {
-        if (!m_isPlaying) return;
+        // Stopped 상태일 때만 렌더링 안함
+        if (m_state == EffectState::Stopped) return;
 
         // 모든 ParticleSystem 렌더링
         for (auto& ps : m_particleSystems) {
@@ -63,8 +77,7 @@ public:
 
     // Effect 제어
     virtual void Play() {
-        m_isPlaying = true;
-        m_isPaused = false;
+        m_state = EffectState::Playing;
         m_currentTime = 0.0f;
 
         // 모든 ParticleSystem 재생
@@ -76,8 +89,7 @@ public:
     }
 
     virtual void Stop() {
-        m_isPlaying = false;
-        m_isPaused = false;
+        m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
 
         // 모든 ParticleSystem 정지
@@ -89,22 +101,25 @@ public:
     }
 
     virtual void Pause() {
-        m_isPaused = true;
+        if (m_state == EffectState::Playing) {
+            m_state = EffectState::Paused;
+        }
     }
 
     virtual void Resume() {
-        m_isPaused = false;
+        if (m_state == EffectState::Paused) {
+            m_state = EffectState::Playing;
+        }
     }
 
     // 위치 설정 (모든 ParticleSystem에 적용)
     virtual void SetPosition(const Mathf::Vector3& newBasePosition) {
-        // 이전 기준점에서 새 기준점으로의 변화량 계산
         m_position = newBasePosition;
 
         // 모든 ParticleSystem을 변화량만큼 이동 (상대 위치 관계 유지)
         for (auto& ps : m_particleSystems) {
             if (ps) {
-                ps->UpdateEffectBasePosition(newBasePosition);  // 절대 위치로 설정
+                ps->UpdateEffectBasePosition(newBasePosition);
             }
         }
     }
@@ -127,7 +142,7 @@ public:
         if (ps) {
             m_particleSystems.push_back(ps);
             // 현재 Effect 상태에 맞게 ParticleSystem 설정
-            if (m_isPlaying && !m_isPaused) {
+            if (m_state == EffectState::Playing) {
                 ps->Play();
             }
         }
@@ -149,8 +164,10 @@ public:
 
     const Mathf::Vector3& GetPosition() const { return m_position; }
 
-    bool IsPlaying() const { return m_isPlaying; }
-    bool IsPaused() const { return m_isPaused; }
+    bool IsPlaying() const { return m_state == EffectState::Playing; }
+    bool IsPaused() const { return m_state == EffectState::Paused; }
+    bool IsFinished() const { return m_state == EffectState::Finished; }
+    EffectState GetState() const { return m_state; }
 
     float GetTimeScale() const { return m_timeScale; }
     void SetTimeScale(float scale) { m_timeScale = scale; }

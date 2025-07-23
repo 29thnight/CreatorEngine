@@ -150,6 +150,8 @@ public:
 	const Mathf::Vector3& GetPosition() const { return m_position; }
 	bool IsRunning() const { return m_isRunning; }
 
+	void SetEffectProgress(float progress);
+
 	std::string m_name{};
 private:
 
@@ -168,7 +170,7 @@ private:
 
 protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
-
+	float m_effectProgress = 0.0f;
 	bool m_isRunning;
 	std::vector<ParticleData> m_particleData;
 	LinkedList<ParticleModule> m_moduleList;

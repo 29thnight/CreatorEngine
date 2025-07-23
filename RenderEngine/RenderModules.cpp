@@ -38,7 +38,7 @@ void RenderModules::EnableClipping(bool enable)
 	if (!SupportsClipping()) return;
 
 	m_clippingEnabled = enable;
-	m_clippingParams.clippingEnabled = enable ? 1.0f : 0.0f;
+	m_clippingParams.polarClippingEnabled = enable ? 1.0f : 0.0f;
 
 	OnClippingStateChanged();
 	UpdateClippingBuffer();
@@ -48,7 +48,7 @@ void RenderModules::SetClippingProgress(float progress)
 {
 	if (!SupportsClipping()) return;
 	// -1.0 ~ 1.0 범위로 확장 (음수는 역방향)
-	m_clippingParams.clippingProgress = std::clamp(progress, -1.0f, 1.0f);
+	m_clippingParams.polarClippingEnabled = std::clamp(progress, -1.0f, 1.0f);
 	UpdateClippingBuffer();
 }
 
@@ -66,11 +66,10 @@ void RenderModules::SetClippingAxis(const Mathf::Vector3& axis)
 		normalizedAxis.z /= length;
 	}
 	else {
-		// 기본값으로 Y축 설정
-		normalizedAxis = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+		normalizedAxis = Mathf::Vector3(1.0f, 0.0f, 0.0f);
 	}
 
-	m_clippingParams.clippingAxis = normalizedAxis;
+	m_clippingParams.polarReferenceDir = normalizedAxis;
 
 	UpdateClippingBuffer();
 }
