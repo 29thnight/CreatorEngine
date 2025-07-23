@@ -250,7 +250,9 @@ void PhysicX::Update(float fixedDeltaTime)
 {
 	// PxScene 업데이트
 	RemoveActors();
+	ApplyPendingShapeChanges(); // <<-- 추가된 부분: 시뮬레이션 전에 변경 사항 적용
 	//천 및 의상 시뮬레이션 업데이트 -> 차후 생각
+	//rigid body 업데이트
 	{
 		//콜라이더 업데이트
 		//업데이트 할 액터들을 모두 씬에 추가
@@ -964,7 +966,11 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 	if (dynamicBody)
 	{
-		//받은 데이터로 pxBody의 transform과 속도와 각속도 설정
+		// PxShape 플래그 변경 요청을 큐에 추가
+		m_pendingShapeChanges.push_back({ id, rigidBodyData.m_EColliderType == EColliderType::TRIGGER, rigidBodyData.isColliderEnabled, rigidBodyData.m_EBodyState });
+
+		// 나머지 데이터는 기존 로직대로 직접 적용
+		//입력 데이터를 pxBody의 transform과 속도에 적용
 		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxTransform;
 		physx::PxVec3 pxLinearVelocity;
@@ -1004,35 +1010,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
-		PxU32 shapeCount = pxBody->getNbShapes();
-		std::vector<physx::PxShape*> shapes(shapeCount);
-		pxBody->getShapes(shapes.data(), shapeCount);
-		for (PxShape* shape : shapes)
-		{
-			if (rigidBodyData.isColliderEnabled == false)
-			{
-				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-			}
-			else 
-			{
-				
-				if (rigidBodyData.m_EColliderType == EColliderType::COLLISION) //&&&&&키는거 만드는중
-				{
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-				}
-				else if(rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
-				{
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
-				}
-
-
-				
-			}
-
-		}
+		
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
 		DirectX::SimpleMath::Quaternion rotation;
@@ -1072,6 +1050,72 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
 		pxBody->setGlobalPose(pxCurrTransform);
 	}
+}
+
+void PhysicX::ApplyPendingShapeChanges()
+{
+	for (const auto& change : m_pendingShapeChanges)
+	{
+		RigidBody* body = GetRigidBody(change.rigidBodyId);
+		if (body)
+		{
+			DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
+			StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
+
+			physx::PxRigidActor* pxActor = nullptr;
+			if (dynamicBody) pxActor = dynamicBody->GetRigidDynamic();
+			else if (staticBody) pxActor = staticBody->GetRigidStatic();
+
+			if (pxActor)
+			{
+				// EBodyState 적용
+				if (dynamicBody) // DynamicRigidBody에만 해당
+				{
+					switch (change.bodyState)
+					{
+					case EBodyState::Active:
+						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
+						break;
+					case EBodyState::Sleeping:
+						// PhysX는 자동으로 잠자기 상태로 전환되지만, 강제할 수도 있습니다.
+						// pxActor->putToSleep();
+						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
+						break;
+					case EBodyState::Kinematic:
+						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
+						break;
+					case EBodyState::Disabled:
+						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, true);
+						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false); // 비활성화된 경우 키네마틱이 아닌지 확인
+						break;
+					}
+				}
+
+				// PxShape 플래그 적용
+				const PxU32 numShapes = pxActor->getNbShapes();
+				std::vector<physx::PxShape*> shapes(numShapes);
+				pxActor->getShapes(shapes.data(), numShapes);
+
+				for (physx::PxShape* shape : shapes)
+				{
+					if (change.isColliderEnabled)
+					{
+						shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, change.isTrigger);
+						shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !change.isTrigger);
+					}
+					else
+					{
+						shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+						shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+					}
+				}
+			}
+		}
+	}
+	m_pendingShapeChanges.clear();
 }
 
 void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
@@ -1118,6 +1162,7 @@ void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std
 	}
 	
 }
+
 
 void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
 {
