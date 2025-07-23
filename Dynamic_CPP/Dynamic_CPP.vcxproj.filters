@@ -168,6 +168,9 @@
 		<ClInclude Include="Assets\Script\EntityResource.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityMineral.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -273,6 +276,9 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityResource.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityMineral.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

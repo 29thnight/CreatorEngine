@@ -181,19 +181,6 @@ void Player::Update(float tick)
 	}
 }
 
-void Player::OnDestroy()
-{
-	/*if (m_animator)
-	{
-		for (auto& socket : m_animator->m_Skeleton->m_sockets)
-		{
-			m_animator->m_Skeleton->DeleteSocket(socket->m_name);
-		}
-	}*/
-	
-
-}
-
 void Player::Move(Mathf::Vector2 dir)
 {
 	if (isStun || isKnockBack) return;
@@ -257,7 +244,7 @@ void Player::Catch()
 		
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
-		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
+		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::TRIGGER);
 		if (m_curWeapon)
 			m_curWeapon->SetEnabled(false);
 	}
@@ -344,15 +331,16 @@ void Player::Attack()
 
 	if (m_comboCount == 0)
 	{
-		auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
+		/*auto obj = SceneManagers->GetActiveScene()->CreateGameObject("gumgi");
 		if (obj)
 		{
 			auto effect = obj->AddComponent<EffectComponent>();
+			effect->m_effectTemplateName = "gumgi";
 			if (effect)
 			{
-
+				effect->Apply();
 			}
-		}
+		}*/
 		std::vector<HitResult> hits;
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;

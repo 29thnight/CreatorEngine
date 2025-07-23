@@ -157,8 +157,8 @@ void EntityAsis::Purification(float tick)
 			{
 				auto player = item->GetThrowOwner();
 				
-				item->GetComponent<Transform>().SetPosition({2000,0,2000});
-				item->GetOwner()->SetEnabled(false);
+				//item->GetComponent<Transform>().SetPosition({2000,0,2000});
+				//item->GetOwner()->SetEnabled(false);
 				item->SetThrowOwner(nullptr);
 				//item->GetOwner()->Destroy();
 				if (player)
