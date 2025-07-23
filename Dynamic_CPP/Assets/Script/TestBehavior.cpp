@@ -8,9 +8,11 @@
 #include <cmath>
 
 #include "BoxColliderComponent.h"
+#include "RigidBodyComponent.h"
 
 
 BoxColliderComponent* boxCollider = nullptr;
+RigidBodyComponent* rigidBody = nullptr;
 
 void TestBehavior::Start()
 {
@@ -22,6 +24,7 @@ void TestBehavior::Start()
 	// setup tasks that are needed before the behavior starts running.
 	
 	boxCollider = m_pOwner->GetComponent<BoxColliderComponent>();
+	rigidBody = m_pOwner->GetComponent<RigidBodyComponent>();
 }
   
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -57,23 +60,35 @@ void TestBehavior::Update(float tick)
 	m_chargingTime += tick;
 	m_chargingTime > 20.f ? m_chargingTime = 0.f : m_chargingTime;
 
-	EColliderType colliderType = boxCollider->GetColliderType();
-
-	if (testValue< m_chargingTime)
+	if (rigidBody)
 	{
-		if (colliderType == EColliderType::COLLISION)
+		bool istriger = rigidBody->IsTrigger();
+		if (istriger)
 		{
-			boxCollider->SetColliderType(EColliderType::TRIGGER);
+			std::cout << "state : trigger" << std::endl;
 		}
-	}
+		else {
+			std::cout << "state : collision" << std::endl;
+		}
 
-	if (testValue> m_chargingTime)
-	{
-
-		if (colliderType == EColliderType::TRIGGER)
+		if (testValue< m_chargingTime)
 		{
-			boxCollider->SetColliderType(EColliderType::COLLISION);
+			if (!istriger)
+			{
+				rigidBody->SetIsTrigger(true);
+				
+			}
 		}
+
+		if (testValue> m_chargingTime)
+		{
+
+			if (istriger)
+			{
+				rigidBody->SetIsTrigger(false);
+			}
+		}
+
 	}
 
 

@@ -500,9 +500,14 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 		if (out.hasBlock)
 		{
 			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
-			out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
-			CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
-			CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+			if (blockHit.shape && blockHit.shape->userData != nullptr) {
+				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
+				CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
+				CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+			}
+			else {
+				out.hasBlock = false; // userData가 유효하지 않으면 블록 처리 안함
+			}
 		}
 
 		unsigned int hitSize = hitBufferStruct.nbTouches;
@@ -513,19 +518,23 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
 			physx::PxShape* shape = hit.shape;
 
-			if (shape->userData == nullptr) continue;
-			
-			DirectX::SimpleMath::Vector3 position;
-			DirectX::SimpleMath::Vector3 normal;
-			CopyVectorPxToDx(hit.position, position);
-			CopyVectorPxToDx(hit.normal, normal);
-			unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
-			unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
+			if (shape && shape->userData != nullptr) // 추가: shape 및 userData 유효성 확인
+			{
+				DirectX::SimpleMath::Vector3 position;
+				DirectX::SimpleMath::Vector3 normal;
+				CopyVectorPxToDx(hit.position, position);
+				CopyVectorPxToDx(hit.normal, normal);
+				unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
+				unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
-			out.contectPoints.push_back(position);
-			out.contectNormals.push_back(normal);
-			out.hitLayerNumber.push_back(layerNumber);
-			out.hitId.push_back(id);
+				out.contectPoints.push_back(position);
+				out.contectNormals.push_back(normal);
+				out.hitLayerNumber.push_back(layerNumber);
+				out.hitId.push_back(id);
+			}
+			else {
+				out.hitSize--; // 유효하지 않은 hit은 카운트에서 제외
+			}
 		}
 	}
 	
@@ -568,7 +577,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 		if (out.hasBlock)
 		{
 			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
-			if (blockHit.shape->userData != nullptr) {
+			if (blockHit.shape && blockHit.shape->userData != nullptr) {
 				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
 				out.blockLayerNumber = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisLayerNumber;
 				CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
@@ -629,11 +638,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
 			physx::PxShape* shape = hit.shape;
 
-			if (shape->userData == nullptr) {
-				out.hitSize--;
-				continue;
-			}
-
+			if (shape && shape->userData != nullptr) { // 추가: shape 및 userData 유효성 확인
 			DirectX::SimpleMath::Vector3 position;
 			DirectX::SimpleMath::Vector3 normal;
 			CopyVectorPxToDx(hit.position, position);
@@ -645,6 +650,10 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			out.contectNormals.push_back(normal);
 			out.hitLayerNumber.push_back(layerNumber);
 			out.hitId.push_back(id);
+			}
+			else {
+				out.hitSize--; // 유효하지 않은 hit은 카운트에서 제외
+			}
 		}
 	}
 
@@ -831,20 +840,28 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	//collisionData
 	StaticRigidBody* staticBody = new StaticRigidBody(collideType,colInfo.id,colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
-
-	//스테틱 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 정보 등록
-	if (!staticBody->Initialize(colInfo,shape,m_physics,collisionData))
+	if (collisionData) // 추가: collisionData가 유효한지 확인
 	{
-		Debug->LogError("PhysicX::SettingStaticBody() : staticBody Initialize failed id :" + std::to_string(colInfo.id));
+		//스테틱 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 정보 등록
+		if (!staticBody->Initialize(colInfo,shape,m_physics,collisionData))
+		{
+			Debug->LogError("PhysicX::SettingStaticBody() : staticBody Initialize failed id :" + std::to_string(colInfo.id));
+			delete collisionData; // 실패 시 메모리 해제
+			return nullptr;
+		}
+
+		//충돌데이터 등록, 리지드 바디 등록
+		m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
+		m_rigidBodyContainer.insert(std::make_pair(staticBody->GetID(), staticBody));
+
+		m_updateActors.push_back(staticBody);
+	}
+	else
+	{
+		Debug->LogError("PhysicX::SettingStaticBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
+		delete staticBody; // staticBody도 해제
 		return nullptr;
 	}
-
-	//충돌데이터 등록, 리지드 바디 등록
-	m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
-	m_rigidBodyContainer.insert(std::make_pair(staticBody->GetID(), staticBody));
-
-	m_updateActors.push_back(staticBody);
-
 	return staticBody;
 }
 
@@ -860,20 +877,28 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//collisionData
 	DynamicRigidBody* dynamicBody = new DynamicRigidBody(collideType, colInfo.id, colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
-
-	//다이나믹 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 정보 등록
-	if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData,isKinematic))
+	if (collisionData) // 추가: collisionData가 유효한지 확인
 	{
-		Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
+		//다이나믹 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 정보 등록
+		if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData,isKinematic))
+		{
+			Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
+			delete collisionData; // 실패 시 메모리 해제
+			return nullptr;
+		}
+
+		//충돌데이터 등록, 리지드 바디 등록
+		m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
+		m_rigidBodyContainer.insert(std::make_pair(dynamicBody->GetID(), dynamicBody));
+
+		m_updateActors.push_back(dynamicBody);
+	}
+	else
+	{
+		Debug->LogError("PhysicX::SettingDynamicBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
+		delete dynamicBody; // dynamicBody도 해제
 		return nullptr;
 	}
-
-	//충돌데이터 등록, 리지드 바디 등록
-	m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
-	m_rigidBodyContainer.insert(std::make_pair(dynamicBody->GetID(), dynamicBody));
-
-	m_updateActors.push_back(dynamicBody);
-
 	return dynamicBody;
 }
 
@@ -986,6 +1011,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 
 
 		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
+		if (!pxBody) return; // 추가: pxBody가 유효한지 확인
 		//운동학 객체가 아닌경우 각	속도 선속도 설정
 		if (!(pxBody->getRigidBodyFlags()&physx::PxRigidBodyFlag::eKINEMATIC))
 		{
@@ -1016,30 +1042,6 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
-		PxU32 shapeCount = pxBody->getNbShapes();
-		std::vector<physx::PxShape*> shapes(shapeCount);
-		pxBody->getShapes(shapes.data(), shapeCount);
-		for (PxShape* shape : shapes)
-		{
-			if (rigidBodyData.isColliderEnabled == false)
-			{
-				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-			}
-			else 
-			{
-				if (rigidBodyData.m_EColliderType == EColliderType::COLLISION) //&&&&&키는거 만드는중
-				{
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, true);
-				}
-				else if (rigidBodyData.m_EColliderType == EColliderType::TRIGGER)
-				{
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
-				}
-			}
-		}
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
 		DirectX::SimpleMath::Quaternion rotation;
@@ -1095,51 +1097,51 @@ void PhysicX::ApplyPendingShapeChanges()
 			if (dynamicBody) pxActor = dynamicBody->GetRigidDynamic();
 			else if (staticBody) pxActor = staticBody->GetRigidStatic();
 
-			if (pxActor)
+			if (!pxActor) continue; // 추가: pxActor가 유효한지 확인
+
+			// EBodyState 적용
+			if (dynamicBody) // DynamicRigidBody에만 해당
 			{
-				// EBodyState 적용
-				if (dynamicBody) // DynamicRigidBody에만 해당
+				physx::PxRigidDynamic* pxDynamicActor = dynamicBody->GetRigidDynamic(); // PxRigidDynamic으로 캐스팅
+				switch (change.bodyState)
 				{
-					switch (change.bodyState)
-					{
-					case EBodyState::Active:
-						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
-						break;
-					case EBodyState::Sleeping:
-						// PhysX는 자동으로 잠자기 상태로 전환되지만, 강제할 수도 있습니다.
-						// pxActor->putToSleep();
-						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
-						break;
-					case EBodyState::Kinematic:
-						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
-						break;
-					case EBodyState::Disabled:
-						pxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, true);
-						//pxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false); // 비활성화된 경우 키네마틱이 아닌지 확인
-						break;
-					}
+				case EBodyState::Active:
+					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
+					break;
+				case EBodyState::Sleeping:
+					// PhysX는 자동으로 잠자기 상태로 전환되지만, 강제할 수도 있습니다.
+					// pxDynamicActor->putToSleep();
+					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
+					break;
+				case EBodyState::Kinematic:
+					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
+					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
+					break;
+				case EBodyState::Disabled:
+					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, true);
+					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false); // 비활성화된 경우 키네마틱이 아닌지 확인
+					break;
 				}
+			}
 
-				// PxShape 플래그 적용
-				const PxU32 numShapes = pxActor->getNbShapes();
-				std::vector<physx::PxShape*> shapes(numShapes);
-				pxActor->getShapes(shapes.data(), numShapes);
+			// PxShape 플래그 적용
+			const PxU32 numShapes = pxActor->getNbShapes();
+			std::vector<physx::PxShape*> shapes(numShapes);
+			pxActor->getShapes(shapes.data(), numShapes);
 
-				for (physx::PxShape* shape : shapes)
+			for (physx::PxShape* shape : shapes)
+			{
+				if (change.isColliderEnabled)
 				{
-					if (change.isColliderEnabled)
-					{
-						shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, change.isTrigger);
-						shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !change.isTrigger);
-					}
-					else
-					{
-						shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-						shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-					}
+					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, change.isTrigger);
+					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !change.isTrigger);
+				}
+				else
+				{
+					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
 				}
 			}
 		}
@@ -1699,4 +1701,73 @@ void PhysicX::ShowNotRelease()
    std::cout << m_physics->getNbShapes()<< std::endl;  // 3
    std::cout << m_physics->getNbTetrahedronMeshes()<< std::endl;
    std::cout << m_physics->getNbTriangleMeshes() << std::endl;
+}
+
+bool PhysicX::IsKinematic(unsigned int id) const
+{
+	auto it = m_rigidBodyContainer.find(id);
+	if (it != m_rigidBodyContainer.end())
+	{
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(it->second))
+		{
+			if (dynamicBody->GetRigidDynamic()) // 추가: GetRigidDynamic() 결과 확인
+			{
+				return dynamicBody->GetRigidDynamic()->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC;
+			}
+		}
+	}
+	return false;
+}
+
+bool PhysicX::IsTrigger(unsigned int id) const
+{
+	auto it = m_rigidBodyContainer.find(id);
+	if (it != m_rigidBodyContainer.end())
+	{
+		physx::PxRigidActor* actor = nullptr;
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(it->second)) actor = dynamicBody->GetRigidDynamic();
+		else if (auto* staticBody = dynamic_cast<StaticRigidBody*>(it->second)) actor = staticBody->GetRigidStatic();
+
+		if (actor)
+		{
+			const physx::PxU32 numShapes = actor->getNbShapes();
+			if (numShapes > 0)
+			{
+				std::vector<physx::PxShape*> shapes(numShapes);
+				actor->getShapes(shapes.data(), numShapes);
+				if (shapes[0]) // 추가: shapes[0] 유효성 확인
+				{
+					return shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+bool PhysicX::IsColliderEnabled(unsigned int id) const
+{
+	auto it = m_rigidBodyContainer.find(id);
+	if (it != m_rigidBodyContainer.end())
+	{
+		physx::PxRigidActor* actor = nullptr;
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(it->second)) actor = dynamicBody->GetRigidDynamic();
+		else if (auto* staticBody = dynamic_cast<StaticRigidBody*>(it->second)) actor = staticBody->GetRigidStatic();
+
+		if (actor)
+		{
+			const physx::PxU32 numShapes = actor->getNbShapes();
+			if (numShapes > 0)
+			{
+				std::vector<physx::PxShape*> shapes(numShapes);
+				actor->getShapes(shapes.data(), numShapes);
+				if (shapes[0]) // 추가: shapes[0] 유효성 확인
+				{
+					// eSIMULATION_SHAPE 또는 eTRIGGER_SHAPE가 설정되어 있으면 활성화된 것으로 간주
+					return (shapes[0]->getFlags() & physx::PxShapeFlag::eSIMULATION_SHAPE) || (shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE);
+				}
+			}
+		}
+	}
+	return false;
 }

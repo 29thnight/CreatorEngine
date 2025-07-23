@@ -66,3 +66,33 @@ void RigidBodyComponent::SetMass(float _mass)
 {
 	m_mass = _mass;
 }
+
+void RigidBodyComponent::SetKinematic(bool isKinematic)
+{
+	PhysicsManagers->SetRigidBodyKinematic(GetInstanceID(), isKinematic);
+}
+
+bool RigidBodyComponent::IsKinematic() const
+{
+	return PhysicsManagers->IsRigidBodyKinematic(GetInstanceID());
+}
+
+void RigidBodyComponent::SetIsTrigger(bool isTrigger)
+{
+	PhysicsManagers->SetRigidBodyIsTrigger(GetInstanceID(), isTrigger);
+}
+
+bool RigidBodyComponent::IsTrigger() const
+{
+	return PhysicsManagers->IsRigidBodyTrigger(GetInstanceID());
+}
+
+void RigidBodyComponent::SetColliderEnabled(bool enabled)
+{
+	PhysicsManagers->SetRigidBodyColliderEnabled(GetInstanceID(), enabled);
+}
+
+bool RigidBodyComponent::IsColliderEnabled() const
+{
+	return PhysicsManagers->IsRigidBodyColliderEnabled(GetInstanceID());
+}

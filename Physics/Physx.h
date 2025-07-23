@@ -90,6 +90,9 @@ public:
 	RigidBody* GetRigidBody(const unsigned int& id);
 	//수정
 	void SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData); //&&&&& RigidBodyGetSetData const 지웠음sehwan
+	bool IsKinematic(unsigned int id) const;
+	bool IsTrigger(unsigned int id) const;
+	bool IsColliderEnabled(unsigned int id) const;
 	//내부용 삭제
 	void RemoveRigidBody(const unsigned int& id,physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
 	

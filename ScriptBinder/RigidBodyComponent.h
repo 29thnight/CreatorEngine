@@ -6,6 +6,8 @@
 #include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
 #include "EForceMode.h"
+#include "../physics/PhysicsCommon.h"  
+
 class RigidBodyComponent : public Component, public IAwakable, public IOnDestroy
 {
 public:
@@ -48,6 +50,19 @@ public:
 	void SetLinearDamping(float _LinearDamping);
 	void AddForce(const Mathf::Vector3& force, EForceMode forceMode = EForceMode::FORCE);
 	void SetMass(float _mass);
+
+	// Rigidbody의 키네마틱 상태를 설정합니다.
+	void SetKinematic(bool isKinematic);
+	bool IsKinematic() const; // 현재 키네마틱 상태를 반환
+
+	// 콜라이더를 트리거 모드로 설정합니다.
+	void SetIsTrigger(bool isTrigger);
+	bool IsTrigger() const; // 현재 트리거 상태를 반환
+
+	// 콜라이더 활성화/비활성화 (선택 사항, 필요시 추가)
+	void SetColliderEnabled(bool enabled);
+	bool IsColliderEnabled() const;
+
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 

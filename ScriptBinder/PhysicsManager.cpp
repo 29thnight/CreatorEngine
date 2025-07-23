@@ -621,8 +621,8 @@ void PhysicsManager::SetPhysicData()
 			data.mass = rigidbody->m_mass;
 
 			
-			data.m_EColliderType = colliderInfo.collider->GetColliderType();
-			data.isColliderEnabled = _isColliderEnabled;
+			//data.m_EColliderType = colliderInfo.collider->GetColliderType();
+			//data.isColliderEnabled = _isColliderEnabled;
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
@@ -669,6 +669,7 @@ void PhysicsManager::GetPhysicData()
 		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
+	
 		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) 
 		{
 			//TODO : 콜라이더도 type 변경해야함
@@ -732,3 +733,38 @@ void PhysicsManager::GetPhysicData()
 //{
 //	Physics->SetCollisionMatrix(layer, other, isCollision);
 //}
+
+void PhysicsManager::SetRigidBodyKinematic(unsigned int id, bool isKinematic)
+{
+	RigidBodyGetSetData data = Physics->GetRigidBodyData(id);
+	data.m_EBodyState = isKinematic ? EBodyState::Kinematic : EBodyState::Active;
+	Physics->SetRigidBodyData(id, data);
+}
+
+void PhysicsManager::SetRigidBodyIsTrigger(unsigned int id, bool isTrigger)
+{
+	RigidBodyGetSetData data = Physics->GetRigidBodyData(id);
+	data.m_EColliderType = isTrigger ? EColliderType::TRIGGER : EColliderType::COLLISION;
+	Physics->SetRigidBodyData(id, data);
+}
+
+void PhysicsManager::SetRigidBodyColliderEnabled(unsigned int id, bool enabled)
+{
+	RigidBodyGetSetData data = Physics->GetRigidBodyData(id);
+	data.isColliderEnabled = enabled;
+	Physics->SetRigidBodyData(id, data);
+}
+
+bool PhysicsManager::IsRigidBodyKinematic(unsigned int id) const
+{
+	return Physics->IsKinematic(id);
+}
+
+bool PhysicsManager::IsRigidBodyTrigger(unsigned int id) const
+{
+	return Physics->IsTrigger(id);
+}
+bool PhysicsManager::IsRigidBodyColliderEnabled(unsigned int id) const
+{
+	return Physics->IsColliderEnabled(id);
+}

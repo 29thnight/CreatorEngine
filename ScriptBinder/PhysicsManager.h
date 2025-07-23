@@ -135,6 +135,15 @@ public:
 	}
 	std::vector<std::vector<uint8_t>> GetCollisionMatrix() const { return m_collisionMatrix; }
 
+	// Rigidbody 상태 변경 요청 (RigidBodyComponent에서 호출)
+	void SetRigidBodyKinematic(unsigned int id, bool isKinematic);
+	void SetRigidBodyIsTrigger(unsigned int id, bool isTrigger);
+	void SetRigidBodyColliderEnabled(unsigned int id, bool enabled);
+
+	// Rigidbody 상태 조회
+	bool IsRigidBodyKinematic(unsigned int id) const;
+	bool IsRigidBodyTrigger(unsigned int id) const;
+	bool IsRigidBodyColliderEnabled(unsigned int id) const;
 private:
 	// 초기화 여부
 	bool m_bIsInitialized{ false };

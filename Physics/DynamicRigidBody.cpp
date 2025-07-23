@@ -7,11 +7,17 @@ DynamicRigidBody::DynamicRigidBody(EColliderType collidreType, unsigned int id, 
 
 DynamicRigidBody::~DynamicRigidBody()
 {
-	CollisionData* data = static_cast<CollisionData*>(m_rigidDynamic->userData);
-	data->isDead = true;
-	physx::PxShape* shape;
-	m_rigidDynamic->getShapes(&shape, 1);
-	m_rigidDynamic->detachShape(*shape);
+	if (m_rigidDynamic) // 추가: m_rigidDynamic 유효성 확인
+	{
+		// Physics->RemoveCollisionData(m_id); // 이 줄 제거
+
+		physx::PxShape* shape;
+		m_rigidDynamic->getShapes(&shape, 1);
+		if (shape) // 추가: shape 유효성 확인
+		{
+			m_rigidDynamic->detachShape(*shape);
+		}
+	}
 }
 
 bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shape, physx::PxPhysics* physics, CollisionData* data, bool isKinematic)
@@ -26,9 +32,6 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 		shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
 	}
 
-	data->thisId = m_id;
-	data->thisLayerNumber = m_layerNumber;
-	shape->userData = data;
 	shape->setContactOffset(0.02f);
 	shape->setRestOffset(0.01f);
 
@@ -63,6 +66,9 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 		Debug->LogError("DynamicRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
+	data->thisId = m_id;
+	data->thisLayerNumber = m_layerNumber;
+	shape->userData = data; // 이 위치로 이동
 	
 	//rigidBody 확장 수집한 쉐이프의 부피에 따라 질량과 관성 모멘트를 업데이트
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_rigidDynamic, 1.0f);
@@ -80,17 +86,21 @@ void DynamicRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, unsign
 	m_layerNumber = layerNumber;
 
 	physx::PxShape* shape;
+	if (!m_rigidDynamic) return; // 추가: m_rigidDynamic 유효성 확인
 	m_rigidDynamic->getShapes(&shape, 1);
 
-	physx::PxFilterData newFilterData;
+	if (shape && shape->userData != nullptr) // 추가: shape 및 userData 유효성 확인
+	{
+		physx::PxFilterData newFilterData;
 
-	newFilterData.word0 = layerNumber;
-	newFilterData.word1 = collisionMatrix[layerNumber];
+		newFilterData.word0 = layerNumber;
+		newFilterData.word1 = collisionMatrix[layerNumber];
 
-	shape->setSimulationFilterData(newFilterData);
+		shape->setSimulationFilterData(newFilterData);
 
-	auto* data = static_cast<CollisionData*>(shape->userData);
-	data->thisLayerNumber = m_layerNumber;
+		auto* data = static_cast<CollisionData*>(shape->userData);
+		data->thisLayerNumber = m_layerNumber;
+	}
 }
 
 void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
@@ -119,7 +129,10 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 	//크기를 바꾸기 위해 shape를 재작성 shape에 크기 이외의 다른 정보는 그대로 유지 하기위한 임시 포인터
 	physx::PxShape* shape;
 	physx::PxMaterial* material;
+	if (!m_rigidDynamic) return; // 추가: m_rigidDynamic 유효성 확인
 	m_rigidDynamic->getShapes(&shape, 1);
+	if (!shape) return; // 추가: shape 유효성 확인
+
 	shape->getMaterials(&material, 1);
 	void* userData = shape->userData;
 
@@ -132,6 +145,7 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 		boxGeometry.halfExtents.z = m_Extent.z * scale.z;
 		m_rigidDynamic->detachShape(*shape);
 
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidDynamic, boxGeometry, physics, material, collisionMatrix, userData);
 
 	}
@@ -141,6 +155,7 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 		float maxRadius = std::max<float>(scale.x, std::max<float>(scale.y, scale.z));
 		sphereGeometry.radius = m_radius * maxRadius;
 		m_rigidDynamic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidDynamic, sphereGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCAPSULE)
@@ -151,6 +166,7 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 
 		capsuleGeometry.halfHeight = m_halfHeight * scale.x;
 		m_rigidDynamic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidDynamic, capsuleGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCONVEXMESH)
@@ -160,6 +176,7 @@ void DynamicRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale
 		convexMeshGeometry.scale.scale.y = m_scale.y;
 		convexMeshGeometry.scale.scale.z = m_scale.z;
 		m_rigidDynamic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidDynamic, convexMeshGeometry, physics, material, collisionMatrix, userData);
 	}
 	else
