@@ -9,6 +9,8 @@ std::string ActionTypeString(ActionType _actionType)
 			return "Value";
 	case ActionType::Button:
 		return "Button";
+    default:
+        return "None";
 	}
 }
 
@@ -23,6 +25,8 @@ std::string InputTypeString(InputType _inputType)
 		return "KeyBoard";
 	case InputType::Mouse:
 		return "Mouse";
+    default:
+        return "None";
 	}
 }
 
@@ -36,6 +40,8 @@ std::string KeyStateString(KeyState _keyState)
 		return "Pressed";
 	case KeyState::Released:
 		return "Released";
+    default:
+        return "Idle";
 	}
 }
 

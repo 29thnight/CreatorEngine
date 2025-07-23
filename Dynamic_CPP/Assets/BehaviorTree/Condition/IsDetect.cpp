@@ -22,7 +22,7 @@ bool IsDetect::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (dir.Length() < chaseRange) {
 		outTime = outDuration;
-		std::cout << "IsDetect ConditionCheck: in range" << std::endl;
+		//std::cout << "IsDetect ConditionCheck: in range" << std::endl;
 		return true;
 	}
 

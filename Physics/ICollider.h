@@ -19,7 +19,7 @@ struct ICollider
 	//virtual void SetIsTrigger(bool isTrigger) = 0; 
 	//virtual bool GetIsTrigger() = 0;
 
-	virtual void SetEnabled(bool able) { isEnabled = able; };
+	virtual void SetColliderEnabled(bool able) { isEnabled = able; };
 	bool isEnabled = true;
 
 	EColliderType GetColliderType() const

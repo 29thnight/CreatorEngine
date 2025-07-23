@@ -11,8 +11,8 @@ private:
 
 public:
     CircularQueue() :
-        capacity(1), // 최소 용량은 1 (실제 저장 가능 요소 0)
-        arr(1),
+        capacity(2), // 최소 용량은 1 (실제 저장 가능 요소 0)
+        arr(2),
         head(0),
         tail(0),
         count(0)
@@ -24,7 +24,7 @@ public:
     // 큐가 비었는지 (head == tail && count == 0)를 구분하기 위함입니다.
     explicit CircularQueue(int size) :
         capacity(size + 1), // 큐가 가득 찼을 때 한 칸을 비워두기 위해 +1
-        arr(size + 1),
+        arr(size),
         head(0),
         tail(0),
         count(0)

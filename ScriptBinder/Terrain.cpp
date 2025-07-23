@@ -18,8 +18,6 @@ struct TerrainBinHeader {
 };
 #pragma pack(pop) // Restore previous alignment
 
-
-//utill :wsting->utf8 string ���߿� utill������ ���°� ������
 static std::string Utf8Encode(const std::wstring& wstr) 
 {
 	int size = static_cast<int>(wstr.size());
@@ -104,7 +102,6 @@ void TerrainComponent::Initialize()
 		indices,
 		(uint32_t)m_width
 	);
-
 
 	m_pMaterial = new TerrainMaterial();
 	//// TerrainMaterial 초기화 -> 스플랫맵 텍스처 생성

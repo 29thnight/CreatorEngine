@@ -24,19 +24,19 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 	//selfTransform->AddPosition(dir * Speed * deltatime);
 	if (movement) {
 		movement->Move(dir2D * Speed * deltatime);
-		std::cout << "ChaseAction executed. Moving towards target." << std::endl;
+		//std::cout << "ChaseAction executed. Moving towards target." << std::endl;
 		if (isAnime)
 		{
 			std::string state = blackBoard.GetValueAsString("AnimeState");
 			if (state == "Move")
 			{
-				std::cout << "Chase action already in progress." << std::endl;
+				//std::cout << "Chase action already in progress." << std::endl;
 				//return NodeStatus::Running; // Continue running if already in chase state
 			}
 			else
 			{
 				blackBoard.SetValueAsString("AnimeState", "Move");
-				std::cout << "Switching to Move state." << std::endl;
+				//std::cout << "Switching to Move state." << std::endl;
 			}
 		}
 	}

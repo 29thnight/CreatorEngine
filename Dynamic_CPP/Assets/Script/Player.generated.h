@@ -11,6 +11,7 @@ ReflectionScriptField(Player) \
 		meta_property(ThrowPowerY) \
 		meta_property(m_comboTime) \
 		meta_property(m_dashPower) \
+		meta_property(m_dashTime) \
 		meta_property(dashCooldown) \
 		meta_property(dubbleDashTime) \
 		meta_property(dashAmount) \

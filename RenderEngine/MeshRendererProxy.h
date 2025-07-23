@@ -70,7 +70,7 @@ public:
 	HashedGuid					m_materialGuid{};
 	Mathf::xMatrix*				m_finalTransforms{};
 	LightMapping				m_LightMapping;
-	//TODO : bitflag Ã³¸®
+
 	bool                        m_isEnableShadow{ true };
 	bool						m_isSkinnedMesh{ false };
 	bool						m_isAnimationEnabled{ false };

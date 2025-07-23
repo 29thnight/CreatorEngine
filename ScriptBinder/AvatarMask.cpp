@@ -17,7 +17,7 @@ bool AvatarMask::IsBoneEnabled(BoneRegion region)
     case BoneRegion::Root:
         return useLower;
     case BoneRegion::Spine:
-        return useLower;
+        return useUpper;
     case BoneRegion::LeftArm:
         return useUpper;
     case BoneRegion::RightArm:

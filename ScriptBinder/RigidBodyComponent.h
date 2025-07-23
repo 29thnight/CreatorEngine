@@ -32,6 +32,11 @@ public:
 	void SetLockAngularX(bool isLock) { m_isLockAngularX = isLock; }
 	void SetLockAngularY(bool isLock) { m_isLockAngularY = isLock; }
 	void SetLockAngularZ(bool isLock) { m_isLockAngularZ = isLock; }
+
+	void LockLinearXZ();
+	void UnLockLinearXZ();
+	void LockAngularXYZ();
+	void UnLockAngularXYZ();
 	bool IsLockLinearX() const { return m_isLockLinearX; }
 	bool IsLockLinearY() const { return m_isLockLinearY; }
 	bool IsLockLinearZ() const { return m_isLockLinearZ; }

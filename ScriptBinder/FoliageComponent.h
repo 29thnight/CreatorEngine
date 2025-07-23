@@ -4,6 +4,7 @@
 #include "IAwakable.h"
 #include "IOnDestroy.h"
 #include "Mesh.h"
+#include "Material.h"
 #include "GameObject.h"
 #include "Terrain.h"
 #include "FoliageComponent.generated.h"
@@ -11,6 +12,7 @@
 struct FoliageType
 {
     Mesh* m_mesh{ nullptr };
+	Material* m_material{ nullptr };
     bool m_castShadow{ true };
 };
 
