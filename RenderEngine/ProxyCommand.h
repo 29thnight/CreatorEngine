@@ -3,17 +3,19 @@
 #include "MeshRendererProxy.h"
 
 class FoliageComponent;
+class TerrainComponent;
 class MeshRenderer;
 using Invokable = std::function<void()>;
 
 class ProxyCommand
 {
 public:
-        ProxyCommand() = default;
-        ~ProxyCommand() = default;
+    ProxyCommand() = default;
+    ~ProxyCommand() = default;
 
-        ProxyCommand(MeshRenderer* pComponent);
-        ProxyCommand(FoliageComponent* pComponent);
+    ProxyCommand(MeshRenderer* pComponent);
+	ProxyCommand(TerrainComponent* pComponent);
+    ProxyCommand(FoliageComponent* pComponent);
 
 	ProxyCommand(const ProxyCommand& other);
 	ProxyCommand(ProxyCommand&& other) noexcept;

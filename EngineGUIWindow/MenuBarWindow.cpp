@@ -290,7 +290,7 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Load Scene"))
                 {
 					SceneManagers->resetSelectedObjectEvent.Broadcast();
-                    //SceneManagers->LoadScene();
+                    //SceneManagers->LoadSceneImmediate();
 
 					file::path fileName = ShowOpenFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
@@ -299,7 +299,7 @@ void MenuBarWindow::RenderMenuBar()
 					);
                     if (!fileName.empty())
                     {
-                        SceneManagers->LoadScene(fileName.string());
+                        SceneManagers->LoadSceneImmediate(fileName.string());
                     }
                     else
                     {

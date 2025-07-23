@@ -1,13 +1,13 @@
 {
     "currentTime": 0.0,
-    "duration": -1.0,
+    "duration": 1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": true,
-    "name": "1234",
+    "loop": false,
+    "name": "gg",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -101,20 +101,6 @@
             "renderModules": [
                 {
                     "data": {
-                        "clipping": {
-                            "animating": false,
-                            "animationSpeed": 1.0,
-                            "enabled": false,
-                            "params": {
-                                "clippingAxis": {
-                                    "x": 0.0,
-                                    "y": 0.0,
-                                    "z": 0.0
-                                },
-                                "clippingEnabled": 0.0,
-                                "clippingProgress": 0.0
-                            }
-                        },
                         "constantBuffer": {
                             "cameraPosition": {
                                 "x": 0.0,
@@ -124,10 +110,38 @@
                         },
                         "mesh": {
                             "meshIndex": 0,
-                            "type": 1
+                            "type": 3
                         },
                         "model": {
-                            "hasModel": false
+                            "assigned": true,
+                            "hasModel": true,
+                            "meshIndex": 0,
+                            "name": "Eff_PC_charge"
+                        },
+                        "polarClipping": {
+                            "animating": true,
+                            "animationSpeed": 5.0,
+                            "enabled": true,
+                            "params": {
+                                "polarAngleProgress": 0.01329195499420166,
+                                "polarCenter": {
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "polarDirection": 1.0,
+                                "polarReferenceDir": {
+                                    "x": 1.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "polarStartAngle": 0.8726646304130554,
+                                "polarUpAxis": {
+                                    "x": 0.0,
+                                    "y": 1.0,
+                                    "z": 0.0
+                                }
+                            }
                         },
                         "renderState": {
                             "instanceCount": 1
@@ -135,7 +149,7 @@
                         "texture": {
                             "assigned": true,
                             "hasTexture": true,
-                            "name": "123"
+                            "name": "Eff_PC_charge_DefaultMaterial_BaseColor.png"
                         }
                     },
                     "type": "MeshModuleGPU"

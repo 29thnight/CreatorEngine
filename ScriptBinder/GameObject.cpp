@@ -14,6 +14,7 @@ GameObject::GameObject() :
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
+	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
 GameObject::GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -25,6 +26,7 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
+	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
 GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -36,6 +38,7 @@ GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObje
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
+	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
 void GameObject::SetTag(const std::string_view& tag)
@@ -44,10 +47,11 @@ void GameObject::SetTag(const std::string_view& tag)
 	{
 		return; // Avoid adding empty tags
 	}
-        if (TagManager::GetInstance()->HasTag(tag))
-        {
-                m_tag = tag.data();
-        }
+
+    if (TagManager::GetInstance()->HasTag(tag))
+    {
+            m_tag = tag.data();
+    }
 }
 
 void GameObject::SetLayer(const std::string_view& layer)

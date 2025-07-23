@@ -206,7 +206,7 @@ private:
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
 	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
-        std::vector<Light>              m_lights;
+    std::vector<Light>              m_lights;
     std::vector<TerrainComponent*>  m_terrainComponents;
     std::vector<FoliageComponent*>  m_foliageComponents;
 

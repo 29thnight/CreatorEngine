@@ -984,7 +984,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	}
 }
 
-void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData)
+void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigidBodyData)
 {
 	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())

@@ -35,12 +35,14 @@ public:
 
     Scene* CreateScene(const std::string_view& name = "SampleScene");
 	Scene* SaveScene(const std::string_view& name = "SampleScene");
-    Scene* LoadScene(const std::string_view& name = "SampleScene");
+    Scene* LoadSceneImmediate(const std::string_view& name = "SampleScene");
+	Scene* LoadScene(const std::string_view& name = "SampleScene");
 
 	void SaveSceneAsync(const std::string_view& name = "SampleScene");
-    std::future<Scene*> LoadSceneAsync(const std::string_view& name = "SampleScene");
+	std::future<Scene*> LoadSceneAsync(const std::string_view& name = "SampleScene");
+    void LoadSceneAsyncAndWaitCallback(const std::string_view& name = "SampleScene");
 
-	void ActivateScene(Scene* sceneToActivate);
+    void WaitForSceneLoad();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
@@ -91,6 +93,7 @@ public:
     std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };  //TODO: 삭제처리 없음 필요시 추가해야함 //sehwan&&&&&
 private:
+	void ActivateScene(Scene* sceneToActivate);
     void CreateEditorOnlyPlayScene();
 	void DeleteEditorOnlyPlayScene();
     void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);

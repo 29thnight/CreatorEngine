@@ -222,7 +222,7 @@ Scene* SceneManager::SaveScene(const std::string_view& name)
     sceneFileOut.close();
 }
 
-Scene* SceneManager::LoadScene(const std::string_view& name)
+Scene* SceneManager::LoadSceneImmediate(const std::string_view& name)
 {
 	std::string loadSceneName = name.data();
 
@@ -289,14 +289,94 @@ Scene* SceneManager::LoadScene(const std::string_view& name)
 	return m_activeScene;
 }
 
+Scene* SceneManager::LoadScene(const std::string_view& name)
+{
+    std::string loadSceneName = name.data();
+    Scene* scene{ nullptr };
+
+    try
+    {
+        MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
+        file::path sceneName = name.data();
+        scene = Scene::LoadScene(sceneName.stem().string());
+
+        //if(sceneNode["AssetsBundle"])
+        //{
+        //    auto assetsBundleNode = sceneNode["AssetsBundle"];
+        //    if (assetsBundleNode.IsNull())
+        //    {
+        //        Debug->LogError("AssetsBundle node is null.");
+        //    }
+        //    else
+        //    {
+        //        auto* AssetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
+        //        Meta::Deserialize(AssetBundle, assetsBundleNode);
+        //    }
+        //}
+
+        for (const auto& objNode : sceneNode["m_SceneObjects"])
+        {
+            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            if (!type)
+            {
+                Debug->LogError("Failed to extract type from YAML node.");
+                continue;
+            }
+
+            DesirealizeGameObject(scene, type, objNode);
+        }
+        scene->AllUpdateWorldMatrix();
+
+        m_scenes.push_back(scene);
+        sceneLoadedEvent.Broadcast();
+    }
+    catch (const std::exception& e)
+    {
+        Debug->LogError(e.what());
+        return nullptr;
+    }
+
+	return scene;
+}
+
 void SceneManager::SaveSceneAsync(const std::string_view& name)
 {
 }
 
 std::future<Scene*> SceneManager::LoadSceneAsync(const std::string_view& name)
 {
-    // std::launch::async ensures the task runs on a new thread immediately.
     return std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
+        try
+        {
+            // This code runs in a background thread.
+            MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
+            Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
+
+            for (const auto& objNode : sceneNode["m_SceneObjects"])
+            {
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type) {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
+                DesirealizeGameObject(newScene, type, objNode);
+            }
+            newScene->AllUpdateWorldMatrix();
+            return newScene;
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError(e.what());
+            // Returning nullptr indicates failure. The exception is also stored in the future.
+            return nullptr;
+        }
+    });
+}
+
+void SceneManager::LoadSceneAsyncAndWaitCallback(const std::string_view& name)
+{
+    // std::launch::async ensures the task runs on a new thread immediately.
+    m_loadingSceneFuture = std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
         try
         {
             // This code runs in a background thread.

@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "GameObject.h"
 #include "Material.h"
+#include "AnimatorData.h"
 
 class ModelLoader;
 class DataSystem;
@@ -32,11 +33,11 @@ public:
     std::string	name{};
     file::path	path{};
 
-	Animator*   m_animator{};
-    Skeleton*   m_Skeleton{};
-	bool        m_hasBones{ false };
-    int         m_numTotalMeshes{};
-	bool        m_isMakeMeshCollider{ false };
+    AnimatorData*   m_animator{};
+    Skeleton*       m_Skeleton{};
+	bool            m_hasBones{ false };
+    int             m_numTotalMeshes{};
+	bool            m_isMakeMeshCollider{ false };
 
 private:
 	friend class SceneRenderer;

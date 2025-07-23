@@ -65,8 +65,13 @@ namespace Core
 	template <typename Ret, typename... Args>
 	void Delegate<Ret, Args...>::Broadcast(Args... args)
 	{
-		SpinLock lock(atomic_flag_);
-		for (auto& info : callbacks_)
+		std::vector<CallbackInfo> callbacksToInvoke;
+		{
+			SpinLock lock(atomic_flag_);
+			callbacksToInvoke = callbacks_;
+		}
+
+		for (auto& info : callbacksToInvoke)
 		{
 			try { info.callback(args...); }
 			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; continue; }
@@ -76,10 +81,15 @@ namespace Core
 	template<typename Ret, typename ...Args>
 	inline void Delegate<Ret, Args...>::TargetInvoke(DelegateHandle& DelegateHandle, Args ...args)
 	{
-		SpinLock lock(atomic_flag_);
-		auto it = std::find_if(callbacks_.begin(), callbacks_.end(),
+		std::vector<CallbackInfo> callbacksToInvoke;
+		{
+			SpinLock lock(atomic_flag_);
+			callbacksToInvoke = callbacks_;
+		}
+
+		auto it = std::find_if(callbacksToInvoke.begin(), callbacksToInvoke.end(),
 			[&DelegateHandle](const CallbackInfo& info) { return info.handle == DelegateHandle; });
-		if (it != callbacks_.end())
+		if (it != callbacksToInvoke.end())
 		{
 			try { it->callback(args...); }
 			catch (const std::exception& e) { std::cerr << "Delegate Exception: " << e.what() << std::endl; }
