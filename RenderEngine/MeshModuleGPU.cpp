@@ -22,8 +22,11 @@ MeshModuleGPU::MeshModuleGPU()
     // 상수 버퍼 데이터도 초기화
     memset(&m_constantBufferData, 0, sizeof(MeshConstantBuffer));
 }
+
 void MeshModuleGPU::Initialize()
 {
+    if (m_enabled) return;
+
     m_pso = std::make_unique<PipelineStateObject>();
     m_instanceCount = 0;
     m_particleSRV = nullptr;
@@ -667,6 +670,8 @@ std::pair<Mathf::Vector3, Mathf::Vector3> MeshModuleGPU::GetCurrentMeshBounds() 
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
 {
+    if (!m_enabled) return;
+
     auto currentMesh = GetCurrentMesh();
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;

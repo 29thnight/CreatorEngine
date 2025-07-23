@@ -17,16 +17,16 @@ EffectEditor::EffectEditor()
 		}
 
 		// 리스트박스
-		if (ImGui::BeginListBox("##EffectList"))
-		{
-			for (const auto& pair : EffectManagers->GetEffects()) {
-				if (ImGui::Selectable(pair.first.c_str())) {
-					// 선택했을 때 처리할 로직
-					std::cout << "Selected effect: " << pair.first << std::endl;
-				}
-			}
-			ImGui::EndListBox();
-		}
+		//if (ImGui::BeginListBox("##EffectList"))
+		//{
+		//	for (const auto& pair : EffectManagers->GetEffects()) {
+		//		if (ImGui::Selectable(pair.first.c_str())) {
+		//			// 선택했을 때 처리할 로직
+		//			std::cout << "Selected effect: " << pair.first << std::endl;
+		//		}
+		//	}
+		//	ImGui::EndListBox();
+		//}
 		});
 	ImGui::GetContext("EffectList").Close();
 
@@ -158,7 +158,7 @@ void EffectEditor::ExportToManager(const std::string& effectName)
 
 	// EffectManager에 등록
 	if (auto* manager = EffectManagers) {
-		manager->RegisterCustomEffect(effectName, emittersToExport);
+		//manager->RegisterCustomEffect(effectName, emittersToExport);
 
 		// 등록된 Effect를 바로 재생
 		/*if (auto* registeredEffect = manager->GetEffect(effectName)) {

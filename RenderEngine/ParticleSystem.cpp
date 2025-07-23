@@ -452,6 +452,57 @@ void ParticleSystem::SetEffectProgress(float progress)
 	}
 }
 
+void ParticleSystem::ResetForReuse()
+{  
+	m_isRunning = false;
+	m_activeParticleCount = 0;
+	m_effectProgress = 0.0f;
+	m_usingBufferA = true;
+
+	// 모듈들 리셋 (멤버 함수 호출)
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+		module.ResetForReuse();  // ParticleModule의 메서드 호출
+	}
+
+	for (auto* renderModule : m_renderModules) {
+		if (renderModule) {
+			renderModule->ResetForReuse();  // RenderModule의 메서드 호출
+		}
+	}
+}
+
+bool ParticleSystem::IsReadyForReuse()
+{
+	if (m_isRunning) {
+		return false;
+	}
+
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		const ParticleModule& module = *it;
+		if (!module.IsReadyForReuse()) {
+			return false;
+		}
+	}
+
+	for (const auto* renderModule : m_renderModules) {
+		if (renderModule && !renderModule->IsReadyForReuse()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void ParticleSystem::WaitForGPUCompletion()
+{
+	DeviceState::g_pDeviceContext->Flush();
+
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		ParticleModule& module = *it;
+		module.WaitForGPUCompletion();
+	}
+}
+
 void ParticleSystem::ConfigureModuleBuffers(ParticleModule& module, bool isFirstModule)
 {
 	// Update 함수에서 직접 처리하므로 이 함수는 필요 없을 수 있음 

@@ -66,6 +66,8 @@ MeshSpawnModuleCS::~MeshSpawnModuleCS()
 
 void MeshSpawnModuleCS::Initialize()
 {
+    if (m_enabled) return;
+
     if (m_isInitialized)
         return;
 
@@ -92,6 +94,8 @@ void MeshSpawnModuleCS::Initialize()
 
 void MeshSpawnModuleCS::Update(float deltaTime)
 {
+    if (!m_enabled) return;
+
     if (m_isInitialized == 0)
     {
         OutputDebugStringA("ERROR: MeshSpawnModule not initialized!\n");

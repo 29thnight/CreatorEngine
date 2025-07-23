@@ -45,6 +45,8 @@ ColorModuleCS::~ColorModuleCS()
 
 void ColorModuleCS::Initialize()
 {
+    if (m_enabled) return;
+
     if (m_isInitialized)
         return;
 
@@ -62,6 +64,9 @@ void ColorModuleCS::Initialize()
 
 void ColorModuleCS::Update(float deltaTime)
 {
+    if (!m_enabled) return;
+
+
     if (!m_isInitialized)
         return;
 

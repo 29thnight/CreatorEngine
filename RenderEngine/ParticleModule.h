@@ -18,6 +18,14 @@ public:
 	virtual void Update(float delta) {}
 	virtual void Release() {}
 
+	virtual void ResetForReuse() {}
+	virtual bool IsReadyForReuse() const { return true; }
+	virtual void WaitForGPUCompletion() {}
+
+
+	void SetEnabled(bool enabled) { m_enabled = enabled; }
+	bool IsEnabled() const { return m_enabled; }
+
 	void SetEasingType(EasingEffect type)
 	{
 		m_easingType = type;
@@ -91,4 +99,6 @@ protected:
 
 	// 파이프라인 변수
 	ModuleStage m_stage = ModuleStage::SIMULATION;
+
+	bool m_enabled = true;
 };

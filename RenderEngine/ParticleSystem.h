@@ -30,7 +30,7 @@ public:
 		static_assert(std::is_base_of<ParticleModule, T>::value, "T must derive from ParticleModule");
 
 		T* module = new T(std::forward<Args>(args)...);
-		module->Initialize();
+		//module->Initialize();
 		module->OnSystemResized(m_maxParticles);
 		m_moduleList.Link(module);
 		return module;
@@ -41,7 +41,7 @@ public:
 		if (module)
 		{
 			ParticleModule* rawPtr = module.release(); // unique_ptr에서 소유권 해제
-			rawPtr->Initialize();
+			//rawPtr->Initialize();
 			rawPtr->OnSystemResized(m_maxParticles);
 			m_moduleList.Link(rawPtr);
 		}
@@ -70,7 +70,7 @@ public:
 			"T must be derived from RenderModules");
 
 		T* module = new T(std::forward<Args>(args)...);
-		module->Initialize();
+		//module->Initialize();
 		m_renderModules.push_back(module);
 		return module;
 	}
@@ -80,7 +80,7 @@ public:
 		if (renderModule)
 		{
 			RenderModules* rawPtr = renderModule.release(); // unique_ptr에서 소유권 해제
-			rawPtr->Initialize();
+			//rawPtr->Initialize();
 			m_renderModules.push_back(rawPtr);
 		}
 	}
@@ -152,6 +152,13 @@ public:
 
 	void SetEffectProgress(float progress);
 
+	void ResetForReuse();
+
+	bool IsReadyForReuse();
+
+	void WaitForGPUCompletion();
+
+public:
 	std::string m_name{};
 private:
 

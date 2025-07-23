@@ -3,12 +3,16 @@
 
 void MovementModuleCS::Initialize()
 {
+    if (m_enabled) return;
+
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();
 }
 
 void MovementModuleCS::Update(float delta)
 {
+    if (!m_enabled) return;
+
     DirectX11::BeginEvent(L"MovementModuleCS");
 
     // 상수 버퍼 업데이트

@@ -135,6 +135,45 @@ public:
         }
     }
 
+    // 풀링을 위한 재사용 리셋
+    void ResetForReuse() {
+        Stop();
+        m_state = EffectState::Stopped;
+        m_currentTime = 0.0f;
+        m_position = Mathf::Vector3(0, 0, 0);
+        m_rotation = Mathf::Vector3(0, 0, 0);
+
+        // ParticleSystem들 리셋 (멤버 함수 호출)
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->ResetForReuse();
+            }
+        }
+    }
+
+    // 재사용 준비 완료 여부 체크
+    bool IsReadyForReuse() const {
+        if (m_state != EffectState::Stopped) {
+            return false;
+        }
+
+        for (const auto& ps : m_particleSystems) {
+            if (ps && !ps->IsReadyForReuse()) {  
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // GPU 작업 완료 대기
+    void WaitForGPUCompletion() {
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->WaitForGPUCompletion();
+            }
+        }
+    }
+
     const Mathf::Vector3& GetRotation() const { return m_rotation; }
 
     // ParticleSystem 관리

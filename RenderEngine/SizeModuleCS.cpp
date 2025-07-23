@@ -30,6 +30,8 @@ SizeModuleCS::~SizeModuleCS()
 
 void SizeModuleCS::Initialize()
 {
+    if (m_enabled) return;
+
     if (m_isInitialized)
         return;
 
@@ -51,6 +53,8 @@ void SizeModuleCS::Initialize()
 
 void SizeModuleCS::Update(float deltaTime)
 {
+    if (!m_enabled) return;
+
     if (!m_isInitialized)
     {
         OutputDebugStringA("ERROR: SizeModuleCS not initialized!\n");

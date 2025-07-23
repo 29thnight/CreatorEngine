@@ -116,7 +116,7 @@ public:
     {
         EffectManagerProxy cmd;
         cmd.m_executeFunction = [templateName, instanceName]() {
-            EffectManagers->CreateEffectInstance(templateName, instanceName);
+            //EffectManagers->CreateEffectInstance(templateName, instanceName);
             };
         return cmd;
     }

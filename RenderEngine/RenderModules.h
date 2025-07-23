@@ -62,6 +62,13 @@ public:
     virtual void BindResource() {}
     virtual void SetupRenderTarget(RenderPassData* renderData) {}
 
+    virtual void ResetForReuse() {}
+    virtual bool IsReadyForReuse() const { return true; }
+    virtual void WaitForGPUCompletion() {}
+
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
+    bool IsEnabled() const { return m_enabled; }
+
     virtual void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instancecount) = 0;
 
     void movePSO(std::unique_ptr<PipelineStateObject> pso) { m_pso.swap(pso); }
@@ -108,6 +115,9 @@ protected:
 
     float m_effectProgress = 0.0f;
     bool m_useEffectProgress = false;
+
+    bool m_enabled = true;
+
 private:
     ID3D11DepthStencilState* m_prevDepthState = nullptr;
     UINT m_prevStencilRef = 0;

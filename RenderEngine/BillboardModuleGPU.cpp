@@ -4,6 +4,8 @@
 
 void BillboardModuleGPU::Initialize()
 {
+	if (m_enabled) return;
+
 	m_vertices = Quad;
 	m_indices = Indices;
 
@@ -70,7 +72,6 @@ void BillboardModuleGPU::Initialize()
 
 	CreateBillboard();
 }
-
 
 void BillboardModuleGPU::Release()
 {
@@ -159,6 +160,47 @@ void BillboardModuleGPU::BindResource()
 	// 파티클 SRV 바인딩
 	deviceContext->VSSetShaderResources(0, 1, &m_particleSRV);
 }
+
+void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
+{
+	if (!m_enabled) return;
+
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+
+	m_ModelConstantBuffer.world = world;
+	m_ModelConstantBuffer.view = view;
+	m_ModelConstantBuffer.projection = projection;
+
+	deviceContext->VSSetConstantBuffers(0, 1, m_ModelBuffer.GetAddressOf());
+	DirectX11::UpdateBuffer(m_ModelBuffer.Get(), &m_ModelConstantBuffer);
+
+	BindResource();
+
+	// 버텍스 및 인덱스 버퍼 설정
+	UINT stride = sizeof(BillboardVertex);
+	UINT offset = 0;
+	deviceContext->IASetVertexBuffers(0, 1, billboardVertexBuffer.GetAddressOf(), &stride, &offset);
+	deviceContext->IASetIndexBuffer(billboardIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+
+	// 인스턴스 렌더링 - 인스턴스 버퍼 없이 인스턴스 수만 사용
+	deviceContext->DrawIndexedInstanced(m_indices.size(), m_instanceCount, 0, 0, 0);
+
+	// 리소스 해제
+	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
+	deviceContext->VSSetShaderResources(0, 1, nullSRV);
+
+	DirectX11::UnbindRenderTargets();
+}
+
+void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
+{
+	m_particleSRV = particleSRV;
+	m_instanceCount = instanceCount;
+}
+
+
+
+// 직렬화 함수
 
 nlohmann::json BillboardModuleGPU::SerializeData() const
 {
@@ -292,40 +334,3 @@ std::string BillboardModuleGPU::GetModuleType() const
 {
 	return "BillboardModuleGPU";
 }
-
-void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
-{
-	auto& deviceContext = DeviceState::g_pDeviceContext;
-
-	m_ModelConstantBuffer.world = world;
-	m_ModelConstantBuffer.view = view;
-	m_ModelConstantBuffer.projection = projection;
-
-	deviceContext->VSSetConstantBuffers(0, 1, m_ModelBuffer.GetAddressOf());
-	DirectX11::UpdateBuffer(m_ModelBuffer.Get(), &m_ModelConstantBuffer);
-
-	BindResource();
-
-	// 버텍스 및 인덱스 버퍼 설정
-	UINT stride = sizeof(BillboardVertex);
-	UINT offset = 0;
-	deviceContext->IASetVertexBuffers(0, 1, billboardVertexBuffer.GetAddressOf(), &stride, &offset);
-	deviceContext->IASetIndexBuffer(billboardIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-
-	// 인스턴스 렌더링 - 인스턴스 버퍼 없이 인스턴스 수만 사용
-	deviceContext->DrawIndexedInstanced(m_indices.size(), m_instanceCount, 0, 0, 0);
-
-	// 리소스 해제
-	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-	deviceContext->VSSetShaderResources(0, 1, nullSRV);
-
-	DirectX11::UnbindRenderTargets();
-}
-
-void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)
-{
-	m_particleSRV = particleSRV;
-	m_instanceCount = instanceCount;
-}
-
-

@@ -70,6 +70,9 @@ public:
     virtual void OnSystemResized(UINT maxParticles) override;
     virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) override;
 
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
+
     // JSON 직렬화용 메소드들 추가 
     const SpawnParams& GetSpawnParams() const { return m_spawnParams; }
     const ParticleTemplateParams& GetParticleTemplate() const { return m_particleTemplate; }
