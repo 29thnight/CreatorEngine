@@ -328,7 +328,7 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 		auto terrainMesh = terrainProxy->m_terrainMesh;
 		auto terrainMaterial = terrainProxy->m_terrainMaterial;
 
-		if (terrainMesh)
+		if (terrainMesh && terrainMaterial)
 		{
 			DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, terrainMaterial->GetLayerBuffer());
 			scene.UpdateModel(terrainProxy->m_worldMatrix, deferredPtr);

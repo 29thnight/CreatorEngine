@@ -115,8 +115,6 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 
 	m_updateFunction = [=]()
 	{
-		proxyObject->m_terrainMesh = pComponent->m_pMesh;
-		proxyObject->m_terrainMaterial = pComponent->m_pMaterial;
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 	};

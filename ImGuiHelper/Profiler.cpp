@@ -34,16 +34,17 @@ void CPUProfiler::BeginEvent(const char* pName, const char* pFilePath, uint32 li
 	if (m_Paused)
 		return;
 
-	EventData& data = GetData();
-	uint32 newIndex = data.NumEvents.fetch_add(1);
-	check(newIndex < data.Events.size());
-
 	TLS& tls = GetTLS();
+	uint32 newIndex = tls.NumEvents.fetch_add(1);
+	if (newIndex >= tls.EventBuffer.size())
+	{
+		tls.EventBuffer.resize(newIndex + 1);
+	}
 
-	EventData::Event& newEvent = data.Events[newIndex];
+	EventData::Event& newEvent = tls.EventBuffer[newIndex];
 	newEvent.Depth = tls.EventStack.GetSize();
 	newEvent.ThreadIndex = tls.ThreadIndex;
-	newEvent.pName = data.Allocator.String(pName);
+	newEvent.pName = pName;
 	newEvent.pFilePath = pFilePath;
 	newEvent.LineNumber = lineNumber;
 	QueryPerformanceCounter((LARGE_INTEGER*)(&newEvent.TicksBegin));
@@ -61,7 +62,8 @@ void CPUProfiler::EndEvent()
 	if (m_Paused)
 		return;
 
-	EventData::Event& event = GetData().Events[GetTLS().EventStack.Pop()];
+	TLS& tls = GetTLS();
+	EventData::Event& event = tls.EventBuffer[tls.EventStack.Pop()];
 	QueryPerformanceCounter((LARGE_INTEGER*)(&event.TicksEnd));
 }
 
@@ -75,12 +77,28 @@ void CPUProfiler::Tick()
 	if (m_FrameIndex)
 		EndEvent();
 
-	// Check if all threads have ended all open sample events
+	EventData& frame = GetData();
+	frame.NumEvents = 0;
+
 	for (auto& threadData : m_ThreadData)
-		check(threadData.pTLS->EventStack.GetSize() == 0);
+	{
+		TLS* pTLS = const_cast<TLS*>(threadData.pTLS);
+		for (uint32 i = 0; i < pTLS->NumEvents; ++i)
+		{
+			EventData::Event& event = pTLS->EventBuffer[i];
+			if (event.TicksEnd > 0)
+			{
+				uint32 newIndex = frame.NumEvents.fetch_add(1);
+				check(newIndex < frame.Events.size());
+				EventData::Event& newEvent = frame.Events[newIndex];
+				newEvent = event;
+				newEvent.pName = frame.Allocator.String(event.pName);
+			}
+		}
+		pTLS->NumEvents = 0;
+	}
 
 	// Sort the events by thread and group by thread
-	EventData& frame = GetData();
 	std::vector<EventData::Event>& events = frame.Events;
 	std::sort(events.begin(), events.begin() + frame.NumEvents, [](const EventData::Event& a, const EventData::Event& b)
 		{
@@ -90,10 +108,10 @@ void CPUProfiler::Tick()
 	URange eventRange(0, 0);
 	for (uint32 threadIndex = 0; threadIndex < (uint32)m_ThreadData.size(); ++threadIndex)
 	{
-		while (threadIndex < events[eventRange.Begin].ThreadIndex)
+		while (eventRange.Begin < frame.NumEvents && threadIndex < events[eventRange.Begin].ThreadIndex)
 			eventRange.Begin++;
 		eventRange.End = eventRange.Begin;
-		while (events[eventRange.End].ThreadIndex == threadIndex && eventRange.End < frame.NumEvents)
+		while (eventRange.End < frame.NumEvents && events[eventRange.End].ThreadIndex == threadIndex)
 			++eventRange.End;
 
 		frame.EventsPerThread[threadIndex] = Span<const EventData::Event>(&events[eventRange.Begin], eventRange.End - eventRange.Begin);
