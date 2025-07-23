@@ -93,8 +93,6 @@ public:
     //브러시 마스크 관련
     bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
     void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
-    
-
 
     // Collider용 접근자
     int GetWidth()  const { return m_width; }

@@ -25,6 +25,7 @@ public:
 	FrameProxyFindInstanceIDs m_findShadowProxyVec[STORE_FRAME_COUNT];
 	ProxyContainer			  m_deferredQueue;
 	ProxyContainer			  m_forwardQueue;
+	ProxyContainer            m_terrainQueue;
 	ProxyContainer			  m_shadowRenderQueue;
 	Camera					  m_shadowCamera;
 	//flags

@@ -150,8 +150,6 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     DirectX11::OMSetRenderTargets(deferredPtr, 2, rtv, nullptr);
     DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 
-    
-
     camera.UpdateBuffer(deferredPtr);
     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
     DirectX11::UpdateBuffer(deferredPtr, m_shadowcamBuffer.Get(), &cameraview);

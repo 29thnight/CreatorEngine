@@ -19,7 +19,8 @@
 
 Scene::Scene()
 {
-    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
+	resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
+	m_SceneObjects.reserve(3000);
 }
 
 Scene::~Scene()

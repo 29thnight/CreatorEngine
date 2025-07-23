@@ -160,6 +160,9 @@
     <Filter Include="Classes\Components\InputComponent">
       <UniqueIdentifier>{13466114-f9ae-4851-b65c-0b0923c77d7d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\FoliageBase">
+      <UniqueIdentifier>{76844eaa-1807-4ec5-9e3d-adf5a3c0bab7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -580,6 +583,9 @@
     </ClInclude>
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageBaseType.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

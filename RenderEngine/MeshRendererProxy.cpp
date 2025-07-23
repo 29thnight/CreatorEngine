@@ -70,7 +70,12 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
     m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
     m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
 {
-    m_instancedID = component->GetInstanceID();
+    GameObject* owner = component->GetOwner();
+    if (owner)
+    {
+        //m_materialGuid = m_Material->m_materialGuid;
+        m_instancedID = component->GetInstanceID();
+    }
     m_proxyType = PrimitiveProxyType::FoliageComponent;
 }
 
@@ -161,8 +166,8 @@ void PrimitiveRenderProxy::Draw()
         break;
     }
     case PrimitiveProxyType::FoliageComponent:
-        if (nullptr == m_Mesh) return;
-        m_Mesh->Draw();
+
+        Debug->LogError("FoliageComponent does not support normal draw function");
         break;
     default:
         break;
@@ -198,8 +203,7 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
     }
     case PrimitiveProxyType::FoliageComponent:
     {
-        if (nullptr == m_Mesh || nullptr == _deferredContext) return;
-        m_Mesh->Draw(_deferredContext);
+		Debug->LogError("FoliageComponent does not support normal draw function");
         break;
     }
     default:

@@ -1,5 +1,6 @@
 #include "ProxyCommand.h"
 #include "MeshRenderer.h"
+#include "Terrain.h"
 #include "FoliageComponent.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
@@ -97,6 +98,22 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 			proxyObject->m_Material = originMat;
 			proxyObject->m_materialGuid = originMatGuid;
 		}
+	};
+}
+
+ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
+{
+	m_proxyGUID = pComponent->GetInstanceID();
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto owner = pComponent->GetOwner();
+	if (!owner) return;
+	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
+	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	m_updateFunction = [=]()
+	{
+		proxyObject->m_worldMatrix = worldMatrix;
+		proxyObject->m_worldPosition = worldPosition;
 	};
 }
 

@@ -36,7 +36,10 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 	inputInfo.id = m_controllerInfo.id;
 	inputInfo.input = input;
 
-	inputInfo.isDynamic = GetOwner()->GetComponent<RigidBodyComponent>()->GetBodyType() == EBodyType::DYNAMIC;
+	auto component = GetOwner()->GetComponent<RigidBodyComponent>();
+	if (!component) return;
+
+	inputInfo.isDynamic = component->GetBodyType() == EBodyType::DYNAMIC;
 	Physics->AddInputMove(inputInfo);
 
 

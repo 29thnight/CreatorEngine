@@ -957,7 +957,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	}
 }
 
-void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigidBodyData)
+void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigidBodyData)
 {
 	//데이터를 설정할 리지드 바디가 등록되어 있는지 검사
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
@@ -1022,7 +1022,6 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 			}
 			else 
 			{
-				
 				if (rigidBodyData.m_EColliderType == EColliderType::COLLISION) //&&&&&키는거 만드는중
 				{
 					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
@@ -1033,11 +1032,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id,RigidBodyGetSetData& rigid
 					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
 					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
 				}
-
-
-				
 			}
-
 		}
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
