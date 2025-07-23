@@ -1063,8 +1063,6 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 
 	ofs.close();
 
-
-
 	Debug->LogDebug("Terrain built successfully: " + Utf8Encode(terrainFile.wstring()));
 }
 
