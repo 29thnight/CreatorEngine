@@ -11,17 +11,19 @@ GameObject::GameObject() :
 	m_index(0),
 	m_parentIndex(-1)
 {
+	m_ownerScene = SceneManagers->GetActiveScene();
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
-GameObject::GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(Scene* scene, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
     Object(name),
     m_gameObjectType(type),
     m_index(index), 
-    m_parentIndex(parentIndex)
+    m_parentIndex(parentIndex),
+	m_ownerScene(scene)
 {
     m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
@@ -29,11 +31,12 @@ GameObject::GameObject(const std::string_view& name, GameObjectType type, GameOb
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
-GameObject::GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(Scene* scene, size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
 	Object(name, instanceID),
 	m_gameObjectType(type),
 	m_index(index),
-	m_parentIndex(parentIndex)
+	m_parentIndex(parentIndex),
+	m_ownerScene(scene)
 {
 	m_typeID = { TypeTrait::GUIDCreator::GetTypeID<GameObject>() };
 	m_transform.SetOwner(this);
@@ -101,6 +104,10 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 	
     if (component)
     {
+		if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
+		{
+			receiver->RegisterOverriddenEvents(this->GetScene());
+		}
         m_components.push_back(component);
         component->SetOwner(this);
         m_componentIds[component->GetTypeID()] = m_components.size() - 1;

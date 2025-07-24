@@ -1,13 +1,12 @@
 #pragma once
 #include "FoliageBaseType.h"
 #include "Component.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
+#include "IRegistableEvent.h"
 #include "GameObject.h"
 #include "Terrain.h"
 #include "FoliageComponent.generated.h"
 
-class FoliageComponent : public Component, public IAwakable, public IOnDestroy
+class FoliageComponent : public Component, public RegistableEvent<FoliageComponent>
 {
 public:
     ReflectFoliageComponent

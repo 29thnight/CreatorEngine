@@ -7,6 +7,7 @@
 #include "LightController.h"
 #include "RenderableComponents.h"
 #include "RenderScene.h"
+#include "SceneManager.h"
 #include "Material.h"
 #include "Core.Random.h"
 #include "PositionMapPass.h"

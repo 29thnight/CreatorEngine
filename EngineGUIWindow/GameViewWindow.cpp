@@ -3,6 +3,7 @@
 #include "SceneRenderer.h"
 #include "CameraComponent.h"
 #include "IconsFontAwesome6.h"
+#include "SceneManager.h"
 #include "fa.h"
 
 void GameViewWindow::RenderGameViewWindow()

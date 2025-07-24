@@ -1,12 +1,11 @@
 #pragma once
 #include "Component.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
+#include "IRegistableEvent.h"
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 #include "SphereColliderComponent.generated.h"
 
-class SphereColliderComponent : public Component, public ICollider, public IAwakable, public IOnDestroy
+class SphereColliderComponent : public Component, public ICollider, public RegistableEvent<SphereColliderComponent>
 {
 public:
    ReflectSphereColliderComponent

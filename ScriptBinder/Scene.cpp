@@ -57,7 +57,7 @@ void Scene::AddRootGameObject(const std::string_view& name)
 	}
 
 	GameObject::Index index = m_SceneObjects.size();
-	auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, GameObjectType::Empty, index, -1);
+	auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
 	if (nullptr == ptr)
 	{
 		return;
@@ -89,7 +89,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
 	GameObject::Index index = m_SceneObjects.size();
-    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         return nullptr;
@@ -138,7 +138,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
     GameObject::Index index = m_SceneObjects.size();
-    auto ptr = ObjectPool::Allocate<GameObject>(uniqueName, type, index, parentIndex);
+    auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         return nullptr;

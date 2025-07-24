@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "IUpdatable.h"
+#include "IRegistableEvent.h"
 #include "UIManager.h"
 #include "UIComponent.h"
 #include "UIButton.generated.h"
@@ -15,7 +15,7 @@ enum class UIColliderType
 };
 AUTO_REGISTER_ENUM(UIColliderType);
 
-class UIButton : public UIComponent, public IUpdatable
+class UIButton : public UIComponent, public RegistableEvent<UIButton>
 {
 public:
    ReflectUIButton

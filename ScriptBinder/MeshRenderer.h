@@ -4,15 +4,14 @@
 #include "GameObject.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
-#include "IOnDestroy.h"
-#include "IAwakable.h"
+#include "IRegistableEvent.h"
 #include "MeshRenderer.generated.h"
 
 class Mesh;
 class Material;
 class Animator;
 class OctreeNode;
-class MeshRenderer : public Component, public IOnDestroy, public IAwakable
+class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>
 {
 public:
    ReflectMeshRenderer
