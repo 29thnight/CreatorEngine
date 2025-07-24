@@ -8,6 +8,7 @@ struct FoliageType
     Mesh* m_mesh{ nullptr };
     Material* m_material{ nullptr };
     bool m_castShadow{ true };
+	std::string m_modelName{};
 };
 
 struct FoliageInstance

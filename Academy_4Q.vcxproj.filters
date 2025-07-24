@@ -54,9 +54,6 @@
     <Filter Include="Settings\ProjectSetting">
       <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\ReferenceAssetsWindow%28작성%3f%29">
-      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
