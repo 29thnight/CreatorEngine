@@ -213,6 +213,7 @@ public:
 	struct TLS
 	{
 		static constexpr int MAX_STACK_DEPTH = 32;
+		static constexpr int EVENT_BUFFER_SIZE = 1024;
 
 		template<typename T, uint32 N>
 		struct FixedStack
@@ -249,6 +250,9 @@ public:
 		FixedStack<uint32, MAX_STACK_DEPTH> EventStack;
 		uint32								ThreadIndex = 0;
 		bool								IsInitialized = false;
+
+		std::vector<EventData::Event> EventBuffer;
+		std::atomic<uint32> NumEvents = 0;
 	};
 
 	// Structure describing a registered thread
@@ -324,7 +328,6 @@ private:
 	bool					m_QueuedPaused = false;	// The queued pause state
 };
 
-
 // Helper RAII-style structure to push and pop a CPU sample region
 struct CPUProfileScope
 {
@@ -346,14 +349,4 @@ struct CPUProfileScope
 	CPUProfileScope(const CPUProfileScope&) = delete;
 	CPUProfileScope& operator=(const CPUProfileScope&) = delete;
 };
-#else
-#define PROFILER_INITIALIZE(size_T, size)
-#define PROFILER_SHUTDOWN()
-
-#define PROFILE_REGISTER_THREAD(...)
-#define PROFILE_FRAME()
-
-#define PROFILE_CPU_SCOPE(...)
-#define PROFILE_CPU_BEGIN(...)
-#define PROFILE_CPU_END()
 #endif // !DYNAMICCPP_EXPORTS

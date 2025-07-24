@@ -1,5 +1,6 @@
 #include "MeshModuleGPU.h"
 #include "ShaderSystem.h"
+#include "DataSystem.h"
 
 MeshModuleGPU::MeshModuleGPU()
 {
@@ -47,7 +48,7 @@ void MeshModuleGPU::Initialize()
 
     // 래스터라이저 스테이트
     CD3D11_RASTERIZER_DESC rasterizerDesc{ CD3D11_DEFAULT() };
-    rasterizerDesc.CullMode = D3D11_CULL_BACK;
+    rasterizerDesc.CullMode = D3D11_CULL_NONE;
     rasterizerDesc.FillMode = D3D11_FILL_SOLID;
     DirectX11::ThrowIfFailed(
         DeviceState::g_pDevice->CreateRasterizerState(&rasterizerDesc, &m_pso->m_rasterizerState)

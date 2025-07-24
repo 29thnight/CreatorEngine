@@ -14,12 +14,9 @@ RigidBody::RigidBody(EColliderType collidreType, unsigned int id, unsigned int l
 
 }
 
-
 RigidBody::~RigidBody()
 {
 }
-
-
 
 void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData)
 {

@@ -110,7 +110,6 @@ void TerrainComponent::Initialize()
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
-
 	m_width = newWidth;
 	m_height = newHeight;
 	m_heightMap.assign(m_width * m_height, 0.0f);
@@ -522,9 +521,6 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		isRelative = true;
 	}
 
-
-
-
 	//.meta -> json 읽기
 
 	std::ifstream ifs(metaPath);
@@ -636,7 +632,13 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		}
 	}
 	tmpLayerDescs.clear();
-
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto proxy = renderScene->FindProxy(GetInstanceID());
+	if (proxy)
+	{
+		proxy->m_terrainMesh = m_pMesh;
+		proxy->m_terrainMaterial = m_pMaterial;
+	}
 }
 
 void TerrainComponent::SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH)
@@ -703,7 +705,6 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath,float 
     
 }
 
-
 void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
 {
 	int w = m_width;
@@ -726,7 +727,6 @@ void TerrainComponent::SaveEditorSplatMap(const std::wstring& pngPath)
 		throw std::runtime_error("Failed to save splat map to PNG: " + utf8Path);
 	}
 }
-
 
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, std::vector<std::vector<float>>& out)
 {
@@ -801,6 +801,13 @@ void TerrainComponent::Awake()
 	if (scene)
 	{
 		scene->CollectTerrainComponent(this);
+		renderScene->RegisterCommand(this);
+		auto proxy = renderScene->FindProxy(GetInstanceID());
+		if (proxy)
+		{
+			proxy->m_terrainMesh = m_pMesh;
+			proxy->m_terrainMaterial = m_pMaterial;
+		}
 	}
 }
 
@@ -811,12 +818,18 @@ void TerrainComponent::OnDestroy()
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
+		auto proxy = renderScene->FindProxy(GetInstanceID());
+		if (proxy)
+		{
+			proxy->m_terrainMesh = nullptr;
+			proxy->m_terrainMaterial = nullptr;
+		}
+		renderScene->UnregisterCommand(this);
 	}
 }
 
 void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling)
 {
-
 	TerrainLayer newLayer;
 	newLayer.m_layerID = m_nextLayerID++;
 	newLayer.tilling = tilling;
@@ -917,8 +930,6 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 		return;
 	}
 
-	
-	
 	// 브러쉬 마스크 텍스쳐 생성
 	{
 		D3D11_TEXTURE2D_DESC desc = {};
@@ -1051,8 +1062,6 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 	}
 
 	ofs.close();
-
-
 
 	Debug->LogDebug("Terrain built successfully: " + Utf8Encode(terrainFile.wstring()));
 }

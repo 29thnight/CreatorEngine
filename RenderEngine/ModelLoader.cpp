@@ -64,7 +64,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fil
     {
         if (0 < m_AIScene->mNumAnimations)
         {
-            m_model->m_animator = new Animator();
+            m_model->m_animator = new AnimatorData();
         }
     }
 }
@@ -150,9 +150,8 @@ Model* ModelLoader::LoadModel(bool isCreateMeshCollider)
 		{
 			Skeleton* skeleton = m_skeletonLoader.GenerateSkeleton(m_AIScene->mRootNode);
 			m_model->m_Skeleton = skeleton;
-			Animator* animator = m_model->m_animator;
+			AnimatorData* animator = m_model->m_animator;
 			animator->m_Motion = m_fileGuid;
-			animator->SetEnabled(true);
 			animator->m_Skeleton = skeleton;
 		}
 		ParseModel(); //not used in current implementation
@@ -475,7 +474,7 @@ void SetParentIndexRecursive(Bone* bone, int parent)
 void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 {
     Skeleton* skeleton = m_model->m_Skeleton;
-	Animator* animator = m_model->m_animator;
+	AnimatorData* animator = m_model->m_animator;
     if (!skeleton || !animator)
         return;
 
@@ -838,10 +837,9 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
     m_model->m_Skeleton = skeleton;
     m_model->m_hasBones = true;
 	
-	m_model->m_animator = new Animator();
+	m_model->m_animator = new AnimatorData();
 	m_model->m_animator->m_Skeleton = skeleton;
 	m_model->m_animator->m_Motion.m_guid = guid;
-	m_model->m_animator->SetEnabled(true);
 }
 
 void ModelLoader::ProcessBones(aiMesh* mesh, std::vector<Vertex>& vertices)
@@ -912,7 +910,6 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 				convexMesh->SetRestitution(0);
 			}
 
-			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
@@ -947,7 +944,6 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 				convexMesh->SetRestitution(0);
 			}
 
-			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
@@ -1017,7 +1013,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		if (m_model->m_hasBones)
 		{
 			m_animator = rootObject->AddComponent<Animator>();
-			m_animator->SetEnabled(true);
 			m_animator->m_Motion = m_model->m_animator->m_Motion;
 			m_animator->m_Skeleton = m_model->m_Skeleton;
 			m_isSkinnedMesh = true;
@@ -1044,7 +1039,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 				convexMesh->SetRestitution(0);
 			}
 
-			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
@@ -1078,7 +1072,6 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 				convexMesh->SetRestitution(0);
 			}
 
-			meshRenderer->SetEnabled(true);
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;

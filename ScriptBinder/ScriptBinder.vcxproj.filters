@@ -160,6 +160,9 @@
     <Filter Include="Classes\Components\InputComponent">
       <UniqueIdentifier>{13466114-f9ae-4851-b65c-0b0923c77d7d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\FoliageBase">
+      <UniqueIdentifier>{76844eaa-1807-4ec5-9e3d-adf5a3c0bab7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -329,12 +332,6 @@
     <ClInclude Include="Object.h">
       <Filter>Classes\Object</Filter>
     </ClInclude>
-    <ClInclude Include="IUpdatable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
-    <ClInclude Include="IFixedUpdatable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
     <ClInclude Include="ImageComponent.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
@@ -374,9 +371,6 @@
     <ClInclude Include="AniTransition.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="IAwakable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
     <ClInclude Include="BoxColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
@@ -397,9 +391,6 @@
     </ClInclude>
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="IOnDestroy.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
       <Filter>Classes\Components\LightComponent</Filter>
@@ -464,12 +455,6 @@
     <ClInclude Include="IProjectSetting.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="IOnEnable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
-    <ClInclude Include="IOnDisable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
     <ClInclude Include="ArticulationData.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
@@ -520,12 +505,6 @@
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
-    </ClInclude>
-    <ClInclude Include="IStartable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
-    </ClInclude>
-    <ClInclude Include="ILateUpdatable.h">
-      <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
     <ClInclude Include="EBodyType.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
@@ -580,6 +559,12 @@
     </ClInclude>
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageBaseType.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
+    </ClInclude>
+    <ClInclude Include="IRegistableEvent.h">
+      <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

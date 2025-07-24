@@ -90,21 +90,6 @@ struct Vertex
 	}
 };
 
-struct InstanceVertex
-{
-	Mathf::Vector3 position;
-	Mathf::Vector3 normal;
-	Mathf::Vector2 uv0;
-	Mathf::Vector2 uv1;
-	Mathf::Vector3 tangent;
-	Mathf::Vector3 bitangent;
-	uint32 instanceID;
-	InstanceVertex() = default;
-	InstanceVertex(const Vertex& vertex, uint32 id) :
-		position(vertex.position), normal(vertex.normal), uv0(vertex.uv0), uv1(vertex.uv1),
-		tangent(vertex.tangent), bitangent(vertex.bitangent), instanceID(id) {}
-};
-
 class Texture;
 class Material;
 class ModelLoader;

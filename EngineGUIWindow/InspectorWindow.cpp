@@ -709,7 +709,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			{
 				if (ImGui::MenuItem("		Remove Component"))
 				{
-					selectedSceneObject->RemoveComponent(selectedComponent);
+					if (selectedComponent) {
+						selectedSceneObject->RemoveComponent(selectedComponent);
+					}
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
 				}

@@ -183,16 +183,16 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 
 void RenderScene::RegisterCommand(FoliageComponent* foliagePtr)
 {
-        if (nullptr == foliagePtr) return;
+    if (nullptr == foliagePtr) return;
 
-        HashedGuid guid = foliagePtr->GetInstanceID();
+    HashedGuid guid = foliagePtr->GetInstanceID();
 
-        SpinLock lock(m_proxyMapFlag);
+    SpinLock lock(m_proxyMapFlag);
 
-        if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
+    if (m_proxyMap.find(guid) != m_proxyMap.end()) return;
 
-        auto managed = std::make_shared<PrimitiveRenderProxy>(foliagePtr);
-        m_proxyMap[guid] = managed;
+    auto managed = std::make_shared<PrimitiveRenderProxy>(foliagePtr);
+    m_proxyMap[guid] = managed;
 }
 
 bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
@@ -217,22 +217,22 @@ bool RenderScene::InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr)
 
 bool RenderScene::InvaildCheckFoliage(FoliageComponent* foliagePtr)
 {
-        if (nullptr == foliagePtr || foliagePtr->IsDestroyMark()) return false;
+    if (nullptr == foliagePtr || foliagePtr->IsDestroyMark()) return false;
 
-        auto owner = foliagePtr->GetOwner();
-        if (nullptr == owner || owner->IsDestroyMark()) return false;
+    auto owner = foliagePtr->GetOwner();
+    if (nullptr == owner || owner->IsDestroyMark()) return false;
 
-        HashedGuid guid = foliagePtr->GetInstanceID();
+    HashedGuid guid = foliagePtr->GetInstanceID();
 
-        SpinLock lock(m_proxyMapFlag);
+    SpinLock lock(m_proxyMapFlag);
 
-        if (m_proxyMap.find(guid) == m_proxyMap.end()) return false;
+    if (m_proxyMap.find(guid) == m_proxyMap.end()) return false;
 
-        auto& proxyObject = m_proxyMap[guid];
+    auto& proxyObject = m_proxyMap[guid];
 
-        if (nullptr == proxyObject) return false;
+    if (nullptr == proxyObject) return false;
 
-        return true;
+    return true;
 }
 
 PrimitiveRenderProxy* RenderScene::FindProxy(size_t guid)
@@ -268,14 +268,14 @@ void RenderScene::OnProxyDestroy()
 
 void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
 {
-        ProxyCommand moveCommand = MakeProxyCommand(meshRendererPtr);
-        ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+    ProxyCommand moveCommand = MakeProxyCommand(meshRendererPtr);
+    ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
 }
 
 void RenderScene::UpdateCommand(FoliageComponent* foliagePtr)
 {
-        ProxyCommand moveCommand = MakeProxyCommand(foliagePtr);
-        ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+    ProxyCommand moveCommand = MakeProxyCommand(foliagePtr);
+    ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
 }
 
 ProxyCommand RenderScene::MakeProxyCommand(MeshRenderer* meshRendererPtr)
@@ -285,19 +285,19 @@ ProxyCommand RenderScene::MakeProxyCommand(MeshRenderer* meshRendererPtr)
 		throw std::runtime_error("InvaildCheckMeshRenderer");
 	}
 
-        ProxyCommand command(meshRendererPtr);
-        return command;
+    ProxyCommand command(meshRendererPtr);
+    return command;
 }
 
 ProxyCommand RenderScene::MakeProxyCommand(FoliageComponent* foliagePtr)
 {
-        if (!InvaildCheckFoliage(foliagePtr))
-        {
-                throw std::runtime_error("InvaildCheckFoliage");
-        }
+    if (!InvaildCheckFoliage(foliagePtr))
+    {
+            throw std::runtime_error("InvaildCheckFoliage");
+    }
 
-        ProxyCommand command(foliagePtr);
-        return command;
+    ProxyCommand command(foliagePtr);
+    return command;
 }
 
 void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
@@ -313,15 +313,69 @@ void RenderScene::UnregisterCommand(MeshRenderer* meshRendererPtr)
         m_proxyMap[meshRendererGuid]->DestroyProxy();
 }
 
+void RenderScene::RegisterCommand(TerrainComponent* terrainPtr)
+{
+	if (nullptr == terrainPtr) return;
+	HashedGuid terrainGuid = terrainPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+	if (m_proxyMap.find(terrainGuid) != m_proxyMap.end()) return;
+	// Create a new proxy for the terrain and insert it into the map
+	auto managedCommand = std::make_shared<PrimitiveRenderProxy>(terrainPtr);
+	m_proxyMap[terrainGuid] = managedCommand;
+}
+
+bool RenderScene::InvaildCheckTerrain(TerrainComponent* terrainPtr)
+{
+	if (nullptr == terrainPtr || terrainPtr->IsDestroyMark()) return false;
+	auto owner = terrainPtr->GetOwner();
+	if (nullptr == owner || owner->IsDestroyMark()) return false;
+	HashedGuid terrainGuid = terrainPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+	if (m_proxyMap.find(terrainGuid) == m_proxyMap.end()) return false;
+	auto& proxyObject = m_proxyMap[terrainGuid];
+	if (nullptr == proxyObject) return false;
+	return true;
+}
+
+void RenderScene::UpdateCommand(TerrainComponent* terrainPtr)
+{
+	if (!InvaildCheckTerrain(terrainPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckTerrain");
+	}
+	ProxyCommand moveCommand = MakeProxyCommand(terrainPtr);
+	ProxyCommandQueue->PushProxyCommand(std::move(moveCommand));
+}
+
+ProxyCommand RenderScene::MakeProxyCommand(TerrainComponent* terrainPtr)
+{
+	if (!InvaildCheckTerrain(terrainPtr)) 
+	{
+		throw std::runtime_error("InvaildCheckTerrain");
+	}
+	ProxyCommand command(terrainPtr);
+	return command;
+}
+
+void RenderScene::UnregisterCommand(TerrainComponent* terrainPtr)
+{
+	if (nullptr == terrainPtr) return;
+	HashedGuid terrainGuid = terrainPtr->GetInstanceID();
+	SpinLock lock(m_proxyMapFlag);
+
+	if (m_proxyMap.find(terrainGuid) == m_proxyMap.end()) return;
+	m_proxyMap[terrainGuid]->DestroyProxy();
+}
+
 void RenderScene::UnregisterCommand(FoliageComponent* foliagePtr)
 {
-        if (nullptr == foliagePtr) return;
+    if (nullptr == foliagePtr) return;
 
-        HashedGuid guid = foliagePtr->GetInstanceID();
+    HashedGuid guid = foliagePtr->GetInstanceID();
 
-        SpinLock lock(m_proxyMapFlag);
+    SpinLock lock(m_proxyMapFlag);
 
-        if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
+    if (m_proxyMap.find(guid) == m_proxyMap.end()) return;
 
-        m_proxyMap[guid]->DestroyProxy();
+    m_proxyMap[guid]->DestroyProxy();
 }

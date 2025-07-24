@@ -6,8 +6,9 @@
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
 #include "ShaderSystem.h"
-#include "IOnDestroy.h"
-#include "IAwakable.h"
+//#include "IOnDestroy.h"
+//#include "IAwakable.h"
+#include "IRegistableEvent.h"
 #include "TerrainMesh.h"
 #include "TerrainMaterial.h"
 
@@ -15,7 +16,8 @@
 // TerrainComponent: ApplyBrush 최적화 버전
 //-----------------------------------------------------------------------------
 class ComponentFactory;
-class TerrainComponent : public Component, public IAwakable, public IOnDestroy
+class ProxyCommand;
+class TerrainComponent : public Component, public RegistableEvent<TerrainComponent>
 {
 public:
     ReflectTerrainComponent
@@ -93,8 +95,6 @@ public:
     //브러시 마스크 관련
     bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
     void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
-    
-
 
     // Collider용 접근자
     int GetWidth()  const { return m_width; }
@@ -111,6 +111,8 @@ public:
     std::wstring m_terrainTargetPath{};
 
 private:
+    friend class ProxyCommand;
+
 	uint32 m_terrainID{ 0 }; // 지형 ID
     std::vector<float> m_heightMap;
     std::vector<DirectX::XMFLOAT3> m_vNormalMap;

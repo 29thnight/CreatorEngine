@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "GameObject.h"
 #include "Transform.h"
+#include "Component.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
@@ -27,7 +28,7 @@ void PhysicsManager::Initialize()
 	//콜리전 콜백 등록
 	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
-		});
+	});
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {

@@ -28,8 +28,8 @@ public:
     ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
-	GameObject(const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
-	GameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(Scene* scene, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(Scene* scene, size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
@@ -98,6 +98,7 @@ public:
 	void SetEnabled(bool able) override final;
 	void SetCollisionType(uint32 type) { m_collisionType = type; }
 	uint32 GetCollisionType() const { return m_collisionType; }
+	Scene* GetScene() { return m_ownerScene; }
 
     [[Property]]
 	Transform m_transform{};
@@ -128,6 +129,8 @@ public:
 	std::unordered_map<HashedGuid, size_t> m_componentIds{};
     [[Property]]
 	std::vector<std::shared_ptr<Component>> m_components{};
+
+	Scene* m_ownerScene{ nullptr };
 };
 
 #include "GameObejct.inl"

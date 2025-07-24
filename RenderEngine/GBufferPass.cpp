@@ -323,22 +323,19 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
-	for (auto& obj : scene.GetScene()->m_SceneObjects) {
-		if (obj->IsDestroyMark()) continue;
-		if (obj->HasComponent<TerrainComponent>()) {
+	for (auto& terrainProxy : data->m_terrainQueue) {
 
-			auto terrain = obj->GetComponent<TerrainComponent>();
-			auto terrainMesh = terrain->GetMesh();
+		auto terrainMesh = terrainProxy->m_terrainMesh;
+		auto terrainMaterial = terrainProxy->m_terrainMaterial;
 
-			if (terrainMesh)
-			{
-				DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, terrain->GetMaterial()->GetLayerBuffer());
-				scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
+		if (terrainMesh && terrainMaterial)
+		{
+			DirectX11::PSSetConstantBuffer(deferredPtr, 12, 1, terrainMaterial->GetLayerBuffer());
+			scene.UpdateModel(terrainProxy->m_worldMatrix, deferredPtr);
 
-				DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrain->GetMaterial()->GetLayerSRV());
-				DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrain->GetMaterial()->GetSplatMapSRV());
-				terrainMesh->Draw(deferredPtr);
-			}
+			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
+			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
+			terrainMesh->Draw(deferredPtr);
 		}
 	}
 

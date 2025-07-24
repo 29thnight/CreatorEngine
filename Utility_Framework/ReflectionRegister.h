@@ -180,7 +180,7 @@ namespace Meta
 
     static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
     using FactoryFunction = std::function<void*()>;
-
+    class IRegistableEvent;
     class FactoryRegistry : public Singleton<FactoryRegistry>
     {
     private:

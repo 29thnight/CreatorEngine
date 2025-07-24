@@ -169,7 +169,6 @@
     <ClCompile Include="EffectEditor.cpp" />
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectProxyController.cpp" />
-    <ClCompile Include="EffectRenderProxy.cpp" />
     <ClCompile Include="EffectSerializer.cpp" />
     <ClCompile Include="LODGroup.cpp" />
     <ClCompile Include="LODSetting.cpp" />
@@ -238,6 +237,7 @@
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AnimationLoader.h" />
+    <ClInclude Include="AnimatorData.h" />
     <ClInclude Include="AssetBundle.h" />
     <ClInclude Include="AssetEntry.h" />
     <ClInclude Include="AssetJob.h" />

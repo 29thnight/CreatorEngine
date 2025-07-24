@@ -95,10 +95,9 @@ void PositionMapPass::Execute(RenderScene& scene, Camera& camera)
 	DeviceState::g_pDeviceContext->RSSetViewports(1, &pre);
 
 	int i = 0;
-	for (auto& obj : scene.GetScene()->m_SceneObjects)
+	std::vector<MeshRenderer*> renderers = scene.GetScene()->GetMeshRenderers();
+	for (auto& renderer : renderers)
 	{
-		auto* renderer = obj->GetComponent<MeshRenderer>();
-		if (renderer == nullptr) continue;
 		if (!renderer->IsEnabled()) continue;
 		auto meshName = renderer->m_Mesh->GetName();
 		if (m_positionMapTextures.find(meshName) == m_positionMapTextures.end()) {
