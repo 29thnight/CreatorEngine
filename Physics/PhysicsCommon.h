@@ -22,14 +22,6 @@ enum class EColliderType {
 	COLLISION
 };
 
-// Rigidbody의 물리적 상태
-enum class EBodyState
-{
-	Active,     // 물리 시뮬레이션에 참여 (기본)
-	Sleeping,   // 비활성 상태 (성능 최적화, 필요시 자동 활성화)
-	Kinematic,  // 물리 시뮬레이션에 영향을 받지 않고 스크립트로 제어
-	Disabled    // 물리 시뮬레이션에서 완전히 제외
-};
 
 //콜백 함수에 전달할 이벤트 타입
 enum class ECollisionEventType {
@@ -110,9 +102,11 @@ struct RigidBodyGetSetData
 	bool isColliderEnabled = true;
 	DirectX::SimpleMath::Vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
-
+		
 	EColliderType m_EColliderType;
-	EBodyState m_EBodyState; // 추가: Rigidbody의 EBodyState
+	bool isKinematic = false; // 키네마틱 여부
+	bool isDisabled = false;  // 시뮬레이션 비활성화 여부
+	bool useGravity = true; // 중력 사용 여부
 };
 
 //CharacterController의 GetSetData를 위한 구조체

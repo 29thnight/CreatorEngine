@@ -84,7 +84,15 @@ public:
 		CollisionData data;
 		ECollisionEventType Type;
 	};
-
+	// RigidBodyComponent가 PhysicsManager로 상태 변경을 요청할 때 사용하는 구조체
+	struct RigidBodyState
+	{
+		unsigned int id;
+		bool isKinematic;
+		bool isTrigger;
+		bool isColliderEnabled;
+		bool useGravity;
+	};
 public:
 
 	PhysicsManager() = default;
@@ -135,15 +143,21 @@ public:
 	}
 	std::vector<std::vector<uint8_t>> GetCollisionMatrix() const { return m_collisionMatrix; }
 
-	// Rigidbody 상태 변경 요청 (RigidBodyComponent에서 호출)
-	void SetRigidBodyKinematic(unsigned int id, bool isKinematic);
-	void SetRigidBodyIsTrigger(unsigned int id, bool isTrigger);
-	void SetRigidBodyColliderEnabled(unsigned int id, bool enabled);
+	// RigidBody 상태 변경 요청 (RigidBodyComponent에서 호출)
+	void SetRigidBodyState(const RigidBodyState& state);
 
 	// Rigidbody 상태 조회
 	bool IsRigidBodyKinematic(unsigned int id) const;
 	bool IsRigidBodyTrigger(unsigned int id) const;
 	bool IsRigidBodyColliderEnabled(unsigned int id) const;
+	bool IsRigidBodyUseGravity(unsigned int id) const;
+
+private:
+	using PendingChange = RigidBodyState;
+
+	std::vector<PendingChange> m_pendingChanges;
+	void ApplyPendingChanges();
+
 private:
 	// 초기화 여부
 	bool m_bIsInitialized{ false };

@@ -42,22 +42,6 @@ PxFilterFlags CustomFilterShader(
 		}
 		return PxFilterFlag::eSUPPRESS;
 	}
-
-	/*if (PxFilterObjectIsTrigger(at0) || PxFilterObjectIsTrigger(at1))
-	{
-		pairFlags = PxPairFlag::eTRIGGER_DEFAULT
-			| PxPairFlag::eNOTIFY_TOUCH_FOUND
-			| PxPairFlag::eNOTIFY_TOUCH_LOST;
-		return PxFilterFlag::eDEFAULT;
-	}
-
-	pairFlags = PxPairFlag::eCONTACT_DEFAULT
-		| PxPairFlag::eNOTIFY_TOUCH_FOUND
-		| PxPairFlag::eNOTIFY_TOUCH_LOST
-		| PxPairFlag::eNOTIFY_CONTACT_POINTS
-		| PxPairFlag::eNOTIFY_TOUCH_PERSISTS;
-	return PxFilterFlag::eDEFAULT;*/
-
 }
 
 class BlockRaycastQueryFilter : public physx::PxQueryFilterCallback {
@@ -130,34 +114,34 @@ bool PhysicX::Initialize()
 	m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_allocator, m_errorCallback);     
 
 #if _DEBUG
-	// PVD »ı¼º
-	// PVD  _DEBUG°¡ ¾Æ´Ò½Ã nullptr
+	// PVD ì—°ê²°
+	// PVDëŠ” _DEBUGê°€ ì•„ë‹ˆë©´ nullptr
 	pvd = PxCreatePvd(*m_foundation);
 	PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
 	auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
 #endif
 
 	//m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 40.f), recordMemoryAllocations, pvd);  
-	m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 10.f), true, pvd);  // ÇÇÁ÷½º ÃÊ±âÈ­
+	m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(1.f, 10.f), true, pvd);  // ë¬¼ë¦¬ ì´ˆê¸°í™”
 	if (m_physics == nullptr)
 	{
 		return false;
 	}
 
-	// physics »ç¿ë ÄÚ¾î ¼ö
+	// physics ì½”ì–´ ê°œìˆ˜
 	UINT MaxThread = 8;
 	UINT core = std::thread::hardware_concurrency();
-	// ¿£Áø ºÎ ½º·¹µå ¹× ·£´õ¸µ ½º·¹µå °í·Á core ¼ö¸¦ Á¶Á¤
+	// í˜„ì¬ ì½”ì–´ ê°œìˆ˜ê°€ ìµœëŒ€ ì½”ì–´ ê°œìˆ˜ë³´ë‹¤ ë§ìœ¼ë©´ ìµœëŒ€ ì½”ì–´ ê°œìˆ˜ ì‚¬ìš©
 	if (core < 4) core = 2;
 	else if (core > MaxThread + 4) core = MaxThread;
 	else core -= 4;
-	// µğ½ºÆäÃ³ ¼³Á¤
+	// ë””ìŠ¤íŒ¨ì²˜ ìƒì„±
 	gDispatcher = PxDefaultCpuDispatcherCreate(core);
 
 	m_defaultMaterial = m_physics->createMaterial(1.f, 1.f, 0.f);
 
 	//gDispatcher = PxDefaultCpuDispatcherCreate(2);  
-	// CUDA ÃÊ±âÈ­
+	// CUDA ì´ˆê¸°í™”
 	PxCudaContextManagerDesc cudaDesc;
 	m_cudaContextManager = PxCreateCudaContextManager(*m_foundation, cudaDesc);
 	if (!m_cudaContextManager || !m_cudaContextManager->contextIsValid())
@@ -180,11 +164,11 @@ bool PhysicX::Initialize()
 	}
 
 
-	//Ãæµ¹ Ã³¸®¿¡ ´ëÇÑ Äİ¹é ¼³Á¤
+	//ì¶©ëŒ ì²˜ë¦¬ë¥¼ ìœ„í•œ ì½œë°± ë“±ë¡
 	m_eventCallback = new PhysicsEventCallback();
 
 
-	// Scene ¼Ä¼º
+	// Scene ìƒì„±
 	physx::PxSceneDesc sceneDesc(m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
 
@@ -195,20 +179,20 @@ bool PhysicX::Initialize()
 
 	sceneDesc.simulationEventCallback = m_eventCallback;
 
-	sceneDesc.flags |= physx::PxSceneFlag::eENABLE_ACTIVE_ACTORS; // È°¼º ¾×ÅÍ¸¸ ¾÷µ¥ÀÌÆ®
+	sceneDesc.flags |= physx::PxSceneFlag::eENABLE_ACTIVE_ACTORS; // í™œì„± ì•¡í„°ë¥¼ ì—…ë°ì´íŠ¸
 	//sceneDesc.kineKineFilteringMode = PxPairFilteringMode::eKEEP;
-	// GPU °¡¼Ó »ç¿ë	½Ã GPU¿¡¼­ ¹°¸® ¿¬»êÀ» ¼öÇàÇÏµµ·Ï ¼³Á¤
-	sceneDesc.flags |= physx::PxSceneFlag::eENABLE_GPU_DYNAMICS; // GPU 
-	sceneDesc.broadPhaseType = PxBroadPhaseType::eGPU; // GPU 
+	// GPU ì‹œë®¬ë ˆì´ì…˜ ì‚¬ìš© ì—¬ë¶€ GPUì—ì„œ ì‹œë®¬ë ˆì´ì…˜ì´ ê°€ëŠ¥í•˜ë„ë¡ ì„¤ì •
+	sceneDesc.flags |= physx::PxSceneFlag::eENABLE_GPU_DYNAMICS; // GPU ì‚¬ìš©
+	sceneDesc.broadPhaseType = PxBroadPhaseType::eGPU; // GPU ì‚¬ìš©
 	sceneDesc.cudaContextManager = m_cudaContextManager;
 
-	m_scene = m_physics->createScene(sceneDesc); //
+	m_scene = m_physics->createScene(sceneDesc); // ì”¬ ìƒì„±
 
 	m_characterControllerManager = PxCreateControllerManager(*m_scene);
 
 
 	//======================================================================
-	//debug¿ë plane »ı¼º --> triangle mesh·Î ´ëÃ¼ ¿¹Á¤
+	//debugìš© plane ìƒì„± --> triangle meshë¡œ ê°ì²´ ìƒì„±
 	
 	physx::PxRigidStatic* plane = m_physics->createRigidStatic(PxTransform(PxQuat(PxPi / 2, PxVec3(0, 0, 1))));
 	auto material = m_defaultMaterial;
@@ -254,14 +238,13 @@ void PhysicX::UnInitialize() {
 
 void PhysicX::Update(float fixedDeltaTime)
 {
-	// PxScene ¾÷µ¥ÀÌÆ®
+	// PxScene ì—…ë°ì´íŠ¸
 	RemoveActors();
-	ApplyPendingShapeChanges(); // <<-- Ãß°¡µÈ ºÎºĞ: ½Ã¹Ä·¹ÀÌ¼Ç Àü¿¡ º¯°æ »çÇ× Àû¿ë
-	//Ãµ ¹× ÀÇ»ó ½Ã¹Ä·¹ÀÌ¼Ç ¾÷µ¥ÀÌÆ® -> Â÷ÈÄ »ı°¢
-	//rigid body ¾÷µ¥ÀÌÆ®
+	//ì²« í‹± ë§ˆë‹¤ ì‹œë®¬ë ˆì´ì…˜ ì—…ë°ì´íŠ¸ -> ë¬¼ë¦¬ ì—…ë°ì´íŠ¸
+	//rigid body ì—…ë°ì´íŠ¸
 	{
-		//Äİ¶óÀÌ´õ ¾÷µ¥ÀÌÆ®
-		//¾÷µ¥ÀÌÆ® ÇÒ ¾×ÅÍµéÀ» ¸ğµÎ ¾À¿¡ Ãß°¡
+		//ì½œë¼ì´ë” ì—…ë°ì´íŠ¸
+		//ì—…ë°ì´íŠ¸ í•  ì•¡í„°ë“¤ì„ ì”¬ì— ì¶”ê°€
 		for (RigidBody* body : m_updateActors) {
 			DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 			if (dynamicBody) {
@@ -275,17 +258,17 @@ void PhysicX::Update(float fixedDeltaTime)
 		m_updateActors.clear();
 	}
 	{
-		//ÄÉ¸¯ÅÍ ¾÷µ¥ÀÌÆ®
-		//ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯ ¾÷µ¥ÀÌÆ®
+		//ìºë¦­í„° ì—…ë°ì´íŠ¸
+		//ìºë¦­í„° ì»¨íŠ¸ë¡¤ëŸ¬ ì—…ë°ì´íŠ¸
 		for (const auto& controller : m_characterControllerContainer) {
 			controller.second->Update(fixedDeltaTime);
-			//ÄÁÆ®·Ñ·¯°¡ »èÁ¦ ¿¹Á¤ÀÌ¶ó¸é
+			//ì»¨íŠ¸ë¡¤ëŸ¬ì˜ ë¬¼ë¦¬ ìƒíƒœê°€ ë³€í•˜ë©´
 			//if(todo : condition){
 			//controller.second->GetController()->release();
 			// }
 
 		}
-		//»ı¼º ¿¹Á¤ÀÎ ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯¸¦ ¾À¿¡ Ãß°¡
+		//ìƒˆë¡œ ìƒì„±ëœ ìºë¦­í„° ì»¨íŠ¸ë¡¤ëŸ¬ë¥¼ ì—…ë°ì´íŠ¸ ë¦¬ìŠ¤íŠ¸ì— ì¶”ê°€
 		for (auto& [contrllerInfo, movementInfo] : m_updateCCTList)
 		{
 			CollisionData* collisionData = new CollisionData();
@@ -339,15 +322,15 @@ void PhysicX::Update(float fixedDeltaTime)
 		}
 		m_updateCCTList.clear();
 
-		//´ë±âÁßÀÎ ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯¸¦ »ı¼º¿¹Á¤ ¸®½ºÆ®¿¡ Ãß°¡
+		//ëŒ€ê¸°ì¤‘ì¸ ìºë¦­í„° ì»¨íŠ¸ë¡¤ëŸ¬ë¥¼ ì—…ë°ì´íŠ¸ ë¦¬ìŠ¤íŠ¸ì— ì¶”ê°€
 		for (auto& controllerInfo : m_waittingCCTList) {
 			m_updateCCTList.push_back(controllerInfo);
 		}
 		m_waittingCCTList.clear();
 	}
 	{
-		//Äİ¸®Àü ¾÷µ¥ÀÌÆ®
-		//»èÁ¦ ¿¹Á¤ÀÎ Äİ¸®Àü µ¥ÀÌÅÍ »èÁ¦
+		//ì¶©ëŒ ì—…ë°ì´íŠ¸
+		//ìƒˆë¡œ ìƒì„±ëœ ì¶©ëŒ ë°ì´í„°ë¥¼ ì œê±°
 		for (unsigned int& removeID : m_removeCollisionIds) {
 			auto iter = m_collisionDataContainer.find(removeID);
 			if (iter != m_collisionDataContainer.end()) {
@@ -364,27 +347,27 @@ void PhysicX::Update(float fixedDeltaTime)
 		}
 	}
 	{
-	//ragdoll ¾÷µ¥ÀÌÆ®
+	//ragdoll ì—…ë°ì´íŠ¸
 		for (auto& [id,ragdoll] : m_ragdollContainer) {
 		
 			ragdoll->Update(fixedDeltaTime);
 		}
 	}
-	//Scene ½Ã¹Ä·¹ÀÌ¼Ç
+	//Scene ì‹œë®¬ë ˆì´ì…˜
 	if (!m_scene->simulate(fixedDeltaTime))
 	{
 		Debug->LogCritical("physic m_scene simulate failed");
 		return;
 	}
-	//½Ã¹Ä·¹ÀÌ¼Ç °á°ú ¹Ş±â
+	//ì‹œë®¬ë ˆì´ì…˜ ê²°ê³¼ ê°€ì ¸ì˜¤ê¸°
 	if (!m_scene->fetchResults(true))
 	{
 		Debug->LogCritical("physic m_scene fetchResults failed");
 		return;
 	}
-	//Äİ¹é ÀÌº¥Æ® Ã³¸®
+	//ì½œë°± ì´ë²¤íŠ¸ ì²˜ë¦¬
 	m_eventCallback->StartTrigger();
-	//¿¡·¯ Ã³¸®
+	//ì˜¤ë¥˜ ì²˜ë¦¬
 	//if (cudaGetLastError() != cudaError::cudaSuccess)
 	//{
 	//	Debug->LogError("cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
@@ -393,7 +376,7 @@ void PhysicX::Update(float fixedDeltaTime)
 
 void PhysicX::FinalUpdate()
 {
-	//¿Ö ÀÖ´ÂÁö ¸ğ¸£°Ú´Ù. ÀÏ´Ü ³²°Ü³ö º¸ÀÚ	
+	//ë”± í•œë²ˆë§Œ ë¶ˆë¦°ë‹¤. ì•„ë§ˆë„ ì”¬ì´ ëë‚ ë•Œ
 }
 
 void PhysicX::SetCallBackCollisionFunction(std::function<void(CollisionData, ECollisionEventType)> func)
@@ -405,25 +388,25 @@ void PhysicX::SetPhysicsInfo()
 {
 		
 	// m_scene->setGravity(PxVec3(0.0f, -9.81f, 0.0f));
-	//collisionMatrix[0][0] = true;
+	//collisionMatrix[0][0] = true;ê¸°ë³¸ ëª¨ë“  ë ˆì´ì–´ê°€ ì¶©ëŒí•˜ëŠ” ìƒíƒœë¡œ ì„¤ì •
 }
 
 void PhysicX::ChangeScene()
 {
-	// ¾À Ã¼ÀÎÁö ½Ã¿¡ ¾À¿¡ ÀÖ´Â ¸ğµç ¹°¸®¿£Áø °´Ã¼ »èÁ¦
+	// ëª¨ë“  ê°ì²´ë¥¼ ì”¬ì—ì„œ ì œê±°í•˜ê³  ë¬¼ë¦¬ ì—”ì§„ ê°ì²´ ì œê±°
 	RemoveAllRigidBody(m_scene,m_removeActorList);
 	RemoveAllCCT();
 	RemoveAllCharacterInfo();
-	//¿Ê ½Ã¹Ä·¹ÀÌ¼Ç »èÁ¦µµ Ãß°¡½Ã »èÁ¦
+	//ìƒˆë¡œìš´ ì‹œë®¬ë ˆì´ì…˜ì— ì¶”ê°€ë  ê°ì²´
 }
 
 void PhysicX::DestroyActor(unsigned int id)
 {
-	//ÄÁÅ×ÀÌ³Ê¿¡ ¿¢ÅÍ È®ÀÎ
+	//ì»¨í…Œì´ë„ˆì— ìˆëŠ”ì§€ í™•ì¸
 	auto iter = m_rigidBodyContainer.find(id);
 	if (iter == m_rigidBodyContainer.end())
 	{
-		Debug->LogError("PhysicX::DestroyActor : Actor not found with id " + std::to_string(id));
+		//std::cout << "PhysicX::DestroyActor : Actor not found with id" << id << std::endl;
 		return;
 	}
 
@@ -431,12 +414,12 @@ void PhysicX::DestroyActor(unsigned int id)
 
 	if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(body))
 	{
-		//µ¿Àû ¹ÙµğÀÎ °æ¿ì
+		//ë‹¤ì´ë‚˜ë¯¹ ë°”ë””ì¸ ê²½ìš°
 		m_removeActorList.push_back(dynamicBody->GetRigidDynamic());
 	}
 	else if (auto* staticBody = dynamic_cast<StaticRigidBody*>(body))
 	{
-		//Á¤Àû ¹ÙµğÀÎ °æ¿ì
+		//ìŠ¤í…Œí‹± ë°”ë””ì¸ ê²½ìš°
 		m_removeActorList.push_back(staticBody->GetRigidStatic());
 	}
 	else
@@ -445,10 +428,10 @@ void PhysicX::DestroyActor(unsigned int id)
 		return;
 	}
 
-	delete body; // ¸Ş¸ğ¸® ÇØÁ¦
-	m_rigidBodyContainer.erase(iter); // ÄÁÅ×ÀÌ³Ê¿¡¼­ Á¦°Å
+	delete body; // ë©”ëª¨ë¦¬ í•´ì œ
+	m_rigidBodyContainer.erase(iter); // ì»¨í…Œì´ë„ˆì—ì„œ ì œê±°
 
-	// Äİ¸®Àü µ¥ÀÌÅÍ Á¦°Å
+	// ì¶©ëŒ ë°ì´í„° ì œê±°
 	RemoveCollisionData(id);
 }
 
@@ -464,7 +447,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 	physx::PxRaycastHit hitBuffer[maxHits];
 	physx::PxRaycastBuffer hitBufferStruct(hitBuffer, maxHits);
 
-	//Ãæµ¹ Äõ¸® Á¤º¸
+	//ì¶©ëŒ í•„í„° ë°ì´í„°
 	physx::PxQueryFilterData filterData;
 	filterData.data.word0 = in.layerNumber;
 	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
@@ -493,7 +476,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 
 	RayCastOutput out;
 
-	//hit°¡ ÀÖ´Â °æ¿ì
+	//hitê°€ ìˆëŠ” ê²½ìš°
 	if (isAnyHit)
 	{
 		out.hasBlock = hitBufferStruct.hasBlock;
@@ -506,7 +489,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 				CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
 			}
 			else {
-				out.hasBlock = false; // userData°¡ À¯È¿ÇÏÁö ¾ÊÀ¸¸é ºí·Ï Ã³¸® ¾ÈÇÔ
+				out.hasBlock = false; // userDataê°€ ìœ íš¨í•˜ì§€ ì•Šìœ¼ë©´ ë¸”ë¡ ì²˜ë¦¬ ì•ˆí•¨
 			}
 		}
 
@@ -518,7 +501,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
 			physx::PxShape* shape = hit.shape;
 
-			if (shape && shape->userData != nullptr) // Ãß°¡: shape ¹× userData À¯È¿¼º È®ÀÎ
+			if (shape && shape->userData != nullptr) // ì¶”ê°€: shape ë° userData ìœ íš¨ì„± í™•ì¸
 			{
 				DirectX::SimpleMath::Vector3 position;
 				DirectX::SimpleMath::Vector3 normal;
@@ -533,7 +516,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 				out.hitId.push_back(id);
 			}
 			else {
-				out.hitSize--; // À¯È¿ÇÏÁö ¾ÊÀº hitÀº Ä«¿îÆ®¿¡¼­ Á¦¿Ü
+				out.hitSize--; // ìœ íš¨í•˜ì§€ ì•Šì€ hitëŠ” ì¹´ìš´íŠ¸ì—ì„œ ì œì™¸
 			}
 		}
 	}
@@ -541,7 +524,7 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 	return out;
 }
 
-// ´ÜÀÏ ·¹ÀÌÄÉ½ºÆ®, static dynamic ¸ğµÎ °ËÃâ, 
+// ë‹¨ì¼ ë ˆì´ìºìŠ¤íŠ¸, static dynamic ëª¨ë‘ ê²€ì‚¬, 
 RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 {
 	physx::PxVec3 pxOrgin;
@@ -552,7 +535,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 	// RaycastHit 
 	physx::PxRaycastBuffer hitBufferStruct;
 
-	//Ãæµ¹ Äõ¸® Á¤º¸
+	//ì¶©ëŒ í•„í„° ë°ì´í„°
 	physx::PxQueryFilterData filterData;
 	filterData.data.word0 = in.layerNumber;
 	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
@@ -570,7 +553,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 
 	RayCastOutput out;
 
-	//hit°¡ ÀÖ´Â °æ¿ì
+	//hitê°€ ìˆëŠ” ê²½ìš°
 	if (isAnyHit)
 	{
 		out.hasBlock = hitBufferStruct.hasBlock;
@@ -593,7 +576,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 	return out;
 }
 
-//PxQueryFlag::eNO_BLOCK È°¼ºÈ­½Ã block Ã³¸®x
+//PxQueryFlag::eNO_BLOCK í™œì„±í™”ì‹œ block ì²˜ë¦¬x
 RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 {
 	physx::PxVec3 pxOrgin;
@@ -606,7 +589,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 	physx::PxRaycastHit hitBuffer[maxHits];
 	physx::PxRaycastBuffer hitBufferStruct(hitBuffer, maxHits);
 
-	//Ãæµ¹ Äõ¸® Á¤º¸
+	//ì¶©ëŒ í•„í„° ë°ì´í„°
 	physx::PxQueryFilterData filterData;
 	filterData.data.word0 = in.layerNumber;
 	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
@@ -627,7 +610,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 
 	RayCastOutput out;
 
-	//hit°¡ ÀÖ´Â °æ¿ì
+	//hitê°€ ìˆëŠ” ê²½ìš°
 	if (isAnyHit)
 	{
 		unsigned int hitSize = hitBufferStruct.nbTouches;
@@ -638,7 +621,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			const physx::PxRaycastHit& hit = hitBufferStruct.touches[hitNum];
 			physx::PxShape* shape = hit.shape;
 
-			if (shape && shape->userData != nullptr) { // Ãß°¡: shape ¹× userData À¯È¿¼º È®ÀÎ
+			if (shape && shape->userData != nullptr) { // ì¶”ê°€: shape ë° userData ìœ íš¨ì„± í™•ì¸
 			DirectX::SimpleMath::Vector3 position;
 			DirectX::SimpleMath::Vector3 normal;
 			CopyVectorPxToDx(hit.position, position);
@@ -652,7 +635,7 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			out.hitId.push_back(id);
 			}
 			else {
-				out.hitSize--; // À¯È¿ÇÏÁö ¾ÊÀº hitÀº Ä«¿îÆ®¿¡¼­ Á¦¿Ü
+				out.hitSize--; // ìœ íš¨í•˜ì§€ ì•Šì€ hitëŠ” ì¹´ìš´íŠ¸ì—ì„œ ì œì™¸
 			}
 		}
 	}
@@ -840,17 +823,17 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	//collisionData
 	StaticRigidBody* staticBody = new StaticRigidBody(collideType,colInfo.id,colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
-	if (collisionData) // Ãß°¡: collisionData°¡ À¯È¿ÇÑÁö È®ÀÎ
+	if (collisionData) // ì¶”ê°€: collisionData ìœ íš¨ì„± í™•ì¸
 	{
-		//½ºÅ×Æ½ ¹Ùµğ ÃÊ±âÈ­-->rigidbody »ı¼º ¹× shape attach , collider Á¤º¸ µî·Ï, collisionData Á¤º¸ µî·Ï
+		//ìŠ¤í…Œí‹± ë°”ë”” ì´ˆê¸°í™”-->rigidbody ìƒì„± ë° shape attach , collider ì •ë³´ ë“±ë¡, collisionData ë“±ë¡
 		if (!staticBody->Initialize(colInfo,shape,m_physics,collisionData))
 		{
 			Debug->LogError("PhysicX::SettingStaticBody() : staticBody Initialize failed id :" + std::to_string(colInfo.id));
-			delete collisionData; // ½ÇÆĞ ½Ã ¸Ş¸ğ¸® ÇØÁ¦
+			delete collisionData; // ì‹¤íŒ¨ ì‹œ ë©”ëª¨ë¦¬ í•´ì œ
 			return nullptr;
 		}
 
-		//Ãæµ¹µ¥ÀÌÅÍ µî·Ï, ¸®Áöµå ¹Ùµğ µî·Ï
+		//ì¶©ëŒë°ì´í„° ë“±ë¡, ë¬¼ë¦¬ ë°”ë”” ë“±ë¡
 		m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
 		m_rigidBodyContainer.insert(std::make_pair(staticBody->GetID(), staticBody));
 
@@ -859,7 +842,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	else
 	{
 		Debug->LogError("PhysicX::SettingStaticBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
-		delete staticBody; // staticBodyµµ ÇØÁ¦
+		delete staticBody; // staticBodyë„ í•´ì œ
 		return nullptr;
 	}
 	return staticBody;
@@ -867,7 +850,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 
 DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const ColliderInfo& colInfo, const EColliderType& collideType, unsigned int* collisionMatrix, bool isKinematic)
 {
-	//ÇÊÅÍµ¥ÀÌÅÍ
+	//í•„í„°ë°ì´í„°
 	physx::PxFilterData filterData;
 	filterData.word0 = colInfo.layerNumber;
 	filterData.word1 = collisionMatrix[colInfo.layerNumber];
@@ -877,17 +860,17 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	//collisionData
 	DynamicRigidBody* dynamicBody = new DynamicRigidBody(collideType, colInfo.id, colInfo.layerNumber);
 	CollisionData* collisionData = new CollisionData();
-	if (collisionData) // Ãß°¡: collisionData°¡ À¯È¿ÇÑÁö È®ÀÎ
+	if (collisionData) // ì¶”ê°€: collisionData ìœ íš¨ì„± í™•ì¸
 	{
-		//´ÙÀÌ³ª¹Í ¹Ùµğ ÃÊ±âÈ­-->rigidbody »ı¼º ¹× shape attach , collider Á¤º¸ µî·Ï, collisionData Á¤º¸ µî·Ï
+		//ë‹¤ì´ë‚˜ë¯¹ ë°”ë”” ì´ˆê¸°í™”-->rigidbody ìƒì„± ë° shape attach , collider ì •ë³´ ë“±ë¡, collisionData ë“±ë¡
 		if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData,isKinematic))
 		{
 			Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
-			delete collisionData; // ½ÇÆĞ ½Ã ¸Ş¸ğ¸® ÇØÁ¦
+			delete collisionData; // ì‹¤íŒ¨ ì‹œ ë©”ëª¨ë¦¬ í•´ì œ
 			return nullptr;
 		}
 
-		//Ãæµ¹µ¥ÀÌÅÍ µî·Ï, ¸®Áöµå ¹Ùµğ µî·Ï
+		//ì¶©ëŒë°ì´í„° ë“±ë¡, ë¬¼ë¦¬ ë°”ë”” ë“±ë¡
 		m_collisionDataContainer.insert(std::make_pair(colInfo.id, collisionData));
 		m_rigidBodyContainer.insert(std::make_pair(dynamicBody->GetID(), dynamicBody));
 
@@ -896,7 +879,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	else
 	{
 		Debug->LogError("PhysicX::SettingDynamicBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
-		delete dynamicBody; // dynamicBodyµµ ÇØÁ¦
+		delete dynamicBody; // dynamicBodyë„ í•´ì œ
 		return nullptr;
 	}
 	return dynamicBody;
@@ -929,9 +912,15 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 {
 	RigidBodyGetSetData rigidBodyData;
 
-	auto body = m_rigidBodyContainer.find(id)->second;
+	auto it = m_rigidBodyContainer.find(id);
+	if (it == m_rigidBodyContainer.end())
+	{
+		//Debug->LogError("PhysicX::GetRigidBodyData: RigidBody with ID " + std::to_string(id) + " not found in container. This might indicate a lifecycle management issue.");
+		return rigidBodyData;
+	}
+	auto body = it->second;
 	
-	//dynamicBody ÀÇ °æ¿ì
+	//dynamicBody ì¸ ê²½ìš°
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 	if (dynamicBody)
 	{
@@ -950,8 +939,25 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		rigidBodyData.isLockAngularX = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X);
 		rigidBodyData.isLockAngularY = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y);
 		rigidBodyData.isLockAngularZ = (flags & physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z);
+
+		rigidBodyData.isKinematic = pxBody->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC;
+		rigidBodyData.isDisabled = pxBody->getActorFlags() & physx::PxActorFlag::eDISABLE_SIMULATION;
+		rigidBodyData.useGravity = !(pxBody->getActorFlags() & physx::PxActorFlag::eDISABLE_GRAVITY);
+
+		const physx::PxU32 numShapes = pxBody->getNbShapes();
+		if (numShapes > 0)
+		{
+			std::vector<physx::PxShape*> shapes(numShapes);
+			pxBody->getShapes(shapes.data(), numShapes);
+			if (shapes[0])
+			{
+				rigidBodyData.m_EColliderType = (shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE) ? EColliderType::TRIGGER : EColliderType::COLLISION;
+				rigidBodyData.isColliderEnabled = (shapes[0]->getFlags() & physx::PxShapeFlag::eSIMULATION_SHAPE) || (shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE);
+			}
+		}
 	}
-	//staticBody ÀÇ °æ¿ì
+	
+	//staticBody ì¸ ê²½ìš°
 	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
 	if (staticBody)
 	{
@@ -966,7 +972,7 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 
 RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 {
-	//µî·ÏµÇ¾î ÀÖ´ÂÁö °Ë»ç
+	//ë“±ë¡ë˜ì–´ ìˆëŠ”ì§€ ê²€ìƒ‰
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
 	{
 		Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
@@ -986,38 +992,54 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 
 void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigidBodyData)
 {
-	//µ¥ÀÌÅÍ¸¦ ¼³Á¤ÇÒ ¸®Áöµå ¹Ùµğ°¡ µî·ÏµÇ¾î ÀÖ´ÂÁö °Ë»ç
+	//ë°ì´í„°ë¥¼ ì„¤ì •í•  ë¬¼ë¦¬ ë°”ë”” ë“±ë¡ë˜ì–´ ìˆëŠ”ì§€ ê²€ìƒ‰
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
 	{
+		std::cout << "PhysicX::SetRigidBodyData: RigidBody with ID " << id << " not found in container." << std::endl;
 		return;
 	}
 	auto body = m_rigidBodyContainer.find(id)->second;
 
-	//dynamicBody ÀÇ °æ¿ì
+	//dynamicBody ì¸ ê²½ìš°
 	DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 	if (dynamicBody)
 	{
-		// PxShape ÇÃ·¡±× º¯°æ ¿äÃ»À» Å¥¿¡ Ãß°¡
-		m_pendingShapeChanges.push_back({ id, rigidBodyData.m_EColliderType == EColliderType::TRIGGER, rigidBodyData.isColliderEnabled, rigidBodyData.m_EBodyState });
+		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
+		if (!pxBody) return;
 
-		// ³ª¸ÓÁö µ¥ÀÌÅÍ´Â ±âÁ¸ ·ÎÁ÷´ë·Î Á÷Á¢ Àû¿ë
-		//ÀÔ·Â µ¥ÀÌÅÍ¸¦ pxBodyÀÇ transform°ú ¼Óµµ¿¡ Àû¿ë
-		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
-		physx::PxTransform pxTransform;
+		// Actor ë° Body í”Œë˜ê·¸ ì„¤ì •
+		pxBody->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, !rigidBodyData.useGravity);
+		pxBody->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, rigidBodyData.isDisabled);
+		pxBody->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, rigidBodyData.isKinematic);
+
+		// Shape í”Œë˜ê·¸ ì„¤ì •
+		const PxU32 numShapes = pxBody->getNbShapes();
+		std::vector<physx::PxShape*> shapes(numShapes);
+		pxBody->getShapes(shapes.data(), numShapes);
+		for (physx::PxShape* shape : shapes)
+		{
+			if (rigidBodyData.isColliderEnabled)
+			{
+				bool isTrigger = (rigidBodyData.m_EColliderType == EColliderType::TRIGGER);
+				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !isTrigger);
+				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, isTrigger);
+			}
+			else
+			{
+				shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
+				shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
+			}
+		}
+
+		// ì†ë„ ë° ê¸°íƒ€ ë°ì´í„° ì„¤ì •
+		if (!rigidBodyData.isKinematic)
+		{
 		physx::PxVec3 pxLinearVelocity;
 		physx::PxVec3 pxAngularVelocity;
 		CopyVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
 		CopyVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
-
-
-		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
-		if (!pxBody) return; // Ãß°¡: pxBody°¡ À¯È¿ÇÑÁö È®ÀÎ
-		//¿îµ¿ÇĞ °´Ã¼°¡ ¾Æ´Ñ°æ¿ì °¢	¼Óµµ ¼±¼Óµµ ¼³Á¤
-		if (!(pxBody->getRigidBodyFlags()&physx::PxRigidBodyFlag::eKINEMATIC))
-		{
 			pxBody->setLinearVelocity(pxLinearVelocity);
 			pxBody->setAngularVelocity(pxAngularVelocity);
-
 		}
 
 		if (rigidBodyData.forceMode != 4) {
@@ -1042,6 +1064,8 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
 		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
 
+		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
+		physx::PxTransform pxTransform;
 		DirectX::SimpleMath::Vector3 position;
 		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
 		DirectX::SimpleMath::Quaternion rotation;
@@ -1060,7 +1084,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 			Debug->LogError("PhysicX::SetRigidBodyData() : scale is 0.0f id :" + std::to_string(id));
 		}
 	}
-	//staticBody ÀÇ °æ¿ì
+	//staticBody ì¸ ê²½ìš°
 	StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
 	if (staticBody)
 	{
@@ -1083,75 +1107,9 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 	}
 }
 
-void PhysicX::ApplyPendingShapeChanges()
-{
-	for (const auto& change : m_pendingShapeChanges)
-	{
-		RigidBody* body = GetRigidBody(change.rigidBodyId);
-		if (body)
-		{
-			DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
-			StaticRigidBody* staticBody = dynamic_cast<StaticRigidBody*>(body);
-
-			physx::PxRigidActor* pxActor = nullptr;
-			if (dynamicBody) pxActor = dynamicBody->GetRigidDynamic();
-			else if (staticBody) pxActor = staticBody->GetRigidStatic();
-
-			if (!pxActor) continue; // Ãß°¡: pxActor°¡ À¯È¿ÇÑÁö È®ÀÎ
-
-			// EBodyState Àû¿ë
-			if (dynamicBody) // DynamicRigidBody¿¡¸¸ ÇØ´ç
-			{
-				physx::PxRigidDynamic* pxDynamicActor = dynamicBody->GetRigidDynamic(); // PxRigidDynamicÀ¸·Î Ä³½ºÆÃ
-				switch (change.bodyState)
-				{
-				case EBodyState::Active:
-					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
-					break;
-				case EBodyState::Sleeping:
-					// PhysX´Â ÀÚµ¿À¸·Î ÀáÀÚ±â »óÅÂ·Î ÀüÈ¯µÇÁö¸¸, °­Á¦ÇÒ ¼öµµ ÀÖ½À´Ï´Ù.
-					// pxDynamicActor->putToSleep();
-					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false);
-					break;
-				case EBodyState::Kinematic:
-					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, false);
-					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, true);
-					break;
-				case EBodyState::Disabled:
-					pxDynamicActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, true);
-					pxDynamicActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, false); // ºñÈ°¼ºÈ­µÈ °æ¿ì Å°³×¸¶Æ½ÀÌ ¾Æ´ÑÁö È®ÀÎ
-					break;
-				}
-			}
-
-			// PxShape ÇÃ·¡±× Àû¿ë
-			const PxU32 numShapes = pxActor->getNbShapes();
-			std::vector<physx::PxShape*> shapes(numShapes);
-			pxActor->getShapes(shapes.data(), numShapes);
-
-			for (physx::PxShape* shape : shapes)
-			{
-				if (change.isColliderEnabled)
-				{
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, change.isTrigger);
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, !change.isTrigger);
-				}
-				else
-				{
-					shape->setFlag(physx::PxShapeFlag::eSIMULATION_SHAPE, false);
-					shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, false);
-				}
-			}
-		}
-	}
-	m_pendingShapeChanges.clear();
-}
-
 void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
 {
-	//µî·ÏµÇ¾î ÀÖ´ÂÁö °Ë»ç
+	//ë“±ë¡ë˜ì–´ ìˆëŠ”ì§€ ê²€ìƒ‰
 	if (m_rigidBodyContainer.find(id)==m_rigidBodyContainer.end())
 	{
 		Debug->LogWarning("RemoveRigidBody id :" + std::to_string(id) + " Remove Failed");
@@ -1160,7 +1118,7 @@ void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std
 
 	RigidBody* body = m_rigidBodyContainer[id];
 
-	//»èÁ¦ÇÒ ¸®Áöµå ¹Ùµğ µî·Ï (PxActor´Â ´ÙÀ½ ÇÁ·¹ÀÓ¿¡ »èÁ¦)
+	//ì”¬ì—ì„œ ì œê±°í•  ë°”ë””ì¸ ê²½ìš° (PxActorë¥¼ ì§ì ‘ ì”¬ì—ì„œ ì œê±°)
 	if (body)
 	{
 		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
@@ -1181,7 +1139,7 @@ void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std
 		}
 	}
 
-	//µî·Ï ¿¹Á¤ ÁöÁ¡µµ È®ÀÎÈÄ »èÁ¦
+	//ì—…ë°ì´íŠ¸ ë¦¬ìŠ¤íŠ¸ì—ì„œ í•´ë‹¹ ë°”ë””ë¥¼ ì œê±°
 	auto bodyIter = m_updateActors.begin();
 	for (bodyIter; bodyIter!= m_updateActors.end(); bodyIter++)
 	{
@@ -1197,7 +1155,7 @@ void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std
 
 void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxActor*>& removeActorList)
 {
-	//»èÁ¦ÇÒ ¸®Áöµå ¹Ùµğ µî·Ï (¹°¸®¾À¿¡ µî·ÏµÈ »óÅÂ¸é ´ÙÀ½ ÇÁ·¹ÀÓ¿¡ »èÁ¦)
+	//ì”¬ì—ì„œ ì œê±°í•  ë°”ë””ì¸ ê²½ìš° (ì»¨í…Œì´ë„ˆì— ë“±ë¡ëœ ëª¨ë“  ë°”ë””ë¥¼ ì”¬ì—ì„œ ì œê±°)
 	for (const auto& body : m_rigidBodyContainer) {
 		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body.second);
 		if (dynamicBody) {
@@ -1217,10 +1175,10 @@ void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxAct
 			}
 		}
 	}
-	//ÀúÀåµÈ ¸®Áöµå ¹Ùµğ »èÁ¦ 
+	//ì»¨í…Œì´ë„ˆì˜ ëª¨ë“  ë°”ë”” ì œê±° 
 	m_rigidBodyContainer.clear();
 
-	//µî·Ï¿¹Á¤ÀÎ ¸®Áöµå ¹Ùµğ »èÁ¦
+	//ì—…ë°ì´íŠ¸ ë¦¬ìŠ¤íŠ¸ì˜ ëª¨ë“  ë°”ë”” ì œê±°
 	for (const auto& body : m_updateActors) {
 		DynamicRigidBody* dynamicBody = dynamic_cast<DynamicRigidBody*>(body);
 		if (dynamicBody) {
@@ -1239,12 +1197,12 @@ void PhysicX::RemoveAllRigidBody(physx::PxScene* scene, std::vector<physx::PxAct
 			}
 		}
 	}
-	//µî·ÏµÈ ¸®Áöµå ¹Ùµğ »èÁ¦
+	//ë“±ë¡ëœ ëª¨ë“  ë°”ë”” ì œê±°
 	m_updateActors.clear();
 }
 
 //==============================================
-//ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯
+//ìºë¦­í„° ì»¨íŠ¸ë¡¤ëŸ¬
 
 void PhysicX::CreateCCT(const CharacterControllerInfo& controllerInfo, const CharacterMovementInfo& movementInfo)
 {
@@ -1369,7 +1327,7 @@ void PhysicX::SetMovementData(const unsigned int& id,const CharacterMovementGetS
 }
 
 //===================================================
-//ÄÉ¸¯ÅÍ °üÀı Á¤º¸ -> ·¹±×µ¹
+//ìºë¦­í„° ë¬¼ë¦¬ ì œì–´ -> ë˜ê·¸ëŒ
 
 void PhysicX::CreateCharacterInfo(const ArticulationInfo& info)
 {
@@ -1527,7 +1485,7 @@ void PhysicX::SetArticulationData(const unsigned int& id, const ArticulationSetD
 		ragdoll->SetIsRagdoll(articulationData.bIsRagdollSimulation);
 		ragdoll->SetWorldTransform(articulationData.WorldTransform);
 
-		//·¹±×µ¹ ½Ã¹Ä·¹ÀÌ¼ÇÀ» ÇØ¾ßÇÏ´Â °æ¿ì
+		//ë˜ê·¸ëŒ ì‹œë®¬ë ˆì´ì…˜ì„ í•´ì•¼í•˜ëŠ” ê²½ìš°
 		if (articulationData.bIsRagdollSimulation)
 		{
 			for (const auto& linkData : articulationData.linkData)
@@ -1565,7 +1523,7 @@ void PhysicX::ConnectPVD()
 
 void PhysicX::CollisionDataUpdate()
 {
-	//»èÁ¦¿¹Á¤ µ¥ÀÌÅÍ »èÁ¦
+	//ì»¨í…Œì´ë„ˆì—ì„œ ì œê±°
 	for (auto& removeId : m_removeCollisionIds) {
 		auto iter = m_collisionDataContainer.find(removeId);
 		if (iter != m_collisionDataContainer.end())
@@ -1575,7 +1533,7 @@ void PhysicX::CollisionDataUpdate()
 	}
 	m_removeCollisionIds.clear();
 
-	//Ãæµ¹ »èÁ¦ ¿¹Á¤ µ¥ÀÌÅÍ µî·Ï
+	//ì¶©ëŒ ë°ì´í„° ë¦¬ìŠ¤íŠ¸ì—ì„œ ì œê±°
 	for (auto& collisionIter : m_collisionDataContainer) {
 		if (collisionIter.second->isDead == true) {
 			m_removeCollisionIds.push_back(collisionIter.first);
@@ -1604,7 +1562,7 @@ void PhysicX::CreateCollisionData(const unsigned int& id, CollisionData* data)
 
 void PhysicX::RemoveCollisionData(const unsigned int& id)
 {
-	//Ãæµ¹ µ¥ÀÌÅÍ°¡ µî·ÏµÇ¾î ÀÖ´ÂÁö °Ë»ç
+	//ì¶©ëŒ ë°ì´í„°ê°€ ë“±ë¡ë˜ì–´ ìˆëŠ”ì§€ ê²€ìƒ‰
 	for (unsigned int& removeId : m_removeCollisionIds) {
 		if (removeId == id) {
 			return;
@@ -1623,14 +1581,14 @@ void PhysicX::extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* 
 
 	std::vector<std::vector<DirectX::SimpleMath::Vector3>> polygon;
 
-	//convexMeshÀÇ Á¤Á¡°ú ÀÎµ¦½º Á¤º¸ °¡Á®¿À±â
+	//convexMeshì˜ ëª¨ë“  ì¸ë±ìŠ¤ ë°ì´í„° ê°€ì ¸ì˜¤ê¸°
 	const physx::PxVec3* convexMeshVertices = convexMeshGeom.convexMesh->getVertices();
 	const physx::PxU32 vertexCount = convexMeshGeom.convexMesh->getNbVertices();
 
 	const physx::PxU8* convexMeshIndices = convexMeshGeom.convexMesh->getIndexBuffer();
 	const physx::PxU32 polygonCount = convexMeshGeom.convexMesh->getNbPolygons();
 
-	//³»º¸³»±â À§ÇÑ polygon Á¤º¸ »ı¼º
+	//í´ë¦¬ê³¤ ê°œìˆ˜ë§Œí¼ polygon ë²¡í„° ìƒì„±
 	polygon.reserve(polygonCount);
 
 	for (PxU32 i = 0; i < polygonCount-1; i++)
@@ -1665,11 +1623,11 @@ void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath:
 	PxPvdSceneClient* pvdClient = m_scene->getScenePvdClient();
 	if (pvdClient && pvd->isConnected())
 	{
-		// »ö»ó ¼³Á¤
+		// ìƒ‰ìƒ ì„¤ì •
 		const PxU32 green = PxDebugColor::eARGB_GREEN;
 		const PxU32 red = PxDebugColor::eARGB_RED;
 
-		// Ãæµ¹ ¿©ºÎ¿¡ µû¶ó ´Ù¸¥ »ö
+		// ì¶©ëŒ ì—¬ë¶€ì— ë”°ë¼ ìƒ‰ìƒ ë³€ê²½
 		PxU32 color = green;
 
 		PxVec3 origin;
@@ -1678,7 +1636,7 @@ void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath:
 		CopyVectorDxToPx(ori, origin);
 		CopyVectorDxToPx(end, endpoint);
 
-		// ¼± ÇÏ³ª¸¸ ±×¸± °ÍÀÌ¹Ç·Î lineCount = 1
+		// ì„  í•˜ë‚˜ë¥¼ ê·¸ë¦¬ëŠ” ê²ƒì´ë¯€ë¡œ lineCount = 1
 		PxDebugLine line(origin, endpoint, color);
 
 		pvdClient->drawLines(&line, 1);
@@ -1710,7 +1668,7 @@ bool PhysicX::IsKinematic(unsigned int id) const
 	{
 		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(it->second))
 		{
-			if (dynamicBody->GetRigidDynamic()) // Ãß°¡: GetRigidDynamic() °á°ú È®ÀÎ
+			if (dynamicBody->GetRigidDynamic()) // ì¶”ê°€: GetRigidDynamic() ìœ íš¨ì„± í™•ì¸
 			{
 				return dynamicBody->GetRigidDynamic()->getRigidBodyFlags() & physx::PxRigidBodyFlag::eKINEMATIC;
 			}
@@ -1735,7 +1693,7 @@ bool PhysicX::IsTrigger(unsigned int id) const
 			{
 				std::vector<physx::PxShape*> shapes(numShapes);
 				actor->getShapes(shapes.data(), numShapes);
-				if (shapes[0]) // Ãß°¡: shapes[0] À¯È¿¼º È®ÀÎ
+				if (shapes[0]) // ì¶”ê°€: shapes[0] ìœ íš¨ì„± í™•ì¸
 				{
 					return shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE;
 				}
@@ -1761,13 +1719,29 @@ bool PhysicX::IsColliderEnabled(unsigned int id) const
 			{
 				std::vector<physx::PxShape*> shapes(numShapes);
 				actor->getShapes(shapes.data(), numShapes);
-				if (shapes[0]) // Ãß°¡: shapes[0] À¯È¿¼º È®ÀÎ
+				if (shapes[0]) // ì¶”ê°€: shapes[0] ìœ íš¨ì„± í™•ì¸
 				{
-					// eSIMULATION_SHAPE ¶Ç´Â eTRIGGER_SHAPE°¡ ¼³Á¤µÇ¾î ÀÖÀ¸¸é È°¼ºÈ­µÈ °ÍÀ¸·Î °£ÁÖ
+					// eSIMULATION_SHAPE ë˜ëŠ” eTRIGGER_SHAPEê°€ ì„¤ì •ë˜ì–´ ìˆìœ¼ë©´ í™œì„±í™”ëœ ìƒíƒœë¡œ ê°„ì£¼
 					return (shapes[0]->getFlags() & physx::PxShapeFlag::eSIMULATION_SHAPE) || (shapes[0]->getFlags() & physx::PxShapeFlag::eTRIGGER_SHAPE);
 				}
 			}
 		}
 	}
 	return false;
+}
+
+bool PhysicX::IsUseGravity(unsigned int id) const
+{
+	auto it = m_rigidBodyContainer.find(id);
+	if (it != m_rigidBodyContainer.end())
+	{
+		if (auto* dynamicBody = dynamic_cast<DynamicRigidBody*>(it->second))
+		{
+			if (dynamicBody->GetRigidDynamic())
+			{
+				return !(dynamicBody->GetRigidDynamic()->getActorFlags() & physx::PxActorFlag::eDISABLE_GRAVITY);
+			}
+		}
+	}
+	return false; // í˜¹ì€ ê¸°ë³¸ê°’
 }

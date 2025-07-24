@@ -19,7 +19,7 @@ public:
    void OnDestroy() override;
 	
 	EBodyType GetBodyType() const { return m_bodyType; }
-	void SetBodyType(const EBodyType& bodyType) { m_bodyType = bodyType; }
+	void SetBodyType(const EBodyType& bodyType);
 	
 	Mathf::Vector3 GetLinearVelocity() const { return m_linearVelocity; }
 	void SetLinearVelocity(const Mathf::Vector3& linearVelocity) { m_linearVelocity = linearVelocity; }
@@ -51,18 +51,36 @@ public:
 	void AddForce(const Mathf::Vector3& force, EForceMode forceMode = EForceMode::FORCE);
 	void SetMass(float _mass);
 
+	float GetMass() const { return m_mass; } // 자신의 질량을 직접 반환
+	float GetMaxLinearVelocity() const { return maxLinearVelocity; } // 자신의 최대 선형 속도를 직접 반환
+	float GetMaxAngularVelocity() const { return maxAngularVelocity; } // 자신의 최대 회전 속도를 직접 반환
+	float GetMaxContactImpulse() const { return maxContactImpulse; } // 자신의 최대 접촉 임펄스를 직접 반환
+	float GetMaxDepenetrationVelocity() const { return maxDepenetrationVelocity; } // 자신의 최대 침투 속도를 직접 반환
+
+	float GetAngularDamping() const { return AngularDamping; } // 자신의 각 감쇠를 직접 반환
+	float GetLinearDamping() const { return LinearDamping; } // 자신의 선형 감쇠를 직접 반환
+
+
+	EForceMode GetForceMode() const { return forceMode; } // 자신의 힘 모드를 직접 반환
+	void SetForceMode(EForceMode mode) { forceMode = mode; } // 힘 모드를 설정
+
 	// Rigidbody의 키네마틱 상태를 설정합니다.
 	void SetKinematic(bool isKinematic);
-	bool IsKinematic() const; // 현재 키네마틱 상태를 반환
+	bool IsKinematic() const { return m_setKinematic; } // 자신의 상태를 직접 반환
 
 	// 콜라이더를 트리거 모드로 설정합니다.
 	void SetIsTrigger(bool isTrigger);
-	bool IsTrigger() const; // 현재 트리거 상태를 반환
+	bool IsTrigger() const { return m_setTrigger; } // 자신의 상태를 직접 반환
 
 	// 콜라이더 활성화/비활성화 (선택 사항, 필요시 추가)
 	void SetColliderEnabled(bool enabled);
-	bool IsColliderEnabled() const;
+	bool IsColliderEnabled() const { return m_collisionEnabled; } // Component의 isEnabled 사용
 
+	void UseGravity(bool useGravity);
+	bool IsUsingGravity() const { return m_useGravity; } // 자신의 상태를 직접 반환
+private:
+	// 모든 상태 변경을 PhysicsManager에 알리는 헬퍼 함수
+	void NotifyPhysicsStateChange();
 	[[Property]]
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
@@ -81,6 +99,14 @@ public:
 	float maxContactImpulse = 1e+32;
 	[[Property]]
 	float maxDepenetrationVelocity = 1e+32;
+	[[Property]]
+	bool m_useGravity = true; // 중력 사용 여부
+	[[Property]]
+	bool m_setTrigger = false; // 트리거 설정 여부
+	[[Property]]
+	bool m_setKinematic = false; // 키네마틱 설정 여부
+	[[Property]]
+	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
 private:
 	Mathf::Vector3 m_linearVelocity;
 	Mathf::Vector3 m_angularVelocity;

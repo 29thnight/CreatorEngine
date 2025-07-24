@@ -65,16 +65,21 @@ void TestBehavior::Update(float tick)
 		bool istriger = rigidBody->IsTrigger();
 		if (istriger)
 		{
-			std::cout << "state : trigger" << std::endl;
+			std::cout << " state : trigger" << std::endl;
 		}
 		else {
-			std::cout << "state : collision" << std::endl;
+			std::cout << " state : collision" << std::endl;
 		}
+
+		std::cout << " testValue : " << testValue << std::endl;
+		std::cout << " m_chargingTime : " << m_chargingTime << std::endl;
 
 		if (testValue< m_chargingTime)
 		{
+			std::cout << " testValue < m_chargingTime" << std::endl;
 			if (!istriger)
 			{
+				std::cout << " set trigger" << std::endl;
 				rigidBody->SetIsTrigger(true);
 				
 			}

@@ -93,6 +93,8 @@ public:
 	bool IsKinematic(unsigned int id) const;
 	bool IsTrigger(unsigned int id) const;
 	bool IsColliderEnabled(unsigned int id) const;
+	bool IsUseGravity(unsigned int id) const;
+
 	//내부용 삭제
 	void RemoveRigidBody(const unsigned int& id,physx::PxScene* scene,std::vector<physx::PxActor*>& removeActorList);
 	
@@ -223,17 +225,6 @@ private:
 
 	//==================================================================================
 	//rigid body 관리용
-	// Pending PhysX Shape Changes
-	struct PendingShapeChange
-	{
-		unsigned int rigidBodyId; // 변경할 RigidBody의 ID
-		bool isTrigger;           // 새로운 트리거 상태
-		bool isColliderEnabled;   // 새로운 콜라이더 활성화 상태
-		EBodyState bodyState;     // 추가: 새로운 바디 상태 (Kinematic, Active 등)
-	};
-	std::vector<PendingShapeChange> m_pendingShapeChanges;
-
-	void ApplyPendingShapeChanges(); // 시뮬레이션 전에 호출될 함수
 	std::unordered_map<unsigned int, RigidBody*> m_rigidBodyContainer; //rigid body 관리용
 	std::vector<RigidBody*> m_updateActors; //업데이트 할 액터들
 

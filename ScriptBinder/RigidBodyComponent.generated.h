@@ -12,6 +12,10 @@ ReflectionFieldInheritance(RigidBodyComponent, Component) \
 		meta_property(maxAngularVelocity) \
 		meta_property(maxContactImpulse) \
 		meta_property(maxDepenetrationVelocity) \
+		meta_property(m_useGravity) \
+		meta_property(m_setTrigger) \
+		meta_property(m_setKinematic) \
+		meta_property(m_collisionEnabled) \
 	}); \
 	FieldEnd(RigidBodyComponent, PropertyOnlyInheritance) \
 };

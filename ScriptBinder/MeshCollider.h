@@ -70,14 +70,7 @@ public:
 	{
 		m_Info.colliderInfo.density = density;
 	}
-	EColliderType GetColliderType() const
-	{
-		return m_type;
-	}
-	void SetColliderType(EColliderType type)
-	{
-		m_type = type;
-	}
+	
 
 	unsigned int GetCollisionCount() const
 	{
@@ -144,6 +137,12 @@ public:
 		if (m_collsionCount != 0) {
 			--m_collsionCount;
 		}
+	}
+	void SetColliderType(EColliderType type) override {
+		m_type = type;
+	}
+	EColliderType GetColliderType() const override {
+		return m_type;
 	}
 private:
 	EColliderType m_type;

@@ -213,6 +213,7 @@
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="ILateUpdatable.h" />
     <ClInclude Include="IStartable.h" />
+    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
@@ -280,7 +281,6 @@
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="Object.h" />
-    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RegisterReflect.def" />

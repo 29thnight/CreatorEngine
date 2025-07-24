@@ -58,4 +58,6 @@ private:
 
 	void OnCollisionExit(ICollider* other) override {}
 
+	void SetColliderType(EColliderType type) override {}
+	EColliderType GetColliderType() const override { return EColliderType::COLLISION; }
 };
