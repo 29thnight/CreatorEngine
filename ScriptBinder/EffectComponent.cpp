@@ -38,6 +38,17 @@ void EffectComponent::Update(float tick)
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
+    // 프록시에서 실제 생성된 인스턴스 이름을 가져와서 동기화
+    if (!proxy->GetInstanceName().empty() && m_effectInstanceName != proxy->GetInstanceName())
+    {
+        m_effectInstanceName = proxy->GetInstanceName();
+
+#ifdef _DEBUG
+        std::cout << "Synced instance name: " << m_effectInstanceName << std::endl;
+#endif
+    }
+
+    // 인스턴스 이름이 있을 때만 position/rotation 업데이트
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
@@ -49,28 +60,36 @@ void EffectComponent::Update(float tick)
         Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
         Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
 
-        // threshold를 더 크게 조정하거나 제거
-        float posThreshold = 0.01f;  // 0.001f에서 0.01f로 증가
+        float posThreshold = 0.01f;
         float posDistance = (m_lastPosition - currentPos).Length();
         if (posDistance > posThreshold)
         {
+            proxy->UpdateInstanceName(m_effectInstanceName);
             proxy->UpdatePosition(currentPos);
             proxy->PushCommand(EffectCommandType::SetPosition);
-            //auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-            //EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
             m_lastPosition = currentPos;
+
         }
 
-        float rotThreshold = 0.01f;  // 회전도 threshold 조정
+        float rotThreshold = 0.01f;
         float rotDistance = (m_lastRotation - currentRot).Length();
         if (rotDistance > rotThreshold)
         {
+            proxy->UpdateInstanceName(m_effectInstanceName);
             proxy->UpdateRotation(currentRot);
             proxy->PushCommand(EffectCommandType::SetRotation);
-            //auto rotationCommand = EffectManagerProxy::CreateSetRotationCommand(m_effectInstanceName, currentRot);
-            //EffectCommandQueue->PushEffectCommand(std::move(rotationCommand));
             m_lastRotation = currentRot;
         }
+    }
+    else
+    {
+#ifdef _DEBUG
+        static int debugCount = 0;
+        if (++debugCount % 60 == 0) {
+            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
+                << proxy->GetInstanceName() << "'" << std::endl;
+        }
+#endif
     }
 }
 
@@ -100,58 +119,43 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     if (!proxy) return;
 
     // 기존 이펙트가 있으면 먼저 삭제
-    if (!m_effectInstanceName.empty())
-    {
+    if (!m_effectInstanceName.empty()) {
         DestroyCurrentEffect();
     }
 
-    // 새로운 고유 인스턴스 이름 생성
-    m_effectInstanceName = effectName + "_" + std::to_string(GetInstanceID()) + "_" + std::to_string(m_instanceCounter++);
-	m_effectTemplateName = effectName;
+    m_effectTemplateName = effectName;
 
-    // 템플릿에서 인스턴스 생성(???)
-    //auto createCommand = EffectManagerProxy::CreateEffectInstanceCommand(effectName, m_effectInstanceName);
-    //EffectCommandQueue->PushEffectCommand(std::move(createCommand));
-	proxy->UpdateTempleteName(m_effectTemplateName);
-    proxy->UpdateInstanceName(m_effectInstanceName);
-    proxy->PushCommand(EffectCommandType::CreateInstance); //현 로직은 이와 같을 것으로 평가됨.
+    // 위치와 회전 설정
+    auto currentPos = GetOwner()->m_transform.GetWorldPosition();
+    auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
 
-    // 먼저 현재 컴포넌트 설정을 적용
-    ApplyEffectSettings();
+    float pitch, yaw, roll;
+    Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
+    Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
 
-    // 이펙트 재생
-    //auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-    //EffectCommandQueue->PushEffectCommand(std::move(playCommand));
+    // 프록시에 설정 업데이트
+    proxy->UpdateTempleteName(m_effectTemplateName);
+    proxy->UpdatePosition(currentPos);
+    proxy->UpdateRotation(currentRot);
+    proxy->UpdateTimeScale(m_timeScale);
+    proxy->UpdateLoop(m_loop);
+    proxy->UpdateDuration(m_duration);
+
+    // 임시로 예상되는 인스턴스 이름 생성 (실제 이름은 Update에서 동기화됨)
+    uint32_t nextId = EffectManagerProxy::GetCurrentInstanceCounter();
+    m_effectInstanceName = effectName + "_" + std::to_string(nextId);
+
+    // 플레이 명령 실행
     proxy->PushCommand(EffectCommandType::Play);
 
-    float templateTimeScale, templateDuration;
-    bool templateLoop;
-
-    if (EffectManagerProxy::GetTemplateSettings(effectName, templateTimeScale, templateLoop, templateDuration))
-    {
-        // 템플릿 설정을 가져온 후 다시 적용
-        m_timeScale = templateTimeScale;
-        m_loop = templateLoop;
-        m_duration = templateDuration;
-
-        // 변경된 설정을 다시 적용
-        ApplyEffectSettings();
-    }
-
-    
-    // 위치 설정
-    auto currentPos = GetOwner()->m_transform.GetWorldPosition();
-    //auto positionCommand = EffectManagerProxy::CreateSetPositionCommand(m_effectInstanceName, currentPos);
-    //EffectCommandQueue->PushEffectCommand(std::move(positionCommand));
-    proxy->UpdatePosition(currentPos);
-    proxy->PushCommand(EffectCommandType::SetPosition);
-
-    // 이펙트 재생
-    auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
-    EffectProxyController::GetInstance()->PushEffectCommand(std::move(playCommand));
-
     m_lastPosition = currentPos;
+    m_lastRotation = currentRot;
     m_isPlaying = true;
+
+#ifdef _DEBUG
+    std::cout << "PlayEffectByName: " << effectName
+        << ", Predicted instance: " << m_effectInstanceName << std::endl;
+#endif
 }
 
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
@@ -177,7 +181,7 @@ void EffectComponent::StopEffect()
 
         //auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(stopCommand));
-
+        proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::Stop);
         m_isPlaying = false;
     }
@@ -191,6 +195,7 @@ void EffectComponent::PauseEffect()
         if (!proxy) return;
         //auto stopCommand = EffectManagerProxy::CreateStopCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(stopCommand));
+        proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::Stop);
         m_isPaused = true;
     }
@@ -205,6 +210,7 @@ void EffectComponent::ResumeEffect()
         if (!proxy) return;
         //auto playCommand = EffectManagerProxy::CreatePlayCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(playCommand));
+        proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::Play);
         m_isPaused = false;
     }
@@ -218,6 +224,7 @@ void EffectComponent::DestroyCurrentEffect()
         if (!proxy) return;
         //auto removeCommand = EffectManagerProxy::CreateRemoveEffectCommand(m_effectInstanceName);
         //EffectCommandQueue->PushEffectCommand(std::move(removeCommand));
+        proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::RemoveEffect);
         m_effectInstanceName.clear();
         m_isPlaying = false;
@@ -245,9 +252,11 @@ void EffectComponent::ApplyEffectSettings()
     {
         EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
         if (!proxy) return;
+        proxy->UpdateInstanceName(m_effectInstanceName);
         //auto timeScaleCommand = EffectManagerProxy::CreateSetTimeScaleCommand(m_effectInstanceName, m_timeScale);
         //EffectCommandQueue->PushEffectCommand(std::move(timeScaleCommand));
         proxy->UpdateTimeScale(m_timeScale);
+
         proxy->PushCommand(EffectCommandType::SetTimeScale);
 
         // 루프 설정

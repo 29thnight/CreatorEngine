@@ -7,23 +7,20 @@ class EffectManagerProxy
 {
 public:
     // 이펙트 재생 명령
-    static EffectManagerProxy CreatePlayCommand(const std::string& effectName)
-    {
+    static EffectManagerProxy CreatePlayCommand(const std::string& templateName) {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
-                effect->Play();
-            }
+        cmd.m_executeFunction = [templateName](){
+            EffectManagers->PlayEffect(templateName);
             };
         return cmd;
     }
 
     // 이펙트 정지 명령
-    static EffectManagerProxy CreateStopCommand(const std::string& effectName)
+    static EffectManagerProxy CreateStopCommand(const std::string& instanceId)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->Stop();
             }
             };
@@ -31,11 +28,11 @@ public:
     }
 
     // 이펙트 위치 설정 명령
-    static EffectManagerProxy CreateSetPositionCommand(const std::string& effectName, const Mathf::Vector3& position)
+    static EffectManagerProxy CreateSetPositionCommand(const std::string& instanceId, const Mathf::Vector3& position)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, position]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId, position](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetPosition(position);
             }
             };
@@ -43,11 +40,11 @@ public:
     }
 
     // 이펙트 타임스케일 설정 명령
-    static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& effectName, float timeScale)
+    static EffectManagerProxy CreateSetTimeScaleCommand(const std::string& instanceId, float timeScale)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, timeScale]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId, timeScale](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetTimeScale(timeScale);
             }
             };
@@ -55,43 +52,43 @@ public:
     }
 
     // 이펙트 회전 설정 명령
-    static EffectManagerProxy CreateSetRotationCommand(const std::string& effectName, const Mathf::Vector3& rotation)
+    static EffectManagerProxy CreateSetRotationCommand(const std::string& instanceId, const Mathf::Vector3& rotation)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, rotation]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId, rotation](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetRotation(rotation);
             }
             };
         return cmd;
     }
 
-    // 이펙트 제거 명령
-    static EffectManagerProxy CreateRemoveEffectCommand(const std::string& effectName)
+    // 이펙트 인스턴스 제거 명령
+    static EffectManagerProxy CreateRemoveEffectCommand(const std::string& instanceId)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            EffectManagers->RemoveEffect(effectName);
+        cmd.m_executeFunction = [instanceId](){
+            EffectManagers->RemoveEffect(instanceId);
             };
         return cmd;
     }
 
-    static EffectManagerProxy CreateSetLoopCommand(const std::string& effectName, bool isLoop)
+    static EffectManagerProxy CreateSetLoopCommand(const std::string& instanceId, bool isLoop)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, isLoop]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId, isLoop](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetLoop(isLoop);
             }
             };
         return cmd;
     }
 
-    static EffectManagerProxy CreateSetDurationCommand(const std::string& effectName, float duration)
+    static EffectManagerProxy CreateSetDurationCommand(const std::string& instanceId, float duration)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName, duration]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId, duration](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetDuration(duration);
             }
             };
@@ -99,24 +96,15 @@ public:
     }
 
     // 이펙트 강제 완료 명령
-    static EffectManagerProxy CreateForceFinishCommand(const std::string& effectName)
+    static EffectManagerProxy CreateForceFinishCommand(const std::string& instanceId)
     {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [effectName]() {
-            if (auto* effect = EffectManagers->GetEffect(effectName)) {
+        cmd.m_executeFunction = [instanceId](){
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
                 effect->SetLoop(false);
                 effect->SetDuration(0.001f);
             }
-            };
-        return cmd;
-    }
-
-    // 이펙트 인스턴스 생성
-    static EffectManagerProxy CreateEffectInstanceCommand(const std::string& templateName, const std::string& instanceName)
-    {
-        EffectManagerProxy cmd;
-        cmd.m_executeFunction = [templateName, instanceName]() {
-            //EffectManagers->CreateEffectInstance(templateName, instanceName);
+            return "";
             };
         return cmd;
     }
@@ -137,13 +125,18 @@ public:
         return false;
     }
 
+    static uint32_t GetCurrentInstanceCounter() {
+        return EffectManagers->GetInstanceId();
+    }
+
     // 명령 실행
     void Execute()
     {
         if (m_executeFunction) {
-            m_executeFunction();
+            return m_executeFunction();
         }
     }
+
 
 private:
     std::function<void()> m_executeFunction;

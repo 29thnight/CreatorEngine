@@ -74,7 +74,7 @@ void EffectManager::Update(float delta)
 	}
 }
 
-std::string EffectManager::PlayEffect(const std::string& templateName, const Mathf::Vector3& position)
+std::string EffectManager::PlayEffect(const std::string& templateName)
 {
 	auto templateIt = templates.find(templateName);
 	if (templateIt == templates.end()) {
@@ -91,11 +91,10 @@ std::string EffectManager::PlayEffect(const std::string& templateName, const Mat
 	// 템플릿 설정 적용
 	ConfigureInstance(instance.get(), templateIt->second);
 
-	// 고유 인스턴스 ID 생성
-	std::string instanceId = templateName + "_" + std::to_string(nextInstanceId++);
+	uint32_t currentId = nextInstanceId.fetch_add(1);  // 안전하게 증가
+	std::string instanceId = templateName + "_" + std::to_string(currentId);
 
 	// 위치 설정 및 재생 시작
-	instance->SetPosition(position);
 	instance->Play();
 
 	// 활성 이펙트 목록에 추가
@@ -125,6 +124,14 @@ bool EffectManager::RemoveEffect(std::string_view name)
 	return activeEffects.erase(name.data()) > 0;
 }
 
+void EffectManager::RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson)
+{
+	UniversalEffectTemplate templateConfig;
+	templateConfig.LoadConfigFromJSON(effectJson);
+	templates[effectName] = templateConfig;
+	std::cout << "Runtime template registered: " << effectName << std::endl;
+}
+
 void EffectManager::InitializeUniversalPool()
 {
 	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
@@ -144,26 +151,33 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	// ParticleSystem 생성 (최대 구성)
 	auto particleSystem = std::make_shared<ParticleSystem>(
 		MAX_PARTICLES_PER_SYSTEM,
-		ParticleDataType::Mesh  // 더 큰 타입으로 설정
+		ParticleDataType::Mesh
 	);
 
-	// 모든 ParticleModule 추가 (비활성화 상태)
+	// 모든 ParticleModule 추가 및 초기화
 	auto spawnModule = particleSystem->AddModule<SpawnModuleCS>();
-	spawnModule->SetEnabled(false);
+	spawnModule->Initialize(); // PSO 생성
+	spawnModule->SetEnabled(false); // 비활성화
 
 	auto colorModule = particleSystem->AddModule<ColorModuleCS>();
+	colorModule->Initialize(); // PSO 생성
 	colorModule->SetEnabled(false);
 
 	auto movementModule = particleSystem->AddModule<MovementModuleCS>();
+	movementModule->Initialize(); // PSO 생성
 	movementModule->SetEnabled(false);
 
 	auto sizeModule = particleSystem->AddModule<SizeModuleCS>();
+	sizeModule->Initialize(); // PSO 생성
 	sizeModule->SetEnabled(false);
 
+	// RenderModule도 초기화
 	auto billboardModule = particleSystem->AddRenderModule<BillboardModuleGPU>();
+	billboardModule->Initialize(); // PSO 생성
 	billboardModule->SetEnabled(false);
 
 	auto meshModule = particleSystem->AddRenderModule<MeshModuleGPU>();
+	meshModule->Initialize(); // PSO 생성
 	meshModule->SetEnabled(false);
 
 	effect->AddParticleSystem(particleSystem);
@@ -180,17 +194,19 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 	universalPool.pop();
 
 	// 재사용을 위한 리셋
-	instance->ResetForReuse();
+	//instance->ResetForReuse();
+
 	return instance;
 }
 
 void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
 	if (effect && effect->IsReadyForReuse()) {
+		// 여기서 정리 작업 수행
 		effect->WaitForGPUCompletion();
 
-		// 모든 모듈 비활성화 (다음 사용을 위해)
-		DisableAllModules(effect.get());
+		// 상태만 초기화 (Stop 호출하지 않음)
+		effect->ResetForReuse();
 
 		universalPool.push(std::move(effect));
 	}
@@ -198,51 +214,69 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 
 void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
 {
-	auto& particleSystems = effect->GetAllParticleSystems();
-	if (particleSystems.empty()) return;
-
-	auto& ps = particleSystems[0];  // 첫 번째 ParticleSystem 사용
+	auto& ps = effect->GetAllParticleSystems()[0];
 
 	// 파티클 시스템 설정
 	ps->ResizeParticleSystem(templateConfig.maxParticles);
 	ps->SetParticleDatatype(templateConfig.dataType);
 
-	// ParticleModule 활성화/비활성화
-	if (auto* spawnModule = ps->GetModule<SpawnModuleCS>()) {
-		spawnModule->SetEnabled(templateConfig.moduleConfig.spawnEnabled);
-		if (templateConfig.moduleConfig.spawnEnabled)
-			spawnModule->Initialize();
+	// 모든 모듈 비활성화
+	DisableAllModules(effect);
+
+	// ParticleModule 데이터 적용 + 활성화
+	if (templateConfig.moduleConfig.spawnEnabled) {
+		if (auto* module = ps->GetModule<SpawnModuleCS>()) {
+			if (!templateConfig.spawnModuleData.empty() && templateConfig.spawnModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.spawnModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 
-	if (auto* colorModule = ps->GetModule<ColorModuleCS>()) {
-		colorModule->SetEnabled(templateConfig.moduleConfig.colorEnabled);
-		if (templateConfig.moduleConfig.colorEnabled)
-			colorModule->Initialize();
+	if (templateConfig.moduleConfig.colorEnabled) {
+		if (auto* module = ps->GetModule<ColorModuleCS>()) {
+			if (!templateConfig.colorModuleData.empty() && templateConfig.colorModuleData.contains("data")) {
+				//module->DeserializeData(templateConfig.colorModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 
-	if (auto* movementModule = ps->GetModule<MovementModuleCS>()) {
-		movementModule->SetEnabled(templateConfig.moduleConfig.movementEnabled);
-		if (templateConfig.moduleConfig.movementEnabled)
-			movementModule->Initialize();
+	if (templateConfig.moduleConfig.movementEnabled) {
+		if (auto* module = ps->GetModule<MovementModuleCS>()) {
+			if (!templateConfig.movementModuleData.empty() && templateConfig.movementModuleData.contains("data")) {
+				//module->DeserializeData(templateConfig.movementModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 
-	if (auto* sizeModule = ps->GetModule<SizeModuleCS>()) {
-		sizeModule->SetEnabled(templateConfig.moduleConfig.sizeEnabled);
-		if (templateConfig.moduleConfig.sizeEnabled)
-			sizeModule->Initialize();
+	if (templateConfig.moduleConfig.sizeEnabled) {
+		if (auto* module = ps->GetModule<SizeModuleCS>()) {
+			if (!templateConfig.sizeModuleData.empty() && templateConfig.sizeModuleData.contains("data")) {
+				//module->DeserializeData(templateConfig.sizeModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 
-	// RenderModule 활성화/비활성화
-	if (auto* billboardModule = ps->GetRenderModule<BillboardModuleGPU>()) {
-		billboardModule->SetEnabled(templateConfig.moduleConfig.billboardEnabled);
-		if (templateConfig.moduleConfig.billboardEnabled)
-			billboardModule->Initialize();
+	// RenderModule 데이터 적용 + 활성화
+	if (templateConfig.moduleConfig.billboardEnabled) {
+		if (auto* module = ps->GetRenderModule<BillboardModuleGPU>()) {
+			if (!templateConfig.billboardModuleData.empty() && templateConfig.billboardModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.billboardModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 
-	if (auto* meshModule = ps->GetRenderModule<MeshModuleGPU>()) {
-		meshModule->SetEnabled(templateConfig.moduleConfig.meshEnabled);
-		if (templateConfig.moduleConfig.meshEnabled)
-			meshModule->Initialize();
+	if (templateConfig.moduleConfig.meshEnabled) {
+		if (auto* module = ps->GetRenderModule<MeshModuleGPU>()) {
+			if (!templateConfig.meshModuleData.empty() && templateConfig.meshModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.meshModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
 	}
 }
 
@@ -269,81 +303,70 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 	maxParticles = 1000;
 	dataType = ParticleDataType::Standard;
 
+	// JSON 원본 저장
+	originalJson = effectJson;
+
 	try {
-		// 기존 JSON 구조에서 EffectBase 정보 파싱
 		if (effectJson.contains("particleSystems") && effectJson["particleSystems"].is_array()) {
 			for (const auto& psJson : effectJson["particleSystems"]) {
 
-				// maxParticles 설정
+				// maxParticles, dataType 설정 (기존 로직)
 				if (psJson.contains("maxParticles")) {
-					maxParticles = std::max(maxParticles, (int)psJson["maxParticles"]);
+					maxParticles = (int)psJson["maxParticles"];
 				}
-
-				// dataType 설정
 				if (psJson.contains("particleDataType")) {
-					int dataTypeInt = psJson["particleDataType"];
-					dataType = static_cast<ParticleDataType>(dataTypeInt);
+					dataType = static_cast<ParticleDataType>(psJson["particleDataType"]);
 				}
 
-				// ParticleModule 체크
-				if (psJson.contains("modules") && psJson["modules"].is_array()) {
+				// 모듈 활성화 플래그 설정 + 모듈 데이터 저장
+				if (psJson.contains("modules")) {
 					for (const auto& moduleJson : psJson["modules"]) {
 						if (moduleJson.contains("type")) {
 							std::string moduleType = moduleJson["type"];
 
-							// 모듈 타입에 따라 활성화 플래그 설정
+							// 활성화 플래그 설정
 							if (moduleType == "SpawnModuleCS") {
 								moduleConfig.spawnEnabled = true;
+								spawnModuleData = moduleJson; // 데이터 저장
 							}
 							else if (moduleType == "ColorModuleCS") {
 								moduleConfig.colorEnabled = true;
+								colorModuleData = moduleJson;
 							}
 							else if (moduleType == "MovementModuleCS") {
 								moduleConfig.movementEnabled = true;
+								movementModuleData = moduleJson;
 							}
 							else if (moduleType == "SizeModuleCS") {
 								moduleConfig.sizeEnabled = true;
-							}
-							else if (moduleType == "MeshSpawnModuleCS") {
-								moduleConfig.meshSpawnEnabled = true;
+								sizeModuleData = moduleJson;
 							}
 						}
 					}
 				}
 
-				// RenderModule 체크
-				if (psJson.contains("renderModules") && psJson["renderModules"].is_array()) {
+				// 렌더 모듈도 동일하게
+				if (psJson.contains("renderModules")) {
 					for (const auto& renderModuleJson : psJson["renderModules"]) {
 						if (renderModuleJson.contains("type")) {
 							std::string renderModuleType = renderModuleJson["type"];
 
 							if (renderModuleType == "BillboardModuleGPU") {
 								moduleConfig.billboardEnabled = true;
+								billboardModuleData = renderModuleJson;
 							}
 							else if (renderModuleType == "MeshModuleGPU") {
 								moduleConfig.meshEnabled = true;
+								meshModuleData = renderModuleJson;
 							}
 						}
 					}
 				}
 			}
 		}
-
-		// 디버그 출력
-		std::cout << "Loaded config - Modules: "
-			<< "Spawn:" << moduleConfig.spawnEnabled
-			<< " Color:" << moduleConfig.colorEnabled
-			<< " Movement:" << moduleConfig.movementEnabled
-			<< " Size:" << moduleConfig.sizeEnabled
-			<< " Billboard:" << moduleConfig.billboardEnabled
-			<< " Mesh:" << moduleConfig.meshEnabled
-			<< " MaxParticles:" << maxParticles << std::endl;
-
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error parsing effect JSON: " << e.what() << std::endl;
-
-		// 에러 발생시 기본 설정 (최소한 spawn + billboard는 켜둠)
 		moduleConfig.spawnEnabled = true;
 		moduleConfig.billboardEnabled = true;
 	}

@@ -40,7 +40,7 @@ public:
 
 	const std::string& GetTempleteName() const { return m_templateName; }
 	const std::string& GetInstanceName() const { return m_instanceName; }
-	const Mathf::Vector3& GetPostion() const { return m_commandPosition; }
+	const Mathf::Vector3& GetPosition() const { return m_commandPosition; }
 	const Mathf::Vector3& GetRotation() const { return m_commandRotation; }
 	const float& GetTimeScale() const { return m_timeScale; }
 	bool& GetLoop() { return m_loop; }

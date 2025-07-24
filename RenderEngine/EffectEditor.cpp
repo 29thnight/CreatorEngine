@@ -19,16 +19,16 @@ EffectEditor::EffectEditor()
 		}
 
 		// 리스트박스
-		//if (ImGui::BeginListBox("##EffectList"))
-		//{
-		//	for (const auto& pair : EffectManagers->GetEffects()) {
-		//		if (ImGui::Selectable(pair.first.c_str())) {
-		//			// 선택했을 때 처리할 로직
-		//			std::cout << "Selected effect: " << pair.first << std::endl;
-		//		}
-		//	}
-		//	ImGui::EndListBox();
-		//}
+		if (ImGui::BeginListBox("##EffectList"))
+		{
+			for (const auto& pair : EffectManagers->GetEffectTemplates()) {
+				if (ImGui::Selectable(pair.first.c_str())) {
+					// 선택했을 때 처리할 로직
+					std::cout << "Selected effect: " << pair.first << std::endl;
+				}
+			}
+			ImGui::EndListBox();
+		}
 		});
 	ImGui::GetContext("EffectList").Close();
 
@@ -150,27 +150,27 @@ void EffectEditor::ExportToManager(const std::string& effectName)
 		return;
 	}
 
-	// 임시 에미터들을 실제 ParticleSystem 벡터로 변환
-	std::vector<std::shared_ptr<ParticleSystem>> emittersToExport;
+	// 임시 EffectBase 생성
+	auto tempEffect = std::make_unique<EffectBase>();
+	tempEffect->SetName(effectName);
+	tempEffect->SetTimeScale(m_effectTimeScale);
+	tempEffect->SetLoop(m_effectLoop);
+	tempEffect->SetDuration(m_effectDuration);
+
 	for (const auto& tempEmitter : m_tempEmitters) {
 		if (tempEmitter.particleSystem) {
-			emittersToExport.push_back(tempEmitter.particleSystem);
+			tempEmitter.particleSystem->m_name = tempEmitter.name;
+			tempEffect->AddParticleSystem(tempEmitter.particleSystem);
 		}
 	}
 
-	// EffectManager에 등록
+	// JSON으로 직렬화
+	nlohmann::json effectJson = EffectSerializer::SerializeEffect(*tempEffect);
+
+	// 매니저에 템플릿으로 등록
 	if (auto* manager = EffectManagers) {
-		//manager->RegisterCustomEffect(effectName, emittersToExport);
-
-		// 등록된 Effect를 바로 재생
-		/*if (auto* registeredEffect = manager->GetEffect(effectName)) {
-			registeredEffect->Play();
-		}*/
-
-		std::cout << "Effect exported and started: " << effectName << std::endl;
-	}
-	else {
-		std::cout << "No active EffectManager found!" << std::endl;
+		manager->RegisterTemplateFromEditor(effectName, effectJson);
+		std::cout << "Effect template registered: " << effectName << std::endl;
 	}
 }
 
@@ -866,18 +866,23 @@ void EffectEditor::AddSelectedModule()
 	switch (type) {
 	case EffectModuleType::SpawnModule:
 		m_editingEmitter->AddModule<SpawnModuleCS>();
+		m_editingEmitter->GetModule<SpawnModuleCS>()->Initialize();
 		break;
 	case EffectModuleType::MeshSpawnModule:
 		m_editingEmitter->AddModule<MeshSpawnModuleCS>();
+		m_editingEmitter->GetModule<MeshSpawnModuleCS>()->Initialize();
 		break;
 	case EffectModuleType::MovementModule:
 		m_editingEmitter->AddModule<MovementModuleCS>();
+		m_editingEmitter->GetModule<MovementModuleCS>()->Initialize();
 		break;
 	case EffectModuleType::ColorModule:
 		m_editingEmitter->AddModule<ColorModuleCS>();
+		m_editingEmitter->GetModule<ColorModuleCS>()->Initialize();
 		break;
 	case EffectModuleType::SizeModule:
 		m_editingEmitter->AddModule<SizeModuleCS>();
+		m_editingEmitter->GetModule<SizeModuleCS>()->Initialize();
 		break;
 	}
 }
@@ -892,10 +897,12 @@ void EffectEditor::AddSelectedRender()
 	case RenderType::Billboard:
 		m_editingEmitter->SetParticleDatatype(ParticleDataType::Standard);
 		m_editingEmitter->AddRenderModule<BillboardModuleGPU>();
+		m_editingEmitter->GetRenderModule<BillboardModuleGPU>()->Initialize();
 		break;
 	case RenderType::Mesh:
 		m_editingEmitter->SetParticleDatatype(ParticleDataType::Mesh);
 		m_editingEmitter->AddRenderModule<MeshModuleGPU>();
+		m_editingEmitter->GetRenderModule<MeshModuleGPU>()->Initialize();
 		break;
 	}
 }

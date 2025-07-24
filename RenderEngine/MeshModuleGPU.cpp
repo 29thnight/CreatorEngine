@@ -26,8 +26,6 @@ MeshModuleGPU::MeshModuleGPU()
 
 void MeshModuleGPU::Initialize()
 {
-    if (m_enabled) return;
-
     m_pso = std::make_unique<PipelineStateObject>();
     m_instanceCount = 0;
     m_particleSRV = nullptr;

@@ -66,7 +66,6 @@ MeshSpawnModuleCS::~MeshSpawnModuleCS()
 
 void MeshSpawnModuleCS::Initialize()
 {
-    if (m_enabled) return;
 
     if (m_isInitialized)
         return;

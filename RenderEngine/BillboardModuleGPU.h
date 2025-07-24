@@ -18,6 +18,10 @@ public:
     void SetupRenderTarget(RenderPassData* renderData) override;
     void SetTexture(Texture* texture) override;
 
+    virtual void ResetForReuse() override;
+    virtual bool IsReadyForReuse() const override;
+    virtual void WaitForGPUCompletion() override;
+
     BillBoardType GetBillboardType() const { return m_BillBoardType; }
     PipelineStateObject* GetPSO() { return m_pso.get(); }
 
@@ -69,5 +73,8 @@ private:
 
     std::vector<BillboardVertex> m_vertices;
     std::vector<uint32> m_indices;
+
+    bool m_isRendering = false;
+    mutable std::atomic<bool> m_gpuWorkPending = false;
 };
 

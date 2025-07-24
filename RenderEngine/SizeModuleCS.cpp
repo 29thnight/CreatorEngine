@@ -30,7 +30,6 @@ SizeModuleCS::~SizeModuleCS()
 
 void SizeModuleCS::Initialize()
 {
-    if (m_enabled) return;
 
     if (m_isInitialized)
         return;

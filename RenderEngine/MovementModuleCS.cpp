@@ -3,7 +3,6 @@
 
 void MovementModuleCS::Initialize()
 {
-    if (m_enabled) return;
 
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();

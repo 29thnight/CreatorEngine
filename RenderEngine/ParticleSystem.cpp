@@ -51,32 +51,42 @@ void ParticleSystem::Update(float delta)
 	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
 	ID3D11ShaderResourceView* outputSRV = m_usingBufferA ? m_particleSRV_B : m_particleSRV_A;
 
-	// 모든 모듈 실행
+	int executedModuleCount = 0;
+
+	// 활성화된 모듈만 실행
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
 	{
 		ParticleModule& module = *it;
+
+		// 비활성화된 모듈은 건너뛰기 (버퍼 스왑도 하지 않음)
+		if (!module.IsEnabled()) {
+			continue;
+		}
 
 		// 버퍼 설정 및 실행
 		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
 		module.Update(delta);
 
-		// 다음 모듈을 위해 입력↔출력 스왑
+		executedModuleCount++;
+
+		// 실제로 실행된 모듈에 대해서만 버퍼 스왑
 		std::swap(inputUAV, outputUAV);
 		std::swap(inputSRV, outputSRV);
 	}
 
-	// 최종 버퍼 스왑 (모듈 개수가 홀수면 결과적으로 버퍼가 바뀜)
-	if (m_moduleList.size() % 2 == 1) {
+	// 실제 실행된 모듈 개수가 홀수면 최종 버퍼 상태 변경
+	if (executedModuleCount % 2 == 1) {
 		m_usingBufferA = !m_usingBufferA;
 	}
 
 	DeviceState::g_pDeviceContext->Flush();
 
 #ifdef _DEBUG
-	//static int frameCount = 0;
-	//if (++frameCount % 60 == 0) {
-	//	std::cout << "Particle system running..." << std::endl;
-	//}
+	static int frameCount = 0;
+	if (++frameCount % 60 == 0) {
+		std::cout << "Executed modules: " << executedModuleCount
+			<< ", Using Buffer A: " << (m_usingBufferA ? "true" : "false") << std::endl;
+	}
 #endif
 }
 
@@ -110,12 +120,16 @@ void ParticleSystem::Render(RenderScene& scene, Camera& camera)
 			continue;
 		}
 
-
 		renderModule->SaveRenderState();
 		renderModule->SetupRenderTarget(renderData);
 
 		// 모든 렌더링 모듈에 파티클 데이터 설정
 		renderModule->SetParticleData(finalParticleSRV, instanceCount);
+
+		if (renderModule->GetPSO() == nullptr)
+		{
+			std::cout << " " << std::endl;
+		}
 
 		renderModule->GetPSO()->Apply();
 		renderModule->Render(world, view, projection);
@@ -429,11 +443,21 @@ void ParticleSystem::ReleaseParticleBuffers()
 	if (m_particleSRV_B) { m_particleSRV_B->Release(); m_particleSRV_B = nullptr; }
 }
 
-ID3D11ShaderResourceView* ParticleSystem::GetCurrentRenderingSRV() const
+ID3D11ShaderResourceView* ParticleSystem::GetCurrentRenderingSRV()
 {
+	// 실제 활성화된 모듈 개수 계산
+	int enabledModuleCount = 0;
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
+		const ParticleModule& module = *it;
+		if (module.IsEnabled()) {
+			enabledModuleCount++;
+		}
+	}
+
 	bool finalIsBufferA = m_usingBufferA;
-	if (m_moduleList.size() % 2 == 1) {
-		// 모듈 개수가 홀수이면 반전
+
+	// 활성화된 모듈 개수가 홀수이면 반전
+	if (enabledModuleCount % 2 == 1) {
 		finalIsBufferA = !finalIsBufferA;
 	}
 

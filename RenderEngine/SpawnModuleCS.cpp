@@ -52,7 +52,6 @@ SpawnModuleCS::~SpawnModuleCS()
 
 void SpawnModuleCS::Initialize()
 {
-	if (!m_enabled) return;
 
 	if (m_isInitialized)
 		return;

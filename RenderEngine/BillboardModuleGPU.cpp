@@ -4,7 +4,6 @@
 
 void BillboardModuleGPU::Initialize()
 {
-	if (m_enabled) return;
 
 	m_vertices = Quad;
 	m_indices = Indices;
@@ -140,6 +139,69 @@ void BillboardModuleGPU::SetTexture(Texture* texture)
 	m_assignedTexture = texture;
 }
 
+void BillboardModuleGPU::ResetForReuse()
+{
+	// 렌더 상태 초기화
+	m_instanceCount = 0;
+	m_maxCount = 0;
+	m_isRendering = false;
+	m_gpuWorkPending = false;
+
+	// 타입을 기본값으로 리셋
+	m_BillBoardType = BillBoardType::Basic;
+
+	// 리소스 참조 해제 (실제 리소스는 해제하지 않음)
+	m_particleSRV = nullptr;
+	m_assignedTexture = nullptr;
+
+	// 상수 버퍼 초기화
+	if (m_ModelBuffer) {
+		m_ModelConstantBuffer = {}; // 구조체 초기화
+		m_ModelConstantBuffer.world = Mathf::Matrix::Identity;
+		m_ModelConstantBuffer.view = Mathf::Matrix::Identity;
+		m_ModelConstantBuffer.projection = Mathf::Matrix::Identity;
+	}
+
+	// 모듈 비활성화 (다음 사용까지)
+	//SetEnabled(false);
+
+	// 디버그 출력
+	OutputDebugStringA("BillboardModule: Reset for reuse completed\n");
+}
+
+bool BillboardModuleGPU::IsReadyForReuse() const
+{
+	// GPU 작업이 완료되었고, 렌더링 중이 아닐 때만 재사용 가능
+	bool ready = !m_isRendering &&
+		!m_gpuWorkPending.load() &&
+		m_instanceCount == 0;
+
+	// 필수 리소스들이 유효한지 확인
+	bool resourcesValid = billboardVertexBuffer != nullptr &&
+		billboardIndexBuffer != nullptr &&
+		m_ModelBuffer != nullptr &&
+		m_pso != nullptr;
+
+	return ready && resourcesValid;
+}
+
+void BillboardModuleGPU::WaitForGPUCompletion()
+{
+	if (!m_gpuWorkPending.load()) {
+		return; // GPU 작업이 없으면 바로 리턴
+	}
+
+	auto& deviceContext = DeviceState::g_pDeviceContext;
+	if (deviceContext) {
+		deviceContext->Flush();
+	}
+
+	// GPU 작업 완료 플래그 리셋
+	m_gpuWorkPending = false;
+
+	OutputDebugStringA("BillboardModule: GPU completion wait finished\n");
+}
+
 void BillboardModuleGPU::SetupRenderTarget(RenderPassData* renderData)
 {
 	auto& deviceContext = DeviceState::g_pDeviceContext;
@@ -165,6 +227,9 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 {
 	if (!m_enabled) return;
 
+	m_isRendering = true;
+	m_gpuWorkPending = true; // GPU 작업 시작
+
 	auto& deviceContext = DeviceState::g_pDeviceContext;
 
 	m_ModelConstantBuffer.world = world;
@@ -182,7 +247,7 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	deviceContext->IASetVertexBuffers(0, 1, billboardVertexBuffer.GetAddressOf(), &stride, &offset);
 	deviceContext->IASetIndexBuffer(billboardIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
-	// 인스턴스 렌더링 - 인스턴스 버퍼 없이 인스턴스 수만 사용
+	// 인스턴스 렌더링
 	deviceContext->DrawIndexedInstanced(m_indices.size(), m_instanceCount, 0, 0, 0);
 
 	// 리소스 해제
@@ -190,6 +255,9 @@ void BillboardModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::
 	deviceContext->VSSetShaderResources(0, 1, nullSRV);
 
 	DirectX11::UnbindRenderTargets();
+
+	m_isRendering = false;
+	// GPU 작업은 비동기이므로 m_gpuWorkPending은 WaitForGPUCompletion에서 해제
 }
 
 void BillboardModuleGPU::SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount)

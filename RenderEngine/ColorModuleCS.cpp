@@ -45,7 +45,6 @@ ColorModuleCS::~ColorModuleCS()
 
 void ColorModuleCS::Initialize()
 {
-    if (m_enabled) return;
 
     if (m_isInitialized)
         return;

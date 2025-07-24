@@ -18,16 +18,25 @@ public:
 		bool billboardEnabled = false;
 		bool meshEnabled = false;
 	};
+	
+	// 원본 설정
+	nlohmann::json originalJson;
 
 	ModuleConfig moduleConfig;
 	int maxParticles = 1000;
 	ParticleDataType dataType = ParticleDataType::Standard;
 
+	// 모듈별 데이터 (한 번만 파싱해서 저장)
+	nlohmann::json spawnModuleData;
+	nlohmann::json colorModuleData;
+	nlohmann::json movementModuleData;
+	nlohmann::json sizeModuleData;
+	nlohmann::json billboardModuleData;
+	nlohmann::json meshModuleData;
+
 	// JSON에서 설정 로드
 	void LoadConfigFromJSON(const nlohmann::json& effectJson);
 };
-
-
 
 class EffectManager : public IRenderPass, public DLLCore::Singleton<EffectManager>
 {
@@ -45,7 +54,7 @@ public:
 
 	void Update(float delta);
 
-	std::string PlayEffect(const std::string& templateName, const Mathf::Vector3& position = { 0,0,0 });
+	std::string PlayEffect(const std::string& templateName);
 
 	EffectBase* GetEffectInstance(const std::string& instanceId);
 
@@ -57,7 +66,12 @@ public:
 	size_t GetActiveEffectCount() const { return activeEffects.size(); }
 
 	// 읽기만 effects에 접근은 오로지 매니저에서만
-	//const std::unordered_map<std::string, std::unique_ptr<EffectBase>>& GetEffects() const { return templates; }
+	const std::unordered_map<std::string, UniversalEffectTemplate> GetEffectTemplates() const { return templates; }
+
+	UINT GetInstanceId() const { return nextInstanceId.load(); }
+
+	void RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson);
+
 private:
 	// 템플릿 설정들 (JSON에서 로드)
 	std::unordered_map<std::string, UniversalEffectTemplate> templates;
@@ -69,7 +83,7 @@ private:
 	std::queue<std::unique_ptr<EffectBase>> universalPool;
 
 	// 인스턴스 ID 생성기
-	uint32_t nextInstanceId = 1;
+	std::atomic<UINT> nextInstanceId{ 1 };
 
 	// 풀 설정
 	static const int DEFAULT_POOL_SIZE = 50;  // 동시 이펙트 최대 개수
