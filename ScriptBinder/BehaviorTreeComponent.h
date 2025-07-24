@@ -1,18 +1,16 @@
 #pragma once
 #include "imgui-node-editor\imgui_node_editor.h"
-#include "IUpdatable.h"
 #include "Component.h"
 #include "IAIComponent.h"
 #include "BTHeader.h"
 #include "AIManager.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
+#include "IRegistableEvent.h"
 #include "BehaviorTreeComponent.generated.h"
 
 using namespace BT;
 
 class BehaviorTreeComponent : 
-	public Component, public IAIComponent, public IUpdatable, public IAwakable, public IOnDestroy
+	public Component, public IAIComponent, public RegistableEvent<BehaviorTreeComponent>
 {
 public:
    ReflectBehaviorTreeComponent

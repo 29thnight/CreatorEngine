@@ -6,8 +6,9 @@
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
 #include "ShaderSystem.h"
-#include "IOnDestroy.h"
-#include "IAwakable.h"
+//#include "IOnDestroy.h"
+//#include "IAwakable.h"
+#include "IRegistableEvent.h"
 #include "TerrainMesh.h"
 #include "TerrainMaterial.h"
 
@@ -16,7 +17,7 @@
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
-class TerrainComponent : public Component, public IAwakable, public IOnDestroy
+class TerrainComponent : public Component, public RegistableEvent<TerrainComponent>
 {
 public:
     ReflectTerrainComponent

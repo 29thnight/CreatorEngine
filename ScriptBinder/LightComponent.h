@@ -3,16 +3,14 @@
 #include "LightProperty.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
-#include "IUpdatable.h"
+#include "IRegistableEvent.h"
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Scene.h"
 #include "DataSystem.h"
 #include "LightComponent.generated.h"
 
-class LightComponent : public Component, public IUpdatable, public IAwakable, public IOnDestroy
+class LightComponent : public Component, public RegistableEvent<LightComponent>
 {
 public:
     ReflectLightComponent

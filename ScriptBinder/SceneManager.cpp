@@ -581,7 +581,10 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             {
                 try
                 {
+                    //이게 문제가 안될까???
+                    m_loadSceneReturn = true;
                     ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                    m_loadSceneReturn = false;
                 }
                 catch (const std::exception& e)
                 {

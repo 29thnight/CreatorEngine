@@ -1,5 +1,6 @@
 #include "MeshModuleGPU.h"
 #include "ShaderSystem.h"
+#include "DataSystem.h"
 
 MeshModuleGPU::MeshModuleGPU()
 {

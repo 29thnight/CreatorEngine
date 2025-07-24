@@ -1,4 +1,5 @@
 #include "BehaviorTreeComponent.h"
+#include "SceneManager.h"
 #include "NodeFactory.h"
 
 void BehaviorTreeComponent::Initialize()

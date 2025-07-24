@@ -2,13 +2,12 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
-#include "IUpdatable.h"
+#include "IRegistableEvent.h"
 #include "Camera.h"
 #include "CameraComponent.generated.h"
+#include "SceneManager.h"
 
-class CameraComponent : public Component, public IAwakable, public IUpdatable, public IOnDestroy
+class CameraComponent : public Component, public RegistableEvent<CameraComponent>
 {
 public:
    ReflectCameraComponent

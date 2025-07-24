@@ -2,14 +2,14 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IUpdatable.h"
+#include "IRegistableEvent.h"
 #include "Canvas.h"
 #include <DirectXTK/SpriteFont.h>
 #include <DirectXTK/SpriteBatch.h>
 #include "UIComponent.h"
 #include "TextComponent.generated.h"
 
-class TextComponent : public UIComponent, public IUpdatable
+class TextComponent : public UIComponent, public RegistableEvent<TextComponent>
 {
 public:
    ReflectTextComponent
@@ -27,8 +27,6 @@ public:
 	std::string message;
 
 private:
-    [[Property]]
-	//bool _isTable = true;
 	Mathf::Vector2 pos{ 0,0};
 	//상위ui 위치기준 추가값
     [[Property]]

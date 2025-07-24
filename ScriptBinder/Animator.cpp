@@ -3,7 +3,9 @@
 #include "RenderScene.h"
 #include "../RenderEngine/Skeleton.h"
 #include "NodeEditor.h"
+#include "SceneManager.h"
 #include "Socket.h"
+
 void Animator::Awake()
 {
 	auto renderScene = SceneManagers->GetRenderScene();

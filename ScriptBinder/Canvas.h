@@ -2,10 +2,10 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
-#include "IUpdatable.h"
 #include "Canvas.generated.h"
-#include "IOnDestroy.h"
-class Canvas : public Component, public IUpdatable, public IOnDestroy
+#include "IRegistableEvent.h"
+
+class Canvas : public Component, public RegistableEvent<Canvas>
 {
 public:
    ReflectCanvas
