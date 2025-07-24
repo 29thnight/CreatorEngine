@@ -781,63 +781,104 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 {
-	if (meshRenderer->m_Material)
+	if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
+		ImGui::Text("Element ");
+		ImGui::SameLine();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+
+		if (meshRenderer->m_Material && !meshRenderer->m_Material->m_name.empty())
 		{
-			ImGui::Text("Element ");
-			ImGui::SameLine();
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
-			ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 			ImGui::Button(meshRenderer->m_Material->m_name.c_str(), ImVec2(250, 0));
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_BOX))
-			{
-				ImGui::GetContext("SelectMatarial").Open();
-			}
-			ImGui::PopStyleVar(2);
 		}
-		if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
+		else
 		{
-			const auto& mat_type = Meta::Find("Material");
-			const auto& mat_info_type = Meta::Find("MaterialInfomation");
+			ImGui::Button("No Material", ImVec2(250, 0));
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_BOX))
+		{
+			ImGui::GetContext("SelectMatarial").Open();
+		}
+		ImGui::PopStyleVar(2);
+	}
+
+	if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const auto& mat_type = Meta::Find("Material");
+		const auto& mat_info_type = Meta::Find("MaterialInfomation");
+		if (nullptr != meshRenderer->m_Material)
+		{
 			Meta::DrawProperties(&meshRenderer->m_Material->m_materialInfo, *mat_info_type);
-			const auto& mat_render_type = Meta::FindEnum("MaterialRenderingMode");
-			for (auto& enumProp : mat_type->properties)
+		}
+		else
+		{
+			ImGui::Text("No Material assigned.");
+		}
+		const auto& mat_render_type = Meta::FindEnum("MaterialRenderingMode");
+		for (auto& enumProp : mat_type->properties)
+		{
+			if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
 			{
-				if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
+				if (nullptr != meshRenderer->m_Material)
 				{
 					Meta::DrawEnumProperty((int*)&meshRenderer->m_Material->m_renderingMode, mat_render_type, enumProp);
-					break;
 				}
+				else
+				{
+					ImGui::Text("No Material assigned.");
+				}
+				break;
 			}
 		}
-		if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
+	}
+
+	if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const auto& lightmap_type = Meta::Find("LightMapping");
+		Meta::DrawProperties(&meshRenderer->m_LightMapping, *lightmap_type);
+	}
+
+	if (ImGui::CollapsingHeader("LODGroupShared", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (!meshRenderer->m_Mesh)
 		{
-			const auto& lightmap_type = Meta::Find("LightMapping");
-			Meta::DrawProperties(&meshRenderer->m_LightMapping, *lightmap_type);
+			ImGui::Text("No Mesh assigned.");
 		}
-
-		if (DataSystems->m_trasfarMaterial)
+		else
 		{
-			std::string name = meshRenderer->m_Material->m_name;
-			Meta::MakeCustomChangeCommand(
-			[=]
-			{
-				meshRenderer->m_Material = DataSystems->Materials[name].get();
-			},
-			[=]
-			{
-				meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
-			});
-
-			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
-			DataSystems->m_trasfarMaterial = nullptr;
+			ImGui::Text("Mesh: %s", meshRenderer->m_Mesh->GetName().c_str());
+			ImGui::Checkbox("Enable LODGroup", &meshRenderer->m_isEnableLOD);
 		}
 	}
-	else
+
+	if (DataSystems->m_trasfarMaterial)
 	{
-		ImGui::Text("No Material");
+		std::string name{};
+		if (meshRenderer->m_Material)
+		{
+			name = meshRenderer->m_Material->m_name;
+		}
+		Meta::MakeCustomChangeCommand(
+		[=]
+		{
+			if(!name.empty() && DataSystems->Materials.find(name) != DataSystems->Materials.end())
+			{
+				meshRenderer->m_Material = DataSystems->Materials[name].get();
+			}
+			else
+			{
+				meshRenderer->m_Material = nullptr;
+			}
+		},
+		[=]
+		{
+			meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+		});
+
+		meshRenderer->m_Material = DataSystems->m_trasfarMaterial;
+		DataSystems->m_trasfarMaterial = nullptr;
 	}
 }
 

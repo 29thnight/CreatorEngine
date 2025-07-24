@@ -14,7 +14,7 @@ public:
 	void Initialize();
 	void LoadComponent(GameObject* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame = false);
 
-	std::unordered_map<std::string, const Meta::Type*> m_componentTypes{};
+	std::map<std::string, const Meta::Type*> m_componentTypes{};
 };
 
 static auto& ComponentFactorys = ComponentFactory::GetInstance();

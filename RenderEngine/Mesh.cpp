@@ -1,5 +1,32 @@
 #include "Mesh.h"
 #include "DeviceState.h"
+#include "Camera.h"
+#include "MeshOptimizer.h"
+
+// Helper to create D3D11 buffers for a given LOD
+void CreateLODBuffers(
+	const std::vector<Vertex>& vertices,
+	const std::vector<uint32>& indices,
+	Mesh::LODResource& outLODResource,
+	const std::string& meshName,
+	uint32_t lodIndex)
+{
+	outLODResource.indexCount = static_cast<uint32>(indices.size());
+
+	// Create Vertex Buffer
+	outLODResource.vertexBuffer = DirectX11::CreateBuffer(
+		sizeof(Vertex) * vertices.size(),
+		D3D11_BIND_VERTEX_BUFFER,
+		vertices.data());
+	DirectX::SetName(outLODResource.vertexBuffer.Get(), meshName + "LOD" + std::to_string(lodIndex) + "VertexBuffer");
+
+	// Create Index Buffer
+	outLODResource.indexBuffer = DirectX11::CreateBuffer(
+		sizeof(uint32) * indices.size(),
+		D3D11_BIND_INDEX_BUFFER,
+		indices.data());
+	DirectX::SetName(outLODResource.indexBuffer.Get(), meshName + "LOD" + std::to_string(lodIndex) + "IndexBuffer");
+}
 
 Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
 	m_name(_name),
@@ -91,6 +118,127 @@ void Mesh::AssetInit()
 	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
+// [NEW] Check if LODs have been generated
+bool Mesh::HasLODs() const
+{
+	return !m_LODs.empty();
+}
+
+// [NEW] Generate LODs
+void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
+{
+	if (m_vertices.empty() || m_indices.empty())
+	{
+		std::cerr << "Mesh::GenerateLODs: Original mesh data is empty. Cannot generate LODs." << std::endl;
+		return;
+	}
+
+	// Store the thresholds
+	m_LODThresholds = lodThresholds;
+
+	// Clear existing LODs (if any) before generating new ones
+	m_LODs.clear();
+	m_LODs.reserve(1 + lodThresholds.size()); // LOD 0 + generated LODs
+
+	// Add LOD 0 (original mesh) as the first LOD resource
+	LODResource lod0_resource;
+	lod0_resource.vertexBuffer = m_vertexBuffer; // Use existing LOD 0 buffer
+	lod0_resource.indexBuffer = m_indexBuffer;   // Use existing LOD 0 buffer
+	lod0_resource.indexCount = static_cast<uint32>(m_indices.size());
+	m_LODs.push_back(lod0_resource);
+
+	// Generate simplified LODs using MeshOptimizer
+	std::optional<std::vector<MeshOptimizer::LOD>> generatedLODs =
+		MeshOptimizer::GenerateLODs(
+			*this, // Pass the current Mesh object (which has GetVertices/GetIndices)
+			lodThresholds);
+
+	if (generatedLODs.has_value())
+	{
+		for (uint32_t i = 0; i < generatedLODs->size(); ++i)
+		{
+			const auto& lod_data = generatedLODs->at(i);
+			LODResource lod_resource;
+			CreateLODBuffers(lod_data.vertices, lod_data.indices, lod_resource, m_name, i + 1); // i+1 for LOD index
+			m_LODs.push_back(lod_resource);
+		}
+	}
+	else
+	{
+		std::cerr << "Mesh::GenerateLODs: MeshOptimizer failed to generate LODs." << std::endl;
+		// If generation fails, m_LODs will only contain LOD 0.
+	}
+}
+
+// [NEW] Select LOD based on screen-space size
+uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Vector3& worldPosition) const
+{
+	if (m_LODs.empty() || m_LODThresholds.empty() || nullptr == camera)
+	{
+		return 0; // No LODs or invalid camera, return LOD 0
+	}
+
+	// Get camera's view and projection matrices
+	Mathf::Matrix viewMatrix = camera->CalculateView();
+	Mathf::Matrix projectionMatrix = camera->CalculateProjection();
+
+	// Get camera's world position
+	Mathf::Vector3 cameraPosition = camera->m_eyePosition;
+
+	// Calculate bounding sphere in world space relative to object's world position
+	// Assuming m_boundingBox and m_boundingSphere are in object-local space
+	// We need to transform them to world space using the object's world matrix
+	// However, the SelectLOD function in PrimitiveRenderProxy already passes worldPosition
+	// So, we assume m_boundingBox/m_boundingSphere are already in world space or relative to worldPosition.
+	// For simplicity, let's assume m_boundingSphere is relative to the object's origin,
+	// and we need to offset it by worldPosition.
+	DirectX::BoundingSphere worldBoundingSphere = m_boundingSphere;
+	worldBoundingSphere.Center = worldPosition + m_boundingSphere.Center; // Adjust center to world space
+
+	// Calculate distance from camera to object's bounding sphere center
+	float distance = Mathf::Vector3::Distance(cameraPosition, worldBoundingSphere.Center);
+
+	// Avoid division by zero or very small numbers
+	if (distance < 0.001f)
+	{
+		return 0; // Very close, use highest LOD
+	}
+
+	// Get projection matrix's Y-scale (cot(FOV_Y / 2))
+	float projectionYScale = projectionMatrix.m[1][1]; // Assuming projectionMatrix is in DirectX format
+
+	// Get screen height from camera (assuming GetScreenSize returns DirectX11::Sizef with width/height)
+	float screenHeight = camera->GetScreenSize().height;
+
+	// Calculate screen-space size
+	// This formula is (worldRadius / distance) * projectionYScale * (screenHeight / 2)
+	// The (screenHeight / 2) part is often implicitly handled by the thresholds
+	// if thresholds are defined in terms of NDC space (0-2 range).
+	// Let's use the NDC-space screen-space size for comparison with thresholds.
+	float screenSpaceSize = (worldBoundingSphere.Radius / distance) * projectionYScale;
+
+	// Iterate through thresholds to find the appropriate LOD
+	for (uint32_t i = 0; i < m_LODThresholds.size(); ++i)
+	{
+		if (screenSpaceSize > m_LODThresholds[i])
+		{
+			// Found a threshold, return this LOD level
+			// m_LODs[0] is LOD 0, m_LODs[1] is LOD 1 (first generated), etc.
+			// So, if threshold[i] is met, we use LOD i. (LOD 0 is original, LOD 1 is first simplified)
+			// The actual LOD index in m_LODs will be i+1 if m_LODThresholds[0] corresponds to LOD1.
+			// If m_LODThresholds[0] means "use LOD0 if > threshold", then it's i.
+			// Let's assume m_LODThresholds[0] is for LOD1, m_LODThresholds[1] for LOD2, etc.
+			// So, if screenSpaceSize > m_LODThresholds[i], we use LOD i+1.
+			// If no threshold is met, we use the last (lowest detail) LOD.
+			return i + 1;
+		}
+	}
+
+	// If no threshold is met, return the lowest detail LOD available
+	// This would be m_LODs.size() - 1
+	return static_cast<uint32_t>(m_LODs.size() - 1);
+}
+
 void Mesh::Draw()
 {
 	UINT offset = 0;
@@ -145,6 +293,69 @@ void Mesh::MakeShadowOptimizedBuffer()
 	m_isShadowOptimized = true;
 }
 
+void Mesh::DrawLOD(ID3D11DeviceContext* context, uint32_t lodIndex)
+{
+	if (lodIndex >= m_LODs.size())
+	{
+		lodIndex = 0; // Fallback to LOD 0 if index is out of bounds
+	}
+
+	const LODResource& currentLOD = m_LODs[lodIndex];
+
+	UINT offset = 0;
+	DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexed(context, currentLOD.indexCount, 0, 0);
+}
+
+void Mesh::DrawShadowLOD(ID3D11DeviceContext* context, uint32_t lodIndex)
+{
+	// If shadow optimized buffers exist, use them regardless of LOD index for simplicity
+	// This assumes shadow meshes are pre-generated and don't use dynamic LODs from main mesh.
+	// If shadow LODs are desired, m_shadowLODs would be needed.
+	if (m_isShadowOptimized && m_shadowVertexBuffer && m_shadowIndexBuffer)
+	{
+		UINT offset = 0;
+		DirectX11::IASetVertexBuffers(context, 0, 1, m_shadowVertexBuffer.GetAddressOf(), &m_stride, &offset);
+		DirectX11::IASetIndexBuffer(context, m_shadowIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		DirectX11::DrawIndexed(context, static_cast<uint32_t>(m_shadowIndices.size()), 0, 0);
+	}
+	else if (lodIndex < m_LODs.size()) // Fallback to main LOD buffers if no shadow-specific LODs
+	{
+		const LODResource& currentLOD = m_LODs[lodIndex];
+		UINT offset = 0;
+		DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
+		DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		DirectX11::DrawIndexed(context, currentLOD.indexCount, 0, 0);
+	}
+	else // No shadow-optimized or valid LOD, use LOD 0 main buffers
+	{
+		UINT offset = 0;
+		DirectX11::IASetVertexBuffers(context, 0, 1, m_vertexBuffer.GetAddressOf(), &m_stride, &offset);
+		DirectX11::IASetIndexBuffer(context, m_indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		DirectX11::DrawIndexed(context, static_cast<uint32_t>(m_indices.size()), 0, 0);
+	}
+}
+
+void Mesh::DrawInstancedLOD(ID3D11DeviceContext* context, uint32_t lodIndex, size_t instanceCount)
+{
+	if (lodIndex >= m_LODs.size())
+	{
+		lodIndex = 0; // Fallback to LOD 0 if index is out of bounds
+	}
+
+	const LODResource& currentLOD = m_LODs[lodIndex];
+
+	UINT offset = 0;
+	DirectX11::IASetVertexBuffers(context, 0, 1, currentLOD.vertexBuffer.GetAddressOf(), &m_stride, &offset);
+	DirectX11::IASetIndexBuffer(context, currentLOD.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+	DirectX11::IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	DirectX11::DrawIndexedInstanced(context, currentLOD.indexCount, static_cast<UINT>(instanceCount), 0, 0, 0);
+}
 
 UIMesh::UIMesh()
 {

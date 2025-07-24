@@ -1,269 +1,158 @@
 #include "MeshOptimizer.h"
 #include "ResourceAllocator.h"
-#include <unordered_map>
-#include <cstring>
+#include <meshoptimizer.h>
+#include <stdexcept>
 
-void RecalculateTangents(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vector<uint32>& indices)
 {
-    std::vector<Mathf::Vector3> tan1(vertices.size(), {});
-    std::vector<Mathf::Vector3> tan2(vertices.size(), {});
+    if (vertices.empty() || indices.empty())
+    {
+        return;
+    }
 
+    // 임시 저장소를 만들어 노멀과 탄젠트를 누적합니다.
+    std::vector<Mathf::Vector3> newNormals(vertices.size(), Mathf::Vector3::Zero);
+    std::vector<Mathf::Vector3> newTangents(vertices.size(), Mathf::Vector3::Zero);
+    std::vector<Mathf::Vector3> newBitangents(vertices.size(), Mathf::Vector3::Zero);
+
+    // 모든 삼각형을 순회하며 노멀과 탄젠트를 계산하고 각 정점에 누적합니다.
     for (size_t i = 0; i < indices.size(); i += 3)
     {
-        uint32_t i0 = indices[i];
-        uint32_t i1 = indices[i + 1];
-        uint32_t i2 = indices[i + 2];
+        uint32 i0 = indices[i + 0];
+        uint32 i1 = indices[i + 1];
+        uint32 i2 = indices[i + 2];
 
-        const Vertex& v0 = vertices[i0];
-        const Vertex& v1 = vertices[i1];
-        const Vertex& v2 = vertices[i2];
+        Vertex& v0 = vertices[i0];
+        Vertex& v1 = vertices[i1];
+        Vertex& v2 = vertices[i2];
 
-        const auto& p0 = v0.position;
-        const auto& p1 = v1.position;
-        const auto& p2 = v2.position;
+        // 위치 벡터 차이 (Edge)
+        Mathf::Vector3 edge1 = v1.position - v0.position;
+        Mathf::Vector3 edge2 = v2.position - v0.position;
 
-        const auto& uv0 = v0.uv0;
-        const auto& uv1 = v1.uv0;
-        const auto& uv2 = v2.uv0;
+        // UV 좌표 차이 (Delta UV)
+        Mathf::Vector2 deltaUV1 = v1.uv0 - v0.uv0;
+        Mathf::Vector2 deltaUV2 = v2.uv0 - v0.uv0;
 
-        float x1 = p1.x - p0.x;
-        float x2 = p2.x - p0.x;
-        float y1 = p1.y - p0.y;
-        float y2 = p2.y - p0.y;
-        float z1 = p1.z - p0.z;
-        float z2 = p2.z - p0.z;
+        // 면 노멀 계산 및 누적
+        Mathf::Vector3 faceNormal = edge1.Cross(edge2);
+        newNormals[i0] += faceNormal;
+        newNormals[i1] += faceNormal;
+        newNormals[i2] += faceNormal;
 
-        float s1 = uv1.x - uv0.x;
-        float s2 = uv2.x - uv0.x;
-        float t1 = uv1.y - uv0.y;
-        float t2 = uv2.y - uv0.y;
+        // 면 탄젠트 및 바이탄젠트 계산
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        if (!isinf(r) && !isnan(r))
+        {
+            Mathf::Vector3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * r;
+            Mathf::Vector3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * r;
 
-        float r = 1.0f / (s1 * t2 - s2 * t1);
-        Mathf::Vector3 sdir((t2 * x1 - t1 * x2) * r,
-            (t2 * y1 - t1 * y2) * r,
-            (t2 * z1 - t1 * z2) * r);
-        Mathf::Vector3 tdir((s1 * x2 - s2 * x1) * r,
-            (s1 * y2 - s2 * y1) * r,
-            (s1 * z2 - s2 * z1) * r);
+            newTangents[i0] += tangent;
+            newTangents[i1] += tangent;
+            newTangents[i2] += tangent;
 
-        tan1[i0] += sdir; tan2[i0] += tdir;
-        tan1[i1] += sdir; tan2[i1] += tdir;
-        tan1[i2] += sdir; tan2[i2] += tdir;
+            newBitangents[i0] += bitangent;
+            newBitangents[i1] += bitangent;
+            newBitangents[i2] += bitangent;
+        }
     }
 
+    // 모든 정점을 순회하며 누적된 값을 정규화하고 직교화합니다.
     for (size_t i = 0; i < vertices.size(); ++i)
     {
-        const auto& n = vertices[i].normal;
-        const auto& t = tan1[i];
+        // 노멀 정규화
+        vertices[i].normal = newNormals[i];
+        vertices[i].normal.Normalize();
 
-        // Gram-Schmidt orthogonalize
-        Mathf::Vector3 normalized = Mathf::Vector3(t - n * n.Dot(t));
-		normalized.Normalize();
-		vertices[i].tangent = normalized;
+        // 그람-슈미트 직교화를 사용하여 탄젠트 보정
+        vertices[i].tangent = newTangents[i] - vertices[i].normal * newTangents[i].Dot(newTangents[i]);
+        vertices[i].tangent.Normalize();
 
-        // Calculate handedness (w component of tangent)
-        float handedness = (n.Cross(t).Dot(tan2[i]) < 0.0f) ? -1.0f : 1.0f;
-        vertices[i].bitangent = n.Cross(vertices[i].tangent) * handedness;
-    }
-}
-
-void MeshOptimizer::Optimize(Mesh& mesh, float overdrawThreshold)
-{
-    meshopt_setAllocator(malloc, free);
-
-    const auto& srcVertices = mesh.m_vertices;
-    const auto& srcIndices = mesh.m_indices;
-
-    const size_t vertexCount = srcVertices.size();
-    const size_t indexCount = srcIndices.size();
-
-    // 1. 압축된 vertex 구조로 복사
-    std::vector<OptVertex> optVertices(vertexCount);
-    for (size_t i = 0; i < vertexCount; ++i)
-        optVertices[i] = srcVertices[i];
-
-    // 2. 인덱스 최적화
-    std::vector<uint32_t> indices = srcIndices;
-
-    meshopt_optimizeVertexCache(indices.data(), indices.data(), indexCount, vertexCount);
-
-    meshopt_optimizeOverdraw(
-        indices.data(),
-        indices.data(),
-        indexCount,
-        reinterpret_cast<const float*>(optVertices.data()),
-        vertexCount,
-        sizeof(OptVertex),
-        overdrawThreshold);
-
-    std::vector<uint32_t> remap(indexCount);
-    size_t newVertexCount = meshopt_optimizeVertexFetchRemap(
-        remap.data(),
-        indices.data(),
-        indexCount,
-        vertexCount);
-
-    std::vector<OptVertex> remappedOptVertices(newVertexCount);
-    meshopt_remapVertexBuffer(
-        remappedOptVertices.data(),
-        optVertices.data(),
-        vertexCount,
-        sizeof(OptVertex),
-        remap.data());
-
-    meshopt_remapIndexBuffer(
-        indices.data(),
-        indices.data(),
-        indexCount,
-        remap.data());
-
-    // 3. 다시 Vertex로 변환
-    std::vector<Vertex> newVertices(newVertexCount);
-    for (size_t i = 0; i < newVertexCount; ++i)
-        remappedOptVertices[i].ToVertex(newVertices[i]);
-
-    mesh.m_vertices = std::move(newVertices);
-    mesh.m_indices = std::move(indices);
-
-    RecalculateTangents(mesh.m_vertices, mesh.m_indices);
-}
-
-void MeshOptimizer::GenerateLODs(std::vector<Mesh*>& lods, const Mesh* sourceMesh, size_t maxLODs, float lodFactor)
-{
-    meshopt_setAllocator(malloc, free);
-
-    const auto& srcVertices = sourceMesh->m_vertices;
-    const auto& srcIndices = sourceMesh->m_indices;
-    const size_t vertexCount = srcVertices.size();
-    const size_t indexCount = srcIndices.size();
-
-    static std::vector<uint32_t> simplifiedIndices;
-
-    // Step 1: Vertex 압축
-    std::vector<OptVertex> optVertices(vertexCount);
-    for (size_t i = 0; i < vertexCount; ++i)
-        optVertices[i] = srcVertices[i];
-
-    lods.push_back(const_cast<Mesh*>(sourceMesh)); // LOD0 포함 (주의: 수정하지 말 것)
-
-    std::vector<uint32_t> workingIndices = srcIndices;
-
-    for (size_t lodLevel = 1; lodLevel <= maxLODs; ++lodLevel)
-    {
-        size_t targetIndexCount = static_cast<size_t>(indexCount * std::pow(lodFactor, lodLevel));
-        if (targetIndexCount < 96)
-            break;
-
-        simplifiedIndices.clear();
-        simplifiedIndices.resize(indexCount);
-        size_t resultCount = meshopt_simplify(
-            simplifiedIndices.data(),
-            workingIndices.data(),
-            workingIndices.size(),
-            reinterpret_cast<const float*>(&optVertices[0].px),
-            vertexCount,
-            sizeof(OptVertex),
-            targetIndexCount,
-            1e-2f); // aggressiveness
-
-        if (resultCount == 0)
-            break;
-
-        // Vertex Fetch Remap
-        std::vector<uint32_t> remap(resultCount);
-        size_t newVertexCount = meshopt_optimizeVertexFetchRemap(
-            remap.data(),
-            simplifiedIndices.data(),
-            resultCount,
-            vertexCount);
-
-        std::vector<OptVertex> remappedOptVertices(newVertexCount);
-        meshopt_remapVertexBuffer(
-            remappedOptVertices.data(),
-            optVertices.data(),
-            vertexCount,
-            sizeof(OptVertex),
-            remap.data());
-
-        meshopt_remapIndexBuffer(
-            simplifiedIndices.data(),
-            simplifiedIndices.data(),
-            resultCount,
-            remap.data());
-
-        // 다시 Vertex로 변환
-        std::vector<Vertex> finalVertices;
-        finalVertices.resize(newVertexCount);
-        for (size_t i = 0; i < remappedOptVertices.size(); ++i)
+        // 바이탄젠트의 방향성(handedness)을 계산하고 최종 바이탄젠트 결정
+        if (vertices[i].normal.Cross(newTangents[i]).Dot(newBitangents[i]) < 0.0f)
         {
-            remappedOptVertices[i].ToVertex(finalVertices[i]);
+            vertices[i].tangent *= -1.0f;
         }
 
-        std::vector<uint32_t> shrink_to_fitIndexes(resultCount);
-		std::copy(
-            simplifiedIndices.begin(), 
-            simplifiedIndices.begin() + resultCount, 
-            shrink_to_fitIndexes.begin()
-        );
-
-        // tangent/bitangent 재계산
-        RecalculateTangents(finalVertices, shrink_to_fitIndexes);
-
-        // 리소스 풀을 통한 Mesh* 생성
-        std::string lodName = sourceMesh->GetName() + "_LOD" + std::to_string(lodLevel);
-
-        Mesh* lodMesh = AllocateResource<Mesh>(lodName, std::move(finalVertices), std::move(shrink_to_fitIndexes));
-        MeshOptimizer::GenerateShadowMesh(*lodMesh);
-
-        lods.push_back(lodMesh);
+        vertices[i].bitangent = vertices[i].normal.Cross(vertices[i].tangent);
     }
 }
 
-void MeshOptimizer::GenerateShadowMesh(Mesh& mesh)
+MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMesh, const std::vector<float>& lodThresholds)
 {
-    meshopt_setAllocator(malloc, free);
+    if (originalMesh.GetVertices().empty() || originalMesh.GetIndices().empty() || lodThresholds.empty())
+    {
+        return std::nullopt;
+    }
 
-    const auto& srcVertices = mesh.m_vertices;
-    const auto& srcIndices = mesh.m_indices;
+    try
+    {
+        std::vector<LOD> lods;
+        lods.reserve(lodThresholds.size());
 
-    const size_t vertexCount = srcVertices.size();
-    const size_t indexCount = srcIndices.size();
+        const std::vector<Vertex>& sourceVertices = originalMesh.GetVertices();
+        const std::vector<uint32>& sourceIndices = originalMesh.GetIndices();
 
-    // Step 1: 압축된 vertex 생성 (position only로 쓰기 위함)
-    std::vector<OptVertex> optVertices(vertexCount);
-    for (size_t i = 0; i < vertexCount; ++i)
-        optVertices[i] = srcVertices[i];
+        std::vector<uint32> simplifiedIndices(sourceIndices.size());
+        std::vector<Vertex> simplifiedVertices(sourceVertices.size());
 
-    // Step 2: 그림자 인덱스 생성
-    std::vector<uint32_t> shadowIndices(indexCount); // 최대 indexCount만큼 필요
-    meshopt_generateShadowIndexBuffer(
-        shadowIndices.data(),
-        srcIndices.data(),
-        indexCount,
-        reinterpret_cast<const float*>(&optVertices[0].px), // position only
-        vertexCount,
-        sizeof(float) * 3, // position 크기
-        sizeof(OptVertex)       // stride
-    );
+        for (float threshold : lodThresholds)
+        {
+            const size_t target_index_count = static_cast<size_t>(sourceIndices.size() * threshold);
+            const float target_error = 1.0f - threshold;
 
-    // Step 3: 정점 캐시 최적화
-    meshopt_optimizeVertexCache(
-        shadowIndices.data(),
-        shadowIndices.data(),
-        indexCount,
-        vertexCount
-    );
+            simplifiedIndices.resize(sourceIndices.size());
+            size_t newIndexCount = meshopt_simplify(
+                &simplifiedIndices[0],
+                &sourceIndices[0], sourceIndices.size(),
+                &sourceVertices[0].position.x, sourceVertices.size(), sizeof(Vertex),
+                target_index_count, target_error);
+            simplifiedIndices.resize(newIndexCount);
 
-    // Step 4: shadowVertices 복사
-    std::vector<Vertex> shadowVertices(vertexCount);
-    for (size_t i = 0; i < vertexCount; ++i)
-        optVertices[i].ToVertex(shadowVertices[i]);
+            simplifiedVertices.resize(sourceVertices.size());
+            size_t newVertexCount = meshopt_optimizeVertexFetch(
+                &simplifiedVertices[0],
+                &simplifiedIndices[0], simplifiedIndices.size(),
+                &sourceVertices[0], sourceVertices.size(), sizeof(Vertex));
+            simplifiedVertices.resize(newVertexCount);
 
-    // Step 5: 결과 저장
-    mesh.m_shadowVertices = std::move(shadowVertices);
-    mesh.m_shadowIndices = std::move(shadowIndices);
+            LOD lod;
+            lod.threshold = threshold;
+            lod.vertices = simplifiedVertices;
+            lod.indices = simplifiedIndices;
 
-	// Step 6: 그림자 버퍼 생성
-	mesh.MakeShadowOptimizedBuffer();
-    mesh.m_isShadowOptimized = true;
+            RecalculateNormalsAndTangents(lod.vertices, lod.indices);
+
+            lods.push_back(std::move(lod));
+        }
+
+        return lods;
+    }
+    catch (const std::bad_alloc& e)
+    {
+        std::cerr << "GenerateLODs failed: Not enough memory. " << e.what() << std::endl;
+        return std::nullopt; // 실패 시 std::nullopt를 반환합니다.
+    }
+}
+
+void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& vertices, std::vector<uint32>& indices)
+{
+    if (vertices.empty() || indices.empty())
+    {
+        return;
+    }
+
+    try
+    {
+        meshopt_optimizeVertexCache(&indices[0], &indices[0], indices.size(), vertices.size());
+        meshopt_optimizeOverdraw(&indices[0], &indices[0], indices.size(), &vertices[0].position.x, vertices.size(), sizeof(Vertex), 1.05f);
+        meshopt_optimizeVertexFetch(&vertices[0], &indices[0], indices.size(), &vertices[0], vertices.size(), sizeof(Vertex));
+        RecalculateNormalsAndTangents(vertices, indices);
+    }
+    catch (const std::bad_alloc& e)
+    {
+        std::cerr << "OptimizeMesh failed: Not enough memory. " << e.what() << std::endl;
+        // 실패 시 아무것도 하지 않고 반환하여 원본 데이터를 보존합니다.
+        return;
+    }
 }

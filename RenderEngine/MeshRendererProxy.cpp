@@ -3,6 +3,7 @@
 #include "Mesh.h"
 #include "RenderScene.h"
 #include "Material.h"
+#include "Camera.h" // [NEW] Camera 정의 포함
 #include "FoliageComponent.h"
 #include "Core.OctreeNode.h"
 #include "CullingManager.h"
@@ -99,10 +100,6 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_isCulled(other.m_isCulled),
     m_isStatic(other.m_isStatic),
     m_EnableLOD(other.m_EnableLOD),
-    m_LODReductionRatio(other.m_LODReductionRatio),
-    m_MaxLODLevels(other.m_MaxLODLevels),
-	m_LODGroup(other.m_LODGroup ? std::make_unique<LODGroup>(*other.m_LODGroup) : nullptr),
-	m_LODDistance(other.m_LODDistance),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
     m_isEnableShadow(other.m_isEnableShadow),
 	m_isInstanced(other.m_isInstanced),
@@ -127,10 +124,6 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_isCulled(other.m_isCulled),
     m_isStatic(other.m_isStatic),
     m_EnableLOD(other.m_EnableLOD),
-    m_LODReductionRatio(other.m_LODReductionRatio),
-	m_MaxLODLevels(other.m_MaxLODLevels),
-	m_LODGroup(std::move(other.m_LODGroup)),
-    m_LODDistance(other.m_LODDistance),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
 	m_isEnableShadow(other.m_isEnableShadow),
     m_isInstanced(other.m_isInstanced),
@@ -138,42 +131,6 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_terrainMaterial(std::exchange(other.m_terrainMaterial, nullptr)),
 	m_isNeedUpdateCulling(other.m_isNeedUpdateCulling)
 {
-}
-
-void PrimitiveRenderProxy::Draw()
-{
-    switch (m_proxyType)
-    {
-    case PrimitiveProxyType::MeshRenderer:
-    {
-        if (nullptr == m_Mesh) return;
-
-        if (m_EnableLOD)
-        {
-            if (!m_LODGroup) return;
-            m_LODGroup->GetLODByDistance(m_LODDistance)->Draw();
-        }
-        else
-        {
-            m_Mesh->Draw();
-        }
-        break;
-    }
-    case PrimitiveProxyType::TerrainComponent:
-    {
-		if (nullptr == m_terrainMesh || nullptr == m_terrainMaterial) return;
-
-        m_terrainMesh->Draw();
-        break;
-    }
-    case PrimitiveProxyType::FoliageComponent:
-
-        Debug->LogError("FoliageComponent does not support normal draw function");
-        break;
-    default:
-        break;
-    }
-    
 }
 
 void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
@@ -184,10 +141,9 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
     {
         if (nullptr == m_Mesh || nullptr == _deferredContext) return;
 
-        if (m_EnableLOD)
+        if (m_EnableLOD && !m_isSkinnedMesh)
         {
-            if (!m_LODGroup) return;
-            m_LODGroup->GetLODByDistance(m_LODDistance)->Draw(_deferredContext);
+            m_Mesh->DrawLOD(_deferredContext, m_currLOD);
         }
         else
         {
@@ -217,66 +173,45 @@ void PrimitiveRenderProxy::DestroyProxy()
     RenderScene::RegisteredDestroyProxyGUIDs.push(m_instancedID);
 }
 
-void PrimitiveRenderProxy::GenerateLODGroup()
-{
-    if (nullptr == m_Mesh || nullptr == m_Material) return;
-	bool isTerrain = (m_proxyType == PrimitiveProxyType::TerrainComponent || m_proxyType == PrimitiveProxyType::FoliageComponent);
-
-	if (isTerrain || m_isSkinnedMesh) return;
-    m_EnableLOD = LODSettings::IsLODEnabled();
-
-    if(!m_EnableLOD) return;
-	bool isChangeLODRatio = m_LODReductionRatio != LODSettings::g_LODReductionRatio.load();
-	bool isChangeMaxLODLevels = m_MaxLODLevels != LODSettings::g_MaxLODLevels.load();
-
-    if (nullptr == m_LODGroup)
-    {
-        m_LODGroup = std::make_unique<LODGroup>(m_Mesh);
-        m_LODReductionRatio = LODSettings::g_LODReductionRatio.load();
-        m_MaxLODLevels = LODSettings::g_MaxLODLevels.load();
-    }
-    else
-    {
-        if (isChangeLODRatio || isChangeMaxLODLevels)
-        {
-            m_LODGroup->UpdateLODs();
-            m_LODReductionRatio = LODSettings::g_LODReductionRatio.load();
-            m_MaxLODLevels = LODSettings::g_MaxLODLevels.load();
-        }
-    }
-}
-
-void PrimitiveRenderProxy::DrawShadow()
+// [CHANGED] LOD 생성 요청 함수 구현
+void PrimitiveRenderProxy::InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds)
 {
     if (nullptr == m_Mesh) return;
 
-    if(m_EnableLOD)
+    // 스키닝 메쉬는 LOD를 생성하지 않습니다.
+    if (m_isSkinnedMesh)
     {
-        if (!m_LODGroup) return;
-        m_LODGroup->GetLODByDistance(m_LODDistance)->DrawShadow();
-	}
-    else
-    {
-        if (m_Mesh->IsShadowOptimized())
-        {
-            m_Mesh->DrawShadow();
-        }
-        else
-        {
-            m_Mesh->Draw();
-        }
+        return;
     }
 
+    // 메쉬에 아직 LOD가 생성되지 않았을 경우에만 생성을 요청합니다.
+    if (!m_Mesh->HasLODs())
+    {
+        m_Mesh->GenerateLODs(lodScreenSpaceThresholds);
+    }
+}
+
+// [NEW] 렌더링 시스템이 사용할 LOD 레벨 결정 함수
+uint32_t PrimitiveRenderProxy::GetLODLevel(Camera* camera)
+{
+    if (nullptr == m_Mesh || nullptr == camera || false == m_EnableLOD)
+    {
+        return 0; // 유효하지 않은 경우, 원본 메쉬(LOD 0) 반환
+    }
+
+	m_currLOD = m_Mesh->SelectLOD(camera, m_worldPosition);
+
+    // 실제 계산은 Mesh 클래스에 위임합니다.
+    return m_currLOD;
 }
 
 void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
     if (nullptr == m_Mesh || nullptr == _deferredContext) return;
 
-    if (m_EnableLOD)
+    if (m_EnableLOD && !m_isSkinnedMesh)
     {
-        if (!m_LODGroup) return;
-        m_LODGroup->GetLODByDistance(m_LODDistance)->DrawShadow(_deferredContext);
+        m_Mesh->DrawLOD(_deferredContext, m_currLOD);
     }
     else
     {
@@ -295,5 +230,12 @@ void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, 
 {
     if (nullptr == m_Mesh || nullptr == _deferredContext) return;
 
-    m_Mesh->DrawInstanced(_deferredContext, instanceCount);
+    if (m_EnableLOD && !m_isSkinnedMesh)
+    {
+        m_Mesh->DrawInstancedLOD(_deferredContext, m_currLOD, instanceCount);
+    }
+    else
+    {
+        m_Mesh->DrawInstanced(_deferredContext, instanceCount);
+    }
 }

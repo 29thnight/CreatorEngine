@@ -170,8 +170,6 @@
     <ClCompile Include="EffectManager.cpp" />
     <ClCompile Include="EffectProxyController.cpp" />
     <ClCompile Include="EffectSerializer.cpp" />
-    <ClCompile Include="LODGroup.cpp" />
-    <ClCompile Include="LODSetting.cpp" />
     <ClCompile Include="MeshModuleGPU.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="MeshSpawnModuleCS.cpp" />
@@ -262,8 +260,6 @@
     <ClInclude Include="EffectProxyController.h" />
     <ClInclude Include="EffectRenderProxy.h" />
     <ClInclude Include="EffectSerializer.h" />
-    <ClInclude Include="LODGroup.h" />
-    <ClInclude Include="LODSetting.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshModuleGPU.h" />
     <ClInclude Include="MeshOptimizer.h" />

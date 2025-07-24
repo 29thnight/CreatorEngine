@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "GameObject.h"
-#include "IRenderable.h"
 #include "LightMapping.h"
 #include "IRegistableEvent.h"
 #include "MeshRenderer.generated.h"
@@ -43,6 +42,8 @@ public:
     LightMapping m_LightMapping;
     [[Property]]
 	bool m_isSkinnedMesh{ false };
+    [[Property]]
+    bool m_isEnableLOD{ false };
 
 private:
 	bool m_isNeedUpdateCulling{ false };

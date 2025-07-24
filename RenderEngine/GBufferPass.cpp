@@ -175,7 +175,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	// --- 1. CLASSIFY RENDER PROXIES ---
 	// Grouping key is now a pair of (Material GUID, Mesh GUID) to ensure
 	// that only objects with the exact same mesh and material are instanced together.
-	using InstanceGroupKey = std::pair<HashedGuid, HashedGuid>;
+	using InstanceGroupKey = PrimitiveRenderProxy::ProxyFilter;
 	std::vector<PrimitiveRenderProxy*> animatedProxies;
 	std::map<InstanceGroupKey, std::vector<PrimitiveRenderProxy*>> instanceGroups;
 
@@ -189,8 +189,14 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		{
 			// Assuming PrimitiveRenderProxy has a pointer to a Mesh object which contains the hashingMesh GUID.
 			// Based on operator==, the mesh guid is proxy->m_mesh->m_hashingMesh.
-			InstanceGroupKey key = { proxy->m_materialGuid, proxy->m_Mesh->m_hashingMesh };
-			instanceGroups[key].push_back(proxy);
+			InstanceGroupKey key
+			{ 
+				proxy->m_materialGuid, 
+				proxy->m_Mesh->m_hashingMesh,
+				proxy->m_EnableLOD,
+				proxy->GetLODLevel(&camera),
+			};
+			instanceGroups[key].push_back(std::move(proxy));
 		}
 	}
 
@@ -245,7 +251,7 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		if (proxies.empty()) continue;
 		assert(proxies.size() <= m_maxInstanceCount && "Exceeded maximum instance count!");
 
-		const auto& groupMaterialGuid = groupKey.first;
+		const auto& groupMaterialGuid = groupKey.materialGuid;
 		auto firstProxy = proxies.front();
 
 		// *** THE KEY OPTIMIZATION IS HERE ***

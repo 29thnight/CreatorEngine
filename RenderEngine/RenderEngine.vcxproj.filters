@@ -255,9 +255,6 @@
     <Filter Include="Asset\MeshOptimizer">
       <UniqueIdentifier>{d01a14c8-5ec3-42f4-bb5f-e016969280fe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\LODGroup">
-      <UniqueIdentifier>{e03aa640-8677-4501-a3ff-7da7616864cf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderPass\PostProcessingPass\BitMaskPass">
       <UniqueIdentifier>{ea303887-bdf2-47c6-badb-d339bdb76275}</UniqueIdentifier>
     </Filter>
@@ -472,12 +469,6 @@
     </ClCompile>
     <ClCompile Include="MeshOptimizer.cpp">
       <Filter>Asset\MeshOptimizer</Filter>
-    </ClCompile>
-    <ClCompile Include="LODSetting.cpp">
-      <Filter>Asset\LODGroup</Filter>
-    </ClCompile>
-    <ClCompile Include="LODGroup.cpp">
-      <Filter>Asset\LODGroup</Filter>
     </ClCompile>
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
@@ -753,12 +744,6 @@
     </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
       <Filter>Asset\MeshOptimizer</Filter>
-    </ClInclude>
-    <ClInclude Include="LODGroup.h">
-      <Filter>Asset\LODGroup</Filter>
-    </ClInclude>
-    <ClInclude Include="LODSetting.h">
-      <Filter>Asset\LODGroup</Filter>
     </ClInclude>
     <ClInclude Include="MeshSpawnModuleCS.h">
       <Filter>RenderPass\EffectPass\2.Spawn</Filter>
