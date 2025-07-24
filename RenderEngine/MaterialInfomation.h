@@ -7,6 +7,8 @@ constexpr bool32 USE_BUMP_MAP = 2;
 
 cbuffer MaterialInfomation
 {
+    const static UINT  USE_SHADOW_RECIVE = 256u;
+
     [[Property]]
     Mathf::Color4 m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
     [[Property]]

@@ -1,13 +1,13 @@
 #pragma once
-#include "FoliageBaseType.h"
+#include "Core.Minimal.h"
+#include "FoliageType.h"
+#include "FoliageInstance.h"
 #include "Component.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
-#include "GameObject.h"
-#include "Terrain.h"
+#include "IRegistableEvent.h"
 #include "FoliageComponent.generated.h"
 
-class FoliageComponent : public Component, public IAwakable, public IOnDestroy
+class TerrainComponent;
+class FoliageComponent : public Component, public RegistableEvent<FoliageComponent>
 {
 public:
     ReflectFoliageComponent
@@ -31,6 +31,8 @@ public:
 private:
     [[Property]]
     FileGuid m_foliageAssetGuid{};
+    [[Property]]
     std::vector<FoliageType> m_foliageTypes{};
+    [[Property]]
     std::vector<FoliageInstance> m_foliageInstances{};
 };

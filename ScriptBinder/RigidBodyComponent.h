@@ -1,14 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Component.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
+#include "IRegistableEvent.h"
 #include "RigidBodyComponent.generated.h"
 #include "EBodyType.h"
 #include "EForceMode.h"
 #include "../physics/PhysicsCommon.h"  
 
-class RigidBodyComponent : public Component, public IAwakable, public IOnDestroy
+class RigidBodyComponent : public Component, public RegistableEvent<RigidBodyComponent>
 {
 public:
    ReflectRigidBodyComponent

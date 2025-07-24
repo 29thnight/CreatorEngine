@@ -1,4 +1,3 @@
-
 #include "Profiler.h"
 #include "ImGui.h"
 #include "IconsFontAwesome4.h"
@@ -502,7 +501,7 @@ void DrawProfilerHUD()
 		buttonFmt = ICON_FA_PLAY;
 		fmt = "Recording - [Press Space to pause]";
 	}
-	
+
 	if (ImGui::Button(buttonFmt) || ImGui::IsKeyPressed(ImGuiKey_Space))
 	{
 		context.IsPaused = !context.IsPaused;

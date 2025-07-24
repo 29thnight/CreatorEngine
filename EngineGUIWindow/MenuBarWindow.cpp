@@ -263,28 +263,60 @@ void MenuBarWindow::RenderMenuBar()
     {
         if (ImGui::BeginMainMenuBar())
         {
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("File"))
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("New Scene"))
                 {
                     m_bShowNewScenePopup = true;
 				}
-                if (ImGui::MenuItem("Save Current Scene"))
+                if (ImGui::MenuItem("Save", "Ctrl+S"))
                 {
+                    SceneManagers->resetSelectedObjectEvent.Broadcast();
+                    std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName.ToString();
+					file::path fileName = PathFinder::Relative("Scenes\\" + sceneName + ".creator").wstring();
+
+                    if (file::exists(fileName))
+                    {
+                        SceneManagers->SaveScene(fileName.string());
+                    }
+                    else 
+                    {
+                        std::cout << "Save Menu" << std::endl;
+
+                        fileName = ShowSaveFileDialog(
+                            L"Scene Files (*.creator)\0*.creator\0",
+                            L"Save Scene",
+                            PathFinder::Relative("Scenes\\").wstring()
+                        );
+                        if (!fileName.empty())
+                        {
+                            SceneManagers->SaveScene(fileName.string());
+                        }
+                        else
+                        {
+                            Debug->LogError("Failed to save scene.");
+                        }
+                    }
+                }
+                if (ImGui::MenuItem("Save As", "Ctrl+Shift+S"))
+                {
+                    std::cout << "Save As Menu" << std::endl;
                     //Test
                     SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
-						L"Scene Files (*.creator)\0*.creator\0",
-						L"Save Scene",
+                        L"Scene Files (*.creator)\0*.creator\0",
+                        L"Save Scene",
                         PathFinder::Relative("Scenes\\").wstring()
-					);
-					if (!fileName.empty())
-					{
+                    );
+                    if (!fileName.empty())
+                    {
                         SceneManagers->SaveScene(fileName.string());
-					}
+                    }
                     else
                     {
-						Debug->LogError("Failed to save scene.");
+                        Debug->LogError("Failed to save scene.");
                     }
                 }
                 if (ImGui::MenuItem("Load Scene"))
@@ -313,11 +345,14 @@ void MenuBarWindow::RenderMenuBar()
 					HWND handle = m_sceneRenderer->m_deviceResources->GetWindow()->GetHandle();
                     PostMessage(handle, WM_CLOSE, 0, 0);
                 }
+                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
-
+            ImGui::PopStyleColor();
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("Edit"))
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("LightMap Window"))
                 {
                     if (!ImGui::GetContext("LightMap").IsOpened())
@@ -353,12 +388,14 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
-
+                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
-
+            ImGui::PopStyleColor();
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("Settings"))
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("Pipeline Setting"))
                 {
                     if (!ImGui::GetContext("RenderPass").IsOpened())
@@ -372,10 +409,10 @@ void MenuBarWindow::RenderMenuBar()
 
                     m_bCollisionMatrixWindow = true;
                 }
-
+                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
-
+            ImGui::PopStyleColor();
             float availRegion = ImGui::GetContentRegionAvail().x;
 
             ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
@@ -475,7 +512,6 @@ void MenuBarWindow::RenderMenuBar()
         m_bShowNewScenePopup = false;
 	}
 
-
     if (m_bCollisionMatrixWindow) 
     {
         ImGui::GetContext("CollisionMatrixPopup").Open();
@@ -510,6 +546,57 @@ void MenuBarWindow::RenderMenuBar()
         }
         ImGui::EndPopup();
     }
+
+	bool isPressedControl = InputManagement->IsKeyPressed((size_t)KeyBoard::LeftControl);
+	bool isPressedShift = InputManagement->IsKeyPressed((size_t)KeyBoard::LeftShift);
+	bool isDownS = ImGui::IsKeyPressed(ImGuiKey_S, false);
+
+    // Ctrl + Shift + S : Save As
+    if (isPressedControl &&
+        isPressedShift &&
+        isDownS)
+    {
+        // 기존 Save As 로직 호출
+        SceneManagers->resetSelectedObjectEvent.Broadcast();
+        file::path fileName = ShowSaveFileDialog(
+            L"Scene Files (*.creator)\0*.creator\0",
+            L"Save Scene",
+            PathFinder::Relative("Scenes\\").wstring()
+        );
+
+		std::cout << "Save As Key" << std::endl;
+
+        if (!fileName.empty())
+            SceneManagers->SaveScene(fileName.string());
+        else
+            Debug->LogError("Failed to save scene.");
+    }
+    else if (isPressedControl && isDownS)
+    {
+        // 기존 Save 로직 호출
+        SceneManagers->resetSelectedObjectEvent.Broadcast();
+        std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName.ToString();
+        file::path fileName = PathFinder::Relative("Scenes\\" + sceneName + ".creator").wstring();
+
+        if (file::exists(fileName))
+        {
+            SceneManagers->SaveScene(fileName.string());
+        }
+        else
+        {
+            std::cout << "Save Key" << std::endl;
+
+            fileName = ShowSaveFileDialog(
+                L"Scene Files (*.creator)\0*.creator\0",
+                L"Save Scene",
+                PathFinder::Relative("Scenes\\").wstring()
+            );
+            if (!fileName.empty())
+                SceneManagers->SaveScene(fileName.string());
+            else
+                Debug->LogError("Failed to save scene.");
+        }
+    }
 }
 
 void MenuBarWindow::ShowLogWindow()
@@ -519,9 +606,7 @@ void MenuBarWindow::ShowLogWindow()
     bool isClear = Debug->IsClear();
 
     ImGui::PushFont(m_koreanFont);
-    ImGui::Begin(ICON_FA_TERMINAL " Log", &m_bShowLogWindow, ImGuiWindowFlags_NoDocking);
-    ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
-    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+    ImGui::Begin(ICON_FA_TERMINAL " Log", &m_bShowLogWindow);
 
     // == 상단 고정 헤더 영역 ==
     ImGui::BeginChild("LogHeader", ImVec2(0, 0),
@@ -556,7 +641,8 @@ void MenuBarWindow::ShowLogWindow()
 
         auto entries = Debug->get_entries();
         float sizeX = ImGui::GetContentRegionAvail().x;
-
+		static bool isCopyPopupOpen = false;
+		static std::string copiedText;
         // 현재 스크롤 상태 감지
         bool shouldScroll = autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10.0f;
 
@@ -606,6 +692,11 @@ void MenuBarWindow::ShowLogWindow()
                     }
                 }
             }
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            {
+                isCopyPopupOpen = true;
+                copiedText = entry.message;
+            }
             ImGui::PopID();
             ImGui::PopStyleColor();
             if (is_selected)
@@ -614,6 +705,29 @@ void MenuBarWindow::ShowLogWindow()
 
         if (shouldScroll)
             ImGui::SetScrollHereY(1.0f);
+
+        if (isCopyPopupOpen)
+        {
+            ImGui::OpenPopup("CopyLogPopup");
+			isCopyPopupOpen = false;
+        }
+
+        if (ImGui::BeginPopup("CopyLogPopup"))
+        {
+            ImGui::Text("Copy Log Text");
+            ImGui::Separator();
+            if (ImGui::Button("Copy"))
+            {
+                ImGui::SetClipboardText(copiedText.c_str());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Close"))
+            {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+		}
     }
     ImGui::EndChild();
 

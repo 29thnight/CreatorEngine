@@ -87,7 +87,7 @@ public:
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
-
+    std::atomic_bool                    m_loadSceneReturn{ false };
     ThreadPool<std::function<void()>>*  m_threadPool{ nullptr };
 
     std::future<Scene*>                 m_loadingSceneFuture;

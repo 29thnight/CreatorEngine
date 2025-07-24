@@ -375,7 +375,15 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
 	m_renderScene->m_LightController->Initialize();
-	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
+	try
+	{
+		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "Error initializing light with shadows: " << e.what() << std::endl;
+	}
+
 	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
 	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
@@ -728,8 +736,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if (nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushShadowRenderQueue(proxy);
 			}
 		}
@@ -739,8 +745,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if(nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushRenderQueue(proxy);
 			}
 		}
@@ -906,8 +910,8 @@ void SceneRenderer::PrepareRender()
 			for (auto& mesh : allMeshes)
 			{
 				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				
-				data->PushShadowRenderData(mesh->GetInstanceID());
+				if(mesh->m_shadowRecive == true)
+					data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 
 			for (auto& culledMesh : staticMeshes)

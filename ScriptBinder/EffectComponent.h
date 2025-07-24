@@ -1,11 +1,9 @@
 #pragma once
 #include "Component.h"
 #include "EffectComponent.generated.h"
-#include "IOnDestroy.h"
-#include "IAwakable.h"
-#include "IUpdatable.h"
+#include "IRegistableEvent.h"
 
-class EffectComponent : public Component, public IUpdatable, public IAwakable, public IOnDestroy
+class EffectComponent : public Component, public RegistableEvent<EffectComponent>
 {
 public:
     ReflectEffectComponent

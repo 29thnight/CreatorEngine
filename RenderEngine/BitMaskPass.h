@@ -34,7 +34,7 @@ private:
 	bool isOn = true;
 	bool blurOutline = true;
 	float outlineVelocity = 1.f;
-	float4 m_colors[8] = {
+	Mathf::Color4 m_colors[8] = {
 		{ 1.f, 0.f, 0.f, 1.f }, // Red
 		{ 0.f, 1.f, 0.f, 1.f }, // Green
 		{ 0.f, 0.f, 1.f, 1.f }, // Blue

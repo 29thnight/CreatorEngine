@@ -13,6 +13,8 @@
 #define LIGHT_ENABLED 1
 #define LIGHT_ENABLED_W_SHADOWMAP 2
 
+#define USE_SHADOW_RECIVE 256
+
 //Texture2D ShadowMap : register(t4); // support 1 for now, future use array
 Texture2DArray ShadowMapArr : register(t4); //< -- t4 
 Texture2D CloudShadowMap : register(t10);

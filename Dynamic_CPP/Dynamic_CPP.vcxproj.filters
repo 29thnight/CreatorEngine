@@ -87,9 +87,6 @@
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="BTActtionFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
@@ -114,9 +111,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\Daed.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsDaed.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
@@ -129,17 +123,8 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\AtteckAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\IsChase.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\IsDetect.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\Idle.h">
 			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
-			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
 			<Filter>BehaviorTree\Condition</Filter>
@@ -166,6 +151,9 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityResource.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\TweenManager.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>
@@ -221,9 +209,6 @@
 		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\Daed.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Condition\IsDaed.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
@@ -236,17 +221,8 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\AtteckAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\IsChase.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\IsDetect.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\Idle.cpp">
 			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
@@ -273,6 +249,9 @@
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityResource.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\TweenManager.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

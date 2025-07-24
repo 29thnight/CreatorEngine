@@ -2,6 +2,7 @@
 #include "DeviceState.h"
 #include "RenderScene.h"
 #include "Material.h"
+#include "SceneManager.h"
 
 bool RenderPassData::VaildCheck(Camera* pCamera)
 {

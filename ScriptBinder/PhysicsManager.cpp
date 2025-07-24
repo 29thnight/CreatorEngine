@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "GameObject.h"
 #include "Transform.h"
+#include "Component.h"
 #include "RigidBodyComponent.h"
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
@@ -16,46 +17,46 @@
 class Scene;
 void PhysicsManager::Initialize()
 {
-	//물리시스템 초기화
+	//�����ý��� �ʱ�ȭ
 	m_bIsInitialized = Physics->Initialize();
 	
-	//이벤트 등록
+	//�̺�Ʈ ���
 	m_OnSceneLoadHandle		= sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
 	m_OnSceneUnloadHandle	= sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
-	//충돌 콜백 등록
+	//�浹 �ݹ� ���
 	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
-		});
+	});
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {
 	if (!m_bIsInitialized) return;
 	
-	//콜백 리스트 비우기
+	//�ݹ� ����Ʈ ����
 	m_callbacks.clear();
 	SetPhysicData();
-	// 보류 중인 변경 사항 적용
+	// ���� ���� ���� ���� ����
 	ApplyPendingChanges();
-	//물리엔진 업데이트
+	//�������� ������Ʈ
 	Physics->Update(fixedDeltaTime);
 
 	
-	//물리엔진 데이터 가져오기
+	//�������� ������ ��������
 	GetPhysicData();
-	//콜백 이벤트 처리
+	//�ݹ� �̺�Ʈ ó��
 	ProcessCallback();
 	
 }
 void PhysicsManager::Shutdown()
 {
-	//모든 객체 제거
+	//��� ��ü ����
 	Physics->ChangeScene();
-	//컨테이너 비우기
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	//컨테이너 제거
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
-	//물리 해제
+	//���� ����
 	Physics->UnInitialize();
 
 }
@@ -73,7 +74,7 @@ void PhysicsManager::OnLoadScene()
 
 void PhysicsManager::OnUnloadScene()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, info] : Container) 
 	{
 		info.bIsDestroyed = true;
@@ -87,7 +88,7 @@ void PhysicsManager::OnUnloadScene()
 
 void PhysicsManager::ProcessCallback()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [data, type] : m_callbacks) {
 
 		auto lhs = Container.find(data.thisId);
@@ -137,17 +138,17 @@ void PhysicsManager::ProcessCallback()
 
 void PhysicsManager::DrawDebugInfo()
 {
-	//collider 정보를 가져와서 render에서 wireframe을 그릴 수 있도록 한다.
+	//collider ������ �����ͼ� render���� wireframe�� �׸� �� �ֵ��� �Ѵ�.
 	//DebugRender debug;
 
-	//물리엔진에 있는 객체를 조회하면 물리 정보를 가져온다.
+	//���������� �ִ� ��ü�� ��ȸ�ϸ� ���� ������ �����´�.
 
 	//DebugData dd;
-	//// 오브젝트의 물리 정보
+	//// ������Ʈ�� ���� ����
 	//for (auto* rb : m_rigidBodies)
 	//	rb->FillDebugData(dd);
 
-	//// 매니저에서 처리하는 Raycast 정보를 추가
+	//// �Ŵ������� ó���ϴ� Raycast ������ �߰�
 	//for (auto& rq : m_raycastSystem->GetRequests())
 	//{
 	//	if (rq.hit)
@@ -157,7 +158,7 @@ void PhysicsManager::DrawDebugInfo()
 	//	}
 	//}
 
-	//// IDebugRenderer에 전달
+	//// IDebugRenderer�� ����
 	//for (auto& l : dd.lines)   debug->DrawLine(l);
 	//for (auto& s : dd.spheres) debug->DrawSphere(s);
 	//for (auto& p : dd.points)  debug->DrawPoint(p);
@@ -171,7 +172,7 @@ void PhysicsManager::DrawDebugInfo()
 void PhysicsManager::RayCast(RayEvent& rayEvent)
 {
 	
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -210,7 +211,7 @@ void PhysicsManager::RayCast(RayEvent& rayEvent)
 
 bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -241,7 +242,7 @@ bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 
 int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -295,7 +296,7 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
 	boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
-	//offset 적용
+	//offset ����
 	if (tranformOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
 		boxInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
@@ -483,7 +484,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (box && box->IsDestroyMark())
 	{
 		auto ID = box->GetBoxInfo().colliderInfo.id;
@@ -494,7 +495,7 @@ void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 
 void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (sphere && sphere->IsDestroyMark())
 	{
 		auto ID = sphere->GetSphereInfo().colliderInfo.id;
@@ -505,7 +506,7 @@ void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 
 void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (capsule && capsule->IsDestroyMark())
 	{
 		auto ID = capsule->GetCapsuleInfo().colliderInfo.id;
@@ -516,7 +517,7 @@ void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 
 void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (mesh && mesh->IsDestroyMark())
 	{
 		auto ID = mesh->GetMeshInfo().colliderInfo.id;
@@ -527,7 +528,7 @@ void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 
 void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (controller && controller->IsDestroyMark())
 	{
 		auto ID = controller->GetControllerInfo().id;
@@ -538,7 +539,7 @@ void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 
 void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (terrain && terrain->IsDestroyMark())
 	{
 		auto ID = terrain->GetColliderID();
@@ -554,7 +555,7 @@ void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 
 void PhysicsManager::SetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, colliderInfo] : Container) 
 	{
 		if (colliderInfo.bIsDestroyed)
@@ -567,10 +568,10 @@ void PhysicsManager::SetPhysicData()
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
-		//todo : CCT,Controller,ragdoll,capsule,나중에 deformeSuface
+		//todo : CCT,Controller,ragdoll,capsule,���߿� deformeSuface
 		if (colliderInfo.id == m_controllerTypeId)
 		{
-			//캐릭터 컨트롤러
+			//ĳ���� ��Ʈ�ѷ�
 			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			CharacterControllerGetSetData data;
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
@@ -603,7 +604,7 @@ void PhysicsManager::SetPhysicData()
 		}
 		else
 		{
-			//기본값
+			//�⺻��
 			RigidBodyGetSetData data;
 			data.transform = transform.GetWorldMatrix();
 			data.angularVelocity = rigidbody->GetAngularVelocity();
@@ -621,7 +622,7 @@ void PhysicsManager::SetPhysicData()
 			data.maxDepenetrationVelocity = rigidbody->GetMaxDepenetrationVelocity();
 
 			data.forceMode = static_cast<int>(rigidbody->GetForceMode());
-			rigidbody->SetForceMode(EForceMode::NONE); // 물리 엔진에 적용하기 전에 ForceMode를 NONE으로 설정
+			rigidbody->SetForceMode(EForceMode::NONE); // ���� ������ �����ϱ� ���� ForceMode�� NONE���� ����
 			data.velocity = rigidbody->GetLinearVelocity();
 			data.AngularDamping = rigidbody->GetAngularDamping();
 			data.LinearDamping = rigidbody->GetLinearDamping();
@@ -658,7 +659,7 @@ void PhysicsManager::SetPhysicData()
 //PxScene --> GameScene
 void PhysicsManager::GetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, ColliderInfo] : Container) {
 
 		if (nullptr == ColliderInfo.gameObject)
@@ -670,7 +671,7 @@ void PhysicsManager::GetPhysicData()
 			continue;
 		}
 
-		//이미 파괴된 콜라이더는 건너뛴다
+		//�̹� �ı��� �ݶ��̴��� �ǳʶڴ�
 		if (ColliderInfo.bIsDestroyed)
 		{
 			continue;
@@ -683,13 +684,13 @@ void PhysicsManager::GetPhysicData()
 
 		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC)
 		{
-			//TODO : 콜라이더 type 바꿔야함
+			//TODO : �ݶ��̴� type �ٲ����
 			continue;
 		}
 
-		//todo : CCT,Controller,ragdoll,capsule,나중에 deformeSuface
+		//todo : CCT,Controller,ragdoll,capsule,���߿� deformeSuface
 		if (ColliderInfo.id == m_controllerTypeId) {
-			//캐릭터 컨트롤러
+			//ĳ���� ��Ʈ�ѷ�
 			auto controller = ColliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			auto controll = Physics->GetCCTData(id);
 			auto movement = Physics->GetMovementData(id);
@@ -701,7 +702,7 @@ void PhysicsManager::GetPhysicData()
 		}
 		else
 		{
-			//기본 값
+			//�⺻ ��
 			auto data = Physics->GetRigidBodyData(id);
 			rigidbody->SetLinearVelocity(data.linearVelocity);
 			rigidbody->SetAngularVelocity(data.angularVelocity);

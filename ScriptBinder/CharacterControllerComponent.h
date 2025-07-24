@@ -2,11 +2,7 @@
 #include "SceneManager.h"
 #include "GameObject.h"
 #include "Component.h"
-#include "IAwakable.h"
-#include "IOnDestroy.h"
-#include "IStartable.h"
-#include "IFixedUpdatable.h"
-#include "ILateUpdatable.h"
+#include "IRegistableEvent.h"
 #include "../physics/PhysicsCommon.h"
 #include "../physics/Physx.h"
 #include "../Physics/ICollider.h"
@@ -16,7 +12,7 @@
 #include "Scene.h"
 #include "CharacterControllerComponent.generated.h"
 
-class CharacterControllerComponent : public Component, public ICollider, public IAwakable, public IOnDestroy, public IStartable, public IFixedUpdatable, public ILateUpdatable
+class CharacterControllerComponent : public Component, public ICollider, public RegistableEvent<CharacterControllerComponent>
 {
 public:
    ReflectCharacterControllerComponent

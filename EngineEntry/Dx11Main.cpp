@@ -21,7 +21,6 @@
 #include "EffectManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
-
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -179,6 +178,7 @@ DirectX11::Dx11Main::~Dx11Main()
     SceneManagers->Decommissioning();
     EffectManager::Destroy();
 	EffectProxyController::Destroy();
+	InputManager::Destroy();
     PROFILER_SHUTDOWN();
 }
 //test code

@@ -545,6 +545,34 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
     return nullptr;
 }
 
+Material* DataSystem::CreateMaterial()
+{
+	Material* material = AllocateResource<Material>();
+	if (material)
+	{
+		auto deleter = [&](Material* mat)
+		{
+			if (mat)
+			{
+				DeallocateResource<Material>(mat);
+			}
+		};
+		std::string name = "NewMaterial";
+		int index = 1;
+		while (Materials.find(name) != Materials.end())
+		{
+			name = "NewMaterial" + std::to_string(index++);
+		}
+		material->m_name = name;
+		material->m_fileGuid = make_file_guid(name);
+		
+		Materials[name] = std::shared_ptr<Material>(material, deleter);
+		
+		return material;
+	}
+	return nullptr;
+}
+
 SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 {
 	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();

@@ -90,27 +90,22 @@ struct Vertex
 	}
 };
 
-struct InstanceVertex
-{
-	Mathf::Vector3 position;
-	Mathf::Vector3 normal;
-	Mathf::Vector2 uv0;
-	Mathf::Vector2 uv1;
-	Mathf::Vector3 tangent;
-	Mathf::Vector3 bitangent;
-	uint32 instanceID;
-	InstanceVertex() = default;
-	InstanceVertex(const Vertex& vertex, uint32 id) :
-		position(vertex.position), normal(vertex.normal), uv0(vertex.uv0), uv1(vertex.uv1),
-		tangent(vertex.tangent), bitangent(vertex.bitangent), instanceID(id) {}
-};
-
 class Texture;
 class Material;
 class ModelLoader;
 class MeshOptimizer;
+class Camera;
 class Mesh
 {
+public:
+	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체
+	struct LODResource
+	{
+		ComPtr<ID3D11Buffer> vertexBuffer;
+		ComPtr<ID3D11Buffer> indexBuffer;
+		uint32 indexCount;
+	};
+
 public:
    ReflectMesh
     [[Serializable]]
@@ -126,14 +121,22 @@ public:
 	}
 
 	void AssetInit();
-
 	void Draw();
 	void Draw(ID3D11DeviceContext* _deferredContext);
-
 	void DrawShadow();
 	void DrawShadow(ID3D11DeviceContext* _deferredContext);
-
 	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
+
+	// [NEW] 특정 LOD 레벨을 그리는 함수 (렌더링 시스템에서 호출)
+	void DrawLOD(ID3D11DeviceContext* context, uint32_t lodIndex);
+	void DrawShadowLOD(ID3D11DeviceContext* context, uint32_t lodIndex);
+	void DrawInstancedLOD(ID3D11DeviceContext* context, uint32_t lodIndex, size_t instanceCount);
+
+	// LOD 생성 함수
+	bool HasLODs() const;
+	void GenerateLODs(const std::vector<float>& lodThresholds);
+	uint32_t SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const;
+	const std::vector<float>& GetLODThresholds() const { return m_LODThresholds; }
 
 	std::string GetName() const { return m_name; }
 	std::string GetModelName() const { return m_modelName; }
@@ -158,6 +161,7 @@ public:
 	ComPtr<ID3D11Buffer> GetShadowIndexBuffer() { return m_shadowIndexBuffer; }
 
 	HashedGuid m_hashingMesh{ make_guid() };
+
 private:
 	friend class ModelLoader;
 	friend class MeshOptimizer;
@@ -181,12 +185,19 @@ private:
 	DirectX::BoundingBox m_boundingBox;
 	DirectX::BoundingSphere m_boundingSphere;
 
+	// --- LOD 관련 멤버 변수 ---
+	// 인덱스 0: 원본(LOD0), 1: LOD1, ...
+	std::vector<LODResource> m_LODs;
+	// 화면 공간 크기 기반의 LOD 전환 임계값
+	[[Property]]
+	std::vector<float> m_LODThresholds;
+	// ---
+
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 
 	ComPtr<ID3D11Buffer> m_shadowVertexBuffer{};
 	ComPtr<ID3D11Buffer> m_shadowIndexBuffer{};
-
 
 	static constexpr const uint32 m_stride = sizeof(Vertex);
 };

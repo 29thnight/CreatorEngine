@@ -110,7 +110,6 @@ void TerrainComponent::Initialize()
 
 void TerrainComponent::Resize(int newWidth, int newHeight)
 {
-
 	m_width = newWidth;
 	m_height = newHeight;
 	m_heightMap.assign(m_width * m_height, 0.0f);
@@ -633,7 +632,13 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		}
 	}
 	tmpLayerDescs.clear();
-
+	auto renderScene = SceneManagers->GetRenderScene();
+	auto proxy = renderScene->FindProxy(GetInstanceID());
+	if (proxy)
+	{
+		proxy->m_terrainMesh = m_pMesh;
+		proxy->m_terrainMaterial = m_pMaterial;
+	}
 }
 
 void TerrainComponent::SaveEditorHeightMap(const std::wstring& pngPath, float minH, float maXH)
@@ -797,6 +802,12 @@ void TerrainComponent::Awake()
 	{
 		scene->CollectTerrainComponent(this);
 		renderScene->RegisterCommand(this);
+		auto proxy = renderScene->FindProxy(GetInstanceID());
+		if (proxy)
+		{
+			proxy->m_terrainMesh = m_pMesh;
+			proxy->m_terrainMaterial = m_pMaterial;
+		}
 	}
 }
 
@@ -807,6 +818,12 @@ void TerrainComponent::OnDestroy()
 	if (scene)
 	{
 		scene->UnCollectTerrainComponent(this);
+		auto proxy = renderScene->FindProxy(GetInstanceID());
+		if (proxy)
+		{
+			proxy->m_terrainMesh = nullptr;
+			proxy->m_terrainMaterial = nullptr;
+		}
 		renderScene->UnregisterCommand(this);
 	}
 }
@@ -1045,8 +1062,6 @@ void TerrainComponent::BuildOutTrrain(const std::wstring& buildPath, const std::
 	}
 
 	ofs.close();
-
-
 
 	Debug->LogDebug("Terrain built successfully: " + Utf8Encode(terrainFile.wstring()));
 }

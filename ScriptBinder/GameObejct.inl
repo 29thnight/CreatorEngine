@@ -1,5 +1,6 @@
 #pragma once
 #include "GameObject.h"
+#include "IRegistableEvent.h"
 
 template<typename T>
 inline T* GameObject::AddComponent()
@@ -10,6 +11,10 @@ inline T* GameObject::AddComponent()
     }
 
     std::shared_ptr<T> component = shared_alloc<T>();
+    if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
+    {
+        receiver->RegisterOverriddenEvents(this->GetScene());
+    }
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;
@@ -26,6 +31,10 @@ inline T* GameObject::AddComponent(Args && ...args)
     }
 
     std::shared_ptr<T> component = shared_alloc<T>(std::forward<Args>(args)...);
+    if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
+    {
+        receiver->RegisterOverriddenEvents(this->GetScene());
+    }
     m_components.push_back(component);
     component->SetOwner(this);
     m_componentIds[component->GetTypeID()] = m_components.size() - 1;

@@ -1,16 +1,16 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "../physics/Physx.h"
-#include "../physics/ICollider.h"
-#include "GameObject.h"
-#include "Component.h"
+#include "../Physics/Physx.h"
+#include "../Physics/ICollider.h"
 
-struct Collision 
+class Component;
+class GameObject;
+struct Collision
 {
 	GameObject* thisObj;
 	GameObject* otherObj;
 
-	const std::vector<DirectX::SimpleMath::Vector3>& contactPoints;
+	const std::vector<Mathf::Vector3>& contactPoints;
 };
 
 //raycast event 관련 함수등록 관련 메인부에 문의 할것
@@ -45,9 +45,6 @@ struct RaycastHit {
 	unsigned int hitObjectLayer = 0;
 };
 
-struct ICollider;
-class Component;
-class GameObject;
 class BoxColliderComponent;
 class SphereColliderComponent;
 class CapsuleColliderComponent;
@@ -223,4 +220,5 @@ private:
 	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
+
 static auto& PhysicsManagers = PhysicsManager::GetInstance();

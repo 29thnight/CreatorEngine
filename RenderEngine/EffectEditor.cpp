@@ -2,6 +2,8 @@
 #include "IconsFontAwesome6.h"
 #include "EffectManager.h"
 #include "EffectBase.h"
+#include "ImGuiRegister.h"
+#include "DataSystem.h"
 
 EffectEditor::EffectEditor()
 {
