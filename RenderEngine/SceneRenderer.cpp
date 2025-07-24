@@ -906,8 +906,8 @@ void SceneRenderer::PrepareRender()
 			for (auto& mesh : allMeshes)
 			{
 				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				
-				data->PushShadowRenderData(mesh->GetInstanceID());
+				if(mesh->m_shadowRecive == true)
+					data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 
 			for (auto& culledMesh : staticMeshes)

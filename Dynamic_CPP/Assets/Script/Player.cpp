@@ -53,7 +53,7 @@ void Player::Start()
 	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
 
-	/*playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
+	playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
 		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
 	playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
 	playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
@@ -61,7 +61,7 @@ void Player::Start()
 	playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {Dash();});
 	playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, 'J', KeyState::Down, [this]() {CatchAndThrow();});
 	playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});*/
+	playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
 
 
 	//m_animator = player->GetComponent<Animator>();
@@ -93,6 +93,9 @@ void Player::Update(float tick)
 		offsetPos.m128_f32[1] = 3.0f; // Y 고정
 
 		catchedObject->GetComponent<Transform>()->SetPosition(offsetPos);
+		auto rb = catchedObject->GetComponent<RigidBodyComponent>();
+		rb->SetAngularVelocity(Mathf::Vector3::Zero);
+		rb->SetLinearVelocity(Mathf::Vector3::Zero);
 	}
 
 
@@ -258,7 +261,7 @@ void Player::Catch()
 		
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
-		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
+		//catchedObject->GetComponent<BoxColliderComponent>()->SetColliderEnabled(false);
 		if (m_curWeapon)
 			m_curWeapon->SetEnabled(false);
 	}
@@ -274,15 +277,25 @@ void Player::Throw()
 	//auto forward  = transform.GetForward();
 	//rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
 
+	// 아시스를 캐싱하는 방식으로 추후 수정 필요
+	Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+	auto asis = GameObject::Find("Asis");
+	Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+	Mathf::Vector3 directionToAsis = asisPos - myPos;
+	float distance = directionToAsis.Length();
+	directionToAsis.Normalize();
 
-	auto item = catchedObject->GetComponent<EntityItem>();
-	if (item) {
-		item->SetThrowOwner(this);
+	float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+	if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f)) {
+		auto item = catchedObject->GetComponent<EntityItem>();
+		if (item) {
+			item->SetThrowOwner(this);
+		}
+		catchedObject = nullptr;
+		m_nearObject = nullptr; //&&&&&
+		if (m_curWeapon)
+			m_curWeapon->SetEnabled(true);
 	}
-	catchedObject = nullptr;
-	m_nearObject = nullptr; //&&&&&
-	if(m_curWeapon)
-		m_curWeapon->SetEnabled(true);
 }
 
 void Player::Dash()
@@ -381,6 +394,10 @@ void Player::Attack()
 				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
 			}
 			
+			auto entityItem = object->GetComponent<Entity>();
+			if (entityItem) {
+				entityItem->Attack(this, 10);
+			}
 		}
 	}
 	else if (m_comboCount == 1)

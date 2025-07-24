@@ -32,6 +32,8 @@ cbuffer PBRMaterial : register(b0)
     int gUseEmmisive;
     int gNormalState;
     int gConvertToLinear;
+
+    bool bitflag;
 }
 
 cbuffer ForwardCBuffer : register(b3)
@@ -106,7 +108,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     float3 Lo = float3(0, 0, 0);
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo.rgb, metallic);
-    
+
+    bool useShadowRevice = (bitflag & (1<<8)) != 0;
+
     for (int i = 0; i < 4; ++i)
     {
         Light light = Lights[i];
@@ -128,7 +132,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         float denominator = 4.0 * saturate(surf.NdotV) * NdotL;
         float3 specular = numerator / max(denominator, 0.001);
 
-        Lo += (kD * albedo.rgb / PI + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);
+        Lo += (kD * albedo.rgb / PI + specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
 
     }
 

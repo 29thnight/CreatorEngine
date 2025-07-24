@@ -73,6 +73,8 @@ public:
 	LightMapping				m_LightMapping;
 
 	bool                        m_isEnableShadow{ true };
+	bool						m_isShadowCast{ true };
+	bool						m_isShadowRecive{ true };
 	bool						m_isSkinnedMesh{ false };
 	bool						m_isAnimationEnabled{ false };
 	bool						m_isInstanced{ false };

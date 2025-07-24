@@ -105,6 +105,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
 	m_LODDistance(other.m_LODDistance),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
     m_isEnableShadow(other.m_isEnableShadow),
+    m_isShadowCast(other.m_isShadowCast),
+    m_isShadowRecive(other.m_isShadowRecive),
 	m_isInstanced(other.m_isInstanced),
     m_terrainMesh(other.m_terrainMesh),
 	m_terrainMaterial(other.m_terrainMaterial),
@@ -133,6 +135,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_LODDistance(other.m_LODDistance),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
 	m_isEnableShadow(other.m_isEnableShadow),
+    m_isShadowCast(other.m_isShadowCast),
+    m_isShadowRecive(other.m_isShadowRecive),
     m_isInstanced(other.m_isInstanced),
 	m_terrainMesh(std::exchange(other.m_terrainMesh, nullptr)),
     m_terrainMaterial(std::exchange(other.m_terrainMaterial, nullptr)),
@@ -248,7 +252,7 @@ void PrimitiveRenderProxy::GenerateLODGroup()
 
 void PrimitiveRenderProxy::DrawShadow()
 {
-    if (nullptr == m_Mesh) return;
+    if (nullptr == m_Mesh || false == m_isShadowCast) return;
 
     if(m_EnableLOD)
     {
@@ -271,7 +275,7 @@ void PrimitiveRenderProxy::DrawShadow()
 
 void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
-    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+    if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
     if (m_EnableLOD)
     {
@@ -293,7 +297,7 @@ void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 
 void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
 {
-    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+    if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
     m_Mesh->DrawInstanced(_deferredContext, instanceCount);
 }

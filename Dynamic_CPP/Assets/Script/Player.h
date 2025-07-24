@@ -1,10 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "ModuleBehavior.h"
+#include "Entity.h"
 #include "Player.generated.h"
 
 class Animator;
-class Player : public ModuleBehavior
+class Player : public Entity
 {
 public:
    ReflectPlayer
@@ -88,6 +88,8 @@ public:
 	[[Property]]
 	float AttackPowerY = 20.f;
 
+	[[Property]]
+	float detectAngle = 30.f;
 
 	void TestStun();
 	void TestKnockBack();

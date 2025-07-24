@@ -160,6 +160,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
     DirectX11::PSSetConstantBuffer(deferredPtr, 10, 1, m_shadowcamBuffer.GetAddressOf());
     DirectX11::PSSetShaderResources(deferredPtr, 0, 10, srvs);
+	DirectX11::PSSetShaderResources(deferredPtr, 11, 1, &m_BitmaskTexture->m_pSRV);
 
     if (lightManager->hasLightWithShadows)
     {

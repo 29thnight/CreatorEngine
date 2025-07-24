@@ -15,6 +15,8 @@
 using namespace Mathf;
 void EntityAsis::Start()
 {
+	m_EntityItemQueue.resize(maxTailCapacity);
+
 	auto gameManager = GameObject::Find("GameManager");
 	if (gameManager)
 	{

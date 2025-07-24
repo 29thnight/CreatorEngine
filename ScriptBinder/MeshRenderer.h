@@ -43,6 +43,10 @@ public:
     LightMapping m_LightMapping;
     [[Property]]
 	bool m_isSkinnedMesh{ false };
+    [[Property]]
+    bool m_shadowRecive = true;
+	[[Property]]
+    bool m_shadowCast = true;
 
 private:
 	bool m_isNeedUpdateCulling{ false };
