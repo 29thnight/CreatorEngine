@@ -98,6 +98,11 @@ MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMes
 
         for (float threshold : lodThresholds)
         {
+            if (0 == threshold)
+            {
+                throw std::exception("threshold value 0");
+            }
+
             const size_t target_index_count = static_cast<size_t>(sourceIndices.size() * threshold);
             const float target_error = 1.0f - threshold;
 
@@ -109,12 +114,19 @@ MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMes
                 target_index_count, target_error);
             simplifiedIndices.resize(newIndexCount);
 
-            simplifiedVertices.resize(sourceVertices.size());
-            size_t newVertexCount = meshopt_optimizeVertexFetch(
-                &simplifiedVertices[0],
-                &simplifiedIndices[0], simplifiedIndices.size(),
-                &sourceVertices[0], sourceVertices.size(), sizeof(Vertex));
-            simplifiedVertices.resize(newVertexCount);
+            if(0 != newIndexCount)
+            {
+                simplifiedVertices.resize(sourceVertices.size());
+                size_t newVertexCount = meshopt_optimizeVertexFetch(
+                    &simplifiedVertices[0],
+                    &simplifiedIndices[0], simplifiedIndices.size(),
+                    &sourceVertices[0], sourceVertices.size(), sizeof(Vertex));
+                simplifiedVertices.resize(newVertexCount);
+            }
+            else
+            {
+                throw std::exception("newIndexCount count 0");
+            }
 
             LOD lod;
             lod.threshold = threshold;
@@ -133,6 +145,11 @@ MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMes
         std::cerr << "GenerateLODs failed: Not enough memory. " << e.what() << std::endl;
         return std::nullopt; // 실패 시 std::nullopt를 반환합니다.
     }
+    catch (const std::exception& e)
+    {
+        std::cerr << "GenerateLODs failed: " << e.what() << std::endl;
+        return std::nullopt; // 다른 예외 발생 시에도 std::nullopt를 반환합니다.
+	}
 }
 
 void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& vertices, std::vector<uint32>& indices)

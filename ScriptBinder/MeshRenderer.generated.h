@@ -11,6 +11,7 @@ ReflectionFieldInheritance(MeshRenderer, Component) \
 		meta_property(m_isSkinnedMesh) \
 		meta_property(m_shadowRecive) \
 		meta_property(m_shadowCast) \
+		meta_property(m_isEnableLOD) \
 	}); \
 	FieldEnd(MeshRenderer, PropertyOnlyInheritance) \
 };

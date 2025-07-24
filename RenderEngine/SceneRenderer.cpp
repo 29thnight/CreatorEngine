@@ -728,8 +728,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if (nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushShadowRenderQueue(proxy);
 			}
 		}
@@ -739,8 +737,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if(nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushRenderQueue(proxy);
 			}
 		}

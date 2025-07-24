@@ -145,7 +145,7 @@ void PrimitiveRenderProxy::Draw(ID3D11DeviceContext* _deferredContext)
     {
         if (nullptr == m_Mesh || nullptr == _deferredContext) return;
 
-        if (m_EnableLOD && !m_isSkinnedMesh)
+        if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
         {
             m_Mesh->DrawLOD(_deferredContext, m_currLOD);
         }
@@ -203,7 +203,7 @@ uint32_t PrimitiveRenderProxy::GetLODLevel(Camera* camera)
         return 0; // 유효하지 않은 경우, 원본 메쉬(LOD 0) 반환
     }
 
-	m_currLOD = m_Mesh->SelectLOD(camera, m_worldPosition);
+	m_currLOD = m_Mesh->SelectLOD(camera, m_worldMatrix);
 
     // 실제 계산은 Mesh 클래스에 위임합니다.
     return m_currLOD;
@@ -213,7 +213,7 @@ void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
     if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
-    if (m_EnableLOD && !m_isSkinnedMesh)
+    if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
     {
         m_Mesh->DrawLOD(_deferredContext, m_currLOD);
     }
@@ -234,7 +234,7 @@ void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, 
 {
     if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
-    if (m_EnableLOD && !m_isSkinnedMesh)
+    if (m_EnableLOD && !m_isSkinnedMesh && m_Mesh->HasLODs())
     {
         m_Mesh->DrawInstancedLOD(_deferredContext, m_currLOD, instanceCount);
     }

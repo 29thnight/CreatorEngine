@@ -170,8 +170,7 @@ void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
 	}
 }
 
-// [NEW] Select LOD based on screen-space size
-uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Vector3& worldPosition) const
+uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Matrix& worldMatrix) const
 {
 	if (m_LODs.empty() || m_LODThresholds.empty() || nullptr == camera)
 	{
@@ -185,15 +184,21 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Vector3& worldPosition) co
 	// Get camera's world position
 	Mathf::Vector3 cameraPosition = camera->m_eyePosition;
 
-	// Calculate bounding sphere in world space relative to object's world position
+	// Calculate bounding sphere in world space using the provided world matrix
 	// Assuming m_boundingBox and m_boundingSphere are in object-local space
-	// We need to transform them to world space using the object's world matrix
-	// However, the SelectLOD function in PrimitiveRenderProxy already passes worldPosition
-	// So, we assume m_boundingBox/m_boundingSphere are already in world space or relative to worldPosition.
-	// For simplicity, let's assume m_boundingSphere is relative to the object's origin,
-	// and we need to offset it by worldPosition.
-	DirectX::BoundingSphere worldBoundingSphere = m_boundingSphere;
-	worldBoundingSphere.Center = worldPosition + m_boundingSphere.Center; // Adjust center to world space
+	DirectX::BoundingSphere worldBoundingSphere{};
+	DirectX::BoundingSphere::CreateFromBoundingBox(worldBoundingSphere, m_boundingBox);
+
+	// Transform local bounding sphere center to world space
+	worldBoundingSphere.Center = Mathf::Vector3::Transform(m_boundingSphere.Center, worldMatrix);
+
+	// Calculate world-space radius by scaling the local radius by the maximum scale factor
+	// Extract scale from the world matrix (assuming no shear)
+	float scaleX = Mathf::Vector3(worldMatrix._11, worldMatrix._12, worldMatrix._13).Length();
+	float scaleY = Mathf::Vector3(worldMatrix._21, worldMatrix._22, worldMatrix._23).Length();
+	float scaleZ = Mathf::Vector3(worldMatrix._31, worldMatrix._32, worldMatrix._33).Length();
+	float maxScale = std::max({ scaleX, scaleY, scaleZ });
+	worldBoundingSphere.Radius = m_boundingSphere.Radius * maxScale;
 
 	// Calculate distance from camera to object's bounding sphere center
 	float distance = Mathf::Vector3::Distance(cameraPosition, worldBoundingSphere.Center);
@@ -218,18 +223,20 @@ uint32_t Mesh::SelectLOD(Camera* camera, const Mathf::Vector3& worldPosition) co
 	float screenSpaceSize = (worldBoundingSphere.Radius / distance) * projectionYScale;
 
 	// Iterate through thresholds to find the appropriate LOD
+	// Assuming m_LODThresholds are ordered from largest to smallest.
+	// m_LODThresholds[0] is the threshold for LOD 1.
+	// If screenSpaceSize is greater than m_LODThresholds[0], it means we should use LOD 0.
+	if (!m_LODThresholds.empty() && screenSpaceSize > m_LODThresholds[0])
+	{
+		return 0; // Use LOD 0 (highest detail)
+	}
+
 	for (uint32_t i = 0; i < m_LODThresholds.size(); ++i)
 	{
 		if (screenSpaceSize > m_LODThresholds[i])
 		{
 			// Found a threshold, return this LOD level
-			// m_LODs[0] is LOD 0, m_LODs[1] is LOD 1 (first generated), etc.
-			// So, if threshold[i] is met, we use LOD i. (LOD 0 is original, LOD 1 is first simplified)
-			// The actual LOD index in m_LODs will be i+1 if m_LODThresholds[0] corresponds to LOD1.
-			// If m_LODThresholds[0] means "use LOD0 if > threshold", then it's i.
-			// Let's assume m_LODThresholds[0] is for LOD1, m_LODThresholds[1] for LOD2, etc.
-			// So, if screenSpaceSize > m_LODThresholds[i], we use LOD i+1.
-			// If no threshold is met, we use the last (lowest detail) LOD.
+			// If m_LODThresholds[i] is the threshold for LOD i+1, then return i+1.
 			return i + 1;
 		}
 	}
