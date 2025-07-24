@@ -176,6 +176,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineEntry\EngineSetting.h" />
     <ClInclude Include="EngineEntry\EngineVersion.h" />
     <ClInclude Include="EngineEntry\framework.h" />
+    <ClInclude Include="EngineEntry\GameObjectCommand.h" />
     <ClInclude Include="EngineEntry\ProgressWindow.h" />
     <ClInclude Include="EngineEntry\ProjectSetting.h" />
     <ClInclude Include="EngineEntry\RenderPassSettings.h" />

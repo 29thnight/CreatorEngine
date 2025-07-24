@@ -110,6 +110,9 @@
     <ClInclude Include="EngineEntry\RenderPassSettings.h">
       <Filter>Settings\EngineSetting</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\GameObjectCommand.h">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">

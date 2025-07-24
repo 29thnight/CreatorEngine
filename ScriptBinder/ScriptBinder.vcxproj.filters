@@ -154,9 +154,6 @@
     <Filter Include="Classes\Components\RenderableComponent\FoliageComponent">
       <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\GPU">
-      <UniqueIdentifier>{af30516f-7274-46c4-a7ee-5f2132d12f1d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\InputComponent">
       <UniqueIdentifier>{13466114-f9ae-4851-b65c-0b0923c77d7d}</UniqueIdentifier>
     </Filter>

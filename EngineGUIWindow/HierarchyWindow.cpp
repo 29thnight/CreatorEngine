@@ -11,7 +11,7 @@
 #include "UIManager.h"
 #include "DataSystem.h"
 #include "PathFinder.h"
-
+#include "GameObjectCommand.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "MetaStateCommand.h"
