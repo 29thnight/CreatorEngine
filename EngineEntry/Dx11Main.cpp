@@ -178,6 +178,7 @@ DirectX11::Dx11Main::~Dx11Main()
     SceneManagers->Decommissioning();
     EffectManager::Destroy();
 	EffectProxyController::Destroy();
+	InputManager::Destroy();
     PROFILER_SHUTDOWN();
 }
 //test code

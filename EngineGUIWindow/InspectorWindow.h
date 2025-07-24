@@ -9,12 +9,9 @@ class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
-
 class TerrainComponent;
-
 class StateMachineComponent;
 class BehaviorTreeComponent;
-
 class InspectorWindow
 {
 public:

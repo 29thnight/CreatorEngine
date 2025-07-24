@@ -1,5 +1,6 @@
 #pragma once
 #include <GameInput.h>
+#include "DLLAcrossSingleton.h"
 #include "Core.Definition.h"
 #include "Core.Mathf.h"
 #include "KeyState.h"
@@ -86,9 +87,9 @@ extern std::vector<KeyBoard> keyboradsss;
 
 
 using namespace Microsoft::WRL;
-class InputManager : public Singleton<InputManager>
+class InputManager : public DLLCore::Singleton<InputManager>
 {
-	friend class Singleton;
+	friend class DLLCore::Singleton<InputManager>;
 private:
 	InputManager() = default;
 	~InputManager() = default;
@@ -201,4 +202,4 @@ private:
 	float _controllerVibrationTime[MAX_CONTROLLER]{};
 };
 
-inline static auto& InputManagement = InputManager::GetInstance();
+inline static auto InputManagement = InputManager::GetInstance();

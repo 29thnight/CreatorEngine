@@ -43,6 +43,7 @@ void LightController::Initialize()
 
 
 	m_shadowMapPass = std::make_unique<ShadowMapPass>();
+	hasLightWithShadows = false;
 }
 
 void LightController::Update()
