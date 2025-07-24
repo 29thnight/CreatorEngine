@@ -1,4 +1,7 @@
 #include "Scene.h"
+#include "Scene.h"
+#include "Scene.h"
+#include "Scene.h"
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
@@ -366,6 +369,39 @@ void Scene::AllDestroyMark()
 void Scene::ResetSelectedSceneObject()
 {
     m_selectedSceneObject = nullptr;
+	m_selectedSceneObjects.clear();
+}
+
+void Scene::AddSelectedSceneObject(GameObject* sceneObject)
+{
+	if (!sceneObject) return;
+
+	if (std::find(m_selectedSceneObjects.begin(), m_selectedSceneObjects.end(), sceneObject) == m_selectedSceneObjects.end())
+	{
+		m_selectedSceneObjects.push_back(sceneObject);
+		m_selectedSceneObject = sceneObject;
+	}
+	
+}
+
+void Scene::RemoveSelectedSceneObject(GameObject* sceneObject)
+{
+	if (!sceneObject) return;
+	auto it = std::find(m_selectedSceneObjects.begin(), m_selectedSceneObjects.end(), sceneObject);
+	if (it != m_selectedSceneObjects.end())
+	{
+		m_selectedSceneObjects.erase(it);
+		if (m_selectedSceneObject == sceneObject)
+		{
+			m_selectedSceneObject = m_selectedSceneObjects.back();
+		}
+	}
+}
+
+void Scene::ClearSelectedSceneObjects()
+{
+	m_selectedSceneObjects.clear();
+	m_selectedSceneObject = nullptr;
 }
 
 void Scene::CollectLightComponent(LightComponent* ptr)
