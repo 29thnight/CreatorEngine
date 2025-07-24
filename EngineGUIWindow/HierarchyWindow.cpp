@@ -14,6 +14,8 @@
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "MetaStateCommand.h"
+#include "ReflectionRegister.h"
 
 HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 	m_sceneRenderer(ptr)
@@ -62,7 +64,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					if (selectedSceneObject)
 					{
-						scene->DestroyGameObject(selectedSceneObject->m_index);
+						Meta::UndoCommandManager->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
 						scene->m_selectedSceneObject = nullptr;
 					}
 				}
@@ -70,7 +72,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 				if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 				{
-					scene->CreateGameObject("GameObject", GameObjectType::Empty);
+					Meta::UndoCommandManager->Execute(std::make_unique<Meta::CreateGameObjectCommand>(scene, "GameObject", GameObjectType::Empty));
 				}
 
 				if (ImGui::BeginMenu("		Light"))
@@ -130,7 +132,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 			if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
 			{
-				scene->DestroyGameObject(selectedSceneObject->m_index);
+				Meta::UndoCommandManager->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
 				scene->m_selectedSceneObject = nullptr;
 			}
 		}
@@ -181,18 +183,18 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 			{
 				GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-				// ºÎ¸ğ º¯°æ ·ÎÁ÷
-				if (draggedIndex != 0) // ÀÚ±â ÀÚ½Å¿¡ µå·ÓÇÏ´Â °Í ¹æÁö
+				// ë¶€ëª¨ ë³€ê²½ ë¡œì§
+				if (draggedIndex != 0) // ìê¸° ìì‹ ì— ë“œë¡­í•˜ëŠ” ê²ƒ ë°©ì§€
 				{
 					GameObject* sceneGameObject = scene->GetGameObject(0).get();
 					const auto& draggedObj = scene->GetGameObject(draggedIndex);
 					const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
 
-					// 1. ±âÁ¸ ºÎ¸ğ¿¡¼­ Á¦°Å
+					// 1. ê¸°ì¡´ ë¶€ëª¨ì—ì„œ ì œê±°
 					auto& siblings = oldParent->m_childrenIndices;
 					std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
 
-					// 2. »õ·Î¿î ºÎ¸ğ¿¡ Ãß°¡
+					// 2. ìƒˆë¡œìš´ ë¶€ëª¨ì— ì¶”ê°€
 					draggedObj->m_parentIndex = 0;
 					sceneGameObject->m_childrenIndices.push_back(draggedIndex);
 					draggedObj->m_transform.SetParentID(draggedObj->m_parentIndex);
@@ -254,7 +256,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 	if (!obj->IsEnabled())
 	{
-		// È¸»öÀ¸·Î ÅØ½ºÆ® »ö»ó º¯°æ
+		// íšŒìƒ‰ìœ¼ë¡œ í…ìŠ¤íŠ¸ ìƒ‰ìƒ ë³€ê²½
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 	}
 
@@ -271,8 +273,8 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 	{
 		if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
 		{
-			GameObject* prevSelection = selectedSceneObject; // ¼±ÅÃµÇ±â Àü °ª
-			GameObject* newSelection = obj.get();            // ¼±ÅÃµÉ °ª
+			GameObject* prevSelection = selectedSceneObject; // ì„ íƒë˜ê¸° ì „ ê°’
+			GameObject* newSelection = obj.get();            // ì„ íƒë  ê°’
 
 			if (prevSelection != newSelection)
 			{
@@ -281,7 +283,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 					[=]() { scene->m_selectedSceneObject = newSelection; }
 				);
 
-				// Áï½Ã ¹İ¿µ
+				// ì¦‰ì‹œ ë°˜ì˜
 				selectedSceneObject = newSelection;
 			}
 		}
@@ -299,21 +301,21 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
 			GameObject::Index draggedIndex = *(GameObject::Index*)payload->Data;
-			// ºÎ¸ğ º¯°æ ·ÎÁ÷
-			if (draggedIndex != obj->m_index) // ÀÚ±â ÀÚ½Å¿¡ µå·ÓÇÏ´Â °Í ¹æÁö
+			// ë¶€ëª¨ ë³€ê²½ ë¡œì§
+			if (draggedIndex != obj->m_index) // ìê¸° ìì‹ ì— ë“œë¡­í•˜ëŠ” ê²ƒ ë°©ì§€
 			{
 				const auto& draggedObj = scene->GetGameObject(draggedIndex);
 				const auto& oldParent = scene->GetGameObject(draggedObj->m_parentIndex);
 
-				// 1. ±âÁ¸ ºÎ¸ğ¿¡¼­ Á¦°Å
+				// 1. ê¸°ì¡´ ë¶€ëª¨ì—ì„œ ì œê±°
 				auto& siblings = oldParent->m_childrenIndices;
 				std::erase_if(siblings, [&](auto index) { return index == draggedIndex; });
 
-				// 2. »õ·Î¿î ºÎ¸ğ¿¡ Ãß°¡
+				// 2. ìƒˆë¡œìš´ ë¶€ëª¨ì— ì¶”ê°€
 				draggedObj->m_parentIndex = obj->m_index;
 				obj->m_childrenIndices.push_back(draggedIndex);
 
-				//MatrixÃ³¸®
+				//Matrixì²˜ë¦¬
 				draggedObj->m_transform.SetParentID(obj->m_index);
 			}
 		}
@@ -322,7 +324,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
 	if (opened)
 	{
-		// ÀÚ½Ä ³ëµå¸¦ Àç±ÍÀûÀ¸·Î ±×¸®±â
+		// ìì‹ ë…¸ë“œë¥¼ ì¬ê·€ì ìœ¼ë¡œ ê·¸ë¦¬ê¸°
 		for (auto childIndex : obj->m_childrenIndices)
 		{
 			auto child = scene->GetGameObject(childIndex);
