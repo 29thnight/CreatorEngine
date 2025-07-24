@@ -560,11 +560,14 @@
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
-    <ClInclude Include="FoliageBaseType.h">
+    <ClInclude Include="FoliageType.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
     </ClInclude>
     <ClInclude Include="IRegistableEvent.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
+    </ClInclude>
+    <ClInclude Include="FoliageInstance.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

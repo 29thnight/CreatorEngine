@@ -1,6 +1,7 @@
 #include "FoliageComponent.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
+#include "Terrain.h"
 #include "Scene.h"
 
 void FoliageComponent::Awake()

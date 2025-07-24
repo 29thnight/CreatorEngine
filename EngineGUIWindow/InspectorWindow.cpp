@@ -800,7 +800,7 @@ void InspectorWindow::ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_BOX))
 		{
-			ImGui::GetContext("SelectMatarial").Open();
+			ImGui::GetContext("SelectMaterial").Open();
 		}
 		ImGui::PopStyleVar(2);
 	}

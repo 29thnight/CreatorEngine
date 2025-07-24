@@ -5,7 +5,8 @@
 #include "Animator.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
-#include "FoliageBaseType.h"
+#include "FoliageType.h"
+#include "FoliageInstance.h"
 
 enum class PrimitiveProxyType
 {
