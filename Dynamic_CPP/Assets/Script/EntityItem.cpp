@@ -58,6 +58,7 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
+	//GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
 	if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
 		if (tailTransform)
@@ -83,6 +84,11 @@ void EntityItem::Update(float tick)
 				myTr->SetPosition(p01);
 			}
 			else {
+				GetComponent<BoxColliderComponent>().SetColliderType(EColliderType::TRIGGER);
+				auto rb = GetComponent<RigidBodyComponent>();
+				rb.SetAngularVelocity(Mathf::Vector3::Zero);
+				rb.SetLinearVelocity(Mathf::Vector3::Zero);
+
 				auto asis = GameObject::Find("Asis_01");
 				if (asis != nullptr) {
 					auto entityAsis = asis->GetComponent<EntityAsis>();

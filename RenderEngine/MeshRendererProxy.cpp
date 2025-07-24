@@ -102,6 +102,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(const PrimitiveRenderProxy& other) :
     m_EnableLOD(other.m_EnableLOD),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
     m_isEnableShadow(other.m_isEnableShadow),
+    m_isShadowCast(other.m_isShadowCast),
+    m_isShadowRecive(other.m_isShadowRecive),
 	m_isInstanced(other.m_isInstanced),
     m_terrainMesh(other.m_terrainMesh),
 	m_terrainMaterial(other.m_terrainMaterial),
@@ -126,6 +128,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(PrimitiveRenderProxy&& other) noexcep
     m_EnableLOD(other.m_EnableLOD),
     m_isAnimationEnabled(other.m_isAnimationEnabled),
 	m_isEnableShadow(other.m_isEnableShadow),
+    m_isShadowCast(other.m_isShadowCast),
+    m_isShadowRecive(other.m_isShadowRecive),
     m_isInstanced(other.m_isInstanced),
 	m_terrainMesh(std::exchange(other.m_terrainMesh, nullptr)),
     m_terrainMaterial(std::exchange(other.m_terrainMaterial, nullptr)),
@@ -176,7 +180,7 @@ void PrimitiveRenderProxy::DestroyProxy()
 // [CHANGED] LOD 생성 요청 함수 구현
 void PrimitiveRenderProxy::InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds)
 {
-    if (nullptr == m_Mesh) return;
+    if (nullptr == m_Mesh || false == m_isShadowCast) return;
 
     // 스키닝 메쉬는 LOD를 생성하지 않습니다.
     if (m_isSkinnedMesh)
@@ -207,7 +211,7 @@ uint32_t PrimitiveRenderProxy::GetLODLevel(Camera* camera)
 
 void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 {
-    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+    if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
     if (m_EnableLOD && !m_isSkinnedMesh)
     {
@@ -228,7 +232,7 @@ void PrimitiveRenderProxy::DrawShadow(ID3D11DeviceContext* _deferredContext)
 
 void PrimitiveRenderProxy::DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount)
 {
-    if (nullptr == m_Mesh || nullptr == _deferredContext) return;
+    if (nullptr == m_Mesh || nullptr == _deferredContext || false == m_isShadowCast) return;
 
     if (m_EnableLOD && !m_isSkinnedMesh)
     {

@@ -52,7 +52,7 @@ void PhysicsManager::Shutdown()
 	//모든 객체 제거
 	Physics->ChangeScene();
 	//컨테이너 제거
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
 	//물리 씬 해제
 	Physics->UnInitialize();
@@ -72,7 +72,7 @@ void PhysicsManager::OnLoadScene()
 
 void PhysicsManager::OnUnloadScene()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, info] : Container) 
 	{
 		info.bIsDestroyed = true;
@@ -86,7 +86,7 @@ void PhysicsManager::OnUnloadScene()
 
 void PhysicsManager::ProcessCallback()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [data, type] : m_callbacks) {
 
 		auto lhs = Container.find(data.thisId);
@@ -170,7 +170,7 @@ void PhysicsManager::DrawDebugInfo()
 void PhysicsManager::RayCast(RayEvent& rayEvent)
 {
 	
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -209,7 +209,7 @@ void PhysicsManager::RayCast(RayEvent& rayEvent)
 
 bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -240,7 +240,7 @@ bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 
 int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -477,7 +477,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (box && box->IsDestroyMark())
 	{
 		auto ID = box->GetBoxInfo().colliderInfo.id;
@@ -488,7 +488,7 @@ void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 
 void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (sphere && sphere->IsDestroyMark())
 	{
 		auto ID = sphere->GetSphereInfo().colliderInfo.id;
@@ -499,7 +499,7 @@ void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 
 void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (capsule && capsule->IsDestroyMark())
 	{
 		auto ID = capsule->GetCapsuleInfo().colliderInfo.id;
@@ -510,7 +510,7 @@ void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 
 void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (mesh && mesh->IsDestroyMark())
 	{
 		auto ID = mesh->GetMeshInfo().colliderInfo.id;
@@ -521,7 +521,7 @@ void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 
 void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (controller && controller->IsDestroyMark())
 	{
 		auto ID = controller->GetControllerInfo().id;
@@ -532,7 +532,7 @@ void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 
 void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (terrain && terrain->IsDestroyMark())
 	{
 		auto ID = terrain->GetColliderID();
@@ -548,7 +548,7 @@ void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 
 void PhysicsManager::SetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, colliderInfo] : Container) 
 	{
 		if (colliderInfo.bIsDestroyed)
@@ -648,7 +648,7 @@ void PhysicsManager::SetPhysicData()
 //PxScene --> GameScene
 void PhysicsManager::GetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, ColliderInfo] : Container) {
 		
 		if(nullptr == ColliderInfo.gameObject)

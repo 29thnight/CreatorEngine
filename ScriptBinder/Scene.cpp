@@ -1078,6 +1078,12 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 void Scene::SetInternalPhysicData()
 {
+	std::erase_if(m_colliderContainer,
+		[&](const auto& pair)
+		{
+			return pair.second.bIsDestroyed == true;
+		});
+
 	std::unordered_map<GameObject*, EBodyType> m_bodyType;
 
 	for (auto& rigid : m_rigidBodyComponents)

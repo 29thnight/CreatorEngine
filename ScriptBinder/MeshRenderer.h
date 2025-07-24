@@ -43,6 +43,10 @@ public:
     [[Property]]
 	bool m_isSkinnedMesh{ false };
     [[Property]]
+    bool m_shadowRecive = true;
+	[[Property]]
+    bool m_shadowCast = true;
+    [[Property]]
     bool m_isEnableLOD{ false };
 
 private:
