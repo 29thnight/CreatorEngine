@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "Core.Mathf.h"
 
 class GameObject;
 struct HitResult {
