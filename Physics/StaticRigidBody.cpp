@@ -9,11 +9,17 @@ StaticRigidBody::StaticRigidBody(EColliderType collidreType, unsigned int id, un
 
 StaticRigidBody::~StaticRigidBody()
 {
-	CollisionData* data = static_cast<CollisionData*>(m_rigidStatic->userData);
-	data->isDead = true;
-	physx::PxShape* shape;
-	m_rigidStatic->getShapes(&shape, 1);
-	m_rigidStatic->detachShape(*shape);
+	if (m_rigidStatic) // 추가: nullptr 체크
+	{
+		// Physics->RemoveCollisionData(m_id); // 이 줄 제거
+
+		physx::PxShape* shape;
+		m_rigidStatic->getShapes(&shape, 1);
+		if (shape) // 추가: shape 유효성 확인
+		{
+			m_rigidStatic->detachShape(*shape);
+		}
+	}
 }
 
 bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shape, physx::PxPhysics* physics, CollisionData* data)
@@ -28,9 +34,6 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 		shape->setFlag(physx::PxShapeFlag::eTRIGGER_SHAPE, true);
 	}
 
-	data->thisId = m_id;
-	data->thisLayerNumber = m_layerNumber;
-	shape->userData = data;
 	shape->setContactOffset(0.02f);
 	shape->setRestOffset(0.01f);
 
@@ -52,6 +55,9 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 		Debug->LogError("StaticRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
+	data->thisId = m_id;
+	data->thisLayerNumber = m_layerNumber;
+	shape->userData = data; // 이 위치로 이동
 
 	return true;
 }
@@ -66,15 +72,19 @@ void StaticRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* co
 	m_layerNumber = layerNumber;
 
 	physx::PxShape* shape;
+	if (!m_rigidStatic) return; // 추가: m_rigidStatic 유효성 확인
 	m_rigidStatic->getShapes(&shape, 1);
 
-	physx::PxFilterData filterData;
-	filterData.word0 = layerNumber;
-	filterData.word1 = collisionMatrix[layerNumber];
-	shape->setSimulationFilterData(filterData);
+	if (shape && shape->userData != nullptr) // 추가: shape 및 userData 유효성 확인
+	{
+		physx::PxFilterData filterData;
+		filterData.word0 = layerNumber;
+		filterData.word1 = collisionMatrix[layerNumber];
+		shape->setSimulationFilterData(filterData);
 
-	auto userData = static_cast<CollisionData*>(shape->userData);
-	userData->thisLayerNumber = layerNumber;
+		auto userData = static_cast<CollisionData*>(shape->userData);
+		userData->thisLayerNumber = layerNumber;
+	}
 }
 
 void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix)
@@ -94,7 +104,10 @@ void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale,
 	physx::PxShape* shape;
 	physx::PxMaterial* material;
 
+	if (!m_rigidStatic) return; // 추가: m_rigidStatic 유효성 확인
 	m_rigidStatic->getShapes(&shape, 1);
+	if (!shape) return; // 추가: shape 유효성 확인
+	
 	shape->getMaterials(&material, 1);
 	void* userData = shape->userData;
 
@@ -105,6 +118,7 @@ void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale,
 		boxGeometry.halfExtents.y = m_Extent.y * m_scale.y;
 		boxGeometry.halfExtents.z = m_Extent.z * m_scale.z;
 		m_rigidStatic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidStatic, boxGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eSPHERE)
@@ -113,6 +127,7 @@ void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale,
 		float maxScale = std::max<float>(m_scale.x, std::max<float>(m_scale.y, m_scale.z));
 		sphereGeometry.radius = m_radius * maxScale;
 		m_rigidStatic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidStatic, sphereGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCAPSULE)
@@ -121,6 +136,7 @@ void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale,
 		capsuleGeometry.halfHeight = m_halfHeight * m_scale.y;
 		capsuleGeometry.radius = m_radius * m_scale.x;
 		m_rigidStatic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidStatic, capsuleGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eCONVEXMESH)
@@ -130,6 +146,7 @@ void StaticRigidBody::SetConvertScale(const DirectX::SimpleMath::Vector3& scale,
 		convexMeshGeometry.scale.scale.y = m_scale.y;
 		convexMeshGeometry.scale.scale.z = m_scale.z;
 		m_rigidStatic->detachShape(*shape);
+		if (userData) // 추가: userData 유효성 확인
 		UpdateShapeGeometry(m_rigidStatic, convexMeshGeometry, physics, material, collisionMatrix, userData);
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eTRIANGLEMESH)

@@ -275,7 +275,6 @@
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="Object.h" />
-    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RegisterReflect.def" />

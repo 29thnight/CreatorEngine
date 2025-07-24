@@ -477,3 +477,5 @@ EngineVersion.h
 /Dynamic_CPP/Assets/VolumeticFog/
 /Dynamic_CPP/Assets/imgui.ini
 *.ini
+GEMINI.md
+gemini_worker/

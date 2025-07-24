@@ -79,14 +79,15 @@ public:
 	}
 
 
-	/*EColliderType GetColliderType() const
+	EColliderType GetColliderType() const
 	{
 		return m_type;
 	}
 	void SetColliderType(EColliderType type)
 	{
 		m_type = type;
-	}*/
+	}
+
 	CapsuleColliderInfo GetCapsuleInfo()
 	{
 		if (m_radius != 0.0f)
@@ -153,8 +154,7 @@ public:
 		return m_rotOffset;
 	}
 
-	/*void SetIsTrigger(bool isTrigger) override;
-	bool GetIsTrigger() override;*/
+	
 
 	//콜리전 이벤트
 	void OnTriggerEnter(ICollider* other) override;
@@ -164,7 +164,7 @@ public:
 	void OnCollisionStay(ICollider* other) override;
 	void OnCollisionExit(ICollider* other) override;
 private:
-	//EColliderType m_type;
+	EColliderType m_type;
 	int m_collsionCount{ 0 };
 	CapsuleColliderInfo m_Info;
 };
