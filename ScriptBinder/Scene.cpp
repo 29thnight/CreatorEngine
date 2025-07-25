@@ -83,7 +83,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     
     if (parentIndex >= m_SceneObjects.size())
     {
-        parentIndex = -1; //&&&&&
+        parentIndex = -1; 
     }
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
@@ -591,7 +591,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); //&&&&&trigger
+				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); 
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,

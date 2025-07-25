@@ -72,6 +72,7 @@ namespace InternalPath
 	inline file::path TerrainSourcePath{};
 	inline file::path DumpPath{};
 	inline file::path NodeEditorPath{};
+	inline file::path InputMapPath{};
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -103,6 +104,7 @@ namespace InternalPath
 
 		TerrainSourcePath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
 		NodeEditorPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
+		InputMapPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
 		//dir not exist -> create dir
 		if (!file::exists(DumpPath))
 		{
@@ -153,6 +155,14 @@ namespace InternalPath
 			file::create_directories(TerrainSourcePath);
 		}
 		
+		if (!file::exists(NodeEditorPath))
+		{
+			file::create_directories(NodeEditorPath);
+		}
+		if (!file::exists(InputMapPath))
+		{
+			file::create_directories(InputMapPath);
+		}
 		
     }
 };
@@ -243,5 +253,9 @@ public:
 	static inline file::path NodeEditorPath(const std::string_view& path)
 	{
 		return file::path(InternalPath::NodeEditorPath) / path;
+	}
+	static inline file::path InputMapPath(const std::string_view& path)
+	{
+		return file::path(InternalPath::InputMapPath) / path;
 	}
 };

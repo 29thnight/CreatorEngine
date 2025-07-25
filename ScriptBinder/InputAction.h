@@ -10,7 +10,7 @@ enum class ActionType
 	Button,
 };
 AUTO_REGISTER_ENUM(ActionType);
-extern std::string ActionTypeString(ActionType _actionType);
+
 
 enum class InputValueType
 {
@@ -22,15 +22,21 @@ AUTO_REGISTER_ENUM(InputValueType);
 
 struct InputValue
 {
-	float fValue;
-	Mathf::Vector2 v2Value;
+	float fValue =0;
+	Mathf::Vector2 v2Value = { 0,0 };
 };
 
-
+extern std::string ActionTypeString(ActionType _actionType);
+extern ActionType ParseActionType(const std::string& str);
 extern std::string InputTypeString(InputType _inputType);
+extern InputType ParseInputType(const std::string& str);
 extern std::string KeyStateString(KeyState _keyState);
+extern KeyState ParseKeyState(const std::string& str);
 extern std::string ControllerButtonString(ControllerButton _btn);
+extern ControllerButton ParseControllerButton(const std::string& str);
 extern std::string KeyBoardString(KeyBoard _key);
+extern KeyBoard ParseKeyBoard(const std::string& str);
+
 class InputAction
 {
 public:
@@ -38,6 +44,8 @@ public:
 	[[Serializable]]
 	InputAction() = default;
 
+
+	[[Property]]
 	std::string actionName;
 
 	InputType inputType= InputType::KeyBoard; //keyboard ,mouse ,gamepad
@@ -98,11 +106,18 @@ public:
 	std::vector<size_t> key = { 0 };
 	void SetKey(std::vector<size_t> _key) { key = _key; };
 	void SetControllerButton(ControllerButton _btn);
-	size_t playerIndex = 0;
 
 
-	InputValue value;
-	std::string objName;
+	size_t playerIndex = 0; //from player input component 
+
+
+	InputValue value; //0
+	std::string objName; //필요없음
+
+	//자기 식별이름
+	
+
+	//실행함 함수이름 Attak
 	[[Property]]
 	std::string funName;
 

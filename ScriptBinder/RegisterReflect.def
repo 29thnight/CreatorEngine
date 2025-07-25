@@ -61,9 +61,9 @@
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
-#include "PlayerInput.h"
 #include "UIButton.h"
 #include "Prefab.h"
+#include "PlayerInput.h"
 #include "Terrain.h"
 #include "TransCondition.h"
 #include "UIComponent.h"
@@ -112,7 +112,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
-    AUTO_REGISTER_CLASS(PlayerInput);
+    AUTO_REGISTER_CLASS(PlayerInputComponent);
     AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RenderPassSettings);

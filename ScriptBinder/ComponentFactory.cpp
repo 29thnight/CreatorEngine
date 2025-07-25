@@ -12,7 +12,7 @@
 #include "NodeEditor.h"
 #include "InvalidScriptComponent.h"
 #include "BehaviorTreeComponent.h"
-
+#include "PlayerInput.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -317,6 +317,15 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(behaviorTree, itNode);
 			behaviorTree->SetOwner(obj);
 		}
+		else if (componentType->typeID == type_guid(PlayerInputComponent))
+		{
+			auto playerinput = static_cast<PlayerInputComponent*>(component);
+			Meta::Deserialize(playerinput, itNode);
+			playerinput->SetOwner(obj);
+
+			
+			playerinput->SetActionMap(playerinput->m_actionMapName);
+			}
 		else
 		{
             Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);

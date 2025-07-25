@@ -1,0 +1,27 @@
+{
+    "actions": [
+        {
+            "actionName": "Test",
+            "actionType": "Button",
+            "funName": "Test",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down"
+        },
+        {
+            "actionName": "Test2",
+            "actionType": "Button",
+            "funName": "Test",
+            "inputType": "KeyBoard",
+            "key0": "A",
+            "key1": "Unknown",
+            "key2": "Unknown",
+            "key3": "Unknown",
+            "keystate": "Down"
+        }
+    ],
+    "mapName": "Player"
+}

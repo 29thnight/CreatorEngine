@@ -6,7 +6,6 @@
 #include "EffectComponent.h"
 #include "pch.h"
 #include <cmath>
-
 GameObject* testObject = nullptr;
 EffectComponent* effectComponent = nullptr;
 
@@ -19,9 +18,9 @@ void TestBehavior::Start()
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
 
-	testObject = SceneManagers->GetActiveScene()->CreateGameObject("TestObject").get();
-	effectComponent = testObject->AddComponent<EffectComponent>();
-	effectComponent->m_effectTemplateName = "Eft";
+
+
+	testObject = GetOwner();
 }
   
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -54,15 +53,15 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-	if(!effectComponent->m_isPlaying)
-	{
-		effectComponent->Apply();
-	}
-
 }
 
 void TestBehavior::LateUpdate(float tick)
 {
+}
+
+void TestBehavior::Test()
+{
+	std::cout << "Test input" << std::endl;
 }
 
 void TestBehavior::Move(Mathf::Vector2 value)

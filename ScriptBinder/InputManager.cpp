@@ -79,7 +79,23 @@ std::vector<KeyBoard> keyboradsss =
     KeyBoard::Numpad9,
     KeyBoard::None,
 };
-
+std::vector<ControllerButton> controllerButtons =
+{
+    ControllerButton::A,
+    ControllerButton::B,
+    ControllerButton::X,
+    ControllerButton::Y,
+    ControllerButton::DPAD_DOWN,
+    ControllerButton::DPAD_LEFT,
+    ControllerButton::DPAD_RIGHT,
+    ControllerButton::DPAD_UP,
+    ControllerButton::START_BUTTON,
+    ControllerButton::BACK_BUTTON,
+    ControllerButton::LEFT_SHOULDER,
+    ControllerButton::RIGHT_SHOULDER,
+    ControllerButton::LEFT_Thumbstick,
+    ControllerButton::RIGHT_Thumbstick,
+};
 
 bool InputManager::Initialize(HWND _hwnd)
 {

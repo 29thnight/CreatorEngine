@@ -28,6 +28,8 @@ public:
 	[[Property]]
 	std::string testString = "TestBehavior";
 
+	[[Method]]
+	void Test();
 	Mathf::Vector2 moveDir{};
 	void Move(Mathf::Vector2 value);
 };

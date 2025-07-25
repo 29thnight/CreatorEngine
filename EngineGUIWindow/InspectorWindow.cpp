@@ -18,6 +18,8 @@
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "TagManager.h"
+#include "PlayerInput.h"
+#include "InputActionManager.h"
 //----------------------------
 #include "NodeFactory.h"
 #include "StateMachineComponent.h"
@@ -546,6 +548,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						if (nullptr != bt)
 						{
 							ImGuiDrawHelperBT(bt);
+						}
+					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<PlayerInputComponent>())
+					{
+						PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
+						if (nullptr != input)
+						{
+							ImGuiDrawHelperPlayerInput(input);
 						}
 					}
 					else if (type)
@@ -1298,7 +1308,7 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 					ImGui::EndChild();
 					ImGui::SameLine();
-					ImGui::BeginChild("Inspector Info", ImVec2(0, 500), false);
+					ImGui::BeginChild("Inspector Info", ImVec2(400, 500), false);
 					ImGui::Text("Inspector");
 					ImGui::Separator();
 					if (preSelectIndex != selectedControllerIndex)
@@ -1694,6 +1704,38 @@ void InspectorWindow::ImGuiDrawHelperAnimator(Animator* animator)
 
 		}
 	}
+}
+
+void InspectorWindow::ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInput)
+{
+	if (playerInput)
+	{
+		
+		ImGui::InputInt("Player Index", &playerInput->controllerIndex);
+
+		ImGui::Text("Action Map");
+		ImGui::SameLine();
+		if (ImGui::Button(playerInput->m_actionMapName.c_str(), ImVec2(140, 0)))
+		{
+			ImGui::OpenPopup("selectMap");
+		}
+
+		if (ImGui::BeginPopup("selectMap"))
+		{
+			for (auto& actionMap : InputActionManagers->m_actionMaps)
+			{
+				ImGui::PushID(actionMap);
+				if (ImGui::MenuItem(actionMap->m_name.c_str()))
+				{
+					playerInput->SetActionMap(actionMap);
+				}
+				ImGui::PopID();
+			}
+			ImGui::EndPopup();
+		}
+
+	}
+
 }
 
 void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)

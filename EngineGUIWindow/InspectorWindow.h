@@ -9,7 +9,7 @@ class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
-
+class PlayerInputComponent;
 class TerrainComponent;
 
 class StateMachineComponent;
@@ -29,6 +29,7 @@ private:
 	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
 	void ImGuiDrawHelperAnimator(Animator* animator);
 
+	void ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInput);
 	//void DrawMyLink(std::string linkName, std::string from, std::string to);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 

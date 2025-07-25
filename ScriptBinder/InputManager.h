@@ -83,7 +83,7 @@ enum class KeyBoard
 };
 
 extern std::vector<KeyBoard> keyboradsss;
-
+extern std::vector<ControllerButton> controllerButtons;
 
 using namespace Microsoft::WRL;
 class InputManager : public Singleton<InputManager>

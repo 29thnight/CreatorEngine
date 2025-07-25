@@ -14,6 +14,13 @@ std::string ActionTypeString(ActionType _actionType)
 	}
 }
 
+ActionType ParseActionType(const std::string& str)
+{
+    if (str == "Value") return ActionType::Value;
+    if (str == "Button") return ActionType::Button;
+    return ActionType::Button;
+}
+
 std::string InputTypeString(InputType _inputType)
 {
 
@@ -30,6 +37,14 @@ std::string InputTypeString(InputType _inputType)
 	}
 }
 
+InputType ParseInputType(const std::string& str)
+{
+    if (str == "GamePad")   return InputType::GamePad;
+    if (str == "KeyBoard")  return InputType::KeyBoard;
+    if (str == "Mouse")     return InputType::Mouse;
+    return InputType::KeyBoard;
+}
+
 std::string KeyStateString(KeyState _keyState)
 {
 	switch (_keyState)
@@ -43,6 +58,14 @@ std::string KeyStateString(KeyState _keyState)
     default:
         return "Idle";
 	}
+}
+
+KeyState ParseKeyState(const std::string& str)
+{
+    if (str == "Down")     return KeyState::Down;
+    if (str == "Pressed")  return KeyState::Pressed;
+    if (str == "Released") return KeyState::Released;
+    return KeyState::Down; // 기본값 또는 오류 처리용
 }
 
 std::string ControllerButtonString(ControllerButton _btn)
@@ -67,6 +90,27 @@ std::string ControllerButtonString(ControllerButton _btn)
 	case ControllerButton::MAX:              return "MAX";
 	default:                                 return "Unknown";
 	}
+}
+
+ControllerButton ParseControllerButton(const std::string& str)
+{
+    if (str == "A")                return ControllerButton::A;
+    if (str == "B")                return ControllerButton::B;
+    if (str == "X")                return ControllerButton::X;
+    if (str == "Y")                return ControllerButton::Y;
+    if (str == "DPad Up")          return ControllerButton::DPAD_UP;
+    if (str == "DPad Down")        return ControllerButton::DPAD_DOWN;
+    if (str == "DPad Left")        return ControllerButton::DPAD_LEFT;
+    if (str == "DPad Right")       return ControllerButton::DPAD_RIGHT;
+    if (str == "Start")            return ControllerButton::START_BUTTON;
+    if (str == "Back")             return ControllerButton::BACK_BUTTON;
+    if (str == "Left Shoulder")    return ControllerButton::LEFT_SHOULDER;
+    if (str == "Right Shoulder")   return ControllerButton::RIGHT_SHOULDER;
+    if (str == "Left Thumbstick")  return ControllerButton::LEFT_Thumbstick;
+    if (str == "Right Thumbstick") return ControllerButton::RIGHT_Thumbstick;
+    if (str == "None")             return ControllerButton::None;
+    if (str == "MAX")              return ControllerButton::MAX;
+    return ControllerButton::None; // 기본값 혹은 오류 처리용
 }
 
 std::string KeyBoardString(KeyBoard _key)
@@ -159,6 +203,93 @@ std::string KeyBoardString(KeyBoard _key)
     }
 
 
+}
+
+KeyBoard ParseKeyBoard(const std::string& str)
+{
+    if (str == "A")               return KeyBoard::A;
+    if (str == "B")               return KeyBoard::B;
+    if (str == "C")               return KeyBoard::C;
+    if (str == "D")               return KeyBoard::D;
+    if (str == "E")               return KeyBoard::E;
+    if (str == "F")               return KeyBoard::F;
+    if (str == "G")               return KeyBoard::G;
+    if (str == "H")               return KeyBoard::H;
+    if (str == "I")               return KeyBoard::I;
+    if (str == "J")               return KeyBoard::J;
+    if (str == "K")               return KeyBoard::K;
+    if (str == "L")               return KeyBoard::L;
+    if (str == "M")               return KeyBoard::M;
+    if (str == "N")               return KeyBoard::N;
+    if (str == "O")               return KeyBoard::O;
+    if (str == "P")               return KeyBoard::P;
+    if (str == "Q")               return KeyBoard::Q;
+    if (str == "R")               return KeyBoard::R;
+    if (str == "S")               return KeyBoard::S;
+    if (str == "T")               return KeyBoard::T;
+    if (str == "U")               return KeyBoard::U;
+    if (str == "V")               return KeyBoard::V;
+    if (str == "W")               return KeyBoard::W;
+    if (str == "X")               return KeyBoard::X;
+    if (str == "Y")               return KeyBoard::Y;
+    if (str == "Z")               return KeyBoard::Z;
+
+    if (str == "Left Arrow")      return KeyBoard::LeftArrow;
+    if (str == "Up Arrow")        return KeyBoard::UpArrow;
+    if (str == "Right Arrow")     return KeyBoard::RightArrow;
+    if (str == "Down Arrow")      return KeyBoard::DownArrow;
+
+    if (str == "Space")           return KeyBoard::Space;
+    if (str == "Left Control")    return KeyBoard::LeftControl;
+    if (str == "Right Control")   return KeyBoard::RightControl;
+    if (str == "Left Shift")      return KeyBoard::LeftShift;
+    if (str == "Right Shift")     return KeyBoard::RightShift;
+    if (str == "Left Alt")        return KeyBoard::LeftAlt;
+    if (str == "Right Alt")       return KeyBoard::RightAlt;
+
+    if (str == "Enter")           return KeyBoard::Enter;
+    if (str == "Backspace")       return KeyBoard::Backspace;
+    if (str == "Tab")             return KeyBoard::Tab;
+    if (str == "Escape")          return KeyBoard::Escape;
+    if (str == "Caps Lock")       return KeyBoard::CapsLock;
+
+    if (str == "Insert")          return KeyBoard::Insert;
+    if (str == "Delete")          return KeyBoard::Delete;
+    if (str == "Home")            return KeyBoard::Home;
+    if (str == "End")             return KeyBoard::End;
+    if (str == "Page Up")         return KeyBoard::PageUp;
+    if (str == "Page Down")       return KeyBoard::PageDown;
+
+    if (str == "Num Lock")        return KeyBoard::NumLock;
+    if (str == "Scroll Lock")     return KeyBoard::ScrollLock;
+
+    if (str == "F1")              return KeyBoard::F1;
+    if (str == "F2")              return KeyBoard::F2;
+    if (str == "F3")              return KeyBoard::F3;
+    if (str == "F4")              return KeyBoard::F4;
+    if (str == "F5")              return KeyBoard::F5;
+    if (str == "F6")              return KeyBoard::F6;
+    if (str == "F7")              return KeyBoard::F7;
+    if (str == "F8")              return KeyBoard::F8;
+    if (str == "F9")              return KeyBoard::F9;
+    if (str == "F10")             return KeyBoard::F10;
+    if (str == "F11")             return KeyBoard::F11;
+    if (str == "F12")             return KeyBoard::F12;
+
+    if (str == "Numpad 0")        return KeyBoard::Numpad0;
+    if (str == "Numpad 1")        return KeyBoard::Numpad1;
+    if (str == "Numpad 2")        return KeyBoard::Numpad2;
+    if (str == "Numpad 3")        return KeyBoard::Numpad3;
+    if (str == "Numpad 4")        return KeyBoard::Numpad4;
+    if (str == "Numpad 5")        return KeyBoard::Numpad5;
+    if (str == "Numpad 6")        return KeyBoard::Numpad6;
+    if (str == "Numpad 7")        return KeyBoard::Numpad7;
+    if (str == "Numpad 8")        return KeyBoard::Numpad8;
+    if (str == "Numpad 9")        return KeyBoard::Numpad9;
+
+    if (str == "None")            return KeyBoard::None;
+
+    return KeyBoard::A; // 기본값 혹은 에러 처리용
 }
 
 void InputAction::SetControllerButton(ControllerButton _btn)
