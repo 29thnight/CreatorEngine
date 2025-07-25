@@ -1662,7 +1662,7 @@ void MenuBarWindow::SHowInputActionMap()
     static int preseletedActionIndex = -1;
     static int seletedActionIndex = -1;
     static int editingActionIndex = -1;
-   
+    static int index = 0;
     if (m_bShowInputActionMapWindow)
     {
         ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
@@ -1749,11 +1749,14 @@ void MenuBarWindow::SHowInputActionMap()
         ImGui::BeginChild("Actions", ImVec2(300, 0), true); 
         ImGui::Text("Actions");
         ImGui::SameLine();
-        if (ImGui::Button("+"))
+        if (seletedActionMapIndex != -1)
         {
-            if (seletedActionMapIndex != -1)
+            if (ImGui::Button("+"))
             {
-                InputActionManagers->m_actionMaps[seletedActionMapIndex]->AddAction();
+                if (seletedActionMapIndex != -1)
+                {
+                    InputActionManagers->m_actionMaps[seletedActionMapIndex]->AddAction();
+                }
             }
         }
         ImGui::Separator();
@@ -1873,7 +1876,7 @@ void MenuBarWindow::SHowInputActionMap()
                     {
                         if (ImGui::Button("KeyBoard Key chull"))
                         {
-
+                            index = 0;
                         }
                     }
                     else if (action->inputType == InputType::GamePad)
@@ -1905,7 +1908,7 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("LeftKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(1);
-                            if (ImGui::Button("KeyBoard1"))
+                            if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[0])).c_str()))
                             {
                                 ImGui::PopID();
                                 //첫번째키
@@ -2001,7 +2004,6 @@ void MenuBarWindow::SHowInputActionMap()
             std::string popupName = "KeyBaordButtonFloat";
             if (ImGui::BeginPopup(popupName.c_str()))
             {
-                static int index = 0;
                 if (InputManagement->IsWheelDown())
                 {
                     

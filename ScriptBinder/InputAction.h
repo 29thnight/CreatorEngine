@@ -40,18 +40,62 @@ public:
 
 	std::string actionName;
 
-	InputType inputType; //keyboard ,mouse ,gamepad
+	InputType inputType= InputType::KeyBoard; //keyboard ,mouse ,gamepad
 	void SetInputType(InputType _inputType) {inputType = _inputType;}
 	
 	ActionType actionType = ActionType::Button; //value , button
-	void SetActionType(ActionType _actionType) { actionType = _actionType; };
-	KeyState  keystate;  //press hold 
+	void SetActionType(ActionType _actionType)
+	{ 
+		actionType = _actionType;
+		if (actionType == ActionType::Button)
+		{
+			key.clear();
+			key.resize(4);
+			if (inputType == InputType::KeyBoard)
+			{
+				key[0] = static_cast<size_t>(KeyBoard::A);
+			}
+			else if (inputType == InputType::GamePad)
+			{
+				key[0] = static_cast<size_t>(ControllerButton::A);
+			}
+			else if (inputType == InputType::Mouse)
+			{
+				key[0] = static_cast<size_t>(MouseKey::LEFT);
+			}
+		}
+		else if (actionType == ActionType::Value)
+		{
+			SetValueType(InputValueType::Vector2);
+			key.clear();
+			key.resize(4);
+			if (inputType == InputType::KeyBoard)
+			{
+				key[0] = static_cast<size_t>(KeyBoard::A);
+				key[1] = static_cast<size_t>(KeyBoard::B);
+				key[2] = static_cast<size_t>(KeyBoard::C);
+				key[3] = static_cast<size_t>(KeyBoard::D);
+			}
+			else if (inputType == InputType::GamePad)
+			{
+				SetControllerButton(ControllerButton::LEFT_Thumbstick);
+			}
+			else if (inputType == InputType::Mouse) //»ç½Ç»ó ¸ø¾¸ ¤·¤·
+			{
+				key[0] = static_cast<size_t>(MouseKey::LEFT);
+				key[1] = static_cast<size_t>(MouseKey::LEFT);
+				key[2] = static_cast<size_t>(MouseKey::LEFT);
+				key[3] = static_cast<size_t>(MouseKey::LEFT);
+			}
+		}
+	};
+	KeyState  keystate  = KeyState::Down;  //down hold 
 	void SetKeyState(KeyState _keyState) { keystate = _keyState; };
 
-	InputValueType valueType = InputValueType::None;   // float ,vector2
+	InputValueType valueType = InputValueType::Vector2;   // float ,vector2
 	void SetValueType(InputValueType _inputValueType) { valueType = _inputValueType; };
 
-	std::vector<size_t> key;
+	std::vector<size_t> key = { 0 };
 	void SetKey(std::vector<size_t> _key) { key = _key; };
 	void SetControllerButton(ControllerButton _btn);
 	size_t playerIndex = 0;

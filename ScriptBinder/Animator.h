@@ -39,7 +39,6 @@ public:
     [[Method]]
     void UpdateAnimation();
     void CreateController(std::string name);
-    [[Method]]
     void CreateController_UI();
     void DeleteController(int index);
     void DeleteController(std::string controllerName);

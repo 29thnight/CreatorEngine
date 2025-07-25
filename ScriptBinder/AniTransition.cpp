@@ -18,16 +18,41 @@ AniTransition::~AniTransition()
 
 bool AniTransition::CheckTransiton()
 {
-	if (conditions.empty() && m_ownerController->endAnimation == true)
+	if (hasExitTime) //최소 탈출시간 있을때
 	{
-		return true;
+		if (conditions.empty()) //탈출시간은 있는대 조건없으면 탈출시간되면 탈출
+		{
+			if (GetExitTime() <= m_ownerController->curAnimationProgress)
+				return true;
+		}
+		else  //탈출시간 + 조건있으면 둘다만족해야 탈출
+		{
+			if (GetExitTime() <= m_ownerController->curAnimationProgress)
+			{
+				for (auto& condition : conditions)
+				{
+					if (true == condition.CheckTrans())
+						return true;
+				}
+			}
+		}
 	}
-	for (auto& condition : conditions)
+	else   //없을떄
 	{
-		if (true == condition.CheckTrans())
-			return true;
+		if (conditions.empty()) //탈출시간은 없고 조건없으면 애니메이션 끝나면탈출 loop면 탈출불가
+		{
+			if (m_ownerController->endAnimation)
+				return true;
+		}
+		else  //탈출 시간없고 조건있으면 조건만족시 탈출
+		{
+			for (auto& condition : conditions)
+			{
+				if (true == condition.CheckTrans())
+					return true;
+			}
+		}
 	}
-
 	return false;
 }
 

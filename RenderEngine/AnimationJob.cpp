@@ -81,6 +81,7 @@ void AnimationJob::Update(float deltaTime)
                     if (animation.m_isLoop == true)
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
+                        animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     }
                     else
                     {
@@ -92,9 +93,8 @@ void AnimationJob::Update(float deltaTime)
                         }
                         
                     }
-                    auto& anim = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    anim.preAnimationProgress = anim.curAnimationProgress;
-                    anim.curAnimationProgress = animationcontroller->curAnimationProgress;
+                    animation.preAnimationProgress = animation.curAnimationProgress;
+                    animation.curAnimationProgress = animationcontroller->curAnimationProgress;
                     XMMATRIX rootTransform = skeleton->m_rootTransform;
                     if (animationcontroller->m_isBlend)
                     {
@@ -118,52 +118,89 @@ void AnimationJob::Update(float deltaTime)
             }
             else
             {
-                Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
-                animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
                 AnimationController* animationcontroller = nullptr;
-                if (!animator->m_animationControllers.empty())
+                if (animator->m_animationControllers.empty()) //아예없으면
                 {
-                    animationcontroller = animator->m_animationControllers[0].get();
-                    animationcontroller->curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
-                    if (!animationcontroller->useController) animationcontroller = nullptr;
-                }
-                if (animation.m_isLoop == true)
-                {
-                    animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-                }
-                else
-                {
-                    if (animator->m_TimeElapsed >= animation.m_duration)
+                    Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
+                    animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+
+                    if (animation.m_isLoop == true)
                     {
-                        animator->m_TimeElapsed = animation.m_duration;
-                        if (animationcontroller)
+                        animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
+                    }
+                    else
+                    {
+                        if (animator->m_TimeElapsed >= animation.m_duration)
                         {
-                            if (animationcontroller->curAnimationProgress >= 0.95)
-                                animationcontroller->endAnimation = true;
+                            animator->m_TimeElapsed = animation.m_duration;
                         }
                     }
-                }
-                animation.preAnimationProgress = animation.curAnimationProgress;
-                animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
-                XMMATRIX rootTransform = skeleton->m_rootTransform;
-                if (animator->m_isBlend)
-                {
-                    if (animator->nextAnimIndex == -1)
+                    animation.preAnimationProgress = animation.curAnimationProgress;
+                    animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
+                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+                    if (animator->m_isBlend)
                     {
-                        //Debug->Log("다음애니메이션인덱스를확인해주세요");
-                        return;
+                        if (animator->nextAnimIndex == -1)
+                        {
+                            //Debug->Log("다음애니메이션인덱스를확인해주세요");
+                            return;
+                        }
+                        Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
+                        animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
+                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
                     }
-                        
-                    Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
-                    animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
-                    animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
-                    UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
+                    else
+                    {
+                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed);
+                    }
+                    animation.InvokeEvent(animator);
                 }
-                else
+                else //한개만 있으면
                 {
-                    UpdateBone(skeleton->m_rootBone, *animator, animationcontroller,rootTransform, (*animator).m_TimeElapsed);
+                    animationcontroller = animator->m_animationControllers[0].get();
+                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
+                    animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
+                    if (animation.m_isLoop == true)
+                    {
+                        animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
+                    }
+                    else
+                    {
+                        if (animationcontroller->curAnimationProgress >= 0.95)
+                            animationcontroller->endAnimation = true;
+                        if (animationcontroller->m_timeElapsed >= animation.m_duration)
+                        {
+                            animationcontroller->m_timeElapsed = animation.m_duration;
+                        }
+
+                    }
+
+                    //auto& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
+                    animation.preAnimationProgress = animation.curAnimationProgress;
+                    animation.curAnimationProgress = animationcontroller->curAnimationProgress;
+                    XMMATRIX rootTransform = skeleton->m_rootTransform;
+
+                    if (animator->m_isBlend)
+                    {
+                        if (animator->nextAnimIndex == -1)
+                        {
+                            //Debug->Log("다음애니메이션인덱스를확인해주세요");
+                            return;
+                        }
+                        Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
+                        animationcontroller->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
+                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
+                    }
+                    else
+                    {
+                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
+                    }
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
                 }
-                animation.InvokeEvent(animator);
+                
             }
 
             if (skeleton->HasSocket())
@@ -333,33 +370,28 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     bool isCalculAnimate = true;
     XMMATRIX globalTransform{};
     
-    std::string& boneName2 = bone->m_name;
     Animation* animation;
 
-
-
-
-    auto controller2 = animator.m_animationControllers[1];
-    if (controller2)
+    bool hasAnyAnimation = false;
+    for (auto& precontroller : animator.m_animationControllers)
     {
-        
-        animation = &skeleton->m_animations[controller2->GetAnimationIndex()];
-        //auto mask = controller2->GetAvatarMask();
+        animation = &skeleton->m_animations[precontroller->GetAnimationIndex()];
+        auto it = animation->m_nodeAnimations.find(boneName);
+        if (it != animation->m_nodeAnimations.end())
+        {
+            hasAnyAnimation = true;
+            break;
+        }
     }
-    else
-    {
-        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
-    }
-    auto it = animation->m_nodeAnimations.find(boneName2);
-    if (it == animation->m_nodeAnimations.end())
+
+    if (!hasAnyAnimation)
     {
         for (Bone* child : bone->m_children)
-        {
             UpdateBoneLayer(child, animator, parentTransform);
-        }
         return;
     }
- 
+
+
     for (auto& controller : animator.m_animationControllers)
     {
         auto mask = controller->GetAvatarMask();
@@ -402,7 +434,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     }
     //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-
+    
     if (skeleton->HasSocket())
     {
         for (auto& socket : skeleton->m_sockets)

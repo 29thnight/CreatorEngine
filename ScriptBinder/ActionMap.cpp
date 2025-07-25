@@ -20,6 +20,8 @@ void ActionMap::AddAction()
 	}
 	InputAction* newAction = new InputAction();
 	newAction->actionName = finalName;
+	newAction->key.clear();
+	newAction->key.resize(4);
 	m_actions.push_back(newAction);
 }
 

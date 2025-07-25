@@ -26,10 +26,14 @@ bool AnimationController::BlendingAnimation(float tick)
 	m_owner->blendT = std::clamp(t, 0.0f, 1.0f);
 	if (blendingTime >= m_curTrans->GetBlendTime()) //블렌드 타임이 끝나면 블렌드종료 -> 다음애니메이션만 계산
 	{
+		//endAnimation = false;
+		m_curState = m_nextState;
+		m_nextState = nullptr;
 		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
 		m_AnimationIndex = m_nextAnimationIndex;
 
 		m_timeElapsed = m_nextTimeElapsed;
+		m_nextTimeElapsed = 0.f;
 		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
 
 		m_owner->nextAnimIndex = -1;
@@ -85,13 +89,10 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	}
 
 	if (m_curState->Transitions.empty()) return nullptr;
+
+	
 	for (auto& trans : m_curState->Transitions)
 	{
-		if (trans->hasExitTime)
-		{
-			if (trans->GetExitTime() >= curAnimationProgress)
-				continue;
-		}
 		if (true == trans->CheckTransiton())
 		{
 			return trans;
@@ -104,27 +105,33 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 void AnimationController::UpdateState()
 {
 
+	
 	auto trans = CheckTransition();
+	if (needBlend)
+	{
+		trans = nullptr;
+	}
 	//전이가있으면 애니메이션 블렌딩시작 //블렌딩없는 강제변화있을경우 추가필요*****
 	if (nullptr != trans)
 	{
 		endAnimation = false;
-		//새전이가있는대 이전 전이가 진행중이었음
-		if (m_nextAnimationIndex != -1)
+		//curAnimationProgress = 0.f;
+		if (needBlend == true)
 		{
-			
-			m_owner->m_AnimIndexChosen = m_nextAnimationIndex;
+			m_curState = m_nextState;
+			m_nextState = nullptr;
+			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
 			m_AnimationIndex = m_nextAnimationIndex;
-			
-			m_owner->nextAnimIndex = -1;
-			m_nextAnimationIndex = -1;
 
 			m_timeElapsed = m_nextTimeElapsed;
+			m_nextTimeElapsed = 0.f;
 			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
 
+			m_owner->nextAnimIndex = -1;
 			m_owner->m_isBlend = false;
 			m_isBlend = false;
 		}
+		
 
 
 		m_nextState = FindState(trans->GetNextState());
@@ -136,24 +143,27 @@ void AnimationController::UpdateState()
 		m_curState->behaviour->Exit();
 		if (m_nextState->behaviour != nullptr)
 		m_nextState->behaviour->Enter();
-		m_curState = m_nextState;
-		m_nextState = nullptr;
 		m_curTrans = trans.get();
 		needBlend = true;
 		m_owner->m_isBlend = true;
 		m_isBlend = true;
 
-		for (auto& othercontorller : m_owner->m_animationControllers)
+		if (m_owner->m_animationControllers.size() >= 2)
 		{
-			if (!othercontorller->useController) continue;
-			if (othercontorller->name == name) continue;
-			if(othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
-				m_nextTimeElapsed = othercontorller->m_timeElapsed;
-			else
-				m_nextTimeElapsed = 0.0f;
+			for (auto& othercontorller : m_owner->m_animationControllers)
+			{
+				if (!othercontorller->useController) continue;
+				if (othercontorller->name == name) continue;
+				if (othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
+					m_nextTimeElapsed = othercontorller->m_timeElapsed;
+				else
+					m_nextTimeElapsed = 0.0f;
+			}
 		}
-		
-		//m_owner->m_nextTimeElapsed = 0.0f; //*****
+		else
+		{
+			m_nextTimeElapsed = 0.0f;
+		}
 
 		m_owner->blendT = 0.0f;
 		blendingTime = 0.0f;

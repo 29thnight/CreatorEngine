@@ -166,7 +166,7 @@ void InputAction::SetControllerButton(ControllerButton _btn)
 	m_controllerButton = _btn;
 
 	key.clear();
-	key.resize(1);
+	key.resize(4);
 	for (int index = 0; index < key.size(); index++)
 	{
 		key[0] = static_cast<size_t>(_btn);

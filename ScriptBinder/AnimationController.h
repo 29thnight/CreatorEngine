@@ -49,7 +49,6 @@ public:
 	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
 	std::shared_ptr<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
-	[[Method]]
 	void CreateState_UI();
 
 	void DeleteState(std::string stateName);
@@ -65,7 +64,7 @@ public:
 	Animator* m_owner{};
 	float m_timeElapsed;
 	float m_nextTimeElapsed;
-	float m_isBlend;
+	bool m_isBlend = false;
 
 
 

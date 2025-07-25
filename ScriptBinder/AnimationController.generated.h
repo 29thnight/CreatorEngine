@@ -14,9 +14,5 @@ ReflectionField(AnimationController) \
 		meta_property(m_avatarMask) \
 		meta_property(useMask) \
 	}); \
-	MethodField \
-	({ \
-		meta_method(CreateState_UI) \
-	}); \
-	FieldEnd(AnimationController, PropertyAndMethod) \
+	FieldEnd(AnimationController, PropertyOnly) \
 };
