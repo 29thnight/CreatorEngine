@@ -29,6 +29,14 @@ void PhysicsManager::Initialize()
 	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
+	
+	//기본 전체 충돌 매트릭스 설정
+	std::vector<std::vector<uint8_t>> collisionGrid;
+	collisionGrid.resize(32);
+	for (auto& row : collisionGrid) {
+		row.resize(32, 1); // 기본적으로 모든 충돌체가 충돌 가능하도록 설정
+	}
+	SetCollisionMatrix(collisionGrid);
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {
