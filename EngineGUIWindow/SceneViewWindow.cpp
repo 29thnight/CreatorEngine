@@ -114,6 +114,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	};
 	static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
 
+
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
 
@@ -371,6 +372,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
 
 	{
+		auto scene = SceneManagers->GetActiveScene();
         auto& selectedObjects = scene->m_selectedSceneObjects;
 		// 기즈모로 변환된 카메라 위치, 회전 적용
 		XMVECTOR poss;
@@ -392,6 +394,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	auto scene = SceneManagers->GetActiveScene();
 	auto& sceneSelectedObj = scene->m_selectedSceneObject;
+	auto& selectedObjects = scene->m_selectedSceneObjects;
 	static bool useGizmo = false;
 	static float gizmoTimer = 0.f;
 
@@ -434,60 +437,37 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		if (!hits.empty())
 		{
-                        m_hitResults = hits;
+            m_hitResults = hits;
 
-                        GameObject* selected = m_hitResults[m_currentHitIndex].object;
-                        bool shift = ImGui::GetIO().KeyShift;
-                        auto prevList = selectedObjects;
-                        GameObject* prevSelection = sceneSelectedObj;
-                        if (shift)
-                        {
-                                if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
-                                        scene->RemoveSelectedSceneObject(selected);
-                                else
-                                        scene->AddSelectedSceneObject(selected);
-                        }
-                        else
-                        {
-                                scene->ClearSelectedSceneObjects();
-                                scene->AddSelectedSceneObject(selected);
-                        }
+            GameObject* selected = m_hitResults[m_currentHitIndex].object;
+            bool shift = ImGui::GetIO().KeyShift;
+            auto prevList = selectedObjects;
+            GameObject* prevSelection = sceneSelectedObj;
+            if (shift)
+            {
+                if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
+                        scene->RemoveSelectedSceneObject(selected);
+                else
+                        scene->AddSelectedSceneObject(selected);
+            }
+            else
+            {
+                scene->ClearSelectedSceneObjects();
+                scene->AddSelectedSceneObject(selected);
+            }
 
-                        auto newList = scene->m_selectedSceneObjects;
-                        GameObject* newSelection = scene->m_selectedSceneObject;
-                        Meta::MakeCustomChangeCommand(
-                                [scene, prevList, prevSelection]() {
-                                        scene->m_selectedSceneObjects = prevList;
-                                        scene->m_selectedSceneObject = prevSelection;
-                                },
-                                [scene, newList, newSelection]() {
-                                        scene->m_selectedSceneObjects = newList;
-                                        scene->m_selectedSceneObject = newSelection;
-                                }
-                        );
-				for (size_t i = 0; i < hits.size(); ++i)
-				{
-					if (hits[i].object != m_hitResults[i].object)
-					{
-						allSame = false;
-						break;
-					}
-				}
-
-				if (allSame)
-					m_currentHitIndex = (m_currentHitIndex + 1) % hits.size();
-				else
-					m_currentHitIndex = 0;
-			}
-			else
-			{
-				m_currentHitIndex = 0;
-			}
-
-			m_hitResults = hits;
-
-			GameObject* selected = m_hitResults[m_currentHitIndex].object;
-			sceneSelectedObj = selected;
+            auto newList = scene->m_selectedSceneObjects;
+            GameObject* newSelection = scene->m_selectedSceneObject;
+            Meta::MakeCustomChangeCommand(
+                    [scene, prevList, prevSelection]() {
+                            scene->m_selectedSceneObjects = prevList;
+                            scene->m_selectedSceneObject = prevSelection;
+                    },
+                    [scene, newList, newSelection]() {
+                            scene->m_selectedSceneObjects = newList;
+                            scene->m_selectedSceneObject = newSelection;
+                    }
+            );
 		}
 		else
 		{

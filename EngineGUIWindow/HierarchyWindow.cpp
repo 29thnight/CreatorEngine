@@ -59,6 +59,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (false == ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
 					scene->m_selectedSceneObject = nullptr;
+					scene->m_selectedSceneObjects.clear();
 				}
 			}
 
@@ -253,11 +254,11 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
         bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
         if (isSelected)
         {
-                flags |= ImGuiTreeNodeFlags_Selected;
+            flags |= ImGuiTreeNodeFlags_Selected;
         }
         else if (0 == obj->m_parentIndex)
         {
-                flags |= ImGuiTreeNodeFlags_DefaultOpen;
+            flags |= ImGuiTreeNodeFlags_DefaultOpen;
         }
 
 	if (0 == obj->m_childrenIndices.size())
@@ -282,39 +283,39 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
         {
-                if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+            if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+            {
+                bool shift = ImGui::GetIO().KeyShift;
+                std::vector<GameObject*> prevList = selectedObjects;
+                GameObject* prevSelection = selectedSceneObject;
+
+                if (shift)
                 {
-                        bool shift = ImGui::GetIO().KeyShift;
-                        std::vector<GameObject*> prevList = selectedObjects;
-                        GameObject* prevSelection = selectedSceneObject;
-
-                        if (shift)
-                        {
-                                if (std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end())
-                                        scene->RemoveSelectedSceneObject(obj.get());
-                                else
-                                        scene->AddSelectedSceneObject(obj.get());
-                        }
-                        else
-                        {
-                                scene->ClearSelectedSceneObjects();
-                                scene->AddSelectedSceneObject(obj.get());
-                        }
-
-                        auto newList = scene->m_selectedSceneObjects;
-                        GameObject* newSelection = scene->m_selectedSceneObject;
-
-                        Meta::MakeCustomChangeCommand(
-                                [scene, prevList, prevSelection]() {
-                                        scene->m_selectedSceneObjects = prevList;
-                                        scene->m_selectedSceneObject = prevSelection;
-                                },
-                                [scene, newList, newSelection]() {
-                                        scene->m_selectedSceneObjects = newList;
-                                        scene->m_selectedSceneObject = newSelection;
-                                }
-                        );
+                    if (std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end())
+                        scene->RemoveSelectedSceneObject(obj.get());
+                    else
+                        scene->AddSelectedSceneObject(obj.get());
                 }
+                else
+                {
+                    scene->ClearSelectedSceneObjects();
+                    scene->AddSelectedSceneObject(obj.get());
+                }
+
+                auto newList = scene->m_selectedSceneObjects;
+                GameObject* newSelection = scene->m_selectedSceneObject;
+
+                Meta::MakeCustomChangeCommand(
+                    [scene, prevList, prevSelection]() {
+                        scene->m_selectedSceneObjects = prevList;
+                        scene->m_selectedSceneObject = prevSelection;
+                    },
+                    [scene, newList, newSelection]() {
+                        scene->m_selectedSceneObjects = newList;
+                        scene->m_selectedSceneObject = newSelection;
+                    }
+                );
+            }
         }
 
 	if (ImGui::BeginDragDropSource())
