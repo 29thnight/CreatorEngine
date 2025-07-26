@@ -28,7 +28,9 @@ namespace DirectX11
 	public:
 		Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources);
 		~Dx11Main();
-		void SceneInitialize();
+
+		void Initialize();
+		void Finalize();
 		void CreateWindowSizeDependentResources();
 		void Update();
 		bool ExecuteRenderPass();

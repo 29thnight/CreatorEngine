@@ -66,6 +66,8 @@ public:
 	SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources);
 	~SceneRenderer();
 
+	void Finalize();
+
 	void NewCreateSceneInitialize();
 	void OnWillRenderObject(float deltaTime);
 	void EndOfFrame(float deltaTime);

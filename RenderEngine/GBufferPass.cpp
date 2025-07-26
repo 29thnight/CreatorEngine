@@ -123,20 +123,6 @@ GBufferPass::GBufferPass()
 
 GBufferPass::~GBufferPass()
 {
-	for (auto& [frame, cmdArr] : m_commandQueueMap)
-	{
-		for (auto& queue : cmdArr)
-		{
-			while (!queue.empty())
-			{
-				ID3D11CommandList* CommandJob;
-				if (queue.try_pop(CommandJob))
-				{
-					Memory::SafeDelete(CommandJob);
-				}
-			}
-		}
-	}
 }
 
 void GBufferPass::SetRenderTargetViews(ID3D11RenderTargetView** renderTargetViews, uint32 size)

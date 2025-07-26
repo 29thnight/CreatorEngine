@@ -160,7 +160,7 @@ void ImGuiRenderer::BeginRender()
 		return;
 	}
 
-    if (firstLoop || forceResize)
+    if (firstLoop /*|| forceResize*/)
 	{
         ImGui::DockBuilderRemoveNode(id);
         ImGui::DockBuilderAddNode(id);

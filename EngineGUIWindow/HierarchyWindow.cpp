@@ -29,6 +29,13 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 		GameObject* selectedSceneObject = nullptr;
 		static bool isSceneObjectSelected = false;
 
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+		ImGui::BeginDisabled();
+		ImGui::Button(ICON_FA_MAGNIFYING_GLASS " Search");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		m_searchFilter.Draw("##HierarchyWindow Search", ImGui::GetContentRegionAvail().x);
+		ImGui::PopStyleVar();
 		if (m_sceneRenderer)
 		{
 			scene = SceneManagers->GetActiveScene();
@@ -108,7 +115,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					auto comp = obj->AddComponent<CameraComponent>();
 				}
 
-
+				//TODO : 아직 처리가 안된듯
 				if (ImGui::BeginMenu("		UI"))
 				{
 					if (ImGui::MenuItem("		Image"))

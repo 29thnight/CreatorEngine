@@ -246,6 +246,21 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
+
+}
+
+void SceneRenderer::Finalize()
+{
+	m_diffuseTexture.release();
+	m_metalRoughTexture.release();
+	m_normalTexture.release();
+	m_emissiveTexture.release();
+	m_toneMappedColourTexture.release();
+	m_bitmaskTexture.release();
+	m_ambientOcclusionTexture.release();
+	m_toneMappedColourTexture.release();
+	m_lightingTexture.release();
+
 	delete m_threadPool;
 
 	OnResizeEvent -= m_resizeEventHandle;
