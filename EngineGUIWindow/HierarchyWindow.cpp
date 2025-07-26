@@ -75,6 +75,13 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 						scene->m_selectedSceneObject = nullptr;
 					}
 				}
+				if (ImGui::MenuItem("		Test", nullptr, nullptr, isSceneObjectSelected))
+				{
+					if (selectedSceneObject)
+					{
+						selectedSceneObject->AddAngelScriptComponent("TestScript");
+					}
+				}
 				ImGui::Separator();
 
 				if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))

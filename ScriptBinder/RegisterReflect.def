@@ -37,6 +37,7 @@
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "Animator.h"
+#include "AScriptComponent.h"
 #include "AvatarMask.h"
 #include "BehaviorTreeComponent.h"
 #include "BoneMask.h"
@@ -73,6 +74,7 @@
 REFLECTION_REGISTER()
 {
     AUTO_REGISTER_CLASS(AAPassSetting);
+    AUTO_REGISTER_CLASS(AScriptComponent);
     AUTO_REGISTER_CLASS(ActionMap);
     AUTO_REGISTER_CLASS(AniTransition);
     AUTO_REGISTER_CLASS(Animation);

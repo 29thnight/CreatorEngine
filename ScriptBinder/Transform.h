@@ -38,18 +38,22 @@ public:
 
 	void SetOwner(GameObject* owner);
 
-	Mathf::xMatrix GetLocalMatrix();
-	Mathf::xMatrix GetWorldMatrix() const;
-	Mathf::xMatrix GetInverseMatrix() const;
+	Mathf::Matrix GetLocalMatrix();
+	Mathf::Matrix GetWorldMatrix() const;
+	Mathf::Matrix GetInverseMatrix() const;
 
 	void UpdateLocalMatrix();
-	Mathf::xMatrix UpdateWorldMatrix();
-	void SetLocalMatrix(const Mathf::xMatrix& matrix);
-	void SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal = false);
+	Mathf::Matrix UpdateWorldMatrix();
+	void SetLocalMatrix(const Mathf::Matrix& matrix);
+	void SetAndDecomposeMatrix(const Mathf::Matrix& matrix, bool setLocal = false);
 
 	Mathf::xVector GetWorldPosition() const;
 	Mathf::xVector GetWorldScale() const;
 	Mathf::xVector GetWorldQuaternion() const;
+
+	Mathf::Vector4 ASGetWorldPosition() const;
+	Mathf::Vector4 ASGetWorldScale() const;
+	Mathf::Vector4 ASGetWorldQuaternion() const;
 
 	Mathf::Vector3 GetForward();
 	Mathf::Vector3 GetRight();

@@ -3,6 +3,8 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
+#include "AScriptComponent.h"
+#include "AngelScriptManager.h"
 #include "TagManager.h"
 
 GameObject::GameObject() :
@@ -145,6 +147,98 @@ ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptNam
     ScriptManager->CollectScriptComponent(this, index, scriptName.data());
 
     return component.get();
+}
+
+
+AScriptComponent* GameObject::AddAngelScriptComponent(const std::string_view& scriptName)
+{
+	std::shared_ptr<AScriptComponent> component = std::make_shared<AScriptComponent>();
+	component->m_scriptName = scriptName.data();
+	component->SetOwner(this);
+
+	// AngelScript 엔진 가져오기
+	asIScriptEngine* asEngine = AngelScriptManagers->GetEngine();
+	if (!asEngine)
+	{
+		Debug->LogError("AngelScript engine is not initialized.");
+		return nullptr;
+	}
+
+	// 스크립트 모듈 생성 또는 가져오기
+	asIScriptModule* module = asEngine->GetModule("AScriptModule", asGM_ALWAYS_CREATE);
+	if (!module)
+	{
+		Debug->LogError("Failed to get AngelScript module.");
+		return nullptr;
+	}
+
+	// 스크립트 코드 로드 (예시: 파일에서 읽어오는 대신 임시로 문자열 사용)
+	// 실제 프로젝트에서는 scriptName을 사용하여 파일에서 스크립트 코드를 읽어와야 합니다.
+	std::string shared_script_code = "shared abstract class AScriptBehaviour { AScriptBehaviour() { @m_obj = AScriptBehaviourWrapper(); } void OnStart() { m_obj.OnStart(); } void OnUpdate(float deltaTime) { m_obj.OnUpdate(deltaTime); } private AScriptBehaviourWrapper@ m_obj; };\n";
+	std::string scriptCode = "class " + std::string(scriptName) + " : AScriptBehaviour { void OnStart() { Print(\"Script Start!\"); } void OnUpdate(float deltaTime) {} };";
+
+	std::string full_scriptCode = shared_script_code + "\n" + scriptCode;
+
+	// 스크립트 컴파일
+	asIScriptContext* ctx = asEngine->RequestContext();
+	if (!ctx)
+	{
+		Debug->LogError("Failed to request AngelScript context.");
+		return nullptr;
+	}
+
+	module->AddScriptSection(scriptName.data(), full_scriptCode.c_str());
+	int r = module->Build();
+	if (r < 0)
+	{
+		Debug->LogError("Failed to build AngelScript module.");
+		asEngine->ReturnContext(ctx);
+		return nullptr;
+	}
+
+	// 스크립트 클래스 타입 가져오기
+	asITypeInfo* type = module->GetTypeInfoByName(scriptName.data());
+	if (!type)
+	{
+		Debug->LogError("Failed to get AngelScript type info for " + std::string(scriptName));
+		asEngine->ReturnContext(ctx);
+		return nullptr;
+	}
+
+	// 스크립트 객체 생성
+	asIScriptObject* scriptObject = reinterpret_cast<asIScriptObject*>(asEngine->CreateScriptObject(type));
+	if (!scriptObject)
+	{
+		Debug->LogError("Failed to create AngelScript object for " + std::string(scriptName));
+		asEngine->ReturnContext(ctx);
+		return nullptr;
+	}
+
+	AScriptBehaviourWrapper* wrapper = *reinterpret_cast<AScriptBehaviourWrapper**>(
+		scriptObject->GetAddressOfProperty(0));
+	if (!wrapper)
+	{
+		Debug->LogError("Failed to get AScriptBehaviourWrapper from AngelScript object for " + std::string(scriptName));
+		asEngine->ReturnContext(ctx);
+		return nullptr;
+	}
+
+	wrapper->AddRef(); // wrapper의 참조 유지
+	scriptObject->Release(); // 스크립트 객체는 더이상 직접 관리 안함
+
+	// AScriptComponent에 스크립트 객체와 wrapper 설정
+	component->SetScriptBehaviourWrapper(wrapper);
+
+	// OnStart 함수 호출 (이제 ScriptedAScriptBehaviour를 통해 호출됨)
+	// 여기서는 직접 호출하지 않고, AScriptBehaviour의 OnStart가 ScriptedAScriptBehaviour를 통해 스크립트 OnStart를 호출하도록 합니다.
+	component->Start(); // 이 부분은 이제 AScriptBehaviour의 OnStart에서 처리
+
+	asEngine->ReturnContext(ctx);
+
+	m_components.push_back(component);
+	m_componentIds[component->GetTypeID()] = m_components.size() - 1;
+
+	return component.get();
 }
 
 std::shared_ptr<Component> GameObject::GetComponent(const Meta::Type& type)

@@ -160,6 +160,18 @@
     <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\FoliageBase">
       <UniqueIdentifier>{76844eaa-1807-4ec5-9e3d-adf5a3c0bab7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\AScriptComponent">
+      <UniqueIdentifier>{a1a955aa-1fee-4215-a424-1c5d57c7fcf5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\AScriptComponent\ASString">
+      <UniqueIdentifier>{e2680449-80e5-42a4-a7f6-4c6edf0dcc11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\AScriptComponent\Wrapper">
+      <UniqueIdentifier>{bc125979-bf53-4b04-9e06-ee7c9c3bc7e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\AScriptComponent\Manager">
+      <UniqueIdentifier>{532f48c4-1dd2-4766-bffd-1bf1136b4edd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -296,6 +308,12 @@
     </ClCompile>
     <ClCompile Include="PhysicsManager.cpp">
       <Filter>Managers\PhysicsManager</Filter>
+    </ClCompile>
+    <ClCompile Include="AngelScriptManager.cpp">
+      <Filter>Classes\Components\AScriptComponent\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="AScriptComponent.cpp">
+      <Filter>Classes\Components\AScriptComponent</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -565,6 +583,18 @@
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
+    </ClInclude>
+    <ClInclude Include="StringFactory.h">
+      <Filter>Classes\Components\AScriptComponent\ASString</Filter>
+    </ClInclude>
+    <ClInclude Include="AScriptBehaviourWrapper.h">
+      <Filter>Classes\Components\AScriptComponent\Wrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="AngelScriptManager.h">
+      <Filter>Classes\Components\AScriptComponent\Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="AScriptComponent.h">
+      <Filter>Classes\Components\AScriptComponent</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

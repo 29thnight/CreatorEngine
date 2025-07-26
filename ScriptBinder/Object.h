@@ -23,10 +23,10 @@ public:
     }
 
 public:
-    size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
+    size_t GetInstanceID() const override { return m_instanceID.m_ID_Data; }
     void MakeInstanceID() { m_instanceID = make_guid(); }
-	HashedGuid GetTypeID() const override final { return m_typeID; }
-    std::string ToString() const override final { return m_name.ToString(); }
+	HashedGuid GetTypeID() const override { return m_typeID; }
+    std::string ToString() const override { return m_name.ToString(); }
     HashingString GetHashedName() const { return m_name; }
 
     virtual void Destroy();

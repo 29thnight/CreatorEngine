@@ -141,7 +141,7 @@ Transform& Transform::SetWorldScale(Mathf::Vector3 scale)
 	}
 }
 
-Mathf::xMatrix Transform::GetLocalMatrix()
+Mathf::Matrix Transform::GetLocalMatrix()
 {
 	if (m_dirty)
 	{
@@ -154,12 +154,12 @@ Mathf::xMatrix Transform::GetLocalMatrix()
 	return m_localMatrix;
 }
 
-Mathf::xMatrix Transform::GetWorldMatrix() const
+Mathf::Matrix Transform::GetWorldMatrix() const
 {
 	return m_worldMatrix;
 }
 
-Mathf::xMatrix Transform::GetInverseMatrix() const
+Mathf::Matrix Transform::GetInverseMatrix() const
 {
 	return m_inverseMatrix;
 }
@@ -175,13 +175,13 @@ void Transform::UpdateLocalMatrix()
 	}
 }
 
-Mathf::xMatrix Transform::UpdateWorldMatrix()
+Mathf::Matrix Transform::UpdateWorldMatrix()
 {
 	if (m_owner->m_parentIndex != 0) {
 		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
-		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
+		Mathf::Matrix parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();
-		XMMATRIX worldMatrix = XMMatrixMultiply(m_localMatrix, parentWorldMatrix);
+		Mathf::Matrix worldMatrix = parentWorldMatrix * m_localMatrix;
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
@@ -205,7 +205,7 @@ void Transform::SetOwner(GameObject* owner)
 	}
 }
 
-void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
+void Transform::SetLocalMatrix(const Mathf::Matrix& matrix)
 {
 	Mathf::xVector _scale{}, _rotation{}, _position{};
 
@@ -225,7 +225,7 @@ void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
 	m_dirty = false;
 }
 
-void Transform::SetAndDecomposeMatrix(const Mathf::xMatrix& matrix, bool setLocal)
+void Transform::SetAndDecomposeMatrix(const Mathf::Matrix& matrix, bool setLocal)
 {
 	Mathf::Matrix compareMat = matrix;
 	if (compareMat == m_worldMatrix) return;
@@ -261,6 +261,21 @@ Mathf::xVector Transform::GetWorldScale() const
 }
 
 Mathf::xVector Transform::GetWorldQuaternion() const
+{
+	return m_worldQuaternion;
+}
+
+Mathf::Vector4 Transform::ASGetWorldPosition() const
+{
+	return m_worldPosition;
+}
+
+Mathf::Vector4 Transform::ASGetWorldScale() const
+{
+	return m_worldScale;
+}
+
+Mathf::Vector4 Transform::ASGetWorldQuaternion() const
 {
 	return m_worldQuaternion;
 }

@@ -162,10 +162,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AIManager.cpp" />
+    <ClCompile Include="AngelScriptManager.cpp" />
     <ClCompile Include="AnimationController.cpp" />
     <ClCompile Include="Animator.cpp" />
     <ClCompile Include="AnimationState.cpp" />
     <ClCompile Include="AniTransition.cpp" />
+    <ClCompile Include="AScriptComponent.cpp" />
     <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BehaviorTreeComponent.cpp" />
     <ClCompile Include="Blackboard.cpp" />
@@ -196,6 +198,9 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="AngelScriptManager.h" />
+    <ClInclude Include="AScriptBehaviourWrapper.h" />
+    <ClInclude Include="AScriptComponent.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BlackBoardEnum.h" />
     <ClInclude Include="BLackBoardValue.h" />
@@ -287,6 +292,7 @@
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="StringFactory.h" />
     <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
     <ClInclude Include="TerrainBuffers.h" />

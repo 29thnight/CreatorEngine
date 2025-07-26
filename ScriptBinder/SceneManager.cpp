@@ -8,6 +8,7 @@
 #include "CullingManager.h"
 #include "Profiler.h"
 #include "InputActionManager.h"
+#include "AngelScriptManager.h"
 #include "NodeFactory.h"
 #include "TagManager.h"
 #include "GameObjectPool.h"
@@ -20,6 +21,7 @@ void SceneManager::ManagerInitialize()
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
 	TagManager::GetInstance()->Initialize();
+    AngelScriptManagers->Initialize();
 }
 
 void SceneManager::Editor()
@@ -162,6 +164,8 @@ void SceneManager::Decommissioning()
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
+
+	m_isGameStart = false;
 }
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
