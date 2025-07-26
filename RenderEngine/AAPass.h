@@ -23,7 +23,7 @@ public:
 	void SetAntiAliasingTexture(Texture* texture) { m_AntiAliasingTexture = texture; }
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-        void ApplySettings(const AAPassSetting& setting);
+    void ApplySettings(const AAPassSetting& setting);
 
 private:
 	Texture* m_CopiedTexture;

@@ -7,7 +7,7 @@
 
 GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_pRenderer(pRenderer),
-	m_renderScene(pRenderer->m_renderScene),
+	m_renderScene(pRenderer->m_renderScene.get()),
 	m_pEditorCamera(pRenderer->m_pEditorCamera.get())
 {
 	m_pGridPass = std::make_unique<GridPass>();

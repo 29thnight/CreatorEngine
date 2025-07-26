@@ -87,7 +87,7 @@ private:
 	void ReloadShaders();
 	void ResourceTrim();
 
-	RenderScene* m_renderScene{};
+	std::shared_ptr<RenderScene> m_renderScene{};
 
 #ifndef DYNAMICCPP_EXPORTS //PassData
 	//device
@@ -137,27 +137,14 @@ private:
 	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
 	UniqueTexturePtr m_lightingTexture		   { TEXTURE_NULL_INITIALIZER };
 
-	//sampler
-	Sampler* m_linearSampler{};
-	Sampler* m_pointSampler{};
-	//View Object
-	ID3D11DepthStencilView*						m_depthStencilView{};
-	ID3D11ShaderResourceView*					m_depthStencilSRV{};
-
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
 	ThreadPool<std::function<void()>>* m_threadPool = nullptr;
-	RenderThreadPool* m_commandThreadPool = nullptr;
+	std::unique_ptr<RenderThreadPool> m_commandThreadPool = nullptr;
 #endif // !DYNAMICCPP_EXPORTS
 	//Editor Camera
 	std::shared_ptr<Camera> m_pEditorCamera{};
 
-	Model* model[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
-
-	GameObject* testt;
-	GameObject* sword;
-	TestPlayer player;
 	lm::LightMap lightMap;
-
 //Debug
 public:
 	void SetWireFrame()     { useWireFrame = !useWireFrame; }

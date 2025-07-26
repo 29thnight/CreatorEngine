@@ -91,6 +91,18 @@
     <Filter Include="Core.CircleQueue">
       <UniqueIdentifier>{73ca2cda-8e59-4929-83b0-9ca662a4a885}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.AngelScriptBind">
+      <UniqueIdentifier>{1904637c-0eba-4cc6-8b16-001793e77563}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.AngelScriptBind\Type">
+      <UniqueIdentifier>{6c8c658b-77a2-4362-841a-3c5b6617e8c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.AngelScriptBind\Type\string">
+      <UniqueIdentifier>{f0190d8d-982d-4277-9a45-7c764ee87561}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.AngelScriptBind\Type\array">
+      <UniqueIdentifier>{46e11ae0-1cd8-4439-8b1d-7e6e240f9000}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">

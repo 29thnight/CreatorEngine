@@ -133,6 +133,6 @@ public:
 	Scene* m_ownerScene{ nullptr };
 };
 
-#include "GameObejct.inl"
+#include "GameObject.inl"
 
 

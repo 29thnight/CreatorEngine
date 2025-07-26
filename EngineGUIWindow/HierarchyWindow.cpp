@@ -39,7 +39,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 		if (m_sceneRenderer)
 		{
 			scene = SceneManagers->GetActiveScene();
-			renderScene = m_sceneRenderer->m_renderScene;
+			renderScene = m_sceneRenderer->m_renderScene.get();
 			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)

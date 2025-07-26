@@ -1,5 +1,8 @@
 #include "LogSystem.h"
+#include "AngelScriptBinder.h"
 #include <chrono>
+#undef interface
+#include <asbind.hpp>
 
 void DebugClass::Initialize()
 {

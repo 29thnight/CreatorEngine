@@ -568,7 +568,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="GameObejct.inl">
+    <None Include="GameObject.inl">
       <Filter>Classes\GameObject</Filter>
     </None>
     <None Include="Component.inl">

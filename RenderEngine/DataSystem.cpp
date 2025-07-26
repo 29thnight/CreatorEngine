@@ -122,6 +122,11 @@ void DataSystem::Finalize()
     DeallocateResource(FolderIcon);
     DeallocateResource(ShaderIcon);
     DeallocateResource(CodeIcon);
+	DeallocateResource(MainLightIcon);
+	DeallocateResource(PointLightIcon);
+	DeallocateResource(SpotLightIcon);
+	DeallocateResource(DirectionalLightIcon);
+	DeallocateResource(CameraIcon);
 
     Models.clear();
     Textures.clear();
