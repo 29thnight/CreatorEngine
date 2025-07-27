@@ -10,6 +10,7 @@
 #include "CameraComponent.h"
 #include "LightComponent.h"
 #include "GameObject.h"
+#include <unordered_map>
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "Terrain.h"
@@ -325,19 +326,27 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 	}
 
-	if (obj && !selectMode)
-	{
-		static XMMATRIX oldLocalMatrix{};
-		static bool wasDragging = false;
+        if (obj && !selectMode)
+        {
+                auto scene = SceneManagers->GetActiveScene();
+                auto& selectedObjects = scene->m_selectedSceneObjects;
+                static XMMATRIX oldLocalMatrix{};
+                static bool wasDragging = false;
+                static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
 	
 		bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 		bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
 		bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 	
-		if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-		{
-			oldLocalMatrix = obj->m_transform.GetLocalMatrix();
-		}
+                if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                {
+                        oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+                        startWorldMatrices.clear();
+                        for (auto* target : selectedObjects)
+                        {
+                                startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+                        }
+                }
 		XMMATRIX deltaMat = XMMatrixIdentity();
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 			deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
@@ -363,11 +372,35 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				}
 			);
 		}
-		//실시간 변화
-		if (!XMMatrixIsIdentity(deltaMat))
-			obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-		wasDragging = isDragging;
-	}
+                //실시간 변화
+                if (!XMMatrixIsIdentity(deltaMat))
+                {
+                        obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
+                        obj->m_transform.UpdateWorldMatrix();
+
+                        XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+                        auto itSelf = startWorldMatrices.find(obj);
+                        if (itSelf != startWorldMatrices.end())
+                        {
+                                XMVECTOR oldPos = itSelf->second.r[3];
+                                XMVECTOR newPos = newWorld.r[3];
+                                XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
+
+                                if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
+                                {
+                                        for (auto* target : selectedObjects)
+                                        {
+                                                if (target == obj) continue;
+                                                auto itStart = startWorldMatrices.find(target);
+                                                if (itStart == startWorldMatrices.end()) continue;
+                                                XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
+                                                target->m_transform.SetAndDecomposeMatrix(targetWorld, true);
+                                        }
+                                }
+                        }
+                }
+                wasDragging = isDragging;
+        }
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
 
