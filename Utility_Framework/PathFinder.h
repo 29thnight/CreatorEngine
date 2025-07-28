@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <Windows.h>
 
-inline const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
+inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
 
 inline std::string ExecuteVsWhere()
 {
@@ -62,6 +62,7 @@ namespace InternalPath
 	inline file::path ModelSourcePath{};
 	inline file::path TextureSourcePath{};
 	inline file::path UISourcePath{};
+	inline file::path PrefabSourcePath{};
 	inline file::path MaterialSourcePath{};
 	inline file::path PrecompiledShaderPath{};
 	inline std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
@@ -82,78 +83,48 @@ namespace InternalPath
 
         ExecuteablePath = p.remove_filename();
 
-		DumpPath = file::path(ExecuteablePath).append("Dump\\").lexically_normal();
-
         auto base = file::path(ExecuteablePath);
 		//TODO 지금은 이런식으로 불러오고 나중에는 기본 ini 설정값을 정해서 읽어오는 걸로 합시다.
-		BaseProjectPath = file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
-        DataPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
-
-		ModelSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Models\\").lexically_normal();
-		TextureSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Textures\\").lexically_normal();
-		MaterialSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Materials\\").lexically_normal();
-		UISourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\UI\\").lexically_normal();
-        ShaderSourcePath	= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
-
+		DumpPath				= file::path(base).append("Dump\\").lexically_normal();
+		BaseProjectPath			= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
+        DataPath				= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\").lexically_normal();
+		ModelSourcePath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Models\\").lexically_normal();
+		TextureSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Textures\\").lexically_normal();
+		MaterialSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Materials\\").lexically_normal();
+		UISourcePath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\UI\\").lexically_normal();
+		PrefabSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Prefabs\\").lexically_normal();
+		ShaderSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Shaders\\").lexically_normal();
 		DynamicSolutionDir		= file::path(base).append("..\\..\\Dynamic_CPP\\").lexically_normal();
 		ProjectSettingsPath		= file::path(base).append("..\\..\\Dynamic_CPP\\ProjectSetting").lexically_normal();
-
 		PrecompiledShaderPath	= file::path(base).append("..\\Assets\\Shaders\\").lexically_normal();
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
-
-		TerrainSourcePath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
-		NodeEditorPath = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
+		TerrainSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
+		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
 		//dir not exist -> create dir
-		if (!file::exists(DumpPath))
+
+		std::vector<file::path> paths = {
+			DumpPath,
+			DataPath,
+			ShaderSourcePath,
+			ModelSourcePath,
+			TextureSourcePath,
+			MaterialSourcePath,
+			UISourcePath,
+			PrefabSourcePath,
+			IconPath,
+			DynamicSolutionDir,
+			PrecompiledShaderPath,
+			ProjectSettingsPath,
+			TerrainSourcePath
+		};
+
+		for (const auto& path : paths)
 		{
-			file::create_directories(DumpPath);
+			if (!file::exists(path))
+			{
+				file::create_directories(path);
+			}
 		}
-		if (!file::exists(DataPath))
-		{
-			file::create_directories(DataPath);
-		}
-		if (!file::exists(ShaderSourcePath))
-		{
-			file::create_directories(ShaderSourcePath);
-		}
-		if (!file::exists(ModelSourcePath))
-		{
-			file::create_directories(ModelSourcePath);
-		}
-		if (!file::exists(TextureSourcePath))
-		{
-			file::create_directories(TextureSourcePath);
-		}
-		if (!file::exists(MaterialSourcePath))
-		{
-			file::create_directories(MaterialSourcePath);
-		}
-		if (!file::exists(UISourcePath))
-		{
-			file::create_directories(UISourcePath);
-		}
-		if (!file::exists(IconPath))
-		{
-			file::create_directories(IconPath);
-		}
-		if (!file::exists(DynamicSolutionDir))
-		{
-			file::create_directories(DynamicSolutionDir);
-		}
-		if (!file::exists(PrecompiledShaderPath))
-		{
-			file::create_directories(PrecompiledShaderPath);
-		}
-		if (!file::exists(ProjectSettingsPath))
-		{
-			file::create_directories(ProjectSettingsPath);
-		}
-		if (!file::exists(TerrainSourcePath))
-		{
-			file::create_directories(TerrainSourcePath);
-		}
-		
-		
     }
 };
 
@@ -243,5 +214,30 @@ public:
 	static inline file::path NodeEditorPath(const std::string_view& path)
 	{
 		return file::path(InternalPath::NodeEditorPath) / path;
+	}
+
+	static inline file::path RelativeToModel(const std::string_view& path)
+	{
+		return file::path(InternalPath::ModelSourcePath) / path;
+	}
+
+	static inline file::path RelativeToTexture(const std::string_view& path)
+	{
+		return file::path(InternalPath::TextureSourcePath) / path;
+	}
+
+	static inline file::path RelativeToUISource(const std::string_view& path)
+	{
+		return file::path(InternalPath::UISourcePath) / path;
+	}
+
+	static inline file::path RelativeToPrefab(const std::string_view& path)
+	{
+		return file::path(InternalPath::PrefabSourcePath) / path;
+	}
+
+	static inline file::path RelativeToBaseProject(const std::string_view& path)
+	{
+		return file::path(InternalPath::BaseProjectPath) / path;
 	}
 };

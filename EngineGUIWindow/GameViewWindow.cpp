@@ -30,9 +30,28 @@ void GameViewWindow::RenderGameViewWindow()
 
 		auto scene = SceneManagers->GetRenderScene();
 		auto camera = CameraManagement->GetLastCamera();
-		auto renderData = RenderPassData::GetData(camera);
+		if(nullptr == camera || 0 == camera->m_cameraIndex)
+		{
+			ImVec2 rectMin = ImVec2(windowPos.x + currentPos.x + offset.x, windowPos.y + currentPos.y + offset.y);
+			ImVec2 rectMax = ImVec2(rectMin.x + imageSize.x, rectMin.y + imageSize.y);
+			ImGui::GetWindowDrawList()->AddRectFilled(rectMin, rectMax, ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f)));
 
-		ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
+			const char* noCameraText = "No Camera rendering";
+			ImVec2 textSize = ImGui::CalcTextSize(noCameraText);
+
+			ImVec2 textPos = ImVec2(rectMin.x + (imageSize.x - textSize.x) * 0.5f, rectMin.y + (imageSize.y - textSize.y) * 0.5f);
+
+			ImGui::SetCursorPos(ImVec2(currentPos.x + offset.x + (imageSize.x - textSize.x) * 0.5f, 
+									   currentPos.y + offset.y + (imageSize.y - textSize.y) * 0.5f));
+			ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), noCameraText);
+
+			ImGui::SetCursorPos(ImVec2(currentPos.x, currentPos.y + imageSize.y)); // Reset cursor position after drawing text
+		}
+		else
+		{
+			auto renderData = RenderPassData::GetData(camera);
+			ImGui::Image((ImTextureID)renderData->m_renderTarget->m_pSRV, imageSize);
+		}
 	}
 	ImGui::End();
 	ImGui::PopStyleVar();

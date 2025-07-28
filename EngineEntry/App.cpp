@@ -8,6 +8,8 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
+#include "EffectProxyController.h"
+#include "ResourceAllocator.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -32,9 +34,17 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
     static DebugStreamBuf debugBuf(std::cout.rdbuf());
     std::cout.rdbuf(&debugBuf);
 
-	Core::App app;
-	app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
-	app.Finalize();
+	{
+		Core::App app;
+		app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
+		app.Finalize();
+	}
+
+	EffectManager::Destroy();
+	EffectProxyController::Destroy();
+	InputManager::Destroy();
+	DataSystem::Destroy();
+	ResourceAllocator::Destroy();
 
 	Log::Finalize();
 
@@ -43,6 +53,11 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	EffectManager::GetInstance();
+	EffectProxyController::GetInstance();
+	DataSystem::GetInstance();
+	ResourceAllocator::GetInstance();
+
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
     g_progressWindow->SetStatusText(L"Initializing Core...");
@@ -68,8 +83,8 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 
 void Core::App::Finalize()
 {
+	m_main->Finalize();
 	m_deviceResources->ReportLiveDeviceObjects();
-    DataSystems->Finalize();
 }
 
 void Core::App::SetWindow(CoreWindow& coreWindow)
@@ -79,11 +94,11 @@ void Core::App::SetWindow(CoreWindow& coreWindow)
 
 void Core::App::RegisterHandler(CoreWindow& coreWindow)
 {
-    coreWindow.RegisterHandler(WM_INPUT, this, &App::ProcessRawInput);
-	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
-    coreWindow.RegisterHandler(WM_KEYDOWN, this, &App::HandleCharEvent);
-    coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
-    coreWindow.RegisterHandler(WM_DROPFILES, this, &App::HandleDropFileEvent);
+    coreWindow.RegisterHandler(WM_INPUT,		this, &App::ProcessRawInput);
+	coreWindow.RegisterHandler(WM_SIZE,			this, &App::HandleResizeEvent);
+    coreWindow.RegisterHandler(WM_KEYDOWN,		this, &App::HandleCharEvent);
+    coreWindow.RegisterHandler(WM_CLOSE,		this, &App::Shutdown);
+    coreWindow.RegisterHandler(WM_DROPFILES,	this, &App::HandleDropFileEvent);
 }
 
 void Core::App::Load()
@@ -98,6 +113,7 @@ void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
+		m_main->Initialize();
 		g_progressWindow->SetStatusText(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
 		g_progressWindow->SetProgress(100);

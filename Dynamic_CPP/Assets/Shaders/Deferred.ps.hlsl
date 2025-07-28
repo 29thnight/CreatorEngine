@@ -28,6 +28,7 @@ TextureCube EnvMap : register(t6);
 TextureCube PrefilteredSpecMap : register(t7);
 Texture2D BrdfLUT : register(t8);
 Texture2D Emissive : register(t9);
+Texture2D<uint> Bitflag : register(t11);
 
 struct gOutput
 {
@@ -66,6 +67,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     float3 normal = Normals.Sample(PointSampler, IN.texCoord).rgb;
     normal = normalize(normal * 2.0 - 1.0);
     float3 emissive = Emissive.Sample(PointSampler, IN.texCoord).rgb;
+	uint bitflag = Bitflag.Load(int3(IN.texCoord * int2(1920, 1080), 0));
 
     SurfaceInfo surf;
     surf.posW = float4(posW, 1);
@@ -78,6 +80,8 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     F0 = lerp(F0, albedo, metallic);
 
 	uint light_count = lightCount;
+
+    bool useShadowRevice = (bitflag & USE_SHADOW_RECIVE) != 0;
 
     for (int i = 0; i < light_count; ++i)
     {
@@ -103,7 +107,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
         
         //light.color.rgb *= light.intencity;
 
-        Lo += (kD * albedo / PI + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);
+        Lo += (kD * albedo / PI + specular) * light.color.rgb * li.attenuation * NdotL * (useShadowRevice ? (li.shadowFactor) : 1);
 
     }
     

@@ -166,31 +166,38 @@ void SceneManager::Decommissioning()
 
 Scene* SceneManager::CreateScene(const std::string_view& name)
 {
-    if (m_activeScene)
-    {
-        sceneUnloadedEvent.Broadcast();
-
-        m_activeScene.load()->AllDestroyMark();
-        m_activeScene.load()->OnDisable();
-        m_activeScene.load()->OnDestroy();
-
-        std::erase_if(m_scenes,
-            [&](const auto& scene) { return scene == m_activeScene.load(); });
-
-        m_activeScene = nullptr;
-    }
-
     resourceTrimEvent.Broadcast();
     Scene* allocScene = Scene::CreateNewScene(name);
-    if (allocScene)
+	Scene* swapScene = nullptr;
+
+	if (!allocScene) return nullptr;
+
+    if (m_activeScene)
     {
-        m_scenes.push_back(allocScene);
+		swapScene = m_activeScene.load();
+        
+        sceneUnloadedEvent.Broadcast();
+
+        swapScene->AllDestroyMark();
+        swapScene->OnDisable();
+        swapScene->OnDestroy();
+
+        std::erase_if(m_scenes,
+            [&](const auto& scene) { return scene == swapScene; });
+
+		swapScene = nullptr;
         m_activeScene = allocScene;
-        m_activeSceneIndex = m_scenes.size() - 1;
-        allocScene->m_buildIndex = m_activeSceneIndex.load();
-        activeSceneChangedEvent.Broadcast();
-        newSceneCreatedEvent.Broadcast();
     }
+    else
+    {
+        m_activeScene = allocScene;
+    }
+
+    m_scenes.push_back(allocScene);
+    m_activeSceneIndex = m_scenes.size() - 1;
+    allocScene->m_buildIndex = m_activeSceneIndex.load();
+    activeSceneChangedEvent.Broadcast();
+    newSceneCreatedEvent.Broadcast();
 
     return allocScene;
 }

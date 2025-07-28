@@ -13,6 +13,7 @@
 #include "SceneManager.h"
 #include "MeshRendererProxy.h"
 #include "ImageComponent.h"
+#include "Terrain.h"
 #include "UIManager.h"
 
 constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;

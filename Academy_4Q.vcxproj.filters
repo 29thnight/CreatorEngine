@@ -54,8 +54,8 @@
     <Filter Include="Settings\ProjectSetting">
       <UniqueIdentifier>{96545ce2-8f91-47b0-8b02-45cf1fdbde12}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\ReferenceAssetsWindow%28작성%3f%29">
-      <UniqueIdentifier>{968d8d4d-06d4-4c33-aee1-6d89ba6e8960}</UniqueIdentifier>
+    <Filter Include="Window\InspectorWindow\CustomInspector">
+      <UniqueIdentifier>{0653c8f2-d894-4946-a610-6ee3fc83195e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -113,6 +113,12 @@
     <ClInclude Include="EngineEntry\RenderPassSettings.h">
       <Filter>Settings\EngineSetting</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\GameObjectCommand.h">
+      <Filter>Window\HierarchyWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ExternUI.h">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -144,6 +150,18 @@
     </ClCompile>
     <ClCompile Include="EngineEntry\EngineSetting.cpp">
       <Filter>Settings\EngineSetting</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperModuleBehavior.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

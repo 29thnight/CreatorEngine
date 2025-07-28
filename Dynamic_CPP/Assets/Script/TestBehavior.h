@@ -28,6 +28,8 @@ public:
 	[[Property]]
 	std::string testString = "TestBehavior";
 
+	float m_chargingTime = 0.f;
+
 	Mathf::Vector2 moveDir{};
 	void Move(Mathf::Vector2 value);
 };

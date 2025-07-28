@@ -7,6 +7,7 @@ ReflectionField(Mesh) \
 	({ \
 		meta_property(m_name) \
 		meta_property(m_materialIndex) \
+		meta_property(m_LODThresholds) \
 	}); \
 	FieldEnd(Mesh, PropertyOnly) \
 };

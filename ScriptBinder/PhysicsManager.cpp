@@ -17,44 +17,54 @@
 class Scene;
 void PhysicsManager::Initialize()
 {
-	//¹°¸®¿£Áø ÃÊ±âÈ­
+	// PhysicsManager ÃÊ±âÈ­
 	m_bIsInitialized = Physics->Initialize();
 	
-	//µ¨¸®°ÔÀÌÆ® µî·Ï
+	// ¾À ·Îµå, ¾ð·Îµå, º¯°æ ÀÌº¥Æ® ÇÚµé·¯ µî·Ï
 	m_OnSceneLoadHandle		= sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
 	m_OnSceneUnloadHandle	= sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
-	//ÄÝ¸®Àü ÄÝ¹é µî·Ï
+	// ¹°¸® ¿£Áø ÄÝ¹é ÇÔ¼ö ¼³Á¤
 	Physics->SetCallBackCollisionFunction([this](CollisionData data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
+	
+	//±âº» ÀüÃ¼ Ãæµ¹ ¸ÅÆ®¸¯½º ¼³Á¤
+	std::vector<std::vector<uint8_t>> collisionGrid;
+	collisionGrid.resize(32);
+	for (auto& row : collisionGrid) {
+		row.resize(32, 1); // ±âº»ÀûÀ¸·Î ¸ðµç Ãæµ¹Ã¼°¡ Ãæµ¹ °¡´ÉÇÏµµ·Ï ¼³Á¤
+	}
+	SetCollisionMatrix(collisionGrid);
 }
 void PhysicsManager::Update(float fixedDeltaTime)
 {
 	if (!m_bIsInitialized) return;
 	
-	//¹°¸®¾À¿¡ µ¥ÀÌÅÍ ¼Â
+	// ÄÝ¹é ÀÌº¥Æ® ÃÊ±âÈ­
 	m_callbacks.clear();
 	SetPhysicData();
-	//¹°¸®¾À ¾÷µ¥ÀÌÆ®
+	// ¹°¸® ¿£Áø¿¡ º¯°æ »çÇ× Àû¿ë
+	ApplyPendingChanges();
+	// ¹°¸® ¿£Áø ¾÷µ¥ÀÌÆ®
 	Physics->Update(fixedDeltaTime);
 
 	
-	//¹°¸®¾À¿¡ µ¥ÀÌÅÍ °¡Á®¿À±â
+	// ¹°¸® ¿£Áø¿¡¼­ ¾À µ¥ÀÌÅÍ °¡Á®¿À±â
 	GetPhysicData();
-	//ÄÝ¹é ÀÌº¥Æ® Ã³¸®
+	// ÄÝ¹é ÀÌº¥Æ® Ã³¸®
 	ProcessCallback();
 	
 }
 void PhysicsManager::Shutdown()
 {
-	//¸ðµç °´Ã¼ Á¦°Å
+	// ¹°¸® ¿£Áø ¾À º¯°æ
 	Physics->ChangeScene();
 	//ÄÁÅ×ÀÌ³Ê Á¦°Å
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
-	//¹°¸® ¾À ÇØÁ¦
+	// ¹°¸® ¿£Áø Á¾·á
 	Physics->UnInitialize();
 
 }
@@ -72,7 +82,7 @@ void PhysicsManager::OnLoadScene()
 
 void PhysicsManager::OnUnloadScene()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, info] : Container) 
 	{
 		info.bIsDestroyed = true;
@@ -86,7 +96,7 @@ void PhysicsManager::OnUnloadScene()
 
 void PhysicsManager::ProcessCallback()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [data, type] : m_callbacks) {
 
 		auto lhs = Container.find(data.thisId);
@@ -96,7 +106,7 @@ void PhysicsManager::ProcessCallback()
 
 		if (isSameID || lhs == iterEnd || rhs == iterEnd)
 		{
-			//ÀÚ½ÅÀÇ ÄÝ¶óÀÌ´õ¿Í Ãæµ¹ ÀÌ°Å³ª Ãæµ¹Ã¼°¡ µî·ÏÀÌ µÇ¾î ÀÖÁö ¾ÊÀº °æ¿ì -> error
+			//ÀÚ½ÅÀÇ ÄÝ¶óÀÌ´õ¿Í Ãæµ¹ ÀÌ°Å³ª Ãæµ¹Ã¼°¡ ¾ø¾î Á³À» °æ¿ì -> error
 			Debug->LogError("Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
 			continue;
 		}
@@ -136,17 +146,17 @@ void PhysicsManager::ProcessCallback()
 
 void PhysicsManager::DrawDebugInfo()
 {
-	//collider Á¤º¸¸¦ ¼öÁýÇÏ¿© render¿¡¼­ wireframe·Î ±×·ÁÁÙ ¼ö ÀÖµµ·Ï ÇÑ´Ù.
+	//collider ?•ë³´ë¥?ê°€?¸ì???render?ì„œ wireframe??ê·¸ë¦´ ???ˆë„ë¡??œë‹¤.
 	//DebugRender debug;
 
-	//¹°¸®¾À¿¡ ÀÖ´Â °´Ã¼¸¦ ¼øÈ¸ÇÏ¸ç ÄÝ¸®Àü Á¤º¸¸¦ °¡Á®¿Â´Ù.
+	//ë¬¼ë¦¬?”ì§„???ˆëŠ” ê°ì²´ë¥?ì¡°íšŒ?˜ë©´ ë¬¼ë¦¬ ?•ë³´ë¥?ê°€?¸ì˜¨??
 
 	//DebugData dd;
-	//// ÄÄÆ÷³ÍÆ®º° µ¥ÀÌÅÍ ¼öÁý
+	//// ?¤ë¸Œ?íŠ¸??ë¬¼ë¦¬ ?•ë³´
 	//for (auto* rb : m_rigidBodies)
 	//	rb->FillDebugData(dd);
 
-	//// ¸Å´ÏÀú°¡ Ã³¸®ÇÏ´Â Raycast µð¹ö±× Ãß°¡
+	//// ë§¤ë‹ˆ?€?ì„œ ì²˜ë¦¬?˜ëŠ” Raycast ?•ë³´ë¥?ì¶”ê?
 	//for (auto& rq : m_raycastSystem->GetRequests())
 	//{
 	//	if (rq.hit)
@@ -156,7 +166,7 @@ void PhysicsManager::DrawDebugInfo()
 	//	}
 	//}
 
-	//// IDebugRenderer¿¡ Á¦Ãâ
+	//// IDebugRenderer???„ë‹¬
 	//for (auto& l : dd.lines)   debug->DrawLine(l);
 	//for (auto& s : dd.spheres) debug->DrawSphere(s);
 	//for (auto& p : dd.points)  debug->DrawPoint(p);
@@ -170,7 +180,7 @@ void PhysicsManager::DrawDebugInfo()
 void PhysicsManager::RayCast(RayEvent& rayEvent)
 {
 	
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -209,7 +219,7 @@ void PhysicsManager::RayCast(RayEvent& rayEvent)
 
 bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -240,7 +250,7 @@ bool PhysicsManager::Raycast(RayEvent& rayEvent, RaycastHit& hit)
 
 int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	RayCastInput inputInfo;
 
 	inputInfo.origin = rayEvent.origin;
@@ -282,18 +292,19 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	}
 
 	auto& transform = obj->m_transform;
-	unsigned int colliderID = box->GetInstanceID();
+	unsigned int gameObjectID = obj->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(Box) - GameObject InstanceID: " << gameObjectID << std::endl;
 	auto boxInfo = box->GetBoxInfo();
 	auto tranformOffset = box->GetPositionOffset();
 	auto rotationOffset = box->GetRotationOffset();
 
-	boxInfo.colliderInfo.id = colliderID;
+	boxInfo.colliderInfo.id = gameObjectID;
 	boxInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	boxInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	boxInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	boxInfo.colliderInfo.collsionTransform.localMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.localScale, boxInfo.colliderInfo.collsionTransform.localRotation, boxInfo.colliderInfo.collsionTransform.localPosition);
 	boxInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(boxInfo.colliderInfo.collsionTransform.worldScale, boxInfo.colliderInfo.collsionTransform.worldRotation, boxInfo.colliderInfo.collsionTransform.worldPosition);
-	//offset °è»ê
+	//offset
 	if (tranformOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
 		boxInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
@@ -324,16 +335,16 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	auto posOffset = sphere->GetPositionOffset();
 	auto rotOffset = sphere->GetRotationOffset();
 
-	unsigned int colliderID = sphere->GetInstanceID();
-
-	sphereInfo.colliderInfo.id = colliderID;
+	unsigned int gameObjectID = obj->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(Sphere) - GameObject InstanceID: " << gameObjectID << std::endl;
+	sphereInfo.colliderInfo.id = gameObjectID;
 	sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	sphereInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	sphereInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	sphereInfo.colliderInfo.collsionTransform.localMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.localScale, sphereInfo.colliderInfo.collsionTransform.localRotation, sphereInfo.colliderInfo.collsionTransform.localPosition);
 	sphereInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(sphereInfo.colliderInfo.collsionTransform.worldScale, sphereInfo.colliderInfo.collsionTransform.worldRotation, sphereInfo.colliderInfo.collsionTransform.worldPosition);
 
-	//offset °è»ê
+	//offset 
 	if (posOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
 		sphereInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
@@ -361,14 +372,15 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	auto capsuleInfo = capsule->GetCapsuleInfo();
 	auto posOffset = capsule->GetPositionOffset();
 	auto rotOffset = capsule->GetRotationOffset();
-	unsigned int colliderID = capsule->GetInstanceID();
-	capsuleInfo.colliderInfo.id = colliderID;
+	unsigned int gameObjectID = obj->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(Capsule) - GameObject InstanceID: " << gameObjectID << std::endl;
+	capsuleInfo.colliderInfo.id = gameObjectID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	capsuleInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	capsuleInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	capsuleInfo.colliderInfo.collsionTransform.localMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.localScale, capsuleInfo.colliderInfo.collsionTransform.localRotation, capsuleInfo.colliderInfo.collsionTransform.localPosition);
 	capsuleInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(capsuleInfo.colliderInfo.collsionTransform.worldScale, capsuleInfo.colliderInfo.collsionTransform.worldRotation, capsuleInfo.colliderInfo.collsionTransform.worldPosition);
-	//offset °è»ê
+	//offset 
 	if (posOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
 		capsuleInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
@@ -397,14 +409,15 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	auto convexMeshInfo = mesh->GetMeshInfo();
 	auto posOffset = mesh->GetPositionOffset();
 	auto rotOffset = mesh->GetRotationOffset();
-	unsigned int colliderID = mesh->GetInstanceID();
-	convexMeshInfo.colliderInfo.id = colliderID;
+	unsigned int gameObjectID = obj->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(Mesh) - GameObject InstanceID: " << gameObjectID << std::endl;
+	convexMeshInfo.colliderInfo.id = gameObjectID;
 	convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	convexMeshInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	convexMeshInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
 	convexMeshInfo.colliderInfo.collsionTransform.localMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.localScale, convexMeshInfo.colliderInfo.collsionTransform.localRotation, convexMeshInfo.colliderInfo.collsionTransform.localPosition);
 	convexMeshInfo.colliderInfo.collsionTransform.worldMatrix.Decompose(convexMeshInfo.colliderInfo.collsionTransform.worldScale, convexMeshInfo.colliderInfo.collsionTransform.worldRotation, convexMeshInfo.colliderInfo.collsionTransform.worldPosition);
-	//offset °è»ê
+	//offset 
 	if (posOffset != DirectX::SimpleMath::Vector3::Zero)
 	{
 		convexMeshInfo.colliderInfo.collsionTransform.worldMatrix._41 = 0.0f;
@@ -432,8 +445,9 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	auto movementInfo = controller->GetMovementInfo();
 	auto posOffset = controller->GetPositionOffset();
 	auto rotOffset = controller->GetRotationOffset();
-	ColliderID colliderID = controller->GetInstanceID();
-	controllerInfo.id = colliderID;
+	ColliderID gameObjectID = obj->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(CharacterController) - GameObject InstanceID: " << gameObjectID << std::endl;
+	controllerInfo.id = gameObjectID;
 	controllerInfo.layerNumber = obj->GetCollisionType();
 	DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 	controllerInfo.position = position + controller->GetPositionOffset();
@@ -454,10 +468,11 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 	HeightFieldColliderInfo heightFieldInfo;
 
-	ColliderID colliderID = terrain->GetInstanceID();
+	ColliderID gameObjectID = object->GetInstanceID();
+	std::cout << "PhysicsManager::AddCollider(Terrain) - GameObject InstanceID: " << gameObjectID << std::endl;
 
-	collider->SetColliderID(colliderID);
-	heightFieldInfo.colliderInfo.id = colliderID;
+	collider->SetColliderID(gameObjectID);
+	heightFieldInfo.colliderInfo.id = gameObjectID;
 	heightFieldInfo.colliderInfo.layerNumber = object->GetCollisionType();
 	heightFieldInfo.colliderInfo.collsionTransform.localMatrix = transform.GetLocalMatrix();
 	heightFieldInfo.colliderInfo.collsionTransform.worldMatrix = transform.GetWorldMatrix();
@@ -477,51 +492,51 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::RemoveCollider(BoxColliderComponent* box)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (box && box->IsDestroyMark())
 	{
 		auto ID = box->GetBoxInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
-		Physics->DestroyActor(ID);
+		//Physics->DestroyActor(ID);
 	}
 }
 
 void PhysicsManager::RemoveCollider(SphereColliderComponent* sphere)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (sphere && sphere->IsDestroyMark())
 	{
 		auto ID = sphere->GetSphereInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
-		Physics->DestroyActor(ID);
+		//Physics->DestroyActor(ID);
 	}
 }
 
 void PhysicsManager::RemoveCollider(CapsuleColliderComponent* capsule)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (capsule && capsule->IsDestroyMark())
 	{
 		auto ID = capsule->GetCapsuleInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
-		Physics->DestroyActor(ID);
+		//Physics->DestroyActor(ID);
 	}
 }
 
 void PhysicsManager::RemoveCollider(MeshColliderComponent* mesh)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (mesh && mesh->IsDestroyMark())
 	{
 		auto ID = mesh->GetMeshInfo().colliderInfo.id;
 		Container[ID].bIsDestroyed = true;
-		Physics->DestroyActor(ID);
+		//Physics->DestroyActor(ID);
 	}
 }
 
 void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (controller && controller->IsDestroyMark())
 	{
 		auto ID = controller->GetControllerInfo().id;
@@ -532,12 +547,12 @@ void PhysicsManager::RemoveCollider(CharacterControllerComponent* controller)
 
 void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	if (terrain && terrain->IsDestroyMark())
 	{
 		auto ID = terrain->GetColliderID();
 		Container[ID].bIsDestroyed = true;
-		Physics->DestroyActor(ID);
+		//Physics->DestroyActor(ID);
 	}
 }
 
@@ -548,7 +563,7 @@ void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 
 void PhysicsManager::SetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, colliderInfo] : Container) 
 	{
 		if (colliderInfo.bIsDestroyed)
@@ -560,11 +575,11 @@ void PhysicsManager::SetPhysicData()
 		//colliderInfo.collider.
 		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
-		bool _isColliderEnabled = colliderInfo.collider->isEnabled;
-		//todo : CCT,Controller,ragdoll,capsule,Â÷ÈÄ deformeSuface
+		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
+		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
 		if (colliderInfo.id == m_controllerTypeId)
 		{
-			//ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯
+			
 			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			CharacterControllerGetSetData data;
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
@@ -597,7 +612,7 @@ void PhysicsManager::SetPhysicData()
 		}
 		else
 		{
-			//±âº»µµÇü
+			
 			RigidBodyGetSetData data;
 			data.transform = transform.GetWorldMatrix();
 			data.angularVelocity = rigidbody->GetAngularVelocity();
@@ -609,21 +624,25 @@ void PhysicsManager::SetPhysicData()
 			data.isLockAngularY = rigidbody->IsLockAngularY();
 			data.isLockAngularZ = rigidbody->IsLockAngularZ();
 
-			data.maxAngularVelocity = rigidbody->maxAngularVelocity;
-			data.maxLinearVelocity = rigidbody->maxLinearVelocity;
-			data.maxContactImpulse = rigidbody->maxContactImpulse;
-			data.maxDepenetrationVelocity = rigidbody->maxDepenetrationVelocity;
+			data.maxAngularVelocity = rigidbody->GetMaxAngularVelocity();
+			data.maxLinearVelocity = rigidbody->GetMaxLinearVelocity();
+			data.maxContactImpulse = rigidbody->GetMaxContactImpulse();
+			data.maxDepenetrationVelocity = rigidbody->GetMaxDepenetrationVelocity();
 
-			data.forceMode = static_cast<int>(rigidbody->forceMode);
-			rigidbody->forceMode = EForceMode::NONE;
-			data.velocity = rigidbody->velocity;
-			data.AngularDamping = rigidbody->AngularDamping;
-			data.LinearDamping = rigidbody->LinearDamping;
-			data.mass = rigidbody->m_mass;
+			data.forceMode = static_cast<int>(rigidbody->GetForceMode());
+			rigidbody->SetForceMode(EForceMode::NONE); 
+			data.velocity = rigidbody->GetLinearVelocity();
+			data.AngularDamping = rigidbody->GetAngularDamping();
+			data.LinearDamping = rigidbody->GetLinearDamping();
+			data.mass = rigidbody->GetMass();
 
 			
-			data.m_EColliderType = colliderInfo.collider->GetColliderType();
-			data.isColliderEnabled = _isColliderEnabled;
+			data.m_EColliderType = rigidbody->IsTrigger() ? EColliderType::TRIGGER : EColliderType::COLLISION;
+			data.isColliderEnabled = rigidbody->IsColliderEnabled();
+			data.useGravity = rigidbody->IsUsingGravity();
+			data.isKinematic = rigidbody->IsKinematic();
+			data.isDisabled = !rigidbody->IsColliderEnabled();
+
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
@@ -648,19 +667,19 @@ void PhysicsManager::SetPhysicData()
 //PxScene --> GameScene
 void PhysicsManager::GetPhysicData()
 {
-	auto Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, ColliderInfo] : Container) {
-		
-		if(nullptr == ColliderInfo.gameObject)
+
+		if (nullptr == ColliderInfo.gameObject)
 			continue;
-		
+
 		if (ColliderInfo.gameObject->IsDestroyMark())
 		{
 			ColliderInfo.bIsDestroyed = true;
 			continue;
 		}
 
-		//»èÁ¦ ¿¹Á¤µÈ ÄÝ¶óÀÌ´õ´Â °Ç³Ê¶Ú´Ù
+		
 		if (ColliderInfo.bIsDestroyed)
 		{
 			continue;
@@ -670,15 +689,16 @@ void PhysicsManager::GetPhysicData()
 		auto& transform = ColliderInfo.gameObject->m_transform;
 		auto offset = ColliderInfo.collider->GetPositionOffset();
 
-		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC) 
+
+		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC)
 		{
-			//TODO : ÄÝ¶óÀÌ´õµµ type º¯°æÇØ¾ßÇÔ
+			
 			continue;
 		}
 
-		//todo : CCT,Controller,ragdoll,capsule,Â÷ÈÄ deformeSuface
+		
 		if (ColliderInfo.id == m_controllerTypeId) {
-			//ÄÉ¸¯ÅÍ ÄÁÆ®·Ñ·¯
+			
 			auto controller = ColliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			auto controll = Physics->GetCCTData(id);
 			auto movement = Physics->GetMovementData(id);
@@ -690,7 +710,7 @@ void PhysicsManager::GetPhysicData()
 		}
 		else
 		{
-			//±âº» µµÇü
+			
 			auto data = Physics->GetRigidBodyData(id);
 			rigidbody->SetLinearVelocity(data.linearVelocity);
 			rigidbody->SetAngularVelocity(data.angularVelocity);
@@ -729,7 +749,44 @@ void PhysicsManager::GetPhysicData()
 	}
 }
 
-//void PhysicsManager::SetCollisionMatrix(unsigned int layer, unsigned int other, bool isCollision)
-//{
-//	Physics->SetCollisionMatrix(layer, other, isCollision);
-//}
+void PhysicsManager::SetRigidBodyState(const RigidBodyState& state)
+{
+	m_pendingChanges.push_back(state);
+}
+
+bool PhysicsManager::IsRigidBodyKinematic(unsigned int id) const
+{
+	return Physics->IsKinematic(id);
+}
+
+bool PhysicsManager::IsRigidBodyTrigger(unsigned int id) const
+{
+	
+	return Physics->IsTrigger(id);
+}
+bool PhysicsManager::IsRigidBodyColliderEnabled(unsigned int id) const
+{
+	return Physics->IsColliderEnabled(id);
+}
+
+bool PhysicsManager::IsRigidBodyUseGravity(unsigned int id) const 
+{
+	return Physics->IsUseGravity(id);
+}
+
+void PhysicsManager::ApplyPendingChanges()
+{
+	for (const auto& change : m_pendingChanges)
+	{
+		RigidBodyGetSetData data = Physics->GetRigidBodyData(change.id);
+
+		data.isKinematic = change.isKinematic;
+		data.m_EColliderType = change.isTrigger ? EColliderType::TRIGGER : EColliderType::COLLISION;
+		data.isColliderEnabled = change.isColliderEnabled;
+		data.useGravity = change.useGravity;
+		data.isDisabled = !change.isColliderEnabled;
+
+		Physics->SetRigidBodyData(change.id, data);
+	}
+	m_pendingChanges.clear();
+}

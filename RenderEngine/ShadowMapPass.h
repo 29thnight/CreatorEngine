@@ -23,7 +23,7 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-        void ApplySettings(const ShadowMapPassSetting& setting);
+    void ApplySettings(const ShadowMapPassSetting& setting);
 	virtual void Resize(uint32_t width, uint32_t height) override;
 	ComPtr<ID3D11Buffer>		m_boneBuffer;
 	D3D11_VIEWPORT				shadowViewport;

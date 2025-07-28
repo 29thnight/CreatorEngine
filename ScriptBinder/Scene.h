@@ -38,6 +38,10 @@ public:
 	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
 	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
+	const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
+	void AddSelectedSceneObject(GameObject* sceneObject);
+	void RemoveSelectedSceneObject(GameObject* sceneObject);
+	void ClearSelectedSceneObjects();
 	void AddRootGameObject(const std::string_view& name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
@@ -232,4 +236,5 @@ public:
     std::vector<Texture*> m_directionalmapTextures{};
     Core::DelegateHandle resetObjHandle{};
     GameObject* m_selectedSceneObject = nullptr;
+	std::vector<GameObject*> m_selectedSceneObjects;
 };

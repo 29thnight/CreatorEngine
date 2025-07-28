@@ -1,12 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModelLoader.h"
+#include "DLLAcrossSingleton.h"
 #include "RenderableComponents.h"
 
-class ResourceAllocator : public Singleton<ResourceAllocator>
+class ResourceAllocator : public DLLCore::Singleton<ResourceAllocator>
 {
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<ResourceAllocator>;
     ResourceAllocator() = default;
     ~ResourceAllocator() = default;
 
@@ -97,7 +98,7 @@ private:
     MemoryPool<Model, 4096> m_modelPool;
 };
 
-static inline auto& ResourceMemoryPools = ResourceAllocator::GetInstance();
+static auto ResourceMemoryPools = ResourceAllocator::GetInstance();
 
 template<typename T>
 concept ResourceType = std::is_base_of_v<Model, T>

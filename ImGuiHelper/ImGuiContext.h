@@ -111,6 +111,11 @@ public:
 		return m_isPopup;
 	}
 
+	void SetPopup(bool isPopup)
+	{
+		m_isPopup = isPopup;
+	}
+
 private:
 	friend class ImGuiRegister;
 	std::string m_name;

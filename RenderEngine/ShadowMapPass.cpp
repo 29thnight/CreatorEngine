@@ -70,20 +70,7 @@ ShadowMapPass::ShadowMapPass()
 
 ShadowMapPass::~ShadowMapPass()
 {
-	for (auto& [frame, cmdArr] : m_commandQueueMap)
-	{
-		for (auto& queue : cmdArr)
-		{
-			while (!queue.empty())
-			{
-				ID3D11CommandList* CommandJob;
-				if (queue.try_pop(CommandJob))
-				{
-					Memory::SafeDelete(CommandJob);
-				}
-			}
-		}
-	}
+	Memory::SafeDelete(m_cloudShadowMapBuffer);
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)
@@ -404,7 +391,7 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 void ShadowMapPass::UseCloudShadowMap(const std::string_view& filename)
 {
 	file::path path = file::path(filename);
-	if (file::exists(path))
+	if (file::exists(path) || nullptr == m_cloudShadowMapTexture)
 	{
 		m_cloudShadowMapTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(filename));
 		m_cloudShadowMapTexture->m_textureType = TextureType::ImageTexture;
@@ -413,7 +400,7 @@ void ShadowMapPass::UseCloudShadowMap(const std::string_view& filename)
 
 void ShadowMapPass::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, LightController* lightcontroller)
 {
-	if (lightcontroller->m_lightCount <= 0)
+	if (lightcontroller->m_lightCount <= 0 || nullptr == m_cloudShadowMapTexture)
 		return;
 	ID3D11DeviceContext* defferdPtr = defferdContext;
 
@@ -435,12 +422,14 @@ void ShadowMapPass::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, Light
 
 void ShadowMapPass::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn)
 {
-	if (isOn) {
+	if (isOn && nullptr != m_cloudShadowMapTexture)
+	{
 		UpdateCloudBuffer(defferdContext, lightcontroller);
 		DirectX11::PSSetConstantBuffer(defferdContext, 4, 1, &m_cloudShadowMapBuffer);
 		DirectX11::PSSetShaderResources(defferdContext, 10, 1, &m_cloudShadowMapTexture->m_pSRV);
 	}
-	else {
+	else 
+	{
 		UpdateCloudBuffer(defferdContext, lightcontroller);
 		ID3D11Buffer* nullbuf = nullptr;
 		ID3D11ShaderResourceView* nullsrv = nullptr;
@@ -451,12 +440,14 @@ void ShadowMapPass::PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, Li
 
 void ShadowMapPass::CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn)
 {
-	if (isOn) {
+	if (isOn && nullptr != m_cloudShadowMapTexture)
+	{
 		UpdateCloudBuffer(defferdContext, lightcontroller);
 		DirectX11::CSSetConstantBuffer(defferdContext, 1, 1, &m_cloudShadowMapBuffer);
 		DirectX11::CSSetShaderResources(defferdContext, 3, 1, &m_cloudShadowMapTexture->m_pSRV);
 	}
-	else {
+	else 
+	{
 		UpdateCloudBuffer(defferdContext, lightcontroller);
 		ID3D11Buffer* nullbuf = nullptr;
 		ID3D11ShaderResourceView* nullsrv = nullptr;
