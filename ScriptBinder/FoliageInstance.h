@@ -12,6 +12,7 @@ struct FoliageInstance
     Mathf::Vector3 m_scale{ 1.f,1.f,1.f };
     [[Property]]
     uint32 m_foliageTypeID{ 0 }; // index of FoliageType
+    bool m_isCulled{ false }; // whether this instance is culled or not
 
    ReflectFoliageInstance
     [[Serializable]]

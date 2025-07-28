@@ -501,6 +501,7 @@ void MenuBarWindow::RenderMenuBar()
     ShowBehaviorTreeWindow();
     ShowBlackBoardWindow();
     SHowInputActionMap();
+	ShowPrefabEditorWindow();
     if (m_bShowProfileWindow)
     {
         ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);

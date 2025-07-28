@@ -68,6 +68,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
         return false;
 
     auto node = Meta::Serialize(const_cast<Prefab*>(prefab));
+	node["PrefabNode"].push_back(prefab->GetPrefabData());
     out << node;
     out.close();
 
@@ -81,6 +82,7 @@ Prefab* PrefabUtility::LoadPrefab(const std::string& path)
     auto node = MetaYml::LoadFile(path);
     auto prefab = new Prefab();
     Meta::Deserialize(prefab, node);
+	prefab->SetPrefabData(node["PrefabNode"]);
     prefab->SetFileGuid(make_file_guid(path));
     return prefab;
 }

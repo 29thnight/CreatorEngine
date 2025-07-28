@@ -985,6 +985,34 @@ void SceneRenderer::PrepareRender()
 					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
 					if (proxy)
 					{
+						//for(auto& foliage : foliageComponent->GetFoliageInstances())
+						//{
+						//	Mathf::Vector3 position = foliage.m_position;
+						//	Mathf::Vector3 rotation = foliage.m_rotation;
+						//	Mathf::Vector3 scale = foliage.m_scale;
+
+						//	Mathf::Matrix transform = Mathf::Matrix::CreateScale(scale) *
+						//		Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+						//		Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+						//		Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+						//		Mathf::Matrix::CreateTranslation(position);
+
+						//	const FoliageType& foliageType = foliageComponent->GetFoliageTypes()[foliage.m_foliageTypeID];
+						//	Mesh* mesh = foliageType.m_mesh;
+						//	if (mesh == nullptr) continue;
+
+						//	DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
+						//	DirectX::BoundingBox transformedBox;
+						//	boundingBox.Transform(transformedBox, transform);
+
+						//	if (camera->GetFrustum().Intersects(transformedBox))
+						//	{
+						//		foliage.m_isCulled = false;
+						//	}
+
+
+						//}
+
 						data->PushRenderQueue(proxy);
 					}
 				}
