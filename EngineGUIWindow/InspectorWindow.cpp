@@ -768,6 +768,9 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		}
 	}	
 
+	editWidth = editWidth > 2 ? editWidth : 2;
+	editHeight = editHeight > 2 ? editHeight : 2;
+
 	if (prewidth != editWidth || preheight != editHeight)
 	{
 		terrainComponent->Resize(editWidth, editHeight);

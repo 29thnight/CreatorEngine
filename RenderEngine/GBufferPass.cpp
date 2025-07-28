@@ -211,12 +211,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 			currentAnimatorGuid = proxy->m_animatorGuid;
 		}
 
+		Material* mat = proxy->m_Material;
+		auto matinfo = mat->m_materialInfo;
+		matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (proxy->m_materialGuid != currentMaterialGuid)
 		{
-			Material* mat = proxy->m_Material;
-			auto matinfo = mat->m_materialInfo;
-			matinfo.m_bitflag |= proxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
-
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
 			if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
 			if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
@@ -246,12 +245,11 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		// *** THE KEY OPTIMIZATION IS HERE ***
 		// --- Set material once per group ---
 		// Only update material state if it has changed from the previous group.
+		Material* mat = firstProxy->m_Material;
+		auto matinfo = mat->m_materialInfo;
+		matinfo.m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
 		if (groupMaterialGuid != currentMaterialGuid)
 		{
-			Material* mat = firstProxy->m_Material;
-			auto matinfo = mat->m_materialInfo;
-			matinfo.m_bitflag |= firstProxy->m_isShadowRecive ? MaterialInfomation::USE_SHADOW_RECIVE : 0;
-
 			DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &matinfo);
 			if (mat->m_pBaseColor) DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
 			if (mat->m_pNormal) DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);

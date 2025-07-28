@@ -304,3 +304,48 @@ public:
 	Tweener* SetEase(std::function<float(float)> func) { this->easeFunction = func; return this; }
 	Tweener* SetOnComplete(std::function<void()> func) { this->onCompleteCallback = func; return this; }
 };
+//#include "SceneManager.h"
+//#include "GameObject.h"
+//#include "TweenManager.h"
+class Tween {
+private:
+    std::shared_ptr<ITween> tweenPtr;
+
+public:
+    Tween(std::shared_ptr<ITween> ptr) : tweenPtr(ptr) {}
+
+    void Pause() { if (tweenPtr) tweenPtr->Pause(); }
+    void Resume() { if (tweenPtr) tweenPtr->Resume(); }
+    void Kill() { if (tweenPtr) tweenPtr->Kill(); }
+
+    // SetEase, SetOnComplete 등을 체이닝하고 싶다면
+    // ITween에 가상 메서드를 추가하고 여기서 호출해주면 됩니다.
+    // 예: Tween& SetEase(...) { ...; return *this; }
+};
+//class DOTween {
+//public:
+//    template <typename T>
+//    static Tween To(std::function<T()> getter, std::function<void(T)> setter, T endValue, float duration) {
+//        // Tweener를 shared_ptr로 생성
+//        auto tweenerPtr = std::make_shared<Tweener<T>>(getter, setter, endValue, duration);
+//
+//        // 관리자에 등록
+//		GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tweenerPtr);
+//
+//        // 사용자에게는 제어용 핸들(Tween)을 반환
+//        return Tween(tweenerPtr);
+//    }
+//
+//	template<>
+//	static Tween To(std::function<Mathf::Vector3()> getter, std::function<void(Mathf::Vector3)> setter, Mathf::Vector3 endValue, float duration) {
+//		// Tweener를 shared_ptr로 생성
+//		auto tweenerPtr = std::make_shared<Tweener<Mathf::Vector3>>(getter, setter, endValue, duration);
+//
+//		// 관리자에 등록
+//		GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tweenerPtr);
+//
+//		// 사용자에게는 제어용 핸들(Tween)을 반환
+//		return Tween(tweenerPtr);
+//	}
+//
+//};

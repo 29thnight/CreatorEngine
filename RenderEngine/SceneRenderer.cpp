@@ -21,6 +21,7 @@
 #include "Terrain.h"
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
+#include "FoliageComponent.h"
 #include "fa.h"
 #include "Trim.h"
 #include "Profiler.h"
@@ -935,7 +936,7 @@ void SceneRenderer::PrepareRender()
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-		m_threadPool->Enqueue([camera, allMeshes, data, terrainComponents, staticMeshes, skinnedMeshes, renderScene]
+		m_threadPool->Enqueue([=]
 		{
 			for (auto& mesh : allMeshes)
 			{
@@ -971,6 +972,18 @@ void SceneRenderer::PrepareRender()
 				{
 					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
 					if(proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& foliageComponent : foliageComponents)
+			{
+				if (foliageComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
+					if (proxy)
 					{
 						data->PushRenderQueue(proxy);
 					}

@@ -9,6 +9,7 @@
 #include "directxtk\SimpleMath.h"
 #include "MeshRendererProxy.h"
 #include "Skeleton.h"
+#include "Terrain.h"
 
 bool g_useCascade = true;
 constexpr size_t CASCADE_BEGIN_END_COUNT = 2;
@@ -204,6 +205,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 		renderData->m_shadowCamera.UpdateBuffer(deferredContextPtr1, true);
 
 		CreateCommandListProxyToShadow(deferredContext, scene, camera);
+		CreateTerrainRenderCommandList(deferredContext, scene, camera);
 	}
 
 	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
@@ -255,6 +257,7 @@ void ShadowMapPass::CreateCommandListNormalShadow(ID3D11DeviceContext* deferredC
 	scene.UseModel(deferredContextPtr1);
 
 	CreateCommandListProxyToShadow(deferredContext, scene, camera);
+	CreateTerrainRenderCommandList(deferredContext, scene, camera);
 
 	DirectX11::RSSetViewports(deferredContextPtr1, 1, &DeviceState::g_Viewport);
 	DirectX11::UnbindRenderTargets(deferredContextPtr1);
@@ -287,6 +290,25 @@ void ShadowMapPass::CreateCommandListProxyToShadow(ID3D11DeviceContext* deferred
 		}
 
 		PrimitiveRenderProxy->DrawShadow(deferredContextPtr1);
+	}
+}
+
+void ShadowMapPass::CreateTerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
+{
+	auto deferredContextPtr1 = deferredContext;
+
+	auto renderData = RenderPassData::GetData(&camera);
+
+	for (auto& terrainProxy : renderData->m_terrainQueue) {
+
+		auto terrainMesh = terrainProxy->m_terrainMesh;
+		auto terrainMaterial = terrainProxy->m_terrainMaterial;
+
+		if (terrainMesh && terrainMaterial)
+		{
+			scene.UpdateModel(terrainProxy->m_worldMatrix, deferredContextPtr1);
+			terrainMesh->Draw(deferredContextPtr1);
+		}
 	}
 }
 
