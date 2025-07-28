@@ -157,6 +157,22 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
 
     m_SceneObjects.push_back(newObj);
 
+	auto parentObj = GetGameObject(parentIndex);
+	if (parentObj && parentObj->m_index != index)
+	{
+		parentObj->m_childrenIndices.push_back(index);
+	}
+
+	if (!newObj->m_tag.ToString().empty())
+	{
+		TagManager::GetInstance()->AddTagToObject(newObj->m_tag.ToString(), newObj.get());
+	}
+
+	if (!newObj->m_layer.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(newObj->m_layer.ToString(), newObj.get());
+	}
+
     return m_SceneObjects[index];
 }
 

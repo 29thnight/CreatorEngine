@@ -147,8 +147,6 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         for (const auto& childNode : node["children"])
         {
             auto childObj = InstantiateRecursive(childNode, scene, obj->m_index);
-            if (childObj)
-                obj->m_childrenIndices.push_back(childObj->m_index);
         }
     }
 
