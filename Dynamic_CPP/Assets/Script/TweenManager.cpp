@@ -8,6 +8,7 @@ void TweenManager::Start()
 
 void TweenManager::Update(float tick)
 {
+    UpdateTween(tick);
 }
 
 void TweenManager::OnDestroy()

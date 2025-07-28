@@ -26,6 +26,7 @@ public:
 	ProxyContainer			  m_deferredQueue;
 	ProxyContainer			  m_forwardQueue;
 	ProxyContainer            m_terrainQueue;
+	ProxyContainer			  m_foliageQueue;
 	ProxyContainer			  m_shadowRenderQueue;
 	Camera					  m_shadowCamera;
 	//flags

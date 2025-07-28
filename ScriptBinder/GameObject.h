@@ -11,6 +11,7 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
+class Prefab;
 class GameObject : public Object
 {
 public:
@@ -112,6 +113,8 @@ public:
     [[Property]]
 	std::vector<GameObject::Index> m_childrenIndices;
 	[[Property]]
+	FileGuid m_prefabFileGuid{ nullFileGuid };
+	[[Property]]
 	HashedGuid m_attachedSoketID{};
 	[[Property]]
 	uint32 m_collisionType = 1;
@@ -131,6 +134,7 @@ public:
 	std::vector<std::shared_ptr<Component>> m_components{};
 
 	Scene* m_ownerScene{ nullptr };
+	Prefab* m_prefab{ nullptr };
 };
 
 #include "GameObject.inl"

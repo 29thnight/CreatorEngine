@@ -21,6 +21,7 @@
 #include "Terrain.h"
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
+#include "FoliageComponent.h"
 #include "fa.h"
 #include "Trim.h"
 #include "Profiler.h"
@@ -896,17 +897,23 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
-	
-	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, m_currentScene]
+	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+
+	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, foliageComponents, m_currentScene]
 	{
+		for (auto& mesh : allMeshes)
+		{
+			renderScene->UpdateCommand(mesh);
+		}
+
 		for (auto& terrain : terrainComponents)
 		{
 			renderScene->UpdateCommand(terrain);
 		}
 
-		for (auto& mesh : allMeshes)
+		for (auto& foliage : foliageComponents)
 		{
-			renderScene->UpdateCommand(mesh);
+			renderScene->UpdateCommand(foliage);
 		}
 	});
 
@@ -929,12 +936,11 @@ void SceneRenderer::PrepareRender()
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-		m_threadPool->Enqueue([camera, allMeshes, data, terrainComponents, staticMeshes, skinnedMeshes, renderScene]
+		m_threadPool->Enqueue([=]
 		{
 			for (auto& mesh : allMeshes)
 			{
 				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				if(mesh->m_shadowRecive == true)
 					data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 
@@ -967,6 +973,46 @@ void SceneRenderer::PrepareRender()
 					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
 					if(proxy)
 					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& foliageComponent : foliageComponents)
+			{
+				if (foliageComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
+					if (proxy)
+					{
+						//for(auto& foliage : foliageComponent->GetFoliageInstances())
+						//{
+						//	Mathf::Vector3 position = foliage.m_position;
+						//	Mathf::Vector3 rotation = foliage.m_rotation;
+						//	Mathf::Vector3 scale = foliage.m_scale;
+
+						//	Mathf::Matrix transform = Mathf::Matrix::CreateScale(scale) *
+						//		Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+						//		Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+						//		Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+						//		Mathf::Matrix::CreateTranslation(position);
+
+						//	const FoliageType& foliageType = foliageComponent->GetFoliageTypes()[foliage.m_foliageTypeID];
+						//	Mesh* mesh = foliageType.m_mesh;
+						//	if (mesh == nullptr) continue;
+
+						//	DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
+						//	DirectX::BoundingBox transformedBox;
+						//	boundingBox.Transform(transformedBox, transform);
+
+						//	if (camera->GetFrustum().Intersects(transformedBox))
+						//	{
+						//		foliage.m_isCulled = false;
+						//	}
+
+
+						//}
+
 						data->PushRenderQueue(proxy);
 					}
 				}

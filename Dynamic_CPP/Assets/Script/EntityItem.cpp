@@ -9,6 +9,8 @@
 #include "RigidBodyComponent.h"
 #include "Player.h"
 
+#include "TweenManager.h"
+
 using namespace Mathf;
 void EntityItem::Start()
 {
@@ -58,6 +60,7 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
+	return;
 	//GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
 	if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
@@ -107,6 +110,18 @@ void EntityItem::SetThrowOwner(Player* player)
 	throwOwner = player;
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+	
+	auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
+		GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+		auto pos = GetOwner()->m_transform.GetWorldPosition();
+		return Vector3(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]); },
+		[&](Vector3 val) { GetOwner()->m_transform.SetPosition(val); },
+		Vector3(30, 5, 30),
+		3.0f, 
+		[](float t) {return Easing::EaseInOutBack(t);}
+	);
+
+	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween);
 }
 
 Player* EntityItem::GetThrowOwner()

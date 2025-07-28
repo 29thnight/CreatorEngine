@@ -166,13 +166,13 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 
 		break;
 	case PrimitiveProxyType::FoliageComponent:
+		m_foliageQueue.push_back(proxy);
 		break;
 	case PrimitiveProxyType::TerrainComponent:
 		terrainMat = proxy->m_terrainMaterial;
 		if (terrainMat != nullptr) {
 			// Not assigned RenderingMode.
 			m_terrainQueue.push_back(proxy);
-			return;
 		}
 		break;
 	default:

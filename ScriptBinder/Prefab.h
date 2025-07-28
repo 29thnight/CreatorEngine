@@ -19,6 +19,11 @@ public:
 
     GameObject* Instantiate(const std::string_view& newName = "") const;
 
+    const MetaYml::Node& GetPrefabData() const { return m_prefabData; }
+    void SetPrefabData(const MetaYml::Node& node) { m_prefabData = node; }
+    FileGuid GetFileGuid() const { return m_fileGuid; }
+    void SetFileGuid(const FileGuid& guid) { m_fileGuid = guid; }
+
 private:
     MetaYml::Node m_prefabData{};
 
