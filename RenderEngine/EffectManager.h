@@ -58,9 +58,9 @@ public:
 
 	EffectBase* GetEffectInstance(const std::string& instanceId);
 
-	EffectBase* GetEffect(std::string_view name);
+	EffectBase* GetEffect(std::string_view instanceName);
 
-	bool RemoveEffect(std::string_view name);
+	bool RemoveEffect(std::string_view instanceName);
 
 	size_t GetPoolSize() const { return universalPool.size(); }
 	size_t GetActiveEffectCount() const { return activeEffects.size(); }

@@ -110,18 +110,26 @@ EffectBase* EffectManager::GetEffectInstance(const std::string& instanceId)
 }
 
 
-EffectBase* EffectManager::GetEffect(std::string_view name)
+EffectBase* EffectManager::GetEffect(std::string_view instanceName)
 {
-	auto it = activeEffects.find(name.data());
-	if (it != activeEffects.end()) {
-		return it->second.get();
-	}
-	return nullptr;
+    auto it = activeEffects.find(instanceName.data());
+    if (it != activeEffects.end()) {
+        return it->second.get();
+    }
+    return nullptr;
 }
 
-bool EffectManager::RemoveEffect(std::string_view name)
+bool EffectManager::RemoveEffect(std::string_view instanceName)
 {
-	return activeEffects.erase(name.data()) > 0;
+	auto it = activeEffects.find(instanceName.data());
+	if (it != activeEffects.end()) {
+		// 풀에 반환
+		auto effectToReturn = std::move(it->second);
+		activeEffects.erase(it);
+		ReturnToPool(std::move(effectToReturn));
+		return true;
+	}
+	return false;
 }
 
 void EffectManager::RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson)

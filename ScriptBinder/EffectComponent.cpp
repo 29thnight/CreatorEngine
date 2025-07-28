@@ -120,7 +120,13 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
 
     // 기존 이펙트가 있으면 먼저 삭제
     if (!m_effectInstanceName.empty()) {
-        DestroyCurrentEffect();
+        // 삭제할 인스턴스 이름을 프록시에 따로 저장
+        proxy->SetPendingRemoveInstance(m_effectInstanceName);
+        proxy->PushCommand(EffectCommandType::RemoveEffect);
+
+        m_effectInstanceName.clear();
+        m_isPlaying = false;
+        m_isPaused = false;
     }
 
     m_effectTemplateName = effectName;
@@ -141,21 +147,12 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     proxy->UpdateLoop(m_loop);
     proxy->UpdateDuration(m_duration);
 
-    // 임시로 예상되는 인스턴스 이름 생성 (실제 이름은 Update에서 동기화됨)
-    uint32_t nextId = EffectManagerProxy::GetCurrentInstanceCounter();
-    m_effectInstanceName = effectName + "_" + std::to_string(nextId);
-
     // 플레이 명령 실행
     proxy->PushCommand(EffectCommandType::Play);
 
     m_lastPosition = currentPos;
     m_lastRotation = currentRot;
     m_isPlaying = true;
-
-#ifdef _DEBUG
-    std::cout << "PlayEffectByName: " << effectName
-        << ", Predicted instance: " << m_effectInstanceName << std::endl;
-#endif
 }
 
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
@@ -222,10 +219,11 @@ void EffectComponent::DestroyCurrentEffect()
     {
         EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
         if (!proxy) return;
-        //auto removeCommand = EffectManagerProxy::CreateRemoveEffectCommand(m_effectInstanceName);
-        //EffectCommandQueue->PushEffectCommand(std::move(removeCommand));
-        proxy->UpdateInstanceName(m_effectInstanceName);
+
+        // 이것도 추가해야 함!
+        proxy->SetPendingRemoveInstance(m_effectInstanceName);
         proxy->PushCommand(EffectCommandType::RemoveEffect);
+
         m_effectInstanceName.clear();
         m_isPlaying = false;
         m_isPaused = false;

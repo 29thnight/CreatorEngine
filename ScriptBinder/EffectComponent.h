@@ -71,10 +71,11 @@ public:
 
     [[Property]]
     bool m_useAbsolutePosition = false;
-
-private:
-    // 실제 사용되는 고유 인스턴스 이름
+    
+    [[Property]]
     std::string m_effectInstanceName;
+private:
+
 
     // 인스턴스 카운터 (같은 컴포넌트에서 여러번 이펙트 변경시 고유성 보장)
     inline static int m_instanceCounter = 0;
