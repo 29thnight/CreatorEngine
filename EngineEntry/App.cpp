@@ -11,7 +11,7 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
-
+#include "InputActionManager.h"
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -100,6 +100,7 @@ void Core::App::Run()
 	{
 		g_progressWindow->SetStatusText(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
+		//InputActionManagers->LoadManager();
 		g_progressWindow->SetProgress(100);
 		
 		g_progressWindow->Close();

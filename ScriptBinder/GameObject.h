@@ -36,6 +36,8 @@ public:
 	~GameObject() override = default;
 
 	HashingString GetHashedName() const { return m_name; }
+	std::string RemoveSuffixNumberTag();
+
     void SetName(const std::string_view& name) { m_name = name.data(); }
     void SetTag(const std::string_view& tag);
     void SetLayer(const std::string_view& layer);

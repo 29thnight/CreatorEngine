@@ -5,6 +5,11 @@
 
 ActionMap::~ActionMap()
 {
+	for (auto& action : m_actions)
+	{
+		delete action;
+	}
+	m_actions.clear();
 }
 
 InputAction* ActionMap::AddAction()
@@ -52,7 +57,6 @@ void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType
 	inputAction->key.resize(1);
 	inputAction->key[0] = _key;
 	inputAction->keystate = _state;
-	inputAction->buttonAction = nullptr;
 	inputAction->buttonAction = _action;
 	if(isNew)
 	m_actions.push_back(inputAction);
@@ -238,6 +242,10 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 
 	for (auto& action : m_actions)
 	{
+		if (type->name != action->m_scriptName) return;
+
+
+
 		if (action->actionType == ActionType::Button)
 		{
 			if (action->key.size() == 0) continue;
@@ -309,7 +317,7 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 						action->value.v2Value = InputManagement->GetControllerThumbR(playerIndex);
 
 
-					InvokeAction(instance, type, action->funName,{action->value.v2Value .x,action->value.v2Value.y});
+					InvokeAction(instance, type, action->funName,{ action->value.v2Value });
 					//action->valueAction(action->value.v2Value);
 					break; //&&&&& 컨트롤러 vector2는 좌우 스틱만
 				}

@@ -2,10 +2,18 @@
 #include "ActionMap.h"
 #include "ModuleBehavior.h"
 #include "InputActionManager.h"
+#include "SceneManager.h"
+
 void PlayerInputComponent::Update(float tick)
 {
-	if (m_actionMap == nullptr) return;
 
+	if (SceneManagers->m_isGameStart == false) return;
+	if (m_actionMap == nullptr)
+	{
+		SetActionMap(m_actionMapName);
+	};
+
+	if (m_actionMap == nullptr) return;
 	GameObject* owner = GetOwner();
 
 	std::vector<ModuleBehavior*> scripts{};
@@ -15,14 +23,20 @@ void PlayerInputComponent::Update(float tick)
 		if (nullptr == component)
 			continue;
 		script = dynamic_cast<ModuleBehavior*>(component.get());
-		if (script != nullptr) break;
+		if (script != nullptr)
+		{
+			scripts.push_back(script);
+		};
 	}
 
-	if (script == nullptr) return;
+	if (scripts.size() == 0) return;
 
-	auto typeName = Meta::Find(script->GetHashedName().ToString());
-	void* voidPtr = static_cast<void*>(script);
-	m_actionMap->CheckAction(controllerIndex,voidPtr, typeName);
+	for (auto& _script : scripts)
+	{
+		auto typeName = Meta::Find(_script->GetHashedName().ToString());
+		void* voidPtr = static_cast<void*>(_script);
+		m_actionMap->CheckAction(controllerIndex, voidPtr, typeName);
+	}
 }
 
 void PlayerInputComponent::SetActionMap(std::string mapName)

@@ -116,10 +116,11 @@ public:
 
 	//자기 식별이름
 	
-
+	[[Property]]
+	std::string m_scriptName  = "None";
 	//실행함 함수이름 Attak
 	[[Property]]
-	std::string funName;
+	std::string funName = "None";
 
 	ControllerButton m_controllerButton = ControllerButton::None;
 	std::function<void()> buttonAction;

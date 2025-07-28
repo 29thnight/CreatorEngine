@@ -142,7 +142,7 @@ nlohmann::json InputActionManager::SerializeMap(ActionMap* _actionMap)
 
 			i++;
 		}
-		
+		actionJson["scpritName"] = action->m_scriptName;
 		actionJson["funName"] = action->funName;
 		actionArray.push_back(actionJson);
 	}
@@ -183,6 +183,7 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 		action->actionType = ParseActionType(actionJson["actionType"]);
 		action->keystate = ParseKeyState(actionJson["keystate"]);
 		action->funName = actionJson["funName"];
+		action->m_scriptName = actionJson["scpritName"];
 		action->key.resize(4);
 		// key0, key1, key2... 식으로 키값들 파싱
 		for (int i = 0; ; ++i)
@@ -190,13 +191,24 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 			std::string keyName = "key" + std::to_string(i);
 			if (actionJson.contains(keyName))
 			{
+				std::string keyname = actionJson[keyName];
 				if (action->inputType == InputType::KeyBoard)
 				{
-					action->key[i] = static_cast<size_t>(ParseKeyBoard(actionJson[keyName]));
+					action->key[i] = static_cast<size_t>(ParseKeyBoard(keyname));
 				}
 				else if (action->inputType == InputType::GamePad)
 				{
-					action->key[i] = static_cast<size_t>(ParseControllerButton(actionJson[keyName]));
+					if (ParseControllerButton(keyname) == ControllerButton::LEFT_Thumbstick ||
+						ParseControllerButton(keyname) == ControllerButton::RIGHT_Thumbstick
+						)
+					{
+						action->SetControllerButton(ParseControllerButton(keyname));
+					}
+					else
+					{
+						action->key[i] = static_cast<size_t>(ParseControllerButton(keyname));
+					}
+					
 				}
 				else
 				{
@@ -209,7 +221,7 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 				break;
 		}
 
-		newMap->m_actions.push_back(action);
+
 	}
 
 	return newMap;

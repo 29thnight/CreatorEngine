@@ -225,7 +225,7 @@ private:
 	HMODULE hDll{};
 	SetObjectAllocFunc m_setObjectAllocFunc{};
 	ModuleBehaviorFunc m_scriptFactoryFunc{};
-	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
+	ModuleBehaviorDeleteFunc m_scriptDeleteFunc{};
 	GetScriptNamesFunc m_scriptNamesFunc{};
 	SetSceneManagerFunc m_setSceneManagerFunc{};
 	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};

@@ -28,24 +28,30 @@ public:
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
 
+	[[Method]]
 	void Move(Mathf::Vector2 dir);
+	[[Method]]
 	void CatchAndThrow();
 	void Catch();
 	void Throw();
+	[[Method]]
 	void Dash();
-
+	[[Method]]
 	void StartAttack();
+	[[Method]]
 	void Charging();
+	[[Method]]
 	void Attack();
+	[[Method]]
 	void SwapWeaponLeft();
+	[[Method]]
 	void SwapWeaponRight();
 	void AddWeapon(GameObject* weapon);
+	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
 	void DeleteWeapon(int index);
 	void DeleteWeapon(GameObject* weapon);
 	void FindNearObject(GameObject* gameObject);
-
-
 	[[Property]]
 	int playerIndex = 0;
 

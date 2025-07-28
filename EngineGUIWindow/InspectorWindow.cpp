@@ -1715,6 +1715,7 @@ void InspectorWindow::ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInp
 
 		ImGui::Text("Action Map");
 		ImGui::SameLine();
+		ImGui::PushID(playerInput);
 		if (ImGui::Button(playerInput->m_actionMapName.c_str(), ImVec2(140, 0)))
 		{
 			ImGui::OpenPopup("selectMap");
@@ -1724,7 +1725,7 @@ void InspectorWindow::ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInp
 		{
 			for (auto& actionMap : InputActionManagers->m_actionMaps)
 			{
-				ImGui::PushID(actionMap);
+				ImGui::PushID(actionMap + 1);
 				if (ImGui::MenuItem(actionMap->m_name.c_str()))
 				{
 					playerInput->SetActionMap(actionMap);
@@ -1733,7 +1734,7 @@ void InspectorWindow::ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInp
 			}
 			ImGui::EndPopup();
 		}
-
+		ImGui::PopID();
 	}
 
 }

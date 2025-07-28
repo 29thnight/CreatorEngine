@@ -36,21 +36,21 @@ void Player::Start()
 		m_animator = player->GetComponent<Animator>();
 	}
 	//pad
-	std::string MapName = "Player" + std::to_string(playerIndex);
-	auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
-	//playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
-	playerMap->AddValueAction("Move", playerIndex, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
-		[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	playerMap->AddButtonAction("StartAttack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
-	playerMap->AddButtonAction("AttackCharging", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
-	playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
-	playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
-	playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
-	playerMap->AddButtonAction("DeleteWeapone", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::Y), KeyState::Down, [this]() {DeleteCurWeapon();});
-	playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
-	playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
-	playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
-	playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
+	//std::string MapName = "Player" + std::to_string(playerIndex);
+	//auto playerMap = SceneManagers->GetInputActionManager()->AddActionMap(MapName);
+	////playerMap->AddButtonAction("Punch", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, [this]() { Punch();});
+	//playerMap->AddValueAction("Move", playerIndex, InputValueType::Vector2, InputType::GamePad, { static_cast<size_t>(ControllerButton::LEFT_Thumbstick) },
+	//	[this](Mathf::Vector2 _vector2) {Move(_vector2);});
+	//playerMap->AddButtonAction("StartAttack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Down, [this]() {  StartAttack();});
+	//playerMap->AddButtonAction("AttackCharging", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Pressed, [this]() { Charging();});
+	//playerMap->AddButtonAction("Attack", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::X), KeyState::Released, [this]() { Attack();});
+	//playerMap->AddButtonAction("Dash", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::B), KeyState::Down, [this]() { Dash(); });
+	//playerMap->AddButtonAction("CatchAndThrow", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::A), KeyState::Down, [this]() {CatchAndThrow();});
+	//playerMap->AddButtonAction("DeleteWeapone", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::Y), KeyState::Down, [this]() {DeleteCurWeapon();});
+	//playerMap->AddButtonAction("SwapWeaponLeft", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::LEFT_SHOULDER), KeyState::Down, [this]() {SwapWeaponLeft();});
+	//playerMap->AddButtonAction("SwapWeaponRight", playerIndex, InputType::GamePad, static_cast<size_t>(ControllerButton::RIGHT_SHOULDER), KeyState::Down, [this]() {SwapWeaponRight();});
+	//playerMap->AddButtonAction("knockback", 0, InputType::KeyBoard, 'O', KeyState::Down, [this]() {TestKnockBack();});
+	//playerMap->AddButtonAction("stun", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {TestStun();});
 	//keyboard
 
 	/*playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'W', 'S' },
@@ -184,7 +184,7 @@ void Player::Update(float tick)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack) return;
+	if (isStun || isKnockBack || !m_isCallStart) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 	
@@ -243,8 +243,7 @@ void Player::Catch()
 		//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
 		//righthand->AttachObject(m_nearObject);
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
-		//rigidbody->SetBodyType(EBodyType::STATIC);
-		
+
 		catchedObject = m_nearObject;
 		m_nearObject = nullptr;
 		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::TRIGGER);
@@ -255,18 +254,11 @@ void Player::Catch()
 
 void Player::Throw()
 {
-	//Socket* righthand = m_animator->MakeSocket("RightHand", "mixamorig:RightHandThumb1");
-	//righthand->DetachObject(catchedObject);
-	//auto rigidbody = catchedObject->GetComponent<RigidBodyComponent>();
-	//rigidbody->SetBodyType(EBodyType::DYNAMIC);
-	//auto& transform = GetOwner()->m_transform;
-	//auto forward  = transform.GetForward();
-	//rigidbody->AddForce({ forward.x * ThrowPowerX ,ThrowPowerY, forward.z * ThrowPowerX }, EForceMode::IMPULSE);
-
 
 	auto item = catchedObject->GetComponent<EntityItem>();
 	if (item) {
 		item->SetThrowOwner(this);
+		item->Throw(player->m_transform.GetForward(),6.0f);
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&

@@ -19,6 +19,7 @@ void SceneManager::ManagerInitialize()
 	m_threadPool = new ThreadPool;
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
+    InputActionManagers->LoadManager();
 	TagManager::GetInstance()->Initialize();
 }
 

@@ -2002,19 +2002,67 @@ void MenuBarWindow::SHowInputActionMap()
                     
                 }
 
-
+                
 
                 if (ImGui::CollapsingHeader("Funciton"))
                 {
-                    char buffer[128];
-                    strcpy_s(buffer, action->funName.c_str());
-                    buffer[sizeof(buffer) - 1] = '\0';
-                    ImGui::SetNextItemWidth(200);
-                    if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+                    ImGui::Text("Script : ");
+                    ImGui::SameLine();
+                    if (ImGui::Button(action->m_scriptName.c_str()))
                     {
-                        // 엔터 눌러서 이름 확정
-                        action->funName = buffer;
+                        ImGui::OpenPopup("selectScript");
                     }
+
+
+
+                    if (ImGui::BeginPopup("selectScript"))
+                    {
+         
+                        for (auto& script : ScriptManager->GetScriptNames())
+                        {
+                         
+                            if (ImGui::MenuItem(script.c_str()))
+                            {
+                                action->m_scriptName = script;
+                            }
+                            
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::Text("Function : ");
+                    ImGui::SameLine();
+                    if (ImGui::Button(action->funName.c_str()))
+                    {
+                        ImGui::OpenPopup("selectMethod");
+                    }
+
+                    if (ImGui::BeginPopup("selectMethod"))
+                    {
+                        auto type = Meta::Find(action->m_scriptName);
+                        if (type != nullptr)
+                        {
+                            for (auto& method : type->methods)
+                            {
+                                if (ImGui::MenuItem(method.name))
+                                {
+                                    action->funName = method.name;
+                                }
+                            }
+                        }
+                        ImGui::EndPopup();
+                    }
+
+
+                    //char buffer[128];
+                    //strcpy_s(buffer, action->funName.c_str());
+                    //buffer[sizeof(buffer) - 1] = '\0';
+                    //ImGui::SetNextItemWidth(200);
+                    //if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+                    //{
+                    //    // 엔터 눌러서 이름 확정
+                    //    action->funName = buffer;
+                    //}
                 }
 
             }

@@ -324,7 +324,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			playerinput->SetOwner(obj);
 
 			
-			playerinput->SetActionMap(playerinput->m_actionMapName);
+			//playerinput->SetActionMap(playerinput->m_actionMapName);
 			}
 		else
 		{

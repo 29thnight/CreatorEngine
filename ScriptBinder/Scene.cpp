@@ -1043,7 +1043,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		{
 			return;
 		}
-		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
 		auto transform = animator->m_localTransforms[bone->m_index];
 		if (bone)
 		{

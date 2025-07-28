@@ -31,8 +31,13 @@ void EntityItem::Start()
 			material->m_materialInfo.m_bitflag = 0;
 		}
 	}
-
-	//GetComponent<BoxColliderComponent>().SetExtents({ 10.f, 10.f, 10.f });
+	auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+	rigid->LockAngularXYZ();
+	rigid->SetLinearDamping(0.1f);
+	auto box = GetOwner()->GetComponent<BoxColliderComponent>();
+	box->SetRestitution(0.f);
+	box->SetStaticFriction(100.f);
+	box->SetDynamicFriction(100.f);
 
 
 
@@ -58,42 +63,93 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 
 void EntityItem::Update(float tick)
 {
-	if (asisTail != nullptr) {
-		Transform* tailTransform = asisTail->GetComponent<Transform>();
-		if (tailTransform)
-		{
-			speed -= tick;
-			if (speed < 1.f) {
-				speed = 1.f;
-			}
+	//if (asisTail != nullptr) {
+	//	Transform* tailTransform = asisTail->GetComponent<Transform>();
+	//	if (tailTransform)
+	//	{
+	//		speed -= tick;
+	//		if (speed < 1.f) {
+	//			speed = 1.f;
+	//		}
 
-			Transform* myTr = GetOwner()->GetComponent<Transform>();
-			
-			Vector3 pC = tailTransform->GetWorldPosition();
-			Vector3 pB = ((pC - startPos) / 2) + startPos;
-			pB.y += 5.f;
-			Vector3 pA = startPos;
+	//		Transform* myTr = GetOwner()->GetComponent<Transform>();
+	//		
+	//		Vector3 pC = tailTransform->GetWorldPosition();
+	//		Vector3 pB = ((pC - startPos) / 2) + startPos;
+	//		pB.y += 5.f;
+	//		Vector3 pA = startPos;
 
-			timer += tick * speed; // 10sec
-			if (timer <= 1.f) {
-				Vector3 p0 = Lerp(pA, pB, timer);
-				Vector3 p1 = Lerp(pB, pC, timer);
-				Vector3 p01 = Lerp(p0, p1, timer);
+	//		timer += tick * speed; // 10sec
+	//		if (timer <= 1.f) {
+	//			Vector3 p0 = Lerp(pA, pB, timer);
+	//			Vector3 p1 = Lerp(pB, pC, timer);
+	//			Vector3 p01 = Lerp(p0, p1, timer);
 
-				myTr->SetPosition(p01);
-			}
-			else {
-				auto asis = GameObject::Find("Asis_01");
-				if (asis != nullptr) {
-					auto entityAsis = asis->GetComponent<EntityAsis>();
-					if(entityAsis) 
-						entityAsis->AddItem(this);
-				}
-				asisTail = nullptr;
-				timer = 0.f;
-			}
+	//			myTr->SetPosition(p01);
+	//		}
+	//		else {
+	//			auto asis = GameObject::Find("Asis_01");
+	//			if (asis != nullptr) {
+	//				auto entityAsis = asis->GetComponent<EntityAsis>();
+	//				if(entityAsis) 
+	//					entityAsis->AddItem(this);
+	//			}
+	//			asisTail = nullptr;
+	//			timer = 0.f;
+	//		}
+	//	}
+	//}
+
+	if (isThrow)
+	{
+		speed -= tick;
+		if (speed < 1.f) {
+			speed = 1.f;
 		}
+
+		Transform* myTr = GetOwner()->GetComponent<Transform>();
+		
+		Vector3 pB = ((endPos - startPos) / 2) + startPos;
+		pB.y += 5.f;
+		Vector3 pA = startPos;
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		timer += tick * speed; // 10sec
+		if (timer < 1.f) {
+			Vector3 p0 = Lerp(pA, pB, timer);
+			Vector3 p1 = Lerp(pB, endPos, timer);
+			Vector3 p01 = Lerp(p0, p1, timer);
+
+			myTr->SetPosition(p01);
+		}
+		else
+		{
+
+			GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+			isThrow = false;
+			speed = 2.f;
+			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+			m_state == EItemState::DROPPED;
+			
+		};
 	}
+
+	if (m_state == EItemState::DROPPED)
+	{
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+	}
+}
+
+void EntityItem::Throw(Mathf::Vector3 ownerForward,float distacne)
+{
+	m_state == EItemState::THROWN;
+	timer = 0.f;
+	isThrow = true;
+	Mathf::Vector3 offset = {ownerForward.x * distacne,0, ownerForward.z * distacne };
+	endPos = startPos + offset;
+	endPos.y = 0.1	;
 }
 
 void EntityItem::SetThrowOwner(Player* player)
