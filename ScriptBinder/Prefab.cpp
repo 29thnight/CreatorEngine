@@ -1,4 +1,6 @@
 #include "Prefab.h"
+#include "GameObject.h"
+#include "PrefabUtility.h"
 
 Prefab::Prefab(const std::string_view& name, const GameObject* source)
     : Object(name)
@@ -66,9 +68,9 @@ MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
 }
 
 GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
-                                         Scene* scene,
-                                         GameObject::Index parent,
-                                         const std::string_view& overrideName) const
+    Scene* scene,
+    GameObject::Index parent,
+    const std::string_view& overrideName) const
 {
     if (!scene || !node)
         return nullptr;
@@ -82,12 +84,24 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         return nullptr;
 
     const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<GameObject>());
+    HashedGuid newInstanceID = obj->GetInstanceID();
+	HashingString newHashedName = obj->GetHashedName();
     GameObject::Index newIndex = obj->m_index;
     if (meta)
     {
-        Meta::Deserialize(obj, node);
+        try
+        {
+            Meta::Deserialize(obj, node);
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError("Prefab instantiation failed: " + std::string(e.what()));
+            return nullptr;
+		}
     }
 
+	obj->m_instanceID = newInstanceID;
+	obj->m_name = newHashedName;
     obj->m_index = newIndex;
     obj->m_parentIndex = parent;
     obj->m_transform.SetParentID(parent);
@@ -98,7 +112,7 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         {
             try
             {
-                ComponentFactorys->LoadComponent(obj, componentNode);
+                ComponentFactorys->LoadComponent(obj, componentNode ,true);
             }
             catch (const std::exception& e)
             {
@@ -119,6 +133,9 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         }
     }
 
+    obj->m_prefab = const_cast<Prefab*>(this);
+    obj->m_prefabFileGuid = GetFileGuid();
+    PrefabUtilitys->RegisterInstance(obj, this);
+
     return obj;
 }
-
