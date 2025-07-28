@@ -118,6 +118,9 @@ protected:
 
     bool m_enabled = true;
 
+    bool m_isRendering = false;
+    mutable std::atomic<bool> m_gpuWorkPending = false;
+
 private:
     ID3D11DepthStencilState* m_prevDepthState = nullptr;
     UINT m_prevStencilRef = 0;

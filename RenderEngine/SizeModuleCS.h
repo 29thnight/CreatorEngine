@@ -33,6 +33,9 @@ public:
     void Release() override;
     void OnSystemResized(UINT maxParticles) override;
 
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
+
     // Size 모듈 전용 설정 메서드
     void SetStartSize(const XMFLOAT2& size);
     void SetEndSize(const XMFLOAT2& size);

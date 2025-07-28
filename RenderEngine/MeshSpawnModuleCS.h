@@ -77,6 +77,9 @@ public:
 	virtual void OnSystemResized(UINT maxParticles) override;
 	virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) override;
 
+	virtual void ResetForReuse();
+	virtual bool IsReadyForReuse() const;
+
 	void SetEmitterPosition(const Mathf::Vector3& position);
 	void SetEmitterRotation(const Mathf::Vector3& rotation);
 

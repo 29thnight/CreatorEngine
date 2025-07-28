@@ -22,6 +22,9 @@ public:
     void Update(float delta) override;
     void OnSystemResized(UINT max) override;
 
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
+
     // Movement settings
     void SetUseGravity(bool use) { m_gravity = use; m_paramsDirty = true;  std::cout << "asd"; }
 

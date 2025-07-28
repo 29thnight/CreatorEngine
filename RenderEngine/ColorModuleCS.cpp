@@ -375,3 +375,31 @@ void ColorModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationTy
     m_easingModule.SetDuration(duration);
     m_easingEnable = true;
 }
+
+void ColorModuleCS::ResetForReuse()
+{
+    if (!m_enabled) return;
+
+    // 시간 관련 상태 초기화
+    m_colorParams.deltaTime = 0.0f;
+
+    // 더티 플래그 설정
+    m_colorParamsDirty = true;
+    m_gradientDirty = true;
+    m_discreteColorsDirty = true;
+
+    // 이징 모듈 리셋
+    if (m_easingEnable) {
+        m_easingModule.Reset();
+    }
+}
+
+bool ColorModuleCS::IsReadyForReuse() const
+{
+    return m_isInitialized &&
+        m_colorParamsBuffer != nullptr &&
+        m_gradientBuffer != nullptr &&
+        m_discreteColorsBuffer != nullptr &&
+        m_gradientSRV != nullptr &&
+        m_discreteColorsSRV != nullptr;
+}

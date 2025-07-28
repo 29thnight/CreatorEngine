@@ -113,3 +113,17 @@ void MovementModuleCS::Release()
 
     m_isInitialized = false;
 }
+
+void MovementModuleCS::ResetForReuse()
+{
+    if (!m_enabled) return;
+
+    // 더티 플래그 설정 (상수 버퍼 재업데이트 강제)
+    m_paramsDirty = true;
+}
+
+bool MovementModuleCS::IsReadyForReuse() const
+{
+    return m_isInitialized &&
+        m_movementParamsBuffer != nullptr;
+}

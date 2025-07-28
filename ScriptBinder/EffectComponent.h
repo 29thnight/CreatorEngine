@@ -76,10 +76,6 @@ public:
     std::string m_effectInstanceName;
 private:
 
-
-    // 인스턴스 카운터 (같은 컴포넌트에서 여러번 이펙트 변경시 고유성 보장)
-    inline static int m_instanceCounter = 0;
-
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;
 

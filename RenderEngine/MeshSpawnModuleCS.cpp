@@ -208,135 +208,47 @@ void MeshSpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& ne
     SetEmitterPosition(newPosition);
 }
 
-nlohmann::json MeshSpawnModuleCS::SerializeData() const
+void MeshSpawnModuleCS::ResetForReuse()
 {
-    nlohmann::json json;
+    if (!m_enabled) return;
 
-    // SpawnParams 직렬화
-    json["spawnParams"] = {
-        {"spawnRate", m_spawnParams.spawnRate},
-        {"emitterType", m_spawnParams.emitterType},
-        {"emitterSize", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterSize)},
-        {"emitterRadius", m_spawnParams.emitterRadius},
-        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)}
-    };
-
-    // MeshParticleTemplateParams 직렬화
-    json["meshParticleTemplate"] = {
-        {"lifeTime", m_meshParticleTemplate.lifeTime},
-        {"minScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minScale)},
-        {"maxScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxScale)},
-        {"minRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minRotationSpeed)},
-        {"maxRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxRotationSpeed)},
-        {"minInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minInitialRotation)},
-        {"maxInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxInitialRotation)},
-        {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
-        {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
-        {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
-        {"minVerticalVelocity", m_meshParticleTemplate.minVerticalVelocity},
-        {"maxVerticalVelocity", m_meshParticleTemplate.maxVerticalVelocity},
-        {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
-        {"textureIndex", m_meshParticleTemplate.textureIndex},
-        {"renderMode", m_meshParticleTemplate.renderMode}
-    };
-
-    // 상태 정보
-    json["state"] = {
-        {"isInitialized", m_isInitialized},
-        {"particleCapacity", m_particleCapacity}
-    };
-
-    return json;
-}
-
-
-void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
-{
-    // SpawnParams 복원
-    if (json.contains("spawnParams"))
-    {
-        const auto& spawnJson = json["spawnParams"];
-
-        if (spawnJson.contains("spawnRate"))
-            m_spawnParams.spawnRate = spawnJson["spawnRate"];
-
-        if (spawnJson.contains("emitterType"))
-            m_spawnParams.emitterType = spawnJson["emitterType"];
-
-        if (spawnJson.contains("emitterSize"))
-            m_spawnParams.emitterSize = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterSize"]);
-
-        if (spawnJson.contains("emitterRadius"))
-            m_spawnParams.emitterRadius = spawnJson["emitterRadius"];
-
-        if (spawnJson.contains("emitterPosition"))
-            m_spawnParams.emitterPosition = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterPosition"]);
-    }
-
-    // MeshParticleTemplateParams 복원
-    if (json.contains("meshParticleTemplate"))
-    {
-        const auto& templateJson = json["meshParticleTemplate"];
-
-        if (templateJson.contains("lifeTime"))
-            m_meshParticleTemplate.lifeTime = templateJson["lifeTime"];
-
-        if (templateJson.contains("minScale"))
-            m_meshParticleTemplate.minScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["minScale"]);
-
-        if (templateJson.contains("maxScale"))
-            m_meshParticleTemplate.maxScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxScale"]);
-
-        if (templateJson.contains("minRotationSpeed"))
-            m_meshParticleTemplate.minRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["minRotationSpeed"]);
-
-        if (templateJson.contains("maxRotationSpeed"))
-            m_meshParticleTemplate.maxRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxRotationSpeed"]);
-
-        if (templateJson.contains("minInitialRotation"))
-            m_meshParticleTemplate.minInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["minInitialRotation"]);
-
-        if (templateJson.contains("maxInitialRotation"))
-            m_meshParticleTemplate.maxInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxInitialRotation"]);
-
-        if (templateJson.contains("color"))
-            m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
-
-        if (templateJson.contains("velocity"))
-            m_meshParticleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
-
-        if (templateJson.contains("acceleration"))
-            m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
-
-        if (templateJson.contains("minVerticalVelocity"))
-            m_meshParticleTemplate.minVerticalVelocity = templateJson["minVerticalVelocity"];
-
-        if (templateJson.contains("maxVerticalVelocity"))
-            m_meshParticleTemplate.maxVerticalVelocity = templateJson["maxVerticalVelocity"];
-
-        if (templateJson.contains("horizontalVelocityRange"))
-            m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
-
-        if (templateJson.contains("textureIndex"))
-            m_meshParticleTemplate.textureIndex = templateJson["textureIndex"];
-
-        if (templateJson.contains("renderMode"))
-            m_meshParticleTemplate.renderMode = templateJson["renderMode"];
-    }
-
-    // 상태 정보 복원
-    if (json.contains("state"))
-    {
-        const auto& stateJson = json["state"];
-
-        if (stateJson.contains("particleCapacity"))
-            m_particleCapacity = stateJson["particleCapacity"];
-    }
-
-    // 변경사항을 적용하기 위해 더티 플래그 설정
+    // 스폰 관련 상태 초기화
+    m_spawnParams.currentTime = 0.0f;
+    m_spawnParams.deltaTime = 0.0f;
+    m_forcePositionUpdate = true;
     m_spawnParamsDirty = true;
     m_templateDirty = true;
+
+    // 이전 위치 리셋
+    m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+    // 회전 리셋
+    m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_spawnParams.forceRotationUpdate = 0;
+
+    // 난수 상태 리셋
+    if (m_randomStateBuffer) {
+        UINT newSeed = m_randomGenerator();
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_randomStateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
+            memcpy(mappedResource.pData, &newSeed, sizeof(UINT));
+            DeviceState::g_pDeviceContext->Unmap(m_randomStateBuffer, 0);
+        }
+    }
 }
+
+bool MeshSpawnModuleCS::IsReadyForReuse() const
+{
+    return m_isInitialized &&
+        m_randomStateBuffer != nullptr &&
+        m_spawnParamsBuffer != nullptr &&
+        m_templateBuffer != nullptr;
+}
+
+
 
 std::string MeshSpawnModuleCS::GetModuleType() const
 {
@@ -606,3 +518,136 @@ void MeshSpawnModuleCS::SetRenderMode(UINT mode)
     }
 }
 
+
+nlohmann::json MeshSpawnModuleCS::SerializeData() const
+{
+    nlohmann::json json;
+
+    // SpawnParams 직렬화
+    json["spawnParams"] = {
+        {"spawnRate", m_spawnParams.spawnRate},
+        {"emitterType", m_spawnParams.emitterType},
+        {"emitterSize", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterSize)},
+        {"emitterRadius", m_spawnParams.emitterRadius},
+        {"emitterPosition", EffectSerializer::SerializeXMFLOAT3(m_spawnParams.emitterPosition)}
+    };
+
+    // MeshParticleTemplateParams 직렬화
+    json["meshParticleTemplate"] = {
+        {"lifeTime", m_meshParticleTemplate.lifeTime},
+        {"minScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minScale)},
+        {"maxScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxScale)},
+        {"minRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minRotationSpeed)},
+        {"maxRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxRotationSpeed)},
+        {"minInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minInitialRotation)},
+        {"maxInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxInitialRotation)},
+        {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
+        {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
+        {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
+        {"minVerticalVelocity", m_meshParticleTemplate.minVerticalVelocity},
+        {"maxVerticalVelocity", m_meshParticleTemplate.maxVerticalVelocity},
+        {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
+        {"textureIndex", m_meshParticleTemplate.textureIndex},
+        {"renderMode", m_meshParticleTemplate.renderMode}
+    };
+
+    // 상태 정보
+    json["state"] = {
+        {"isInitialized", m_isInitialized},
+        {"particleCapacity", m_particleCapacity}
+    };
+
+    return json;
+}
+
+
+void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
+{
+    // SpawnParams 복원
+    if (json.contains("spawnParams"))
+    {
+        const auto& spawnJson = json["spawnParams"];
+
+        if (spawnJson.contains("spawnRate"))
+            m_spawnParams.spawnRate = spawnJson["spawnRate"];
+
+        if (spawnJson.contains("emitterType"))
+            m_spawnParams.emitterType = spawnJson["emitterType"];
+
+        if (spawnJson.contains("emitterSize"))
+            m_spawnParams.emitterSize = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterSize"]);
+
+        if (spawnJson.contains("emitterRadius"))
+            m_spawnParams.emitterRadius = spawnJson["emitterRadius"];
+
+        if (spawnJson.contains("emitterPosition"))
+            m_spawnParams.emitterPosition = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterPosition"]);
+    }
+
+    // MeshParticleTemplateParams 복원
+    if (json.contains("meshParticleTemplate"))
+    {
+        const auto& templateJson = json["meshParticleTemplate"];
+
+        if (templateJson.contains("lifeTime"))
+            m_meshParticleTemplate.lifeTime = templateJson["lifeTime"];
+
+        if (templateJson.contains("minScale"))
+            m_meshParticleTemplate.minScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["minScale"]);
+
+        if (templateJson.contains("maxScale"))
+            m_meshParticleTemplate.maxScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxScale"]);
+
+        if (templateJson.contains("minRotationSpeed"))
+            m_meshParticleTemplate.minRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["minRotationSpeed"]);
+
+        if (templateJson.contains("maxRotationSpeed"))
+            m_meshParticleTemplate.maxRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxRotationSpeed"]);
+
+        if (templateJson.contains("minInitialRotation"))
+            m_meshParticleTemplate.minInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["minInitialRotation"]);
+
+        if (templateJson.contains("maxInitialRotation"))
+            m_meshParticleTemplate.maxInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxInitialRotation"]);
+
+        if (templateJson.contains("color"))
+            m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
+
+        if (templateJson.contains("velocity"))
+            m_meshParticleTemplate.velocity = EffectSerializer::DeserializeXMFLOAT3(templateJson["velocity"]);
+
+        if (templateJson.contains("acceleration"))
+            m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
+
+        if (templateJson.contains("minVerticalVelocity"))
+            m_meshParticleTemplate.minVerticalVelocity = templateJson["minVerticalVelocity"];
+
+        if (templateJson.contains("maxVerticalVelocity"))
+            m_meshParticleTemplate.maxVerticalVelocity = templateJson["maxVerticalVelocity"];
+
+        if (templateJson.contains("horizontalVelocityRange"))
+            m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
+
+        if (templateJson.contains("textureIndex"))
+            m_meshParticleTemplate.textureIndex = templateJson["textureIndex"];
+
+        if (templateJson.contains("renderMode"))
+            m_meshParticleTemplate.renderMode = templateJson["renderMode"];
+    }
+
+    // 상태 정보 복원
+    if (json.contains("state"))
+    {
+        const auto& stateJson = json["state"];
+
+        if (stateJson.contains("particleCapacity"))
+            m_particleCapacity = stateJson["particleCapacity"];
+    }
+
+    if (!m_isInitialized)
+        Initialize();
+
+    // 변경사항을 적용하기 위해 더티 플래그 설정
+    m_spawnParamsDirty = true;
+    m_templateDirty = true;
+}

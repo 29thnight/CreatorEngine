@@ -68,9 +68,13 @@ public:
 	// 읽기만 effects에 접근은 오로지 매니저에서만
 	const std::unordered_map<std::string, UniversalEffectTemplate> GetEffectTemplates() const { return templates; }
 
-	UINT GetInstanceId() const { return nextInstanceId.load(); }
+	//UINT GetInstanceId() const { return nextInstanceId.load(); }
 
 	void RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson);
+
+	std::string ReplaceEffect(const std::string& instanceId, const std::string& newTemplateName);
+
+	uint32_t GetSmartAvailableId(const std::string& templateName);
 
 private:
 	// 템플릿 설정들 (JSON에서 로드)
@@ -83,11 +87,12 @@ private:
 	std::queue<std::unique_ptr<EffectBase>> universalPool;
 
 	// 인스턴스 ID 생성기
-	std::atomic<UINT> nextInstanceId{ 1 };
+	std::mutex smartIdMutex;
+
 
 	// 풀 설정
 	static const int DEFAULT_POOL_SIZE = 50;  // 동시 이펙트 최대 개수
-	static const int MAX_PARTICLES_PER_SYSTEM = 2000;  // 시스템당 최대 파티클 수
+	static const int MAX_PARTICLES_PER_SYSTEM = 10000;  // 시스템당 최대 파티클 수
 
 private:
 	void InitializeUniversalPool();

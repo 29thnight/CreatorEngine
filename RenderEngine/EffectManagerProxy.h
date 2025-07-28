@@ -109,6 +109,15 @@ public:
         return cmd;
     }
 
+    static EffectManagerProxy CreateReplaceEffectCommand(const std::string& instanceId, const std::string& newTemplateName)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [instanceId, newTemplateName]() {
+            return EffectManagers->ReplaceEffect(instanceId, newTemplateName);
+            };
+        return cmd;
+    }
+
     // 템플릿 설정 가져오기 (정적 함수로 직접 처리)
     static bool GetTemplateSettings(const std::string& templateName,
         float& outTimeScale,
@@ -125,9 +134,9 @@ public:
         return false;
     }
 
-    static uint32_t GetCurrentInstanceCounter() {
-        return EffectManagers->GetInstanceId();
-    }
+    //static uint32_t GetCurrentInstanceCounter() {
+    //    return EffectManagers->GetInstanceId();
+    //}
 
     // 명령 실행
     void Execute()

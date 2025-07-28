@@ -184,6 +184,25 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 					PushEffectCommand(std::move(command));
 				}
 				break;
+			case EffectCommandType::ReplaceEffect:
+			{
+				std::string newInstanceId = EffectManagers->ReplaceEffect(
+					proxy->GetInstanceName(),
+					proxy->GetTempleteName()
+				);
+
+				if (!newInstanceId.empty()) {
+					// 인스턴스 ID는 그대로 유지됨
+					if (auto* effect = EffectManagers->GetEffectInstance(newInstanceId)) {
+						effect->SetPosition(proxy->GetPosition());
+						effect->SetRotation(proxy->GetRotation());
+						effect->SetTimeScale(proxy->GetTimeScale());
+						effect->SetLoop(proxy->GetLoop());
+						effect->SetDuration(proxy->GetDuration());
+					}
+				}
+				break;
+			}
 			default:
 				break;
 			}

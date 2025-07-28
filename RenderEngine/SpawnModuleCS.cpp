@@ -600,6 +600,9 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 			m_particleCapacity = stateJson["particleCapacity"];
 	}
 
+	if (!m_isInitialized)
+		Initialize();
+
 	// 변경사항을 적용하기 위해 더티 플래그 설정
 	m_spawnParamsDirty = true;
 	m_templateDirty = true;

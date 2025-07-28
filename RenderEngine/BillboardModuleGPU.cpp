@@ -393,8 +393,9 @@ void BillboardModuleGPU::DeserializeData(const nlohmann::json& json)
 		m_indices = json["indices"].get<std::vector<uint32>>();
 	}
 
-	// 복원 후 리소스 재생성 필요
-	// Initialize()를 다시 호출하거나 별도 메소드로 GPU 리소스 재생성
+	if (!m_pso) {
+		Initialize();
+	}
 }
 
 std::string BillboardModuleGPU::GetModuleType() const

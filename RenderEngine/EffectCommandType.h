@@ -13,6 +13,7 @@ enum class EffectCommandType
     SetRotation,
     SetLoop,
     SetDuration,
+    ReplaceEffect,
 };
 
 AUTO_REGISTER_ENUM(EffectCommandType)

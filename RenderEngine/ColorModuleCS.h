@@ -78,6 +78,9 @@ public:
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
 
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
+
 private:
     // 초기화 메서드
     bool InitializeComputeShader();

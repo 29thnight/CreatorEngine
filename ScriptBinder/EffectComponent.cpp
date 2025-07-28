@@ -118,17 +118,6 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
-    // 기존 이펙트가 있으면 먼저 삭제
-    if (!m_effectInstanceName.empty()) {
-        // 삭제할 인스턴스 이름을 프록시에 따로 저장
-        proxy->SetPendingRemoveInstance(m_effectInstanceName);
-        proxy->PushCommand(EffectCommandType::RemoveEffect);
-
-        m_effectInstanceName.clear();
-        m_isPlaying = false;
-        m_isPaused = false;
-    }
-
     m_effectTemplateName = effectName;
 
     // 위치와 회전 설정
@@ -139,34 +128,53 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
     Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
 
-    // 프록시에 설정 업데이트
-    proxy->UpdateTempleteName(m_effectTemplateName);
-    proxy->UpdatePosition(currentPos);
-    proxy->UpdateRotation(currentRot);
-    proxy->UpdateTimeScale(m_timeScale);
-    proxy->UpdateLoop(m_loop);
-    proxy->UpdateDuration(m_duration);
+    // 기존 이펙트가 있으면 Replace, 없으면 새로 생성
+    if (!m_effectInstanceName.empty()) {
+        // Replace 명령 (인스턴스 ID 유지)
+        proxy->UpdateInstanceName(m_effectInstanceName);
+        proxy->UpdateTempleteName(m_effectTemplateName);
+        proxy->UpdatePosition(currentPos);
+        proxy->UpdateRotation(currentRot);
+        proxy->UpdateTimeScale(m_timeScale);
+        proxy->UpdateLoop(m_loop);
+        proxy->UpdateDuration(m_duration);
 
-    // 플레이 명령 실행
-    proxy->PushCommand(EffectCommandType::Play);
+        proxy->PushCommand(EffectCommandType::ReplaceEffect);
+    }
+    else {
+        // 새로 생성
+        proxy->UpdateTempleteName(m_effectTemplateName);
+        proxy->UpdatePosition(currentPos);
+        proxy->UpdateRotation(currentRot);
+        proxy->UpdateTimeScale(m_timeScale);
+        proxy->UpdateLoop(m_loop);
+        proxy->UpdateDuration(m_duration);
+
+        proxy->PushCommand(EffectCommandType::Play);
+    }
 
     m_lastPosition = currentPos;
     m_lastRotation = currentRot;
     m_isPlaying = true;
 }
 
+
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
 {
     if (newEffectName.empty()) return;
 
-    // 기존 이펙트 정지 및 삭제
-    DestroyCurrentEffect();
-
-    // 새로운 이펙트로 변경
+    // 새로운 이펙트 이름 설정
     m_effectTemplateName = newEffectName;
 
-    // 새 이펙트 재생
-    PlayEffectByName(newEffectName);
+    // 기존 이펙트가 있으면 Replace, 없으면 새로 생성
+    if (!m_effectInstanceName.empty()) {
+        // Replace로 처리 (ID 유지)
+        PlayEffectByName(newEffectName);
+    }
+    else {
+        // 새로 생성
+        PlayEffectByName(newEffectName);
+    }
 }
 
 void EffectComponent::StopEffect()

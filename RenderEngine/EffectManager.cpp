@@ -62,7 +62,6 @@ void EffectManager::Update(float delta)
 		auto& effect = it->second;
 		effect->Update(delta);
 
-		// 종료된 이펙트는 자동으로 풀에 반환
 		if (effect->GetState() == EffectState::Stopped) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
@@ -81,23 +80,19 @@ std::string EffectManager::PlayEffect(const std::string& templateName)
 		return "";
 	}
 
-	// 풀에서 인스턴스 가져오기
 	auto instance = AcquireFromPool();
 	if (!instance) {
 		std::cerr << "Pool exhausted! Cannot play effect: " << templateName << std::endl;
 		return "";
 	}
 
-	// 템플릿 설정 적용
 	ConfigureInstance(instance.get(), templateIt->second);
 
-	uint32_t currentId = nextInstanceId.fetch_add(1);  // 안전하게 증가
+	// 스마트 ID 할당 시스템 사용
+	uint32_t currentId = GetSmartAvailableId(templateName);
 	std::string instanceId = templateName + "_" + std::to_string(currentId);
 
-	// 위치 설정 및 재생 시작
 	instance->Play();
-
-	// 활성 이펙트 목록에 추가
 	activeEffects[instanceId] = std::move(instance);
 
 	return instanceId;
@@ -123,7 +118,7 @@ bool EffectManager::RemoveEffect(std::string_view instanceName)
 {
 	auto it = activeEffects.find(instanceName.data());
 	if (it != activeEffects.end()) {
-		// 풀에 반환
+		// ID 재활용 코드 제거 (스마트 할당이 알아서 처리)
 		auto effectToReturn = std::move(it->second);
 		activeEffects.erase(it);
 		ReturnToPool(std::move(effectToReturn));
@@ -138,6 +133,64 @@ void EffectManager::RegisterTemplateFromEditor(const std::string& effectName, co
 	templateConfig.LoadConfigFromJSON(effectJson);
 	templates[effectName] = templateConfig;
 	std::cout << "Runtime template registered: " << effectName << std::endl;
+}
+
+std::string EffectManager::ReplaceEffect(const std::string& instanceId, const std::string& newTemplateName)
+{
+	auto templateIt = templates.find(newTemplateName);
+	if (templateIt == templates.end()) {
+		return "";
+	}
+
+	auto it = activeEffects.find(instanceId);
+	if (it != activeEffects.end()) {
+		// 기존 인스턴스를 재설정 (삭제/생성 없음)
+		auto& effect = it->second;
+
+		// 이펙트 정지
+		effect->Stop();
+
+		// 새 템플릿 설정 적용
+		ConfigureInstance(effect.get(), templateIt->second);
+
+		// 재생 시작
+		effect->Play();
+
+		return instanceId; // 같은 ID 반환
+	}
+
+	// 기존 인스턴스가 없으면 새로 생성
+	return PlayEffect(newTemplateName);
+}
+
+uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
+{
+	std::lock_guard<std::mutex> lock(smartIdMutex);
+
+	// 현재 활성화된 이펙트들에서 사용 중인 ID 수집
+	std::set<uint32_t> usedIds;
+
+	for (const auto& [instanceName, effect] : activeEffects) {
+		size_t underscorePos = instanceName.find_last_of('_');
+		if (underscorePos != std::string::npos) {
+			try {
+				uint32_t id = std::stoul(instanceName.substr(underscorePos + 1));
+				usedIds.insert(id);
+			}
+			catch (const std::exception&) {
+				// 파싱 실패시 무시
+			}
+		}
+	}
+
+	// 가장 작은 사용 가능한 ID 찾기
+	uint32_t availableId = 1;
+	while (usedIds.find(availableId) != usedIds.end()) {
+		availableId++;
+	}
+
+	std::cout << "Smart ID assignment: " << templateName << "_" << availableId << std::endl;
+	return availableId;
 }
 
 void EffectManager::InitializeUniversalPool()

@@ -74,7 +74,6 @@ private:
     std::vector<BillboardVertex> m_vertices;
     std::vector<uint32> m_indices;
 
-    bool m_isRendering = false;
-    mutable std::atomic<bool> m_gpuWorkPending = false;
+
 };
 
