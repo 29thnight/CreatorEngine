@@ -124,14 +124,7 @@ public:
         bool& outLoop,
         float& outDuration)
     {
-        auto* templateEffect = EffectManagers->GetEffect(templateName);
-        if (templateEffect) {
-            outTimeScale = templateEffect->GetTimeScale();
-            outLoop = templateEffect->IsLooping();
-            outDuration = templateEffect->GetDuration();
-            return true;
-        }
-        return false;
+        return EffectManagers->GetTemplateSettings(templateName, outTimeScale, outLoop, outDuration);
     }
 
     //static uint32_t GetCurrentInstanceCounter() {

@@ -26,8 +26,14 @@ public:
 	int maxParticles = 1000;
 	ParticleDataType dataType = ParticleDataType::Standard;
 
+	std::string name{};
+	float duration = 1.0f;
+	bool loop = false;
+	float timeScale = 1.0f;
+
 	// 모듈별 데이터 (한 번만 파싱해서 저장)
 	nlohmann::json spawnModuleData;
+	nlohmann::json meshSpawnModuleData;
 	nlohmann::json colorModuleData;
 	nlohmann::json movementModuleData;
 	nlohmann::json sizeModuleData;
@@ -75,6 +81,11 @@ public:
 	std::string ReplaceEffect(const std::string& instanceId, const std::string& newTemplateName);
 
 	uint32_t GetSmartAvailableId(const std::string& templateName);
+
+	bool GetTemplateSettings(const std::string& templateName,
+		float& outTimeScale,
+		bool& outLoop,
+		float& outDuration);
 
 private:
 	// 템플릿 설정들 (JSON에서 로드)

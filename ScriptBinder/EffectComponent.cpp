@@ -120,6 +120,17 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
 
     m_effectTemplateName = effectName;
 
+    float templateTimeScale, templateDuration;
+    bool templateLoop;
+
+    if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
+    {
+        // JSON에서 로드된 원본 설정으로 컴포넌트 변수 업데이트
+        m_timeScale = templateTimeScale;
+        m_loop = templateLoop;
+        m_duration = templateDuration;
+    }
+
     // 위치와 회전 설정
     auto currentPos = GetOwner()->m_transform.GetWorldPosition();
     auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
@@ -165,6 +176,16 @@ void EffectComponent::ChangeEffect(const std::string& newEffectName)
 
     // 새로운 이펙트 이름 설정
     m_effectTemplateName = newEffectName;
+
+    float templateTimeScale, templateDuration;
+    bool templateLoop;
+
+    if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
+    {
+        m_timeScale = templateTimeScale;
+        m_loop = templateLoop;
+        m_duration = templateDuration;
+    }
 
     // 기존 이펙트가 있으면 Replace, 없으면 새로 생성
     if (!m_effectInstanceName.empty()) {

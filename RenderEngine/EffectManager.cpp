@@ -193,6 +193,20 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 	return availableId;
 }
 
+bool EffectManager::GetTemplateSettings(const std::string& templateName, float& outTimeScale, bool& outLoop, float& outDuration)
+{
+	auto templateIt = templates.find(templateName);
+	if (templateIt != templates.end()) {
+		const auto& templateConfig = templateIt->second;
+
+		outTimeScale = templateConfig.timeScale;
+		outLoop = templateConfig.loop;
+		outDuration = templateConfig.duration;
+		return true;
+	}
+	return false;
+}
+
 void EffectManager::InitializeUniversalPool()
 {
 	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
@@ -231,6 +245,10 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	auto sizeModule = particleSystem->AddModule<SizeModuleCS>();
 	sizeModule->Initialize(); // PSO 생성
 	sizeModule->SetEnabled(false);
+
+	auto meshSpawnModule = particleSystem->AddModule<MeshSpawnModuleCS>();
+	meshSpawnModule->Initialize();
+	meshSpawnModule->SetEnabled(false);
 
 	// RenderModule도 초기화
 	auto billboardModule = particleSystem->AddRenderModule<BillboardModuleGPU>();
@@ -275,6 +293,10 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 
 void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
 {
+	effect->SetDuration(templateConfig.duration);
+	effect->SetLoop(templateConfig.loop);
+	effect->SetName(templateConfig.name);
+
 	auto& ps = effect->GetAllParticleSystems()[0];
 
 	// 파티클 시스템 설정
@@ -321,6 +343,16 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 		}
 	}
 
+	if (templateConfig.moduleConfig.meshSpawnEnabled) {
+		if (auto* module = ps->GetModule<MeshSpawnModuleCS>()) {
+			if (!templateConfig.meshSpawnModuleData.empty() && templateConfig.meshSpawnModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.meshSpawnModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
+	}
+
+
 	// RenderModule 데이터 적용 + 활성화
 	if (templateConfig.moduleConfig.billboardEnabled) {
 		if (auto* module = ps->GetRenderModule<BillboardModuleGPU>()) {
@@ -364,10 +396,25 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 	maxParticles = 1000;
 	dataType = ParticleDataType::Standard;
 
+	name = "";
+	duration = 1.0f;
+	loop = false;
+
 	// JSON 원본 저장
 	originalJson = effectJson;
 
 	try {
+
+		if (effectJson.contains("name")) {
+			name = effectJson["name"];
+		}
+		if (effectJson.contains("duration")) {
+			duration = effectJson["duration"];
+		}
+		if (effectJson.contains("loop")) {
+			loop = effectJson["loop"];
+		}
+
 		if (effectJson.contains("particleSystems") && effectJson["particleSystems"].is_array()) {
 			for (const auto& psJson : effectJson["particleSystems"]) {
 
@@ -402,6 +449,11 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 								moduleConfig.sizeEnabled = true;
 								sizeModuleData = moduleJson;
 							}
+							else if (moduleType == "MeshSpawnModuleCS")
+							{
+								moduleConfig.meshSpawnEnabled = true;
+								meshSpawnModuleData = moduleJson;
+							}
 						}
 					}
 				}
@@ -428,7 +480,7 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error parsing effect JSON: " << e.what() << std::endl;
-		moduleConfig.spawnEnabled = true;
-		moduleConfig.billboardEnabled = true;
+		//moduleConfig.spawnEnabled = true;
+		//moduleConfig.billboardEnabled = true;
 	}
 }
