@@ -24,6 +24,8 @@ public:
     void RemoveFoliageInstance(size_t index);
 
     void AddInstanceFromTerrain(TerrainComponent* terrain, const FoliageInstance& instance);
+    void AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count);
+    void RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush);
 
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }

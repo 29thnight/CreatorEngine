@@ -22,18 +22,14 @@ private:
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	bool m_openScriptPopup{ false };
 	bool m_openNewScriptPopup{ false };
-	void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer);
-	void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior);
-	void ImGuiDrawHelperAnimator(Animator* animator);
-
-	//void DrawMyLink(std::string linkName, std::string from, std::string to);
-	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
-
+	bool m_openNewTagPopup{ false };
+	bool m_openNewLayerPopup{ false };
 	bool m_openFSMPopup{ false };
-	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	bool m_openBTPopup{ false };
-	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
 
+	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
+	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
+	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
 	void ImguiDrawLuaScriptPopup();
 
 

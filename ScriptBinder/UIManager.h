@@ -3,9 +3,9 @@
 #include "GameObject.h"
 #include <stop_token>
 #include <DirectXTK/SpriteFont.h>
+
 class Canvas;
 class Texture;
-
 class UIManager : public Singleton<UIManager>
 {
 

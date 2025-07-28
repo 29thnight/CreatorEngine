@@ -13,6 +13,8 @@
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
+#include "EngineSetting.h"
+#include "ToggleUI.h"
 
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
@@ -283,8 +285,6 @@ void MenuBarWindow::RenderMenuBar()
                     }
                     else 
                     {
-                        std::cout << "Save Menu" << std::endl;
-
                         fileName = ShowSaveFileDialog(
                             L"Scene Files (*.creator)\0*.creator\0",
                             L"Save Scene",
@@ -302,8 +302,6 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::MenuItem("Save As", "Ctrl+Shift+S"))
                 {
-                    std::cout << "Save As Menu" << std::endl;
-                    //Test
                     SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
                         L"Scene Files (*.creator)\0*.creator\0",
@@ -431,6 +429,21 @@ void MenuBarWindow::RenderMenuBar()
 			{
 			}
 
+            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
+            bool style = static_cast<bool>(DataSystems->GetContentsBrowserStyle());
+            if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, style))
+            {
+                style = !style;
+                auto newStyle = static_cast<ContentsBrowserStyle>(style);
+                DataSystems->SetContentsBrowserStyle(newStyle);
+                EngineSettingInstance->SetContentsBrowserStyle(static_cast<ContentsBrowserStyle>(style));
+                if (newStyle == ContentsBrowserStyle::Tree)
+                    DataSystems->OpenContentsBrowser();
+                else
+                    DataSystems->CloseContentsBrowser();
+                EngineSettingInstance->SaveSettings();
+            }
+
             ImGui::EndMainMenuBar();
         }
         ImGui::End();
@@ -439,20 +452,23 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
+            if (DataSystems->GetContentsBrowserStyle() == ContentsBrowserStyle::Tile)
             {
-                auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
-                if (!contentDrawerContext.IsOpened())
+                if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
                 {
-                    contentDrawerContext.Open();
+                    auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
+                    if (!contentDrawerContext.IsOpened())
+                    {
+                        contentDrawerContext.Open();
+                    }
+                    else
+                    {
+                        contentDrawerContext.Close();
+                    }
                 }
-                else
-                {
-                    contentDrawerContext.Close();
-                }
+                ImGui::SameLine();
             }
 
-            ImGui::SameLine();
             if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
                 m_bShowLogWindow = !m_bShowProfileWindow;
@@ -564,12 +580,15 @@ void MenuBarWindow::RenderMenuBar()
             PathFinder::Relative("Scenes\\").wstring()
         );
 
-		std::cout << "Save As Key" << std::endl;
-
         if (!fileName.empty())
+        {
             SceneManagers->SaveScene(fileName.string());
+            EngineSettingInstance->SaveSettings();
+        }
         else
+        {
             Debug->LogError("Failed to save scene.");
+        }
     }
     else if (isPressedControl && isDownS)
     {
@@ -584,17 +603,20 @@ void MenuBarWindow::RenderMenuBar()
         }
         else
         {
-            std::cout << "Save Key" << std::endl;
-
             fileName = ShowSaveFileDialog(
                 L"Scene Files (*.creator)\0*.creator\0",
                 L"Save Scene",
                 PathFinder::Relative("Scenes\\").wstring()
             );
             if (!fileName.empty())
+            {
                 SceneManagers->SaveScene(fileName.string());
+                EngineSettingInstance->SaveSettings();
+            }
             else
+            {
                 Debug->LogError("Failed to save scene.");
+            }
         }
     }
 }

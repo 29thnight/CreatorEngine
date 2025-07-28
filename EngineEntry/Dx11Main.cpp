@@ -93,7 +93,7 @@ void DirectX11::Dx11Main::Initialize()
             else
                 InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
-            bool isPressedCtrl = InputManagement->IsKeyPressed(VK_LCONTROL);
+            bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
             if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
             {
                 Meta::UndoCommandManager->Undo();
@@ -183,6 +183,7 @@ void DirectX11::Dx11Main::Initialize()
 void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
+    EngineSettingInstance->SaveSettings();
     SceneManagers->Decommissioning();
     m_sceneRenderer->Finalize();
     m_deviceResources->RegisterDeviceNotify(nullptr);

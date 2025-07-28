@@ -15,6 +15,12 @@ enum class MSVCVersion
 	Comunity2022Preview,
 };
 
+enum class ContentsBrowserStyle
+{
+	Tile,
+	Tree,
+};
+
 class EngineSetting : public Singleton<EngineSetting>
 {
 private:
@@ -49,6 +55,8 @@ public:
 	Mathf::Vector2 GetWindowSize() const { return m_lastWindowSize; }
     RenderPassSettings& GetRenderPassSettings() { return m_renderPassSettings; }
     const RenderPassSettings& GetRenderPassSettings() const { return m_renderPassSettings; }
+	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_contentsBrowserStyle; }
+	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }
 
 	void SetImGuiInitialized(bool isInitialized)
 	{
@@ -75,6 +83,7 @@ private:
     std::atomic_bool m_isGameView{ false };
 	std::atomic_bool m_isImGuiInitialized{ false };
     std::string m_currentEngineGitHash{ ENGINE_VERSION };
+	ContentsBrowserStyle m_contentsBrowserStyle{ ContentsBrowserStyle::Tile };
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };

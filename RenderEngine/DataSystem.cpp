@@ -102,6 +102,7 @@ void DataSystem::Initialize()
 	CameraIcon				= Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
 	smallFont				= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont			= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
+	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
 
 	RenderForEditer();
 	m_watcher			= new efsw::FileWatcher();
@@ -223,6 +224,9 @@ void DataSystem::RenderForEditer()
 
 	ImGui::ContextRegister(ICON_FA_HARD_DRIVE " Content Browser", true, [&]()
 	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").SetPopup(
+			m_ContentsBrowserStyle == ContentsBrowserStyle::Tile);
+
 		static file::path DataDirectory = PathFinder::Relative();
 		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, ImVec2(0, 0)))
 		{
@@ -237,19 +241,6 @@ void DataSystem::RenderForEditer()
 		ImGui::SameLine();
 		filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
 		ImGui::PopStyleVar();
-
-		ImGui::SameLine();
-		static bool currentMode{};
-
-		currentMode = static_cast<bool>(m_ContentsBrowserStyle);
-
-		ImGui::SetNextItemWidth(80);
-
-		if(ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, currentMode))
-		{
-			currentMode = !currentMode;
-			m_ContentsBrowserStyle = static_cast<ContentsBrowserStyle>(currentMode);
-		}
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
@@ -342,7 +333,15 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_AlwaysAutoResize);
 
 	ImGui::GetContext("TextureType Selector").Close();
-	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	//ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	if (m_ContentsBrowserStyle == ContentsBrowserStyle::Tile) 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	}
+	else 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
+	}
 }
 
 void DataSystem::MonitorFiles()
@@ -737,10 +736,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 	}
 	else
 	{
-		if (currentDirectory.empty())
-		{
-			currentDirectory = PathFinder::Relative();
-		}
+		currentDirectory = PathFinder::Relative();
 
 		ShowCurrentDirectoryFilesTree(currentDirectory);
 	}
@@ -970,6 +966,8 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 			Debug->LogError(e.what());
 			selectedFileMetaNode = std::nullopt;
 		}
+
+		isHoverAndClicked = false;
 	}
 
 }

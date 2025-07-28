@@ -25,6 +25,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
 	io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
 	io.Fonts->Build();
+	io.FontGlobalScale = 0.8f;
     // Setup Dear ImGui style
 	ImGuiStyle* style = &ImGui::GetStyle();
 #pragma region "ImGuiStyle"
@@ -76,6 +77,9 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	style->Colors[ImGuiCol_PlotHistogram] = ImVec4(0.40f, 0.39f, 0.38f, 0.63f);
 	style->Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.25f, 0.00f, 0.00f, 1.00f);
 	style->Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.25f, 1.00f, 0.00f, 0.43f);
+
+	style->ScaleAllSizes(0.8f);
+
 #pragma endregion
     // Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(m_deviceResources->GetWindow()->GetHandle());
@@ -96,7 +100,6 @@ void ImGuiRenderer::BeginRender()
 {
 	PROFILE_CPU_BEGIN("ImGuiBeginRender");
     static bool firstLoop = true;
-	static bool forceResize = false;
 	ImGuiIO& io = ImGui::GetIO();
 
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
@@ -113,7 +116,6 @@ void ImGuiRenderer::BeginRender()
 		&& newSize			!= ImVec2(0, 0)
 		&& io.DisplaySize	!= ImVec2(0, 0))
 	{
-		forceResize = true;
 		io.DisplaySize = newSize;
 		io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
 	}
@@ -154,39 +156,69 @@ void ImGuiRenderer::BeginRender()
 	ImGui::End();
 
 	file::path iniPath = PathFinder::RelativeToExecutable("imgui.ini");
-	if (!forceResize && file::exists(iniPath))
+	bool isExists = file::exists(iniPath);
+    if (firstLoop && !isExists)
 	{
-		PROFILE_CPU_END();
-		return;
-	}
+		ImGuiID dock1;
+		ImGuiID dock_gameView;
+		ImGuiID dock2;
+		ImGuiID dock3;
+		ImGuiID dock4;
 
-    if (firstLoop /*|| forceResize*/)
-	{
-        ImGui::DockBuilderRemoveNode(id);
-        ImGui::DockBuilderAddNode(id);
+		switch (EngineSettingInstance->GetContentsBrowserStyle())
+		{
+		case ContentsBrowserStyle::Tree:
+			ImGui::DockBuilderRemoveNode(id);
+			ImGui::DockBuilderAddNode(id);
 
-        // Set the size and position:
-        ImGui::DockBuilderSetNodeSize(id, size);
-        ImGui::DockBuilderSetNodePos(id, nodePos);
+			// Set the size and position:
+			ImGui::DockBuilderSetNodeSize(id, size);
+			ImGui::DockBuilderSetNodePos(id, nodePos);
 
-        ImGuiID dock1 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Left, 0.5f, nullptr, &id);
-		ImGuiID dock_gameView = ImGui::DockBuilderSplitNode(dock1, ImGuiDir_Down, 0.5f, nullptr, &dock1);
-        ImGuiID dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.5f, nullptr, &id);
-        ImGuiID dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
+			dock1 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Left, 0.5f, nullptr, &id);
+			dock_gameView = ImGui::DockBuilderSplitNode(dock1, ImGuiDir_Down, 0.5f, nullptr, &dock1);
+			dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.33f, nullptr, &id);
+			dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
+			dock4 = ImGui::DockBuilderSplitNode(dock3, ImGuiDir_Down, 0.5f, nullptr, &dock3);
 
-        ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
-		ImGui::DockBuilderDockWindow("Behavior Tree Editor", dock1);
-		ImGui::DockBuilderDockWindow("BlackBoard Editor", dock1);
-        ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
-        ImGui::DockBuilderDockWindow(ICON_FA_BARS_STAGGERED "  Hierarchy", dock2);
-        ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock3);
-        ImGui::DockBuilderFinish(id);
+			ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
+			ImGui::DockBuilderDockWindow("Behavior Tree Editor", dock1);
+			ImGui::DockBuilderDockWindow("BlackBoard Editor", dock1);
+			ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
+			ImGui::DockBuilderDockWindow(ICON_FA_BARS_STAGGERED "  Hierarchy", dock2);
+			ImGui::DockBuilderDockWindow(ICON_FA_HARD_DRIVE "  Content Browser", dock3);
+			ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock4);
+			ImGui::DockBuilderFinish(id);
 
-		EngineSettingInstance->SetImGuiInitialized(true);
+			EngineSettingInstance->SetImGuiInitialized(true);
+			break;
+		case ContentsBrowserStyle::Tile:
+			ImGui::DockBuilderRemoveNode(id);
+			ImGui::DockBuilderAddNode(id);
+
+			// Set the size and position:
+			ImGui::DockBuilderSetNodeSize(id, size);
+			ImGui::DockBuilderSetNodePos(id, nodePos);
+
+			dock1 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Left, 0.5f, nullptr, &id);
+			dock_gameView = ImGui::DockBuilderSplitNode(dock1, ImGuiDir_Down, 0.5f, nullptr, &dock1);
+			dock2 = ImGui::DockBuilderSplitNode(id, ImGuiDir_Right, 0.5f, nullptr, &id);
+			dock3 = ImGui::DockBuilderSplitNode(dock2, ImGuiDir_Right, 0.5f, nullptr, &dock2);
+
+			ImGui::DockBuilderDockWindow(ICON_FA_USERS_VIEWFINDER "  Scene      ", dock1);
+			ImGui::DockBuilderDockWindow("Behavior Tree Editor", dock1);
+			ImGui::DockBuilderDockWindow("BlackBoard Editor", dock1);
+			ImGui::DockBuilderDockWindow(ICON_FA_GAMEPAD "  Game        ", dock_gameView);
+			ImGui::DockBuilderDockWindow(ICON_FA_BARS_STAGGERED "  Hierarchy", dock2);
+			ImGui::DockBuilderDockWindow(ICON_FA_CIRCLE_INFO "  Inspector", dock3);
+			ImGui::DockBuilderFinish(id);
+
+			EngineSettingInstance->SetImGuiInitialized(true);
+			break;
+		}
     }
 
     if (firstLoop) firstLoop = false;
-	if (forceResize) forceResize = false;
 	PROFILE_CPU_END();
 }
 

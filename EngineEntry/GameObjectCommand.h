@@ -3,6 +3,8 @@
 #include <functional>
 #include "Scene.h"
 #include "GameObject.h"
+#include "ReflectionYml.h"
+#include "ComponentFactory.h"
 
 namespace Meta
 {
@@ -51,13 +53,33 @@ namespace Meta
                 m_name = obj->m_name.ToString();
                 m_type = obj->GetType();
                 m_parentIndex = obj->m_parentIndex;
+                m_serializedNode = Meta::Serialize(obj.get());
             }
         }
 
         void Undo() override
         {
-            auto obj = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
-            m_index = obj ? obj->m_index : GameObject::INVALID_INDEX;
+            auto objPtr = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
+            if (objPtr)
+            {
+                Meta::Deserialize(objPtr.get(), m_serializedNode);
+                if (m_serializedNode["m_components"])
+                {
+                    for (const auto& componentNode : m_serializedNode["m_components"])
+                    {
+                        try
+                        {
+                            ComponentFactorys->LoadComponent(objPtr.get(), componentNode);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            Debug->LogError(e.what());
+                            continue;
+                        }
+                    }
+                }
+            }
+            m_index = objPtr ? objPtr->m_index : GameObject::INVALID_INDEX;
         }
 
         void Redo() override
@@ -74,5 +96,6 @@ namespace Meta
         GameObjectType m_type{ GameObjectType::Empty };
         GameObject::Index m_parentIndex{ 0 };
         GameObject::Index m_index{ GameObject::INVALID_INDEX };
+        MetaYml::Node m_serializedNode{};
     };
 }

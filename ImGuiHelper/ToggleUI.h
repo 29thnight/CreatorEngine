@@ -4,7 +4,7 @@
 // 눌렸을 때 true 반환, 상태는 참조로 전달받아서 외부에서 바꿀 수 있게 함
 namespace ImGui
 {
-    bool ToggleSwitch(const char* str_id, bool v)
+    inline bool ToggleSwitch(const char* str_id, bool v)
     {
         ImVec2 p = ImGui::GetCursorScreenPos();
         ImDrawList* draw_list = ImGui::GetWindowDrawList();

@@ -9,6 +9,7 @@
 #include "concurrent_queue.h"
 #include "AssetJob.h"
 #include "DLLAcrossSingleton.h"
+#include "EngineSetting.h"
 
 // Main system for storing runtime data
 class ModelLoader;
@@ -44,12 +45,6 @@ public:
 		Model,
 		Material,
 		Skeleton,
-	};
-
-	enum class ContentsBrowserStyle
-	{
-		Tile,
-		Tree,
 	};
 
 private:
@@ -97,6 +92,8 @@ public:
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
 	void ShowDirectoryTree(const file::path& directory);
+	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_ContentsBrowserStyle = style; }
+	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_ContentsBrowserStyle; }
 	void ShowCurrentDirectoryFiles();
 	void ShowCurrentDirectoryFilesTile();
 	void ShowCurrentDirectoryFilesTree(const file::path& directory);

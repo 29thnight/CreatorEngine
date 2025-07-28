@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "CameraComponent.h"
+#include "FoliageComponent.h"
 #include "LightComponent.h"
 #include "GameObject.h"
 #include <unordered_map>
@@ -326,27 +327,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 	}
 
-        if (obj && !selectMode)
-        {
-                auto scene = SceneManagers->GetActiveScene();
-                auto& selectedObjects = scene->m_selectedSceneObjects;
-                static XMMATRIX oldLocalMatrix{};
-                static bool wasDragging = false;
-                static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
+    if (obj && !selectMode)
+    {
+        auto scene = SceneManagers->GetActiveScene();
+        auto& selectedObjects = scene->m_selectedSceneObjects;
+        static XMMATRIX oldLocalMatrix{};
+        static bool wasDragging = false;
+        static std::unordered_map<GameObject*, XMMATRIX> startWorldMatrices;
 	
 		bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 		bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
 		bool isWindowHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 	
-                if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-                {
-                        oldLocalMatrix = obj->m_transform.GetLocalMatrix();
-                        startWorldMatrices.clear();
-                        for (auto* target : selectedObjects)
-                        {
-                                startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
-                        }
-                }
+        if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            oldLocalMatrix = obj->m_transform.GetLocalMatrix();
+            startWorldMatrices.clear();
+            for (auto* target : selectedObjects)
+            {
+                    startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+            }
+        }
+
 		XMMATRIX deltaMat = XMMatrixIdentity();
 		ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 			deltaMat.r[0].m128_f32, useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr);
@@ -356,51 +358,55 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		XMMATRIX newLocalMatrix = XMMatrixMultiply(XMMATRIX(matrix), parentWorldInverse);
 	
 		bool matrixChanged = (Mathf::Matrix(oldLocalMatrix) != newLocalMatrix);
+            //실시간 변화
+        if (!XMMatrixIsIdentity(deltaMat))
+        {
+            obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
+
+			XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
+			auto itSelf = startWorldMatrices.find(obj);
+			if (itSelf != startWorldMatrices.end())
+			{
+			    XMVECTOR oldPos = itSelf->second.r[3];
+			    XMVECTOR newPos = newWorld.r[3];
+			    XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
+
+			    if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
+			    {
+			        for (auto* target : selectedObjects)
+			        {
+						if (target == obj) continue;
+						auto itStart = startWorldMatrices.find(target);
+						if (itStart == startWorldMatrices.end()) continue;
+						XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
+						XMMATRIX parentWorld = GameObject::FindIndex(target->m_parentIndex)->m_transform.GetWorldMatrix();
+						XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
+						XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
+						target->m_transform.SetLocalMatrix(targetLocal);
+			        }
+			    }
+			}
+		}
+
 		//Undo Redo 커멘드를 저장할 목적의 코드
 		if (wasDragging && mouseReleased && matrixChanged)
 		{
 			Meta::MakeCustomChangeCommand(
-				[=] 
-				{ 
+				[=]
+				{
 					XMMATRIX copy = oldLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
 				},
-				[=] 
-				{ 
+				[=]
+				{
 					XMMATRIX copy = newLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
 				}
 			);
 		}
-                //실시간 변화
-                if (!XMMatrixIsIdentity(deltaMat))
-                {
-                        obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-                        obj->m_transform.UpdateWorldMatrix();
 
-                        XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
-                        auto itSelf = startWorldMatrices.find(obj);
-                        if (itSelf != startWorldMatrices.end())
-                        {
-                                XMVECTOR oldPos = itSelf->second.r[3];
-                                XMVECTOR newPos = newWorld.r[3];
-                                XMVECTOR offset = XMVectorSubtract(newPos, oldPos);
-
-                                if (!XMVector3Equal(offset, XMVectorZero()) && mCurrentGizmoOperation == ImGuizmo::TRANSLATE)
-                                {
-                                        for (auto* target : selectedObjects)
-                                        {
-                                                if (target == obj) continue;
-                                                auto itStart = startWorldMatrices.find(target);
-                                                if (itStart == startWorldMatrices.end()) continue;
-                                                XMMATRIX targetWorld = XMMatrixMultiply(itStart->second, XMMatrixTranslationFromVector(offset));
-                                                target->m_transform.SetAndDecomposeMatrix(targetWorld, true);
-                                        }
-                                }
-                        }
-                }
-                wasDragging = isDragging;
-        }
+		wasDragging = isDragging;
+    }
 
 	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
 
@@ -492,14 +498,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
             auto newList = scene->m_selectedSceneObjects;
             GameObject* newSelection = scene->m_selectedSceneObject;
             Meta::MakeCustomChangeCommand(
-                    [scene, prevList, prevSelection]() {
-                            scene->m_selectedSceneObjects = prevList;
-                            scene->m_selectedSceneObject = prevSelection;
-                    },
-                    [scene, newList, newSelection]() {
-                            scene->m_selectedSceneObjects = newList;
-                            scene->m_selectedSceneObject = newSelection;
-                    }
+                [scene, prevList, prevSelection]() {
+                        scene->m_selectedSceneObjects = prevList;
+                        scene->m_selectedSceneObject = prevSelection;
+                },
+                [scene, newList, newSelection]() {
+                        scene->m_selectedSceneObjects = newList;
+                        scene->m_selectedSceneObject = newSelection;
+                }
             );
 		}
 		else
@@ -568,28 +574,30 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	
 	//====================
 	// 선택 아이템 있을시 처리
-	if (sceneSelectedObj != nullptr) {
-
+	if (sceneSelectedObj != nullptr) 
+	{
 		//터레인 일때	
-		if (sceneSelectedObj->HasComponent<TerrainComponent>()) {
-			if (terrainBrush == nullptr) {
+		if (sceneSelectedObj->HasComponent<TerrainComponent>()) 
+		{
+			if (terrainBrush == nullptr) 
+			{
 				terrainBrush = new TerrainBrush();
 			}
 
 			TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
-			if (terrainComponent != nullptr) {
+			if (terrainComponent != nullptr) 
+			{
 				terrainComponent->SetTerrainBrush(terrainBrush);
 				if (terrainBrush->m_isEditMode)
 				{
 
-					if (ImGui::IsWindowHovered()) {
+					if (ImGui::IsWindowHovered()) 
+					{
 						ImVec2 mousePos = ImGui::GetMousePos();
 						Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
-
 						//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
 						XMFLOAT3 origin = ray.origin;
 						XMFLOAT3 direction = ray.direction;
-
 						// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
 						if (direction.y < 0.0f)
 						{
@@ -609,15 +617,38 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 								int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
 								int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
 
-								//// 경계 검사
-								//if (!(tileX < 0 || tileX >= terrainComponent->m_width ||
-								//	tileY < 0 || tileY >= terrainComponent->m_height))
-								//{
-									terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
+								terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
-									if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+								{
+									if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage || terrainBrush->m_mode == TerrainBrush::Mode::EraseFoliage)
+									{
+										FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
+										if (foliage)
+										{
+											if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage)
+											{
+												foliage->AddRandomInstancesInBrush(terrainComponent, *terrainBrush, terrainBrush->m_foliageTypeID, terrainBrush->m_foliageDensity);
+											}
+											else
+											{
+												foliage->RemoveInstancesInBrush(terrainComponent, *terrainBrush);
+											}
+
+											auto renderScene = SceneManagers->GetRenderScene();
+											if (renderScene) renderScene->UpdateCommand(foliage);
+										}
+									}
+									else
+									{
 										terrainComponent->ApplyBrush(*terrainBrush);
 									}
+								}
+
+									//if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+									//	terrainComponent->ApplyBrush(*terrainBrush);
+									//}
+									// 
 								//}
 							}
 						}
