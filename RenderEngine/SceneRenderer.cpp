@@ -823,6 +823,7 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
 			PROFILE_CPU_BEGIN("ForwardPassCommandList");
+			m_pForwardPass->CreateFoliageCommandList(deferredContext, *m_renderScene, *camera);
 			m_pForwardPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
@@ -938,34 +939,6 @@ void SceneRenderer::PrepareRender()
 
 		m_threadPool->Enqueue([=]
 		{
-			for (auto& mesh : allMeshes)
-			{
-				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-					data->PushShadowRenderData(mesh->GetInstanceID());
-			}
-
-			for (auto& culledMesh : staticMeshes)
-			{
-				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(culledMesh->GetBoundingBox()))
-				{
-					data->PushCullData(culledMesh->GetInstanceID());
-				}
-			}
-
-			for (auto& skinnedMesh : skinnedMeshes)
-			{
-				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-				{
-					data->PushCullData(skinnedMesh->GetInstanceID());
-				}
-			}
-
 			for (auto& terrainComponent : terrainComponents)
 			{
 				if (terrainComponent->IsEnabled())
@@ -985,34 +958,6 @@ void SceneRenderer::PrepareRender()
 					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
 					if (proxy)
 					{
-						//for(auto& foliage : foliageComponent->GetFoliageInstances())
-						//{
-						//	Mathf::Vector3 position = foliage.m_position;
-						//	Mathf::Vector3 rotation = foliage.m_rotation;
-						//	Mathf::Vector3 scale = foliage.m_scale;
-
-						//	Mathf::Matrix transform = Mathf::Matrix::CreateScale(scale) *
-						//		Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
-						//		Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
-						//		Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
-						//		Mathf::Matrix::CreateTranslation(position);
-
-						//	const FoliageType& foliageType = foliageComponent->GetFoliageTypes()[foliage.m_foliageTypeID];
-						//	Mesh* mesh = foliageType.m_mesh;
-						//	if (mesh == nullptr) continue;
-
-						//	DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
-						//	DirectX::BoundingBox transformedBox;
-						//	boundingBox.Transform(transformedBox, transform);
-
-						//	if (camera->GetFrustum().Intersects(transformedBox))
-						//	{
-						//		foliage.m_isCulled = false;
-						//	}
-
-
-						//}
-
 						data->PushRenderQueue(proxy);
 					}
 				}

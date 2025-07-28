@@ -6,6 +6,7 @@
 #include "IRegistableEvent.h"
 #include "FoliageComponent.generated.h"
 
+class Camera;
 class TerrainComponent;
 class FoliageComponent : public Component, public RegistableEvent<FoliageComponent>
 {
@@ -15,6 +16,7 @@ public:
     GENERATED_BODY(FoliageComponent)
 
     void Awake() override;
+    void Update(float deltaTime) override;
     void OnDestroy() override;
 
     void AddFoliageType(const FoliageType& type);
@@ -26,6 +28,8 @@ public:
     void AddInstanceFromTerrain(TerrainComponent* terrain, const FoliageInstance& instance);
     void AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count);
     void RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush);
+
+	void UpdateFoliageCullingData(Camera* camera);
 
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }

@@ -105,7 +105,7 @@ public:
 	//foliage type
 	std::vector<FoliageInstance>	m_foliageInstances{};
 	std::vector<FoliageType>		m_foliageTypes{};
-	
+
 private:
 	bool						m_isNeedUpdateCulling{ false };
 };

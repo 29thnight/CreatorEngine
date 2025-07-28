@@ -13,6 +13,7 @@ struct FoliageInstance
     [[Property]]
     uint32 m_foliageTypeID{ 0 }; // index of FoliageType
     bool m_isCulled{ false }; // whether this instance is culled or not
+	Mathf::xMatrix m_worldMatrix{ Mathf::Matrix::Identity };
 
    ReflectFoliageInstance
     [[Serializable]]

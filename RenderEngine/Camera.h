@@ -164,6 +164,11 @@ public:
 		return nullptr;
 	}
 
+	std::vector<Camera*>& GetCameras()
+	{
+		return m_cameras;
+	}
+
 	Camera* GetLastCamera()
 	{
 		for (int i = m_cameras.size() - 1; i >= 0; --i)

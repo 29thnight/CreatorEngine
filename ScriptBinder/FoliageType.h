@@ -10,6 +10,8 @@ struct FoliageType
     [[Property]]
     bool m_castShadow{ true };
     [[Property]]
+    bool m_isShadowRecive{ true };
+    [[Property]]
 	std::string m_modelName{};
 
    ReflectFoliageType

@@ -9,6 +9,7 @@
 class Mesh;
 class Material;
 class Animator;
+class Camera;
 class OctreeNode;
 class MeshRenderer : public Component, public RegistableEvent<MeshRenderer>
 {

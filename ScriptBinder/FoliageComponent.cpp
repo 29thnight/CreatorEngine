@@ -3,6 +3,7 @@
 #include "RenderScene.h"
 #include "Terrain.h"
 #include "Scene.h"
+#include "Camera.h"
 #include <random>
 
 void FoliageComponent::Awake()
@@ -17,6 +18,20 @@ void FoliageComponent::Awake()
             renderScene->RegisterCommand(this);
         }
     }
+}
+
+void FoliageComponent::Update(float deltaTime)
+{
+    auto scene = SceneManagers->GetActiveScene();
+    auto renderScene = SceneManagers->GetRenderScene();
+    if (scene && renderScene)
+    {
+        auto camera = CameraManagement->GetLastCamera();
+        if (camera)
+        {
+            UpdateFoliageCullingData(camera);
+		}
+	}
 }
 
 void FoliageComponent::OnDestroy()
@@ -108,4 +123,39 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
             float dz = inst.m_position.z - brush.m_center.y;
             return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
         }), m_foliageInstances.end());
+}
+
+void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
+{
+    if (!camera) return;
+
+    for (auto& foliage : m_foliageInstances)
+    {
+        Mathf::Vector3 position = foliage.m_position;
+        Mathf::Vector3 rotation = foliage.m_rotation;
+        Mathf::Vector3 scale = foliage.m_scale;
+
+        foliage.m_worldMatrix = Mathf::Matrix::CreateScale(scale) *
+            Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+            Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+            Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+            Mathf::Matrix::CreateTranslation(position);
+
+        const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
+        Mesh* mesh = foliageType.m_mesh;
+        if (mesh == nullptr) continue;
+
+        DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
+        DirectX::BoundingBox transformedBox;
+        boundingBox.Transform(transformedBox, foliage.m_worldMatrix);
+
+        if (camera->GetFrustum().Intersects(transformedBox))
+        {
+            foliage.m_isCulled = false;
+        }
+        else
+        {
+			foliage.m_isCulled = true;
+        }
+    }
 }

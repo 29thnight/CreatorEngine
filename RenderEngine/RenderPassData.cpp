@@ -206,6 +206,7 @@ void RenderPassData::ClearRenderQueue()
 	m_deferredQueue.clear();
 	m_forwardQueue.clear();
 	m_terrainQueue.clear();
+	m_foliageQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
