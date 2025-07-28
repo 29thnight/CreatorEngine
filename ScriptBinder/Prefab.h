@@ -25,6 +25,12 @@ public:
     void SetFileGuid(const FileGuid& guid) { m_fileGuid = guid; }
 
 private:
+    static MetaYml::Node SerializeRecursive(const GameObject* obj);
+    GameObject* InstantiateRecursive(const MetaYml::Node& node,
+                                     Scene* scene,
+                                     GameObject::Index parent,
+                                     const std::string_view& overrideName = "") const;
+
     MetaYml::Node m_prefabData{};
 
     [[Property]]
