@@ -4,7 +4,6 @@
 
 void BillboardModuleGPU::Initialize()
 {
-
 	m_vertices = Quad;
 	m_indices = Indices;
 

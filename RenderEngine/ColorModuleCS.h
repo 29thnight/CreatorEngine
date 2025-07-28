@@ -62,7 +62,6 @@ private:
     bool m_discreteColorsDirty;
 
     // 시스템 상태
-    bool m_isInitialized;
     UINT m_particleCapacity;
 
     // 이징 모듈

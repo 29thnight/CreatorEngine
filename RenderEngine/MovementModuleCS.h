@@ -7,7 +7,7 @@ public:
     MovementModuleCS(bool useGravity = false, float gravityStrength = 1.0f)
         : m_gravity(useGravity), m_gravityStrength(gravityStrength),
         m_computeShader(nullptr), m_movementParamsBuffer(nullptr),
-        m_isInitialized(false), m_paramsDirty(true), m_easingEnabled(false),
+         m_paramsDirty(true), m_easingEnabled(false),
         m_easingType(0)
     {
     }
@@ -61,7 +61,6 @@ private:
     ID3D11Buffer* m_movementParamsBuffer;
 
     // State tracking
-    bool m_isInitialized;
     bool m_paramsDirty;
     UINT m_particleCapacity = 0;
 };

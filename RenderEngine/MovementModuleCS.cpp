@@ -12,6 +12,8 @@ void MovementModuleCS::Update(float delta)
 {
     if (!m_enabled) return;
 
+    if (!m_isInitialized) return;
+
     DirectX11::BeginEvent(L"MovementModuleCS");
 
     // 상수 버퍼 업데이트

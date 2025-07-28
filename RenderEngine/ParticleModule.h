@@ -100,5 +100,7 @@ protected:
 	// 파이프라인 변수
 	ModuleStage m_stage = ModuleStage::SIMULATION;
 
+	// 상태 관리
 	bool m_enabled = true;
+	bool m_isInitialized = false;
 };

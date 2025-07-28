@@ -12,7 +12,6 @@ ColorModuleCS::ColorModuleCS()
     , m_colorParamsDirty(true)
     , m_gradientDirty(true)
     , m_discreteColorsDirty(true)
-    , m_isInitialized(false)
     , m_particleCapacity(0)
     , m_easingEnable(false)
 {

@@ -48,7 +48,6 @@ private:
     // 상태 관리
     bool m_spawnParamsDirty;
     bool m_templateDirty;
-    bool m_isInitialized;
     UINT m_particleCapacity;
 
     // 난수 생성기 (초기 시드용)
