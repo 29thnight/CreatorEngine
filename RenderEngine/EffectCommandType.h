@@ -9,13 +9,11 @@ enum class EffectCommandType
     Resume,
     SetPosition,
     SetTimeScale,
-    CreateEffect,
     RemoveEffect,
-    UpdateEffectProperty,
-    CreateInstance,
     SetRotation,
     SetLoop,
     SetDuration,
+    ReplaceEffect,
 };
 
 AUTO_REGISTER_ENUM(EffectCommandType)

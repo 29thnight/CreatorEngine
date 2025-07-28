@@ -30,6 +30,7 @@ SizeModuleCS::~SizeModuleCS()
 
 void SizeModuleCS::Initialize()
 {
+
     if (m_isInitialized)
         return;
 
@@ -51,6 +52,8 @@ void SizeModuleCS::Initialize()
 
 void SizeModuleCS::Update(float deltaTime)
 {
+    if (!m_enabled) return;
+
     if (!m_isInitialized)
     {
         OutputDebugStringA("ERROR: SizeModuleCS not initialized!\n");
@@ -212,4 +215,26 @@ void SizeModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationTyp
     m_easingModule.SetAnimationType(animationType);
     m_easingModule.SetDuration(duration);
     m_easingEnable = true;
+}
+
+void SizeModuleCS::ResetForReuse()
+{
+    if (!m_enabled) return;
+
+    // 시간 관련 상태 초기화
+    m_sizeParams.deltaTime = 0.0f;
+
+    // 더티 플래그 설정
+    m_paramsDirty = true;
+
+    // 이징 모듈 리셋
+    if (m_easingEnable) {
+        m_easingModule.Reset();
+    }
+}
+
+bool SizeModuleCS::IsReadyForReuse() const
+{
+    return m_isInitialized &&
+        m_sizeParamsBuffer != nullptr;
 }

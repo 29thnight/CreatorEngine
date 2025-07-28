@@ -48,7 +48,6 @@ private:
     // 상태 관리
     bool m_spawnParamsDirty;
     bool m_templateDirty;
-    bool m_isInitialized;
     UINT m_particleCapacity;
 
     // 난수 생성기 (초기 시드용)
@@ -69,6 +68,9 @@ public:
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
     virtual void OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition) override;
+
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
 
     // JSON 직렬화용 메소드들 추가 
     const SpawnParams& GetSpawnParams() const { return m_spawnParams; }

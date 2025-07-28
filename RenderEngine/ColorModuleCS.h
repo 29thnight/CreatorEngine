@@ -62,7 +62,6 @@ private:
     bool m_discreteColorsDirty;
 
     // 시스템 상태
-    bool m_isInitialized;
     UINT m_particleCapacity;
 
     // 이징 모듈
@@ -78,6 +77,9 @@ public:
     virtual void Update(float deltaTime) override;
     virtual void Release() override;
     virtual void OnSystemResized(UINT maxParticles) override;
+
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
 
 private:
     // 초기화 메서드

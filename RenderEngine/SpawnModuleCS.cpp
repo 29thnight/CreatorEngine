@@ -11,7 +11,6 @@ SpawnModuleCS::SpawnModuleCS()
 	, m_randomStateUAV(nullptr)
 	, m_spawnParamsDirty(true)
 	, m_templateDirty(true)
-	, m_isInitialized(false)
 	, m_particleCapacity(0)
 	, m_randomGenerator(m_randomDevice())
 	, m_uniform(0.0f, 1.0f)
@@ -52,6 +51,7 @@ SpawnModuleCS::~SpawnModuleCS()
 
 void SpawnModuleCS::Initialize()
 {
+
 	if (m_isInitialized)
 		return;
 
@@ -78,6 +78,8 @@ void SpawnModuleCS::Initialize()
 
 void SpawnModuleCS::Update(float deltaTime)
 {
+	if (!m_enabled) return;
+
 	if (m_isInitialized == 0)
 	{
 		OutputDebugStringA("ERROR: SpawnModule not initialized!\n");
@@ -174,21 +176,6 @@ void SpawnModuleCS::Release()
 {
 	ReleaseResources();
 	m_isInitialized = false;
-}
-
-void SpawnModuleCS::OnSystemResized(UINT maxParticles)
-{
-	if (maxParticles != m_particleCapacity)
-	{
-		m_particleCapacity = maxParticles;
-		m_spawnParams.maxParticles = maxParticles;
-		m_spawnParamsDirty = true;
-	}
-}
-
-void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
-{
-	SetEmitterPosition(newPosition);
 }
 
 bool SpawnModuleCS::InitializeComputeShader()
@@ -296,6 +283,74 @@ void SpawnModuleCS::ReleaseResources()
 	if (m_randomStateUAV) { m_randomStateUAV->Release(); m_randomStateUAV = nullptr; }
 }
 
+void SpawnModuleCS::ResetForReuse()
+{
+	if (!m_enabled) return;
+
+	// 스폰 관련 상태 초기화
+	m_spawnParams.currentTime = 0.0f;
+	m_spawnParams.deltaTime = 0.0f;
+	m_forcePositionUpdate = true;
+	m_spawnParamsDirty = true;
+	m_templateDirty = true;
+
+	// 이전 위치 리셋
+	m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+	// 회전 리셋
+	m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	m_spawnParams.forceRotationUpdate = 0;
+
+	// 난수 상태 리셋
+	if (m_randomStateBuffer) {
+		UINT newSeed = m_randomGenerator();
+		D3D11_MAPPED_SUBRESOURCE mappedResource;
+		if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_randomStateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
+			memcpy(mappedResource.pData, &newSeed, sizeof(UINT));
+			DeviceState::g_pDeviceContext->Unmap(m_randomStateBuffer, 0);
+		}
+	}
+}
+
+bool SpawnModuleCS::IsReadyForReuse() const
+{
+	return m_isInitialized &&
+		m_randomStateBuffer != nullptr &&
+		m_spawnParamsBuffer != nullptr &&
+		m_templateBuffer != nullptr;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 설정 메서드들
 void SpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
 {
 	Mathf::Vector3 newPos = position;
@@ -351,7 +406,7 @@ void SpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 	}
 }
 
-// 설정 메서드들
+
 void SpawnModuleCS::SetSpawnRate(float rate)
 {
 	if (m_spawnParams.spawnRate != rate)
@@ -545,6 +600,9 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 			m_particleCapacity = stateJson["particleCapacity"];
 	}
 
+	if (!m_isInitialized)
+		Initialize();
+
 	// 변경사항을 적용하기 위해 더티 플래그 설정
 	m_spawnParamsDirty = true;
 	m_templateDirty = true;
@@ -553,4 +611,19 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 std::string SpawnModuleCS::GetModuleType() const
 {
 	return "SpawnModuleCS";
+}
+
+void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
+{
+	SetEmitterPosition(newPosition);
+}
+
+void SpawnModuleCS::OnSystemResized(UINT maxParticles)
+{
+	if (maxParticles != m_particleCapacity)
+	{
+		m_particleCapacity = maxParticles;
+		m_spawnParams.maxParticles = maxParticles;
+		m_spawnParamsDirty = true;
+	}
 }

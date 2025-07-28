@@ -23,6 +23,7 @@ MeshModuleGPU::MeshModuleGPU()
     // 상수 버퍼 데이터도 초기화
     memset(&m_constantBufferData, 0, sizeof(MeshConstantBuffer));
 }
+
 void MeshModuleGPU::Initialize()
 {
     m_pso = std::make_unique<PipelineStateObject>();
@@ -600,6 +601,10 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
         }
     }
 
+    if (!m_pso) {
+        Initialize();
+    }
+
     // 클리핑 버퍼 업데이트
     if (IsPolarClippingEnabled())
     {
@@ -668,6 +673,8 @@ std::pair<Mathf::Vector3, Mathf::Vector3> MeshModuleGPU::GetCurrentMeshBounds() 
 
 void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection)
 {
+    if (!m_enabled) return;
+
     auto currentMesh = GetCurrentMesh();
     if (!currentMesh || !m_particleSRV || m_instanceCount == 0)
         return;
@@ -772,4 +779,71 @@ void MeshModuleGPU::Release()
     m_particleSRV = nullptr;
     m_instanceCount = 0;
     m_assignedTexture = nullptr;
+}
+
+void MeshModuleGPU::ResetForReuse()
+{
+    if (!m_enabled) return;
+
+    // 렌더 상태 초기화
+    m_instanceCount = 0;
+    m_isRendering = false;
+    m_gpuWorkPending = false;
+
+    // 리소스 참조 해제 (실제 리소스는 해제하지 않음)
+    m_particleSRV = nullptr;
+    m_assignedTexture = nullptr;
+
+    // 메시 타입을 기본값으로 리셋
+    m_meshType = MeshType::Cube;
+    m_model = nullptr;
+    m_meshIndex = 0;
+
+    // 상수 버퍼 초기화
+    if (m_constantBuffer) {
+        m_constantBufferData = {}; // 구조체 초기화
+        m_constantBufferData.world = Mathf::Matrix::Identity;
+        m_constantBufferData.view = Mathf::Matrix::Identity;
+        m_constantBufferData.projection = Mathf::Matrix::Identity;
+    }
+
+    // 클리핑 상태 초기화
+    m_polarClippingParams = {};
+    m_isPolarClippingAnimating = false;
+    m_polarClippingAnimationSpeed = 1.0f;
+    m_effectProgress = 0.0f;
+    m_useEffectProgress = false;
+
+    // 월드 매트릭스 초기화
+    m_worldMatrix = Mathf::Matrix::Identity;
+    m_invWorldMatrix = Mathf::Matrix::Identity;
+}
+
+bool MeshModuleGPU::IsReadyForReuse() const
+{
+    // GPU 작업이 완료되었고, 렌더링 중이 아닐 때만 재사용 가능
+    bool ready = !m_isRendering &&
+        !m_gpuWorkPending.load() &&
+        m_instanceCount == 0;
+
+    // 필수 리소스들이 유효한지 확인
+    bool resourcesValid = m_constantBuffer != nullptr &&
+        m_pso != nullptr;
+
+    return ready && resourcesValid;
+}
+
+void MeshModuleGPU::WaitForGPUCompletion()
+{
+    if (!m_gpuWorkPending.load()) {
+        return; // GPU 작업이 없으면 바로 리턴
+    }
+
+    auto& deviceContext = DeviceState::g_pDeviceContext;
+    if (deviceContext) {
+        deviceContext->Flush();
+    }
+
+    // GPU 작업 완료 플래그 리셋
+    m_gpuWorkPending = false;
 }
