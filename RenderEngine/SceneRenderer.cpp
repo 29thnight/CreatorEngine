@@ -896,17 +896,23 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
-	
-	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, m_currentScene]
+	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+
+	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, foliageComponents, m_currentScene]
 	{
+		for (auto& mesh : allMeshes)
+		{
+			renderScene->UpdateCommand(mesh);
+		}
+
 		for (auto& terrain : terrainComponents)
 		{
 			renderScene->UpdateCommand(terrain);
 		}
 
-		for (auto& mesh : allMeshes)
+		for (auto& foliage : foliageComponents)
 		{
-			renderScene->UpdateCommand(mesh);
+			renderScene->UpdateCommand(foliage);
 		}
 	});
 
@@ -934,7 +940,6 @@ void SceneRenderer::PrepareRender()
 			for (auto& mesh : allMeshes)
 			{
 				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				if(mesh->m_shadowRecive == true)
 					data->PushShadowRenderData(mesh->GetInstanceID());
 			}
 

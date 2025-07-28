@@ -9,6 +9,78 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, const std::st
 {
     if (!prefab)
         return nullptr;
-    return prefab->Instantiate(name);
+    GameObject* obj = prefab->Instantiate(name);
+    if (obj)
+    {
+        obj->m_prefab = const_cast<Prefab*>(prefab);
+        obj->m_prefabFileGuid = prefab->GetFileGuid();
+        RegisterInstance(obj, prefab);
+    }
+    return obj;
 }
 
+void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
+{
+    if (!instance || !prefab)
+        return;
+    m_instanceMap[prefab].push_back(instance);
+}
+
+void PrefabUtility::UpdateInstances(const Prefab* prefab)
+{
+    auto it = m_instanceMap.find(prefab);
+    if (it == m_instanceMap.end())
+        return;
+    for (GameObject* obj : it->second)
+    {
+        if (!obj)
+            continue;
+        auto savedPos = obj->m_transform.position;
+        Meta::Deserialize(obj, prefab->GetPrefabData());
+        if (prefab->GetPrefabData()["m_components"])
+        {
+            obj->m_components.clear();
+            obj->m_componentIds.clear();
+            for (const auto& componentNode : prefab->GetPrefabData()["m_components"])
+            {
+                try
+                {
+                    ComponentFactorys->LoadComponent(obj, componentNode);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(e.what());
+                    continue;
+                }
+            }
+        }
+        obj->m_transform.position = savedPos;
+        prefabInstanceUpdated.Broadcast(*obj);
+    }
+}
+
+bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
+{
+    if (!prefab || path.empty())
+        return false;
+    std::ofstream out(path);
+    if (!out.is_open())
+        return false;
+
+    auto node = Meta::Serialize(const_cast<Prefab*>(prefab));
+    out << node;
+    out.close();
+
+    return true;
+}
+
+Prefab* PrefabUtility::LoadPrefab(const std::string& path)
+{
+    if (path.empty() || !file::exists(path))
+        return nullptr;
+    auto node = MetaYml::LoadFile(path);
+    auto prefab = new Prefab();
+    Meta::Deserialize(prefab, node);
+    prefab->SetFileGuid(make_file_guid(path));
+    return prefab;
+}

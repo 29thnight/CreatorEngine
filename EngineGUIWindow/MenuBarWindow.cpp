@@ -9,6 +9,8 @@
 #include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "Prefab.h"
+#include "PrefabUtility.h"
 #include "AIManager.h"
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
@@ -386,6 +388,12 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
+                
+                if (ImGui::MenuItem("Prefab Editor"))
+                {
+                    m_bShowPrefabEditorWindow = true;
+				}
+
                 ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
@@ -760,6 +768,54 @@ void MenuBarWindow::ShowLogWindow()
 void MenuBarWindow::ShowLightMapWindow()
 {
     ImGui::GetContext("LightMap").Open();
+}
+
+void MenuBarWindow::ShowPrefabEditorWindow()
+{
+    static Prefab* s_prefab = nullptr;
+    static file::path prefabPath;
+    if (m_bShowPrefabEditorWindow)
+    {
+        ImGui::Begin("Prefab Editor", &m_bShowPrefabEditorWindow);
+        if (ImGui::Button("Create From Selection"))
+        {
+            GameObject* selected = SceneManagers->GetActiveScene()->m_selectedSceneObject;
+            if (selected)
+            {
+                s_prefab = PrefabUtilitys->CreatePrefab(selected);
+                prefabPath.clear();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load"))
+        {
+            file::path path = ShowOpenFileDialog(L"Prefab Files (*.pfb)\0*.pfb\0", L"Load Prefab", PathFinder::Relative("Prefab").wstring());
+            if (!path.empty())
+            {
+                s_prefab = PrefabUtilitys->LoadPrefab(path.string());
+                prefabPath = path.string();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save") && s_prefab)
+        {
+            file::path path = prefabPath.empty() ? ShowSaveFileDialog(L"Prefab Files (*.pfb)\0*.pfb\0", L"Save Prefab", PathFinder::Relative("Prefab").wstring()) : prefabPath.wstring();
+            if (!path.empty())
+            {
+                PrefabUtilitys->SavePrefab(s_prefab, path.string());
+                prefabPath = path.string();
+            }
+        }
+        if (s_prefab && ImGui::Button("Instantiate"))
+        {
+            PrefabUtilitys->InstantiatePrefab(s_prefab);
+        }
+        if (s_prefab && ImGui::Button("Apply To Instances"))
+        {
+            PrefabUtilitys->UpdateInstances(s_prefab);
+        }
+        ImGui::End();
+    }
 }
 
 ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };

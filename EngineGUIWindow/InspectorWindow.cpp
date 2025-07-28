@@ -885,26 +885,52 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 
 
 		// 브러시 모양 선택
-		if (ImGui::Button("mask texture load")) {
+		if (ImGui::Button("mask texture load")) 
+		{
 			file::path maskTexture = ShowOpenFileDialog(L"");
 			terrainComponent->SetBrushMaskTexture(g_CurrentBrush, maskTexture);
 		}
 
-		if (ImGui::CollapsingHeader("Paint Foliage")) {
+		if (ImGui::CollapsingHeader("Paint Foliage")) 
+		{
 			g_CurrentBrush->m_isEditMode = true;
-			FoliageComponent* foliage = terrainComponent->GetOwner()->GetComponent<FoliageComponent>();
-			if (foliage) {
-				std::vector<const char*> typeNames;
-				for (const auto& t : foliage->GetFoliageTypes()) { typeNames.push_back(t.m_modelName.c_str()); }
-				int typeIndex = static_cast<int>(g_CurrentBrush->m_foliageTypeID);
-				if (!typeNames.empty()) { ImGui::Combo("Type", &typeIndex, typeNames.data(), (int)typeNames.size()); g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex); }
-				ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
-				const char* fModes[] = { "Paint", "Erase" };
-				int fm = (g_CurrentBrush->m_mode == TerrainBrush::Mode::EraseFoliage) ? 1 : 0;
-				if (ImGui::Combo("Action", &fm, fModes, 2)) { g_CurrentBrush->m_mode = fm == 0 ? TerrainBrush::Mode::PaintFoliage : TerrainBrush::Mode::EraseFoliage; }
+			GameObject* owner = terrainComponent->GetOwner();
+			FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
+			if (!foliage) 
+			{
+				foliage = owner->AddComponent<FoliageComponent>();
 			}
-			else {
-				ImGui::Text("FoliageComponent missing");
+
+			std::vector<const char*> typeNames;
+			for (const auto& t : foliage->GetFoliageTypes()) { typeNames.push_back(t.m_modelName.c_str()); }
+			int typeIndex = static_cast<int>(g_CurrentBrush->m_foliageTypeID);
+			if (!typeNames.empty()) 
+			{
+				ImGui::Combo("Type", &typeIndex, typeNames.data(), static_cast<int>(typeNames.size()));
+				g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex);
+			}
+			ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
+			const char* fModes[] = { "Paint", "Erase" };
+			int fm = (g_CurrentBrush->m_mode == TerrainBrush::Mode::EraseFoliage) ? 1 : 0;
+			if (ImGui::Combo("Action", &fm, fModes, 2)) { g_CurrentBrush->m_mode = fm == 0 ? TerrainBrush::Mode::PaintFoliage : TerrainBrush::Mode::EraseFoliage; }
+
+			ImGui::SeparatorText("Foliage Mesh");
+			ImGui::Text("Drag Model Here");
+			if (ImGui::BeginDragDropTarget()) 
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model")) 
+				{
+					const char* droppedFilePath = static_cast<const char*>(payload->Data);
+					file::path filename = file::path(droppedFilePath).filename();
+					file::path filepath = PathFinder::Relative("Models\\") / filename;
+					if (Model* model = DataSystems->LoadCashedModel(filepath.string().c_str())) 
+					{
+						FoliageType type(model, true);
+						foliage->AddFoliageType(type);
+						g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
+					}
+				}
+				ImGui::EndDragDropTarget();
 			}
 		}
 	}

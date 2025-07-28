@@ -69,6 +69,8 @@ PrimitiveRenderProxy::PrimitiveRenderProxy(TerrainComponent* component) :
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(FoliageComponent* component) :
     m_isSkinnedMesh(false),
+	m_foliageInstances(component->GetFoliageInstances()),
+	m_foliageTypes(component->GetFoliageTypes()),
     m_worldMatrix(component->GetOwner()->m_transform.GetWorldMatrix()),
     m_worldPosition(component->GetOwner()->m_transform.GetWorldPosition())
 {
