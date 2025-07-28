@@ -777,7 +777,9 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
         if (ImGui::Button("Create"))
         {
             isfirstLoad = true;
-            file::path BTSavePath = ShowSaveFileDialog(L"", L"Save Behavior Tree Asset",
+            file::path BTSavePath = ShowSaveFileDialog(
+                L"Behavior Tree Files (*.bt)\0*.bt\0", 
+                L"Save Behavior Tree Asset",
                 PathFinder::Relative("BehaviorTree"));
 
             if (!BTSavePath.empty())
@@ -787,7 +789,28 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 {
                     file::create_directories(BTSavePath.parent_path());
                 }
-                graph.CleanUp();
+                graph.Clear();
+
+                for (auto& node : graph.NodeList)
+                {
+                    node.Position = BT::ToMathfVec2(node.PositionEditor);
+                }
+
+                // Save the graph to a file
+                auto node = Meta::Serialize(&graph);
+
+                std::ofstream outFile(BTSavePath.string());
+
+                if (outFile.is_open())
+                {
+                    outFile << node; // Pretty print with 4 spaces
+                    outFile.close();
+                    outFile.flush();
+                }
+                else
+                {
+                    std::cerr << "Failed to open file for writing: " << BTSavePath.string() << std::endl;
+                }
             }
             else
             {
