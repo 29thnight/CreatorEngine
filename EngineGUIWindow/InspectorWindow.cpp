@@ -286,7 +286,6 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::EndPopup();
 			}
 
-
 			// 현재 트랜스폼 값
 			Mathf::Vector4& position = selectedSceneObject->m_transform.position;
 			Mathf::Vector4& rotation = selectedSceneObject->m_transform.rotation;
@@ -852,14 +851,18 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 
 			static int selectedMaskIndex = -1;
 			int maskIndex = 0;
-			for (const auto& mask : g_CurrentBrush->m_masks) {
-				if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f))) {
-					if (selectedMaskIndex != maskIndex) {
+			for (const auto& mask : g_CurrentBrush->m_masks) 
+			{
+				if (ImGui::ImageButton(maskNames[maskIndex], (ImTextureID)mask.m_maskSRV, ImVec2((float)100.0f, (float)100.0f))) 
+				{
+					if (selectedMaskIndex != maskIndex) 
+					{
 						selectedMaskIndex = maskIndex;
 						uint32_t id = static_cast<uint32_t>(maskIndex);
 						g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
 					}
-					else {
+					else 
+					{
 						selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
 						uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
 						g_CurrentBrush->SetMaskID(id); // No mask selected
