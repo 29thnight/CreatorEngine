@@ -30,8 +30,27 @@ GameObject* Prefab::Instantiate(const std::string_view& newName) const
     if (!scene)
         return nullptr;
 
-    GameObject::Index parent = m_prefabData["m_parentIndex"].as<GameObject::Index>();
-    return InstantiateRecursive(m_prefabData, scene, parent, newName);
+    if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
+        return nullptr;
+
+    auto gameObjNode = m_prefabData["GameObject"];
+
+    GameObject* rootObject = nullptr;
+
+    for (std::size_t i = 0; i < m_prefabData.size(); ++i)
+    {
+        const MetaYml::Node& gameObjNode = m_prefabData[i];
+
+        // 첫 번째 GameObject에만 overrideName 적용
+        std::string_view nameOverride = (i == 0) ? newName : "";
+
+        GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+
+        if (i == 0)
+            rootObject = instantiated;
+    }
+
+    return rootObject;
 }
 
 MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
