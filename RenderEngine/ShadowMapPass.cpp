@@ -70,20 +70,7 @@ ShadowMapPass::ShadowMapPass()
 
 ShadowMapPass::~ShadowMapPass()
 {
-	for (auto& [frame, cmdArr] : m_commandQueueMap)
-	{
-		for (auto& queue : cmdArr)
-		{
-			while (!queue.empty())
-			{
-				ID3D11CommandList* CommandJob;
-				if (queue.try_pop(CommandJob))
-				{
-					Memory::SafeDelete(CommandJob);
-				}
-			}
-		}
-	}
+	Memory::SafeDelete(m_cloudShadowMapBuffer);
 }
 
 void ShadowMapPass::Initialize(uint32 width, uint32 height)

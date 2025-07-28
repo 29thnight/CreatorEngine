@@ -29,10 +29,17 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 		GameObject* selectedSceneObject = nullptr;
 		static bool isSceneObjectSelected = false;
 
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+		ImGui::BeginDisabled();
+		ImGui::Button(ICON_FA_MAGNIFYING_GLASS " Search");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		m_searchFilter.Draw("##HierarchyWindow Search", ImGui::GetContentRegionAvail().x);
+		ImGui::PopStyleVar();
 		if (m_sceneRenderer)
 		{
 			scene = SceneManagers->GetActiveScene();
-			renderScene = m_sceneRenderer->m_renderScene;
+			renderScene = m_sceneRenderer->m_renderScene.get();
 			selectedSceneObject = scene->m_selectedSceneObject;
 
 			if (!scene && !renderScene)
@@ -52,6 +59,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (false == ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				{
 					scene->m_selectedSceneObject = nullptr;
+					scene->m_selectedSceneObjects.clear();
 				}
 			}
 
@@ -108,7 +116,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					auto comp = obj->AddComponent<CameraComponent>();
 				}
 
-
+				//TODO : 아직 처리가 안된듯
 				if (ImGui::BeginMenu("		UI"))
 				{
 					if (ImGui::MenuItem("		Image"))
@@ -239,17 +247,19 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto& selectedSceneObject = scene->m_selectedSceneObject;
+        auto& selectedSceneObject = scene->m_selectedSceneObject;
+        auto& selectedObjects = scene->m_selectedSceneObjects;
 
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
-	if (obj.get() == selectedSceneObject)
-	{
-		flags |= ImGuiTreeNodeFlags_Selected;
-	}
-	else if (0 == obj->m_parentIndex)
-	{
-		flags |= ImGuiTreeNodeFlags_DefaultOpen;
-	}
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+        bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
+        if (isSelected)
+        {
+            flags |= ImGuiTreeNodeFlags_Selected;
+        }
+        else if (0 == obj->m_parentIndex)
+        {
+            flags |= ImGuiTreeNodeFlags_DefaultOpen;
+        }
 
 	if (0 == obj->m_childrenIndices.size())
 	{
@@ -271,25 +281,42 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		ImGui::PopStyleColor();
 	}
 
-	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-	{
-		if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
-		{
-			GameObject* prevSelection = selectedSceneObject; // 선택되기 전 값
-			GameObject* newSelection = obj.get();            // 선택될 값
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+        {
+            if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+            {
+                bool shift = ImGui::GetIO().KeyShift;
+                std::vector<GameObject*> prevList = selectedObjects;
+                GameObject* prevSelection = selectedSceneObject;
 
-			if (prevSelection != newSelection)
-			{
-				Meta::MakeCustomChangeCommand(
-					[=]() { scene->m_selectedSceneObject = prevSelection; },
-					[=]() { scene->m_selectedSceneObject = newSelection; }
-				);
+                if (shift)
+                {
+                    if (std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end())
+                        scene->RemoveSelectedSceneObject(obj.get());
+                    else
+                        scene->AddSelectedSceneObject(obj.get());
+                }
+                else
+                {
+                    scene->ClearSelectedSceneObjects();
+                    scene->AddSelectedSceneObject(obj.get());
+                }
 
-				// 즉시 반영
-				selectedSceneObject = newSelection;
-			}
-		}
-	}
+                auto newList = scene->m_selectedSceneObjects;
+                GameObject* newSelection = scene->m_selectedSceneObject;
+
+                Meta::MakeCustomChangeCommand(
+                    [scene, prevList, prevSelection]() {
+                        scene->m_selectedSceneObjects = prevList;
+                        scene->m_selectedSceneObject = prevSelection;
+                    },
+                    [scene, newList, newSelection]() {
+                        scene->m_selectedSceneObjects = newList;
+                        scene->m_selectedSceneObject = newSelection;
+                    }
+                );
+            }
+        }
 
 	if (ImGui::BeginDragDropSource())
 	{

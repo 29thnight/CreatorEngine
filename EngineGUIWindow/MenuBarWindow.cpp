@@ -114,7 +114,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
             // 皋浆喊肺 positionMap 积己
             m_pPositionMapPass->Execute(*m_renderScene, c);
             // lightMap 积己
-            lightMap.GenerateLightMap(m_renderScene, m_pPositionMapPass, m_pLightMapPass);
+            lightMap.GenerateLightMap(m_renderScene.get(), m_pPositionMapPass, m_pLightMapPass);
 
             //m_pLightMapPass->Initialize(lightMap.lightmaps);
         }

@@ -90,6 +90,9 @@ PipelineStateObject::PipelineStateObject()
 PipelineStateObject::~PipelineStateObject()
 {
 	ShaderSystem->m_shaderReloadedDelegate.Remove(m_shaderReloadEventHandle);
+
+	Memory::SafeDelete(m_inputLayout);
+	Memory::SafeDelete(m_rasterizerState);
 }
 
 void PipelineStateObject::Apply()
@@ -203,7 +206,6 @@ void PipelineStateObject::ReloadShaders()
 
 void PipelineStateObject::Reset()
 {
-
     DeviceState::g_pDeviceContext->IASetInputLayout(nullptr);
     DeviceState::g_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

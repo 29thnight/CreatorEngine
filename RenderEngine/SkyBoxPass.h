@@ -35,7 +35,6 @@ private:
 	PixelShader* m_irradiancePS{};
 	PixelShader* m_prefilterPS{};
 	PixelShader* m_brdfPS{};
-	ID3D11RasterizerState* m_skyBoxRasterizerState{};
 	ID3D11RenderTargetView* m_backBuffer{};
 
 	PixelShader* m_rectToCubeMapPS{};

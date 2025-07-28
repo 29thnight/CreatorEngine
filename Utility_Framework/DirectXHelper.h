@@ -291,10 +291,22 @@ namespace DirectX
     {
         pObject->SetPrivateData(WKPDID_D3DDebugObjectName, (uint32)name.length(), name.data());
     }
+
+    inline std::string PointerToString(const void* ptr)
+    {
+        std::stringstream ss;
+        ss << "0x" << std::hex << std::uppercase << reinterpret_cast<uintptr_t>(ptr);
+        return ss.str();
+	}
 #else
     inline void SetName(DXObjects auto, const std::string_view&)
     {
     }
+
+    inline std::string PointerToString(const void*)
+    {
+        return "0x00000000";
+	}
 #endif
     static inline DXGI_FORMAT NoSRGB(DXGI_FORMAT fmt)
     {

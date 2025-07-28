@@ -77,6 +77,9 @@
     <ClInclude Include="HorizontalLayout.h">
       <Filter>소스 파일\NodeEditorHelper</Filter>
     </ClInclude>
+    <ClInclude Include="ToggleUI.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp">

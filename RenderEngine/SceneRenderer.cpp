@@ -43,13 +43,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     InitializeShadowMapDesc();
 
 	m_threadPool = new ThreadPool;
-	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
-	m_renderScene = new RenderScene();
-	SceneManagers->SetRenderScene(m_renderScene);
+	m_commandThreadPool = std::make_unique<RenderThreadPool>(DeviceState::g_pDevice);
+	m_renderScene = std::make_shared<RenderScene>();
+	SceneManagers->SetRenderScene(m_renderScene.get());
 
 	//sampler 생성
-	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	//m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	//m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	InitializeTextures();
 
@@ -226,8 +226,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
 
-
-
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 
@@ -246,6 +244,46 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
+
+}
+
+void SceneRenderer::Finalize()
+{
+	m_diffuseTexture.reset();
+	m_metalRoughTexture.reset();
+	m_normalTexture.reset();
+	m_emissiveTexture.reset();
+	m_toneMappedColourTexture.reset();
+	m_bitmaskTexture.reset();
+	m_ambientOcclusionTexture.reset();
+	m_toneMappedColourTexture.reset();
+	m_lightingTexture.reset();
+
+	m_pSSAOPass.reset();
+	m_pGBufferPass.reset();
+	m_pDeferredPass.reset();
+	m_pForwardPass.reset();
+	m_pSkyBoxPass.reset();
+	m_pToneMapPass.reset();
+	m_pSpritePass.reset();
+	m_pBlitPass.reset();
+	m_pAAPass.reset();
+	m_pPostProcessingPass.reset();
+	m_pPositionMapPass.reset();
+	m_pLightMapPass.reset();
+	m_pScreenSpaceReflectionPass.reset();
+	m_pSubsurfaceScatteringPass.reset();
+	m_pVignettePass.reset();
+	m_pColorGradingPass.reset();
+	m_pVolumetricFogPass.reset();
+	m_pUIPass.reset();
+	m_pSSGIPass.reset();
+	m_pBitMaskPass.reset();
+	m_pTerrainGizmoPass.reset();
+	m_EffectEditor.reset();
+
+	m_commandThreadPool.reset();
+
 	delete m_threadPool;
 
 	OnResizeEvent -= m_resizeEventHandle;
@@ -386,9 +424,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
-	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
-	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
-
 	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
 	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
 	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
@@ -397,15 +432,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
-
-	//TODO : 시연용 Player주석 코드
-/*	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/ //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
-	////TODO : 시연용 Player주석 코드
-	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	//testt = Model::LoadModelToSceneObj(model[0], *scene);
-	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -417,8 +443,6 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	//TODO : 시연용 Player주석 코드
-	player.Update(deltaTime);
 	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
