@@ -1,0 +1,131 @@
+Mage:
+  - key: eEmageTargetRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageHP
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 100
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 1
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageDistanceRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageDmg
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 1
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eMageProjectileSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageAtkCooldown
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageChaseRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageTPRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageTPCooldown
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 5
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageChaseOutDuration
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageAsis
+    value:
+      Type: 1
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eEmageReward
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
