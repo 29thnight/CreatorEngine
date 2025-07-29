@@ -1,6 +1,7 @@
 #include "PrefabUtility.h"
 #include "GameObject.h"
 #include "Object.h"
+#include "ReflectionYml.h"
 
 Prefab* PrefabUtility::CreatePrefab(const GameObject* source, const std::string_view& name)
 {
@@ -37,28 +38,33 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
     {
         if (!obj)
             continue;
-        auto savedPos = obj->m_transform.position;
-        HashedGuid newInstanceID = obj->GetInstanceID();
-        HashingString newHashedName = obj->GetHashedName();
-        GameObject::Index newIndex = obj->m_index;
-		GameObject::Index parentIndex = obj->m_parentIndex;
-		auto children = obj->m_childrenIndices;
-        Meta::Deserialize(obj, prefab->GetPrefabData());
-        if (prefab->GetPrefabData()["m_components"])
+
+        auto newData = prefab->GetPrefabData();
+        MetaYml::Node currentNode = Meta::Serialize(obj, GameObject::Reflect());
+        bool updateComponents = false;
+
+        if (newData["m_components"])
         {
-            for (auto comp : obj->m_components)
+            const auto& currComp = currentNode["m_components"];
+            const auto& prevComp = obj->m_prefabOriginal["m_components"];
+            if (currComp && prevComp && YAML::Dump(currComp) == YAML::Dump(prevComp))
+                updateComponents = true;
+        }
+
+        Meta::DeserializePrefab(obj, newData, obj->m_prefabOriginal);
+
+        if (updateComponents && newData["m_components"])
+        {
+            for (auto& comp : obj->m_components)
             {
                 comp->Destroy();
-				auto eventReceiver = std::dynamic_pointer_cast<IRegistableEvent>(comp);
+                auto eventReceiver = std::dynamic_pointer_cast<IRegistableEvent>(comp);
                 if (eventReceiver)
-                {
                     eventReceiver->OnDestroy();
-				}
             }
-
             obj->m_components.clear();
             obj->m_componentIds.clear();
-            for (const auto& componentNode : prefab->GetPrefabData()["m_components"])
+            for (const auto& componentNode : newData["m_components"])
             {
                 try
                 {
@@ -71,13 +77,8 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
                 }
             }
         }
-        obj->m_transform.position = savedPos;
-        obj->m_instanceID = newInstanceID;
-        obj->m_name = newHashedName;
-		obj->m_index = newIndex;
-		obj->m_parentIndex = parentIndex;
-		obj->m_childrenIndices = children;
-		obj->m_prefab = const_cast<Prefab*>(prefab);
+        obj->m_prefab = const_cast<Prefab*>(prefab);
+        obj->m_prefabFileGuid = prefab->GetFileGuid();
 
         prefabInstanceUpdated.Broadcast(*obj);
     }

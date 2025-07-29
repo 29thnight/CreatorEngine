@@ -597,3 +597,43 @@ namespace Meta
 
 
 }
+
+namespace Meta
+{
+	inline void DeserializePrefab(void* instance, const Type& type,
+		const MetaYml::Node& newNode,
+		MetaYml::Node& prevNode)
+	{
+		MetaYml::Node currentNode = Serialize(instance, type);
+		MetaYml::Node patchedNode = currentNode;
+
+		if (type.parent)
+		{
+			DeserializePrefab(instance, *type.parent, newNode, prevNode);
+		}
+
+		for (const auto& prop : type.properties)
+		{
+			if (!newNode[prop.name])
+				continue;
+
+			const auto& currProp = currentNode[prop.name];
+			const auto& prevProp = prevNode[prop.name];
+
+			if (currProp && prevProp && YAML::Dump(currProp) == YAML::Dump(prevProp))
+			{
+				patchedNode[prop.name] = newNode[prop.name];
+			}
+		}
+
+		Deserialize(instance, type, patchedNode);
+		prevNode = newNode;
+	}
+
+	template<typename T>
+	inline void DeserializePrefab(T* instance, const MetaYml::Node& newNode,
+		MetaYml::Node& prevNode)
+	{
+		DeserializePrefab(reinterpret_cast<void*>(instance), T::Reflect(), newNode, prevNode);
+	}
+}

@@ -169,6 +169,7 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     obj->m_prefab = const_cast<Prefab*>(this);
     obj->m_prefabFileGuid = GetFileGuid();
+    obj->m_prefabOriginal = node;
     PrefabUtilitys->RegisterInstance(obj, this);
 
     return obj;

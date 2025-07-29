@@ -5,6 +5,7 @@
 #include "Transform.h"
 #include "GameObjectType.h"
 #include "GameObject.generated.h"
+#include <yaml-cpp/yaml.h>
 
 class Scene;
 class Bone;
@@ -135,6 +136,7 @@ public:
 
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };
+	YAML::Node m_prefabOriginal{};
 };
 
 #include "GameObject.inl"
