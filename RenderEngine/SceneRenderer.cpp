@@ -240,10 +240,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	{
 		m_renderScene->Update(0.f);
 	});
-
-	m_volumeProfileApplyEventHandle = VolumeProfileApplyEvent.AddRaw(this, &SceneRenderer::ApplyVolumeProfile);
-
-
 }
 
 SceneRenderer::~SceneRenderer()
@@ -752,6 +748,12 @@ void SceneRenderer::CreateCommandListPass()
 	PROFILE_CPU_BEGIN("ProxyCommandExecute");
 	ProxyCommandQueue->Execute();
 	PROFILE_CPU_END();
+
+	if (SceneManagers->IsVolumeProfileApply())
+	{
+		ApplyVolumeProfile();
+		SceneManagers->ResetVolumeProfileApply();
+	}
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{

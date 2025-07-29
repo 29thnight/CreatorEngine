@@ -491,6 +491,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<int>>();
 						auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -500,6 +501,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<float>>();
 						auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -509,6 +511,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<bool>>();
 						auto castInstance = reinterpret_cast<std::vector<bool>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -518,6 +521,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -527,6 +531,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);
@@ -536,6 +541,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<uint32_t>>();
 						auto castInstance = reinterpret_cast<std::vector<HashedGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);
@@ -545,6 +551,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<FileGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);

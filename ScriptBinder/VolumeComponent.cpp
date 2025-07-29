@@ -5,7 +5,7 @@
 
 void VolumeComponent::Awake()
 {
-    m_prevSettings = EngineSettingInstance.GetRenderPassSettings();
+    m_prevSettings = EngineSettingInstance->GetRenderPassSettings();
 
     if (m_volumeProfileGuid == nullFileGuid)
         return;
@@ -17,12 +17,16 @@ void VolumeComponent::Awake()
         if (node["settings"])
         {
             Meta::Deserialize(&m_profile.settings, node["settings"]);
-            EngineSettingInstance.GetRenderPassSettings() = m_profile.settings;
+            EngineSettingInstance->GetRenderPassSettings() = m_profile.settings;
         }
     }
+
+    SceneManagers->VolumeProfileApply();
 }
 
 void VolumeComponent::OnDestroy()
 {
-    EngineSettingInstance.GetRenderPassSettings() = m_prevSettings;
+    EngineSettingInstance->SetRenderPassSettings(m_prevSettings);
+
+    SceneManagers->VolumeProfileApply();
 }

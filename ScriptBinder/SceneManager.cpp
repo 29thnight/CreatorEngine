@@ -448,6 +448,11 @@ std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 	return m_activeScene.load()->m_allMeshRenderers;
 }
 
+void SceneManager::VolumeProfileApply()
+{
+	m_volumeProfileApply = true;
+}
+
 void SceneManager::CreateEditorOnlyPlayScene()
 {
     MetaYml::Node sceneNode{};

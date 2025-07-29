@@ -54,6 +54,7 @@ public:
 	void SetWindowSize(Mathf::Vector2 size) { m_lastWindowSize = size; }
 	Mathf::Vector2 GetWindowSize() const { return m_lastWindowSize; }
     RenderPassSettings& GetRenderPassSettings() { return m_renderPassSettings; }
+	void SetRenderPassSettings(const RenderPassSettings& settings) { m_renderPassSettings = settings; }
     const RenderPassSettings& GetRenderPassSettings() const { return m_renderPassSettings; }
 	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_contentsBrowserStyle; }
 	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_contentsBrowserStyle = style; }

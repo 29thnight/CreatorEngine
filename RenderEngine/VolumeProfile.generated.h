@@ -3,9 +3,9 @@
 #define ReflectVolumeProfile \
 ReflectionField(VolumeProfile) \
 { \
-    PropertyField \
-    ({ \
-        meta_property(settings) \
-    }); \
-    FieldEnd(VolumeProfile, PropertyOnly) \
+	PropertyField \
+	({ \
+		meta_property(settings) \
+	}); \
+	FieldEnd(VolumeProfile, PropertyOnly) \
 };
