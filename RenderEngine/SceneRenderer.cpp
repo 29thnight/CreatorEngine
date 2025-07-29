@@ -904,7 +904,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& terrain : terrainComponents)
 		{
-			renderScene->UpdateCommand(terrain);
+			try
+			{
+				renderScene->UpdateCommand(terrain);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating terrain command: " << e.what() << std::endl;
+			}
 		}
 	});
 
@@ -912,7 +919,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& mesh : allMeshes)
 		{
-			renderScene->UpdateCommand(mesh);
+			try
+			{
+				renderScene->UpdateCommand(mesh);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating mesh command: " << e.what() << std::endl;
+			}
 		}
 	});
 
@@ -920,7 +934,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& foliage : foliageComponents)
 		{
-			renderScene->UpdateCommand(foliage);
+			try
+			{
+				renderScene->UpdateCommand(foliage);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating foliage command: " << e.what() << std::endl;
+			}
 		}
 	});
 

@@ -7,7 +7,7 @@
 void RigidBodyComponent::Awake()
 {
 	std::cout << "RigidBodyComponent::Awake() - InstanceID: " << GetOwner()->GetInstanceID() << std::endl;
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	if (scene)
 	{
 		scene->CollectRigidBodyComponent(this);
@@ -25,7 +25,7 @@ void RigidBodyComponent::Awake()
 
 void RigidBodyComponent::OnDestroy()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	if (scene)
 	{
 		scene->UnCollectRigidBodyComponent(this);

@@ -24,7 +24,7 @@ public:
     Prefab* LoadPrefab(const std::string& path);
 
 private:
-    std::unordered_map<const Prefab*, std::vector<GameObject*>> m_instanceMap{};
+    std::unordered_map<FileGuid, std::vector<GameObject*>> m_instanceMap{};
 };
 
 static auto PrefabUtilitys = PrefabUtility::GetInstance();

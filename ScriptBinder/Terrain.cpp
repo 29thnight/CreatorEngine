@@ -796,7 +796,7 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 
 void TerrainComponent::Awake()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
@@ -813,7 +813,7 @@ void TerrainComponent::Awake()
 
 void TerrainComponent::OnDestroy()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{

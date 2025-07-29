@@ -12,8 +12,10 @@
 #include "DataSystem.h"
 #include "PathFinder.h"
 #include "GameObjectCommand.h"
+#include "PrefabEditor.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "InputManager.h"
 #include "MetaStateCommand.h"
 #include "ReflectionRegister.h"
 
@@ -226,13 +228,25 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			{
 				SceneIcon = ICON_FA_BOLT + std::string(" ") + scene->m_SceneObjects[0]->m_name.ToString();
 			}
-
+			ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 			if (0 == scene->m_SceneObjects.size())
 			{
 				ImGui::Text("No GameObject in Scene");
 			}
 			else if (ImGui::TreeNodeEx(SceneIcon.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
+				bool isPrefabEditor = scene->m_SceneObjects[0]->m_name.ToString() == "PrefabEditor";
+				if (isPrefabEditor									&& 
+					ImGui::IsItemClicked(ImGuiMouseButton_Left)		&&
+					ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				{
+					// PrefabEditor가 열려있다면 닫기
+					if (PrefabEditors->IsOpened())
+					{
+						PrefabEditors->Close();
+					}
+				}
+
 				auto& sceneObjects = scene->m_SceneObjects;
 				for (int i = 1; i < sceneObjects.size(); ++i)
 				{
@@ -280,7 +294,16 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 	}
 
-	std::string icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
+	std::string icon{};
+
+	if (obj->m_prefab)
+	{
+		icon = ICON_FA_BOX_OPEN + std::string(" ") + obj->m_name.ToString();
+	}
+	else
+	{
+		icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
+	}
 	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
 
 
@@ -289,42 +312,42 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 		ImGui::PopStyleColor();
 	}
 
-        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+    {
+        if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
         {
-            if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
+            std::vector<GameObject*> prevList = selectedObjects;
+            GameObject* prevSelection = selectedSceneObject;
+
+            if (shift)
             {
-                bool shift = ImGui::GetIO().KeyShift;
-                std::vector<GameObject*> prevList = selectedObjects;
-                GameObject* prevSelection = selectedSceneObject;
-
-                if (shift)
-                {
-                    if (std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end())
-                        scene->RemoveSelectedSceneObject(obj.get());
-                    else
-                        scene->AddSelectedSceneObject(obj.get());
-                }
+                if (std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end())
+                    scene->RemoveSelectedSceneObject(obj.get());
                 else
-                {
-                    scene->ClearSelectedSceneObjects();
                     scene->AddSelectedSceneObject(obj.get());
-                }
-
-                auto newList = scene->m_selectedSceneObjects;
-                GameObject* newSelection = scene->m_selectedSceneObject;
-
-                Meta::MakeCustomChangeCommand(
-                    [scene, prevList, prevSelection]() {
-                        scene->m_selectedSceneObjects = prevList;
-                        scene->m_selectedSceneObject = prevSelection;
-                    },
-                    [scene, newList, newSelection]() {
-                        scene->m_selectedSceneObjects = newList;
-                        scene->m_selectedSceneObject = newSelection;
-                    }
-                );
             }
+            else
+            {
+                scene->ClearSelectedSceneObjects();
+                scene->AddSelectedSceneObject(obj.get());
+            }
+
+            auto newList = scene->m_selectedSceneObjects;
+            GameObject* newSelection = scene->m_selectedSceneObject;
+
+            Meta::MakeCustomChangeCommand(
+                [scene, prevList, prevSelection]() {
+                    scene->m_selectedSceneObjects = prevList;
+                    scene->m_selectedSceneObject = prevSelection;
+                },
+                [scene, newList, newSelection]() {
+                    scene->m_selectedSceneObjects = newList;
+                    scene->m_selectedSceneObject = newSelection;
+                }
+            );
         }
+    }
 
 	if (ImGui::BeginDragDropSource())
 	{

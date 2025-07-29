@@ -56,22 +56,22 @@ CullingManager::~CullingManager()
 
 void CullingManager::Initialize(const BoundingBox& worldBounds, int maxDepth, int maxMeshesPerNode)
 {
-    Clear();
-    m_maxDepth = maxDepth;
-    m_maxMeshesPerNode = maxMeshesPerNode;
+ //   Clear();
+ //   m_maxDepth = maxDepth;
+ //   m_maxMeshesPerNode = maxMeshesPerNode;
 
-	void* voidPtr = malloc(sizeof(OctreeNode));
-	m_root = new (voidPtr) OctreeNode(worldBounds, 0);
+	//void* voidPtr = malloc(sizeof(OctreeNode));
+	//m_root = new (voidPtr) OctreeNode(worldBounds, 0);
 
-	m_threadPool = new ThreadPool;
+	//m_threadPool = new ThreadPool;
 
-    SceneManagers->activeSceneChangedEvent.AddLambda([&]()
-    {
-		std::vector<MeshRenderer*> sceneMeshes = SceneManagers->GetAllMeshRenderers();
-		BoundingBox newWorldBounds = CalculateSceneWorldBounds(sceneMeshes);
+ //   SceneManagers->activeSceneChangedEvent.AddLambda([&]()
+ //   {
+	//	std::vector<MeshRenderer*> sceneMeshes = SceneManagers->GetAllMeshRenderers();
+	//	BoundingBox newWorldBounds = CalculateSceneWorldBounds(sceneMeshes);
 
-		Rebuild(sceneMeshes, newWorldBounds);
-    });
+	//	Rebuild(sceneMeshes, newWorldBounds);
+ //   });
 
 }
 

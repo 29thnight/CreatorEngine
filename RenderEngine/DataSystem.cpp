@@ -8,6 +8,8 @@
 #include <ppl.h>
 #include "FileIO.h"
 #include "Benchmark.hpp"
+#include "SceneManager.h"
+#include "PrefabUtility.h"
 #include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -271,6 +273,36 @@ void DataSystem::RenderForEditer()
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 		ImGui::PopStyleVar();
+		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::RelativeToPrefab("")))
+		{
+			ImGui::Dummy(ImGui::GetContentRegionAvail());
+			overlayPos = ImGui::GetItemRectMin();
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+				{
+					auto scene = SceneManagers->GetActiveScene();
+					if (scene)
+					{
+						GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
+						auto objPtr = scene->GetGameObject(index);
+						if (objPtr)
+						{
+							GameObject* obj = objPtr.get();
+							Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+							if (prefab)
+							{
+								file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+								PrefabUtilitys->SavePrefab(prefab, savePath.string());
+								ForceCreateYamlMetaFile(savePath);
+								delete prefab;
+							}
+						}
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
 
 		ShowCurrentDirectoryFiles();
 		ImGui::PopStyleColor();
@@ -697,10 +729,39 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 			std::string iconName = ICON_FA_FOLDER + std::string(" ") + dirName;
 			bool nodeOpen = ImGui::TreeNodeEx(iconName.c_str(), nodeFlags);
+			if (!entry.path().empty() && std::filesystem::equivalent(entry.path(), PathFinder::RelativeToPrefab("")))
+			{
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+					{
+						auto scene = SceneManagers->GetActiveScene();
+						if (scene)
+						{
+							GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
+							auto objPtr = scene->GetGameObject(index);
+							if (objPtr)
+							{
+								GameObject* obj = objPtr.get();
+								Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+								if (prefab)
+								{
+									file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+									PrefabUtilitys->SavePrefab(prefab, savePath.string());
+									ForceCreateYamlMetaFile(savePath);
+									delete prefab;
+								}
+							}
+						}
+					}
+					ImGui::EndDragDropTarget();
+				}
+			}
 			if (ImGui::IsItemClicked())
 			{
 				currentDirectory = entry.path();
 			}
+
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
 				MenuDirectory = entry.path();
@@ -748,6 +809,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 void DataSystem::ShowCurrentDirectoryFilesTile()
 {
+	ImGui::SetCursorScreenPos(overlayPos);
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -774,7 +836,8 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
 				extension == ".glb" || extension == ".png" || extension == ".dds" ||
 				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3")
+				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
+				extension == ".prefab")
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
@@ -815,6 +878,11 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 				{
 					fileType = FileType::Sound;
 					iconTexture = (ImTextureID)UnknownIcon->m_pSRV;
+				}
+				else if (extension == ".prefab")
+				{
+					fileType = FileType::Prefab;
+					iconTexture = (ImTextureID)ModelIcon->m_pSRV;
 				}
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
@@ -859,7 +927,8 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
 				extension == ".glb" || extension == ".png" || extension == ".dds" ||
 				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3")
+				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
+				extension == ".prefab")
 			{
 				std::string label = entry.path().filename().string();
 				std::string apliedIcon;
@@ -894,6 +963,10 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 				else if (extension == ".wav" || extension == ".mp3")
 				{
 					apliedIcon = ICON_FA_FILE_AUDIO " ";
+				}
+				else if (extension == ".prefab")
+				{
+					apliedIcon = ICON_FA_BOX_OPEN " ";
 				}
 
 				label = apliedIcon + label;

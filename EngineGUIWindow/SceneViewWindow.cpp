@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include "DataSystem.h"
 #include "RenderState.h"
+#include "PrefabUtility.h"
 #include "Terrain.h"
 
 bool useWindow = true;
@@ -567,6 +568,18 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			file::path filename = droppedFilePath;
 			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
 			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
+		}
+
+		if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
+		{
+			const char* droppedFilePath = (const char*)prefabPayload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
+			auto prefab = PrefabUtilitys->LoadPrefab(filepath.string().c_str());
+			if (prefab)
+			{
+				PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());
+			}
 		}
 
 		ImGui::EndDragDropTarget(); 

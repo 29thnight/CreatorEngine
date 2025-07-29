@@ -15,7 +15,7 @@ public:
 
    void Awake() override
    {
-	   auto scene = SceneManagers->GetActiveScene();
+	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)
 	   {
 		   scene->CollectColliderComponent(this);
@@ -24,7 +24,7 @@ public:
 
    void OnDestroy() override
    {
-	   auto scene = SceneManagers->GetActiveScene();
+	   auto scene = GetOwner()->m_ownerScene;
 	   if (scene)
 	   {
 		   scene->UnCollectColliderComponent(this);

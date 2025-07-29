@@ -22,7 +22,7 @@ public:
 
    void Awake() override  
     {  
-        auto scene = SceneManagers->GetActiveScene();  
+        auto scene = GetOwner()->m_ownerScene;  
         if (scene)  
         {  
             if (m_boxExtent != DirectX::SimpleMath::Vector3::Zero)
@@ -38,7 +38,7 @@ public:
 
    void OnDestroy() override  
    {  
-       auto scene = SceneManagers->GetActiveScene();  
+       auto scene = GetOwner()->m_ownerScene;  
        if (scene)  
        {  
            scene->UnCollectColliderComponent(this);  

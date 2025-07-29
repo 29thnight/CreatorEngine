@@ -151,6 +151,7 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
+	ImVec2 overlayPos{};
 
 	file::path currentDirectory{};
 	efsw::FileWatcher* m_watcher{};
