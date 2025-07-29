@@ -129,9 +129,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
@@ -155,6 +152,27 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TweenManager.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsMageAttack.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Easing.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -227,9 +245,6 @@
 		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
@@ -253,6 +268,24 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TweenManager.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsReteat.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsMageAttack.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsTeleport.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TeleportAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\RetreatAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

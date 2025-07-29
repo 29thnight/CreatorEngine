@@ -17,7 +17,7 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [4182950584]
+    Children: [4182950584, 741719526]
     Position: {x: 166, y: 104}
   - ID: 4182950584
     Type: 2
@@ -28,7 +28,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [610608400, 2221862267]
-    Position: {x: -26, y: 264}
+    Position: {x: -122, y: 173}
   - ID: 610608400
     Type: 6
     Name: Condition
@@ -38,7 +38,7 @@ NodeList:
     ScriptName: IsDaed
     Policy: -858993460
     Children: ~
-    Position: {x: -186, y: 488}
+    Position: {x: -266, y: 360}
   - ID: 2221862267
     Type: 8
     Name: Action
@@ -48,4 +48,64 @@ NodeList:
     ScriptName: DaedAction
     Policy: -858993460
     Children: ~
-    Position: {x: 54, y: 488}
+    Position: {x: -42, y: 360}
+  - ID: 741719526
+    Type: 3
+    Name: Selector
+    ParentID: 3270138650
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [459807300, 168876844, 3482717246, 590480351]
+    Position: {x: 246, y: 221}
+  - ID: 459807300
+    Type: 2
+    Name: Sequence
+    ParentID: 741719526
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 38, y: 536}
+  - ID: 168876844
+    Type: 2
+    Name: Sequence
+    ParentID: 741719526
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 246, y: 536}
+  - ID: 3482717246
+    Type: 2
+    Name: Sequence
+    ParentID: 741719526
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 470, y: 525}
+  - ID: 590480351
+    Type: 2
+    Name: Sequence
+    ParentID: 741719526
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [742195152]
+    Position: {x: 742, y: 536}
+  - ID: 742195152
+    Type: 6
+    Name: Condition
+    ParentID: 590480351
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsDetect
+    Policy: -858993460
+    Children: ~
+    Position: {x: 726, y: 680}
