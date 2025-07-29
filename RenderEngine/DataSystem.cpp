@@ -23,13 +23,11 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Shader,         "Shader"			},
 	{ DataSystem::FileType::CppScript,      "CppScript"			},
 	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
-        { DataSystem::FileType::Prefab,         "Prefab"                       },
+    { DataSystem::FileType::Prefab,         "Prefab"            },
 	{ DataSystem::FileType::Sound,          "Sound"				},
 	{ DataSystem::FileType::HDR,            "HDR"				}
 }};
 
-        else if (filepath.extension() == ".pfb")
-                return DataSystem::FileType::Prefab;
 // 검색 함수
 constexpr const char* FileTypeToString(DataSystem::FileType type)
 {
@@ -62,6 +60,8 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::Sound;
 	else if (filepath.extension() == ".hdr")
 		return DataSystem::FileType::HDR;
+	else if (filepath.extension() == ".prefab")
+		return DataSystem::FileType::Prefab;
 	return DataSystem::FileType::Unknown;
 }
 
@@ -1098,7 +1098,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
-    if(filepath.extension() == ".pfb") { PrefabEditors->Open(filepath.string()); return; }
+    if(filepath.extension() == ".prefab") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	if ((int)result <= 32)

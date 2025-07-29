@@ -28,7 +28,7 @@ public:
 		Shader,
 		CppScript,
 		CSharpScript,
-                Prefab,
+		Prefab,
 		Sound,
 		HDR,
 	};

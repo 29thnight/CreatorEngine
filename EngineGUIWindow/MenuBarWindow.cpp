@@ -389,6 +389,7 @@ void MenuBarWindow::RenderMenuBar()
                     m_bShowInputActionMapWindow = true;
                 }
                 
+                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
             ImGui::PopStyleColor();
@@ -495,6 +496,7 @@ void MenuBarWindow::RenderMenuBar()
     ShowBehaviorTreeWindow();
     ShowBlackBoardWindow();
     SHowInputActionMap();
+    if (m_bShowProfileWindow)
     {
         ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);
         {

@@ -2,20 +2,6 @@
 
 PrefabEditor::PrefabEditor()
 {
-    ImGui::ContextRegister("Prefab Editor", [&]() {
-        if (!m_isOpened)
-            return;
-        if (ImGui::Button("Apply & Close"))
-        {
-            Close(true);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Close"))
-        {
-            Close(false);
-        }
-    });
-    ImGui::GetContext("Prefab Editor").Close();
 }
 
 void PrefabEditor::Open(const std::string& path)
@@ -41,7 +27,6 @@ void PrefabEditor::Open(const std::string& path)
     PrefabUtilitys->InstantiatePrefab(m_prefab);
 
     m_isOpened = true;
-    ImGui::GetContext("Prefab Editor").Open();
 }
 
 void PrefabEditor::Close(bool apply)
@@ -77,5 +62,4 @@ void PrefabEditor::Close(bool apply)
     activeSceneChangedEvent.Broadcast();
 
     m_isOpened = false;
-    ImGui::GetContext("Prefab Editor").Close();
 }
