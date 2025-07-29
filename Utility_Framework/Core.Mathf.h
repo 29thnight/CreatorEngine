@@ -235,4 +235,14 @@ namespace Mathf
 		if (length == 0.0f) return Mathf::Vector3::Zero;
 		return vector / length;
 	}
+
+    inline float ToDegrees(float radians)
+    {
+        return radians * Mathf::Rad2Deg;
+	}
+
+    inline float ToRadians(float degrees)
+    {
+        return degrees * Mathf::Deg2Rad;
+	}
 }

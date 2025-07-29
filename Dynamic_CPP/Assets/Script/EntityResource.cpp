@@ -34,7 +34,7 @@ void EntityResource::Attack(Entity* sender, int damage)
 					Mathf::Vector3 spawnPos = GetOwner()->m_transform.GetWorldPosition();
 					spawnPos.y += 3.f;
 					item->GetOwner()->m_transform.SetPosition(spawnPos);
-					item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 10.f, 0.f }, EForceMode::IMPULSE);
+					item->GetComponent<RigidBodyComponent>().AddForce({ 0.f, 300.f, 300.f }, EForceMode::IMPULSE);
 				}
 				//GetOwner()->Destroy();
 			}

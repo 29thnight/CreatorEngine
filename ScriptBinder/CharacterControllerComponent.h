@@ -240,4 +240,16 @@ private:
 	//이동 제한
 	std::array<bool, 4> m_bMoveRestrict;
 
+	EColliderType m_type{ EColliderType::COLLISION };
+	// ICollider을(를) 통해 상속됨
+	void SetColliderType(EColliderType type) override
+	{
+		m_type = type;
+	}
+
+	EColliderType GetColliderType() const override 
+	{
+		return m_type;
+	}
+
 };

@@ -154,9 +154,6 @@
     <Filter Include="Classes\Components\RenderableComponent\FoliageComponent">
       <UniqueIdentifier>{78c4d329-a387-4455-b754-5ec774bba782}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Classes\Components\RenderableComponent\FoliageComponent\GPU">
-      <UniqueIdentifier>{af30516f-7274-46c4-a7ee-5f2132d12f1d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Classes\Components\InputComponent">
       <UniqueIdentifier>{13466114-f9ae-4851-b65c-0b0923c77d7d}</UniqueIdentifier>
     </Filter>
@@ -237,9 +234,6 @@
     <ClCompile Include="TerrainCollider.cpp">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
-    <ClCompile Include="PhysicsManager.cpp">
-      <Filter>Managers\PhysicsManager</Filter>
-    </ClCompile>
     <ClCompile Include="InputManager.cpp">
       <Filter>Managers\InputManager</Filter>
     </ClCompile>
@@ -299,6 +293,9 @@
     </ClCompile>
     <ClCompile Include="PlayerInput.cpp">
       <Filter>Classes\Components\InputComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsManager.cpp">
+      <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -406,9 +403,6 @@
     </ClInclude>
     <ClInclude Include="CSharpScriptComponent.h">
       <Filter>Classes\Components\CSharpScriptComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsManager.h">
-      <Filter>Managers\PhysicsManager</Filter>
     </ClInclude>
     <ClInclude Include="CapsuleColliderComponent.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
@@ -560,15 +554,21 @@
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
-    <ClInclude Include="FoliageBaseType.h">
+    <ClInclude Include="FoliageType.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
     </ClInclude>
     <ClInclude Include="IRegistableEvent.h">
       <Filter>Classes\RegistrableSceneEvents</Filter>
     </ClInclude>
+    <ClInclude Include="FoliageInstance.h">
+      <Filter>Classes\Components\RenderableComponent\FoliageComponent\FoliageBase</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsManager.h">
+      <Filter>Managers\PhysicsManager</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="GameObejct.inl">
+    <None Include="GameObject.inl">
       <Filter>Classes\GameObject</Filter>
     </None>
     <None Include="Component.inl">

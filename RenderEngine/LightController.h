@@ -57,8 +57,10 @@ private:
 	ShadowMapRenderDesc				m_shadowMapRenderDesc;
 	ShadowMapConstant				m_shadowMapConstant;
 	LightProperties					m_lightProperties;
+	LightProperties                 m_lightPropertiesArr[3];
     LightCount						m_lightCountStruct;
 	bool							hasLightWithShadows{ false };
 	ID3D11Buffer*					m_shadowMapBuffer{ nullptr };
 	std::unique_ptr<ShadowMapPass>	m_shadowMapPass;
+	uint32                          m_frameCount{ 0 };
 };

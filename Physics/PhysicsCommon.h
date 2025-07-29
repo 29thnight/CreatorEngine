@@ -22,6 +22,7 @@ enum class EColliderType {
 	COLLISION
 };
 
+
 //콜백 함수에 전달할 이벤트 타입
 enum class ECollisionEventType {
 	ENTER_OVERLAP = 0 ,
@@ -101,8 +102,11 @@ struct RigidBodyGetSetData
 	bool isColliderEnabled = true;
 	DirectX::SimpleMath::Vector3 velocity{};
 	int forceMode{ 4 }; // 4 == NONE
-
+		
 	EColliderType m_EColliderType;
+	bool isKinematic = false; // 키네마틱 여부
+	bool isDisabled = false;  // 시뮬레이션 비활성화 여부
+	bool useGravity = true; // 중력 사용 여부
 };
 
 //CharacterController의 GetSetData를 위한 구조체

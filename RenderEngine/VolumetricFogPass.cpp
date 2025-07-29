@@ -109,6 +109,17 @@ VolumetricFogPass::~VolumetricFogPass()
 	Memory::SafeDelete(m_pShadowSamper);
 	Memory::SafeDelete(m_pClampSampler);
 	Memory::SafeDelete(m_pWrapSampler);
+
+	for (int i = 0; i < 2; ++i)
+	{
+		Memory::SafeDelete(mTempVoxelInjectionTexture3D[i]);
+		Memory::SafeDelete(mTempVoxelInjectionTexture3DSRV[i]);
+		Memory::SafeDelete(mTempVoxelInjectionTexture3DUAV[i]);
+	}
+
+	Memory::SafeDelete(mFinalVoxelInjectionTexture3D);
+	Memory::SafeDelete(mFinalVoxelInjectionTexture3DSRV);
+	Memory::SafeDelete(mFinalVoxelInjectionTexture3DUAV);
 }
 //
 void VolumetricFogPass::Initialize(const std::string_view& fileName)

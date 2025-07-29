@@ -1,4 +1,7 @@
 #include "Prefab.h"
+#include "GameObject.h"
+#include "PrefabUtility.h"
+#include "TagManager.h"
 
 Prefab::Prefab(const std::string_view& name, const GameObject* source)
     : Object(name)
@@ -6,12 +9,7 @@ Prefab::Prefab(const std::string_view& name, const GameObject* source)
     m_typeID = TypeTrait::GUIDCreator::GetTypeID<Prefab>();
     if (source)
     {
-        const Meta::Type* type = Meta::MetaDataRegistry->Find(source->GetTypeID());
-        if (type)
-        {
-            GameObject* nonConst = const_cast<GameObject*>(source);
-            m_prefabData = Meta::Serialize(nonConst, *type);
-        }
+        m_prefabData = SerializeRecursive(source);
     }
 }
 
@@ -33,25 +31,125 @@ GameObject* Prefab::Instantiate(const std::string_view& newName) const
     if (!scene)
         return nullptr;
 
-    GameObjectType type = static_cast<GameObjectType>(m_prefabData["m_gameObjectType"].as<int>());
-    GameObject::Index parent = m_prefabData["m_parentIndex"].as<GameObject::Index>();
+    if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
+        return nullptr;
 
-    auto objPtr = scene->LoadGameObject(make_guid(), newName.empty() ? m_prefabData["m_name"].as<std::string>() : std::string(newName), type, parent);
-    GameObject* obj = objPtr.get();
+    auto gameObjNode = m_prefabData["GameObject"];
 
-    const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<GameObject>());
-    if (meta && obj)
+    GameObject* rootObject = nullptr;
+
+    for (std::size_t i = 0; i < m_prefabData.size(); ++i)
     {
-        Meta::Deserialize(obj, m_prefabData);
+        const MetaYml::Node& gameObjNode = m_prefabData[i];
+
+        // 첫 번째 GameObject에만 overrideName 적용
+        std::string_view nameOverride = (i == 0) ? newName : "";
+
+        GameObject* instantiated = InstantiateRecursive(gameObjNode, scene, 0, nameOverride);
+
+        if (i == 0)
+            rootObject = instantiated;
     }
 
-    if (m_prefabData["m_components"])
+    return rootObject;
+}
+
+MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
+{
+    MetaYml::Node node;
+    if (!obj)
+        return node;
+
+    const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+    if (type)
     {
-        for (const auto& componentNode : m_prefabData["m_components"])
+        GameObject* nonConst = const_cast<GameObject*>(obj);
+        node = Meta::Serialize(nonConst, *type);
+    }
+
+    if (!obj->m_childrenIndices.empty())
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (scene)
+        {
+            MetaYml::Node childrenNode;
+            for (auto childIndex : obj->m_childrenIndices)
+            {
+                auto childObj = scene->GetGameObject(childIndex);
+                if (childObj)
+                    childrenNode.push_back(SerializeRecursive(childObj.get()));
+            }
+            if (childrenNode)
+                node["children"] = childrenNode;
+        }
+    }
+
+    return node;
+}
+
+GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
+    Scene* scene,
+    GameObject::Index parent,
+    const std::string_view& overrideName) const
+{
+    if (!scene || !node)
+        return nullptr;
+
+    GameObjectType type = static_cast<GameObjectType>(node["m_gameObjectType"].as<int>());
+    std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
+
+    auto objPtr = scene->LoadGameObject(make_guid(), objName, type, parent);
+    GameObject* obj = objPtr.get();
+    if (!obj)
+        return nullptr;
+
+    const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<GameObject>());
+    HashedGuid newInstanceID = obj->GetInstanceID();
+	HashingString newHashedName = obj->GetHashedName();
+    GameObject::Index newIndex = obj->m_index;
+    if (meta)
+    {
+        try
+        {
+            Meta::Deserialize(obj, node);
+        }
+        catch (const std::exception& e)
+        {
+            Debug->LogError("Prefab instantiation failed: " + std::string(e.what()));
+            return nullptr;
+		}
+    }
+
+	obj->m_instanceID = newInstanceID;
+	obj->m_name = newHashedName;
+    obj->m_index = newIndex;
+    obj->m_parentIndex = parent;
+    obj->m_transform.SetParentID(parent);
+    obj->m_childrenIndices.clear();
+
+    if (!obj->m_tag.ToString().empty())
+    {
+        TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+    }
+
+    if (!obj->m_layer.ToString().empty())
+    {
+        TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+    }
+
+    auto parentObj = scene->m_SceneObjects[parent];
+    if (parentObj && parentObj->m_index != newIndex)
+    {
+        parentObj->m_childrenIndices.push_back(newIndex);
+    }
+
+    if (node["m_components"])
+    {
+        for (const auto& componentNode : node["m_components"])
         {
             try
             {
-                ComponentFactorys->LoadComponent(obj, componentNode);
+                ComponentFactorys->LoadComponent(obj, componentNode ,true);
             }
             catch (const std::exception& e)
             {
@@ -61,6 +159,17 @@ GameObject* Prefab::Instantiate(const std::string_view& newName) const
         }
     }
 
+    if (node["children"])
+    {
+        for (const auto& childNode : node["children"])
+        {
+            auto childObj = InstantiateRecursive(childNode, scene, obj->m_index);
+        }
+    }
+
+    obj->m_prefab = const_cast<Prefab*>(this);
+    obj->m_prefabFileGuid = GetFileGuid();
+    PrefabUtilitys->RegisterInstance(obj, this);
+
     return obj;
 }
-

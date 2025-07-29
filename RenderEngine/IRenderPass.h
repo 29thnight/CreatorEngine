@@ -40,6 +40,22 @@ public:
 	virtual ~IRenderPass()
 	{
 		SwapEvent -= m_swapEventHandle;
+
+		for (auto& frameQueue : m_frameQueues)
+		{
+			for (auto& queue : frameQueue)
+			{
+				while (!queue.empty())
+				{
+					ID3D11CommandList* command;
+					if (queue.try_pop(command))
+					{
+						Memory::SafeDelete(command);
+					}
+				}
+			}
+		}
+
 	}
 
 	//virtual std::string ToString() abstract;
@@ -69,7 +85,7 @@ public:
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
-	CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
+	//CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
 	FrameQueueArray m_frameQueues;
 	Core::DelegateHandle m_swapEventHandle{};
 

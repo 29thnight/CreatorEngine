@@ -6,7 +6,7 @@ class GizmoPass : public IRenderPass
 {
 public:
 	GizmoPass();
-	~GizmoPass() override = default;
+	~GizmoPass() override;
 
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;

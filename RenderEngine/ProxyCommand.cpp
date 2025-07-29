@@ -16,6 +16,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	auto owner						= componentPtr->GetOwner();
 	bool isStatic					= owner->IsStatic();
 	bool isEnabled					= owner->IsEnabled();
+	bool isShadowCast				= pComponent->m_shadowCast;
+	bool isShadowRecive				= pComponent->m_shadowRecive;
 	Mathf::xMatrix worldMatrix		= owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
 	Material* originMat				= pComponent->m_Material;
@@ -33,6 +35,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	HashedGuid aniGuid				= proxyObject->m_animatorGuid;
 	HashedGuid matGuid				= proxyObject->m_materialGuid;
 	HashedGuid originMatGuid		= pComponent->m_Material->m_materialGuid;
+	bool isEnableLOD				= pComponent->m_isEnableLOD;
 
 	Mathf::xMatrix* palletePtr{ nullptr };
 	bool isAnimationUpdate{ false };
@@ -87,6 +90,9 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 		proxyObject->m_worldPosition	= worldPosition;
 		proxyObject->m_isStatic			= isStatic;
 		proxyObject->m_isEnableShadow	= isEnabled;
+		proxyObject->m_isShadowCast		= isShadowCast;
+		proxyObject->m_isShadowRecive	= isShadowRecive;
+		proxyObject->m_EnableLOD		= isEnableLOD;
 
 		if(isLightMappingUpdatable)
 		{
@@ -129,8 +135,37 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	if (!proxyObject) return;
+
+	std::vector<FoliageType> foliageTypes;
+	std::vector<FoliageInstance> foliageInstances;
+
+	size_t foliageTypesSize = pComponent->GetFoliageTypes().size();
+	size_t foliageInstancesSize = pComponent->GetFoliageInstances().size();
+	size_t proxyFoliageSize = proxyObject->m_foliageTypes.size();
+	size_t proxyInstancesSize = proxyObject->m_foliageInstances.size();
+
+	if (foliageTypesSize != proxyFoliageSize)
+	{
+		foliageTypes = pComponent->GetFoliageTypes();
+	}
+
+	if (foliageInstancesSize != proxyInstancesSize)
+	{
+		foliageInstances = pComponent->GetFoliageInstances();
+	}
+
 	m_updateFunction = [=]()
 	{
+		if (proxyFoliageSize != foliageTypesSize)
+		{
+			proxyObject->m_foliageTypes = foliageTypes;
+		}
+
+		if (proxyInstancesSize != foliageInstancesSize)
+		{
+			proxyObject->m_foliageInstances = foliageInstances;
+		}
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 	};

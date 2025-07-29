@@ -3,7 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
-#include "EntityMineral.h"
+#include "TweenManager.h"
 #include "EntityResource.h"
 #include "TestEnemy.h"
 #include "InverseKinematic.h"

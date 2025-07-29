@@ -14,9 +14,9 @@ public:
     BoxColliderComponent() 
    {
         m_name = "BoxColliderComponent"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<BoxColliderComponent>();
-		m_type = EColliderType::COLLISION;
         m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
 		m_boxExtent = m_Info.boxExtent;
+        m_type = EColliderType::COLLISION; // 기본값 설정
    } 
    virtual ~BoxColliderComponent() = default;
 
@@ -67,15 +67,15 @@ public:
        m_Info.boxExtent = extents;  
        m_boxExtent = m_Info.boxExtent;
    }  
-  /* EColliderType GetColliderType() const  
-   {  
-	   return m_type;
-   }  
-
-   void SetColliderType(EColliderType type)
+   EColliderType GetColliderType() const override
    {
-	   m_type = type;
-   }*/
+       return m_type;
+   }
+
+   void SetColliderType(EColliderType type) override
+   {
+       m_type = type;
+   }
 
    BoxColliderInfo GetBoxInfo()
    {
@@ -149,8 +149,7 @@ public:
     void SetRotationOffset(DirectX::SimpleMath::Quaternion rotation) override;
 
     DirectX::SimpleMath::Quaternion GetRotationOffset() override;
-    /*void SetIsTrigger(bool isTrigger) override;
-    bool GetIsTrigger() override;*/
+    
     BoxColliderInfo m_Info;
 private:  
 
@@ -166,6 +165,6 @@ private:
 
     void OnCollisionExit(ICollider* other) override;
 
-    //EColliderType m_type;
+    EColliderType m_type;
 	unsigned int m_collsionCount = 0;
 };

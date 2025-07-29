@@ -7,6 +7,11 @@
 
 LightController::~LightController()
 {
+	Memory::SafeDelete(m_pLightBuffer);
+	Memory::SafeDelete(m_pLightCountBuffer);
+	Memory::SafeDelete(m_shadowMapBuffer);
+
+	m_shadowMapPass.reset();
 }
 
 void LightController::Initialize()
@@ -43,6 +48,7 @@ void LightController::Initialize()
 
 
 	m_shadowMapPass = std::make_unique<ShadowMapPass>();
+	hasLightWithShadows = false;
 }
 
 void LightController::Update()

@@ -17,6 +17,7 @@ ReflectionScriptField(Player) \
 		meta_property(dashAmount) \
 		meta_property(AttackPowerX) \
 		meta_property(AttackPowerY) \
+		meta_property(detectAngle) \
 		meta_property(KnockBackForceY) \
 		meta_property(KnockBackForce) \
 	}); \

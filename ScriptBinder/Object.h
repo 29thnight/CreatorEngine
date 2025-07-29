@@ -48,6 +48,8 @@ public:
 protected:
     friend class SceneManager;
     friend class RenderScene;
+    friend class Prefab;
+    friend class PrefabUtility;
 	HashedGuid              m_typeID{ type_guid(Object) };
     [[Property]]
     HashedGuid              m_instanceID{ make_guid() };

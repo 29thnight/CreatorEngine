@@ -45,5 +45,5 @@ namespace Meta
 		std::function<void()> m_undoFunc;
 		std::function<void()> m_redoFunc;
 	};
-}
 
+}

@@ -230,6 +230,11 @@ void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 	{
 		m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	}
+
+    if (m_dxgiDebug != nullptr)
+    {
+        m_dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
+	}
 #endif
 }
 

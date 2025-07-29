@@ -8,12 +8,14 @@
 #include <DirectXTK/SpriteBatch.h>
 #include "concurrent_queue.h"
 #include "AssetJob.h"
+#include "DLLAcrossSingleton.h"
+#include "EngineSetting.h"
 
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
 class Material;
-class DataSystem : public Singleton<DataSystem>
+class DataSystem : public DLLCore::Singleton<DataSystem>
 {
 public:
 	enum class FileType
@@ -26,6 +28,7 @@ public:
 		Shader,
 		CppScript,
 		CSharpScript,
+                Prefab,
 		Sound,
 		HDR,
 	};
@@ -45,30 +48,8 @@ public:
 		Skeleton,
 	};
 
-	std::unordered_map<FileType, std::string> FileTypeString =
-	{
-		{ FileType::Model, "Model" },
-		{ FileType::Texture, "Texture" },
-		{ FileType::MaterialTexture, "MaterialTexture" },
-		{ FileType::TerrainTexture, "TerrainTexture" },
-		{ FileType::Shader, "Shader" },
-		{ FileType::CppScript, "CppScript" },
-		{ FileType::CSharpScript, "CSharpScript" },
-		{ FileType::Sound, "Sound" },
-		{ FileType::HDR, "HDR" }
-	};
-
-	std::unordered_map<FileType, std::string> TextureTypeToString =
-	{
-		{ FileType::Model ,"Model" },
-		{ FileType::Texture, "Texture" },
-		{ FileType::MaterialTexture, "MaterialTexture" },
-		{ FileType::TerrainTexture, "TerrainTexture" },
-		{ FileType::HDR, "HDR" }
-	};
-
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<DataSystem>;
 
 	DataSystem() = default;
 	~DataSystem();
@@ -96,10 +77,11 @@ public:
     Texture* LoadMaterialTexture(const std::string_view& filePath);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
+	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음
 	void OpenFile(const file::path& filepath);
 	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
 	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
-
+	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
@@ -107,11 +89,15 @@ public:
 
 	file::path m_TargetTexturePath;
 	concurrency::concurrent_queue<file::path> m_LoadTextureAssetQueue;
-
+	// Contents Browser
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
 	void ShowDirectoryTree(const file::path& directory);
+	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_ContentsBrowserStyle = style; }
+	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_ContentsBrowserStyle; }
 	void ShowCurrentDirectoryFiles();
+	void ShowCurrentDirectoryFilesTile();
+	void ShowCurrentDirectoryFilesTree(const file::path& directory);
 	void DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize = ImVec2(160, 160));
 
 	ImFont* GetSmallFont() const { return smallFont; }
@@ -126,6 +112,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Texture>> Textures;
 	std::unordered_map<std::string, std::shared_ptr<SpriteFont>> SFonts;
 	static ImGuiTextFilter filter;
+	ContentsBrowserStyle m_ContentsBrowserStyle{ ContentsBrowserStyle::Tile };
+	float tileSize = 160.0f;
 
 	Material* m_trasfarMaterial{};
 
@@ -172,5 +160,5 @@ private:
 	static std::atomic_bool m_isExecuteSolution;
 };
 
-static inline auto& DataSystems = DataSystem::GetInstance();
+static auto DataSystems = DataSystem::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

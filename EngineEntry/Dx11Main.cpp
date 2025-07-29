@@ -21,6 +21,7 @@
 #include "EffectManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
+#include "ResourceAllocator.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -31,42 +32,52 @@ std::atomic<bool> isGameToRender = false;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
+   
+}
+
+DirectX11::Dx11Main::~Dx11Main()
+{
+
+}
+
+void DirectX11::Dx11Main::Initialize()
+{
     PROFILER_INITIALIZE(5, 1024);
     PROFILE_REGISTER_THREAD("[GameThread]");
 
     g_progressWindow->SetStatusText(L"Initializing RenderEngine...");
-	m_deviceResources->RegisterDeviceNotify(this);
+    m_deviceResources->RegisterDeviceNotify(this);
 
     XMFLOAT3 center = { 0.0f, 0.0f, 0.0f };
     XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
     BoundingBox fixedBounds(center, extents);
-	CullingManagers->Initialize(fixedBounds, 3, 30);
+    CullingManagers->Initialize(fixedBounds, 3, 30);
 
     g_progressWindow->SetProgress(50);
-	m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
-	m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
+    m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
+    m_imguiRenderer = std::make_unique<ImGuiRenderer>(m_deviceResources);
     g_progressWindow->SetProgress(55);
 #ifdef EDITOR
-	m_gizmoRenderer     = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
-	m_renderPassWindow  = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_sceneViewWindow   = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
-	m_menuBarWindow     = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
-	m_gameViewWindow    = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
-	m_hierarchyWindow   = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
-	m_inspectorWindow   = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
+    m_gizmoRenderer = std::make_shared<GizmoRenderer>(m_sceneRenderer.get());
+    m_renderPassWindow = std::make_unique<RenderPassWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
+    m_sceneViewWindow = std::make_unique<SceneViewWindow>(m_sceneRenderer.get(), m_gizmoRenderer.get());
+    m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneRenderer.get());
+    m_gameViewWindow = std::make_unique<GameViewWindow>(m_sceneRenderer.get());
+    m_hierarchyWindow = std::make_unique<HierarchyWindow>(m_sceneRenderer.get());
+    m_inspectorWindow = std::make_unique<InspectorWindow>(m_sceneRenderer.get());
     g_progressWindow->SetProgress(60);
 #endif // !EDITOR
 
     g_progressWindow->SetStatusText(L"Script Building...");
-	ScriptManager->Initialize();
+    ScriptManager->Initialize();
     g_progressWindow->SetProgress(65);
 
     g_progressWindow->SetStatusText(L"Initializing SoundManager...");
-	Sound->initialize((int)ChannelType::MaxChannel);
+    Sound->initialize((int)ChannelType::MaxChannel);
     g_progressWindow->SetProgress(70);
 
     g_progressWindow->SetStatusText(L"Loading Assets...");
-	DataSystems->Initialize();
+    DataSystems->Initialize();
     g_progressWindow->SetProgress(75);
     //CreateScene
     g_progressWindow->SetStatusText(L"Loading Project...");
@@ -74,73 +85,71 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
     g_progressWindow->SetProgress(80);
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
-    {
-        if (InputActionManagers == nullptr)
         {
-            Debug->LogDebug("null입니다ㅏㅏ");
-        }
-        else
-         InputActionManagers->Update(deltaSecond);
+            if (InputActionManagers == nullptr)
+            {
+                Debug->LogDebug("null입니다ㅏㅏ");
+            }
+            else
+                InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
-        bool isPressedCtrl = InputManagement->IsKeyPressed(VK_LCONTROL);
-        if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
-        {
-			Meta::UndoCommandManager->Undo();
-        }
+            bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
+            if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
+            {
+                Meta::UndoCommandManager->Undo();
+            }
 
-        if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
-        {
-			Meta::UndoCommandManager->Redo();
-        }
+            if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
+            {
+                Meta::UndoCommandManager->Redo();
+            }
 #endif // !EDITOR
-		UIManagers->Update();
-        Sound->update();
-    });
+            UIManagers->Update();
+            Sound->update();
+        });
     g_progressWindow->SetProgress(81);
     m_SceneRenderingEventHandle = SceneRenderingEvent.AddLambda([&](float deltaSecond)
-    {
-        m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
-        m_sceneRenderer->SceneRendering();
-    });
+        {
+            m_sceneRenderer->OnWillRenderObject(EngineSettingInstance->frameDeltaTime);
+            m_sceneRenderer->SceneRendering();
+        });
     g_progressWindow->SetProgress(82);
-	m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
-	{
-		m_gizmoRenderer->OnDrawGizmos();
-	});
+    m_OnGizmoEventHandle = OnDrawGizmosEvent.AddLambda([&]()
+        {
+            m_gizmoRenderer->OnDrawGizmos();
+        });
     g_progressWindow->SetProgress(83);
     m_GUIRenderingEventHandle = GUIRenderingEvent.AddLambda([&]()
-    {
-        OnGui();
-    });
+        {
+            OnGui();
+        });
 
-    m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]() 
-    {
-        m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
-    });
+    m_EndOfFrameEventHandle = endOfFrameEvent.AddLambda([&]()
+        {
+            m_sceneRenderer->EndOfFrame(EngineSettingInstance->frameDeltaTime);
+        });
 
     g_progressWindow->SetProgress(85);
     SceneManagers->ManagerInitialize();
     g_progressWindow->SetProgress(90);
-	PhysicsManagers->Initialize();
-    EffectManager::GetInstance();
-    EffectProxyController::GetInstance();
+    PhysicsManagers->Initialize();
 
     isGameToRender = true;
 
     PROFILE_FRAME();
 
-    m_CB_Thread = std::thread([&] 
-	{
+    m_CB_Thread = std::thread([&]
+    {
         PROFILE_REGISTER_THREAD("[CB-Thread]");
-		while (isGameToRender)
-		{
+        while (isGameToRender)
+        {
             if (!m_isInvokeResize)
             {
                 CommandBuildThread();
             }
-		}
-	});
-    
+        }
+    });
+
     m_CE_Thread = std::thread([&]
     {
         PROFILE_REGISTER_THREAD("[CE-Thread]");
@@ -148,7 +157,7 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
         {
             while (!WinProcProxy::GetInstance()->IsEmpty())
             {
-				auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
+                auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
 
                 if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
                 {
@@ -166,24 +175,19 @@ DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceReso
             CommandExecuteThread();
         }
     });
-    
+
     m_CB_Thread.detach();
     m_CE_Thread.detach();
 }
 
-DirectX11::Dx11Main::~Dx11Main()
+void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
-	m_deviceResources->RegisterDeviceNotify(nullptr);
+    EngineSettingInstance->SaveSettings();
     SceneManagers->Decommissioning();
-    EffectManager::Destroy();
-	EffectProxyController::Destroy();
+    m_sceneRenderer->Finalize();
+    m_deviceResources->RegisterDeviceNotify(nullptr);
     PROFILER_SHUTDOWN();
-}
-//test code
-void DirectX11::Dx11Main::SceneInitialize()
-{
-	
 }
 
 void DirectX11::Dx11Main::CreateWindowSizeDependentResources()

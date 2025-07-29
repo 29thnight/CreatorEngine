@@ -21,6 +21,7 @@
 #include "Terrain.h"
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
+#include "FoliageComponent.h"
 #include "fa.h"
 #include "Trim.h"
 #include "Profiler.h"
@@ -43,13 +44,13 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     InitializeShadowMapDesc();
 
 	m_threadPool = new ThreadPool;
-	m_commandThreadPool = new RenderThreadPool(DeviceState::g_pDevice);
-	m_renderScene = new RenderScene();
-	SceneManagers->SetRenderScene(m_renderScene);
+	m_commandThreadPool = std::make_unique<RenderThreadPool>(DeviceState::g_pDevice);
+	m_renderScene = std::make_shared<RenderScene>();
+	SceneManagers->SetRenderScene(m_renderScene.get());
 
 	//sampler 생성
-	m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
-	m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
+	//m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
+	//m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
 
 	InitializeTextures();
 
@@ -226,8 +227,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	m_pTerrainGizmoPass = std::make_unique<TerrainGizmoPass>();
 
-
-
 	m_renderScene->Initialize();
 	m_renderScene->SetBuffers(m_ModelBuffer.Get());
 
@@ -246,6 +245,46 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
+
+}
+
+void SceneRenderer::Finalize()
+{
+	m_diffuseTexture.reset();
+	m_metalRoughTexture.reset();
+	m_normalTexture.reset();
+	m_emissiveTexture.reset();
+	m_toneMappedColourTexture.reset();
+	m_bitmaskTexture.reset();
+	m_ambientOcclusionTexture.reset();
+	m_toneMappedColourTexture.reset();
+	m_lightingTexture.reset();
+
+	m_pSSAOPass.reset();
+	m_pGBufferPass.reset();
+	m_pDeferredPass.reset();
+	m_pForwardPass.reset();
+	m_pSkyBoxPass.reset();
+	m_pToneMapPass.reset();
+	m_pSpritePass.reset();
+	m_pBlitPass.reset();
+	m_pAAPass.reset();
+	m_pPostProcessingPass.reset();
+	m_pPositionMapPass.reset();
+	m_pLightMapPass.reset();
+	m_pScreenSpaceReflectionPass.reset();
+	m_pSubsurfaceScatteringPass.reset();
+	m_pVignettePass.reset();
+	m_pColorGradingPass.reset();
+	m_pVolumetricFogPass.reset();
+	m_pUIPass.reset();
+	m_pSSGIPass.reset();
+	m_pBitMaskPass.reset();
+	m_pTerrainGizmoPass.reset();
+	m_EffectEditor.reset();
+
+	m_commandThreadPool.reset();
+
 	delete m_threadPool;
 
 	OnResizeEvent -= m_resizeEventHandle;
@@ -375,11 +414,16 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
 	m_renderScene->m_LightController->Initialize();
-	m_renderScene->m_LightController->SetLightWithShadows(0, desc);
-	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
+	try
+	{
+		m_renderScene->m_LightController->SetLightWithShadows(0, desc);
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "Error initializing light with shadows: " << e.what() << std::endl;
+	}
 
-	DeviceState::g_pDeviceContext->PSSetSamplers(0, 1, &m_linearSampler->m_SamplerState);
-	DeviceState::g_pDeviceContext->PSSetSamplers(1, 1, &m_pointSampler->m_SamplerState);
+	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
 	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
 	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
@@ -389,29 +433,16 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	lightMap.envMap = envMap;
-
-	//TODO : 시연용 Player주석 코드
-/*	model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	testt = Model::LoadModelToSceneObj(model[0], *scene);
-	player.GetPlayer(testt);*/ //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
-	////TODO : 시연용 Player주석 코드
-	//model[0] = DataSystems->LoadCashedModel("Punch.fbx");
-	//testt = Model::LoadModelToSceneObj(model[0], *scene);
-	//player.GetPlayer(testt); //인게임에서 animations -> punch isLoop 체크 풀고 씬저장
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	//TODO : 시연용 Player주석 코드
-	player.Update(deltaTime);
-	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDestroy();
@@ -649,11 +680,13 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
+		// EffectPass
 		{
 			PROFILE_CPU_BEGIN("EffectPass");
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
 			float deltaTime = Time->GetElapsedSeconds();
+			m_EffectEditor->Update(deltaTime);
 			EffectManagers->Update(deltaTime);
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
@@ -728,8 +761,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if (nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushShadowRenderQueue(proxy);
 			}
 		}
@@ -739,8 +770,6 @@ void SceneRenderer::CreateCommandListPass()
 			auto proxy = renderScene->FindProxy(instanceID);
 			if(nullptr != proxy)
 			{
-				proxy->GenerateLODGroup();
-				proxy->m_LODDistance = camera->CalculateLODDistance(proxy->m_worldPosition);
 				data->PushRenderQueue(proxy);
 			}
 		}
@@ -794,6 +823,7 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
 			PROFILE_CPU_BEGIN("ForwardPassCommandList");
+			m_pForwardPass->CreateFoliageCommandList(deferredContext, *m_renderScene, *camera);
 			m_pForwardPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
@@ -868,17 +898,29 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
-	
-	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, m_currentScene]
+	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+
+	m_threadPool->Enqueue([=]
 	{
 		for (auto& terrain : terrainComponents)
 		{
 			renderScene->UpdateCommand(terrain);
 		}
+	});
 
+	m_threadPool->Enqueue([=]
+	{
 		for (auto& mesh : allMeshes)
 		{
 			renderScene->UpdateCommand(mesh);
+		}
+	});
+
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& foliage : foliageComponents)
+		{
+			renderScene->UpdateCommand(foliage);
 		}
 	});
 
@@ -901,43 +943,26 @@ void SceneRenderer::PrepareRender()
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-		m_threadPool->Enqueue([camera, allMeshes, data, terrainComponents, staticMeshes, skinnedMeshes, renderScene]
+		m_threadPool->Enqueue([=]
 		{
-			for (auto& mesh : allMeshes)
-			{
-				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				
-				data->PushShadowRenderData(mesh->GetInstanceID());
-			}
-
-			for (auto& culledMesh : staticMeshes)
-			{
-				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(culledMesh->GetBoundingBox()))
-				{
-					data->PushCullData(culledMesh->GetInstanceID());
-				}
-			}
-
-			for (auto& skinnedMesh : skinnedMeshes)
-			{
-				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-				{
-					data->PushCullData(skinnedMesh->GetInstanceID());
-				}
-			}
-
 			for (auto& terrainComponent : terrainComponents)
 			{
 				if (terrainComponent->IsEnabled())
 				{
 					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
 					if(proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& foliageComponent : foliageComponents)
+			{
+				if (foliageComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
+					if (proxy)
 					{
 						data->PushRenderQueue(proxy);
 					}

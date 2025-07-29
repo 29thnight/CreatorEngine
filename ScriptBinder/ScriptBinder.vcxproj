@@ -119,7 +119,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Fmod\inc\;$(SolutionDir)Physics\;$(SolutionDir)ImGuiHelper\;$(SolutionDir)RenderEngine\;$(SolutionDir)Utility_Framework\;$(SolutionDir)EngineEntry\;C:\Program Files\Mono\include\mono-2.0\;$(SolutionDir)SingletonManager\SingletonManager\;$(ProjectDir)asbind20\;$(SolutionDir)ManagedHeap\ManagedHeap\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -205,13 +205,15 @@
     <ClInclude Include="BTHeader.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EForceMode.h" />
-    <ClInclude Include="FoliageBaseType.h" />
+    <ClInclude Include="FoliageInstance.h" />
+    <ClInclude Include="FoliageType.h" />
     <ClInclude Include="FoliageComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="IRegistableEvent.h" />
     <ClInclude Include="ISerializable.h" />
     <ClInclude Include="EBodyType.h" />
+    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
@@ -274,7 +276,6 @@
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="MonoBehaviorRecord.h" />
     <ClInclude Include="Object.h" />
-    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RegisterReflect.def" />
@@ -301,7 +302,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Component.inl" />
-    <None Include="GameObejct.inl" />
+    <None Include="GameObject.inl" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="GameAi.txt" />

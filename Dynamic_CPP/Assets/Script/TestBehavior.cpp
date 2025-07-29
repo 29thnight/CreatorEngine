@@ -3,11 +3,16 @@
 #include "RenderScene.h"
 #include "InputManager.h"
 #include "InputActionManager.h"
-#include "EffectComponent.h"
+
 #include "pch.h"
 #include <cmath>
-GameObject* testObject = nullptr;
-EffectComponent* effectComponent = nullptr;
+
+#include "BoxColliderComponent.h"
+#include "RigidBodyComponent.h"
+
+
+BoxColliderComponent* boxCollider = nullptr;
+RigidBodyComponent* rigidBody = nullptr;
 
 void TestBehavior::Start()
 {
@@ -17,10 +22,9 @@ void TestBehavior::Start()
 	// that this behavior is attached to.
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
-
-
-
-	testObject = GetOwner();
+	
+	boxCollider = m_pOwner->GetComponent<BoxColliderComponent>();
+	rigidBody = m_pOwner->GetComponent<RigidBodyComponent>();
 }
   
 void TestBehavior::FixedUpdate(float fixedTick)
@@ -53,10 +57,46 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-}
+	m_chargingTime += tick;
+	m_chargingTime > 20.f ? m_chargingTime = 0.f : m_chargingTime;
 
-void TestBehavior::LateUpdate(float tick)
-{
+	if (rigidBody)
+	{
+		bool istriger = rigidBody->IsTrigger();
+		if (istriger)
+		{
+			std::cout << " state : trigger" << std::endl;
+		}
+		else {
+			std::cout << " state : collision" << std::endl;
+		}
+
+		std::cout << " testValue : " << testValue << std::endl;
+		std::cout << " m_chargingTime : " << m_chargingTime << std::endl;
+
+		if (testValue< m_chargingTime)
+		{
+			std::cout << " testValue < m_chargingTime" << std::endl;
+			if (!istriger)
+			{
+				std::cout << " set trigger" << std::endl;
+				rigidBody->SetIsTrigger(true);
+				
+			}
+		}
+
+		if (testValue> m_chargingTime)
+		{
+
+			if (istriger)
+			{
+				rigidBody->SetIsTrigger(false);
+			}
+		}
+
+	}
+
+
 }
 
 void TestBehavior::Test()

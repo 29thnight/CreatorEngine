@@ -55,6 +55,7 @@ PostProcessingPass::~PostProcessingPass()
 {
 	//Memory::SafeDelete(m_CopiedTexture);
     DeallocateResource(m_CopiedTexture);
+
 }
 
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)

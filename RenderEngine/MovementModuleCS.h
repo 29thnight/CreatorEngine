@@ -7,7 +7,7 @@ public:
     MovementModuleCS(bool useGravity = false, float gravityStrength = 1.0f)
         : m_gravity(useGravity), m_gravityStrength(gravityStrength),
         m_computeShader(nullptr), m_movementParamsBuffer(nullptr),
-        m_isInitialized(false), m_paramsDirty(true), m_easingEnabled(false),
+         m_paramsDirty(true), m_easingEnabled(false),
         m_easingType(0)
     {
     }
@@ -21,6 +21,9 @@ public:
     void Initialize() override;
     void Update(float delta) override;
     void OnSystemResized(UINT max) override;
+
+    virtual void ResetForReuse();
+    virtual bool IsReadyForReuse() const;
 
     // Movement settings
     void SetUseGravity(bool use) { m_gravity = use; m_paramsDirty = true;  std::cout << "asd"; }
@@ -61,7 +64,6 @@ private:
     ID3D11Buffer* m_movementParamsBuffer;
 
     // State tracking
-    bool m_isInitialized;
     bool m_paramsDirty;
     UINT m_particleCapacity = 0;
 };

@@ -99,6 +99,8 @@ SSGIPass::SSGIPass()
 
 SSGIPass::~SSGIPass()
 {
+    Memory::SafeDelete(sample);
+    Memory::SafeDelete(pointSample);
 }
 
 void SSGIPass::Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive)

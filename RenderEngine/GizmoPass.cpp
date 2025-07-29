@@ -6,6 +6,7 @@
 #include "LightComponent.h"
 #include "Scene.h"
 #include "GizmoCbuffer.h"
+#include "ResourceAllocator.h"
 
 constexpr int MAIN_LIGHT_INDEX = 0;
 
@@ -65,6 +66,15 @@ GizmoPass::GizmoPass()
 	DirectX::SetName(m_sizeBuffer.Get(), "GizmoSizeBuffer");
 	m_gizmoCameraBuffer = DirectX11::CreateBuffer(sizeof(GizmoCameraBuffer), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 	DirectX::SetName(m_gizmoCameraBuffer.Get(), "GizmoCameraBuffer");
+}
+
+GizmoPass::~GizmoPass()
+{
+	DeallocateResource(MainLightIcon);
+	DeallocateResource(PointLightIcon);
+	DeallocateResource(SpotLightIcon);
+	DeallocateResource(DirectionalLightIcon);
+	DeallocateResource(CameraIcon);
 }
 
 void GizmoPass::Execute(RenderScene& scene, Camera& camera)

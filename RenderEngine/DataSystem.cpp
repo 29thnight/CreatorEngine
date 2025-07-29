@@ -1,6 +1,7 @@
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
+#include "PrefabEditor.h"
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
@@ -10,6 +11,59 @@
 #include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "ToggleUI.h"
+
+using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 10>;
+
+constexpr FileTypeCharArr FileTypeStringTable{{
+	{ DataSystem::FileType::Model,          "Model"				},
+	{ DataSystem::FileType::Texture,        "Texture"			},
+	{ DataSystem::FileType::MaterialTexture,"MaterialTexture"	},
+	{ DataSystem::FileType::TerrainTexture, "TerrainTexture"	},
+	{ DataSystem::FileType::Shader,         "Shader"			},
+	{ DataSystem::FileType::CppScript,      "CppScript"			},
+	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
+        { DataSystem::FileType::Prefab,         "Prefab"                       },
+	{ DataSystem::FileType::Sound,          "Sound"				},
+	{ DataSystem::FileType::HDR,            "HDR"				}
+}};
+
+        else if (filepath.extension() == ".pfb")
+                return DataSystem::FileType::Prefab;
+// Í≤ÄÏÉâ Ìï®Ïàò
+constexpr const char* FileTypeToString(DataSystem::FileType type)
+{
+	// ÏÑ†Ìòï Í≤ÄÏÉâ
+	for (auto&& kv : FileTypeStringTable)
+	{
+		if (kv.first == type)
+			return kv.second;
+	}
+	return "Unknown";
+}
+
+DataSystem::FileType GetFileType(const file::path& filepath)
+{
+	if (filepath.extension() == ".fbx" || filepath.extension() == ".gltf" || filepath.extension() == ".glb")
+		return DataSystem::FileType::Model;
+	else if (filepath.extension() == ".png" || filepath.extension() == ".jpg" || filepath.extension() == ".jpeg")
+		return DataSystem::FileType::Texture;
+	else if (filepath.extension() == ".mat")
+		return DataSystem::FileType::MaterialTexture;
+	else if (filepath.extension() == ".terrain")
+		return DataSystem::FileType::TerrainTexture;
+	else if (filepath.extension() == ".hlsl" || filepath.extension() == ".fx")
+		return DataSystem::FileType::Shader;
+	else if (filepath.extension() == ".cpp" || filepath.extension() == ".h")
+		return DataSystem::FileType::CppScript;
+	else if (filepath.extension() == ".cs")
+		return DataSystem::FileType::CSharpScript;
+	else if (filepath.extension() == ".wav" || filepath.extension() == ".mp3")
+		return DataSystem::FileType::Sound;
+	else if (filepath.extension() == ".hdr")
+		return DataSystem::FileType::HDR;
+	return DataSystem::FileType::Unknown;
+}
 
 ImGuiTextFilter DataSystem::filter;
 std::atomic_bool DataSystem::m_isExecuteSolution = false;
@@ -32,31 +86,30 @@ bool HasImageFile(const file::path& directory)
 
 DataSystem::~DataSystem()
 {
-
+	Finalize();
 }
 
 void DataSystem::Initialize()
 {
-	file::path iconpath = PathFinder::IconPath();
-	UnknownIcon = Texture::LoadFormPath(iconpath.string() + "Unknown.png");
-	TextureIcon = Texture::LoadFormPath(iconpath.string() + "Texture.png");
-	ModelIcon = Texture::LoadFormPath(iconpath.string() + "Model.png");
-	AssetsIcon = Texture::LoadFormPath(iconpath.string() + "Assets.png");
-	FolderIcon = Texture::LoadFormPath(iconpath.string() + "Folder.png");
-	ShaderIcon = Texture::LoadFormPath(iconpath.string() + "Shader.png");
-	CodeIcon = Texture::LoadFormPath(iconpath.string() + "Code.png");
-
-	MainLightIcon = Texture::LoadFormPath(iconpath.string() + "MainLightGizmo.png");
-	PointLightIcon = Texture::LoadFormPath(iconpath.string() + "PointLightGizmo.png");
-	SpotLightIcon = Texture::LoadFormPath(iconpath.string() + "SpotLightGizmo.png");
-	DirectionalLightIcon = Texture::LoadFormPath(iconpath.string() + "DirectionalLightGizmo.png");
-	CameraIcon = Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
-
-	smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
-	extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
+	file::path iconpath		= PathFinder::IconPath();
+	UnknownIcon				= Texture::LoadFormPath(iconpath.string() + "Unknown.png");
+	TextureIcon				= Texture::LoadFormPath(iconpath.string() + "Texture.png");
+	ModelIcon				= Texture::LoadFormPath(iconpath.string() + "Model.png");
+	AssetsIcon				= Texture::LoadFormPath(iconpath.string() + "Assets.png");
+	FolderIcon				= Texture::LoadFormPath(iconpath.string() + "Folder.png");
+	ShaderIcon				= Texture::LoadFormPath(iconpath.string() + "Shader.png");
+	CodeIcon				= Texture::LoadFormPath(iconpath.string() + "Code.png");
+	MainLightIcon			= Texture::LoadFormPath(iconpath.string() + "MainLightGizmo.png");
+	PointLightIcon			= Texture::LoadFormPath(iconpath.string() + "PointLightGizmo.png");
+	SpotLightIcon			= Texture::LoadFormPath(iconpath.string() + "SpotLightGizmo.png");
+	DirectionalLightIcon	= Texture::LoadFormPath(iconpath.string() + "DirectionalLightGizmo.png");
+	CameraIcon				= Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
+	smallFont				= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
+	extraSmallFont			= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
+	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
 
 	RenderForEditer();
-	m_watcher = new efsw::FileWatcher();
+	m_watcher			= new efsw::FileWatcher();
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
 	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
 	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
@@ -74,6 +127,11 @@ void DataSystem::Finalize()
     DeallocateResource(FolderIcon);
     DeallocateResource(ShaderIcon);
     DeallocateResource(CodeIcon);
+	DeallocateResource(MainLightIcon);
+	DeallocateResource(PointLightIcon);
+	DeallocateResource(SpotLightIcon);
+	DeallocateResource(DirectionalLightIcon);
+	DeallocateResource(CameraIcon);
 
     Models.clear();
     Textures.clear();
@@ -170,33 +228,47 @@ void DataSystem::RenderForEditer()
 
 	ImGui::ContextRegister(ICON_FA_HARD_DRIVE " Content Browser", true, [&]()
 	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").SetPopup(
+			m_ContentsBrowserStyle == ContentsBrowserStyle::Tile);
+
 		static file::path DataDirectory = PathFinder::Relative();
-		if (ImGui::Button(ICON_FA_ARROWS_ROTATE " Shader Reload", ImVec2(0, 0)))
+		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, ImVec2(0, 0)))
 		{
 			ShaderSystem->SetReloading(true);
 		}
 
 		ImGui::SameLine();
-		filter.Draw(ICON_FA_MAGNIFYING_GLASS " Search", ImGui::GetContentRegionAvail().x);
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+		ImGui::BeginDisabled();
+		ImGui::Button(ICON_FA_MAGNIFYING_GLASS);
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
+		ImGui::PopStyleVar();
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
-		ImGuiTreeNodeFlags rootFlags = 
-			ImGuiTreeNodeFlags_OpenOnArrow | 
-			ImGuiTreeNodeFlags_SpanFullWidth | 
-			ImGuiTreeNodeFlags_DefaultOpen;
 
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
-		if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
+		if(m_ContentsBrowserStyle == ContentsBrowserStyle::Tile)
 		{
-			ShowDirectoryTree(DataDirectory);
-			ImGui::TreePop();
+			ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
+			ImGuiTreeNodeFlags rootFlags =
+				ImGuiTreeNodeFlags_OpenOnArrow |
+				ImGuiTreeNodeFlags_SpanFullWidth |
+				ImGuiTreeNodeFlags_DefaultOpen;
+
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
+			if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
+			{
+				ShowDirectoryTree(DataDirectory);
+				ImGui::TreePop();
+			}
+			ImGui::PopStyleVar();
+			ImGui::EndChild();
+
+			ImGui::SameLine();
 		}
-		ImGui::PopStyleVar();
-		ImGui::EndChild();
 
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
-		ImGui::SameLine();
 		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 		ImGui::PopStyleVar();
 
@@ -265,7 +337,15 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_AlwaysAutoResize);
 
 	ImGui::GetContext("TextureType Selector").Close();
-	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	//ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	if (m_ContentsBrowserStyle == ContentsBrowserStyle::Tile) 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	}
+	else 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
+	}
 }
 
 void DataSystem::MonitorFiles()
@@ -545,6 +625,34 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
     return nullptr;
 }
 
+Material* DataSystem::CreateMaterial()
+{
+	Material* material = AllocateResource<Material>();
+	if (material)
+	{
+		auto deleter = [&](Material* mat)
+		{
+			if (mat)
+			{
+				DeallocateResource<Material>(mat);
+			}
+		};
+		std::string name = "NewMaterial";
+		int index = 1;
+		while (Materials.find(name) != Materials.end())
+		{
+			name = "NewMaterial" + std::to_string(index++);
+		}
+		material->m_name = name;
+		material->m_fileGuid = make_file_guid(name);
+		
+		Materials[name] = std::shared_ptr<Material>(material, deleter);
+		
+		return material;
+	}
+	return nullptr;
+}
+
 SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 {
 	file::path destination = PathFinder::Relative("Font\\") / file::path(filePath).filename();
@@ -626,6 +734,20 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
+	if(m_ContentsBrowserStyle == ContentsBrowserStyle::Tile)
+	{
+		ShowCurrentDirectoryFilesTile();
+	}
+	else
+	{
+		currentDirectory = PathFinder::Relative();
+
+		ShowCurrentDirectoryFilesTree(currentDirectory);
+	}
+}
+
+void DataSystem::ShowCurrentDirectoryFilesTile()
+{
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -649,16 +771,16 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 			std::string extension = entry.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-            if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" || 
-				extension == ".glb" || extension == ".png" || extension == ".dds" || 
-				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" || 
+			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
+				extension == ".glb" || extension == ".png" || extension == ".dds" ||
+				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
 				extension == ".cs" || extension == ".wav" || extension == ".mp3")
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
-				if (extension == ".fbx" || 
-					extension == ".gltf" || 
-					extension == ".obj" || 
+				if (extension == ".fbx" ||
+					extension == ".gltf" ||
+					extension == ".obj" ||
 					extension == ".glb")
 				{
 					fileType = FileType::Model;
@@ -702,6 +824,156 @@ void DataSystem::ShowCurrentDirectoryFiles()
 		}
 	}
 	ImGui::Columns(1);
+}
+
+void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
+{
+	static file::path currentDirectory;
+	static FileType selectedFileType = FileType::Unknown;
+	static std::string draggedFileType{};
+	static bool isRightClicked = false;
+	static bool isHoverAndClicked = false;
+
+	for (const auto& entry : file::directory_iterator(directory))
+	{
+		if (entry.is_directory())
+		{
+			std::string name = entry.path().filename().string();
+			std::string label = std::string(ICON_FA_FOLDER " ") + name;
+
+			if(ImGui::TreeNode(label.c_str()))
+			{
+				ShowCurrentDirectoryFilesTree(entry.path());
+				ImGui::TreePop();
+			}
+		}
+		else if (entry.is_regular_file())
+		{
+			if(filter.IsActive() && !filter.PassFilter(entry.path().filename().string().c_str()))
+				continue;
+
+			std::string extension = entry.path().extension().string();
+			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+
+			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
+				extension == ".glb" || extension == ".png" || extension == ".dds" ||
+				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
+				extension == ".cs" || extension == ".wav" || extension == ".mp3")
+			{
+				std::string label = entry.path().filename().string();
+				std::string apliedIcon;
+
+				if (extension == ".fbx" ||
+					extension == ".gltf" ||
+					extension == ".obj" ||
+					extension == ".glb")
+				{
+					apliedIcon = ICON_FA_CUBE " ";
+				}
+				else if (extension == ".png" || extension == ".dds")
+				{
+					apliedIcon = ICON_FA_IMAGE " ";
+				}
+				else if (extension == ".hdr")
+				{
+					apliedIcon = ICON_FA_IMAGE " ";
+				}
+				else if (extension == ".hlsl")
+				{
+					apliedIcon = ICON_FA_FILE_CONTRACT " ";
+				}
+				else if (extension == ".cpp")
+				{
+					apliedIcon = ICON_FA_FILE_CODE " ";
+				}
+				else if (extension == ".cs")
+				{
+					apliedIcon = ICON_FA_FILE_CODE " ";
+				}
+				else if (extension == ".wav" || extension == ".mp3")
+				{
+					apliedIcon = ICON_FA_FILE_AUDIO " ";
+				}
+
+				label = apliedIcon + label;
+
+				ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+				{
+					OpenFile(entry.path());
+				}
+				else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0))
+				{
+					currentDirectory = entry.path();
+					selectedFileType = GetFileType(entry.path());
+					isHoverAndClicked = true;
+				}
+				else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1))
+				{
+					currentDirectory = entry.path();
+					selectedFileType = GetFileType(entry.path());
+					isRightClicked = true;
+				}
+
+				if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+				{
+					ImGui::SetDragDropPayload(FileTypeToString(selectedFileType), entry.path().string().c_str(), entry.path().string().size() + 1);
+					ImGui::Text("Dragging %s", entry.path().filename().string().c_str());
+					ImGui::EndDragDropSource();
+				}
+			}
+		}
+	}
+
+	if (isRightClicked)
+	{
+		ImGui::OpenPopup("Context Menu");
+		isRightClicked = false;
+	}
+
+	if (ImGui::BeginPopup("Context Menu"))
+	{
+		if (ImGui::MenuItem("Delete"))
+		{
+			file::remove(currentDirectory);
+			if (currentDirectory.extension() == ".cpp")
+			{
+				file::path headerPath = currentDirectory;
+				headerPath.replace_extension(".h");
+				if (file::exists(headerPath))
+				{
+					file::remove(headerPath);
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+					ScriptManager->CompileEvent();
+				}
+			}
+		}
+		if (ImGui::MenuItem("Open Save Directory"))
+		{
+			OpenExplorerSelectFile(currentDirectory);
+		}
+		ImGui::EndPopup();
+	}
+
+	if (isHoverAndClicked && !currentDirectory.empty())
+	{
+		selectedMetaFilePath = currentDirectory.string() + ".meta";
+		selectedFileName = currentDirectory.filename().string();
+		draggedFileType = FileTypeToString(selectedFileType);
+		try
+		{
+			selectedFileMetaNode = YAML::LoadFile(selectedMetaFilePath);
+		}
+		catch (const std::exception& e)
+		{
+			Debug->LogError(e.what());
+			selectedFileMetaNode = std::nullopt;
+		}
+
+		isHoverAndClicked = false;
+	}
+
 }
 
 void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
@@ -784,6 +1056,9 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	case FileType::CSharpScript:
 		color = IM_COL32(255, 0, 255, 255);
 		break;
+        case FileType::Prefab:
+                color = IM_COL32(0, 128, 255, 255);
+                break;
 	case FileType::Sound:
 		color = IM_COL32(255, 255, 0, 255);
 		break;
@@ -801,14 +1076,14 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	ImGui::PopFont();
 	ImGui::Dummy(ImVec2(0, 2));
 	ImGui::PushFont(extraSmallFont);
-	ImGui::TextWrapped("%s", FileTypeString[fileType].c_str());
+	ImGui::TextWrapped("%s", FileTypeToString(fileType));
 	ImGui::PopFont();
 
 	ImGui::EndGroup();
 
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
-		ImGui::SetDragDropPayload(FileTypeString[fileType].c_str(), fileName.c_str(), fileName.size() + 1);
+		ImGui::SetDragDropPayload(FileTypeToString(fileType), fileName.c_str(), fileName.size() + 1);
 		ImGui::Text("Dragging %s", fileName.c_str());
 		ImGui::EndDragDropSource();
 	}
@@ -823,6 +1098,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
+    if(filepath.extension() == ".pfb") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	if ((int)result <= 32)
@@ -844,7 +1120,7 @@ void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 		SW_SHOWNORMAL   // nShowCmd
 	);
 
-	// ShellExecute Ω«∆– Ω√ ø¿∑˘ ƒ⁄µÂ (0 ~ 32)
+	// ShellExecute Ïã§Ìå® Ïãú Ïò§Î•ò ÏΩîÎìú (0 ~ 32)
 	if ((INT_PTR)result <= 32)
 	{
 		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
@@ -893,7 +1169,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 				std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 
-			// Visual Studio ¡æ∑· ∞®¡ˆ øœ∑·
+			// Visual Studio Ï¢ÖÎ£å Í∞êÏßÄ ÏôÑÎ£å
 			if (!ScriptManager->IsCompileEventInvoked())
 			{
 				ScriptManager->SetCompileEventInvoked(true);
@@ -905,7 +1181,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 			CloseHandle(hProcess);
 		}).detach();
 
-		CloseHandle(pi.hThread); // Ω∫∑πµÂ¥¬ ∞πŸ∑Œ ¥›æ∆µµ µ 
+		CloseHandle(pi.hThread); // Ïä§Î†àÎìúÎäî Í≥ßÎ∞îÎ°ú Îã´ÏïÑÎèÑ Îê®
 	}
 	else
 	{

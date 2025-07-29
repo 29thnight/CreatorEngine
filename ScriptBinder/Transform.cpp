@@ -177,7 +177,7 @@ void Transform::UpdateLocalMatrix()
 
 Mathf::xMatrix Transform::UpdateWorldMatrix()
 {
-	if (m_owner->m_parentIndex != 0) {
+	if (m_owner->m_parentIndex != -1) {
 		auto parent = GameObject::FindIndex(m_owner->m_parentIndex);
 		XMMATRIX parentWorldMatrix = parent->m_transform.UpdateWorldMatrix();
 		UpdateLocalMatrix();

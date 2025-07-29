@@ -5,8 +5,8 @@
 #include "Animator.h"
 #ifndef DYNAMICCPP_EXPORTS
 #include "TerrainBuffers.h"
-#include "FoliageBaseType.h"
-#include "LODGroup.h"
+#include "FoliageType.h"
+#include "FoliageInstance.h"
 
 enum class PrimitiveProxyType
 {
@@ -26,6 +26,20 @@ class FoliageComponent;
 class PrimitiveRenderProxy
 {
 public:
+	struct ProxyFilter
+	{
+		HashedGuid animatorGuid{};
+		HashedGuid materialGuid{};
+		bool       LODEnabled{ false };
+		uint32	   LODLevel{ 0 };
+
+		ProxyFilter(size_t animatorGuid, size_t materialGuid, bool LODEnabled, uint32 LODLevel)
+			: animatorGuid(animatorGuid), materialGuid(materialGuid), LODEnabled(LODEnabled), LODLevel(LODLevel) {
+		}
+
+		auto operator<=>(const ProxyFilter& other) const = default;
+	};
+public:
 	PrimitiveRenderProxy(MeshRenderer* component);
     PrimitiveRenderProxy(FoliageComponent* component);
 	PrimitiveRenderProxy(TerrainComponent* component);
@@ -41,10 +55,7 @@ public:
 	void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
 	bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-	void Draw();
 	void Draw(ID3D11DeviceContext* _deferredContext);
-
-	void DrawShadow();
 	void DrawShadow(ID3D11DeviceContext* _deferredContext);
 	void DrawInstanced(ID3D11DeviceContext* _deferredContext, size_t instanceCount);
 
@@ -52,9 +63,12 @@ public:
 
 	void DestroyProxy();
 
-	void GenerateLODGroup();
+	void InitializeLODs(const std::vector<float>& lodScreenSpaceThresholds);
+	void SetLODEnabled(bool enable) { m_EnableLOD = enable; }
+	uint32_t GetLODLevel(Camera* camera);
 
 public:
+	// Common properties
 	PrimitiveProxyType	m_proxyType{ PrimitiveProxyType::MeshRenderer };
 	Mathf::Vector3		m_worldPosition{ 0.0f, 0.0f, 0.0f };
 	Mathf::xMatrix		m_worldMatrix{ XMMatrixIdentity() };
@@ -66,21 +80,19 @@ public:
 	//meshRenderer type
 	Material*					m_Material{ nullptr };
 	Mesh*						m_Mesh{ nullptr };
-	std::unique_ptr<LODGroup>	m_LODGroup{ nullptr };
 	HashedGuid					m_animatorGuid{};
 	HashedGuid					m_materialGuid{};
 	Mathf::xMatrix*				m_finalTransforms{};
 	LightMapping				m_LightMapping;
+	uint32						m_currLOD{ 0 };
 
 	bool                        m_isEnableShadow{ true };
+	bool						m_isShadowCast{ true };
+	bool						m_isShadowRecive{ true };
 	bool						m_isSkinnedMesh{ false };
 	bool						m_isAnimationEnabled{ false };
 	bool						m_isInstanced{ false };
-
 	bool						m_EnableLOD{ false };
-	float						m_LODReductionRatio = 0.5f;
-	size_t						m_MaxLODLevels = 3;
-	float						m_LODDistance = 0.0f;
 
 public:
 	//terrain type
@@ -93,7 +105,7 @@ public:
 	//foliage type
 	std::vector<FoliageInstance>	m_foliageInstances{};
 	std::vector<FoliageType>		m_foliageTypes{};
-	
+
 private:
 	bool						m_isNeedUpdateCulling{ false };
 };

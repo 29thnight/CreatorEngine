@@ -47,12 +47,32 @@ public:
 	DirectX11::Sizef GetScreenSize() const;
 	DirectX::BoundingFrustum GetFrustum();
 
+	void SetShadowInfo(const std::vector<ShadowInfo>& shadowInfo)
+	{
+		m_cascadeinfo = shadowInfo;
+	}
+
+	void ApplyShadowInfo(uint32 index)
+	{
+		if (index < m_cascadeinfo.size())
+		{
+			m_eyePosition									= m_cascadeinfo[index].m_eyePosition;
+			m_lookAt										= m_cascadeinfo[index].m_lookAt;
+			m_nearPlane										= m_cascadeinfo[index].m_nearPlane;
+			m_farPlane										= m_cascadeinfo[index].m_farPlane;
+			m_viewWidth										= m_cascadeinfo[index].m_viewWidth;
+			m_viewHeight									= m_cascadeinfo[index].m_viewHeight;
+			m_shadowMapConstant.m_lightViewProjection[0]	= m_cascadeinfo[index].m_lightViewProjection;
+		}
+	}
+
 	void ResizeRelease();
 	void ResizeResources();
 
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
 	void UpdateBuffer(bool shadow = false);
+	void UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);
 
 	float CalculateLODDistance(const Mathf::Vector3& position) const;
@@ -105,6 +125,8 @@ public:
 
 	ComPtr<ID3D11Buffer>	m_ViewBuffer;
 	ComPtr<ID3D11Buffer>	m_ProjBuffer;
+	ComPtr<ID3D11Buffer>	m_CascadeViewBuffer;
+	ComPtr<ID3D11Buffer>	m_CascadeProjBuffer;
 };
 
 class SceneRenderer;
@@ -162,6 +184,11 @@ public:
 		}
 
 		return nullptr;
+	}
+
+	std::vector<Camera*>& GetCameras()
+	{
+		return m_cameras;
 	}
 
 	Camera* GetLastCamera()

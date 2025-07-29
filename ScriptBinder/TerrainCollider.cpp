@@ -25,3 +25,5 @@ void TerrainColliderComponent::OnCollisionStay(ICollider* other)
 void TerrainColliderComponent::OnCollisionExit(ICollider* other)
 {
 }
+
+

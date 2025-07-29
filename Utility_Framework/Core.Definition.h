@@ -49,6 +49,8 @@ namespace file = std::filesystem;
 #include <deque>
 #include <set>
 #include <stack>
+#include <numeric> 
+#include <cmath>
 #include <string>
 #include <tuple>
 #include <utility>

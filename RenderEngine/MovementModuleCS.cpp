@@ -3,12 +3,17 @@
 
 void MovementModuleCS::Initialize()
 {
+
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();
 }
 
 void MovementModuleCS::Update(float delta)
 {
+    if (!m_enabled) return;
+
+    if (!m_isInitialized) return;
+
     DirectX11::BeginEvent(L"MovementModuleCS");
 
     // 상수 버퍼 업데이트
@@ -107,4 +112,18 @@ void MovementModuleCS::Release()
     m_movementParamsBuffer = nullptr;
 
     m_isInitialized = false;
+}
+
+void MovementModuleCS::ResetForReuse()
+{
+    if (!m_enabled) return;
+
+    // 더티 플래그 설정 (상수 버퍼 재업데이트 강제)
+    m_paramsDirty = true;
+}
+
+bool MovementModuleCS::IsReadyForReuse() const
+{
+    return m_isInitialized &&
+        m_movementParamsBuffer != nullptr;
 }

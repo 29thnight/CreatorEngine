@@ -41,7 +41,7 @@ struct TerrainBrush
     };
 
 
-    enum class Mode { Raise, Lower, Flatten, PaintLayer } m_mode;
+    enum class Mode { Raise, Lower, Flatten, PaintLayer, PaintFoliage, EraseFoliage } m_mode;
     DirectX::XMFLOAT2 m_center;
 	bool m_isEditMode{ false }; // 편집 모드 여부
     float m_radius{ 1.0f };
@@ -49,6 +49,8 @@ struct TerrainBrush
     float m_flatTargetHeight{ 0.0f };
     uint32_t m_layerID{ 0 };
 	uint32_t m_maskID{ 0xFFFFFFFF }; // 기본은 -1 마스크 ID (추가된 경우에만 사용)
+    uint32_t m_foliageTypeID{ 0 };
+	int m_foliageDensity{ 10 }; // 식생 밀도
 
 	std::vector<BrushMask> m_masks; // 브러시 마스크들
     std::vector<std::string> m_maskNames{}; // 마스크 이름들

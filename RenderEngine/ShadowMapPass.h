@@ -3,13 +3,19 @@
 #include "IRenderPass.h"
 #include "Camera.h"
 #include "LightProperty.h"
+
+constexpr int cascadeCount = 3;
+
+cbuffer CascadeIndexBuffer
+{
+	uint32_t cascadeIndex;
+	uint32_t padding[3]; // 16바이트 정렬
+};
+
 class Texture;
 class Scene;
 class LightController;
-
 struct ShadowMapPassSetting;
-constexpr int cascadeCount = 3;
-
 class ShadowMapPass final : public IRenderPass
 {
 public:
@@ -23,9 +29,13 @@ public:
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-        void ApplySettings(const ShadowMapPassSetting& setting);
+    void ApplySettings(const ShadowMapPassSetting& setting);
 	virtual void Resize(uint32_t width, uint32_t height) override;
-	ComPtr<ID3D11Buffer>		m_boneBuffer;
+
+public:
+	std::unique_ptr<PipelineStateObject> m_instancePSO;
+	ComPtr<ID3D11Buffer>				m_boneBuffer;
+	ComPtr<ID3D11Buffer>                m_cascadeIndexBuffer;
 	D3D11_VIEWPORT				shadowViewport;
 	ShadowMapConstant			m_settingConstant;
 	FrustumContainer			sliceFrustums;
@@ -33,6 +43,7 @@ public:
 	UniqueTexturePtr				m_cloudShadowMapTexture{ nullptr };
 	ID3D11Buffer*					m_cloudShadowMapBuffer{ nullptr };
 
+	uint32 m_maxInstanceCount{};
 	size_t m_cascadeRatioSize{ 2 };
 	bool m_useCascade{ true };
 
@@ -55,5 +66,6 @@ private:
 	void CreateCommandListNormalShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 	void CreateCommandListProxyToShadow(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
+	void CreateTerrainRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 };
 
