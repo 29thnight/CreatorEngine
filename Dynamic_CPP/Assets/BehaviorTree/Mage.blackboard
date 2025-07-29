@@ -1,0 +1,181 @@
+Mage:
+  - key: eChaseOutDuration
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Player2
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: 2P
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eTargetRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eReward
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eAsis
+    value:
+      Type: 1
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eTPCooldown
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 5
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eTPRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 1
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eChaseRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eAtkCooldown
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eProjectileSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eDmg
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 1
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eDistanceRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eHP
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 100
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Identity
+    value:
+      Type: 4
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Mage
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Asis
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Asis
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Player1
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: 1PAni
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: State
+    value:
+      Type: 4
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Idle
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}

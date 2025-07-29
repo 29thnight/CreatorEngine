@@ -128,6 +128,7 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
 void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
 {
     if (!camera) return;
+    if (m_foliageTypes.empty()) return;
 
     for (auto& foliage : m_foliageInstances)
     {
