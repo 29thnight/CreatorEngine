@@ -81,12 +81,23 @@ void PostProcessingPass::ControlPanel()
 	ImGui::Checkbox("ApplyBloom",	&m_PostProcessingApply.m_Bloom);
 	ImGui::DragFloat("Threshold",	&m_bloomThreshold.threshold);
 	ImGui::DragFloat("Knee",		&m_bloomThreshold.knee);
-	ImGui::DragFloat("Coeddicient", &m_bloomComposite.coeddicient);
+	ImGui::DragFloat("Coefficient", &m_bloomComposite.coefficient);
+	if (ImGui::DragInt("BlurRadius", &m_bloomBlur.radius, 1.f, 1, GAUSSIAN_BLUR_RADIUS))
+	{
+		GaussianBlurComputeKernel();
+	}
+	if (ImGui::DragFloat("BlurSigma", &m_bloomBlur.sigma, 0.1f, 0.1f, 20.0f))
+	{
+		GaussianBlurComputeKernel();
+	}
 
 	if (ImGui::Button("Reset")) {
 		m_bloomThreshold.threshold = 0.3f;
 		m_bloomThreshold.knee = 0.5f;
-		m_bloomComposite.coeddicient = 0.3f;
+		m_bloomComposite.coefficient = 0.3f;
+		m_bloomBlur.radius = 7;
+		m_bloomBlur.sigma = 5.f;
+		GaussianBlurComputeKernel();
 	}
 	ImGui::PopID();
 
@@ -97,7 +108,10 @@ void PostProcessingPass::ApplySettings(const BloomPassSetting& setting)
 	m_PostProcessingApply.m_Bloom = setting.applyBloom;
 	m_bloomThreshold.threshold = setting.threshold;
 	m_bloomThreshold.knee = setting.knee;
-	m_bloomComposite.coeddicient = setting.coefficient;
+	m_bloomComposite.coefficient = setting.coefficient;
+	m_bloomBlur.radius = setting.blurRadius;
+	m_bloomBlur.sigma = setting.blurSigma;
+	GaussianBlurComputeKernel();
 }
 
 void PostProcessingPass::PrepaerShaderState()
@@ -171,6 +185,8 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 	constexpr ID3D11RenderTargetView* nullRTV = nullptr;
 	constexpr ID3D11ShaderResourceView* nullSRV = nullptr;
 	constexpr ID3D11UnorderedAccessView* nullUAV = nullptr;
+	UINT groupX = (DeviceState::g_Viewport.Width + 15) / 16;
+	UINT groupY = (DeviceState::g_Viewport.Height + 15) / 16;
 	{
 		DirectX11::UpdateBuffer(m_bloomThresholdBuffer.Get(), &m_bloomThreshold);
 
@@ -179,7 +195,7 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 		DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomFilterSRV1->m_pUAV, offsets);
 		DirectX11::CSSetConstantBuffer(0, 1, m_bloomThresholdBuffer.GetAddressOf());
 
-		DirectX11::Dispatch(DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
+		DirectX11::Dispatch(groupX, groupY, 1);
 
 		DirectX11::CSSetShaderResources(0, 1, &nullSRV);
 		DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
@@ -201,7 +217,7 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 			DirectX11::CSSetShaderResources(0, 1, &csSRVs[direction]);
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &csUAVs[direction], offsets);
 
-			DirectX11::Dispatch(DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
+			DirectX11::Dispatch(groupX, groupY, 1);
 
 			DirectX11::CSSetShaderResources(0, 1, &nullSRV);
 			DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
@@ -233,22 +249,41 @@ void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 
 void PostProcessingPass::GaussianBlurComputeKernel()
 {
-	float sigma = 5.f;
-	float sigmaRcp = 1.f / sigma;
-	float twoSigmaSq = 2 * sigma * sigma;
+	float sigma = m_bloomBlur.sigma;
+	float twoSigmaSq = 2.f * sigma * sigma;
 
+	std::vector<float> tempCoefficients(static_cast<size_t>(m_bloomBlur.radius) + 1);
 	float sum = 0.f;
-	for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	for (int i = 0; i <= m_bloomBlur.radius && i <= GAUSSIAN_BLUR_RADIUS; ++i)
 	{
-		m_bloomBlur.coefficients[i] = (1.f / sigma) * std::expf(-static_cast<float>(i * i) / twoSigmaSq);
-		sum += 2 * m_bloomBlur.coefficients[i];
+		tempCoefficients[i] = (1.f / sigma) * std::expf(-static_cast<float>(i * i) / twoSigmaSq);
+		sum += (i == 0) ? tempCoefficients[i] : 2.f * tempCoefficients[i];
 	}
-	sum -= m_bloomBlur.coefficients[0];
 	float normalizationFactor = 1.f / sum;
-	for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	for (int i = 0; i <= m_bloomBlur.radius && i <= GAUSSIAN_BLUR_RADIUS; ++i)
 	{
-		m_bloomBlur.coefficients[i] *= normalizationFactor;
+		m_bloomBlur.coefficients[i] = tempCoefficients[i] * normalizationFactor;
 	}
+	for (int i = m_bloomBlur.radius + 1; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	{
+		m_bloomBlur.coefficients[i] = 0.f;
+	}
+	//float sigma = 5.f;
+	//float sigmaRcp = 1.f / sigma;
+	//float twoSigmaSq = 2 * sigma * sigma;
+
+	//float sum = 0.f;
+	//for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	//{
+	//	m_bloomBlur.coefficients[i] = (1.f / sigma) * std::expf(-static_cast<float>(i * i) / twoSigmaSq);
+	//	sum += 2 * m_bloomBlur.coefficients[i];
+	//}
+	//sum -= m_bloomBlur.coefficients[0];
+	//float normalizationFactor = 1.f / sum;
+	//for (size_t i = 0; i <= GAUSSIAN_BLUR_RADIUS; ++i)
+	//{
+	//	m_bloomBlur.coefficients[i] *= normalizationFactor;
+	//}
 }
 
 void PostProcessingPass::Resize(uint32_t width, uint32_t height)

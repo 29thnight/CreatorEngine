@@ -17,7 +17,7 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, const std::st
     {
         obj->m_prefab = const_cast<Prefab*>(prefab);
         obj->m_prefabFileGuid = prefab->GetFileGuid();
-        RegisterInstance(obj, prefab);
+        //RegisterInstance(obj, prefab);
     }
     return obj;
 }
@@ -26,7 +26,16 @@ void PrefabUtility::RegisterInstance(GameObject* instance, const Prefab* prefab)
 {
     if (!instance || !prefab)
         return;
-    m_instanceMap[prefab->GetFileGuid()].push_back(instance);
+
+	auto& instances = m_instanceMap[prefab->GetFileGuid()];
+    if(std::find(instances.begin(), instances.end(), instance) != instances.end())
+    {
+        return; // 이미 등록된 인스턴스는 중복 등록하지 않음
+    }
+    else
+    {
+        instances.push_back(instance);
+    }
 }
 
 void PrefabUtility::UpdateInstances(const Prefab* prefab)

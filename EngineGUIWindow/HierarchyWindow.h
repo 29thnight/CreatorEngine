@@ -11,9 +11,9 @@ public:
 	~HierarchyWindow() = default;
 
 	void DrawSceneObject(const std::shared_ptr<GameObject>& obj);
-	bool PassFilterRecursive(const std::shared_ptr<GameObject>& obj);
 
 	SceneRenderer* m_sceneRenderer{ nullptr };
 	ImGuiTextFilter m_searchFilter{};
+	std::vector<GameObject*> m_clipboard{};
 };
 #endif // !DYNAMICCPP_EXPORTS

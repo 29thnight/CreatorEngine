@@ -1,12 +1,12 @@
 m_name: GameObject_Prefab
 m_isEnabled: true
-m_instanceID: 3953816606
+m_instanceID: 436620335
 m_fileGuid: 2e27ed79-429f-5dc4-8ad6-67a3a6a71730
 PrefabNode:
   - GameObject: 2166264123
     m_name: GameObject
     m_isEnabled: true
-    m_instanceID: 2840887712
+    m_instanceID: 3778307569
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -24,18 +24,12 @@ PrefabNode:
     m_gameObjectType: 0
     m_tag: Untagged
     m_layer: Default
-    m_components:
-      - InvalidScriptComponent: 3306612392
-        m_name: InvalidScriptComponent
-        m_isEnabled: true
-        m_instanceID: 2736938797
-        m_FileID: 00000000-0000-0000-0000-000000000000
-        m_errorMessage: ~
+    m_components: ~
     children:
       - GameObject: 2166264123
         m_name: Asis_01
         m_isEnabled: true
-        m_instanceID: 3387558088
+        m_instanceID: 4187273175
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -57,7 +51,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3994010367
+            m_instanceID: 2335083700
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: TT_checker_512x512_UV_GRID

@@ -44,6 +44,38 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			renderScene = m_sceneRenderer->m_renderScene.get();
 			selectedSceneObject = scene->m_selectedSceneObject;
 
+			if (ImGui::IsWindowFocused())
+			{
+				bool ctrl = ImGui::GetIO().KeyCtrl;
+				if (ctrl && ImGui::IsKeyPressed(ImGuiKey_C))
+				{
+					m_clipboard = scene->m_selectedSceneObjects;
+				}
+				if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V))
+				{
+					scene->ClearSelectedSceneObjects();
+					for (auto* obj : m_clipboard)
+					{
+						if (!obj) continue;
+						auto cloned = dynamic_cast<GameObject*>(Object::Instantiate(obj, obj->m_name.ToString()));
+						if (!cloned) continue;
+						GameObject::Index parentIndex = obj->m_parentIndex;
+						auto parentObj = scene->GetGameObject(parentIndex);
+						if (parentObj && parentIndex != cloned->m_parentIndex)
+						{
+							// remove from root children list
+							auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+							rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
+
+							cloned->m_parentIndex = parentIndex;
+							cloned->m_transform.SetParentID(parentIndex);
+							parentObj->m_childrenIndices.push_back(cloned->m_index);
+						}
+						scene->AddSelectedSceneObject(cloned);
+					}
+				}
+			}
+
 			if (!scene && !renderScene)
 			{
 				ImGui::Text("Not Init HierarchyWindow");
@@ -77,6 +109,31 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (ImGui::MenuItem("		Redo", "		Ctrl + Y"))
 				{
 					Meta::UndoCommandManager->Redo();
+				}
+				if (ImGui::MenuItem("           Copy", "       Ctrl + C", nullptr, !scene->m_selectedSceneObjects.empty()))
+				{
+					m_clipboard = scene->m_selectedSceneObjects;
+				}
+				if (ImGui::MenuItem("           Paste", "       Ctrl + V", nullptr, !m_clipboard.empty()))
+				{
+					scene->ClearSelectedSceneObjects();
+					for (auto* obj : m_clipboard)
+					{
+						if (!obj) continue;
+						auto cloned = dynamic_cast<GameObject*>(Object::Instantiate(obj, obj->m_name.ToString()));
+						if (!cloned) continue;
+						GameObject::Index parentIndex = obj->m_parentIndex;
+						auto parentObj = scene->GetGameObject(parentIndex);
+						if (parentObj && parentIndex != cloned->m_parentIndex)
+						{
+							auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+							rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
+							cloned->m_parentIndex = parentIndex;
+							cloned->m_transform.SetParentID(parentIndex);
+							parentObj->m_childrenIndices.push_back(cloned->m_index);
+						}
+						scene->AddSelectedSceneObject(cloned);
+					}
 				}
 				if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
 				{

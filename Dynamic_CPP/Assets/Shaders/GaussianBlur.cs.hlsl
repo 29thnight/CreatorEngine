@@ -6,8 +6,10 @@ RWTexture2D<float4> outputTexture : register(u0);
 cbuffer BlurParams : register(b0)
 {
     float4 coefficients[(GAUSSIAN_RADIUS + 1) / 4];
+    float blurSigma;
     // radius <= GAUSSIAN_RADIUS, direction 0 = horizontal, 1 = vertical
     int2 radiusAndDirection;
+    float _padding;
 }
 
 [numthreads(8, 8, 1)]

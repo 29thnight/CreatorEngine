@@ -24,7 +24,6 @@ void main(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadID, ui
     
     float3 color = intensity.rgb;
     float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
-    float knee = 0.1f;
     float soft = saturate((brightness - threshold) / knee);
     outputTexture[pixel] = float4(color * soft, 1.0);
 }
