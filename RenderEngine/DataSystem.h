@@ -9,6 +9,7 @@
 #include "concurrent_queue.h"
 #include "AssetJob.h"
 #include "DLLAcrossSingleton.h"
+#include "EngineSetting.h"
 
 // Main system for storing runtime data
 class ModelLoader;
@@ -27,6 +28,7 @@ public:
 		Shader,
 		CppScript,
 		CSharpScript,
+		Prefab,
 		Sound,
 		HDR,
 	};
@@ -44,12 +46,6 @@ public:
 		Model,
 		Material,
 		Skeleton,
-	};
-
-	enum class ContentsBrowserStyle
-	{
-		Tile,
-		Tree,
 	};
 
 private:
@@ -81,7 +77,7 @@ public:
     Texture* LoadMaterialTexture(const std::string_view& filePath);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
-	// File Operations //ÆÄÀÏ ½Ã½ºÅÛ¿¡ Á¢±ÙÀÌ °¡´ÉÇÏ±â ‹š¹®¿¡ º¸¾È»ó ÀÌ½´°¡ ÀÖÀ» °¡´É¼º ÀÖÀ½
+	// File Operations //íŒŒì¼ ì‹œìŠ¤í…œì— ì ‘ê·¼ì´ ê°€ëŠ¥í•˜ê¸° Â‹Âšë¬¸ì— ë³´ì•ˆìƒ ì´ìŠˆê°€ ìˆì„ ê°€ëŠ¥ì„± ìˆìŒ
 	void OpenFile(const file::path& filepath);
 	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
 	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
@@ -97,6 +93,8 @@ public:
 	void OpenContentsBrowser();
 	void CloseContentsBrowser();
 	void ShowDirectoryTree(const file::path& directory);
+	void SetContentsBrowserStyle(ContentsBrowserStyle style) { m_ContentsBrowserStyle = style; }
+	ContentsBrowserStyle GetContentsBrowserStyle() const { return m_ContentsBrowserStyle; }
 	void ShowCurrentDirectoryFiles();
 	void ShowCurrentDirectoryFilesTile();
 	void ShowCurrentDirectoryFilesTree(const file::path& directory);

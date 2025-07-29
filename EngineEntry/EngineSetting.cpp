@@ -35,6 +35,8 @@ bool EngineSetting::Initialize()
 		return false;
 	}
 
+	isSuccess = EngineSetting::LoadSettings();
+
 	return isSuccess;
 }
 
@@ -50,6 +52,7 @@ bool EngineSetting::SaveSettings()
 	rootNode["lastWindowSize"]["y"] = m_lastWindowSize.y;
 	rootNode["msvcVersion"] = static_cast<int>(m_msvcVersion);
 	rootNode["renderPassSettings"] = Meta::Serialize(&m_renderPassSettings);
+	rootNode["m_contentsBrowserStyle"] = (int)m_contentsBrowserStyle;
 
 	settingsFile << rootNode;
 
@@ -80,6 +83,15 @@ bool EngineSetting::LoadSettings()
 	m_msvcVersion = static_cast<MSVCVersion>(rootNode["msvcVersion"].as<int>());
 	if (rootNode["renderPassSettings"])
 		Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
+
+	if (rootNode["m_contentsBrowserStyle"])
+	{
+		m_contentsBrowserStyle = static_cast<ContentsBrowserStyle>(rootNode["m_contentsBrowserStyle"].as<int>());
+	}
+	else
+	{
+		m_contentsBrowserStyle = ContentsBrowserStyle::Tile; // Default style if not set
+	}
 
 	return isSuccess;
 }

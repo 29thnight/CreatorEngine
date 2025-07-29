@@ -27,6 +27,6 @@ private:
 	bool m_bShowBehaviorTreeWindow{ false };
 	bool m_bShowBlackBoardWindow{ false };
 	bool m_bShowInputActionMapWindow{ false };
-	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 Çà·ÄÀ» »ç¿ëÇÏ¿© Ãæµ¹ ¸ÅÆ®¸¯½º¸¦ Ç¥½ÃÇÕ´Ï´Ù.
+	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 í–‰ë ¬ì„ ì‚¬ìš©í•˜ì—¬ ì¶©ëŒ ë§¤íŠ¸ë¦­ìŠ¤ë¥¼ í‘œì‹œí•©ë‹ˆë‹¤.
 };
 #endif // !DYNAMICCPP_EXPORTS

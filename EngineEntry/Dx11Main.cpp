@@ -93,7 +93,7 @@ void DirectX11::Dx11Main::Initialize()
             else
                 InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
-            bool isPressedCtrl = InputManagement->IsKeyPressed(VK_LCONTROL);
+            bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
             if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
             {
                 Meta::UndoCommandManager->Undo();
@@ -139,42 +139,42 @@ void DirectX11::Dx11Main::Initialize()
     PROFILE_FRAME();
 
     m_CB_Thread = std::thread([&]
+    {
+        PROFILE_REGISTER_THREAD("[CB-Thread]");
+        while (isGameToRender)
         {
-            PROFILE_REGISTER_THREAD("[CB-Thread]");
-            while (isGameToRender)
+            if (!m_isInvokeResize)
             {
-                if (!m_isInvokeResize)
-                {
-                    CommandBuildThread();
-                }
+                CommandBuildThread();
             }
-        });
+        }
+    });
 
     m_CE_Thread = std::thread([&]
+    {
+        PROFILE_REGISTER_THREAD("[CE-Thread]");
+        while (isGameToRender)
         {
-            PROFILE_REGISTER_THREAD("[CE-Thread]");
-            while (isGameToRender)
+            while (!WinProcProxy::GetInstance()->IsEmpty())
             {
-                while (!WinProcProxy::GetInstance()->IsEmpty())
+                auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
+
+                if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
                 {
-                    auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
-
-                    if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
-
-                if (m_isInvokeResize)
-                {
-                    CreateWindowSizeDependentResources();
-                    m_isInvokeResize = false;
-                }
-
-                CoroutineManagers->yield_OnRender();
-                CommandExecuteThread();
             }
-        });
+
+            if (m_isInvokeResize)
+            {
+                CreateWindowSizeDependentResources();
+                m_isInvokeResize = false;
+            }
+
+            CoroutineManagers->yield_OnRender();
+            CommandExecuteThread();
+        }
+    });
 
     m_CB_Thread.detach();
     m_CE_Thread.detach();
@@ -183,6 +183,7 @@ void DirectX11::Dx11Main::Initialize()
 void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
+    EngineSettingInstance->SaveSettings();
     SceneManagers->Decommissioning();
     m_sceneRenderer->Finalize();
     m_deviceResources->RegisterDeviceNotify(nullptr);

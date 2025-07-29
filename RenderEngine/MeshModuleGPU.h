@@ -33,6 +33,10 @@ public:
 	void SetupRenderTarget(RenderPassData* renderData) override;
 	void SetTexture(Texture* texture) override;
 
+	virtual void ResetForReuse() override;
+	virtual bool IsReadyForReuse() const override;
+	virtual void WaitForGPUCompletion() override;
+
 	// 메시 타입 설정
 	void SetMeshType(MeshType type);
 

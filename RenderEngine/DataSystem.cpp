@@ -1,6 +1,7 @@
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
+#include "PrefabEditor.h"
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
@@ -12,7 +13,7 @@
 #include "fa.h"
 #include "ToggleUI.h"
 
-using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 9>;
+using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 10>;
 
 constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Model,          "Model"				},
@@ -22,14 +23,15 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Shader,         "Shader"			},
 	{ DataSystem::FileType::CppScript,      "CppScript"			},
 	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
+    { DataSystem::FileType::Prefab,         "Prefab"            },
 	{ DataSystem::FileType::Sound,          "Sound"				},
 	{ DataSystem::FileType::HDR,            "HDR"				}
 }};
 
-// ∞Àªˆ «‘ºˆ
+// Í≤ÄÏÉâ Ìï®Ïàò
 constexpr const char* FileTypeToString(DataSystem::FileType type)
 {
-	// º±«¸ ∞Àªˆ
+	// ÏÑ†Ìòï Í≤ÄÏÉâ
 	for (auto&& kv : FileTypeStringTable)
 	{
 		if (kv.first == type)
@@ -58,6 +60,8 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::Sound;
 	else if (filepath.extension() == ".hdr")
 		return DataSystem::FileType::HDR;
+	else if (filepath.extension() == ".prefab")
+		return DataSystem::FileType::Prefab;
 	return DataSystem::FileType::Unknown;
 }
 
@@ -102,6 +106,7 @@ void DataSystem::Initialize()
 	CameraIcon				= Texture::LoadFormPath(iconpath.string() + "CameraGizmo.png");
 	smallFont				= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont			= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
+	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
 
 	RenderForEditer();
 	m_watcher			= new efsw::FileWatcher();
@@ -223,6 +228,9 @@ void DataSystem::RenderForEditer()
 
 	ImGui::ContextRegister(ICON_FA_HARD_DRIVE " Content Browser", true, [&]()
 	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").SetPopup(
+			m_ContentsBrowserStyle == ContentsBrowserStyle::Tile);
+
 		static file::path DataDirectory = PathFinder::Relative();
 		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, ImVec2(0, 0)))
 		{
@@ -237,19 +245,6 @@ void DataSystem::RenderForEditer()
 		ImGui::SameLine();
 		filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
 		ImGui::PopStyleVar();
-
-		ImGui::SameLine();
-		static bool currentMode{};
-
-		currentMode = static_cast<bool>(m_ContentsBrowserStyle);
-
-		ImGui::SetNextItemWidth(80);
-
-		if(ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, currentMode))
-		{
-			currentMode = !currentMode;
-			m_ContentsBrowserStyle = static_cast<ContentsBrowserStyle>(currentMode);
-		}
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
@@ -342,7 +337,15 @@ void DataSystem::RenderForEditer()
 	}, ImGuiWindowFlags_AlwaysAutoResize);
 
 	ImGui::GetContext("TextureType Selector").Close();
-	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	//ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	if (m_ContentsBrowserStyle == ContentsBrowserStyle::Tile) 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+	}
+	else 
+	{
+		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
+	}
 }
 
 void DataSystem::MonitorFiles()
@@ -737,10 +740,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 	}
 	else
 	{
-		if (currentDirectory.empty())
-		{
-			currentDirectory = PathFinder::Relative();
-		}
+		currentDirectory = PathFinder::Relative();
 
 		ShowCurrentDirectoryFilesTree(currentDirectory);
 	}
@@ -970,6 +970,8 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 			Debug->LogError(e.what());
 			selectedFileMetaNode = std::nullopt;
 		}
+
+		isHoverAndClicked = false;
 	}
 
 }
@@ -1054,6 +1056,9 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	case FileType::CSharpScript:
 		color = IM_COL32(255, 0, 255, 255);
 		break;
+        case FileType::Prefab:
+                color = IM_COL32(0, 128, 255, 255);
+                break;
 	case FileType::Sound:
 		color = IM_COL32(255, 255, 0, 255);
 		break;
@@ -1093,6 +1098,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
+    if(filepath.extension() == ".prefab") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	if ((int)result <= 32)
@@ -1114,7 +1120,7 @@ void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 		SW_SHOWNORMAL   // nShowCmd
 	);
 
-	// ShellExecute Ω«∆– Ω√ ø¿∑˘ ƒ⁄µÂ (0 ~ 32)
+	// ShellExecute Ïã§Ìå® Ïãú Ïò§Î•ò ÏΩîÎìú (0 ~ 32)
 	if ((INT_PTR)result <= 32)
 	{
 		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
@@ -1163,7 +1169,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 				std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 
-			// Visual Studio ¡æ∑· ∞®¡ˆ øœ∑·
+			// Visual Studio Ï¢ÖÎ£å Í∞êÏßÄ ÏôÑÎ£å
 			if (!ScriptManager->IsCompileEventInvoked())
 			{
 				ScriptManager->SetCompileEventInvoked(true);
@@ -1175,7 +1181,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 			CloseHandle(hProcess);
 		}).detach();
 
-		CloseHandle(pi.hThread); // Ω∫∑πµÂ¥¬ ∞πŸ∑Œ ¥›æ∆µµ µ 
+		CloseHandle(pi.hThread); // Ïä§Î†àÎìúÎäî Í≥ßÎ∞îÎ°ú Îã´ÏïÑÎèÑ Îê®
 	}
 	else
 	{

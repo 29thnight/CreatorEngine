@@ -342,6 +342,51 @@ void Scene::YieldNull()
 void Scene::LateUpdate(float deltaSecond)
 {
     LateUpdateEvent.Broadcast(deltaSecond);
+
+	std::vector<MeshRenderer*> allMeshes = m_allMeshRenderers;
+	std::vector<MeshRenderer*> staticMeshes = m_staticMeshRenderers;
+	std::vector<MeshRenderer*> skinnedMeshes = m_skinnedMeshRenderers;
+	std::vector<TerrainComponent*> terrainComponents = m_terrainComponents;
+	std::vector<FoliageComponent*> foliageComponents = m_foliageComponents;
+
+	for(auto camera : CameraManagement->GetCameras())
+	{
+		if (!RenderPassData::VaildCheck(camera)) return;
+		auto data = RenderPassData::GetData(camera);
+
+		SceneManagers->m_threadPool->Enqueue([=]
+		{
+			for (auto& mesh : allMeshes)
+			{
+				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+				data->PushShadowRenderData(mesh->GetInstanceID());
+			}
+
+			for (auto& culledMesh : staticMeshes)
+			{
+				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(culledMesh->GetBoundingBox()))
+				{
+					data->PushCullData(culledMesh->GetInstanceID());
+				}
+			}
+
+			for (auto& skinnedMesh : skinnedMeshes)
+			{
+				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
+
+				auto frustum = camera->GetFrustum();
+				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
+				{
+					data->PushCullData(skinnedMesh->GetInstanceID());
+				}
+			}
+		});
+	}
+
+	SceneManagers->m_threadPool->NotifyAllAndWait();
 }
 
 void Scene::OnDisable()

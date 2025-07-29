@@ -182,6 +182,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineEntry\RenderPassSettings.h" />
     <ClInclude Include="EngineEntry\Resource.h" />
     <ClInclude Include="EngineEntry\targetver.h" />
+    <ClInclude Include="EngineGUIWindow\ExternUI.h" />
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
@@ -196,11 +197,14 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineEntry\Dx11Main.cpp" />
     <ClCompile Include="EngineEntry\EngineSetting.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperModuleBehavior.cpp" />
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />

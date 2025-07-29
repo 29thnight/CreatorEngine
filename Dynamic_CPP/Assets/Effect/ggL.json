@@ -1,10 +1,10 @@
 {
     "currentTime": 0.0,
-    "duration": 1.0,
+    "duration": -1.0,
     "isPaused": false,
     "isPlaying": false,
-    "loop": false,
-    "name": "123",
+    "loop": true,
+    "name": "ggL",
     "particleSystems": [
         {
             "isRunning": false,
@@ -68,7 +68,7 @@
                         },
                         "spawnParams": {
                             "emitterPosition": {
-                                "x": 1.698172688484192,
+                                "x": 0.0,
                                 "y": 0.0,
                                 "z": 0.0
                             },
@@ -123,9 +123,9 @@
                             "animationSpeed": 5.0,
                             "enabled": true,
                             "params": {
-                                "polarAngleProgress": 0.05046844482421875,
+                                "polarAngleProgress": 0.01329195499420166,
                                 "polarCenter": {
-                                    "x": 1.698172688484192,
+                                    "x": 0.0,
                                     "y": 0.0,
                                     "z": 0.0
                                 },
@@ -144,7 +144,7 @@
                             }
                         },
                         "renderState": {
-                            "instanceCount": 1
+                            "instanceCount": 0
                         },
                         "texture": {
                             "assigned": true,

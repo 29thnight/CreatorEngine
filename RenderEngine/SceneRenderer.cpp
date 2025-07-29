@@ -21,6 +21,7 @@
 #include "Terrain.h"
 #include "CullingManager.h"
 #include "IconsFontAwesome6.h"
+#include "FoliageComponent.h"
 #include "fa.h"
 #include "Trim.h"
 #include "Profiler.h"
@@ -438,12 +439,10 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
 	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDestroy();
@@ -681,11 +680,13 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
+		// EffectPass
 		{
 			PROFILE_CPU_BEGIN("EffectPass");
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
 			float deltaTime = Time->GetElapsedSeconds();
+			m_EffectEditor->Update(deltaTime);
 			EffectManagers->Update(deltaTime);
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
@@ -822,6 +823,7 @@ void SceneRenderer::CreateCommandListPass()
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
 			PROFILE_CPU_BEGIN("ForwardPassCommandList");
+			m_pForwardPass->CreateFoliageCommandList(deferredContext, *m_renderScene, *camera);
 			m_pForwardPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 			PROFILE_CPU_END();
 		});
@@ -896,17 +898,29 @@ void SceneRenderer::PrepareRender()
 	std::vector<MeshRenderer*> staticMeshes = m_currentScene->GetStaticMeshRenderers();
 	std::vector<MeshRenderer*> skinnedMeshes = m_currentScene->GetSkinnedMeshRenderers();
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
-	
-	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, m_currentScene]
+	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
+
+	m_threadPool->Enqueue([=]
 	{
 		for (auto& terrain : terrainComponents)
 		{
 			renderScene->UpdateCommand(terrain);
 		}
+	});
 
+	m_threadPool->Enqueue([=]
+	{
 		for (auto& mesh : allMeshes)
 		{
 			renderScene->UpdateCommand(mesh);
+		}
+	});
+
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& foliage : foliageComponents)
+		{
+			renderScene->UpdateCommand(foliage);
 		}
 	});
 
@@ -929,43 +943,26 @@ void SceneRenderer::PrepareRender()
 		//std::vector<MeshRenderer*> culledMeshes;
 		//CullingManagers->SmartCullMeshes(camera->GetFrustum(), culledMeshes);
 
-		m_threadPool->Enqueue([camera, allMeshes, data, terrainComponents, staticMeshes, skinnedMeshes, renderScene]
+		m_threadPool->Enqueue([=]
 		{
-			for (auto& mesh : allMeshes)
-			{
-				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				if(mesh->m_shadowRecive == true)
-					data->PushShadowRenderData(mesh->GetInstanceID());
-			}
-
-			for (auto& culledMesh : staticMeshes)
-			{
-				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(culledMesh->GetBoundingBox()))
-				{
-					data->PushCullData(culledMesh->GetInstanceID());
-				}
-			}
-
-			for (auto& skinnedMesh : skinnedMeshes)
-			{
-				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-				{
-					data->PushCullData(skinnedMesh->GetInstanceID());
-				}
-			}
-
 			for (auto& terrainComponent : terrainComponents)
 			{
 				if (terrainComponent->IsEnabled())
 				{
 					auto proxy = renderScene->FindProxy(terrainComponent->GetInstanceID());
 					if(proxy)
+					{
+						data->PushRenderQueue(proxy);
+					}
+				}
+			}
+
+			for (auto& foliageComponent : foliageComponents)
+			{
+				if (foliageComponent->IsEnabled())
+				{
+					auto proxy = renderScene->FindProxy(foliageComponent->GetInstanceID());
+					if (proxy)
 					{
 						data->PushRenderQueue(proxy);
 					}

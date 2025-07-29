@@ -68,6 +68,14 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 			ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
 			if (ImGui::BeginPopup("HierarchyMenu"))
 			{
+				if (ImGui::MenuItem("		Undo", "		Ctrl + Z"))
+				{
+					Meta::UndoCommandManager->Undo();
+				}
+				if (ImGui::MenuItem("		Redo", "		Ctrl + Y"))
+				{
+					Meta::UndoCommandManager->Redo();
+				}
 				if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
 				{
 					if (selectedSceneObject)

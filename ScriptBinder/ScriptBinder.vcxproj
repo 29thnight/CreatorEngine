@@ -190,6 +190,7 @@
     <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="PlayerInput.cpp" />
     <ClCompile Include="Prefab.cpp" />
+    <ClCompile Include="PrefabEditor.cpp" />
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="RigidBodyComponent.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -217,6 +218,7 @@
     <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="NodeFactory.h" />
+    <ClInclude Include="PrefabEditor.h" />
     <ClInclude Include="StateMachineComponent.h">
       <FileType>CppCode</FileType>
     </ClInclude>

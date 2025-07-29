@@ -166,13 +166,13 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 
 		break;
 	case PrimitiveProxyType::FoliageComponent:
+		m_foliageQueue.push_back(proxy);
 		break;
 	case PrimitiveProxyType::TerrainComponent:
 		terrainMat = proxy->m_terrainMaterial;
 		if (terrainMat != nullptr) {
 			// Not assigned RenderingMode.
 			m_terrainQueue.push_back(proxy);
-			return;
 		}
 		break;
 	default:
@@ -206,6 +206,7 @@ void RenderPassData::ClearRenderQueue()
 	m_deferredQueue.clear();
 	m_forwardQueue.clear();
 	m_terrainQueue.clear();
+	m_foliageQueue.clear();
 }
 
 void RenderPassData::PushShadowRenderQueue(PrimitiveRenderProxy* proxy)
@@ -220,7 +221,7 @@ void RenderPassData::SortShadowRenderQueue()
 		std::sort(
 			m_shadowRenderQueue.begin(),
 			m_shadowRenderQueue.end(),
-			SortByAnimationAndMaterialGuid
+		SortByAnimationAndMaterialGuid	
 		);
 	}
 }

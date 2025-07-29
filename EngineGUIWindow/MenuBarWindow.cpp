@@ -9,29 +9,33 @@
 #include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "Prefab.h"
+#include "PrefabUtility.h"
 #include "AIManager.h"
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
+#include "EngineSetting.h"
+#include "ToggleUI.h"
 
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
     float usagePercent = (float)usedVRAM / (float)budgetVRAM;
     ImGui::Text("VRAM Usage: %.2f MB / %.2f MB", usedVRAM / (1024.0f * 1024.0f), budgetVRAM / (1024.0f * 1024.0f));
 
-    // ¹Ù ³ôÀÌ¿Í ³Êºñ Á¤ÀÇ
+    // ë°” ë†’ì´ì™€ ë„ˆë¹„ ì •ì˜
     ImVec2 barSize = ImVec2(300, 20);
     ImVec2 cursorPos = ImGui::GetCursorScreenPos();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // ¹è°æ ¹Ù
+    // ë°°ê²½ ë°”
     drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + barSize.x, cursorPos.y + barSize.y), IM_COL32(100, 100, 100, 255));
 
-    // »ç¿ë·® ¹Ù
+    // ì‚¬ìš©ëŸ‰ ë°”
     float fillWidth = barSize.x * usagePercent;
     drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + fillWidth, cursorPos.y + barSize.y), IM_COL32(50, 200, 50, 255));
 
-    ImGui::Dummy(barSize); // ·¹ÀÌ¾Æ¿ô °ø°£ È®º¸
+    ImGui::Dummy(barSize); // ë ˆì´ì•„ì›ƒ ê³µê°„ í™•ë³´
 }
 
 std::string WordWrapText(const std::string& input, size_t maxLineLength)
@@ -111,9 +115,9 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         if (ImGui::Button("Generate LightMap"))
         {
             Camera c{};
-            // ¸Ş½¬º°·Î positionMap »ı¼º
+            // ë©”ì‰¬ë³„ë¡œ positionMap ìƒì„±
             m_pPositionMapPass->Execute(*m_renderScene, c);
-            // lightMap »ı¼º
+            // lightMap ìƒì„±
             lightMap.GenerateLightMap(m_renderScene.get(), m_pPositionMapPass, m_pLightMapPass);
 
             //m_pLightMapPass->Initialize(lightMap.lightmaps);
@@ -172,19 +176,19 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         if (ImGui::BeginChild("Matrix", ImVec2(0, 0), flags))
         {
             ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2, 2));
-            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1.0f, 1.0f, 1.0f, 0.0f)); // ÁøÇÑ ÁÙ - ¹İÅõ¸í Èò»ö
-            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));  // ¿¬ÇÑ ÁÙ - ´õ Åõ¸í
+            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1.0f, 1.0f, 1.0f, 0.0f)); // ì§„í•œ ì¤„ - ë°˜íˆ¬ëª… í°ìƒ‰
+            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));  // ì—°í•œ ì¤„ - ë” íˆ¬ëª…
 
             const int matrixSize = 32;
             const float checkboxSize = ImGui::GetFrameHeight();
             const float cellWidth = checkboxSize;
 
-            // ÃÑ ¿­ °³¼ö = ÀÎµ¦½º ¹øÈ£ Æ÷ÇÔÇØ¼­ 33°³
+            // ì´ ì—´ ê°œìˆ˜ = ì¸ë±ìŠ¤ ë²ˆí˜¸ í¬í•¨í•´ì„œ 33ê°œ
             if (ImGui::BeginTable("CollisionMatrixTable", matrixSize + 1,
                 ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit))
             {
                 // -------------------------
-                // Ã¹ ¹øÂ° Çì´õ Çà
+                // ì²« ë²ˆì§¸ í—¤ë” í–‰
                 // -------------------------
                 ImGui::TableNextRow();
                 for (int col = -1; col < matrixSize; ++col)
@@ -193,11 +197,11 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                     if (col >= 0)
                         ImGui::Text("%2d", col);
                     else
-                        ImGui::Text("   "); // ÁÂ»ó´Ü ºóÄ­
+                        ImGui::Text("   "); // ì¢Œìƒë‹¨ ë¹ˆì¹¸
                 }
 
                 // -------------------------
-                // º»¹® Çà ·»´õ¸µ
+                // ë³¸ë¬¸ í–‰ ë Œë”ë§
                 // -------------------------
                 for (int row = 0; row < matrixSize; ++row)
                 {
@@ -207,7 +211,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                         ImGui::TableNextColumn();
                         if (col == -1)
                         {
-                            // Çà ¹øÈ£
+                            // í–‰ ë²ˆí˜¸
                             ImGui::Text("%2d", row);
                         }
                         else
@@ -222,7 +226,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                             }
                             else
                             {
-                                // ½Ã°¢ÀûÀ¸·Î µ¿ÀÏÇÑ Å©±â È®º¸
+                                // ì‹œê°ì ìœ¼ë¡œ ë™ì¼í•œ í¬ê¸° í™•ë³´
                                 ImGui::Dummy(ImVec2(cellWidth, checkboxSize));
                             }
 
@@ -234,7 +238,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                 ImGui::EndTable();
             }
 
-            ImGui::PopStyleColor(2); // ¼³Á¤ÇÑ 2°³ »ö»ó pop
+            ImGui::PopStyleColor(2); // ì„¤ì •í•œ 2ê°œ ìƒ‰ìƒ pop
             ImGui::PopStyleVar();
             ImGui::EndChild();
         }
@@ -242,7 +246,7 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
         ImGui::Separator();
         if (ImGui::Button("Save"))
         {
-            //Àû¿ëµÈ Ãæµ¹ ¸Å½º¸¯½º ÀúÀå
+            //ì ìš©ëœ ì¶©ëŒ ë§¤ìŠ¤ë¦­ìŠ¤ ì €ì¥
             PhysicsManagers->SetCollisionMatrix(collisionMatrix);
             m_bCollisionMatrixWindow = false;
             ImGui::GetContext("CollisionMatrixPopup").Close();
@@ -283,8 +287,6 @@ void MenuBarWindow::RenderMenuBar()
                     }
                     else 
                     {
-                        std::cout << "Save Menu" << std::endl;
-
                         fileName = ShowSaveFileDialog(
                             L"Scene Files (*.creator)\0*.creator\0",
                             L"Save Scene",
@@ -302,8 +304,6 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::MenuItem("Save As", "Ctrl+Shift+S"))
                 {
-                    std::cout << "Save As Menu" << std::endl;
-                    //Test
                     SceneManagers->resetSelectedObjectEvent.Broadcast();
                     file::path fileName = ShowSaveFileDialog(
                         L"Scene Files (*.creator)\0*.creator\0",
@@ -388,6 +388,7 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
+                
                 ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
@@ -431,6 +432,21 @@ void MenuBarWindow::RenderMenuBar()
 			{
 			}
 
+            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
+            bool style = static_cast<bool>(DataSystems->GetContentsBrowserStyle());
+            if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, style))
+            {
+                style = !style;
+                auto newStyle = static_cast<ContentsBrowserStyle>(style);
+                DataSystems->SetContentsBrowserStyle(newStyle);
+                EngineSettingInstance->SetContentsBrowserStyle(static_cast<ContentsBrowserStyle>(style));
+                if (newStyle == ContentsBrowserStyle::Tree)
+                    DataSystems->OpenContentsBrowser();
+                else
+                    DataSystems->CloseContentsBrowser();
+                EngineSettingInstance->SaveSettings();
+            }
+
             ImGui::EndMainMenuBar();
         }
         ImGui::End();
@@ -439,20 +455,23 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
+            if (DataSystems->GetContentsBrowserStyle() == ContentsBrowserStyle::Tile)
             {
-                auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
-                if (!contentDrawerContext.IsOpened())
+                if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
                 {
-                    contentDrawerContext.Open();
+                    auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
+                    if (!contentDrawerContext.IsOpened())
+                    {
+                        contentDrawerContext.Open();
+                    }
+                    else
+                    {
+                        contentDrawerContext.Close();
+                    }
                 }
-                else
-                {
-                    contentDrawerContext.Close();
-                }
+                ImGui::SameLine();
             }
 
-            ImGui::SameLine();
             if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
                 m_bShowLogWindow = !m_bShowProfileWindow;
@@ -484,22 +503,22 @@ void MenuBarWindow::RenderMenuBar()
             ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
             ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
-            const float vramPanelHeight = 50.0f; // VRAM ±×·¡ÇÁ ³ôÀÌ
+            const float vramPanelHeight = 50.0f; // VRAM ê·¸ë˜í”„ ë†’ì´
             const float contentWidth = ImGui::GetContentRegionAvail().x;
             const float contentHeight = ImGui::GetContentRegionAvail().y;
 
-            // À§ÂÊ: HUD
+            // ìœ„ìª½: HUD
             ImGui::BeginChild("Profiler HUD", ImVec2(contentWidth, contentHeight - vramPanelHeight), false);
             {
                 DrawProfilerHUD();
             }
             ImGui::EndChild();
 
-            // ¾Æ·¡ÂÊ: VRAM ±×·¡ÇÁ
+            // ì•„ë˜ìª½: VRAM ê·¸ë˜í”„
             ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
             {
                 auto info = m_sceneRenderer->m_deviceResources->GetVideoMemoryInfo();
-                ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // °¡·Î ¸·´ë ±×·¡ÇÁ
+                ShowVRAMBarGraph(info.CurrentUsage, info.Budget); // ê°€ë¡œ ë§‰ëŒ€ ê·¸ë˜í”„
             }
             ImGui::EndChild();
         }
@@ -556,7 +575,7 @@ void MenuBarWindow::RenderMenuBar()
         isPressedShift &&
         isDownS)
     {
-        // ±âÁ¸ Save As ·ÎÁ÷ È£Ãâ
+        // ê¸°ì¡´ Save As ë¡œì§ í˜¸ì¶œ
         SceneManagers->resetSelectedObjectEvent.Broadcast();
         file::path fileName = ShowSaveFileDialog(
             L"Scene Files (*.creator)\0*.creator\0",
@@ -564,16 +583,19 @@ void MenuBarWindow::RenderMenuBar()
             PathFinder::Relative("Scenes\\").wstring()
         );
 
-		std::cout << "Save As Key" << std::endl;
-
         if (!fileName.empty())
+        {
             SceneManagers->SaveScene(fileName.string());
+            EngineSettingInstance->SaveSettings();
+        }
         else
+        {
             Debug->LogError("Failed to save scene.");
+        }
     }
     else if (isPressedControl && isDownS)
     {
-        // ±âÁ¸ Save ·ÎÁ÷ È£Ãâ
+        // ê¸°ì¡´ Save ë¡œì§ í˜¸ì¶œ
         SceneManagers->resetSelectedObjectEvent.Broadcast();
         std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName.ToString();
         file::path fileName = PathFinder::Relative("Scenes\\" + sceneName + ".creator").wstring();
@@ -584,17 +606,20 @@ void MenuBarWindow::RenderMenuBar()
         }
         else
         {
-            std::cout << "Save Key" << std::endl;
-
             fileName = ShowSaveFileDialog(
                 L"Scene Files (*.creator)\0*.creator\0",
                 L"Save Scene",
                 PathFinder::Relative("Scenes\\").wstring()
             );
             if (!fileName.empty())
+            {
                 SceneManagers->SaveScene(fileName.string());
+                EngineSettingInstance->SaveSettings();
+            }
             else
+            {
                 Debug->LogError("Failed to save scene.");
+            }
         }
     }
 }
@@ -608,7 +633,7 @@ void MenuBarWindow::ShowLogWindow()
     ImGui::PushFont(m_koreanFont);
     ImGui::Begin(ICON_FA_TERMINAL " Log", &m_bShowLogWindow);
 
-    // == »ó´Ü °íÁ¤ Çì´õ ¿µ¿ª ==
+    // == ìƒë‹¨ ê³ ì • í—¤ë” ì˜ì—­ ==
     ImGui::BeginChild("LogHeader", ImVec2(0, 0),
         ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY,
         ImGuiWindowFlags_NoScrollbar);
@@ -627,7 +652,7 @@ void MenuBarWindow::ShowLogWindow()
 
     ImGui::Separator();
 
-    // == ½ºÅ©·Ñ °¡´ÉÇÑ ·Î±× ¿µ¿ª ==
+    // == ìŠ¤í¬ë¡¤ ê°€ëŠ¥í•œ ë¡œê·¸ ì˜ì—­ ==
     ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
     {
         if (isClear)
@@ -643,7 +668,7 @@ void MenuBarWindow::ShowLogWindow()
         float sizeX = ImGui::GetContentRegionAvail().x;
 		static bool isCopyPopupOpen = false;
 		static std::string copiedText;
-        // ÇöÀç ½ºÅ©·Ñ »óÅÂ °¨Áö
+        // í˜„ì¬ ìŠ¤í¬ë¡¤ ìƒíƒœ ê°ì§€
         bool shouldScroll = autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10.0f;
 
         for (size_t i = 0; i < entries.size(); ++i)
@@ -740,6 +765,7 @@ void MenuBarWindow::ShowLightMapWindow()
     ImGui::GetContext("LightMap").Open();
 }
 
+
 ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };
 
 void MenuBarWindow::ShowBehaviorTreeWindow()
@@ -755,7 +781,9 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
         if (ImGui::Button("Create"))
         {
             isfirstLoad = true;
-            file::path BTSavePath = ShowSaveFileDialog(L"", L"Save Behavior Tree Asset",
+            file::path BTSavePath = ShowSaveFileDialog(
+                L"Behavior Tree Files (*.bt)\0*.bt\0", 
+                L"Save Behavior Tree Asset",
                 PathFinder::Relative("BehaviorTree"));
 
             if (!BTSavePath.empty())
@@ -765,7 +793,28 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 {
                     file::create_directories(BTSavePath.parent_path());
                 }
-                graph.CleanUp();
+                graph.Clear();
+
+                for (auto& node : graph.NodeList)
+                {
+                    node.Position = BT::ToMathfVec2(node.PositionEditor);
+                }
+
+                // Save the graph to a file
+                auto node = Meta::Serialize(&graph);
+
+                std::ofstream outFile(BTSavePath.string());
+
+                if (outFile.is_open())
+                {
+                    outFile << node; // Pretty print with 4 spaces
+                    outFile.close();
+                    outFile.flush();
+                }
+                else
+                {
+                    std::cerr << "Failed to open file for writing: " << BTSavePath.string() << std::endl;
+                }
             }
             else
             {
@@ -1794,9 +1843,9 @@ void MenuBarWindow::SHowInputActionMap()
         }
         ImGui::Separator();
 
-        ImGui::BeginChild("ActionMaps", ImVec2(200, 0), true); // ¿ŞÂÊ
+        ImGui::BeginChild("ActionMaps", ImVec2(200, 0), true); // ì™¼ìª½
         ImGui::Text("Action Maps");
-        ImGui::SameLine();  // ¹Ù·Î ¿·¿¡ ¹öÆ° ¹èÄ¡
+        ImGui::SameLine();  // ë°”ë¡œ ì˜†ì— ë²„íŠ¼ ë°°ì¹˜
         if (ImGui::Button("+"))
         {
             InputActionManagers->AddActionMap();
@@ -1814,7 +1863,7 @@ void MenuBarWindow::SHowInputActionMap()
                 ImGui::SetNextItemWidth(200);
                 if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                 {
-                    // ¿£ÅÍ ´­·¯¼­ ÀÌ¸§ È®Á¤
+                    // ì—”í„° ëˆŒëŸ¬ì„œ ì´ë¦„ í™•ì •
                     InputActionManagers->m_actionMaps[editingMapIndex]->m_name = buffer;
                     editingMapIndex = -1;
                 }
@@ -1890,7 +1939,7 @@ void MenuBarWindow::SHowInputActionMap()
                     ImGui::SetNextItemWidth(300);
                     if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
                     {
-                        // ¿£ÅÍ ´­·¯¼­ ÀÌ¸§ È®Á¤
+                        // ì—”í„° ëˆŒëŸ¬ì„œ ì´ë¦„ í™•ì •
                         map->m_actions[editingActionIndex]->actionName = buffer;
                         editingActionIndex = -1;
                     }
@@ -1969,9 +2018,9 @@ void MenuBarWindow::SHowInputActionMap()
                 {
                     ImGui::OpenPopup("SelectInputType");
                 }
-                //value ¸é state¹«½ÃÇÏ°í pressed¸¸¹Ş°í value ¿¡ vector2¿¡ ÄÁÆ®·Ñ·¯¸é ¿Ş½ºÆ½,¿À¸¥½ºÆ½  floatÀÌ¸é ¿Ş¿À,Æ®¸®°Å¸¸ ¹Ş°Ô²û Å°º¸µå´Â ´Ù°¡´É // Å°º¸µå´Â ´Ù°¡´É 4°³¹Ş°Ô²û 0,1,2,3¼ø 
+                //value ë©´ stateë¬´ì‹œí•˜ê³  pressedë§Œë°›ê³  value ì— vector2ì— ì»¨íŠ¸ë¡¤ëŸ¬ë©´ ì™¼ìŠ¤í‹±,ì˜¤ë¥¸ìŠ¤í‹±  floatì´ë©´ ì™¼ì˜¤,íŠ¸ë¦¬ê±°ë§Œ ë°›ê²Œë” í‚¤ë³´ë“œëŠ” ë‹¤ê°€ëŠ¥ // í‚¤ë³´ë“œëŠ” ë‹¤ê°€ëŠ¥ 4ê°œë°›ê²Œë” 0,1,2,3ìˆœ 
 
-                //Key State´Â valueÅ¸ÀÔÀÏ°æ¿ì Ãâ·Âx
+                //Key StateëŠ” valueíƒ€ì…ì¼ê²½ìš° ì¶œë ¥x
                 ImGui::Text("Key State : ");
                 ImGui::SameLine();
                 if(ImGui::Button(KeyStateString(action->keystate).c_str()))
@@ -2010,7 +2059,7 @@ void MenuBarWindow::SHowInputActionMap()
                     
                     if (action->valueType == InputValueType::Float)
                     {
-                        //³ªÁß¿¡ ±¸Çö
+                        //ë‚˜ì¤‘ì— êµ¬í˜„
                     }
                     else if (action->valueType == InputValueType::Vector2)
                     {
@@ -2022,7 +2071,7 @@ void MenuBarWindow::SHowInputActionMap()
                             if (ImGui::Button("KeyBoard1"))
                             {
                                 ImGui::PopID();
-                                //Ã¹¹øÂ°Å°
+                                //ì²«ë²ˆì§¸í‚¤
                                 floatId = 0;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
@@ -2036,7 +2085,7 @@ void MenuBarWindow::SHowInputActionMap()
                             if (ImGui::Button("KeyBoard2"))
                             {
                                 ImGui::PopID();
-                                //2¹øÂ°Å°
+                                //2ë²ˆì§¸í‚¤
                                 floatId = 1;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
@@ -2050,7 +2099,7 @@ void MenuBarWindow::SHowInputActionMap()
                             if (ImGui::Button("KeyBoard3"))
                             {
                                 ImGui::PopID();
-                                //2¹øÂ°Å°
+                                //2ë²ˆì§¸í‚¤
                                 floatId = 2;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
@@ -2064,7 +2113,7 @@ void MenuBarWindow::SHowInputActionMap()
                             if (ImGui::Button("KeyBoard4"))
                             {
                                 ImGui::PopID();
-                                //2¹øÂ°Å°
+                                //2ë²ˆì§¸í‚¤
                                 floatId = 3;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
@@ -2080,7 +2129,7 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::SameLine();
                             if (ImGui::Button(ControllerButtonString(action->m_controllerButton).c_str()))
                             {
-                                //°ÔÀÓÆĞµå´Â left ½ºÆ½ light ½ºÆ½ ¸¸ ³Ö°Ô²û
+                                //ê²Œì„íŒ¨ë“œëŠ” left ìŠ¤í‹± light ìŠ¤í‹± ë§Œ ë„£ê²Œë”
                                 ImGui::OpenPopup("ControllerButtonFlaot4");
                             }
                         }

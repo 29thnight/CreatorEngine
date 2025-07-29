@@ -3,6 +3,8 @@
 #include "RenderScene.h"
 #include "Terrain.h"
 #include "Scene.h"
+#include "Camera.h"
+#include <random>
 
 void FoliageComponent::Awake()
 {
@@ -16,6 +18,20 @@ void FoliageComponent::Awake()
             renderScene->RegisterCommand(this);
         }
     }
+}
+
+void FoliageComponent::Update(float deltaTime)
+{
+    auto scene = SceneManagers->GetActiveScene();
+    auto renderScene = SceneManagers->GetRenderScene();
+    if (scene && renderScene)
+    {
+        auto camera = CameraManagement->GetLastCamera();
+        if (camera)
+        {
+            UpdateFoliageCullingData(camera);
+		}
+	}
 }
 
 void FoliageComponent::OnDestroy()
@@ -66,4 +82,80 @@ void FoliageComponent::AddInstanceFromTerrain(TerrainComponent* terrain, const F
     int idx = y * width + x;
     inst.m_position.y = heightMap[idx];
     m_foliageInstances.push_back(inst);
+}
+
+void FoliageComponent::AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count)
+{
+    if (!terrain || count <= 0) return;
+
+    std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<float> offset(-brush.m_radius, brush.m_radius);
+    std::uniform_real_distribution<float> rot(0.f, 360.f);
+    std::uniform_real_distribution<float> scl(0.8f, 1.2f);
+
+    for (int i = 0; i < count; ++i)
+    {
+        float dx = offset(gen);
+        float dz = offset(gen);
+        if (dx * dx + dz * dz > brush.m_radius * brush.m_radius)
+        {
+            --i;
+            continue;
+        }
+
+        FoliageInstance inst;
+        inst.m_position = { brush.m_center.x + dx, 0.f, brush.m_center.y + dz };
+        inst.m_rotation = { 0.f, rot(gen), 0.f };
+        float s = scl(gen);
+        inst.m_scale = { s, s, s };
+        inst.m_foliageTypeID = typeID;
+        AddInstanceFromTerrain(terrain, inst);
+    }
+}
+
+void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush)
+{
+    (void)terrain;
+    m_foliageInstances.erase(std::remove_if(m_foliageInstances.begin(), m_foliageInstances.end(),
+        [&](const FoliageInstance& inst)
+        {
+            float dx = inst.m_position.x - brush.m_center.x;
+            float dz = inst.m_position.z - brush.m_center.y;
+            return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
+        }), m_foliageInstances.end());
+}
+
+void FoliageComponent::UpdateFoliageCullingData(Camera* camera)
+{
+    if (!camera) return;
+
+    for (auto& foliage : m_foliageInstances)
+    {
+        Mathf::Vector3 position = foliage.m_position;
+        Mathf::Vector3 rotation = foliage.m_rotation;
+        Mathf::Vector3 scale = foliage.m_scale;
+
+        foliage.m_worldMatrix = Mathf::Matrix::CreateScale(scale) *
+            Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+            Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+            Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+            Mathf::Matrix::CreateTranslation(position);
+
+        const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
+        Mesh* mesh = foliageType.m_mesh;
+        if (mesh == nullptr) continue;
+
+        DirectX::BoundingBox boundingBox = mesh->GetBoundingBox();
+        DirectX::BoundingBox transformedBox;
+        boundingBox.Transform(transformedBox, foliage.m_worldMatrix);
+
+        if (camera->GetFrustum().Intersects(transformedBox))
+        {
+            foliage.m_isCulled = false;
+        }
+        else
+        {
+			foliage.m_isCulled = true;
+        }
+    }
 }

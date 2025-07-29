@@ -80,6 +80,10 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
+
+        if (albedo.a == 0.f) {
+            discard;
+        }
     }
     
     float occlusion = 1;

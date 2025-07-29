@@ -71,6 +71,8 @@ GBufferOutput main(PixelShaderInput IN)
     surf.T = normalize(IN.tangent);
     surf.B = normalize(IN.binormal);
 
+    uint bit = bitflag;
+
     if (gNormalState == NORMAL_MAP)
     {
         surf.N = CalcNormalFromNormMap(NormalMap, IN.texCoord, surf);
@@ -165,7 +167,7 @@ GBufferOutput main(PixelShaderInput IN)
         metallic = 0.0;
         roughness = 1.0;
         surf.N = float3(0, 1, 0);
-
+        bit = 1 << 8;
     }
     
 
@@ -178,7 +180,7 @@ GBufferOutput main(PixelShaderInput IN)
     //uint hi = (bitflag >> 16) & 0xFFFF;
     //float fLo = asfloat(lo); // float 하위 16비트에 lo 저장
     //float fHi = asfloat(hi); // float 하위 16비트에 hi 저장
-    OUT.bitmask = bitflag; //float4(fLo, fHi, 0, 1);
+    OUT.bitmask = bit; //float4(fLo, fHi, 0, 1);
     
     //uint u = asuint(bitflag);
     //float2 packed = float2(

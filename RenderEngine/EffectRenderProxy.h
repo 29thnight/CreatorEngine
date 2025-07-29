@@ -23,6 +23,10 @@ public:
 	void UpdateLoop(bool isLoop) { m_loop = isLoop; }
 	void UpdateDuration(const float& duration) { m_duration = duration; }
 
+	void SetPendingRemoveInstance(const std::string& instanceName) { m_pendingRemoveInstance = instanceName; }
+	const std::string& GetPendingRemoveInstance() const { return m_pendingRemoveInstance; }
+	void ClearPendingRemoveInstance() { m_pendingRemoveInstance.clear(); }
+
 	bool TryPop(EffectCommandType& type)
 	{ 
 		return m_commandTypeQueue.try_pop(type);
@@ -40,7 +44,7 @@ public:
 
 	const std::string& GetTempleteName() const { return m_templateName; }
 	const std::string& GetInstanceName() const { return m_instanceName; }
-	const Mathf::Vector3& GetPostion() const { return m_commandPosition; }
+	const Mathf::Vector3& GetPosition() const { return m_commandPosition; }
 	const Mathf::Vector3& GetRotation() const { return m_commandRotation; }
 	const float& GetTimeScale() const { return m_timeScale; }
 	bool& GetLoop() { return m_loop; }
@@ -55,4 +59,5 @@ private:
 	float                   m_timeScale{ 1.f };
 	bool					m_loop{ false };
 	float                   m_duration{ 0.f };
+	std::string m_pendingRemoveInstance;
 };

@@ -135,8 +135,37 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
+	if (!proxyObject) return;
+
+	std::vector<FoliageType> foliageTypes;
+	std::vector<FoliageInstance> foliageInstances;
+
+	size_t foliageTypesSize = pComponent->GetFoliageTypes().size();
+	size_t foliageInstancesSize = pComponent->GetFoliageInstances().size();
+	size_t proxyFoliageSize = proxyObject->m_foliageTypes.size();
+	size_t proxyInstancesSize = proxyObject->m_foliageInstances.size();
+
+	if (foliageTypesSize != proxyFoliageSize)
+	{
+		foliageTypes = pComponent->GetFoliageTypes();
+	}
+
+	if (foliageInstancesSize != proxyInstancesSize)
+	{
+		foliageInstances = pComponent->GetFoliageInstances();
+	}
+
 	m_updateFunction = [=]()
 	{
+		if (proxyFoliageSize != foliageTypesSize)
+		{
+			proxyObject->m_foliageTypes = foliageTypes;
+		}
+
+		if (proxyInstancesSize != foliageInstancesSize)
+		{
+			proxyObject->m_foliageInstances = foliageInstances;
+		}
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
 	};

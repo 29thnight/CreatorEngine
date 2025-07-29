@@ -1,11 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "Prefab.h"
 
-class PrefabUtility : public Singleton<PrefabUtility>
+class PrefabUtility : public DLLCore::Singleton<PrefabUtility>
 {
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<PrefabUtility>;
     PrefabUtility() = default;
     ~PrefabUtility() = default;
 
@@ -17,5 +18,13 @@ public:
 
     Prefab* CreatePrefab(const GameObject* source, const std::string_view& name = "");
     GameObject* InstantiatePrefab(const Prefab* prefab, const std::string_view& name = "");
+    void RegisterInstance(GameObject* instance, const Prefab* prefab);
+    void UpdateInstances(const Prefab* prefab);
+    bool SavePrefab(const Prefab* prefab, const std::string& path);
+    Prefab* LoadPrefab(const std::string& path);
+
+private:
+    std::unordered_map<const Prefab*, std::vector<GameObject*>> m_instanceMap{};
 };
 
+static auto PrefabUtilitys = PrefabUtility::GetInstance();
