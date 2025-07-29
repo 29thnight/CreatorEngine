@@ -9,6 +9,7 @@
 #include "InputManager.h"
 #include "RigidBodyComponent.h"
 #include "RaycastHelper.h"
+#include "Weapon.h"
 void GameManager::Awake()
 {
 	std::cout << "GameManager Awake" << std::endl;
@@ -30,7 +31,7 @@ void GameManager::Awake()
 	if (weaponPiecePool) {
 		for (auto& index : weaponPiecePool->m_childrenIndices) {
 			auto object = GameObject::FindIndex(index);
-			auto entity = object->GetComponent<Entity>();
+			auto entity = object->GetComponent<Weapon>();
 			if (entity)
 				m_weaponPiecePool.push_back(entity);
 		}
@@ -113,7 +114,7 @@ std::vector<Entity*>& GameManager::GetResourcePool()
 	return m_resourcePool;
 }
 
-std::vector<Entity*>& GameManager::GetWeaponPiecePool()
+std::vector<Weapon*>& GameManager::GetWeaponPiecePool()
 {
 	// TODO: 여기에 return 문을 삽입합니다.
 	return m_weaponPiecePool;

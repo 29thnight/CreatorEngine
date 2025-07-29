@@ -388,7 +388,7 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
-                
+                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
             ImGui::PopStyleColor();

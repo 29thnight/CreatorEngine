@@ -8,9 +8,5 @@ ReflectionScriptField(TestBehavior) \
 		meta_property(testValue) \
 		meta_property(testString) \
 	}); \
-	MethodField \
-	({ \
-		meta_method(Test) \
-	}); \
-	FieldEnd(TestBehavior, PropertyAndMethod) \
+	FieldEnd(TestBehavior, PropertyOnly) \
 };

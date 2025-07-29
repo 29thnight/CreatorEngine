@@ -63,7 +63,7 @@ public:
 	void InvokeEvent();
 	void InvokeEvent(Animator* _ownerAnimator);
 	void SetEvent(const std::string& _funName, float progressPercent, std::function<void()> _func);
-	void SetEvent(const std::string& _scriptName, const std::string& _funName, float progressPercent);
+	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
 
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };

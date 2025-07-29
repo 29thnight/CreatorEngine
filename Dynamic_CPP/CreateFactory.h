@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "Weapon.h"
 #include "TweenManager.h"
 #include "EntityResource.h"
 #include "TestEnemy.h"

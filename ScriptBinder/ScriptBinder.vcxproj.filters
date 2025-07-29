@@ -297,6 +297,9 @@
     <ClCompile Include="PhysicsManager.cpp">
       <Filter>Managers\PhysicsManager</Filter>
     </ClCompile>
+    <ClCompile Include="PrefabEditor.cpp">
+      <Filter>Classes\GameObject\PrefabUtility</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -565,6 +568,9 @@
     </ClInclude>
     <ClInclude Include="PhysicsManager.h">
       <Filter>Managers\PhysicsManager</Filter>
+    </ClInclude>
+    <ClInclude Include="PrefabEditor.h">
+      <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

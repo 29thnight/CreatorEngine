@@ -392,9 +392,6 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp">
       <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
     </ClCompile>
-    <ClCompile Include="TestPlayer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="GizmoLinePass.cpp">
       <Filter>RenderPass\GizmoPass</Filter>
     </ClCompile>
@@ -472,9 +469,6 @@
     </ClCompile>
     <ClCompile Include="BitMaskPass.cpp">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
-    </ClCompile>
-    <ClCompile Include="TestAniScprit.cpp">
-      <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="EffectBase.cpp">
       <Filter>RenderPass\EffectPass\0.Example</Filter>
@@ -640,9 +634,6 @@
     <ClInclude Include="SubsurfaceScatteringPass.h">
       <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
     </ClInclude>
-    <ClInclude Include="TestPlayer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="GizmoLinePass.h">
       <Filter>RenderPass\GizmoPass</Filter>
     </ClInclude>
@@ -768,9 +759,6 @@
     </ClInclude>
     <ClInclude Include="EffectBase.h">
       <Filter>RenderPass\EffectPass\1.Base</Filter>
-    </ClInclude>
-    <ClInclude Include="TestAniScprit.h">
-      <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="AssetJob.h">
       <Filter>Asset\JobSystem\Asset</Filter>

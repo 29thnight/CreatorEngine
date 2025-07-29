@@ -25,6 +25,7 @@ ReflectionScriptField(Player) \
 	({ \
 		meta_method(Move, "dir") \
 		meta_method(CatchAndThrow) \
+		meta_method(ThrowEvent) \
 		meta_method(Dash) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \

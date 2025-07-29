@@ -99,10 +99,10 @@ void TestBehavior::Update(float tick)
 
 }
 
-void TestBehavior::Test()
+void TestBehavior::LateUpdate(float tick)
 {
-	std::cout << "Test input" << std::endl;
 }
+
 
 void TestBehavior::Move(Mathf::Vector2 value)
 {

@@ -13,6 +13,7 @@
 #include "Camera.h"
 #include "AAPassSetting.h"
 #include "MaterialFlowInformation.h"
+#include "Transform.h"
 #include "SpriteRenderer.h"
 #include "MeshRenderer.h"
 #include "AssetBundle.h"
@@ -25,7 +26,6 @@
 #include "MaterialInfomation.h"
 #include "Mesh.h"
 #include "ToneMapPassSetting.h"
-#include "TestAniScprit.h"
 #include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
@@ -62,12 +62,11 @@
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
-#include "PlayerInput.h"
-#include "UIButton.h"
 #include "Prefab.h"
+#include "PlayerInput.h"
 #include "Terrain.h"
 #include "TransCondition.h"
-#include "Transform.h"
+#include "UIButton.h"
 #include "UIComponent.h"
 
 REFLECTION_REGISTER()
@@ -131,7 +130,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(StateMachineComponent);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);
-    AUTO_REGISTER_CLASS(TestAniScprit);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(ToneMapPassSetting);
     AUTO_REGISTER_CLASS(TransCondition);

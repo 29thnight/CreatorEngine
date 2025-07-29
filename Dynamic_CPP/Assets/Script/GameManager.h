@@ -4,6 +4,7 @@
 
 class Entity;
 class ActionMap;
+class Weapon;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -31,13 +32,13 @@ public:
 	const std::vector<Entity*>& GetEntities();
 
 	std::vector<Entity*>& GetResourcePool();
-	std::vector<Entity*>& GetWeaponPiecePool();
+	std::vector<Weapon*>& GetWeaponPiecePool();
 private:
 	std::vector<Entity*> m_entities;
 	ActionMap* playerMap{ nullptr };
 
 	std::vector<Entity*> m_resourcePool;
-	std::vector<Entity*> m_weaponPiecePool;
+	std::vector<Weapon*> m_weaponPiecePool;
 private:
 	void CheatMiningResource();
 };

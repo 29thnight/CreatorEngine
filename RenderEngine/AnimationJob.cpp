@@ -404,7 +404,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
             {
                 if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
                 {
-                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+                    //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
                     globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
                 }
                 else
@@ -428,7 +428,7 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
         }
         else
         {
-            animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
+            //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
             globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
         }
     }

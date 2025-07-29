@@ -3,6 +3,7 @@
 #include "Entity.h"
 #include "Player.generated.h"
 class Animator;
+class Weapon;
 class Player : public Entity
 {
 public:
@@ -34,6 +35,8 @@ public:
 	void Catch();
 	void Throw();
 	[[Method]]
+	void ThrowEvent();
+	[[Method]]
 	void Dash();
 	[[Method]]
 	void StartAttack();
@@ -45,11 +48,11 @@ public:
 	void SwapWeaponLeft();
 	[[Method]]
 	void SwapWeaponRight();
-	void AddWeapon(GameObject* weapon);
+	void AddWeapon(Weapon* weapon);
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
 	void DeleteWeapon(int index);
-	void DeleteWeapon(GameObject* weapon);
+	void DeleteWeapon(Weapon* weapon);
 	void FindNearObject(GameObject* gameObject);
 	[[Property]]
 	int playerIndex = 0;
@@ -108,8 +111,8 @@ public:
 	float KnockBackElapsedTime = 0.f;
 	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 	float m_nearDistance = FLT_MAX;
-	std::vector<GameObject*> m_weaponInventory;
-	GameObject* m_curWeapon = nullptr;
+	std::vector<Weapon*> m_weaponInventory;
+	Weapon* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
 	GameObject* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;

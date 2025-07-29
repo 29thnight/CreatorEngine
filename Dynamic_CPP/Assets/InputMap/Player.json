@@ -77,7 +77,7 @@
             "actionType": "Button",
             "funName": "DeleteCurWeapon",
             "inputType": "GamePad",
-            "key0": "X",
+            "key0": "Y",
             "key1": "A",
             "key2": "A",
             "key3": "A",

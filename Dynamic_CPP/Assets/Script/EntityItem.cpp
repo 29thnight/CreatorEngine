@@ -64,10 +64,10 @@ void EntityItem::OnCollisionExit(const Collision& collision)
 }
 
 void EntityItem::Update(float tick)
-
-	return;
+{
+	//return;
 	//GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
-	if (asisTail != nullptr) {
+	/*if (asisTail != nullptr) {
 		Transform* tailTransform = asisTail->GetComponent<Transform>();
 		if (tailTransform)
 		{
@@ -75,14 +75,16 @@ void EntityItem::Update(float tick)
 			if (speed < 1.f) {
 				speed = 1.f;
 			}
-			if (isThrow)
-			{
-				speed -= tick;
-				if (speed < 1.f) {
-					speed = 1.f;
-				}
+		}
+	}*/
+	if (isThrow)
+	{
+		speed -= tick;
+		if (speed < 1.f) {
+			speed = 1.f;
+		}
 		Transform* myTr = GetOwner()->GetComponent<Transform>();
-		
+
 		Vector3 pB = ((endPos - startPos) / 2) + startPos;
 		pB.y += 5.f;
 		Vector3 pA = startPos;
@@ -104,7 +106,7 @@ void EntityItem::Update(float tick)
 			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			m_state == EItemState::DROPPED;
-			
+
 		};
 	}
 
@@ -114,8 +116,9 @@ void EntityItem::Update(float tick)
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 	}
+		
+	
 }
-
 void EntityItem::Throw(Mathf::Vector3 ownerForward,float distacne)
 {
 	m_state == EItemState::THROWN;
@@ -123,7 +126,7 @@ void EntityItem::Throw(Mathf::Vector3 ownerForward,float distacne)
 	isThrow = true;
 	Mathf::Vector3 offset = {ownerForward.x * distacne,0, ownerForward.z * distacne };
 	endPos = startPos + offset;
-	endPos.y = 0.1	;
+	endPos.y = 0.1;
 }
 
 void EntityItem::SetThrowOwner(Player* player)
@@ -132,7 +135,7 @@ void EntityItem::SetThrowOwner(Player* player)
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	
-	auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
+	/*auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
 		GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
 		auto pos = GetOwner()->m_transform.GetWorldPosition();
 		return Vector3(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]); },
@@ -142,7 +145,7 @@ void EntityItem::SetThrowOwner(Player* player)
 		[](float t) {return Easing::EaseInOutBack(t);}
 	);
 
-	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween);
+	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween);*/
 }
 
 Player* EntityItem::GetThrowOwner()

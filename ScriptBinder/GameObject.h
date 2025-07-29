@@ -50,7 +50,7 @@ public:
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 	void RefreshComponentIdIndices();
-
+	void AddChild(GameObject* _objcet);
 	template<typename T>
 	T* AddComponent();
 

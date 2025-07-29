@@ -2,7 +2,6 @@
 #include "GameObject.h"
 #include "Animator.h"
 #include "ModuleBehavior.h"
-#include "TestAniScprit.h"
 void Animation::InvokeEvent()
 {
 	
@@ -34,7 +33,10 @@ void Animation::InvokeEvent(Animator* _ownerAnimator)
 	if (m_keyFrameEvent.empty())
 		return;
 	GameObject* owner = _ownerAnimator->GetOwner();
-
+	if (owner->m_parentIndex != 0)
+	{
+		owner = GameObject::FindIndex(owner->m_parentIndex);
+	}
 	std::vector<ModuleBehavior*> scripts{};
 	ModuleBehavior* script = nullptr;
 	for (auto& component : owner->m_components)
@@ -118,9 +120,20 @@ void Animation::SetEvent(const std::string& _funName, float progressPercent, std
 	m_keyFrameEvent.push_back(newEvent);
 }
 
-void Animation::SetEvent(const std::string& _scriptName, const std::string& _funName, float progressPercent)
+void Animation::SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent)
 {
 	KeyFrameEvent newEvent;
+	for (auto& event : m_keyFrameEvent)
+	{
+		if (event.m_eventName == _eventName)
+		{
+			event.m_scriptName = _scriptName;
+			event.m_funName = _funName;
+			event.key = progressPercent;
+			return;
+		}	
+	}		
+	newEvent.m_eventName = _eventName;
 	newEvent.m_scriptName = _scriptName;
 	newEvent.m_funName = _funName;
 	newEvent.key = progressPercent;

@@ -123,6 +123,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <MinFilesInUnityFile>10</MinFilesInUnityFile>
+      <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -197,8 +199,6 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
-    <ClCompile Include="TestAniScprit.cpp" />
-    <ClCompile Include="TestPlayer.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="DeferredPass.cpp" />
@@ -301,8 +301,6 @@
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
-    <ClInclude Include="TestAniScprit.h" />
-    <ClInclude Include="TestPlayer.h" />
     <ClInclude Include="ToneMapPassSetting.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="DataSystem.h" />
