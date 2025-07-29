@@ -82,6 +82,7 @@ public:
 	Core::Delegate<void>                resourceTrimEvent{};
     
 	Core::Delegate<void>                AssetLoadEvent{};
+    Core::Delegate<void>                VolumeProfileApplyEvent{};
 
     std::atomic_bool                    m_isGameStart{ false };
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
@@ -123,4 +124,5 @@ static auto& newSceneCreatedEvent = SceneManagers->newSceneCreatedEvent;
 static auto& resetSelectedObjectEvent = SceneManagers->resetSelectedObjectEvent;
 static auto& endOfFrameEvent = SceneManagers->endOfFrameEvent;
 static auto& resourceTrimEvent = SceneManagers->resourceTrimEvent;
+static auto& VolumeProfileApplyEvent = SceneManagers->VolumeProfileApplyEvent;
 #pragma endregion

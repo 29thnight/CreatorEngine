@@ -241,6 +241,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 		m_renderScene->Update(0.f);
 	});
 
+	m_volumeProfileApplyEventHandle = VolumeProfileApplyEvent.AddRaw(this, &SceneRenderer::ApplyVolumeProfile);
+
+
 }
 
 SceneRenderer::~SceneRenderer()
@@ -885,6 +888,42 @@ void SceneRenderer::CreateCommandListPass()
 void SceneRenderer::ReApplyCurrCubeMap()
 {
 	ApplyNewCubeMap(m_pSkyBoxPass->CurrentSkyBoxTextureName().string());
+}
+
+void SceneRenderer::ApplyVolumeProfile()
+{
+	if (m_renderScene && m_renderScene->m_LightController)
+	{
+		m_renderScene->m_LightController->m_shadowMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().shadow);
+	}
+	if (m_pDeferredPass)
+	{
+		m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
+	}
+	if (m_pSSAOPass)
+	{
+		m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
+	}
+	if (m_pAAPass)
+	{
+		m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
+	}
+	if (m_pPostProcessingPass)
+	{
+		m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
+	}
+	if (m_pVignettePass)
+	{
+		m_pVignettePass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().vignette);
+	}
+	if (m_pColorGradingPass)
+	{
+		m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
+	}
+	if (m_pSSGIPass)
+	{
+		m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
+	}
 }
 
 void SceneRenderer::PrepareRender()
