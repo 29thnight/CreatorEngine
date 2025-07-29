@@ -123,6 +123,7 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 	{
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
+		proxyObject->m_terrainMesh = pComponent->GetMesh();
 	};
 }
 

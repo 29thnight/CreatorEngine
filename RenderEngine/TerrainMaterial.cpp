@@ -198,10 +198,11 @@ void TerrainMaterial::InitSplatMapTexture(UINT width, UINT height)
 	{
 		BYTE* dest = reinterpret_cast<BYTE*>(mapped.pData);
 
-		for (int y = 0; y < width; ++y)
+		for (UINT y = 0; y < height; ++y)
 		{
 			BYTE* row = dest + y * mapped.RowPitch;
-			memset(row, 0, height * 4); // RGBA 4채널이므로 4바이트씩 초기화
+			// 각 행의 패딩까지 포함해 전부 0으로
+			memset(row, 0, mapped.RowPitch);
 		}
 	}
 
