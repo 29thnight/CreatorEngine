@@ -439,14 +439,12 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-
+	m_renderScene->Update(deltaTime);
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	m_EffectEditor->Update(deltaTime);
 	m_renderScene->EraseRenderPassData();
-	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDestroy();
 	PrepareRender();
 }
@@ -682,11 +680,13 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
+		// EffectPass
 		{
 			PROFILE_CPU_BEGIN("EffectPass");
 			DirectX11::BeginEvent(L"EffectPass");
 			Benchmark banch;
 			float deltaTime = Time->GetElapsedSeconds();
+			m_EffectEditor->Update(deltaTime);
 			EffectManagers->Update(deltaTime);
 			EffectManagers->Execute(*m_renderScene, *camera);
 			m_EffectEditor->Render(*m_renderScene, *camera);
@@ -900,18 +900,24 @@ void SceneRenderer::PrepareRender()
 	std::vector<TerrainComponent*> terrainComponents = m_currentScene->GetTerrainComponent();
 	std::vector<FoliageComponent*> foliageComponents = m_currentScene->GetFoliageComponents();
 
-	m_threadPool->Enqueue([renderScene, allMeshes, terrainComponents, foliageComponents, m_currentScene]
+	m_threadPool->Enqueue([=]
+	{
+		for (auto& terrain : terrainComponents)
+		{
+			renderScene->UpdateCommand(terrain);
+		}
+	});
+
+	m_threadPool->Enqueue([=]
 	{
 		for (auto& mesh : allMeshes)
 		{
 			renderScene->UpdateCommand(mesh);
 		}
+	});
 
-		for (auto& terrain : terrainComponents)
-		{
-			renderScene->UpdateCommand(terrain);
-		}
-
+	m_threadPool->Enqueue([=]
+	{
 		for (auto& foliage : foliageComponents)
 		{
 			renderScene->UpdateCommand(foliage);

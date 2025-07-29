@@ -1,6 +1,7 @@
 #include "Prefab.h"
 #include "GameObject.h"
 #include "PrefabUtility.h"
+#include "TagManager.h"
 
 Prefab::Prefab(const std::string_view& name, const GameObject* source)
     : Object(name)
@@ -124,6 +125,23 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     obj->m_index = newIndex;
     obj->m_parentIndex = parent;
     obj->m_transform.SetParentID(parent);
+    obj->m_childrenIndices.clear();
+
+    if (!obj->m_tag.ToString().empty())
+    {
+        TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+    }
+
+    if (!obj->m_layer.ToString().empty())
+    {
+        TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+    }
+
+    auto parentObj = scene->m_SceneObjects[parent];
+    if (parentObj && parentObj->m_index != newIndex)
+    {
+        parentObj->m_childrenIndices.push_back(newIndex);
+    }
 
     if (node["m_components"])
     {
@@ -141,7 +159,6 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         }
     }
 
-    obj->m_childrenIndices.clear();
     if (node["children"])
     {
         for (const auto& childNode : node["children"])

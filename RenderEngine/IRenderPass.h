@@ -41,22 +41,21 @@ public:
 	{
 		SwapEvent -= m_swapEventHandle;
 
-		for (auto& [frame, cmdArr] : m_commandQueueMap)
+		for (auto& frameQueue : m_frameQueues)
 		{
-			for (auto& queue : cmdArr)
+			for (auto& queue : frameQueue)
 			{
 				while (!queue.empty())
 				{
-					ID3D11CommandList* CommandJob;
-					if (queue.try_pop(CommandJob))
+					ID3D11CommandList* command;
+					if (queue.try_pop(command))
 					{
-						Memory::SafeDelete(CommandJob);
+						Memory::SafeDelete(command);
 					}
 				}
 			}
 		}
 
-		m_commandQueueMap.clear();
 	}
 
 	//virtual std::string ToString() abstract;
@@ -86,7 +85,7 @@ public:
 
 protected:
 	std::unique_ptr<PipelineStateObject> m_pso{ nullptr };
-	CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
+	//CommandQueueMap m_commandQueueMap{}; //카메라 별 커멘드 큐
 	FrameQueueArray m_frameQueues;
 	Core::DelegateHandle m_swapEventHandle{};
 

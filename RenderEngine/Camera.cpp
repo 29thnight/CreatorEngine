@@ -227,44 +227,6 @@ void Camera::HandleMovement(float deltaTime)
 		m_up = XMVector3Rotate(XMVectorSet(0, 1, 0, 0), cameraRot);
 		m_right = XMVector3Cross(m_up, m_forward);
 		rotate = cameraRot;
-
-		/*XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), rotate);
-
-		XMVECTOR q1 = XMQuaternionRotationAxis(forward, deltaYaw);
-		forward = XMVector3Rotate(forward, q1);
-
-		XMVECTOR q2 = XMQuaternionRotationAxis(forward, deltaPitch);
-		rotate = q2;
-		m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, rotate));
-		m_right = XMVector3Normalize(XMVector3Rotate(RIGHT, rotate));
-		m_up = XMVector3Normalize(XMVector3Rotate(UP, rotate));*/
-
-		//// 현재 회전 기준 축을 얻음
-		//XMVECTOR rightAxis = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
-
-		//// 프레임당 변화량만 적용
-		//XMVECTOR pitchQuat = XMQuaternionRotationAxis(rightAxis, deltaPitch);
-		//XMVECTOR yawQuat = XMQuaternionRotationAxis(m_up, deltaYaw);
-
-		//// Yaw를 먼저 적용 -> Pitch를 적용
-		//XMVECTOR deltaRotation = XMQuaternionMultiply(yawQuat, pitchQuat);
-		//m_rotationQuat = XMQuaternionMultiply(deltaRotation, m_rotationQuat);
-		//m_rotationQuat = XMQuaternionMultiply(rotate, m_rotationQuat);
-		//m_rotationQuat = XMQuaternionNormalize(m_rotationQuat);
-
-		//// 새로운 방향 벡터 계산
-		//m_forward = XMVector3Normalize(XMVector3Rotate(FORWARD, m_rotationQuat));
-
-		//// Right 벡터 업데이트 (UP을 기준으로 다시 계산)
-		//m_right = XMVector3Normalize(XMVector3Cross(m_up, m_forward));
-
-		//m_up = XMVector3Cross(m_forward, m_right);
-
-		//	float sign = XMVectorGetY(m_up) > 0 ? 1.0f : -1.0f;
-		//	m_up = XMVectorSet(XMVectorGetX(m_up), sign * 20.f, XMVectorGetZ(m_up), 0);
-		//	m_up = XMQuaternionNormalize(m_up);
-
-		//rotate = m_rotationQuat;
 	}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
@@ -280,6 +242,36 @@ void Camera::UpdateBuffer(bool shadow)
 
 	DirectX11::VSSetConstantBuffer(1, 1, m_ViewBuffer.GetAddressOf());
 	DirectX11::VSSetConstantBuffer(2, 1, m_ProjBuffer.GetAddressOf());
+}
+
+void Camera::UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow)
+{
+	if (nullptr == m_CascadeViewBuffer)
+	{
+		m_CascadeViewBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * cascadeCount, D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER);
+		DirectX::SetName(m_CascadeViewBuffer.Get(), "CameraCascadeViewBuffer");
+	}
+
+	if (nullptr == m_CascadeProjBuffer)
+	{
+		m_CascadeProjBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix) * cascadeCount, D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER);
+		DirectX::SetName(m_CascadeProjBuffer.Get(), "CameraCascadeProjBuffer");
+	}
+
+	Mathf::xMatrix view[cascadeCount];
+	Mathf::xMatrix proj[cascadeCount];
+	for(auto i : std::views::iota(0, cascadeCount))
+	{
+		ApplyShadowInfo(i);
+		view[i] = CalculateView();
+		proj[i] = CalculateProjection(shadow);
+	}
+
+	deferredContext->UpdateSubresource(m_CascadeViewBuffer.Get(), 0, nullptr, view, 0, 0);
+	deferredContext->UpdateSubresource(m_CascadeProjBuffer.Get(), 0, nullptr, proj, 0, 0);
+
+	deferredContext->VSSetConstantBuffers(1, 1, m_CascadeViewBuffer.GetAddressOf());
+	deferredContext->VSSetConstantBuffers(2, 1, m_CascadeProjBuffer.GetAddressOf());
 }
 
 void Camera::UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow)

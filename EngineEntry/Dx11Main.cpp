@@ -139,42 +139,42 @@ void DirectX11::Dx11Main::Initialize()
     PROFILE_FRAME();
 
     m_CB_Thread = std::thread([&]
+    {
+        PROFILE_REGISTER_THREAD("[CB-Thread]");
+        while (isGameToRender)
         {
-            PROFILE_REGISTER_THREAD("[CB-Thread]");
-            while (isGameToRender)
+            if (!m_isInvokeResize)
             {
-                if (!m_isInvokeResize)
-                {
-                    CommandBuildThread();
-                }
+                CommandBuildThread();
             }
-        });
+        }
+    });
 
     m_CE_Thread = std::thread([&]
+    {
+        PROFILE_REGISTER_THREAD("[CE-Thread]");
+        while (isGameToRender)
         {
-            PROFILE_REGISTER_THREAD("[CE-Thread]");
-            while (isGameToRender)
+            while (!WinProcProxy::GetInstance()->IsEmpty())
             {
-                while (!WinProcProxy::GetInstance()->IsEmpty())
+                auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
+
+                if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
                 {
-                    auto [hwnd, message, wParam, lParam] = WinProcProxy::GetInstance()->PopMessage();
-
-                    if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
-
-                if (m_isInvokeResize)
-                {
-                    CreateWindowSizeDependentResources();
-                    m_isInvokeResize = false;
-                }
-
-                CoroutineManagers->yield_OnRender();
-                CommandExecuteThread();
             }
-        });
+
+            if (m_isInvokeResize)
+            {
+                CreateWindowSizeDependentResources();
+                m_isInvokeResize = false;
+            }
+
+            CoroutineManagers->yield_OnRender();
+            CommandExecuteThread();
+        }
+    });
 
     m_CB_Thread.detach();
     m_CE_Thread.detach();

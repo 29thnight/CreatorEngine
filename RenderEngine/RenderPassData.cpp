@@ -221,7 +221,7 @@ void RenderPassData::SortShadowRenderQueue()
 		std::sort(
 			m_shadowRenderQueue.begin(),
 			m_shadowRenderQueue.end(),
-			SortByAnimationAndMaterialGuid
+		SortByAnimationAndMaterialGuid	
 		);
 	}
 }
