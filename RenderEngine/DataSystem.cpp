@@ -1,6 +1,7 @@
 #include "DataSystem.h"
 #include "ShaderSystem.h"
 #include "Model.h"	
+#include "PrefabEditor.h"
 #include <future>
 #include <shellapi.h>
 #include <ppltasks.h>
@@ -12,7 +13,7 @@
 #include "fa.h"
 #include "ToggleUI.h"
 
-using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 9>;
+using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 10>;
 
 constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Model,          "Model"				},
@@ -22,14 +23,17 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Shader,         "Shader"			},
 	{ DataSystem::FileType::CppScript,      "CppScript"			},
 	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
+        { DataSystem::FileType::Prefab,         "Prefab"                       },
 	{ DataSystem::FileType::Sound,          "Sound"				},
 	{ DataSystem::FileType::HDR,            "HDR"				}
 }};
 
-// °Ë»ö ÇÔ¼ö
+        else if (filepath.extension() == ".pfb")
+                return DataSystem::FileType::Prefab;
+// ê²€ìƒ‰ í•¨ìˆ˜
 constexpr const char* FileTypeToString(DataSystem::FileType type)
 {
-	// ¼±Çü °Ë»ö
+	// ì„ í˜• ê²€ìƒ‰
 	for (auto&& kv : FileTypeStringTable)
 	{
 		if (kv.first == type)
@@ -1052,6 +1056,9 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	case FileType::CSharpScript:
 		color = IM_COL32(255, 0, 255, 255);
 		break;
+        case FileType::Prefab:
+                color = IM_COL32(0, 128, 255, 255);
+                break;
 	case FileType::Sound:
 		color = IM_COL32(255, 255, 0, 255);
 		break;
@@ -1091,6 +1098,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
+    if(filepath.extension() == ".pfb") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
 	if ((int)result <= 32)
@@ -1112,7 +1120,7 @@ void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 		SW_SHOWNORMAL   // nShowCmd
 	);
 
-	// ShellExecute ½ÇÆĞ ½Ã ¿À·ù ÄÚµå (0 ~ 32)
+	// ShellExecute ì‹¤íŒ¨ ì‹œ ì˜¤ë¥˜ ì½”ë“œ (0 ~ 32)
 	if ((INT_PTR)result <= 32)
 	{
 		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
@@ -1161,7 +1169,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 				std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 
-			// Visual Studio Á¾·á °¨Áö ¿Ï·á
+			// Visual Studio ì¢…ë£Œ ê°ì§€ ì™„ë£Œ
 			if (!ScriptManager->IsCompileEventInvoked())
 			{
 				ScriptManager->SetCompileEventInvoked(true);
@@ -1173,7 +1181,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 			CloseHandle(hProcess);
 		}).detach();
 
-		CloseHandle(pi.hThread); // ½º·¹µå´Â °ğ¹Ù·Î ´İ¾Æµµ µÊ
+		CloseHandle(pi.hThread); // ìŠ¤ë ˆë“œëŠ” ê³§ë°”ë¡œ ë‹«ì•„ë„ ë¨
 	}
 	else
 	{
