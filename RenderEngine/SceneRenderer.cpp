@@ -439,12 +439,12 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
 	//
 	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
-	m_renderScene->Update(deltaTime);
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
 	m_renderScene->EraseRenderPassData();
+	m_renderScene->Update(deltaTime);
 	m_renderScene->OnProxyDestroy();
 	PrepareRender();
 }
