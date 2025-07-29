@@ -28,6 +28,7 @@ public:
 		Shader,
 		CppScript,
 		CSharpScript,
+                Prefab,
 		Sound,
 		HDR,
 	};
@@ -76,7 +77,7 @@ public:
     Texture* LoadMaterialTexture(const std::string_view& filePath);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
-	// File Operations //ÆÄÀÏ ½Ã½ºÅÛ¿¡ Á¢±ÙÀÌ °¡´ÉÇÏ±â ‹š¹®¿¡ º¸¾È»ó ÀÌ½´°¡ ÀÖÀ» °¡´É¼º ÀÖÀ½
+	// File Operations //íŒŒì¼ ì‹œìŠ¤í…œì— ì ‘ê·¼ì´ ê°€ëŠ¥í•˜ê¸° Â‹Âšë¬¸ì— ë³´ì•ˆìƒ ì´ìŠˆê°€ ìˆì„ ê°€ëŠ¥ì„± ìˆìŒ
 	void OpenFile(const file::path& filepath);
 	void OpenExplorerSelectFile(const std::filesystem::path& filePath);
 	void OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath);
