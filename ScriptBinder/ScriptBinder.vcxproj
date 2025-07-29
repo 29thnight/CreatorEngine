@@ -177,6 +177,7 @@
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
+    <ClCompile Include="VolumeComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
     <ClCompile Include="InputAction.cpp" />
@@ -209,6 +210,7 @@
     <ClInclude Include="FoliageInstance.h" />
     <ClInclude Include="FoliageType.h" />
     <ClInclude Include="FoliageComponent.h" />
+    <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="FunctionRegistry.h" />
     <ClInclude Include="IRegistableEvent.h" />
