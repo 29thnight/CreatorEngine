@@ -338,6 +338,7 @@
     <ClInclude Include="VignettePass.h" />
     <ClInclude Include="VignettePassSetting.h" />
     <ClInclude Include="VolumetricFogPass.h" />
+    <ClInclude Include="VolumeProfile.h" />
     <ClInclude Include="WireFramePass.h" />
     <ClInclude Include="GridPass.h" />
   </ItemGroup>
