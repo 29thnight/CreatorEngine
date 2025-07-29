@@ -153,7 +153,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     camera.UpdateBuffer(deferredPtr);
     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &buffer);
     DirectX11::UpdateBuffer(deferredPtr, m_shadowcamBuffer.Get(), &cameraview);
-    DirectX11::UpdateBuffer(deferredPtr, lightManager->m_shadowMapBuffer, &camera.m_shadowMapConstant);
+    DirectX11::UpdateBuffer(deferredPtr, lightManager->m_shadowMapBuffer, &renderData->m_shadowCamera.m_shadowMapConstant);
 
     DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &lightManager->m_pLightBuffer);
     DirectX11::PSSetConstantBuffer(deferredPtr, 11, 1, &lightManager->m_pLightCountBuffer);

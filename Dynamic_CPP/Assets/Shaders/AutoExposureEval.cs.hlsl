@@ -5,7 +5,7 @@ RWTexture2D<float> g_OutputTexture : register(u0);
 
 static const float3 LuminanceFactors = float3(0.2126, 0.7152, 0.0722);
 
-[numthreads(8, 8, 1)]
+[numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint2 inputDims;

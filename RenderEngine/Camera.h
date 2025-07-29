@@ -56,13 +56,13 @@ public:
 	{
 		if (index < m_cascadeinfo.size())
 		{
-			m_eyePosition									= m_cascadeinfo[index].m_eyePosition;
-			m_lookAt										= m_cascadeinfo[index].m_lookAt;
-			m_nearPlane										= m_cascadeinfo[index].m_nearPlane;
-			m_farPlane										= m_cascadeinfo[index].m_farPlane;
-			m_viewWidth										= m_cascadeinfo[index].m_viewWidth;
-			m_viewHeight									= m_cascadeinfo[index].m_viewHeight;
-			m_shadowMapConstant.m_lightViewProjection[0]	= m_cascadeinfo[index].m_lightViewProjection;
+			m_eyePosition										= m_cascadeinfo[index].m_eyePosition;
+			m_lookAt											= m_cascadeinfo[index].m_lookAt;
+			m_nearPlane											= m_cascadeinfo[index].m_nearPlane;
+			m_farPlane											= m_cascadeinfo[index].m_farPlane;
+			m_viewWidth											= m_cascadeinfo[index].m_viewWidth;
+			m_viewHeight										= m_cascadeinfo[index].m_viewHeight;
+			m_shadowMapConstant.m_lightViewProjection[index]	= m_cascadeinfo[index].m_lightViewProjection;
 		}
 	}
 

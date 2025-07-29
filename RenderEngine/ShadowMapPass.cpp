@@ -174,7 +174,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 
 	auto  lightdir	= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc		= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constant	= camera.m_shadowMapConstant;						//type = ShadowMapConstant
+	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;						//type = ShadowMapConstant
 	auto  projMat	= camera.CalculateProjection();						//type = Mathf::xMatrix
 
 	DevideCascadeEnd(camera);
@@ -202,7 +202,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 	{
 		CascadeIndexBuffer m_currentCascadeIndex{};
 		m_currentCascadeIndex.cascadeIndex = i;
-		renderData->m_shadowCamera.ApplyShadowInfo(i);
+		//renderData->m_shadowCamera.ApplyShadowInfo(i);
 
 		DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[i]);
 		DirectX11::UpdateBuffer(deferredContextPtr1, m_cascadeIndexBuffer.Get(), &m_currentCascadeIndex);
@@ -400,6 +400,15 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 		cascadeInfo.m_lightViewProjection = lightView * lightProj;
 	}
 
+	//if (Mathf::Vector3(LightDir) == Mathf::Vector3{ 0, 0, 0 })
+	//{
+	//	LightDir = { 0.f, 0.f, -1.f, 0.f };
+	//}
+	//else
+	//{
+	//	LightDir.Normalize();
+	//}
+
 	//auto Fullfrustum = camera.GetFrustum();
 
 	//Mathf::Vector3 FullfrustumCorners[8];
@@ -452,15 +461,6 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 
 	//	Mathf::Vector3 maxExtents = { radius, radius, radius };
 	//	Mathf::Vector3 minExtents = -maxExtents;
-
-	//	if (Mathf::Vector3(LightDir) == Mathf::Vector3{ 0, 0, 0 })
-	//	{
-	//		LightDir = { 0.f, 0.f, -1.f, 0.f };
-	//	}
-	//	else
-	//	{
-	//		LightDir.Normalize();
-	//	}
 
 	//	centerPos.x = (int)centerPos.x;
 	//	centerPos.y = (int)centerPos.y;
