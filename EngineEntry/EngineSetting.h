@@ -5,6 +5,7 @@
 #include "Core.Fence.h"
 #include "Core.Barrier.h"
 #include "RenderPassSettings.h"
+#include "DLLAcrossSingleton.h"
 #include <yaml-cpp/yaml.h>
 namespace MetaYml = YAML;
 
@@ -21,10 +22,10 @@ enum class ContentsBrowserStyle
 	Tree,
 };
 
-class EngineSetting : public Singleton<EngineSetting>
+class EngineSetting : public DLLCore::Singleton<EngineSetting>
 {
 private:
-	friend class Singleton;
+	friend class DLLCore::Singleton<EngineSetting>;
 	EngineSetting() : renderBarrier(3) {}
 	~EngineSetting() = default;
 
@@ -92,4 +93,4 @@ private:
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
 };
 
-static auto& EngineSettingInstance = EngineSetting::GetInstance();
+static auto EngineSettingInstance = EngineSetting::GetInstance();

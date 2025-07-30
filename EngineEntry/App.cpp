@@ -41,6 +41,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		app.Finalize();
 	}
 
+	EngineSetting::Destroy();
 	EffectManager::Destroy();
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
@@ -55,6 +56,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	EngineSetting::GetInstance();
 	PrefabUtility::GetInstance();
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
