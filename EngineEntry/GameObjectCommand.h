@@ -102,16 +102,9 @@ namespace Meta
     class DuplicateGameObjectCommand : public IUndoableCommand
     {
     public:
-        DuplicateGameObjectCommand(Scene* scene, const GameObject* original)
-            : m_scene(scene)
+        DuplicateGameObjectCommand(Scene* scene, GameObject::Index originalIndex)
+            : m_scene(scene), m_originalIndex(originalIndex)
         {
-            if (original)
-            {
-                m_name = original->m_name.ToString();
-                m_type = original->GetType();
-                m_parentIndex = original->m_parentIndex;
-                m_serializedNode = Meta::Serialize(const_cast<GameObject*>(original));
-            }
         }
 
         void Undo() override
@@ -124,39 +117,66 @@ namespace Meta
 
         void Redo() override
         {
-            auto objPtr = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
-            if (objPtr)
+            auto original = m_scene->GetGameObject(m_originalIndex);
+            if (!original)
+                return;
+
+            auto* cloned = dynamic_cast<GameObject*>(Object::Instantiate(original.get(), original->m_name.ToString()));
+            if (!cloned)
+                return;
+
+            GameObject::Index parentIndex = original->m_parentIndex;
+            auto parentObj = m_scene->GetGameObject(parentIndex);
+            if (parentObj && parentIndex != cloned->m_parentIndex)
             {
-				GameObject::Index oldIndex = objPtr->m_index;
-                Meta::Deserialize(objPtr.get(), m_serializedNode);
-                if (m_serializedNode["m_components"])
-                {
-                    for (const auto& componentNode : m_serializedNode["m_components"])
-                    {
-                        try
-                        {
-                            ComponentFactorys->LoadComponent(objPtr.get(), componentNode, true);
-                        }
-                        catch (const std::exception& e)
-                        {
-                            Debug->LogError(e.what());
-                            continue;
-                        }
-                    }
-                }
-				objPtr->m_index = oldIndex; // Restore the original index after deserialization
+                auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
+                rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
+
+                cloned->m_parentIndex = parentIndex;
+                cloned->m_transform.SetParentID(parentIndex);
+                parentObj->m_childrenIndices.push_back(cloned->m_index);
             }
-            m_createdIndex = objPtr ? objPtr->m_index : GameObject::INVALID_INDEX;
+
+            m_scene->AddSelectedSceneObject(cloned);
+            m_createdIndex = cloned->m_index;
         }
 
     private:
         Scene* m_scene{};
-        std::string m_name{};
-        GameObjectType m_type{ GameObjectType::Empty };
-        GameObject::Index m_parentIndex{ 0 };
+        GameObject::Index m_originalIndex{ GameObject::INVALID_INDEX };
         GameObject::Index m_createdIndex{ GameObject::INVALID_INDEX };
-        MetaYml::Node m_serializedNode{};
     public:
         [[nodiscard]] GameObject::Index GetCreatedIndex() const { return m_createdIndex; }
+    };
+
+    class DuplicateGameObjectsCommand : public IUndoableCommand
+    {
+    public:
+        DuplicateGameObjectsCommand(Scene* scene, std::span<GameObject* const> originals)
+            : m_scene(scene)
+        {
+            for (auto* obj : originals)
+            {
+                if (!obj)
+                    continue;
+                m_commands.emplace_back(scene, obj->m_index);
+            }
+        }
+
+        void Undo() override
+        {
+            for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it)
+                it->Undo();
+        }
+
+        void Redo() override
+        {
+            for (auto& cmd : m_commands)
+                cmd.Redo();
+        }
+
+    private:
+        Scene* m_scene{};
+        std::vector<DuplicateGameObjectCommand> m_commands{};
     };
 }
