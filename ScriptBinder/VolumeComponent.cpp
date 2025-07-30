@@ -17,7 +17,7 @@ void VolumeComponent::Awake()
         if (node["settings"])
         {
             Meta::Deserialize(&m_profile.settings, node["settings"]);
-            EngineSettingInstance->GetRenderPassSettings() = m_profile.settings;
+            EngineSettingInstance->GetRenderPassSettingsRW() = m_profile.settings;
         }
     }
 
@@ -42,7 +42,7 @@ void VolumeComponent::ApplyProfile()
         if (node["settings"])
         {
             Meta::Deserialize(&m_profile.settings, node["settings"]);
-            EngineSettingInstance->GetRenderPassSettings() = m_profile.settings;
+            EngineSettingInstance->GetRenderPassSettingsRW() = m_profile.settings;
         }
     }
 	SceneManagers->VolumeProfileApply();

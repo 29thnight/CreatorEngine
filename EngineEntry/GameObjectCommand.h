@@ -2,6 +2,8 @@
 #include "MetaStateCommand.h"
 #include <functional>
 #include "Scene.h"
+#include "Model.h"
+#include "SceneManager.h"
 #include "GameObject.h"
 #include "ReflectionYml.h"
 #include "ComponentFactory.h"
@@ -180,5 +182,36 @@ namespace Meta
     private:
         Scene* m_scene{};
         std::vector<DuplicateGameObjectCommand> m_commands{};
+    };
+
+    class LoadModelToSceneObjCommand : public IUndoableCommand
+    {
+    public:
+        LoadModelToSceneObjCommand(Scene* scene, Model* model, GameObject** outObj = nullptr)
+            : m_scene(scene), m_model(model), m_outObj(outObj) {
+        }
+
+        void Undo() override
+        {
+            resetSelectedObjectEvent.Broadcast();
+            if (GameObject::IsValidIndex(m_rootIndex))
+            {
+                m_scene->DestroyGameObject(m_rootIndex);
+            }
+        }
+
+        void Redo() override
+        {
+            GameObject* obj = Model::LoadModelToSceneObj(m_model, *m_scene);
+            m_rootIndex = obj ? obj->m_index : GameObject::INVALID_INDEX;
+            if (m_outObj)
+                *m_outObj = obj;
+        }
+
+    private:
+        Scene* m_scene{};
+        Model* m_model{};
+        GameObject::Index m_rootIndex{ GameObject::INVALID_INDEX };
+        GameObject** m_outObj{};
     };
 }

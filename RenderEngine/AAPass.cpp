@@ -93,6 +93,14 @@ void AAPass::ControlPanel()
 		m_FXAAParameters.SpanMax = 8.0f;
 	}
 	ImGui::PopID();
+
+	//EngineSettingInstance->GetRenderPassSettingsRW().aa = {
+	//	.isApply = m_isApply,
+	//	.bias = m_FXAAParameters.Bias,
+	//	.biasMin = m_FXAAParameters.BiasMin,
+	//	.spanMax = m_FXAAParameters.SpanMax
+	//};
+
 }
 
 void AAPass::ApplySettings(const AAPassSetting& setting)
