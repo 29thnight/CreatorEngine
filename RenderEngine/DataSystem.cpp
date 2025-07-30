@@ -7,6 +7,7 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "FileIO.h"
+#include "VolumeProfile.h"
 #include "Benchmark.hpp"
 #include "SceneManager.h"
 #include "PrefabUtility.h"
@@ -784,6 +785,13 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 	if (ImGui::BeginPopup("Context Menu"))
 	{
+		if (MenuDirectory.empty() && std::filesystem::equivalent(MenuDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(MenuDirectory);
+			}
+		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
 			OpenExplorerSelectFile(MenuDirectory);
@@ -892,6 +900,23 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 		}
 	}
 	ImGui::Columns(1);
+
+	if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+	{
+		ImGui::OpenPopup("Directory Context");
+	}
+
+	if (ImGui::BeginPopup("Directory Context"))
+	{
+		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
@@ -1167,6 +1192,30 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 {
 	m_assetMetaWatcher->CreateYamlMeta(filepath);
+}
+
+void DataSystem::CreateVolumeProfile(const file::path& filepath)
+{
+	VolumeProfile profile;
+	profile.settings = EngineSettingInstance->GetRenderPassSettings();
+
+	std::string baseName = "NewVolumeProfile";
+	file::path savePath = filepath / (baseName + ".volume");
+	int index = 1;
+	while (std::filesystem::exists(savePath))
+	{
+		savePath = filepath / (baseName + std::to_string(index++) + ".volume");
+	}
+
+	std::ofstream fout(savePath);
+	if (fout.is_open())
+	{
+		YAML::Node node = Meta::Serialize(&profile);
+		fout << node;
+		fout.close();
+	}
+
+	ForceCreateYamlMetaFile(savePath);
 }
 
 void DataSystem::OpenFile(const file::path& filepath)

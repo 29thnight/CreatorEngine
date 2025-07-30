@@ -823,6 +823,9 @@
     <ClInclude Include="AnimatorData.h">
       <Filter>Resources</Filter>
     </ClInclude>
+    <ClInclude Include="VolumeProfile.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">

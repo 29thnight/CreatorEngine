@@ -30,3 +30,20 @@ void VolumeComponent::OnDestroy()
 
     SceneManagers->VolumeProfileApply();
 }
+
+void VolumeComponent::ApplyProfile()
+{
+    if (m_volumeProfileGuid == nullFileGuid)
+        return;
+    file::path path = DataSystems->GetFilePath(m_volumeProfileGuid);
+    if (!path.empty() && file::exists(path))
+    {
+        MetaYml::Node node = MetaYml::LoadFile(path.string());
+        if (node["settings"])
+        {
+            Meta::Deserialize(&m_profile.settings, node["settings"]);
+            EngineSettingInstance->GetRenderPassSettings() = m_profile.settings;
+        }
+    }
+	SceneManagers->VolumeProfileApply();
+}

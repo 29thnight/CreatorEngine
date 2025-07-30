@@ -165,12 +165,14 @@ namespace Meta
 
         void Undo() override
         {
+            resetSelectedObjectEvent.Broadcast();
             for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it)
                 it->Undo();
         }
 
         void Redo() override
         {
+            resetSelectedObjectEvent.Broadcast();
             for (auto& cmd : m_commands)
                 cmd.Redo();
         }

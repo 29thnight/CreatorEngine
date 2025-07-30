@@ -106,6 +106,7 @@ public:
 	AssetMetaWatcher* GetAssetMetaWatcher() const { return m_assetMetaWatcher.get(); }
 
 	void ForceCreateYamlMetaFile(const file::path& filepath);
+	void CreateVolumeProfile(const file::path& filepath);
 
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;

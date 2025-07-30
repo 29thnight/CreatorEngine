@@ -15,6 +15,8 @@ public:
     void Awake() override;
     void OnDestroy() override;
 
+    void ApplyProfile();
+
     [[Property]]
     FileGuid m_volumeProfileGuid{ nullFileGuid };
 

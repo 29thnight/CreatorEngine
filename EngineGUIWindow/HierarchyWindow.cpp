@@ -54,25 +54,8 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V))
 				{
 					scene->ClearSelectedSceneObjects();
-					for (auto* obj : m_clipboard)
-					{
-						if (!obj) continue;
-						auto cloned = dynamic_cast<GameObject*>(Object::Instantiate(obj, obj->m_name.ToString()));
-						if (!cloned) continue;
-						GameObject::Index parentIndex = obj->m_parentIndex;
-						auto parentObj = scene->GetGameObject(parentIndex);
-						if (parentObj && parentIndex != cloned->m_parentIndex)
-						{
-							// remove from root children list
-							auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
-							rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
-
-							cloned->m_parentIndex = parentIndex;
-							cloned->m_transform.SetParentID(parentIndex);
-							parentObj->m_childrenIndices.push_back(cloned->m_index);
-						}
-						scene->AddSelectedSceneObject(cloned);
-					}
+					Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
+						scene, std::span<GameObject* const>(m_clipboard.data(), m_clipboard.size())));
 				}
 			}
 
@@ -114,26 +97,11 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					m_clipboard = scene->m_selectedSceneObjects;
 				}
-				if (ImGui::MenuItem("           Paste", "       Ctrl + V", nullptr, !m_clipboard.empty()))
+				if (ImGui::MenuItem("           Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
 				{
 					scene->ClearSelectedSceneObjects();
-					for (auto* obj : m_clipboard)
-					{
-						if (!obj) continue;
-						auto cloned = dynamic_cast<GameObject*>(Object::Instantiate(obj, obj->m_name.ToString()));
-						if (!cloned) continue;
-						GameObject::Index parentIndex = obj->m_parentIndex;
-						auto parentObj = scene->GetGameObject(parentIndex);
-						if (parentObj && parentIndex != cloned->m_parentIndex)
-						{
-							auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
-							rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
-							cloned->m_parentIndex = parentIndex;
-							cloned->m_transform.SetParentID(parentIndex);
-							parentObj->m_childrenIndices.push_back(cloned->m_index);
-						}
-						scene->AddSelectedSceneObject(cloned);
-					}
+					Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
+						scene, std::span<GameObject* const>(m_clipboard.data(), m_clipboard.size())));
 				}
 				if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
 				{
