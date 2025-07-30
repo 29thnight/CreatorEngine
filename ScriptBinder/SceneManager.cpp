@@ -50,7 +50,6 @@ void SceneManager::Initialization()
 {
     if(!m_isInitialized)
     {
-        ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
         ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
         ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
         ScriptManager->UpdatePhysx(PhysicX::GetInstance);

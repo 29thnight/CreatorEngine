@@ -45,6 +45,7 @@
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
+    <ClInclude Include="DLLRefHelper.h" />
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
@@ -76,6 +77,7 @@
     <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
     <ClInclude Include="SpinLock.h" />
+    <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
     <ClInclude Include="Trim.h" />
     <ClInclude Include="TypeDefinition.h" />

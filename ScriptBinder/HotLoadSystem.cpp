@@ -9,124 +9,15 @@
 #include "ProgressWindow.h"
 #include "ReflectionRegister.h"
 #include "AIManager.h"
+#include "DLLRefHelper.h"
+#include "StringHelper.h"
+#include "ScriptStringModule.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-#include <winternl.h>                   //PROCESS_BASIC_INFORMATION
-
 constexpr int MAX__COMPILE_ITERATION = 4;
-
-// warning C4996: 'GetVersionExW': was declared deprecated
-#pragma warning (disable : 4996)
-bool IsWindows8OrGreater()
-{
-	OSVERSIONINFO ovi = { 0 };
-	ovi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-	GetVersionEx(&ovi);
-	if ((ovi.dwMajorVersion == 6 && ovi.dwMinorVersion >= 2) || ovi.dwMajorVersion > 6)
-		return true;
-
-	return false;
-} //IsWindows8OrGreater
-#pragma warning (default : 4996)
-
-
-
-bool ReadMem(void* addr, void* buf, int size)
-{
-	BOOL b = ReadProcessMemory(GetCurrentProcess(), addr, buf, size, nullptr);
-	return b != FALSE;
-}
-
-#ifdef _WIN64
-#define BITNESS 1
-#else
-#define BITNESS 0
-#endif
-
-typedef NTSTATUS(NTAPI* pfuncNtQueryInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-
-
-int GetModuleLoadCount(HMODULE hDll)
-{
-	// Not supported by earlier versions of windows.
-	if (!IsWindows8OrGreater())
-		return 0;
-
-	PROCESS_BASIC_INFORMATION pbi = { 0 };
-
-	HMODULE hNtDll = LoadLibraryA("ntdll.dll");
-	if (!hNtDll)
-		return 0;
-
-	pfuncNtQueryInformationProcess pNtQueryInformationProcess = (pfuncNtQueryInformationProcess)GetProcAddress(hNtDll, "NtQueryInformationProcess");
-	bool b = pNtQueryInformationProcess != nullptr;
-	if (b) b = NT_SUCCESS(pNtQueryInformationProcess(GetCurrentProcess(), ProcessBasicInformation, &pbi, sizeof(pbi), nullptr));
-	FreeLibrary(hNtDll);
-
-	if (!b)
-		return 0;
-
-	char* LdrDataOffset = (char*)(pbi.PebBaseAddress) + offsetof(PEB, Ldr);
-	char* addr;
-	PEB_LDR_DATA LdrData;
-
-	if (!ReadMem(LdrDataOffset, &addr, sizeof(void*)) || !ReadMem(addr, &LdrData, sizeof(LdrData)))
-		return 0;
-
-	LIST_ENTRY* head = LdrData.InMemoryOrderModuleList.Flink;
-	LIST_ENTRY* next = head;
-
-	do {
-		LDR_DATA_TABLE_ENTRY LdrEntry;
-		LDR_DATA_TABLE_ENTRY* pLdrEntry = CONTAINING_RECORD(head, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
-
-		if (!ReadMem(pLdrEntry, &LdrEntry, sizeof(LdrEntry)))
-			return 0;
-
-		if (LdrEntry.DllBase == (void*)hDll)
-		{
-			//  
-			//  http://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm
-			//
-			int offDdagNode = (0x14 - BITNESS) * sizeof(void*);   // See offset on LDR_DDAG_NODE *DdagNode;
-
-			ULONG count = 0;
-			char* addrDdagNode = ((char*)pLdrEntry) + offDdagNode;
-
-			//
-			//  http://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_ddag_node.htm
-			//  See offset on ULONG LoadCount;
-			//
-			if (!ReadMem(addrDdagNode, &addr, sizeof(void*)) || !ReadMem(addr + 3 * sizeof(void*), &count, sizeof(count)))
-				return 0;
-
-			return (int)count;
-		} //if
-
-		head = LdrEntry.InMemoryOrderLinks.Flink;
-	} while (head != next);
-
-	return 0;
-} //GetModuleLoadCount
-
-std::string AnsiToUtf8(const std::string& ansiStr)
-{
-    // ANSI → Wide
-    int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiStr.c_str(), -1, nullptr, 0);
-    std::wstring wide(wideLen, 0);
-    MultiByteToWideChar(CP_ACP, 0, ansiStr.c_str(), -1, &wide[0], wideLen);
-
-    // Wide → UTF-8
-    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string utf8(utf8Len, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &utf8[0], utf8Len, nullptr, nullptr);
-
-    return utf8;
-}
 
 void RunMsbuildWithLiveLog(const std::wstring& commandLine)
 {
@@ -730,7 +621,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			size_t endLine = content.find('\n', posHeader);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, scriptFactoryIncludeString + scriptHeaderFileName + "\"\n");
+				content.insert(endLine + 1, scriptFactoryIncludeString.data() + scriptHeaderFileName + "\"\n");
 			}
 		}
 		else
@@ -769,7 +660,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			size_t endLine = content.find('\n', posFunc);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, scriptFactoryFunctionString + name.data() + scriptFactoryFunctionLambdaString + name.data() + scriptFactoryFunctionEndString);
+				content.insert(endLine + 1, scriptFactoryFunctionString.data() + std::string(name) +scriptFactoryFunctionLambdaString.data() + std::string(name) + scriptFactoryFunctionEndString.data());
 			}
 		}
 		else
@@ -963,7 +854,7 @@ void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
 			size_t endLine = content.find('\n', posHeader);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, actionFactoryIncludeString + actionHeaderFileName + "\"\n");
+				content.insert(endLine + 1, actionFactoryIncludeString.data() + actionHeaderFileName + "\"\n");
 			}
 		}
 		else
@@ -1000,7 +891,7 @@ void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
 			size_t endLine = content.find('\n', posFunc);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, actionFactoryFunctionString + name.data() + actionFactoryFunctionLambdaString + name.data() + actionFactoryFunctionEndString);
+				content.insert(endLine + 1, actionFactoryFunctionString.data() + std::string(name) + actionFactoryFunctionLambdaString.data() + std::string(name) + actionFactoryFunctionEndString.data());
 			}
 		}
 		else
@@ -1155,7 +1046,7 @@ void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
 			size_t endLine = content.find('\n', posHeader);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, conditionFactoryIncludeString + conditionHeaderFileName + "\"\n");
+				content.insert(endLine + 1, conditionFactoryIncludeString.data() + conditionHeaderFileName + "\"\n");
 			}
 		}
 		else
@@ -1192,7 +1083,7 @@ void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
 			size_t endLine = content.find('\n', posFunc);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, conditionFactoryFunctionString + name.data() + conditionFactoryFunctionLambdaString + name.data() + conditionFactoryFunctionEndString);
+				content.insert(endLine + 1, conditionFactoryFunctionString.data() + std::string(name) + conditionFactoryFunctionLambdaString.data() + std::string(name) + conditionFactoryFunctionEndString.data());
 			}
 		}
 		else
@@ -1351,7 +1242,7 @@ void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& n
 			size_t endLine = content.find('\n', posHeader);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, conditionDecoratorFactoryIncludeString + conditionHeaderFileName + "\"\n");
+				content.insert(endLine + 1, conditionDecoratorFactoryIncludeString.data() + conditionHeaderFileName + "\"\n");
 			}
 		}
 		else
@@ -1388,7 +1279,7 @@ void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& n
 			size_t endLine = content.find('\n', posFunc);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, conditionDecoratorFactoryFunctionString + name.data() + conditionDecoratorFactoryFunctionLambdaString + name.data() + conditionDecoratorFactoryFunctionEndString);
+				content.insert(endLine + 1, conditionDecoratorFactoryFunctionString.data() + std::string(name) + conditionDecoratorFactoryFunctionLambdaString.data() + std::string(name) + conditionDecoratorFactoryFunctionEndString.data());
 			}
 		}
 		else
@@ -1471,6 +1362,193 @@ void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& n
 		additionalOptionsRelease.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
 
 		if (!doc.save_file(conditionProjPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+}
+
+void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
+{
+	if (!file::exists(PathFinder::Relative("Script")))
+	{
+		file::create_directories(PathFinder::Relative("Script"));
+	}
+	std::string scriptHeaderFileName = std::string(name) + ".h";
+	std::string scriptBodyFileName = std::string(name) + ".cpp";
+	std::string scriptHeaderFilePath = PathFinder::Relative("Script\\" + scriptHeaderFileName).string();
+	std::string scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptBodyFileName).string();
+	std::string aniScriptFactoryPath = PathFinder::DynamicSolutionPath("AniBehaviourFactory.h").string();
+	std::string aniScriptFactoryFuncPath = PathFinder::DynamicSolutionPath("funcMain.h").string();
+	std::string scriptProjPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj").string();
+	std::string scriptFilterPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj.filters").string();
+	std::ofstream scriptFile(scriptHeaderFilePath);
+	if (scriptFile.is_open())
+	{
+		scriptFile << aniBehaviourIncludeString 
+			<< name << aniBehaviourInheritString 
+			<< name << aniBehaviourEndString;
+		scriptFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create ani behaviour file");
+	}
+
+	std::ofstream scriptBodyFile(scriptBodyFilePath);
+	if (scriptBodyFile.is_open())
+	{
+		scriptBodyFile
+			<< aniBehaviourCPPString
+			<< name << aniBehaviourCPPEndString
+			<< name << aniBehaviourCPPEndEnterBodyString
+			<< name << aniBehaviourCPPEndUpdateString
+			<< name << aniBehaviourCPPEndExitBodyString;
+		scriptBodyFile.close();
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create ani behaviour body file");
+	}
+
+	//Factory Add
+	std::ifstream aniScriptFactoryFile(aniScriptFactoryPath);
+	if (aniScriptFactoryFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << aniScriptFactoryFile.rdbuf();
+		std::string content = buffer.str();
+		aniScriptFactoryFile.close();
+		size_t posHeader = content.find(aniBehaviourMarkerFactoryHeaderString);
+		if (posHeader != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posHeader);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, aniBehaviourFactoryIncludeString.data() + scriptHeaderFileName + "\"\n");
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in ani behaviour factory file");
+		}
+		std::ofstream aniScriptFactoryFileOut(aniScriptFactoryPath);
+		if (aniScriptFactoryFileOut.is_open())
+		{
+			aniScriptFactoryFileOut << content;
+			aniScriptFactoryFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create ani behaviour factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create ani behaviour factory file");
+	}
+
+	//Factory Func Add
+	std::ifstream aniScriptFactoryFuncFile(aniScriptFactoryFuncPath);
+	if (aniScriptFactoryFuncFile.is_open())
+	{
+		std::stringstream buffer;
+		buffer << aniScriptFactoryFuncFile.rdbuf();
+		std::string content = buffer.str();
+		aniScriptFactoryFuncFile.close();
+		size_t posFunc = content.find(aniBehaviourMarkerFactoryFuncString);
+		if (posFunc != std::string::npos)
+		{
+			size_t endLine = content.find('\n', posFunc);
+			if (endLine != std::string::npos)
+			{
+				content.insert(endLine + 1, aniBehaviourFactoryFunctionString.data() + std::string(name) + aniBehaviourFactoryFunctionLambdaString.data() + std::string(name) + aniBehaviourFactoryFunctionEndString.data());
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to find marker in ani behaviour factory file");
+		}
+		std::ofstream aniScriptFactoryFuncFileOut(aniScriptFactoryFuncPath);
+		if (aniScriptFactoryFuncFileOut.is_open())
+		{
+			aniScriptFactoryFuncFileOut << content;
+			aniScriptFactoryFuncFileOut.close();
+		}
+		else
+		{
+			throw std::runtime_error("Failed to create ani behaviour factory file");
+		}
+	}
+	else
+	{
+		throw std::runtime_error("Failed to create ani behaviour factory file");
+	}
+
+	{
+		//Filter Add
+		pugi::xml_document doc;
+		if (!doc.load_file(scriptFilterPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+		std::vector<pugi::xml_node> itemGroups;
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\Script\\" + scriptHeaderFileName;
+		pugi::xml_node filterNodeHeader = newHeader.append_child("Filter");
+		filterNodeHeader.text().set("Script");
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
+		pugi::xml_node filterNodeSource = newSource.append_child("Filter");
+		filterNodeSource.text().set("Script");
+		
+		if (!doc.save_file(scriptFilterPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to save XML file");
+		}
+	}
+	
+	{
+		//Proj Add
+		pugi::xml_document doc;
+		if (!doc.load_file(scriptProjPath.c_str(), pugi::parse_full, pugi::encoding_auto))
+		{
+			throw std::runtime_error("Failed to load XML file");
+		}
+
+		std::vector<pugi::xml_node> itemGroups;
+		for (pugi::xml_node itemGroup = doc.child("Project").child("ItemGroup"); itemGroup; itemGroup = itemGroup.next_sibling("ItemGroup"))
+		{
+			itemGroups.push_back(itemGroup);
+		}
+
+		// 두 번째 ItemGroup (인덱스 1)에 헤더 파일 추가 (ClInclude)
+		pugi::xml_node headerGroup = itemGroups[1];
+		pugi::xml_node newHeader = headerGroup.append_child("ClInclude");
+		newHeader.append_attribute("Include") = "Assets\\Script\\" + scriptHeaderFileName;
+
+		// 세 번째 ItemGroup (인덱스 2)에 소스 파일 추가 (ClCompile)
+		pugi::xml_node cppGroup = itemGroups[2];
+		pugi::xml_node newSource = cppGroup.append_child("ClCompile");
+		newSource.append_attribute("Include") = "Assets\\Script\\" + scriptBodyFileName;
+
+		pugi::xml_node additionalOptionsDebug = newSource.append_child("AdditionalOptions");
+		additionalOptionsDebug.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Debug|x64'";
+		additionalOptionsDebug.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+
+		pugi::xml_node additionalOptionsRelease = newSource.append_child("AdditionalOptions");
+		additionalOptionsRelease.append_attribute("Condition") = "'$(Configuration)|$(Platform)'=='Release|x64'";
+		additionalOptionsRelease.append_child(pugi::node_pcdata).set_value("/utf-8 %(AdditionalOptions)");
+
+		if (!doc.save_file(scriptProjPath.c_str(), PUGIXML_TEXT("\t"), 1U, pugi::encoding_auto))
 		{
 			throw std::runtime_error("Failed to save XML file");
 		}
@@ -1594,14 +1672,6 @@ void HotLoadSystem::Compile()
 	// 스크립트 이름 함수 가져오기
 	m_scriptNamesFunc = reinterpret_cast<GetScriptNamesFunc>(GetProcAddress(hDll, "ListModuleBehavior"));
 	if (!m_scriptNamesFunc)
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
-	}
-	// 씬 매니저 설정 함수 가져오기
-	m_setSceneManagerFunc = reinterpret_cast<SetSceneManagerFunc>(GetProcAddress(hDll, "SetSceneManager"));
-	if (!m_setSceneManagerFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");

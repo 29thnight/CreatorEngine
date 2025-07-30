@@ -289,6 +289,12 @@
     <ClInclude Include="CircleQueue.hpp">
       <Filter>Core.CircleQueue</Filter>
     </ClInclude>
+    <ClInclude Include="DLLRefHelper.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="StringHelper.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreWindow.cpp">

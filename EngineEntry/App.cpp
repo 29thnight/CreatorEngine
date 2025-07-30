@@ -41,6 +41,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		app.Finalize();
 	}
 
+	SceneManager::Destroy();
 	EffectManager::Destroy();
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
@@ -60,6 +61,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	EffectProxyController::GetInstance();
 	DataSystem::GetInstance();
 	ResourceAllocator::GetInstance();
+	SceneManager::GetInstance();
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
