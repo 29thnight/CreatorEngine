@@ -26,29 +26,31 @@ public:
 	virtual void OnDestroy() override {}
 public:
 	virtual void Interact() override {}
+	virtual void Attack(Entity* sender, int damage);
 
 	bool AddItem(EntityItem* item);
 	void Purification(float tick);
+	void PathMove(float tick);
+	void Stun();
 
 	EntityItem* GetPurificationItemInEntityItemQueue();
 private:
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
-	std::vector<GameObject*>		m_fakeItemQueue;
 
 	int								m_currentEntityItemCount = 0;
 	GameObject* asisTail{ nullptr };
 	GameObject* asisHead{ nullptr };
-	float angle = 0.f;
+	float m_purificationAngle = 0.f;
 	[[Property]]
-	float radius = 5.f;
-	float timer = 0.f;
+	float m_purificationRadius = 5.f;
+	float m_purificationTimer = 0.f;
 	Mathf::Vector2 dir{ 0.f,0.f };
 
 private:
 	[[Property]]
 	int		maxHP{ 1 };							// 최대 체력
 	[[Property]]
-	float	moveSpeed{ 10.f };					// 이동 속도
+	float	moveSpeed{ 1.f };					// 이동 속도
 
 	[[Property]]
 	float	graceperiod{ 1.f };					// 피격 무적 시간
@@ -80,5 +82,30 @@ private:
 	int		pollutionCoreAmount{ 1 };			// 오염도 게이지 최대치 도달 시 생성되는 오염 결정 개수
 
 private:
-	float	m_currentTailPurificationDuration;
+	float	m_currentTailPurificationDuration; // 꼬리 정화 연출 소요 시간
+	float	m_currentStaggerDuration{ 0 };	// 현재 경직 시간
+	float	m_currentGracePeriod{ 0 };	// 현재 무적 시간
+
+
+
+	// Move (Path)
+private:
+	GameObject* m_playerObject{ nullptr };
+	Mathf::Vector3 nextMovePoint{ 0.f, 0.f, 0.f };
+
+	std::vector<Mathf::Vector3> points;
+
+	int currentPointIndex = 0;
+
+private:
+	[[Property]]
+	float m_pathRadius = 1.f;
+	[[Property]]
+	float m_predictNextTime = 2.0f; // 예측 시간
+	[[Property]]
+	float m_rotateSpeed = 5.f;
+
+#ifdef _DEBUG
+	GameObject* DebugPoint{ nullptr };
+#endif // _DEBUG
 };

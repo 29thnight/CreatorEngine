@@ -17,6 +17,7 @@
 #include "TestEnemy.h"
 #include "EffectComponent.h"
 #include "BoxColliderComponent.h"
+#include "GameManager.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -77,6 +78,11 @@ void Player::Start()
 	//	[this](Mathf::Vector2 dir) { Move(dir);});
 	//m_animator->m_Skeleton->m_animations[3].SetEvent("Player", "OnPunch", 0.353);
 
+
+	GameManager* gm = GameObject::Find("GameManager")->GetComponent<GameManager>();
+	gm->PushEntity(this);
+	gm->PushPlayer(this);
+
 	camera = GameObject::Find("Main Camera");
 }
 
@@ -89,7 +95,7 @@ void Player::Update(float tick)
 
 		XMVECTOR forwardVec = XMLoadFloat3(&forward); // Vector3 ¡æ XMVECTOR
 
-		XMVECTOR offsetPos = world + forwardVec * 1.0f;
+		XMVECTOR offsetPos = world + forwardVec * 3.0f;
 		offsetPos.m128_f32[1] = 3.0f; // Y °íÁ¤
 
 		catchedObject->GetComponent<Transform>()->SetPosition(offsetPos);

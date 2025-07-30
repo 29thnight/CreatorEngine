@@ -28,7 +28,11 @@ public:
 
 public:
 	void PushEntity(Entity* entity);
+	void PushPlayer(Entity* player);
+	void PushAsis(Entity* asis);
 	const std::vector<Entity*>& GetEntities();
+	const std::vector<Entity*>& GetPlayers();
+	const std::vector<Entity*>& GetAsis();
 
 	std::vector<Entity*>& GetResourcePool();
 	std::vector<Entity*>& GetWeaponPiecePool();
@@ -38,6 +42,8 @@ private:
 
 	std::vector<Entity*> m_resourcePool;
 	std::vector<Entity*> m_weaponPiecePool;
+	std::vector<Entity*> m_players;
+	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 private:
 	void CheatMiningResource();
 };

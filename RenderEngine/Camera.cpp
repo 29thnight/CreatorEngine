@@ -163,27 +163,27 @@ void Camera::HandleMovement(float deltaTime)
 	constexpr float minSpeed = 10.f;
 	constexpr float maxSpeed = 100.f;
 
-	if (InputManagement->IsKeyPressed('W'))
+	if (InputManagement->IsKeyPressed('W') || ImGui::GetIO().KeysData[ImGuiKey_W].Down)
 	{
 		z += 1.f;
 	}
-	if (InputManagement->IsKeyPressed('S'))
+	if (InputManagement->IsKeyPressed('S') || ImGui::GetIO().KeysData[ImGuiKey_S].Down)
 	{
 		z -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('A'))
+	if (InputManagement->IsKeyPressed('A') || ImGui::GetIO().KeysData[ImGuiKey_A].Down)
 	{
 		x -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('D'))
+	if (InputManagement->IsKeyPressed('D') || ImGui::GetIO().KeysData[ImGuiKey_D].Down)
 	{
 		x += 1.f;
 	}
-	if (InputManagement->IsKeyPressed('Q'))
+	if (InputManagement->IsKeyPressed('Q') || ImGui::GetIO().KeysData[ImGuiKey_Q].Down)
 	{
 		y -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('E'))
+	if (InputManagement->IsKeyPressed('E') || ImGui::GetIO().KeysData[ImGuiKey_E].Down)
 	{
 		y += 1.f;
 	}
@@ -230,6 +230,12 @@ void Camera::HandleMovement(float deltaTime)
 	}
 
 	m_eyePosition += ((z * m_forward) + (y * m_up) + (x * m_right)) * m_speed * deltaTime;
+	m_lookAt = m_eyePosition + m_forward;
+}
+
+void Camera::MoveToTarget(Mathf::Vector3 targetPosition)
+{
+	m_eyePosition = targetPosition;
 	m_lookAt = m_eyePosition + m_forward;
 }
 

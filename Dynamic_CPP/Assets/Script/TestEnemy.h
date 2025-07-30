@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
+class GameManager;
 class TestEnemy : public ModuleBehavior
 {
 public:
@@ -25,4 +26,11 @@ public:
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
+
+	[[Property]]
+	float detectRange = 5.f;
+	GameManager* gm = nullptr;
+	float targetLostTimer = 0.f;
+	float maxTargetLostTimer = 5.f;
+	Mathf::Vector3 directionToTarget = { 0.f, 0.f, 0.f };
 };

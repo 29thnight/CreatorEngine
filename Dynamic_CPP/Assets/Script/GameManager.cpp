@@ -102,9 +102,29 @@ void GameManager::PushEntity(Entity* entity)
 	}
 }
 
+void GameManager::PushPlayer(Entity* player)
+{
+	m_players.push_back(player);
+}
+
+void GameManager::PushAsis(Entity* asis)
+{
+	m_asis.push_back(asis);
+}
+
 const std::vector<Entity*>& GameManager::GetEntities()
 {
 	return m_entities;
+}
+
+const std::vector<Entity*>& GameManager::GetPlayers()
+{
+	return m_players;
+}
+
+const std::vector<Entity*>& GameManager::GetAsis()
+{
+	return m_asis;
 }
 
 std::vector<Entity*>& GameManager::GetResourcePool()

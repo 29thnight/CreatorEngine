@@ -5,7 +5,7 @@ ReflectionScriptField(EntityAsis) \
 { \
 	PropertyField \
 	({ \
-		meta_property(radius) \
+		meta_property(m_purificationRadius) \
 		meta_property(maxHP) \
 		meta_property(moveSpeed) \
 		meta_property(graceperiod) \
@@ -20,6 +20,9 @@ ReflectionScriptField(EntityAsis) \
 		meta_property(maxTailCapacity) \
 		meta_property(maxPollutionGauge) \
 		meta_property(pollutionCoreAmount) \
+		meta_property(m_pathRadius) \
+		meta_property(m_predictNextTime) \
+		meta_property(m_rotateSpeed) \
 	}); \
 	FieldEnd(EntityAsis, PropertyOnly) \
 };
