@@ -82,6 +82,10 @@ void GameObject::Destroy()
 	{
 		return;
 	}
+
+	TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
+	TagManager::GetInstance()->RemoveObjectFromLayer(m_layer.ToString(), this);
+
 	m_destroyMark = true;
 
 	for (auto& component : m_components)

@@ -1,4 +1,4 @@
-#include "Scene.h"01
+#include "Scene.h"
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
@@ -16,6 +16,7 @@
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
 #include "TagManager.h"
+#include <execution>
 
 Scene::Scene()
 {
@@ -40,6 +41,16 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 	const_cast<GameObject::Index&>(sceneObject->m_index) = m_SceneObjects.size() - 1;
 
 	m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
+
+	if (!sceneObject->m_tag.ToString().empty())
+	{
+		TagManager::GetInstance()->AddTagToObject(sceneObject->m_tag.ToString(), sceneObject.get());
+	}
+
+	if (!sceneObject->m_layer.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(sceneObject->m_layer.ToString(), sceneObject.get());
+	}
 
 	return sceneObject;
 }
@@ -1113,13 +1124,7 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
-	if(m_updatedTransformObjs.contains(objIndex))
-	{
-		return;
-	}
-
 	const auto& obj = GetGameObject(objIndex);
-	m_updatedTransformObjs.insert(objIndex);
 
 	if (!obj || obj->IsDestroyMark())
 	{
@@ -1134,19 +1139,9 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 			return;
 		}
 		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
-		if (bone)
-		{
-			auto transform = animator->m_localTransforms[bone->m_index];
-			model = XMMatrixMultiply(transform, model);
-			//model = XMMatrixMultiply(bone->m_localTransform, model);
-			obj->m_transform.SetAndDecomposeMatrix(model);
-			//obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
-		}
-		else {
-			//model = XMMatrixMultiply(transform, model);
-			 model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-			obj->m_transform.SetAndDecomposeMatrix(model);
-		}
+		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ? 
+			animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+
 	}
 	else
 	{
@@ -1252,11 +1247,14 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
-	m_updatedTransformObjs.clear();
+	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
+	auto updateModel = [this](GameObject::Index index){ UpdateModelRecursive(index, XMMatrixIdentity()); };
 
-	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
+	if (rootObjects.empty())
 	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
+		return;
 	}
+
+	std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateModel);
 }
 
