@@ -135,7 +135,7 @@ void EntityItem::SetThrowOwner(Player* player)
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	
-	auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
+	/*auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
 		auto pos = GetOwner()->m_transform.GetWorldPosition();
 		return Vector3(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]); },
 		[&](Vector3 val) {
