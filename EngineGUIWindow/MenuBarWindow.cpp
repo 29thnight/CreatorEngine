@@ -1671,7 +1671,24 @@ void MenuBarWindow::ShowBlackBoardWindow()
             ImGui::Separator();
 
             // List of existing keys
-            for (auto const& [key, value] : editorBlackBoard.m_values)
+            std::vector<std::pair<std::string, BlackBoardValue>> sortedKeys;
+            for (const auto& pair : editorBlackBoard.m_values) {
+				sortedKeys.push_back(pair);
+            }
+			std::sort(sortedKeys.begin(), sortedKeys.end(),
+				[](const auto& a,const auto& b) {
+					const BlackBoardValue& valueA = a.second;
+					const BlackBoardValue& valueB = b.second;
+
+					if (valueA.Type != valueB.Type) {
+						return static_cast<int>(valueA.Type) < static_cast<int>(valueB.Type);
+					}
+
+					return a.first < b.first; // Sort by key name if types are the same
+
+				});
+            for (auto const& [key, value] : sortedKeys)
+            //for (auto const& [key, value] : editorBlackBoard.m_values)
             {
                 ImDrawList* draw_list = ImGui::GetWindowDrawList();
                 ImVec2 p = ImGui::GetCursorScreenPos();
@@ -1685,8 +1702,52 @@ void MenuBarWindow::ShowBlackBoardWindow()
 
                 if (ImGui::Selectable(key.c_str(), selectedKey == key, ImGuiSelectableFlags_AllowItemOverlap))
                 {
-                    selectedKey = key;
+                    selectedKey = key;   
                 }
+                
+                /*ImGui::SameLine();
+
+                if (value.Type == BlackBoardType::Bool) {
+					ImGui::Text(value.BoolValue ? "True" : "False");
+                }
+				else if (value.Type == BlackBoardType::Int) {
+					ImGui::Text("%d", value.IntValue);
+				}
+				else if (value.Type == BlackBoardType::Float) {
+					ImGui::Text("%.2f", value.FloatValue);
+				}
+				else if (value.Type == BlackBoardType::String || value.Type == BlackBoardType::GameObject || value.Type == BlackBoardType::Transform) {
+					ImGui::Text("%s", value.StringValue.c_str());
+				}
+				else if (value.Type == BlackBoardType::Vector2) {
+					ImGui::Text("(%.2f, %.2f)", value.Vec2Value.x, value.Vec2Value.y);
+				}
+				else if (value.Type == BlackBoardType::Vector3) {
+					ImGui::Text("(%.2f, %.2f, %.2f)", value.Vec3Value.x, value.Vec3Value.y, value.Vec3Value.z);
+				}
+				else if (value.Type == BlackBoardType::Vector4) {
+					ImGui::Text("(%.2f, %.2f, %.2f, %.2f)", value.Vec4Value.x, value.Vec4Value.y, value.Vec4Value.z, value.Vec4Value.w);
+				}*/
+
+                std::string valueText;
+                char buffer[256]; // 충분한 크기의 버퍼
+                switch (value.Type) {
+                    case BlackBoardType::Bool:   valueText = value.BoolValue ? "True" : "False"; break;
+                    case BlackBoardType::Int:    snprintf(buffer, sizeof(buffer), "%d", value.IntValue); valueText = buffer; break;
+					case BlackBoardType::Float:  snprintf(buffer, sizeof(buffer), "%.2f", value.FloatValue); valueText = buffer; break;
+					case BlackBoardType::String:
+					case BlackBoardType::GameObject:
+					case BlackBoardType::Transform: valueText = value.StringValue; break;
+					case BlackBoardType::Vector2: snprintf(buffer, sizeof(buffer), "(%.2f, %.2f)", value.Vec2Value.x, value.Vec2Value.y); valueText = buffer; break;
+					case BlackBoardType::Vector3: snprintf(buffer, sizeof(buffer), "(%.2f, %.2f, %.2f)", value.Vec3Value.x, value.Vec3Value.y, value.Vec3Value.z); valueText = buffer; break;
+					case BlackBoardType::Vector4: snprintf(buffer, sizeof(buffer), "(%.2f, %.2f, %.2f, %.2f)", value.Vec4Value.x, value.Vec4Value.y, value.Vec4Value.z, value.Vec4Value.w); valueText = buffer; break;
+					default:                      valueText = "Unknown Type"; break;
+                }
+
+                float textWidth = ImGui::CalcTextSize(valueText.c_str()).x;
+                float rightAlignedX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - textWidth;
+                ImGui::SameLine(rightAlignedX);
+                ImGui::Text("%s", valueText.c_str());
             }
         }
         ImGui::EndChild();
