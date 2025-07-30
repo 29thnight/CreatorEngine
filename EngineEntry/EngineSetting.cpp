@@ -80,7 +80,7 @@ bool EngineSetting::LoadSettings()
 		rootNode["lastWindowSize"]["x"].as<float>(),
 		rootNode["lastWindowSize"]["y"].as<float>()
 	};
-	m_msvcVersion = static_cast<MSVCVersion>(rootNode["msvcVersion"].as<int>());
+
 	if (rootNode["renderPassSettings"])
 		Meta::Deserialize(&m_renderPassSettings, rootNode["renderPassSettings"]);
 
