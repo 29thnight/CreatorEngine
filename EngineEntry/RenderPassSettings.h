@@ -35,4 +35,3 @@ struct RenderPassSettings
 	[[Property]]
     ToneMapPassSetting toneMap{};
 };
-

@@ -1,8 +1,47 @@
 #include "ShaderSystem.h"
 #include "MovementModuleCS.h"
 
+MovementModuleCS::MovementModuleCS()
+    : m_computeShader(nullptr), m_movementParamsBuffer(nullptr),
+    m_velocityCurveBuffer(nullptr), m_velocityCurveSRV(nullptr),
+    m_impulsesBuffer(nullptr), m_impulsesSRV(nullptr),
+    m_paramsDirty(true), m_easingEnabled(false),
+    m_easingType(0), m_currentTime(0.0f)
+{
+    // 기본값 설정
+    m_velocityMode = VelocityMode::Constant;
+    m_gravity = false;
+    m_gravityStrength = 9.8f;
+
+    // Wind 기본값
+    m_windData.direction = Mathf::Vector3(1, 0, 0);
+    m_windData.baseStrength = 1.0f;
+    m_windData.turbulence = 0.5f;
+    m_windData.frequency = 1.0f;
+
+    // Orbital 기본값
+    m_orbitalData.center = Mathf::Vector3(0, 0, 0);
+    m_orbitalData.radius = 5.0f;
+    m_orbitalData.speed = 1.0f;
+    m_orbitalData.axis = Mathf::Vector3(0, 1, 0);
+}
+
 void MovementModuleCS::Initialize()
 {
+    m_velocityMode = VelocityMode::Constant;
+    m_currentTime = 0.0f; // 시간 초기화
+
+    // Wind 기본값
+    m_windData.direction = Mathf::Vector3(1, 0, 0);
+    m_windData.baseStrength = 1.0f;
+    m_windData.turbulence = 0.5f;
+    m_windData.frequency = 1.0f;
+
+    // Orbital 기본값
+    m_orbitalData.center = Mathf::Vector3(0, 0, 0);
+    m_orbitalData.radius = 5.0f;
+    m_orbitalData.speed = 1.0f;
+    m_orbitalData.axis = Mathf::Vector3(0, 1, 0);
 
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();
@@ -15,6 +54,12 @@ void MovementModuleCS::Update(float delta)
     if (!m_isInitialized) return;
 
     DirectX11::BeginEvent(L"MovementModuleCS");
+
+    // 시간 업데이트
+    m_currentTime += delta;
+
+    // Structured Buffer 업데이트 (매번 체크)
+    UpdateStructuredBuffers();
 
     // 상수 버퍼 업데이트
     UpdateConstantBuffers(delta);
@@ -30,6 +75,13 @@ void MovementModuleCS::Update(float delta)
     ID3D11ShaderResourceView* srvs[] = { m_inputSRV };
     DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, srvs);
 
+    // Velocity Curve와 Impulse 버퍼 항상 바인드 (null이어도)
+    ID3D11ShaderResourceView* curveSrvs[] = { m_velocityCurveSRV };
+    DeviceState::g_pDeviceContext->CSSetShaderResources(1, 1, curveSrvs);
+
+    ID3D11ShaderResourceView* impulseSrvs[] = { m_impulsesSRV };
+    DeviceState::g_pDeviceContext->CSSetShaderResources(2, 1, impulseSrvs);
+
     // 셰이더에서 출력으로 사용할 버퍼 설정
     ID3D11UnorderedAccessView* uavs[] = { m_outputUAV };
     UINT initCounts[] = { 0 };
@@ -43,8 +95,8 @@ void MovementModuleCS::Update(float delta)
     ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
     DeviceState::g_pDeviceContext->CSSetUnorderedAccessViews(0, 1, nullUAVs, nullptr);
 
-    ID3D11ShaderResourceView* nullSRVs[] = { nullptr };
-    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 1, nullSRVs);
+    ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr, nullptr };
+    DeviceState::g_pDeviceContext->CSSetShaderResources(0, 3, nullSRVs);
 
     ID3D11Buffer* nullBuffers[] = { nullptr };
     DeviceState::g_pDeviceContext->CSSetConstantBuffers(0, 1, nullBuffers);
@@ -82,22 +134,113 @@ bool MovementModuleCS::InitializeCompute()
 
 void MovementModuleCS::UpdateConstantBuffers(float delta)
 {
-    // 파라미터 업데이트가 필요한 경우에만 상수 버퍼 업데이트
-    if (m_paramsDirty)
+    // 항상 상수 버퍼 업데이트 (시간 변수 때문에)
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    HRESULT hr = DeviceState::g_pDeviceContext->Map(m_movementParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    if (SUCCEEDED(hr))
     {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DeviceState::g_pDeviceContext->Map(m_movementParamsBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        MovementParams* params = reinterpret_cast<MovementParams*>(mappedResource.pData);
+        params->deltaTime = delta;
+        params->gravityStrength = m_gravityStrength;
+        params->useGravity = m_gravity ? 1 : 0;
 
-        if (SUCCEEDED(hr))
+        // Velocity 관련 파라미터 업데이트
+        params->velocityMode = static_cast<int>(m_velocityMode);
+        params->currentTime = m_currentTime;
+
+        // Wind 데이터
+        params->windDirection = m_windData.direction;
+        params->windStrength = m_windData.baseStrength;
+        params->turbulence = m_windData.turbulence;
+        params->frequency = m_windData.frequency;
+
+        // Orbital 데이터
+        params->orbitalCenter = m_orbitalData.center;
+        params->orbitalRadius = m_orbitalData.radius;
+        params->orbitalSpeed = m_orbitalData.speed;
+        params->orbitalAxis = m_orbitalData.axis;
+
+        // 배열 크기
+        params->velocityCurveSize = static_cast<int>(m_velocityCurve.size());
+        params->impulseCount = static_cast<int>(m_impulses.size());
+
+        DeviceState::g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
+        m_paramsDirty = false;
+    }
+}
+
+void MovementModuleCS::UpdateStructuredBuffers()
+{
+    // Velocity Curve 버퍼 업데이트
+    if (!m_velocityCurve.empty())
+    {
+        if (m_velocityCurveBuffer)
         {
-            MovementParams* params = reinterpret_cast<MovementParams*>(mappedResource.pData);
-            params->deltaTime = delta;
-            params->gravityStrength = m_gravityStrength;
-            params->useGravity = m_gravity ? 1 : 0;
-
-            DeviceState::g_pDeviceContext->Unmap(m_movementParamsBuffer, 0);
-            m_paramsDirty = false;
+            m_velocityCurveBuffer->Release();
+            m_velocityCurveBuffer = nullptr;
         }
+        if (m_velocityCurveSRV)
+        {
+            m_velocityCurveSRV->Release();
+            m_velocityCurveSRV = nullptr;
+        }
+
+        // 버퍼 생성
+        D3D11_BUFFER_DESC bufferDesc = {};
+        bufferDesc.ByteWidth = sizeof(VelocityPoint) * m_velocityCurve.size();
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        bufferDesc.StructureByteStride = sizeof(VelocityPoint);
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = m_velocityCurve.data();
+
+        DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_velocityCurveBuffer);
+
+        // SRV 생성
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+        srvDesc.Buffer.NumElements = m_velocityCurve.size();
+
+        DeviceState::g_pDevice->CreateShaderResourceView(m_velocityCurveBuffer, &srvDesc, &m_velocityCurveSRV);
+    }
+
+    // Impulse 버퍼 업데이트
+    if (!m_impulses.empty())
+    {
+        if (m_impulsesBuffer)
+        {
+            m_impulsesBuffer->Release();
+            m_impulsesBuffer = nullptr;
+        }
+        if (m_impulsesSRV)
+        {
+            m_impulsesSRV->Release();
+            m_impulsesSRV = nullptr;
+        }
+
+        // 버퍼 생성
+        D3D11_BUFFER_DESC bufferDesc = {};
+        bufferDesc.ByteWidth = sizeof(ImpulseData) * m_impulses.size();
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        bufferDesc.StructureByteStride = sizeof(ImpulseData);
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = m_impulses.data();
+
+        DeviceState::g_pDevice->CreateBuffer(&bufferDesc, &initData, &m_impulsesBuffer);
+
+        // SRV 생성
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+        srvDesc.Buffer.NumElements = m_impulses.size();
+
+        DeviceState::g_pDevice->CreateShaderResourceView(m_impulsesBuffer, &srvDesc, &m_impulsesSRV);
     }
 }
 
@@ -106,10 +249,18 @@ void MovementModuleCS::Release()
     // 리소스 해제
     if (m_computeShader) m_computeShader->Release();
     if (m_movementParamsBuffer) m_movementParamsBuffer->Release();
+    if (m_velocityCurveBuffer) m_velocityCurveBuffer->Release();
+    if (m_velocityCurveSRV) m_velocityCurveSRV->Release();
+    if (m_impulsesBuffer) m_impulsesBuffer->Release();
+    if (m_impulsesSRV) m_impulsesSRV->Release();
 
     // 포인터 초기화
     m_computeShader = nullptr;
     m_movementParamsBuffer = nullptr;
+    m_velocityCurveBuffer = nullptr;
+    m_velocityCurveSRV = nullptr;
+    m_impulsesBuffer = nullptr;
+    m_impulsesSRV = nullptr;
 
     m_isInitialized = false;
 }
@@ -117,6 +268,9 @@ void MovementModuleCS::Release()
 void MovementModuleCS::ResetForReuse()
 {
     if (!m_enabled) return;
+
+    // 시간 초기화
+    m_currentTime = 0.0f;
 
     // 더티 플래그 설정 (상수 버퍼 재업데이트 강제)
     m_paramsDirty = true;
@@ -126,4 +280,285 @@ bool MovementModuleCS::IsReadyForReuse() const
 {
     return m_isInitialized &&
         m_movementParamsBuffer != nullptr;
+}
+
+void MovementModuleCS::SetVelocityMode(VelocityMode mode)
+{
+    m_velocityMode = mode;
+    m_paramsDirty = true;
+}
+
+void MovementModuleCS::SetVelocityCurve(const std::vector<VelocityPoint>& curve)
+{
+    m_velocityCurve = curve;
+    m_paramsDirty = true;
+    // UpdateStructuredBuffers는 Update()에서 호출됨
+}
+
+void MovementModuleCS::AddVelocityPoint(float time, const Mathf::Vector3& velocity, float strength)
+{
+    VelocityPoint point;
+    point.time = time;
+    point.velocity = velocity;
+    point.strength = strength;
+
+    m_velocityCurve.push_back(point);
+    // 시간순으로 정렬
+    std::sort(m_velocityCurve.begin(), m_velocityCurve.end(),
+        [](const VelocityPoint& a, const VelocityPoint& b) {
+            return a.time < b.time;
+        });
+    m_paramsDirty = true;
+    // UpdateStructuredBuffers는 Update()에서 호출됨
+}
+
+void MovementModuleCS::AddImpulse(float triggerTime, const Mathf::Vector3& direction, float force, float duration)
+{
+    ImpulseData impulse;
+    impulse.triggerTime = triggerTime;
+    impulse.direction = direction;
+    impulse.force = force;
+    impulse.duration = duration;
+
+    m_impulses.push_back(impulse);
+    std::sort(m_impulses.begin(), m_impulses.end(),
+        [](const ImpulseData& a, const ImpulseData& b) {
+            return a.triggerTime < b.triggerTime;
+        });
+    m_paramsDirty = true;
+    // UpdateStructuredBuffers는 Update()에서 호출됨
+}
+
+void MovementModuleCS::SetWindEffect(const Mathf::Vector3& direction, float strength, float turbulence, float frequency)
+{
+    m_windData.direction = direction;
+    m_windData.baseStrength = strength;
+    m_windData.turbulence = turbulence;
+    m_windData.frequency = frequency;
+    m_paramsDirty = true;
+}
+
+void MovementModuleCS::SetOrbitalMotion(const Mathf::Vector3& center, float radius, float speed, const Mathf::Vector3& axis)
+{
+    m_orbitalData.center = center;
+    m_orbitalData.radius = radius;
+    m_orbitalData.speed = speed;
+    m_orbitalData.axis = axis;
+    m_paramsDirty = true;
+}
+
+void MovementModuleCS::ClearVelocityCurve()
+{
+    m_velocityCurve.clear();
+    m_paramsDirty = true;
+    // UpdateStructuredBuffers는 Update()에서 호출됨
+}
+
+void MovementModuleCS::ClearImpulses()
+{
+    m_impulses.clear();
+    m_paramsDirty = true;
+    // UpdateStructuredBuffers는 Update()에서 호출됨
+}
+
+nlohmann::json MovementModuleCS::SerializeData() const
+{
+    nlohmann::json json;
+
+    // Movement 파라미터 직렬화
+    json["movementParams"] = {
+        {"useGravity", m_gravity},
+        {"gravityStrength", m_gravityStrength},
+        {"easingEnabled", m_easingEnabled},
+        {"easingType", m_easingType},
+        {"velocityMode", static_cast<int>(m_velocityMode)},
+        {"currentTime", m_currentTime}
+    };
+
+    // VelocityCurve 데이터 직렬화
+    json["velocityCurve"] = nlohmann::json::array();
+    for (const auto& point : m_velocityCurve)
+    {
+        json["velocityCurve"].push_back({
+            {"time", point.time},
+            {"velocity", {point.velocity.x, point.velocity.y, point.velocity.z}},
+            {"strength", point.strength}
+            });
+    }
+
+    // Impulse 데이터 직렬화
+    json["impulses"] = nlohmann::json::array();
+    for (const auto& impulse : m_impulses)
+    {
+        json["impulses"].push_back({
+            {"triggerTime", impulse.triggerTime},
+            {"direction", {impulse.direction.x, impulse.direction.y, impulse.direction.z}},
+            {"force", impulse.force},
+            {"duration", impulse.duration}
+            });
+    }
+
+    // Wind 데이터 직렬화
+    json["windData"] = {
+        {"direction", {m_windData.direction.x, m_windData.direction.y, m_windData.direction.z}},
+        {"baseStrength", m_windData.baseStrength},
+        {"turbulence", m_windData.turbulence},
+        {"frequency", m_windData.frequency}
+    };
+
+    // Orbital 데이터 직렬화
+    json["orbitalData"] = {
+        {"center", {m_orbitalData.center.x, m_orbitalData.center.y, m_orbitalData.center.z}},
+        {"radius", m_orbitalData.radius},
+        {"speed", m_orbitalData.speed},
+        {"axis", {m_orbitalData.axis.x, m_orbitalData.axis.y, m_orbitalData.axis.z}}
+    };
+
+    // 상태 정보
+    json["state"] = {
+        {"isInitialized", m_isInitialized},
+        {"particleCapacity", m_particleCapacity}
+    };
+
+    return json;
+}
+
+void MovementModuleCS::DeserializeData(const nlohmann::json& json)
+{
+    // Movement 파라미터 복원
+    if (json.contains("movementParams"))
+    {
+        const auto& movementJson = json["movementParams"];
+
+        if (movementJson.contains("useGravity"))
+            m_gravity = movementJson["useGravity"];
+
+        if (movementJson.contains("gravityStrength"))
+            m_gravityStrength = movementJson["gravityStrength"];
+
+        if (movementJson.contains("easingEnabled"))
+            m_easingEnabled = movementJson["easingEnabled"];
+
+        if (movementJson.contains("easingType"))
+            m_easingType = movementJson["easingType"];
+
+        if (movementJson.contains("velocityMode"))
+            m_velocityMode = static_cast<VelocityMode>(movementJson["velocityMode"]);
+
+        if (movementJson.contains("currentTime"))
+            m_currentTime = movementJson["currentTime"];
+    }
+
+    // VelocityCurve 데이터 복원
+    if (json.contains("velocityCurve"))
+    {
+        m_velocityCurve.clear();
+        for (const auto& pointJson : json["velocityCurve"])
+        {
+            VelocityPoint point;
+            if (pointJson.contains("time"))
+                point.time = pointJson["time"];
+            if (pointJson.contains("velocity"))
+            {
+                auto vel = pointJson["velocity"];
+                point.velocity = Mathf::Vector3(vel[0], vel[1], vel[2]);
+            }
+            if (pointJson.contains("strength"))
+                point.strength = pointJson["strength"];
+
+            m_velocityCurve.push_back(point);
+        }
+
+        // 시간순으로 정렬
+        std::sort(m_velocityCurve.begin(), m_velocityCurve.end(),
+            [](const VelocityPoint& a, const VelocityPoint& b) {
+                return a.time < b.time;
+            });
+    }
+
+    // Impulse 데이터 복원
+    if (json.contains("impulses"))
+    {
+        m_impulses.clear();
+        for (const auto& impulseJson : json["impulses"])
+        {
+            ImpulseData impulse;
+            if (impulseJson.contains("triggerTime"))
+                impulse.triggerTime = impulseJson["triggerTime"];
+            if (impulseJson.contains("direction"))
+            {
+                auto dir = impulseJson["direction"];
+                impulse.direction = Mathf::Vector3(dir[0], dir[1], dir[2]);
+            }
+            if (impulseJson.contains("force"))
+                impulse.force = impulseJson["force"];
+            if (impulseJson.contains("duration"))
+                impulse.duration = impulseJson["duration"];
+
+            m_impulses.push_back(impulse);
+        }
+
+        // 시간순으로 정렬
+        std::sort(m_impulses.begin(), m_impulses.end(),
+            [](const ImpulseData& a, const ImpulseData& b) {
+                return a.triggerTime < b.triggerTime;
+            });
+    }
+
+    // Wind 데이터 복원
+    if (json.contains("windData"))
+    {
+        const auto& windJson = json["windData"];
+        if (windJson.contains("direction"))
+        {
+            auto dir = windJson["direction"];
+            m_windData.direction = Mathf::Vector3(dir[0], dir[1], dir[2]);
+        }
+        if (windJson.contains("baseStrength"))
+            m_windData.baseStrength = windJson["baseStrength"];
+        if (windJson.contains("turbulence"))
+            m_windData.turbulence = windJson["turbulence"];
+        if (windJson.contains("frequency"))
+            m_windData.frequency = windJson["frequency"];
+    }
+
+    // Orbital 데이터 복원
+    if (json.contains("orbitalData"))
+    {
+        const auto& orbitalJson = json["orbitalData"];
+        if (orbitalJson.contains("center"))
+        {
+            auto center = orbitalJson["center"];
+            m_orbitalData.center = Mathf::Vector3(center[0], center[1], center[2]);
+        }
+        if (orbitalJson.contains("radius"))
+            m_orbitalData.radius = orbitalJson["radius"];
+        if (orbitalJson.contains("speed"))
+            m_orbitalData.speed = orbitalJson["speed"];
+        if (orbitalJson.contains("axis"))
+        {
+            auto axis = orbitalJson["axis"];
+            m_orbitalData.axis = Mathf::Vector3(axis[0], axis[1], axis[2]);
+        }
+    }
+
+    // 상태 정보 복원
+    if (json.contains("state"))
+    {
+        const auto& stateJson = json["state"];
+
+        if (stateJson.contains("particleCapacity"))
+            m_particleCapacity = stateJson["particleCapacity"];
+    }
+
+    if (!m_isInitialized)
+        Initialize();
+
+    // 변경사항을 적용하기 위해 더티 플래그 설정
+    m_paramsDirty = true;
+}
+
+std::string MovementModuleCS::GetModuleType() const
+{
+    return "MovementModuleCS";
 }

@@ -24,9 +24,9 @@ public:
 	virtual void Attack(Entity* sender, int damage) {}
 
 	[[Property]]
-	int m_currentHP{ 0 };
+	int m_currentHP{ 100 };
 	[[Property]]
-	int m_maxHP{ 1 };
+	int m_maxHP{ 100 };
 
 	Core::Delegate<void> m_onDeathEvent;
 	Core::Delegate<void> m_onDamageEvent;

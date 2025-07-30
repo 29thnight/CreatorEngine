@@ -1,11 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "Prefab.h"
 
-class PrefabUtility : public Singleton<PrefabUtility>
+class PrefabUtility : public DLLCore::Singleton<PrefabUtility>
 {
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<PrefabUtility>;
     PrefabUtility() = default;
     ~PrefabUtility() = default;
 
@@ -23,7 +24,7 @@ public:
     Prefab* LoadPrefab(const std::string& path);
 
 private:
-    std::unordered_map<const Prefab*, std::vector<GameObject*>> m_instanceMap{};
+    std::unordered_map<FileGuid, std::vector<GameObject*>> m_instanceMap{};
 };
 
-static auto& PrefabUtilitys = PrefabUtility::GetInstance();
+static auto PrefabUtilitys = PrefabUtility::GetInstance();

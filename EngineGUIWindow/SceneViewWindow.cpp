@@ -7,6 +7,7 @@
 #include "fa.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "GameObjectCommand.h"
 #include "CameraComponent.h"
 #include "FoliageComponent.h"
 #include "LightComponent.h"
@@ -14,6 +15,8 @@
 #include <unordered_map>
 #include "DataSystem.h"
 #include "RenderState.h"
+#include "PrefabUtility.h"
+#include "InputManager.h"
 #include "Terrain.h"
 
 bool useWindow = true;
@@ -112,24 +115,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ICON_FA_EYE,
 		ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
 		ICON_FA_ARROWS_ROTATE,
-		ICON_FA_GROUP_ARROWS_ROTATE
+		ICON_FA_GROUP_ARROWS_ROTATE,
 	};
 	static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
 
 
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
+	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 
-	if (ImGui::IsKeyPressed(ImGuiKey_T))
-		selectGizmoMode = SelectGuizmoMode::Translate;
-	if (ImGui::IsKeyPressed(ImGuiKey_R))
-		selectGizmoMode = SelectGuizmoMode::Rotate;
-	if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
-		selectGizmoMode = SelectGuizmoMode::Scale;
-	if (ImGui::IsKeyPressed(ImGuiKey_F))
-		useSnap = !useSnap;
-	if (ImGui::IsKeyPressed(ImGuiKey_V))
-		selectGizmoMode = SelectGuizmoMode::Select;
+	if(!ctrl)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_W))
+			selectGizmoMode = SelectGuizmoMode::Translate;
+		if (ImGui::IsKeyPressed(ImGuiKey_E))
+			selectGizmoMode = SelectGuizmoMode::Rotate;
+		if (ImGui::IsKeyPressed(ImGuiKey_R)) // r Key
+			selectGizmoMode = SelectGuizmoMode::Scale;
+		if (ImGui::IsKeyPressed(ImGuiKey_T))
+			useSnap = !useSnap;
+		if (ImGui::IsKeyPressed(ImGuiKey_Q))
+			selectGizmoMode = SelectGuizmoMode::Select;
+	}
 
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
@@ -211,9 +218,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::OpenPopup("CameraSettings");
 		}
 
+
+
 		ImGui::SameLine();
 		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 250.f, currentPos.y));
+		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 270.f, currentPos.y));
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
 		for (int i = 0; i < buttonCount; i++)
 		{
@@ -234,9 +243,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::SameLine();
 			currentPos = ImGui::GetCursorScreenPos();
 			ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
-
 			ImGui::PopStyleColor();
 		}
+
+		ImGui::SameLine();
+		currentPos = ImGui::GetCursorScreenPos();
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
+		if (useSnap)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
+		}
+		else
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+		}
+
+		if (ImGui::Button(ICON_FA_BORDER_ALL " Snap"))
+		{
+			useSnap = !useSnap;
+		}
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
+		ImGui::PopStyleColor();
+
 		ImGui::PopStyleVar(1);
 
 
@@ -408,7 +436,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		wasDragging = isDragging;
     }
 
-	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
+	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 16), ImVec2(128, 128), IM_COL32(0, 0, 0, 0));
 
 	{
 		auto scene = SceneManagers->GetActiveScene();
@@ -429,6 +457,51 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
 	{
 		cam->HandleMovement(Time->GetElapsedSeconds());
+	}
+
+	if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_G)) {
+		auto scene = SceneManagers->GetActiveScene();
+		auto selectedObjects = scene->m_selectedSceneObjects;
+		for (auto* target : selectedObjects)
+		{
+		    // 월드 공간의 '앞쪽' 벡터 (보통 Z-축 또는 X-축을 사용)
+		    // 여기서는 DirectX의 일반적인 관례에 따라 Z-축을 사용합니다.
+		    const DirectX::XMVECTOR forward = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+		
+		    // 두 벡터가 거의 반대 방향일 경우를 처리
+		    float dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(forward, cam->m_forward));
+		    if (dot < -0.999999f)
+		    {
+		        // 180도 회전. 회전 축은 어떤 것이든 상관없으므로,
+		        // 월드 '위쪽' 벡터와 교차하여 축을 찾습니다.
+		        DirectX::XMVECTOR right = DirectX::XMVector3Cross(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), forward);
+
+				target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(right, DirectX::XM_PI));
+		    }
+		
+		    // 두 벡터가 거의 같은 방향일 경우 (회전 필요 없음)
+		    if (dot > 0.999999f)
+		    {
+				target->m_transform.SetWorldRotation(DirectX::XMQuaternionIdentity());
+		    }
+		
+		    // 가장 짧은 호 회전(shortest arc rotation)을 계산합니다.
+		    DirectX::XMVECTOR rotAxis = DirectX::XMVector3Cross(forward, cam->m_forward);
+		    float angle = acosf(dot);
+		
+			target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(rotAxis, angle));
+
+			target->m_transform.SetWorldPosition(cam->m_eyePosition);
+		}
+	}
+	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
+		auto scene = SceneManagers->GetActiveScene();
+		auto selectedObjects = scene->m_selectedSceneObjects;
+		for (auto* target : selectedObjects)
+		{
+			cam->MoveToTarget(target->m_transform.GetWorldPosition() - cam->m_forward * 5.f);
+			break;
+		}
 	}
 
 	auto scene = SceneManagers->GetActiveScene();
@@ -532,9 +605,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				file::path filename = file::path(droppedFilePath).filename();
 				previewModelPath = PathFinder::Relative("Models\\") / filename;
 
-				dragPreviewObject = Model::LoadModelToSceneObj(
-					DataSystems->LoadCashedModel(previewModelPath.string()),
-					*scene);
+				GameObject* createdObj = nullptr;
+				Meta::UndoCommandManager->Execute(
+					std::make_unique<Meta::LoadModelToSceneObjCommand>(
+						scene,
+						DataSystems->LoadCashedModel(previewModelPath.string()),
+						&createdObj));
+				dragPreviewObject = createdObj;
 			}
 		}
 		else
@@ -567,6 +644,18 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			file::path filename = droppedFilePath;
 			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
 			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
+		}
+
+		if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
+		{
+			const char* droppedFilePath = (const char*)prefabPayload->Data;
+			file::path filename = droppedFilePath;
+			file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
+			auto prefab = PrefabUtilitys->LoadPrefab(filepath.string().c_str());
+			if (prefab)
+			{
+				PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());
+			}
 		}
 
 		ImGui::EndDragDropTarget(); 

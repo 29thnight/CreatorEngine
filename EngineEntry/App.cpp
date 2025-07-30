@@ -10,6 +10,7 @@
 #include "EngineSetting.h"
 #include "EffectProxyController.h"
 #include "ResourceAllocator.h"
+#include "PrefabUtility.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -45,6 +46,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	InputManager::Destroy();
 	DataSystem::Destroy();
 	ResourceAllocator::Destroy();
+	PrefabUtility::Destroy();
 
 	Log::Finalize();
 
@@ -53,6 +55,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	PrefabUtility::GetInstance();
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
 	DataSystem::GetInstance();

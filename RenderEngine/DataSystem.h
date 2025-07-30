@@ -28,9 +28,11 @@ public:
 		Shader,
 		CppScript,
 		CSharpScript,
-                Prefab,
+		Prefab,
 		Sound,
 		HDR,
+		VolumeProfile,
+		End,
 	};
 
 	enum class TextureFileType
@@ -106,6 +108,7 @@ public:
 	AssetMetaWatcher* GetAssetMetaWatcher() const { return m_assetMetaWatcher.get(); }
 
 	void ForceCreateYamlMetaFile(const file::path& filepath);
+	void CreateVolumeProfile(const file::path& filepath);
 
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
@@ -151,6 +154,7 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
+	ImVec2 overlayPos{};
 
 	file::path currentDirectory{};
 	efsw::FileWatcher* m_watcher{};

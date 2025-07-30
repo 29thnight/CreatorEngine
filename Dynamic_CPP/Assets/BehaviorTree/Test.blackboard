@@ -9,37 +9,7 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorTargetRange
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 10
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorHP
-    value:
-      Type: 2
-      BoolValue: false
-      IntValue: 100
-      FloatValue: 0
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorAsis
-    value:
-      Type: 1
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 0
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorSpeed
+  - key: eAtkRange
     value:
       Type: 3
       BoolValue: false
@@ -49,7 +19,37 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorDmg
+  - key: eChaseOutDuration
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 2
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eSpeed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eChaseRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eDmg
     value:
       Type: 2
       BoolValue: false
@@ -59,32 +59,32 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorChaseRange
+  - key: eHP
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 100
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eAsis
+    value:
+      Type: 1
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eTargetRange
     value:
       Type: 3
       BoolValue: false
       IntValue: 0
       FloatValue: 10
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorAtkRange
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 3
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eNorChaseOutDuration
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 2
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}

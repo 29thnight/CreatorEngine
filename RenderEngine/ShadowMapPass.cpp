@@ -104,14 +104,31 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 void ShadowMapPass::ControlPanel()
 {
-	ImGui::Text("ShadowPass");
-	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Checkbox("UseCasCade", &g_useCascade);
+        ImGui::Text("ShadowPass");
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().shadow;
 
-	ImGui::Checkbox("Is Cloud On", &isCloudOn);
-	ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f);
-	ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f);
-	ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f");
+        ImGui::Checkbox("Enable2", &m_abled);
+        if (ImGui::Checkbox("UseCasCade", &g_useCascade))
+        {
+                setting.useCascade = g_useCascade;
+        }
+
+        if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
+        {
+                setting.isCloudOn = isCloudOn;
+        }
+        if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
+        {
+                setting.cloudSize = cloudSize;
+        }
+        if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
+        {
+                setting.cloudDirection = cloudDirection;
+        }
+        if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
+        {
+                setting.cloudMoveSpeed = cloudMoveSpeed;
+        }
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};
@@ -147,7 +164,10 @@ void ShadowMapPass::ControlPanel()
 		ImGui::Image((ImTextureID)selectedData->sliceSRV[i], ImVec2(256, 256));
 	}
 
-	ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f);
+        if (ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f))
+        {
+                setting.epsilon = m_settingConstant._epsilon;
+        }
 }
 
 void ShadowMapPass::Resize(uint32_t width, uint32_t height)
@@ -174,7 +194,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 
 	auto  lightdir	= scene.m_LightController->GetLight(0).m_direction; //type = Mathf::Vector4
 	auto  desc		= scene.m_LightController->m_shadowMapRenderDesc;	//type = ShadowMapRenderDesc
-	auto& constant	= camera.m_shadowMapConstant;						//type = ShadowMapConstant
+	auto& constant	= renderData->m_shadowCamera.m_shadowMapConstant;						//type = ShadowMapConstant
 	auto  projMat	= camera.CalculateProjection();						//type = Mathf::xMatrix
 
 	DevideCascadeEnd(camera);
@@ -202,7 +222,7 @@ void ShadowMapPass::CreateCommandListCascadeShadow(ID3D11DeviceContext* deferred
 	{
 		CascadeIndexBuffer m_currentCascadeIndex{};
 		m_currentCascadeIndex.cascadeIndex = i;
-		renderData->m_shadowCamera.ApplyShadowInfo(i);
+		//renderData->m_shadowCamera.ApplyShadowInfo(i);
 
 		DirectX11::OMSetRenderTargets(deferredContextPtr1, 0, nullptr, renderData->m_shadowMapDSVarr[i]);
 		DirectX11::UpdateBuffer(deferredContextPtr1, m_cascadeIndexBuffer.Get(), &m_currentCascadeIndex);
@@ -399,85 +419,6 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 		cascadeInfo.m_viewHeight = maxExtents.y;
 		cascadeInfo.m_lightViewProjection = lightView * lightProj;
 	}
-
-	//auto Fullfrustum = camera.GetFrustum();
-
-	//Mathf::Vector3 FullfrustumCorners[8];
-	//Fullfrustum.GetCorners(FullfrustumCorners);
-	//float nearZ = camera.m_nearPlane;
-	//float farZ  = camera.m_farPlane;
-
-	//DirectX::BoundingFrustum frustum(camera.CalculateProjection());
-
-	//Mathf::Matrix cameraview  = camera.CalculateView();
-	//Mathf::Matrix viewInverse = camera.CalculateInverseView();
-	//Mathf::Vector3 forwardVec = cameraview.Forward();
-
-	//for (size_t i = 0; i < sliceFrustums.size(); ++i)
-	//{
-	//	std::array<Mathf::Vector3, 8>& sliceFrustum = sliceFrustums[i];
-	//	float curEnd	= camera.m_cascadeEnd[i];
-	//	float nextEnd	= camera.m_cascadeEnd[i + 1];
-
-	//	sliceFrustum[0] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.TopSlope * curEnd, curEnd }, viewInverse);
-	//	sliceFrustum[1] = Mathf::Vector3::Transform({ frustum.RightSlope * curEnd, frustum.BottomSlope * curEnd, curEnd }, viewInverse);
-	//	sliceFrustum[2] = Mathf::Vector3::Transform({ frustum.LeftSlope * curEnd, frustum.TopSlope * curEnd, curEnd }, viewInverse);
-	//	sliceFrustum[3] = Mathf::Vector3::Transform({ frustum.LeftSlope * curEnd, frustum.BottomSlope * curEnd, curEnd }, viewInverse);
-
-	//	sliceFrustum[4] = Mathf::Vector3::Transform({ frustum.RightSlope * nextEnd, frustum.TopSlope * nextEnd, nextEnd }, viewInverse);
-	//	sliceFrustum[5] = Mathf::Vector3::Transform({ frustum.RightSlope * nextEnd, frustum.BottomSlope * nextEnd, nextEnd }, viewInverse);
-	//	sliceFrustum[6] = Mathf::Vector3::Transform({ frustum.LeftSlope * nextEnd, frustum.TopSlope * nextEnd, nextEnd }, viewInverse);
-	//	sliceFrustum[7] = Mathf::Vector3::Transform({ frustum.LeftSlope * nextEnd, frustum.BottomSlope * nextEnd, nextEnd }, viewInverse);
-	//}
-
-	//for (size_t i = 0; i < cascadeCount; ++i)
-	//{
-	//	const auto& sliceFrustum = sliceFrustums[i];
-
-	//	Mathf::Vector3 centerPos = { 0.f, 0.f, 0.f };
-	//	for (const auto& pos : sliceFrustum)
-	//	{
-	//		centerPos += pos;
-	//	}
-	//	centerPos /= 8.f;
-
-	//	float radius = 0.f;
-	//	for (const auto& pos : sliceFrustum)
-	//	{
-	//		float distance = Mathf::Vector3::Distance(centerPos, pos);
-	//		radius = std::max<float>(radius, distance);
-	//	}
-
-	//	radius = std::ceil(radius * 32.f) / 32.f;
-
-	//	Mathf::Vector3 maxExtents = { radius, radius, radius };
-	//	Mathf::Vector3 minExtents = -maxExtents;
-
-	//	if (Mathf::Vector3(LightDir) == Mathf::Vector3{ 0, 0, 0 })
-	//	{
-	//		LightDir = { 0.f, 0.f, -1.f, 0.f };
-	//	}
-	//	else
-	//	{
-	//		LightDir.Normalize();
-	//	}
-
-	//	centerPos.x = (int)centerPos.x;
-	//	centerPos.y = (int)centerPos.y;
-	//	centerPos.z = (int)centerPos.z;
-
-	//	Mathf::Vector3 shadowPos						= centerPos + LightDir * -250;
-	//	Mathf::Vector3 cascadeExtents					= maxExtents - minExtents;
-	//	Mathf::xMatrix lightView						= DirectX::XMMatrixLookAtLH(shadowPos, centerPos, { 0, 1, 0 });
-	//	Mathf::xMatrix lightProj						= DirectX::XMMatrixOrthographicOffCenterLH(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.1f, 500);
-	//	camera.m_cascadeinfo[i].m_eyePosition			= shadowPos;
-	//	camera.m_cascadeinfo[i].m_lookAt				= centerPos;
-	//	camera.m_cascadeinfo[i].m_nearPlane				= 0.1f; //*****
-	//	camera.m_cascadeinfo[i].m_farPlane				= 500;
-	//	camera.m_cascadeinfo[i].m_viewWidth				= maxExtents.x;
-	//	camera.m_cascadeinfo[i].m_viewHeight			= maxExtents.y;
-	//	camera.m_cascadeinfo[i].m_lightViewProjection	= lightView * lightProj;
-	//}
 }
 
 void ShadowMapPass::UseCloudShadowMap(const std::string_view& filename)

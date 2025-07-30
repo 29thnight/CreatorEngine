@@ -146,8 +146,16 @@ void SSAOPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSAO");
-    ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
-    ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().ssao;
+
+    if (ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f))
+    {
+        setting.radius = radius;
+    }
+    if (ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f))
+    {
+        setting.thickness = thickness;
+    }
     ImGui::PopID();
 }
 

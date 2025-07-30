@@ -531,6 +531,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("AddComponent"))
 			{
+				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Add Component"); // 노란색 텍스트
+				ImGui::Separator(); // 구분선
+
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
 

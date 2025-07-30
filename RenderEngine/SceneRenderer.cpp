@@ -240,7 +240,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	{
 		m_renderScene->Update(0.f);
 	});
-
 }
 
 SceneRenderer::~SceneRenderer()
@@ -750,6 +749,12 @@ void SceneRenderer::CreateCommandListPass()
 	ProxyCommandQueue->Execute();
 	PROFILE_CPU_END();
 
+	if (SceneManagers->IsVolumeProfileApply())
+	{
+		ApplyVolumeProfile();
+		SceneManagers->ResetVolumeProfileApply();
+	}
+
 	for (auto& camera : CameraManagement->m_cameras)
 	{
 		if (!RenderPassData::VaildCheck(camera)) return;
@@ -887,6 +892,42 @@ void SceneRenderer::ReApplyCurrCubeMap()
 	ApplyNewCubeMap(m_pSkyBoxPass->CurrentSkyBoxTextureName().string());
 }
 
+void SceneRenderer::ApplyVolumeProfile()
+{
+	if (m_renderScene && m_renderScene->m_LightController)
+	{
+		m_renderScene->m_LightController->m_shadowMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().shadow);
+	}
+	if (m_pDeferredPass)
+	{
+		m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
+	}
+	if (m_pSSAOPass)
+	{
+		m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
+	}
+	if (m_pAAPass)
+	{
+		m_pAAPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().aa);
+	}
+	if (m_pPostProcessingPass)
+	{
+		m_pPostProcessingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().bloom);
+	}
+	if (m_pVignettePass)
+	{
+		m_pVignettePass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().vignette);
+	}
+	if (m_pColorGradingPass)
+	{
+		m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
+	}
+	if (m_pSSGIPass)
+	{
+		m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
+	}
+}
+
 void SceneRenderer::PrepareRender()
 {
 	auto GameSceneStart = SceneManagers->m_isGameStart && !SceneManagers->m_isEditorSceneLoaded;
@@ -904,7 +945,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& terrain : terrainComponents)
 		{
-			renderScene->UpdateCommand(terrain);
+			try
+			{
+				renderScene->UpdateCommand(terrain);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating terrain command: " << e.what() << std::endl;
+			}
 		}
 	});
 
@@ -912,7 +960,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& mesh : allMeshes)
 		{
-			renderScene->UpdateCommand(mesh);
+			try
+			{
+				renderScene->UpdateCommand(mesh);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating mesh command: " << e.what() << std::endl;
+			}
 		}
 	});
 
@@ -920,7 +975,14 @@ void SceneRenderer::PrepareRender()
 	{
 		for (auto& foliage : foliageComponents)
 		{
-			renderScene->UpdateCommand(foliage);
+			try
+			{
+				renderScene->UpdateCommand(foliage);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Error updating foliage command: " << e.what() << std::endl;
+			}
 		}
 	});
 

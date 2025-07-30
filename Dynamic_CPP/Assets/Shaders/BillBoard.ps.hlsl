@@ -17,33 +17,38 @@ float4 main(VSOutput input) : SV_TARGET
 {
     // 기본 텍스처 색상 가져오기
     float4 texColor = sparkleTexture.Sample(linearSampler, input.TexCoord);
-    float texAlpha = texColor.a;
     
-    // 외곽선 두께 및 색상 설정
-    float outlineThickness = 0.04f; // 외곽선 두께 조절 (값이 작을수록 얇은 선)
-    float outlineIntensity = 2.0f; // 외곽선 밝기 조절
-    float3 outlineColor = float3(1.0f, 1.0f, 1.0f); // 흰색 외곽선 (원하는 색상으로 변경 가능)
-    
-    // Quad의 가장자리 검출 (텍스처 좌표가 0 또는 1에 가까운지 확인)
-    float2 border;
-    border.x = min(input.TexCoord.x, 1.0f - input.TexCoord.x);
-    border.y = min(input.TexCoord.y, 1.0f - input.TexCoord.y);
-    float borderDist = min(border.x, border.y);
-    
-    // 외곽선 효과 계산 (0에 가까울수록 가장자리)
-    float outlineEffect = 1.0f - smoothstep(0.0f, outlineThickness, borderDist);
-    
-    // 기본 컬러 (텍스처 색상 × 입력 색상)
-    float4 baseColor = float4(input.Color.rgb, texAlpha * input.Color.a);
-    
-    // 알파값이 너무 낮으면 픽셀 폐기
-    if (baseColor.a < 0.01f)
+    // 텍스처의 알파값이 너무 낮으면 픽셀 폐기 (원본 형태 유지)
+    if (texColor.a < 0.01f)
         discard;
     
-    // 최종 색상 계산 (기본 색상과 외곽선 색상 혼합)
-    float3 finalColor = lerp(baseColor.rgb, outlineColor, outlineEffect);
+    // 외곽선 두께 및 색상 설정
+    //float outlineThickness = 0.04f;
+    //float outlineIntensity = 2.0f;
+    //float3 outlineColor = float3(1.0f, 1.0f, 1.0f);
     
-    return texColor;
-    //return float4(finalColor, baseColor.a);
-    //return float4(1, 0, 0, 1);
+    // Quad의 가장자리 검출
+    //float2 border;
+    //border.x = min(input.TexCoord.x, 1.0f - input.TexCoord.x);
+    //border.y = min(input.TexCoord.y, 1.0f - input.TexCoord.y);
+    //float borderDist = min(border.x, border.y);
+    
+    // 외곽선 효과 계산
+    //float outlineEffect = 1.0f - smoothstep(0.0f, outlineThickness, borderDist);
+    
+    // 원본 텍스처 색상을 기본으로 사용
+    float3 baseColor = texColor.rgb;
+    
+    // 입력 색상을 additive 방식으로 더하기 (밝기 증가)
+    // 또는 multiply 방식으로 색조 변경
+    //float3 coloredTexture = baseColor * input.Color.rgb; // multiply 방식
+    float3 coloredTexture = baseColor + (input.Color.rgb * 0.5f); // additive 방식
+    
+    // 외곽선과 기본 색상 혼합
+    float3 finalColor = coloredTexture; //, outlineColor * outlineIntensity, outlineEffect);
+    
+    // 최종 알파값 계산 (원본 텍스처 알파 × 입력 알파)
+    float finalAlpha = texColor.a * input.Color.a;
+    
+    return float4(finalColor, finalAlpha);
 }

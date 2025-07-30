@@ -89,7 +89,7 @@ Object* Object::Instantiate(const Object* original, const std::string_view& newN
 			{
                 try
                 {
-                    ComponentFactorys->LoadComponent(cloneGameObject, componentNode);
+                    ComponentFactorys->LoadComponent(cloneGameObject, componentNode, true);
                 }
                 catch (const std::exception& e)
                 {

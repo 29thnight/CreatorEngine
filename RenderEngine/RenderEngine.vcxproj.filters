@@ -276,6 +276,9 @@
     <Filter Include="RenderPass\EffectPass\999.Extension">
       <UniqueIdentifier>{2da88463-c92b-416c-86ed-4776ab989d97}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderPass\EffectPass\555.Generate">
+      <UniqueIdentifier>{0cdfa8c0-5b0d-4f24-b2d6-47d90edf6ef7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -496,6 +499,9 @@
     </ClCompile>
     <ClCompile Include="AssetJob.cpp">
       <Filter>Asset\JobSystem\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="TrailGenerateModule.cpp">
+      <Filter>RenderPass\EffectPass\555.Generate</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -811,6 +817,11 @@
     <ClInclude Include="AnimatorData.h">
       <Filter>Resources</Filter>
     </ClInclude>
+    <ClInclude Include="VolumeProfile.h">
+      <Filter>Resources</Filter>
+    <ClInclude Include="TrailGenerateModule.h">
+      <Filter>RenderPass\EffectPass\555.Generate</Filter>
+    </ClInclude>
     <ClInclude Include="KeyFrameEvent.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
@@ -1022,6 +1033,11 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TerrainTexture.cs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ShadowVertexShader.vs.hlsl">
+      <Filter>Shaders\PipelineShader</Filter>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SizeModule.cs.hlsl">
+      <Filter>Shaders\Effect\2D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

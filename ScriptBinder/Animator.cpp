@@ -35,7 +35,7 @@ void Animator::Update(float tick)
 
 void Animator::OnDestroy()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
 	{

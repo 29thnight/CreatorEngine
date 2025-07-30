@@ -16,4 +16,8 @@ struct BloomPassSetting
     float knee{ 0.5f };
     [[Property]]
     float coefficient{ 0.3f };
+    [[Property]]
+    int blurRadius{ 7 };
+    [[Property]]
+    float blurSigma{ 5.f };
 };

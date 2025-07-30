@@ -91,16 +91,24 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 
 void ColorGradingPass::ControlPanel()
 {
-	ImGui::PushID(this);
-	ImGui::Checkbox("ColorGrading", &isOn);
-	ImGui::SliderFloat("Lerp", &lerp, 0.0f, 1.0f);
+        ImGui::PushID(this);
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().colorGrading;
+        if (ImGui::Checkbox("ColorGrading", &isOn))
+        {
+                setting.isOn = isOn;
+        }
+        if (ImGui::SliderFloat("Lerp", &lerp, 0.0f, 1.0f))
+        {
+                setting.lerp = lerp;
+        }
 	if(ImGui::Button("Timer Zero"))
 		timer = 0.0f;
 
-	if (ImGui::Button("Reset")) {
-		lerp = 0.0f;
-		timer = 0.0f;
-	}
+        if (ImGui::Button("Reset")) {
+                lerp = 0.0f;
+                timer = 0.0f;
+                setting.lerp = lerp;
+        }
 
 	ImGui::PopID();
 }

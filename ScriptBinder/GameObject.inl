@@ -72,7 +72,7 @@ inline Transform* GameObject::GetComponent()
 template<typename T>
 inline bool GameObject::HasComponent()
 {
-	for (auto& [typeID, index ] : m_componentIds)
+	for (auto& [typeID, index] : m_componentIds)
 	{
 		if (typeID == TypeTrait::GUIDCreator::GetTypeID<T>())
 		{

@@ -7,7 +7,7 @@
     "name": "ggL",
     "particleSystems": [
         {
-            "isRunning": false,
+            "isRunning": true,
             "maxParticles": 1,
             "modules": [
                 {
@@ -123,7 +123,7 @@
                             "animationSpeed": 5.0,
                             "enabled": true,
                             "params": {
-                                "polarAngleProgress": 0.01329195499420166,
+                                "polarAngleProgress": 0.8846540451049805,
                                 "polarCenter": {
                                     "x": 0.0,
                                     "y": 0.0,
@@ -135,7 +135,7 @@
                                     "y": 0.0,
                                     "z": 0.0
                                 },
-                                "polarStartAngle": 0.8726646304130554,
+                                "polarStartAngle": 3.1415927410125732,
                                 "polarUpAxis": {
                                     "x": 0.0,
                                     "y": 1.0,
@@ -144,7 +144,7 @@
                             }
                         },
                         "renderState": {
-                            "instanceCount": 0
+                            "instanceCount": 1
                         },
                         "texture": {
                             "assigned": true,

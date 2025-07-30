@@ -73,6 +73,7 @@ namespace InternalPath
 	inline file::path TerrainSourcePath{};
 	inline file::path DumpPath{};
 	inline file::path NodeEditorPath{};
+	inline file::path volumeProfilePath{};
 	inline file::path InputMapPath{};
     inline void Initialize()
     {
@@ -101,6 +102,7 @@ namespace InternalPath
         IconPath				= file::path(base).append("..\\Icons\\").lexically_normal();
 		TerrainSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
 		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
+		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
 		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
 		//dir not exist -> create dir
 
@@ -118,6 +120,7 @@ namespace InternalPath
 			PrecompiledShaderPath,
 			ProjectSettingsPath,
 			TerrainSourcePath,
+			volumeProfilePath
 			NodeEditorPath,
 			InputMapPath,
 		};
@@ -200,6 +203,41 @@ public:
         return InternalPath::MsbuildExe;
     }
 
+	static inline file::path ModelSourcePath()
+	{
+		return InternalPath::ModelSourcePath;
+	}
+
+	static inline file::path TextureSourcePath()
+	{
+		return InternalPath::TextureSourcePath;
+	}
+
+	static inline file::path UISourcePath()
+	{
+		return InternalPath::UISourcePath;
+	}
+
+	static inline file::path PrefabSourcePath()
+	{
+		return InternalPath::PrefabSourcePath;
+	}
+
+	static inline file::path MaterialSourcePath()
+	{
+		return InternalPath::MaterialSourcePath;
+	}
+
+	static inline file::path BaseProjectPath()
+	{
+		return InternalPath::BaseProjectPath;
+	}
+
+	static inline file::path VolumeProfilePath()
+	{
+		return InternalPath::volumeProfilePath;
+	}
+
 	static inline file::path DynamicSolutionPath(const std::string_view& path)
 	{
 		return file::path(InternalPath::DynamicSolutionDir) / path;
@@ -243,6 +281,11 @@ public:
 	static inline file::path RelativeToBaseProject(const std::string_view& path)
 	{
 		return file::path(InternalPath::BaseProjectPath) / path;
+	}
+
+	static inline file::path RelativeToVolumeProfile(const std::string_view& path)
+	{
+		return file::path(InternalPath::volumeProfilePath) / path;
 	}
 	static inline file::path InputMapPath(const std::string_view& path)
 	{

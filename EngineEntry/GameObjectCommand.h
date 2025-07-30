@@ -2,6 +2,8 @@
 #include "MetaStateCommand.h"
 #include <functional>
 #include "Scene.h"
+#include "Model.h"
+#include "SceneManager.h"
 #include "GameObject.h"
 #include "ReflectionYml.h"
 #include "ComponentFactory.h"
@@ -97,5 +99,119 @@ namespace Meta
         GameObject::Index m_parentIndex{ 0 };
         GameObject::Index m_index{ GameObject::INVALID_INDEX };
         MetaYml::Node m_serializedNode{};
+    };
+
+    class DuplicateGameObjectCommand : public IUndoableCommand
+    {
+    public:
+        DuplicateGameObjectCommand(Scene* scene, GameObject::Index originalIndex)
+            : m_scene(scene), m_originalIndex(originalIndex)
+        {
+        }
+
+        void Undo() override
+        {
+            if (GameObject::IsValidIndex(m_createdIndex))
+            {
+                m_scene->DestroyGameObject(m_createdIndex);
+            }
+        }
+
+        void Redo() override
+        {
+            auto original = m_scene->GetGameObject(m_originalIndex);
+            if (!original)
+                return;
+
+            auto* cloned = dynamic_cast<GameObject*>(Object::Instantiate(original.get(), original->m_name.ToString()));
+            if (!cloned)
+                return;
+
+            GameObject::Index parentIndex = original->m_parentIndex;
+            auto parentObj = m_scene->GetGameObject(parentIndex);
+            if (parentObj && parentIndex != cloned->m_parentIndex)
+            {
+                auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
+                rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
+
+                cloned->m_parentIndex = parentIndex;
+                cloned->m_transform.SetParentID(parentIndex);
+                parentObj->m_childrenIndices.push_back(cloned->m_index);
+            }
+
+            m_scene->AddSelectedSceneObject(cloned);
+            m_createdIndex = cloned->m_index;
+        }
+
+    private:
+        Scene* m_scene{};
+        GameObject::Index m_originalIndex{ GameObject::INVALID_INDEX };
+        GameObject::Index m_createdIndex{ GameObject::INVALID_INDEX };
+    public:
+        [[nodiscard]] GameObject::Index GetCreatedIndex() const { return m_createdIndex; }
+    };
+
+    class DuplicateGameObjectsCommand : public IUndoableCommand
+    {
+    public:
+        DuplicateGameObjectsCommand(Scene* scene, std::span<GameObject* const> originals)
+            : m_scene(scene)
+        {
+            for (auto* obj : originals)
+            {
+                if (!obj)
+                    continue;
+                m_commands.emplace_back(scene, obj->m_index);
+            }
+        }
+
+        void Undo() override
+        {
+            resetSelectedObjectEvent.Broadcast();
+            for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it)
+                it->Undo();
+        }
+
+        void Redo() override
+        {
+            resetSelectedObjectEvent.Broadcast();
+            for (auto& cmd : m_commands)
+                cmd.Redo();
+        }
+
+    private:
+        Scene* m_scene{};
+        std::vector<DuplicateGameObjectCommand> m_commands{};
+    };
+
+    class LoadModelToSceneObjCommand : public IUndoableCommand
+    {
+    public:
+        LoadModelToSceneObjCommand(Scene* scene, Model* model, GameObject** outObj = nullptr)
+            : m_scene(scene), m_model(model), m_outObj(outObj) {
+        }
+
+        void Undo() override
+        {
+            resetSelectedObjectEvent.Broadcast();
+            if (GameObject::IsValidIndex(m_rootIndex))
+            {
+                m_scene->DestroyGameObject(m_rootIndex);
+            }
+        }
+
+        void Redo() override
+        {
+            GameObject* obj = Model::LoadModelToSceneObj(m_model, *m_scene);
+            m_rootIndex = obj ? obj->m_index : GameObject::INVALID_INDEX;
+            if (m_outObj)
+                *m_outObj = obj;
+        }
+
+    private:
+        Scene* m_scene{};
+        Model* m_model{};
+        GameObject::Index m_rootIndex{ GameObject::INVALID_INDEX };
+        GameObject** m_outObj{};
     };
 }

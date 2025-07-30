@@ -13,6 +13,27 @@
 
 #include "GameManager.h"
 using namespace Mathf;
+inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
+{
+	Mathf::Vector3 lineDirection = lineEnd - lineStart;
+	Mathf::Vector3 pointToLineStart = point - lineStart;
+
+	float t = pointToLineStart.Dot(lineDirection) / lineDirection.Dot(lineDirection);
+	Mathf::Clamp(t, 0.f, 1.f);
+	Mathf::Vector3 closestPoint = lineStart + t * lineDirection;
+	return closestPoint;
+}
+inline static float GetBothPointAndLineDistance(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
+{
+	Mathf::Vector3 closestPoint = GetBothPointAndLineClosestPoint(point, lineStart, lineEnd);
+	return Mathf::Distance(point, closestPoint);
+}
+inline static Mathf::Vector3 VectorProjection(const Mathf::Vector3& vector, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
+{
+	Mathf::Vector3 lineDirection = lineEnd - lineStart;
+	float t = vector.Dot(lineDirection) / lineDirection.Dot(lineDirection);
+	return lineStart + t * lineDirection;
+}
 void EntityAsis::Start()
 {
 	m_EntityItemQueue.resize(maxTailCapacity);
@@ -24,6 +45,7 @@ void EntityAsis::Start()
 		if (gm)
 		{
 			gm->PushEntity(this);
+			gm->PushAsis(this);
 		}
 	}
 
@@ -40,39 +62,52 @@ void EntityAsis::Start()
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
 
-	auto fakeObjects = GameObject::Find("fake");
+	/*auto fakeObjects = GameObject::Find("fake");
 	if (fakeObjects) {
 		for (auto& index : fakeObjects->m_childrenIndices) {
 			auto object = GameObject::FindIndex(index);
 			m_fakeItemQueue.push_back(object);
 		}
+	}*/
+
+
+
+
+	auto paths = GameObject::Find("Paths");
+	if (paths) {
+		for (auto& index : paths->m_childrenIndices) {
+			auto object = GameObject::FindIndex(index);
+			if (object) {
+				points.push_back(object->m_transform.GetWorldPosition());
+			}
+		}
 	}
+	else {
+		auto point1 = GameObject::Find("TestPoint1");
+		auto point2 = GameObject::Find("TestPoint2");
+		auto point3 = GameObject::Find("TestPoint3");
+
+		if (point1 != nullptr)
+			points.push_back(point1->GetComponent<Transform>()->GetWorldPosition());
+		if (point2 != nullptr)
+			points.push_back(point2->GetComponent<Transform>()->GetWorldPosition());
+		if (point3 != nullptr)
+			points.push_back(point3->GetComponent<Transform>()->GetWorldPosition());
+	}
+#ifdef _DEBUG
+	DebugPoint = GameObject::Find("DebugPoint");
+#endif // _DEBUG
 }
 
 void EntityAsis::OnTriggerEnter(const Collision& collision)
 {
-	auto item = collision.otherObj->GetComponent<EntityItem>();
-	if (item) {
-		std::cout << "OnTrigger Item" << std::endl;
-		auto owner = item->GetThrowOwner();
-		if (owner) {
-			bool result = AddItem(item);
-
-			if (!result) {
-				// 획득을 실패했을 때.
-			}
-			else {
-				// 획득했을 때 처리.
-			}
-		}
-	}
 }
 
 void EntityAsis::OnCollisionEnter(const Collision& collision)
 {
 	auto item = collision.otherObj->GetComponent<EntityItem>();
 	if (item) {
-		std::cout << "OnCollision Item" << std::endl;
+		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
@@ -89,27 +124,38 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
-	timer += tick;
-	angle += tick * 5.f;
-	Transform* tailTr = asisTail->GetComponent<Transform>();
-	Vector3 tailPos = tailTr->GetWorldPosition();
-	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
+	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
+		Attack(nullptr, 10);
+	}
 
-	auto& arr = m_EntityItemQueue.getArray();
-	int size = arr.size();
-	for (int i = 0; i < size; i++) {
-		if (arr[i] == nullptr) continue; // nullptr 체크
-		float orbitAngle = angle + XM_PI * 2.f * i / 3.f;
-		Vector3 localOrbit = Vector3(cos(orbitAngle) * radius, 0.f, sin(orbitAngle) * radius);
-		XMMATRIX axisRotation = XMMatrixRotationAxis(Vector3::Forward, 0.0f);
-		XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
+	m_currentGracePeriod -= tick;
+	m_currentStaggerDuration -= tick;
 
-		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
-		arr[i]->GetComponent<Transform>().SetPosition(finalPos);
-		i++;
+	if (m_currentStaggerDuration <= 0.f) {
+		m_purificationTimer += tick;
+		m_purificationAngle += tick * 5.f;
+
+		PathMove(tick);
 	}
 
 	Purification(tick);
+}
+
+void EntityAsis::Attack(Entity* sender, int damage)
+{
+	if (m_currentGracePeriod > 0.f) {
+		// 무적이지만 히트 사운드나 별도 처리시 여기서 처리.
+		return;
+	}
+
+	m_currentHP -= damage;
+	m_currentStaggerDuration = staggerDuration;
+	m_currentGracePeriod = graceperiod;
+	std::cout << "EntityAsis: Current HP: " << m_currentHP << std::endl;
+	if(m_currentHP <= 0)
+	{
+		// 스턴
+	}
 }
 
 bool EntityAsis::AddItem(EntityItem* item)
@@ -138,7 +184,7 @@ bool EntityAsis::AddItem(EntityItem* item)
 
 	m_EntityItemQueue.enqueue(item);
 	m_currentEntityItemCount++;
-	item->GetComponent<BoxColliderComponent>().SetColliderType(EColliderType::TRIGGER);
+	item->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 
 	std::cout << "EntityAsis: Adding item at index " << m_currentEntityItemCount << std::endl;
 	return true;
@@ -146,6 +192,25 @@ bool EntityAsis::AddItem(EntityItem* item)
 
 void EntityAsis::Purification(float tick)
 {
+	Transform* tailTr = asisTail->GetComponent<Transform>();
+	Vector3 tailPos = tailTr->GetWorldPosition();
+	Vector3 tailForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), tailTr->GetWorldQuaternion());
+
+	auto& arr = m_EntityItemQueue.getArray();
+	int size = arr.size();
+	for (int i = 0; i < size; i++) {
+		if (arr[i] == nullptr) continue; // nullptr 체크
+		float orbitAngle = m_purificationAngle + XM_PI * 2.f * i / 3.f;
+		Vector3 localOrbit = Vector3(cos(orbitAngle) * m_purificationRadius, 0.f, sin(orbitAngle) * m_purificationRadius);
+		XMMATRIX axisRotation = XMMatrixRotationAxis(Vector3::Forward, 0.0f);
+		XMVECTOR orbitOffset = XMVector3Transform(localOrbit, axisRotation);
+
+		Vector3 finalPos = tailPos + Vector3(orbitOffset.m128_f32[0], orbitOffset.m128_f32[1], orbitOffset.m128_f32[2]);
+		arr[i]->GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+		arr[i]->GetOwner()->m_transform.SetPosition(finalPos);
+		i++;
+	}
+
 	// 꼬리에 아이템이 있다면 정화를 진행.
 	if (m_currentEntityItemCount > 0) {
 		m_currentTailPurificationDuration += tick;
@@ -170,6 +235,68 @@ void EntityAsis::Purification(float tick)
 			//}
 		}
 	}
+}
+
+void EntityAsis::PathMove(float tick)
+{
+	int pathSize = points.size();
+	int nextPointIndex = (currentPointIndex + 1) % pathSize;
+	Vector3 currentPosition = GetOwner()->m_transform.GetWorldPosition();
+	Quaternion currentRotation = GetOwner()->m_transform.GetWorldQuaternion();
+	currentRotation.Normalize();
+	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
+
+	Vector3 dir = Mathf::Normalize(points[nextPointIndex] - points[currentPointIndex]);
+	Vector3 endResult = points[nextPointIndex] - dir * m_pathRadius;
+	Vector3 startResult = points[currentPointIndex] + dir * m_pathRadius;
+	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
+	Vector3 predictClosestPosition = GetBothPointAndLineClosestPoint(closestPoint + dir * m_predictNextTime * moveSpeed, startResult, endResult);
+
+#ifdef _DEBUG
+	if (DebugPoint)
+		DebugPoint->m_transform.SetPosition(predictClosestPosition);
+#endif // _DEBUG
+
+	Mathf::Vector3 direction = currentForward;
+	float rotDownSpeed = 1.f;
+
+	// 1. 미래위치의 투영점이 경로의 반지름을 벗어난 경우, 경로를 재설정
+	if (Mathf::Distance(currentPosition, closestPoint) > m_pathRadius) {
+		nextMovePoint = predictClosestPosition; // 새로운 목적지 설정
+		direction = Mathf::Normalize(nextMovePoint - currentPosition);
+		Vector3 right = Vector3::Up.Cross(direction);
+		if (right.LengthSquared() < 0.0001f)
+			right = Vector3::Right; // fallback for colinear
+		right.Normalize();
+		Vector3 up = direction.Cross(right);
+
+		Matrix rotMatrix = Matrix(
+			right.x, right.y, right.z, 0,
+			up.x, up.y, up.z, 0,
+			direction.x, direction.y, direction.z, 0,
+			0, 0, 0, 1
+		);
+
+		Quaternion rot = Quaternion::CreateFromRotationMatrix(rotMatrix);
+		Quaternion newRot = Quaternion::Slerp(currentRotation, rot, m_rotateSpeed * tick);
+
+		rotDownSpeed = rot.Dot(GetComponent<Transform>().GetWorldQuaternion());
+		rotDownSpeed = std::clamp(rotDownSpeed, 0.f, 1.f);
+
+		GetOwner()->m_transform.SetRotation(newRot);
+	}
+
+	Vector3 newPosition = currentPosition + direction * moveSpeed * tick * rotDownSpeed;
+	GetOwner()->m_transform.SetPosition(newPosition);
+
+	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
+	if (newDistance <= m_pathRadius) {
+		currentPointIndex = nextPointIndex; // Loop through the points
+	}
+}
+
+void EntityAsis::Stun()
+{
 }
 
 EntityItem* EntityAsis::GetPurificationItemInEntityItemQueue()

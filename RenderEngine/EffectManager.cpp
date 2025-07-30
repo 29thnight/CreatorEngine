@@ -319,7 +319,7 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 	if (templateConfig.moduleConfig.colorEnabled) {
 		if (auto* module = ps->GetModule<ColorModuleCS>()) {
 			if (!templateConfig.colorModuleData.empty() && templateConfig.colorModuleData.contains("data")) {
-				//module->DeserializeData(templateConfig.colorModuleData["data"]);
+				module->DeserializeData(templateConfig.colorModuleData["data"]);
 			}
 			module->SetEnabled(true);
 		}
@@ -328,7 +328,7 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 	if (templateConfig.moduleConfig.movementEnabled) {
 		if (auto* module = ps->GetModule<MovementModuleCS>()) {
 			if (!templateConfig.movementModuleData.empty() && templateConfig.movementModuleData.contains("data")) {
-				//module->DeserializeData(templateConfig.movementModuleData["data"]);
+				module->DeserializeData(templateConfig.movementModuleData["data"]);
 			}
 			module->SetEnabled(true);
 		}

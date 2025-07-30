@@ -12,8 +12,8 @@ bool IsDetect::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	Mathf::Vector3 dir = asispos - pos;
 
-	float chaseRange = blackBoard.GetValueAsFloat("eNorChaseRange");
-	float outDuration = blackBoard.GetValueAsFloat("eNorChaseOutDuration");
+	float chaseRange = blackBoard.GetValueAsFloat("eChaseRange");
+	float outDuration = blackBoard.GetValueAsFloat("eChaseOutDuration");
 
 	static float outTime = 0.0f;
 

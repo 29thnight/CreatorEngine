@@ -135,14 +135,15 @@ void EntityItem::SetThrowOwner(Player* player)
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	
-	/*auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
-		GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+	auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
 		auto pos = GetOwner()->m_transform.GetWorldPosition();
 		return Vector3(pos.m128_f32[0], pos.m128_f32[1], pos.m128_f32[2]); },
-		[&](Vector3 val) { GetOwner()->m_transform.SetPosition(val); },
-		Vector3(30, 5, 30),
-		3.0f, 
-		[](float t) {return Easing::EaseInOutBack(t);}
+		[&](Vector3 val) {
+			GetComponent<RigidBodyComponent>().SetLinearVelocity(Mathf::Vector3::Zero);
+			GetOwner()->m_transform.SetPosition(val); },
+		asisTail->m_transform.GetWorldPosition(),
+		0.5f, 
+		[](float t) {return Easing::Linear(t);}
 	);
 
 	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween);*/

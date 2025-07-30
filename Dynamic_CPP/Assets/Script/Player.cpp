@@ -68,6 +68,11 @@ void Player::Start()
 	player->m_collisionType = 2;
 	m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
 
+
+	GameManager* gm = GameObject::Find("GameManager")->GetComponent<GameManager>();
+	gm->PushEntity(this);
+	gm->PushPlayer(this);
+
 	camera = GameObject::Find("Main Camera");
 }
 

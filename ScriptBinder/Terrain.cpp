@@ -96,12 +96,13 @@ void TerrainComponent::Initialize()
 	}
 
 	// TerrainMesh 생성 (한 번만)
-	m_pMesh = new TerrainMesh(
+	m_pTerrainMesh = std::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+	/*m_pMesh = new TerrainMesh(
 		m_name.ToString(),
 		verts,
 		indices,
 		(uint32_t)m_width
-	);
+	);*/
 
 	m_pMaterial = new TerrainMaterial();
 	//// TerrainMaterial 초기화 -> 스플랫맵 텍스처 생성
@@ -120,10 +121,12 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 		w.assign(m_width * m_height, 0.0f);
 
 	// 2) 기존 메시 해제
-	if (m_pMesh) {
+	m_pTerrainMesh.reset();
+
+	/*if (m_pMesh) {
 		delete m_pMesh;
 		m_pMesh = nullptr;
-	}
+	}*/
 
 	// 3) 메시 재생성 (initMesh 로직 그대로 재사용)
 	{
@@ -154,7 +157,8 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 				indices.push_back(bl); indices.push_back(br); indices.push_back(tr);
 			}
 		}
-		m_pMesh = new TerrainMesh(m_name.ToString(), verts, indices, (uint32_t)m_width);
+		m_pTerrainMesh = std::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+		//m_pMesh = new TerrainMesh(m_name.ToString(), verts, indices, (uint32_t)m_width);
 	}
 
 	// 4) 스플랫 맵 텍스처 초기화
@@ -260,13 +264,17 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 	}
 
 	// 실제 GPU 버퍼에 패치만 업로드
-	m_pMesh->UpdateVertexBufferPatch(
+	m_pTerrainMesh->UpdateVertexBufferPatch(
+		patchVerts.data(),
+		(uint32_t)minX, (uint32_t)minY, (uint32_t)patchW, (uint32_t)patchH
+	);
+	/*m_pMesh->UpdateVertexBufferPatch(
 		patchVerts.data(),
 		(uint32_t)minX,
 		(uint32_t)minY,
 		(uint32_t)patchW,
 		(uint32_t)patchH
-	);
+	);*/
 
 
 	// 레이어 페인트 splet 맵 업데이트
@@ -603,11 +611,17 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			));
 		}
 	}
-	m_pMesh->UpdateVertexBuffer(
+	m_pTerrainMesh->UpdateVertexBuffer(
 		patchVerts.data(),
 		(uint32_t)m_width *
 		(uint32_t)m_height
 	); // 높이맵 변경 후 메쉬 업데이트
+
+	//m_pMesh->UpdateVertexBuffer(
+	//	patchVerts.data(),
+	//	(uint32_t)m_width *
+	//	(uint32_t)m_height
+	//); // 높이맵 변경 후 메쉬 업데이트
 	//InitSplatMapTexture(m_width, m_height); // 스플랫맵 텍스처 초기화
 	std::swap(m_layerHeightMap, tmpLayerHeightMap);
 	//UpdateSplatMapPatch(0, 0, m_width, m_height); // 스플랫맵 패치 업데이트
@@ -636,7 +650,8 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	auto proxy = renderScene->FindProxy(GetInstanceID());
 	if (proxy)
 	{
-		proxy->m_terrainMesh = m_pMesh;
+		proxy->m_terrainMesh = m_pTerrainMesh;
+		//proxy->m_terrainMesh = m_pMesh;
 		proxy->m_terrainMaterial = m_pMaterial;
 	}
 }
@@ -796,7 +811,7 @@ void TerrainComponent::UpdateLayerDesc(uint32_t layerID)
 
 void TerrainComponent::Awake()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
@@ -805,7 +820,8 @@ void TerrainComponent::Awake()
 		auto proxy = renderScene->FindProxy(GetInstanceID());
 		if (proxy)
 		{
-			proxy->m_terrainMesh = m_pMesh;
+			proxy->m_terrainMesh = m_pTerrainMesh;
+			//proxy->m_terrainMesh = m_pMesh;
 			proxy->m_terrainMaterial = m_pMaterial;
 		}
 	}
@@ -813,7 +829,7 @@ void TerrainComponent::Awake()
 
 void TerrainComponent::OnDestroy()
 {
-	auto scene = SceneManagers->GetActiveScene();
+	auto scene = GetOwner()->m_ownerScene;
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{

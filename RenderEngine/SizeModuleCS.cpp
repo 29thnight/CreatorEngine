@@ -211,7 +211,7 @@ void SizeModuleCS::SetRandomScale(bool enabled, float minScale, float maxScale)
 
 void SizeModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
 {
-    m_easingModule.SetEasinType(easingType);
+    m_easingModule.SetEasingType(easingType);
     m_easingModule.SetAnimationType(animationType);
     m_easingModule.SetDuration(duration);
     m_easingEnable = true;

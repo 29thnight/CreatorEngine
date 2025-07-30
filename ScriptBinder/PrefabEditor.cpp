@@ -2,20 +2,6 @@
 
 PrefabEditor::PrefabEditor()
 {
-    ImGui::ContextRegister("Prefab Editor", [&]() {
-        if (!m_isOpened)
-            return;
-        if (ImGui::Button("Apply & Close"))
-        {
-            Close(true);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Close"))
-        {
-            Close(false);
-        }
-    });
-    ImGui::GetContext("Prefab Editor").Close();
 }
 
 void PrefabEditor::Open(const std::string& path)
@@ -31,7 +17,7 @@ void PrefabEditor::Open(const std::string& path)
     m_prevScene = SceneManagers->GetActiveScene();
     m_prevSceneIndex = SceneManagers->GetActiveSceneIndex();
 
-    m_editScene = Scene::CreateNewScene("PrefabEditorScene");
+    m_editScene = Scene::CreateNewScene("PrefabEditor");
     SceneManagers->GetScenes().push_back(m_editScene);
     SceneManagers->SetActiveScene(m_editScene);
     SceneManagers->SetActiveSceneIndex(SceneManagers->GetScenes().size() - 1);
@@ -41,7 +27,6 @@ void PrefabEditor::Open(const std::string& path)
     PrefabUtilitys->InstantiatePrefab(m_prefab);
 
     m_isOpened = true;
-    ImGui::GetContext("Prefab Editor").Open();
 }
 
 void PrefabEditor::Close(bool apply)
@@ -77,5 +62,4 @@ void PrefabEditor::Close(bool apply)
     activeSceneChangedEvent.Broadcast();
 
     m_isOpened = false;
-    ImGui::GetContext("Prefab Editor").Close();
 }

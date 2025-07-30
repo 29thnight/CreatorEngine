@@ -7,6 +7,7 @@ struct AAPassSetting
    ReflectAAPassSetting
     [[Serializable]]
     AAPassSetting() = default;
+   ~AAPassSetting() = default;
 
     [[Property]]
     bool isApply{ true };
