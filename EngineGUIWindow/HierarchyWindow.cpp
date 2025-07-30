@@ -194,7 +194,10 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 				if(scene)
 				{
-					Model::LoadModelToScene(DataSystems->LoadCashedModel(filepath.string().c_str()), *scene);
+					Meta::UndoCommandManager->Execute(
+						std::make_unique<Meta::LoadModelToSceneObjCommand>(
+							scene,
+							DataSystems->LoadCashedModel(filepath.string())));
 				}
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))

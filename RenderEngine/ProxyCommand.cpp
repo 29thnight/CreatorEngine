@@ -22,6 +22,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* pComponent) :
 	Mathf::Vector3 worldPosition	= owner->m_transform.GetWorldPosition();
 	Material* originMat				= pComponent->m_Material;
 
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
+
 	if (nullptr == originMat) 
 	{
 		m_updateFunction = [=]
@@ -112,9 +114,10 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 	m_proxyGUID = pComponent->GetInstanceID();
 	auto renderScene = SceneManagers->GetRenderScene();
 	auto owner = pComponent->GetOwner();
-	if (!owner) return;
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
+	auto terrainMesh = pComponent->GetMesh();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];
 
 	if (!proxyObject) return;
@@ -123,7 +126,7 @@ ProxyCommand::ProxyCommand(TerrainComponent* pComponent)
 	{
 		proxyObject->m_worldMatrix = worldMatrix;
 		proxyObject->m_worldPosition = worldPosition;
-		proxyObject->m_terrainMesh = pComponent->GetMesh();
+		proxyObject->m_terrainMesh = terrainMesh;
 	};
 }
 
@@ -132,7 +135,7 @@ ProxyCommand::ProxyCommand(FoliageComponent* pComponent) :
 {
 	auto renderScene = SceneManagers->GetRenderScene();
 	auto owner = pComponent->GetOwner();
-	if (!owner) return;
+	if (!owner || owner->IsDestroyMark() || pComponent->IsDestroyMark()) return;
 	Mathf::xMatrix worldMatrix = owner->m_transform.GetWorldMatrix();
 	Mathf::Vector3 worldPosition = owner->m_transform.GetWorldPosition();
 	auto& proxyObject = renderScene->m_proxyMap[m_proxyGUID];

@@ -7,6 +7,7 @@
 #include "fa.h"
 #include "Scene.h"
 #include "Camera.h"
+#include "GameObjectCommand.h"
 #include "CameraComponent.h"
 #include "FoliageComponent.h"
 #include "LightComponent.h"
@@ -113,24 +114,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ICON_FA_EYE,
 		ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
 		ICON_FA_ARROWS_ROTATE,
-		ICON_FA_GROUP_ARROWS_ROTATE
+		ICON_FA_GROUP_ARROWS_ROTATE,
 	};
 	static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
 
 
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
+	bool ctrl = ImGui::GetIO().KeyCtrl;
 
-	if (ImGui::IsKeyPressed(ImGuiKey_T))
-		selectGizmoMode = SelectGuizmoMode::Translate;
-	if (ImGui::IsKeyPressed(ImGuiKey_R))
-		selectGizmoMode = SelectGuizmoMode::Rotate;
-	if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
-		selectGizmoMode = SelectGuizmoMode::Scale;
-	if (ImGui::IsKeyPressed(ImGuiKey_F))
-		useSnap = !useSnap;
-	if (ImGui::IsKeyPressed(ImGuiKey_V))
-		selectGizmoMode = SelectGuizmoMode::Select;
+	if(!ctrl)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_T))
+			selectGizmoMode = SelectGuizmoMode::Translate;
+		if (ImGui::IsKeyPressed(ImGuiKey_R))
+			selectGizmoMode = SelectGuizmoMode::Rotate;
+		if (ImGui::IsKeyPressed(ImGuiKey_G)) // r Key
+			selectGizmoMode = SelectGuizmoMode::Scale;
+		if (ImGui::IsKeyPressed(ImGuiKey_F))
+			useSnap = !useSnap;
+		if (ImGui::IsKeyPressed(ImGuiKey_V))
+			selectGizmoMode = SelectGuizmoMode::Select;
+	}
 
 	ImGuiIO& io = ImGui::GetIO();
 	float viewManipulateRight = io.DisplaySize.x;
@@ -212,9 +217,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::OpenPopup("CameraSettings");
 		}
 
+
+
 		ImGui::SameLine();
 		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 250.f, currentPos.y));
+		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 270.f, currentPos.y));
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
 		for (int i = 0; i < buttonCount; i++)
 		{
@@ -235,9 +242,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			ImGui::SameLine();
 			currentPos = ImGui::GetCursorScreenPos();
 			ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
-
 			ImGui::PopStyleColor();
 		}
+
+		ImGui::SameLine();
+		currentPos = ImGui::GetCursorScreenPos();
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
+		if (useSnap)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
+		}
+		else
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+		}
+
+		if (ImGui::Button(ICON_FA_BORDER_ALL " Snap"))
+		{
+			useSnap = !useSnap;
+		}
+		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
+		ImGui::PopStyleColor();
+
 		ImGui::PopStyleVar(1);
 
 
@@ -409,7 +435,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		wasDragging = isDragging;
     }
 
-	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 30), ImVec2(128, 128), 0x10101010);
+	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 16), ImVec2(128, 128), IM_COL32(0, 0, 0, 0));
 
 	{
 		auto scene = SceneManagers->GetActiveScene();
@@ -533,9 +559,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				file::path filename = file::path(droppedFilePath).filename();
 				previewModelPath = PathFinder::Relative("Models\\") / filename;
 
-				dragPreviewObject = Model::LoadModelToSceneObj(
-					DataSystems->LoadCashedModel(previewModelPath.string()),
-					*scene);
+				GameObject* createdObj = nullptr;
+				Meta::UndoCommandManager->Execute(
+					std::make_unique<Meta::LoadModelToSceneObjCommand>(
+						scene,
+						DataSystems->LoadCashedModel(previewModelPath.string()),
+						&createdObj));
+				dragPreviewObject = createdObj;
 			}
 		}
 		else
