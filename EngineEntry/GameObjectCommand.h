@@ -98,4 +98,65 @@ namespace Meta
         GameObject::Index m_index{ GameObject::INVALID_INDEX };
         MetaYml::Node m_serializedNode{};
     };
+
+    class DuplicateGameObjectCommand : public IUndoableCommand
+    {
+    public:
+        DuplicateGameObjectCommand(Scene* scene, const GameObject* original)
+            : m_scene(scene)
+        {
+            if (original)
+            {
+                m_name = original->m_name.ToString();
+                m_type = original->GetType();
+                m_parentIndex = original->m_parentIndex;
+                m_serializedNode = Meta::Serialize(const_cast<GameObject*>(original));
+            }
+        }
+
+        void Undo() override
+        {
+            if (GameObject::IsValidIndex(m_createdIndex))
+            {
+                m_scene->DestroyGameObject(m_createdIndex);
+            }
+        }
+
+        void Redo() override
+        {
+            auto objPtr = m_scene->CreateGameObject(m_name, m_type, m_parentIndex);
+            if (objPtr)
+            {
+				GameObject::Index oldIndex = objPtr->m_index;
+                Meta::Deserialize(objPtr.get(), m_serializedNode);
+                if (m_serializedNode["m_components"])
+                {
+                    for (const auto& componentNode : m_serializedNode["m_components"])
+                    {
+                        try
+                        {
+                            ComponentFactorys->LoadComponent(objPtr.get(), componentNode, true);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            Debug->LogError(e.what());
+                            continue;
+                        }
+                    }
+                }
+				objPtr->m_index = oldIndex; // Restore the original index after deserialization
+            }
+            m_createdIndex = objPtr ? objPtr->m_index : GameObject::INVALID_INDEX;
+        }
+
+    private:
+        Scene* m_scene{};
+        std::string m_name{};
+        GameObjectType m_type{ GameObjectType::Empty };
+        GameObject::Index m_parentIndex{ 0 };
+        GameObject::Index m_createdIndex{ GameObject::INVALID_INDEX };
+        MetaYml::Node m_serializedNode{};
+    public:
+        [[nodiscard]] GameObject::Index GetCreatedIndex() const { return m_createdIndex; }
+    };
 }
