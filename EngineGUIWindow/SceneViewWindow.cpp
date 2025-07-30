@@ -16,6 +16,7 @@
 #include "DataSystem.h"
 #include "RenderState.h"
 #include "PrefabUtility.h"
+#include "InputManager.h"
 #include "Terrain.h"
 
 bool useWindow = true;
@@ -121,7 +122,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	ImGuizmo::SetOrthographic(m_sceneRenderer->m_pEditorCamera->m_isOrthographic); 
 	ImGuizmo::BeginFrame();
-	bool ctrl = ImGui::GetIO().KeyCtrl;
+	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 
 	if(!ctrl)
 	{

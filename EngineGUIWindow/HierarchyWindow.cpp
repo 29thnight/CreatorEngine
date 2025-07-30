@@ -46,7 +46,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 
 			if (ImGui::IsWindowFocused())
 			{
-				bool ctrl = ImGui::GetIO().KeyCtrl;
+				bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 				if (ctrl && ImGui::IsKeyPressed(ImGuiKey_C))
 				{
 					m_clipboard = scene->m_selectedSceneObjects;

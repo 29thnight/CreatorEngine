@@ -1044,6 +1044,13 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 	if (ImGui::BeginPopup("Context Menu"))
 	{
+		if (currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
+		}
 		if (ImGui::MenuItem("Delete"))
 		{
 			file::remove(currentDirectory);
@@ -1138,6 +1145,13 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
 			OpenExplorerSelectFile(directory);
+		}
+		if (currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
 		}
 		ImGui::EndPopup();
 	}

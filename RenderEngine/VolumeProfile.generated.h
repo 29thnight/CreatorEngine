@@ -5,6 +5,7 @@ ReflectionField(VolumeProfile) \
 { \
 	PropertyField \
 	({ \
+		meta_property(profileName) \
 		meta_property(settings) \
 	}); \
 	FieldEnd(VolumeProfile, PropertyOnly) \
