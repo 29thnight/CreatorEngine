@@ -28,9 +28,6 @@ struct NodeAnimation
 	std::vector<ScaleKey> m_scaleKeys;
 };
 
-
-
-
 class Animator;
 class Animation
 {

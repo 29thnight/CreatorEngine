@@ -206,6 +206,7 @@ public:
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
+	std::unordered_set<GameObject::Index> m_updatedTransformObjs{};
 	std::vector<LightComponent*>    m_lightComponents;
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;

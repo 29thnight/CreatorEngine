@@ -96,6 +96,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
         return nullptr;
     }
 	ptr->m_ownerScene = this;
+	ptr->m_removedSuffixNumberTag = name.data();
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -139,6 +140,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
+
     GameObject::Index index = m_SceneObjects.size();
     auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
@@ -147,6 +149,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
     }
 
 	ptr->m_ownerScene = this;
+	ptr->m_removedSuffixNumberTag = name.data();
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -1110,7 +1113,13 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
+	if(m_updatedTransformObjs.contains(objIndex))
+	{
+		return;
+	}
+
 	const auto& obj = GetGameObject(objIndex);
+	m_updatedTransformObjs.insert(objIndex);
 
 	if (!obj || obj->IsDestroyMark())
 	{
@@ -1243,6 +1252,8 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
+	m_updatedTransformObjs.clear();
+
 	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
 	{
 		UpdateModelRecursive(objIndex, XMMatrixIdentity());
