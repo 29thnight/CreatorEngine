@@ -205,21 +205,40 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 void ToneMapPass::ControlPanel()
 {
     ImGui::PushID(this);
-    ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap);
+    auto& setting = EngineSettingInstance->GetRenderPassSettings().toneMap;
+    if (ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap))
+    {
+        setting.isAbleToneMap = m_isAbleToneMap;
+    }
     ImGui::SetNextWindowFocus();
-    ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10");
+    if (ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10"))
+    {
+        setting.toneMapType = (int)m_toneMapType;
+    }
     ImGui::Separator();
     ImGui::Text("Auto Exposure Settings");
-	ImGui::Checkbox("Use Auto Exposure", &m_isAbleAutoExposure);
-    ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", ImGuiSliderFlags_NoInput);
+        if (ImGui::Checkbox("Use Auto Exposure", &m_isAbleAutoExposure))
+        {
+                setting.isAbleAutoExposure = m_isAbleAutoExposure;
+        }
+    if (ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", ImGuiSliderFlags_NoInput))
+    {
+        setting.toneMapExposure = m_toneMapConstant.toneMapExposure;
+    }
     ImGui::Separator();
 	ImGui::Text("Auto Exposure Settings");
-	ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f);
-	ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f);
-	ImGui::DragFloat("ISO", &m_ISO, 50.0f, 50.0f, 6400.0f);
-	ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f);
-	ImGui::DragFloat("Speed Brightness", &m_speedBrightness, 0.01f, 0.1f, 10.0f);
-	ImGui::DragFloat("Speed Darkness", &m_speedDarkness, 0.01f, 0.1f, 10.0f);
+        if (ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f))
+                setting.fNumber = m_fNumber;
+        if (ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f))
+                setting.shutterTime = m_shutterTime;
+        if (ImGui::DragFloat("ISO", &m_ISO, 50.0f, 50.0f, 6400.0f))
+                setting.ISO = m_ISO;
+        if (ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f))
+                setting.exposureCompensation = m_exposureCompensation;
+        if (ImGui::DragFloat("Speed Brightness", &m_speedBrightness, 0.01f, 0.1f, 10.0f))
+                setting.speedBrightness = m_speedBrightness;
+        if (ImGui::DragFloat("Speed Darkness", &m_speedDarkness, 0.01f, 0.1f, 10.0f))
+                setting.speedDarkness = m_speedDarkness;
     ImGui::PopID();
 }
 

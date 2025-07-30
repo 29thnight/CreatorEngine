@@ -180,16 +180,35 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 void DeferredPass::ControlPanel()
 {
     ImGui::PushID(this);
-	ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion);
-	ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows);
-	ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap);
-	ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f);
+        auto& setting = EngineSettingInstance->GetRenderPassSettings().deferred;
+
+        if (ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion))
+        {
+                setting.useAmbientOcclusion = m_UseAmbientOcclusion;
+        }
+        if (ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows))
+        {
+                setting.useLightWithShadows = m_UseLightWithShadows;
+        }
+        if (ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap))
+        {
+                setting.useEnvironmentMap = m_UseEnvironmentMap;
+        }
+        if (ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f))
+        {
+                setting.envMapIntensity = m_envMapIntensity;
+        }
 
     if (ImGui::Button("Reset")) {
-		m_UseAmbientOcclusion = true;
-		m_UseEnvironmentMap = true;
-		m_UseLightWithShadows = true;
-		m_envMapIntensity = 1.f;
+                m_UseAmbientOcclusion = true;
+                m_UseEnvironmentMap = true;
+                m_UseLightWithShadows = true;
+                m_envMapIntensity = 1.f;
+
+                setting.useAmbientOcclusion = m_UseAmbientOcclusion;
+                setting.useEnvironmentMap = m_UseEnvironmentMap;
+                setting.useLightWithShadows = m_UseLightWithShadows;
+                setting.envMapIntensity = m_envMapIntensity;
     }
     ImGui::PopID();
 }
