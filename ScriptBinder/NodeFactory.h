@@ -1,14 +1,14 @@
 #pragma once
 #include "BTHeader.h"
 #include "Core.Minimal.h"
-
+#include "DLLAcrossSingleton.h"
 
 namespace BT
 {
-	class NodeFactory : public Singleton<NodeFactory>
+	class NodeFactory : public DLLCore::Singleton<NodeFactory>
 	{
 	private:
-		friend class Singleton;
+		friend class DLLCore::Singleton<NodeFactory>;
 		NodeFactory() = default;
 		~NodeFactory() = default;
 
@@ -44,4 +44,4 @@ namespace BT
 	};
 } // namespace BT
 
-static auto& BTNodeFactory = BT::NodeFactory::GetInstance();
+static auto BTNodeFactory = BT::NodeFactory::GetInstance();

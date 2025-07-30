@@ -51,10 +51,10 @@ void SceneManager::Initialization()
 {
     if(!m_isInitialized)
     {
-        ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
-        ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
-        ScriptManager->UpdatePhysx(PhysicX::GetInstance);
-		ScriptManager->UpdateObjectAllocFunc(GameObjectPool::GetInstance);
+        //ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
+        //ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
+        //ScriptManager->UpdatePhysx(PhysicX::GetInstance);
+		//ScriptManager->UpdateObjectAllocFunc(GameObjectPool::GetInstance);
 		m_isInitialized = true;
     }
 

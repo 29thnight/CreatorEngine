@@ -3,12 +3,7 @@
 #include <winternl.h>                   //PROCESS_BASIC_INFORMATION
 #include <VersionHelpers.h>
 
-bool IsWindows8OrGreater()
-{
-	return ::IsWindows8OrGreater(); // Windows SDK 제공 함수
-}
-
-bool ReadMem(void* addr, void* buf, int size)
+inline bool ReadMem(void* addr, void* buf, int size)
 {
 	BOOL b = ReadProcessMemory(GetCurrentProcess(), addr, buf, size, nullptr);
 	return b != FALSE;
@@ -22,10 +17,10 @@ bool ReadMem(void* addr, void* buf, int size)
 
 typedef NTSTATUS(NTAPI* pfuncNtQueryInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
-int GetModuleLoadCount(HMODULE hDll)
+inline int GetModuleLoadCount(HMODULE hDll)
 {
 	// Not supported by earlier versions of windows.
-	if (!IsWindows8OrGreater())
+	if (!::IsWindows8OrGreater())
 		return 0;
 
 	PROCESS_BASIC_INFORMATION pbi = { 0 };

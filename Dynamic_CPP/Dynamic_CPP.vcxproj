@@ -165,8 +165,13 @@
 		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
+		<ClInclude Include="AniBehaviourFactory.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
 		<ClInclude Include="Assets\Script\AsisMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
+		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="RaycastHelper.h" />
@@ -207,14 +212,14 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h" />
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h" />
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
-		<ClInclude Include="Assets\Script\Weapon.h" />
 	</ItemGroup>
 	<ItemGroup>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp" />
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp" />
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp" />
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
+		<ClCompile Include="Assets\Script\Weapon.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
 		<ClCompile Include="pch.cpp">
@@ -336,22 +341,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Weapon.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

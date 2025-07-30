@@ -141,6 +141,15 @@
 		<ClInclude Include="Assets\Script\TestEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
@@ -174,17 +183,8 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\Weapon.h">
-			<Filter>Script\ScriptClass</Filter>
+		<ClInclude Include="AniBehaviourFactory.h">
+			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -272,6 +272,15 @@
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
@@ -298,18 +307,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
 			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase2.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\Weapon.cpp">
-			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

@@ -78,34 +78,7 @@ public:
 
 	void CreateAniBehaviourScript(const std::string_view& name);
 
-	void UpdateObjectAllocFunc(Singleton<GameObjectPool>::FGetInstance objectPool)
-	{
-		if (!m_setObjectAllocFunc) return;
-
-		m_setObjectAllocFunc(objectPool);
-	}
-
 #pragma region Script Build Helper
-	void UpdateBTNodeFactory(Singleton<BT::NodeFactory>::FGetInstance btNodeFactory)
-	{
-		if (!m_setBTNodeFactoryFunc) return;
-
-		m_setBTNodeFactoryFunc(btNodeFactory);
-	}
-
-	void UpdatePhysicsManager(Singleton<PhysicsManager>::FGetInstance physicsManager) 
-	{
-		if (!m_setPhysicsManagerFunc) return;
-
-		m_setPhysicsManagerFunc(physicsManager);
-	}
-
-	void UpdatePhysx(Singleton<PhysicX>::FGetInstance physx) {
-		if (!m_setPhysxFunc) return;
-
-		m_setPhysxFunc(physx);
-	}
-
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
 		if (!m_scriptFactoryFunc) return nullptr;
@@ -224,15 +197,9 @@ private:
 
 private:
 	HMODULE hDll{};
-	SetObjectAllocFunc			m_setObjectAllocFunc{};
 	ModuleBehaviorFunc			m_scriptFactoryFunc{};
 	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
 	GetScriptNamesFunc			m_scriptNamesFunc{};
-	//[deprecated]
-	//SetSceneManagerFunc			m_setSceneManagerFunc{};
-	SetBTNodeFactoryFunc		m_setBTNodeFactoryFunc{};
-	SetPhysicsManagerFunc		m_setPhysicsManagerFunc{};
-	SetPhysxFunc				m_setPhysxFunc{};
 
 	std::wstring msbuildPath{};
 	std::wstring command{};

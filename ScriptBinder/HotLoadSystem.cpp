@@ -1606,7 +1606,7 @@ void HotLoadSystem::Compile()
 		}
 		m_scriptFactoryFunc		= nullptr;
 		m_scriptNamesFunc		= nullptr;
-		m_setSceneManagerFunc	= nullptr;
+		//m_setSceneManagerFunc	= nullptr;
 		hDll					= nullptr;
 	}
 
@@ -1672,14 +1672,6 @@ void HotLoadSystem::Compile()
 	// 스크립트 이름 함수 가져오기
 	m_scriptNamesFunc = reinterpret_cast<GetScriptNamesFunc>(GetProcAddress(hDll, "ListModuleBehavior"));
 	if (!m_scriptNamesFunc)
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
-	}
-	// 행동 트리 노드 팩토리 함수 가져오기
-	m_setBTNodeFactoryFunc = reinterpret_cast<SetBTNodeFactoryFunc>(GetProcAddress(hDll, "SetNodeFactory"));
-	if (!m_setBTNodeFactoryFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");
@@ -1759,30 +1751,6 @@ void HotLoadSystem::Compile()
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");
 		throw std::runtime_error("Failed to get function address...");
-	}
-
-	m_setPhysicsManagerFunc = reinterpret_cast<SetPhysicsManagerFunc>(GetProcAddress(hDll, "SetPhysicsManager"));
-	if (!m_setPhysicsManagerFunc)
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
-	}
-
-	m_setPhysxFunc = reinterpret_cast<SetPhysxFunc>(GetProcAddress(hDll, "SetPhysics"));
-	if (!m_setPhysxFunc)
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
-	}
-
-	m_setObjectAllocFunc = reinterpret_cast<SetObjectAllocFunc>(GetProcAddress(hDll, "SetObjectAllocator"));
-	if (!m_setObjectAllocFunc)
-	{
-		m_isReloading = false;
-		g_progressWindow->SetStatusText(L"Failed to get function address...");
-		throw std::runtime_error("Failed to get function address");
 	}
 
 	m_isCompileEventInvoked = false;

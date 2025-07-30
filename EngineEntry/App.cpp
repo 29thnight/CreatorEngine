@@ -11,6 +11,7 @@
 #include "EffectProxyController.h"
 #include "ResourceAllocator.h"
 #include "PrefabUtility.h"
+#include "GameObjectPool.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -42,12 +43,15 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	}
 
 	SceneManager::Destroy();
+	PhysicsManager::Destroy();
+	PhysicX::Destroy();
 	EngineSetting::Destroy();
 	EffectManager::Destroy();
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
 	DataSystem::Destroy();
 	ResourceAllocator::Destroy();
+	GameObjectPool::Destroy();
 	PrefabUtility::Destroy();
 
 	Log::Finalize();
@@ -57,12 +61,15 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	GameObjectPool::GetInstance();
 	EngineSetting::GetInstance();
 	PrefabUtility::GetInstance();
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
 	DataSystem::GetInstance();
 	ResourceAllocator::GetInstance();
+	PhysicX::GetInstance();
+	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
