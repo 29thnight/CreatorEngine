@@ -120,7 +120,7 @@ namespace InternalPath
 			PrecompiledShaderPath,
 			ProjectSettingsPath,
 			TerrainSourcePath,
-			volumeProfilePath
+			volumeProfilePath,
 			NodeEditorPath,
 			InputMapPath,
 		};

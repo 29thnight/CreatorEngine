@@ -819,7 +819,7 @@
     </ClInclude>
     <ClInclude Include="VolumeProfile.h">
       <Filter>Resources</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="TrailGenerateModule.h">
       <Filter>RenderPass\EffectPass\555.Generate</Filter>
     </ClInclude>
@@ -1037,7 +1037,7 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\ShadowVertexShader.vs.hlsl">
       <Filter>Shaders\PipelineShader</Filter>
-	</FxCompile>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SizeModule.cs.hlsl">
       <Filter>Shaders\Effect\2D</Filter>
     </FxCompile>
