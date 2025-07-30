@@ -75,6 +75,7 @@ public:
 	void SceneRendering();
 	void CreateCommandListPass();
 	void ReApplyCurrCubeMap();
+	void ApplyVolumeProfile();
 
 private:
 	void InitializeDeviceState();
@@ -97,6 +98,7 @@ private:
 	Core::DelegateHandle						m_activeSceneChangedEventHandle{};
 	Core::DelegateHandle						m_resizeEventHandle{};
 	Core::DelegateHandle						m_trimEventHandle{};
+	Core::DelegateHandle                        m_volumeProfileApplyEventHandle{};
 	//pass
 	std::unique_ptr<ShadowMapPass>				m_pShadowMapPass{};
 	std::unique_ptr<GBufferPass>				m_pGBufferPass{};

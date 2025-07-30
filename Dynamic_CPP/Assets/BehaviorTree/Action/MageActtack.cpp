@@ -1,5 +1,6 @@
-#include "MageActtack.h"
 #include "pch.h"
+#include "MageActtack.h"
+#include "RigidBodyComponent.h"
 
 NodeStatus MageActtack::Tick(float deltatime, BlackBoard& blackBoard)
 {

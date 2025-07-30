@@ -7,13 +7,16 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "FileIO.h"
+#include "VolumeProfile.h"
 #include "Benchmark.hpp"
+#include "SceneManager.h"
+#include "PrefabUtility.h"
 #include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ToggleUI.h"
 
-using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 10>;
+using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, (size_t)DataSystem::FileType::End>;
 
 constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Model,          "Model"				},
@@ -25,7 +28,8 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
     { DataSystem::FileType::Prefab,         "Prefab"            },
 	{ DataSystem::FileType::Sound,          "Sound"				},
-	{ DataSystem::FileType::HDR,            "HDR"				}
+	{ DataSystem::FileType::HDR,            "HDR"				},
+	{ DataSystem::FileType::VolumeProfile , "VolumeProfile"		}
 }};
 
 // 검색 함수
@@ -62,6 +66,8 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::HDR;
 	else if (filepath.extension() == ".prefab")
 		return DataSystem::FileType::Prefab;
+	else if (filepath.extension() == ".volume")
+		return DataSystem::FileType::VolumeProfile;
 	return DataSystem::FileType::Unknown;
 }
 
@@ -271,6 +277,36 @@ void DataSystem::RenderForEditer()
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 		ImGui::PopStyleVar();
+		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::RelativeToPrefab("")))
+		{
+			ImGui::Dummy(ImGui::GetContentRegionAvail());
+			overlayPos = ImGui::GetItemRectMin();
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+				{
+					auto scene = SceneManagers->GetActiveScene();
+					if (scene)
+					{
+						GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
+						auto objPtr = scene->GetGameObject(index);
+						if (objPtr)
+						{
+							GameObject* obj = objPtr.get();
+							Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+							if (prefab)
+							{
+								file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+								PrefabUtilitys->SavePrefab(prefab, savePath.string());
+								ForceCreateYamlMetaFile(savePath);
+								delete prefab;
+							}
+						}
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
 
 		ShowCurrentDirectoryFiles();
 		ImGui::PopStyleColor();
@@ -697,10 +733,39 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 			std::string iconName = ICON_FA_FOLDER + std::string(" ") + dirName;
 			bool nodeOpen = ImGui::TreeNodeEx(iconName.c_str(), nodeFlags);
+			if (!entry.path().empty() && std::filesystem::equivalent(entry.path(), PathFinder::RelativeToPrefab("")))
+			{
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+					{
+						auto scene = SceneManagers->GetActiveScene();
+						if (scene)
+						{
+							GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
+							auto objPtr = scene->GetGameObject(index);
+							if (objPtr)
+							{
+								GameObject* obj = objPtr.get();
+								Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+								if (prefab)
+								{
+									file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+									PrefabUtilitys->SavePrefab(prefab, savePath.string());
+									ForceCreateYamlMetaFile(savePath);
+									delete prefab;
+								}
+							}
+						}
+					}
+					ImGui::EndDragDropTarget();
+				}
+			}
 			if (ImGui::IsItemClicked())
 			{
 				currentDirectory = entry.path();
 			}
+
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
 				MenuDirectory = entry.path();
@@ -723,6 +788,13 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 
 	if (ImGui::BeginPopup("Context Menu"))
 	{
+		if (MenuDirectory.empty() && std::filesystem::equivalent(MenuDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(MenuDirectory);
+			}
+		}
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
 			OpenExplorerSelectFile(MenuDirectory);
@@ -748,6 +820,7 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 void DataSystem::ShowCurrentDirectoryFilesTile()
 {
+	ImGui::SetCursorScreenPos(overlayPos);
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -774,7 +847,8 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
 				extension == ".glb" || extension == ".png" || extension == ".dds" ||
 				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3")
+				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
+				extension == ".prefab")
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
@@ -816,6 +890,16 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 					fileType = FileType::Sound;
 					iconTexture = (ImTextureID)UnknownIcon->m_pSRV;
 				}
+				else if (extension == ".prefab")
+				{
+					fileType = FileType::Prefab;
+					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
+				}
+				else if (extension == ".volume")
+				{
+					fileType = FileType::VolumeProfile;
+					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
+				}
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
 
@@ -824,6 +908,23 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 		}
 	}
 	ImGui::Columns(1);
+
+	if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+	{
+		ImGui::OpenPopup("Directory Context");
+	}
+
+	if (ImGui::BeginPopup("Directory Context"))
+	{
+		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
+		}
+		ImGui::EndPopup();
+	}
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
@@ -859,7 +960,8 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
 				extension == ".glb" || extension == ".png" || extension == ".dds" ||
 				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3")
+				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
+				extension == ".prefab")
 			{
 				std::string label = entry.path().filename().string();
 				std::string apliedIcon;
@@ -894,6 +996,14 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 				else if (extension == ".wav" || extension == ".mp3")
 				{
 					apliedIcon = ICON_FA_FILE_AUDIO " ";
+				}
+				else if (extension == ".prefab")
+				{
+					apliedIcon = ICON_FA_BOX_OPEN " ";
+				}
+				else if (extension == ".volume")
+				{
+					apliedIcon = ICON_FA_SLIDERS " ";
 				}
 
 				label = apliedIcon + label;
@@ -934,6 +1044,13 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 	if (ImGui::BeginPopup("Context Menu"))
 	{
+		if (currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
+		}
 		if (ImGui::MenuItem("Delete"))
 		{
 			file::remove(currentDirectory);
@@ -1029,6 +1146,13 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		{
 			OpenExplorerSelectFile(directory);
 		}
+		if (currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		{
+			if (ImGui::MenuItem("Create Volume Profile"))
+			{
+				CreateVolumeProfile(currentDirectory);
+			}
+		}
 		ImGui::EndPopup();
 	}
 
@@ -1094,6 +1218,30 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 {
 	m_assetMetaWatcher->CreateYamlMeta(filepath);
+}
+
+void DataSystem::CreateVolumeProfile(const file::path& filepath)
+{
+	VolumeProfile profile;
+	profile.settings = EngineSettingInstance->GetRenderPassSettings();
+
+	std::string baseName = "NewVolumeProfile";
+	file::path savePath = filepath / (baseName + ".volume");
+	int index = 1;
+	while (std::filesystem::exists(savePath))
+	{
+		savePath = filepath / (baseName + std::to_string(index++) + ".volume");
+	}
+
+	std::ofstream fout(savePath);
+	if (fout.is_open())
+	{
+		YAML::Node node = Meta::Serialize(&profile);
+		fout << node;
+		fout.close();
+	}
+
+	ForceCreateYamlMetaFile(savePath);
 }
 
 void DataSystem::OpenFile(const file::path& filepath)

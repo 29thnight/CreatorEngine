@@ -9,6 +9,8 @@ ReflectionField(BloomPassSetting) \
 		meta_property(threshold) \
 		meta_property(knee) \
 		meta_property(coefficient) \
+		meta_property(blurRadius) \
+		meta_property(blurSigma) \
 	}); \
 	FieldEnd(BloomPassSetting, PropertyOnly) \
 };

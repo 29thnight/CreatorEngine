@@ -62,6 +62,10 @@ public:
 
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
 
+	void VolumeProfileApply();
+	bool IsVolumeProfileApply() const { return m_volumeProfileApply; }
+	void ResetVolumeProfileApply() { m_volumeProfileApply = false; }
+
 public:
 	//for Editor
 	Core::Delegate<void>                PlayModeEvent{};
@@ -106,6 +110,7 @@ private:
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
 	std::string                         m_LoadSceneName{};
     std::atomic_size_t                  m_activeSceneIndex{};
+	std::atomic_bool                    m_volumeProfileApply{ false };
 };
 
 static auto& SceneManagers = SceneManager::GetInstance();

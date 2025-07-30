@@ -140,7 +140,16 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     auto parentObj = scene->m_SceneObjects[parent];
     if (parentObj && parentObj->m_index != newIndex)
     {
-        parentObj->m_childrenIndices.push_back(newIndex);
+        if(std::find_if(parentObj->m_childrenIndices.begin(), parentObj->m_childrenIndices.end(),
+            [&](GameObject::Index index) { return index == newIndex; }) == parentObj->m_childrenIndices.end())
+        {
+            parentObj->m_childrenIndices.push_back(newIndex);
+        }
+        else
+        {
+            Debug->LogWarning("GameObject with index " + std::to_string(newIndex) + " is already a child of " + std::to_string(parent));
+		}
+
     }
 
     if (node["m_components"])
@@ -169,7 +178,9 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     obj->m_prefab = const_cast<Prefab*>(this);
     obj->m_prefabFileGuid = GetFileGuid();
-    PrefabUtilitys->RegisterInstance(obj, this);
+    obj->m_prefabOriginal = node;
+    if (parent == 0)
+        PrefabUtilitys->RegisterInstance(obj, this);
 
     return obj;
 }

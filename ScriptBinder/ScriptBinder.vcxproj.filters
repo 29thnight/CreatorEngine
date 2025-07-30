@@ -163,6 +163,9 @@
     <Filter Include="Classes\GameObject\PrefabUtility\Editor">
       <UniqueIdentifier>{1bc4df7b-91e2-422d-8d0c-992100ef5e1e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\Volume">
+      <UniqueIdentifier>{01015c03-b349-4cb1-8fc7-90849a47f6d6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -302,6 +305,9 @@
     </ClCompile>
     <ClCompile Include="PrefabEditor.cpp">
       <Filter>Classes\GameObject\PrefabUtility\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="VolumeComponent.cpp">
+      <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -574,6 +580,9 @@
     </ClInclude>
     <ClInclude Include="PrefabEditor.h">
       <Filter>Classes\GameObject\PrefabUtility\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="VolumeComponent.h">
+      <Filter>Classes\Components\Volume</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

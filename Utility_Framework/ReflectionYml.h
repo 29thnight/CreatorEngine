@@ -491,6 +491,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<int>>();
 						auto castInstance = reinterpret_cast<std::vector<int>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -500,6 +501,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<float>>();
 						auto castInstance = reinterpret_cast<std::vector<float>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -509,6 +511,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<bool>>();
 						auto castInstance = reinterpret_cast<std::vector<bool>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -518,6 +521,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<std::string>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->push_back(elem);
@@ -527,6 +531,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<HashingString>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);
@@ -536,6 +541,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<uint32_t>>();
 						auto castInstance = reinterpret_cast<std::vector<HashedGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);
@@ -545,6 +551,7 @@ namespace Meta
 					{
 						auto vec = node[prop.name].as<std::vector<std::string>>();
 						auto castInstance = reinterpret_cast<std::vector<FileGuid>*>(reinterpret_cast<char*>(instance) + prop.offset);
+						castInstance->clear(); // Clear existing elements
 						for (const auto& elem : vec)
 						{
 							castInstance->emplace_back(elem);
@@ -596,4 +603,44 @@ namespace Meta
 	}
 
 
+}
+
+namespace Meta
+{
+	inline void DeserializePrefab(void* instance, const Type& type,
+		const MetaYml::Node& newNode,
+		MetaYml::Node& prevNode)
+	{
+		MetaYml::Node currentNode = Serialize(instance, type);
+		MetaYml::Node patchedNode = currentNode;
+
+		if (type.parent)
+		{
+			DeserializePrefab(instance, *type.parent, newNode, prevNode);
+		}
+
+		for (const auto& prop : type.properties)
+		{
+			if (!newNode[prop.name])
+				continue;
+
+			const auto& currProp = currentNode[prop.name];
+			const auto& prevProp = prevNode[prop.name];
+
+			if (currProp && prevProp && YAML::Dump(currProp) == YAML::Dump(prevProp))
+			{
+				patchedNode[prop.name] = newNode[prop.name];
+			}
+		}
+
+		Deserialize(instance, type, patchedNode);
+		prevNode = newNode;
+	}
+
+	template<typename T>
+	inline void DeserializePrefab(T* instance, const MetaYml::Node& newNode,
+		MetaYml::Node& prevNode)
+	{
+		DeserializePrefab(reinterpret_cast<void*>(instance), T::Reflect(), newNode, prevNode);
+	}
 }

@@ -36,6 +36,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
     std::string uniqueName = GenerateUniqueGameObjectName(sceneObject->GetHashedName().ToString());
 
     sceneObject->SetName(uniqueName);
+	sceneObject->m_ownerScene = this;
 
 	m_SceneObjects.push_back(sceneObject);
 
@@ -97,6 +98,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     {
         return nullptr;
     }
+	ptr->m_ownerScene = this;
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -146,6 +148,8 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
     {
         return nullptr;
     }
+
+	ptr->m_ownerScene = this;
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -354,39 +358,34 @@ void Scene::LateUpdate(float deltaSecond)
 		if (!RenderPassData::VaildCheck(camera)) return;
 		auto data = RenderPassData::GetData(camera);
 
-		SceneManagers->m_threadPool->Enqueue([=]
+		for (auto& mesh : allMeshes)
 		{
-			for (auto& mesh : allMeshes)
+			if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
+			data->PushShadowRenderData(mesh->GetInstanceID());
+		}
+
+		for (auto& culledMesh : staticMeshes)
+		{
+			if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
+
+			auto frustum = camera->GetFrustum();
+			if (frustum.Intersects(culledMesh->GetBoundingBox()))
 			{
-				if (false == mesh->IsEnabled() || false == mesh->GetOwner()->IsEnabled()) continue;
-				data->PushShadowRenderData(mesh->GetInstanceID());
+				data->PushCullData(culledMesh->GetInstanceID());
 			}
+		}
 
-			for (auto& culledMesh : staticMeshes)
+		for (auto& skinnedMesh : skinnedMeshes)
+		{
+			if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
+
+			auto frustum = camera->GetFrustum();
+			if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
 			{
-				if (false == culledMesh->IsEnabled() || false == culledMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(culledMesh->GetBoundingBox()))
-				{
-					data->PushCullData(culledMesh->GetInstanceID());
-				}
+				data->PushCullData(skinnedMesh->GetInstanceID());
 			}
-
-			for (auto& skinnedMesh : skinnedMeshes)
-			{
-				if (false == skinnedMesh->IsEnabled() || false == skinnedMesh->GetOwner()->IsEnabled()) continue;
-
-				auto frustum = camera->GetFrustum();
-				if (frustum.Intersects(skinnedMesh->GetBoundingBox()))
-				{
-					data->PushCullData(skinnedMesh->GetInstanceID());
-				}
-			}
-		});
+		}
 	}
-
-	SceneManagers->m_threadPool->NotifyAllAndWait();
 }
 
 void Scene::OnDisable()
@@ -602,26 +601,26 @@ void Scene::CollectTerrainComponent(TerrainComponent* ptr)
 
 void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
 {
-        if (ptr)
-        {
-                std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
-        }
+    if (ptr)
+    {
+        std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
+    }
 }
 
 void Scene::CollectFoliageComponent(FoliageComponent* ptr)
 {
-        if (ptr)
-        {
-                m_foliageComponents.push_back(ptr);
-        }
+    if (ptr)
+    {
+        m_foliageComponents.push_back(ptr);
+    }
 }
 
 void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
 {
-        if (ptr)
-        {
-                std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
-        }
+    if (ptr)
+    {
+         std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
+    }
 }
 
 void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)

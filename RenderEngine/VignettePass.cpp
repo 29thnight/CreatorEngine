@@ -80,15 +80,28 @@ void VignettePass::Execute(RenderScene& scene, Camera& camera)
 
 void VignettePass::ControlPanel()
 {
-	ImGui::PushID(this);
-	ImGui::Checkbox("Vignette", &isOn);
-	ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f);
-	ImGui::SliderFloat("Softness", &softness, 0.0f, 1.0f);
+        ImGui::PushID(this);
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().vignette;
+        if (ImGui::Checkbox("Vignette", &isOn))
+        {
+                setting.isOn = isOn;
+        }
+        if (ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f))
+        {
+                setting.radius = radius;
+        }
+        if (ImGui::SliderFloat("Softness", &softness, 0.0f, 1.0f))
+        {
+                setting.softness = softness;
+        }
 
-	if (ImGui::Button("Reset")) {
-		radius = 0.75f;
-		softness = 0.5f;
-	}
+        if (ImGui::Button("Reset")) {
+                radius = 0.75f;
+                softness = 0.5f;
+
+                setting.radius = radius;
+                setting.softness = softness;
+        }
 
 	ImGui::PopID();
 }

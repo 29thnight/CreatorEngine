@@ -20,7 +20,7 @@ MeshRenderer::~MeshRenderer()
 
 void MeshRenderer::Awake()
 {
-    auto scene = SceneManagers->GetActiveScene();
+    auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if (scene)
     {
@@ -39,7 +39,7 @@ void MeshRenderer::Awake()
 void MeshRenderer::OnDestroy()
 {
     CullingManagers->Remove(this);
-	auto scene = SceneManagers->GetActiveScene();
+    auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{

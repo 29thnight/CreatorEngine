@@ -19,6 +19,11 @@ void ComponentFactory::Initialize()
 
    for (const auto& [name, type] : registerMap)
    {
+	   if (name == "Component" || name == "ScriptComponent" || name == "InvalidScriptComponent")
+	   {
+		   continue; // Skip base Component and ScriptComponent
+	   }
+
 	   size_t pos = name.find("Component");
 	   if (pos != std::string::npos)
 	   {

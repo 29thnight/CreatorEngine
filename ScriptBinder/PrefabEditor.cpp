@@ -17,7 +17,7 @@ void PrefabEditor::Open(const std::string& path)
     m_prevScene = SceneManagers->GetActiveScene();
     m_prevSceneIndex = SceneManagers->GetActiveSceneIndex();
 
-    m_editScene = Scene::CreateNewScene("PrefabEditorScene");
+    m_editScene = Scene::CreateNewScene("PrefabEditor");
     SceneManagers->GetScenes().push_back(m_editScene);
     SceneManagers->SetActiveScene(m_editScene);
     SceneManagers->SetActiveSceneIndex(SceneManagers->GetScenes().size() - 1);

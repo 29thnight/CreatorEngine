@@ -8,7 +8,7 @@
 
 void FoliageComponent::Awake()
 {
-    auto scene = SceneManagers->GetActiveScene();
+    auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if(scene)
     {
@@ -22,7 +22,7 @@ void FoliageComponent::Awake()
 
 void FoliageComponent::Update(float deltaTime)
 {
-    auto scene = SceneManagers->GetActiveScene();
+    auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if (scene && renderScene)
     {
@@ -36,7 +36,7 @@ void FoliageComponent::Update(float deltaTime)
 
 void FoliageComponent::OnDestroy()
 {
-    auto scene = SceneManagers->GetActiveScene();
+    auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if(scene)
     {

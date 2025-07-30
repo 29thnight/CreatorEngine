@@ -1,7 +1,7 @@
 #include "TestEnemy.h"
+#include "RigidBodyComponent.h"
 #include "pch.h"
 
-#include "RigidBodyComponent.h"
 void TestEnemy::Start()
 {
 	Owner = GetOwner();
