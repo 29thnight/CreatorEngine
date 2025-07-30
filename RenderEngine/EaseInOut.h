@@ -203,7 +203,7 @@ public:
           m_isReverse(false)
     {}
 
-    void SetEasinType(EasingEffect type) { m_easingType = type; }
+    void SetEasingType(EasingEffect type) { m_easingType = type; }
 
     void SetAnimationType(StepAnimation type) { m_animationType = type; }
 
@@ -214,6 +214,11 @@ public:
     float Update(float deltatime);
 
     bool isFinished() const { return m_isFinished; }
+
+    EasingEffect GetEasingType() const { return m_easingType; }
+    StepAnimation GetAnimationType() const { return m_animationType; }
+    float GetDuration() const { return m_duration; }
+
 private:
     EasingEffect m_easingType;
     StepAnimation m_animationType;

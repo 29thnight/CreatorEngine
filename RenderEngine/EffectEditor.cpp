@@ -1200,10 +1200,849 @@ void EffectEditor::RenderSpawnModuleEditor(SpawnModuleCS* spawnModule)
 
 void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 {
+	if (!movementModule) return;
+
+	if (ImGui::CollapsingHeader("Movement Module", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = movementModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Movement Module", &enabled))
+		{
+			movementModule->SetEnabled(enabled);
+		}
+
+		if (!enabled) return;
+
+		ImGui::Separator();
+
+		// Velocity 모드 선택
+		if (ImGui::TreeNode("Velocity Mode"))
+		{
+			static const char* velocityModes[] = {
+				"Constant",
+				"Curve",
+				"Impulse",
+				"Wind",
+				"Orbital"
+			};
+
+			int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
+			if (ImGui::Combo("Velocity Mode", &currentVelocityMode, velocityModes, IM_ARRAYSIZE(velocityModes)))
+			{
+				movementModule->SetVelocityMode(static_cast<VelocityMode>(currentVelocityMode));
+			}
+
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+
+		int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
+
+		if (currentVelocityMode == 1) // Curve
+		{
+			if (ImGui::TreeNode("Velocity Curve"))
+			{
+				// 모듈에서 현재 curve 데이터 가져오기
+				auto currentCurve = movementModule->GetVelocityCurve();
+
+				// static 대신 실시간으로 현재 데이터 사용
+				auto velocityPoints = currentCurve;
+
+				// 빈 경우 기본값 추가하고 바로 적용
+				if (velocityPoints.empty())
+				{
+					VelocityPoint defaultPoint;
+					defaultPoint.time = 0.0f;
+					defaultPoint.velocity = Mathf::Vector3(0, 2, 0);
+					defaultPoint.strength = 1.0f;
+					velocityPoints.push_back(defaultPoint);
+
+					defaultPoint.time = 0.5f;
+					defaultPoint.velocity = Mathf::Vector3(1, 0, 0);
+					defaultPoint.strength = 0.8f;
+					velocityPoints.push_back(defaultPoint);
+
+					defaultPoint.time = 1.0f;
+					defaultPoint.velocity = Mathf::Vector3(0, -1, 0);
+					defaultPoint.strength = 0.5f;
+					velocityPoints.push_back(defaultPoint);
+
+					// 기본값을 바로 적용
+					movementModule->SetVelocityCurve(velocityPoints);
+				}
+
+				bool curveChanged = false;
+
+				for (int i = 0; i < velocityPoints.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Point %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						if (ImGui::SliderFloat("Time", &velocityPoints[i].time, 0.0f, 1.0f))
+						{
+							curveChanged = true;
+						}
+
+						float velocity[3] = {
+							velocityPoints[i].velocity.x,
+							velocityPoints[i].velocity.y,
+							velocityPoints[i].velocity.z
+						};
+
+						if (ImGui::DragFloat3("Velocity", velocity, 0.1f, -10.0f, 10.0f))
+						{
+							velocityPoints[i].velocity = Mathf::Vector3(velocity[0], velocity[1], velocity[2]);
+							curveChanged = true;
+						}
+
+						if (ImGui::SliderFloat("Strength", &velocityPoints[i].strength, 0.0f, 2.0f))
+						{
+							curveChanged = true;
+						}
+
+						if (velocityPoints.size() > 1)
+						{
+							if (ImGui::Button("Delete Point"))
+							{
+								velocityPoints.erase(velocityPoints.begin() + i);
+								movementModule->SetVelocityCurve(velocityPoints); // 즉시 적용
+								ImGui::TreePop();
+								ImGui::PopID();
+								break;
+							}
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Point") && velocityPoints.size() < 16)
+				{
+					VelocityPoint newPoint;
+					newPoint.time = velocityPoints.empty() ? 0.5f : std::min(velocityPoints.back().time + 0.1f, 1.0f);
+					newPoint.velocity = Mathf::Vector3(0, 0, 0);
+					newPoint.strength = 1.0f;
+					velocityPoints.push_back(newPoint);
+					movementModule->SetVelocityCurve(velocityPoints); // 즉시 적용
+				}
+
+				// 실시간 업데이트 - 매 프레임마다 적용
+				if (curveChanged)
+				{
+					movementModule->SetVelocityCurve(velocityPoints);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// Impulse 설정 (Impulse 모드일 때)
+		else if (currentVelocityMode == 2) // Impulse
+		{
+			if (ImGui::TreeNode("Impulse Settings"))
+			{
+				// 모듈에서 현재 impulse 데이터 가져오기
+				auto currentImpulses = movementModule->GetImpulses();
+				auto impulses = currentImpulses;
+
+				// 빈 경우 기본값 추가하고 바로 적용
+				if (impulses.empty())
+				{
+					ImpulseData defaultImpulse;
+					defaultImpulse.triggerTime = 0.2f;
+					defaultImpulse.direction = Mathf::Vector3(0, 1, 0);
+					defaultImpulse.force = 5.0f;
+					defaultImpulse.duration = 0.1f;
+					impulses.push_back(defaultImpulse);
+
+					// 기본값을 바로 적용
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+					}
+				}
+
+				bool impulsesChanged = false;
+
+				for (int i = 0; i < impulses.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Impulse %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						if (ImGui::SliderFloat("Trigger Time", &impulses[i].triggerTime, 0.0f, 1.0f))
+							impulsesChanged = true;
+
+						float direction[3] = {
+							impulses[i].direction.x,
+							impulses[i].direction.y,
+							impulses[i].direction.z
+						};
+
+						if (ImGui::DragFloat3("Direction", direction, 0.1f, -1.0f, 1.0f))
+						{
+							impulses[i].direction = Mathf::Vector3(direction[0], direction[1], direction[2]);
+							impulsesChanged = true;
+						}
+
+						if (ImGui::SliderFloat("Force", &impulses[i].force, 0.0f, 20.0f))
+							impulsesChanged = true;
+
+						if (ImGui::SliderFloat("Duration", &impulses[i].duration, 0.01f, 1.0f))
+							impulsesChanged = true;
+
+						if (ImGui::Button("Delete Impulse"))
+						{
+							impulses.erase(impulses.begin() + i);
+							// 즉시 적용
+							movementModule->ClearImpulses();
+							for (const auto& impulse : impulses)
+							{
+								movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+							}
+							ImGui::TreePop();
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Impulse") && impulses.size() < 16)
+				{
+					ImpulseData newImpulse;
+					newImpulse.triggerTime = 0.5f;
+					newImpulse.direction = Mathf::Vector3(0, 1, 0);
+					newImpulse.force = 5.0f;
+					newImpulse.duration = 0.1f;
+					impulses.push_back(newImpulse);
+
+					// 즉시 적용
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+					}
+				}
+
+				// 실시간 업데이트 - 매 프레임마다 적용
+				if (impulsesChanged)
+				{
+					movementModule->ClearImpulses();
+					for (const auto& impulse : impulses)
+					{
+						movementModule->AddImpulse(impulse.triggerTime, impulse.direction, impulse.force, impulse.duration);
+					}
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// Wind 설정 (Wind 모드일 때)
+		else if (currentVelocityMode == 3) // Wind
+		{
+			if (ImGui::TreeNode("Wind Settings"))
+			{
+				// 모듈에서 현재 wind 데이터 가져오기
+				auto windData = movementModule->GetWindData();
+
+				// static 대신 실시간으로 현재 데이터 사용
+				float windDirection[3] = { windData.direction.x, windData.direction.y, windData.direction.z };
+				float windStrength = windData.baseStrength;
+				float turbulence = windData.turbulence;
+				float frequency = windData.frequency;
+
+				bool windChanged = false;
+
+				if (ImGui::DragFloat3("Wind Direction", windDirection, 0.1f, -1.0f, 1.0f))
+				{
+					// 정규화
+					float length = sqrt(windDirection[0] * windDirection[0] +
+						windDirection[1] * windDirection[1] +
+						windDirection[2] * windDirection[2]);
+					if (length > 0.001f)
+					{
+						windDirection[0] /= length;
+						windDirection[1] /= length;
+						windDirection[2] /= length;
+					}
+					windChanged = true;
+				}
+
+				if (ImGui::SliderFloat("Wind Strength", &windStrength, 0.0f, 10.0f))
+					windChanged = true;
+
+				if (ImGui::SliderFloat("Turbulence", &turbulence, 0.0f, 2.0f))
+					windChanged = true;
+
+				if (ImGui::SliderFloat("Frequency", &frequency, 0.1f, 5.0f))
+					windChanged = true;
+
+				// 실시간 업데이트 - 매 프레임마다 적용
+				if (windChanged)
+				{
+					movementModule->SetWindEffect(
+						Mathf::Vector3(windDirection[0], windDirection[1], windDirection[2]),
+						windStrength,
+						turbulence,
+						frequency
+					);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// Orbital 설정 (Orbital 모드일 때)
+		else if (currentVelocityMode == 4) // Orbital
+		{
+			if (ImGui::TreeNode("Orbital Settings"))
+			{
+				// 모듈에서 현재 orbital 데이터 가져오기
+				auto orbitalData = movementModule->GetOrbitalData();
+
+				// static 대신 실시간으로 현재 데이터 사용
+				float orbitalCenter[3] = { orbitalData.center.x, orbitalData.center.y, orbitalData.center.z };
+				float orbitalRadius = orbitalData.radius;
+				float orbitalSpeed = orbitalData.speed;
+				float orbitalAxis[3] = { orbitalData.axis.x, orbitalData.axis.y, orbitalData.axis.z };
+
+				bool orbitalChanged = false;
+
+				if (ImGui::DragFloat3("Orbital Center", orbitalCenter, 0.1f, -20.0f, 20.0f))
+					orbitalChanged = true;
+
+				if (ImGui::SliderFloat("Radius", &orbitalRadius, 0.1f, 20.0f))
+					orbitalChanged = true;
+
+				if (ImGui::SliderFloat("Speed", &orbitalSpeed, -5.0f, 5.0f))
+					orbitalChanged = true;
+
+				if (ImGui::DragFloat3("Rotation Axis", orbitalAxis, 0.1f, -1.0f, 1.0f))
+				{
+					// 정규화
+					float length = sqrt(orbitalAxis[0] * orbitalAxis[0] +
+						orbitalAxis[1] * orbitalAxis[1] +
+						orbitalAxis[2] * orbitalAxis[2]);
+					if (length > 0.001f)
+					{
+						orbitalAxis[0] /= length;
+						orbitalAxis[1] /= length;
+						orbitalAxis[2] /= length;
+					}
+					orbitalChanged = true;
+				}
+
+				// 프리셋 버튼들
+				ImGui::Text("Presets:");
+				if (ImGui::Button("Horizontal"))
+				{
+					orbitalAxis[0] = 0.0f; orbitalAxis[1] = 1.0f; orbitalAxis[2] = 0.0f;
+					// 즉시 적용
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Vertical"))
+				{
+					orbitalAxis[0] = 1.0f; orbitalAxis[1] = 0.0f; orbitalAxis[2] = 0.0f;
+					// 즉시 적용
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Depth"))
+				{
+					orbitalAxis[0] = 0.0f; orbitalAxis[1] = 0.0f; orbitalAxis[2] = 1.0f;
+					// 즉시 적용
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+
+				// 실시간 업데이트 - 매 프레임마다 적용
+				if (orbitalChanged)
+				{
+					movementModule->SetOrbitalMotion(
+						Mathf::Vector3(orbitalCenter[0], orbitalCenter[1], orbitalCenter[2]),
+						orbitalRadius,
+						orbitalSpeed,
+						Mathf::Vector3(orbitalAxis[0], orbitalAxis[1], orbitalAxis[2])
+					);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		// 중력 설정
+		if (ImGui::TreeNode("Gravity Settings"))
+		{
+			bool useGravity = movementModule->GetUseGravity();
+			if (ImGui::Checkbox("Use Gravity", &useGravity))
+			{
+				movementModule->SetUseGravity(useGravity);
+			}
+
+			if (useGravity)
+			{
+				// static 대신 실시간으로 현재 값 가져오기
+				static float gravityStrength = 9.8f;
+				static bool gravityInitialized = false;
+
+				// 첫 번째 렌더링에서만 현재 값으로 초기화
+				if (!gravityInitialized)
+				{
+					// movementModule에서 현재 중력 강도를 가져오는 getter 필요
+					gravityInitialized = true;
+				}
+
+				if (ImGui::SliderFloat("Gravity Strength", &gravityStrength, 0.0f, 50.0f, "%.2f"))
+				{
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Reset##Gravity"))
+				{
+					gravityStrength = 9.8f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+
+				// 프리셋 버튼들
+				ImGui::Text("Gravity Presets:");
+				ImGui::SameLine();
+
+				if (ImGui::Button("Earth"))
+				{
+					gravityStrength = 9.8f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Moon"))
+				{
+					gravityStrength = 1.6f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Mars"))
+				{
+					gravityStrength = 3.7f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Jupiter"))
+				{
+					gravityStrength = 24.8f;
+					movementModule->SetGravityStrength(gravityStrength);
+				}
+			}
+
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+			{
+				movementModule->SetEasingEnabled(easingEnabled);
+			}
+
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear",
+					"Ease In Quad", "Ease Out Quad", "Ease In Out Quad",
+					"Ease In Cubic", "Ease Out Cubic", "Ease In Out Cubic",
+					"Ease In Quart", "Ease Out Quart", "Ease In Out Quart",
+					"Ease In Quint", "Ease Out Quint", "Ease In Out Quint",
+					"Ease In Sine", "Ease Out Sine", "Ease In Out Sine",
+					"Ease In Expo", "Ease Out Expo", "Ease In Out Expo",
+					"Ease In Circ", "Ease Out Circ", "Ease In Out Circ",
+					"Ease In Back", "Ease Out Back", "Ease In Out Back",
+					"Ease In Elastic", "Ease Out Elastic", "Ease In Out Elastic",
+					"Ease In Bounce", "Ease Out Bounce", "Ease In Out Bounce"
+				};
+
+				static int currentEasingType = 0;
+				if (ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes)))
+				{
+					movementModule->SetEasingType(currentEasingType);
+				}
+			}
+
+			ImGui::TreePop();
+		}
+
+		ImGui::Separator();
+
+		// 디버그 정보
+		if (ImGui::TreeNode("Debug Info"))
+		{
+			ImGui::Text("Module Status: %s", movementModule->IsEnabled() ? "Enabled" : "Disabled");
+			ImGui::Text("Ready for Reuse: %s", movementModule->IsReadyForReuse() ? "Yes" : "No");
+			ImGui::Text("Current Velocity Mode: %d", static_cast<int>(movementModule->GetVelocityMode()));
+			ImGui::Text("Velocity Points: %zu", movementModule->GetVelocityCurve().size());
+			ImGui::Text("Impulses: %zu", movementModule->GetImpulses().size());
+
+			if (ImGui::Button("Reset Module"))
+			{
+				movementModule->ResetForReuse();
+			}
+
+			ImGui::TreePop();
+		}
+	}
 }
 
 void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 {
+	if (!colorModule) return;
+
+	if (ImGui::CollapsingHeader("Color Module", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = colorModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Color Module", &enabled))
+		{
+			colorModule->SetEnabled(enabled);
+		}
+
+		if (!enabled) return;
+
+		ImGui::Separator();
+
+		// 색상 전환 모드 선택
+		static const char* transitionModes[] = {
+			"Gradient",
+			"Discrete",
+			"Custom"
+		};
+
+		static int currentTransitionMode = 0;
+		if (ImGui::Combo("Transition Mode", &currentTransitionMode, transitionModes, IM_ARRAYSIZE(transitionModes)))
+		{
+			colorModule->SetTransitionMode(static_cast<ColorTransitionMode>(currentTransitionMode));
+		}
+
+		ImGui::Separator();
+
+		// 그라데이션 모드
+		if (currentTransitionMode == 0)
+		{
+			if (ImGui::TreeNode("Gradient Settings"))
+			{
+				static std::vector<std::pair<float, Mathf::Vector4>> gradientPoints = {
+					{0.0f, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f)},
+					{0.3f, Mathf::Vector4(1.0f, 1.0f, 0.0f, 0.9f)},
+					{0.7f, Mathf::Vector4(1.0f, 0.0f, 0.0f, 0.7f)},
+					{1.0f, Mathf::Vector4(0.5f, 0.0f, 0.0f, 0.0f)}
+				};
+
+				for (int i = 0; i < gradientPoints.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Point %d", i);
+
+					if (ImGui::TreeNode(label))
+					{
+						ImGui::SliderFloat("Time", &gradientPoints[i].first, 0.0f, 1.0f);
+
+						float color[4] = {
+							gradientPoints[i].second.x,
+							gradientPoints[i].second.y,
+							gradientPoints[i].second.z,
+							gradientPoints[i].second.w
+						};
+
+						if (ImGui::ColorEdit4("Color", color))
+						{
+							gradientPoints[i].second = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						}
+
+						if (gradientPoints.size() > 2)
+						{
+							if (ImGui::Button("Delete Point"))
+							{
+								gradientPoints.erase(gradientPoints.begin() + i);
+								ImGui::TreePop();
+								ImGui::PopID();
+								break;
+							}
+						}
+
+						ImGui::TreePop();
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Point") && gradientPoints.size() < 16)
+				{
+					float newTime = gradientPoints.empty() ? 0.5f :
+						(gradientPoints.back().first + 0.1f > 1.0f ? 0.5f : gradientPoints.back().first + 0.1f);
+					gradientPoints.emplace_back(newTime, Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+				}
+
+				if (ImGui::Button("Apply Gradient"))
+				{
+					std::sort(gradientPoints.begin(), gradientPoints.end(),
+						[](const auto& a, const auto& b) { return a.first < b.first; });
+
+					colorModule->SetColorGradient(gradientPoints);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// 이산 색상 모드
+		else if (currentTransitionMode == 1)
+		{
+			if (ImGui::TreeNode("Discrete Colors"))
+			{
+				static std::vector<Mathf::Vector4> discreteColors = {
+					Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+					Mathf::Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+					Mathf::Vector4(0.0f, 0.0f, 1.0f, 1.0f)
+				};
+
+				for (int i = 0; i < discreteColors.size(); ++i)
+				{
+					ImGui::PushID(i);
+
+					char label[32];
+					sprintf_s(label, "Color %d", i);
+
+					float color[4] = {
+						discreteColors[i].x,
+						discreteColors[i].y,
+						discreteColors[i].z,
+						discreteColors[i].w
+					};
+
+					if (ImGui::ColorEdit4(label, color))
+					{
+						discreteColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+					}
+
+					ImGui::SameLine();
+					if (ImGui::Button("Remove") && discreteColors.size() > 1)
+					{
+						discreteColors.erase(discreteColors.begin() + i);
+						ImGui::PopID();
+						break;
+					}
+
+					ImGui::PopID();
+				}
+
+				if (ImGui::Button("Add Color") && discreteColors.size() < 32)
+				{
+					discreteColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+				}
+
+				if (ImGui::Button("Apply Colors"))
+				{
+					colorModule->SetDiscreteColors(discreteColors);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+		// 커스텀 함수 모드
+		else if (currentTransitionMode == 2)
+		{
+			if (ImGui::TreeNode("Custom Function"))
+			{
+				static const char* functionTypes[] = {
+					"Pulse",
+					"Sine Wave",
+					"Flicker"
+				};
+
+				static int currentFunction = 0;
+				ImGui::Combo("Function Type", &currentFunction, functionTypes, IM_ARRAYSIZE(functionTypes));
+
+				if (currentFunction == 0) // Pulse
+				{
+					static float baseColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+					static float pulseColor[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					static float frequency = 1.0f;
+
+					ImGui::ColorEdit4("Base Color", baseColor);
+					ImGui::ColorEdit4("Pulse Color", pulseColor);
+					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+
+					if (ImGui::Button("Apply Pulse"))
+					{
+						colorModule->SetPulseColor(
+							Mathf::Vector4(baseColor[0], baseColor[1], baseColor[2], baseColor[3]),
+							Mathf::Vector4(pulseColor[0], pulseColor[1], pulseColor[2], pulseColor[3]),
+							frequency
+						);
+					}
+				}
+				else if (currentFunction == 1) // Sine Wave
+				{
+					static float color1[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+					static float color2[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+					static float frequency = 1.0f;
+					static float phase = 0.0f;
+
+					ImGui::ColorEdit4("Color 1", color1);
+					ImGui::ColorEdit4("Color 2", color2);
+					ImGui::SliderFloat("Frequency", &frequency, 0.1f, 10.0f);
+					ImGui::SliderFloat("Phase", &phase, 0.0f, 6.28f);
+
+					if (ImGui::Button("Apply Sine Wave"))
+					{
+						colorModule->SetSineWaveColor(
+							Mathf::Vector4(color1[0], color1[1], color1[2], color1[3]),
+							Mathf::Vector4(color2[0], color2[1], color2[2], color2[3]),
+							frequency,
+							phase
+						);
+					}
+				}
+				else if (currentFunction == 2) // Flicker
+				{
+					static std::vector<Mathf::Vector4> flickerColors = {
+						Mathf::Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+						Mathf::Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+						Mathf::Vector4(1.0f, 0.0f, 0.0f, 1.0f)
+					};
+					static float speed = 5.0f;
+
+					for (int i = 0; i < flickerColors.size(); ++i)
+					{
+						ImGui::PushID(i);
+
+						char label[32];
+						sprintf_s(label, "Flicker Color %d", i);
+
+						float color[4] = {
+							flickerColors[i].x,
+							flickerColors[i].y,
+							flickerColors[i].z,
+							flickerColors[i].w
+						};
+
+						if (ImGui::ColorEdit4(label, color))
+						{
+							flickerColors[i] = Mathf::Vector4(color[0], color[1], color[2], color[3]);
+						}
+
+						ImGui::SameLine();
+						if (ImGui::Button("Remove") && flickerColors.size() > 1)
+						{
+							flickerColors.erase(flickerColors.begin() + i);
+							ImGui::PopID();
+							break;
+						}
+
+						ImGui::PopID();
+					}
+
+					if (ImGui::Button("Add Flicker Color") && flickerColors.size() < 32)
+					{
+						flickerColors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+					}
+
+					ImGui::SliderFloat("Flicker Speed", &speed, 0.1f, 20.0f);
+
+					if (ImGui::Button("Apply Flicker"))
+					{
+						colorModule->SetFlickerColor(flickerColors, speed);
+					}
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		if (ImGui::TreeNode("Easing Settings"))
+		{
+			static bool easingEnabled = false;
+			ImGui::Checkbox("Enable Easing", &easingEnabled);
+
+			if (easingEnabled)
+			{
+				static const char* easingTypes[] = {
+					"Linear", "InSine", "OutSine", "InOutSine",
+					"InQuad", "OutQuad", "InOutQuad",
+					"InCubic", "OutCubic", "InOutCubic",
+					"InQuart", "OutQuart", "InOutQuart",
+					"InQuint", "OutQuint", "InOutQuint",
+					"InExpo", "OutExpo", "InOutExpo",
+					"InCirc", "OutCirc", "InOutCirc",
+					"InBack", "OutBack", "InOutBack",
+					"InElastic", "OutElastic", "InOutElastic",
+					"InBounce", "OutBounce", "InOutBounce"
+				};
+
+				static const char* animationTypes[] = {
+					"Once Forward", "Once Back", "Once PingPong",
+					"Loop Forward", "Loop Back", "Loop PingPong"
+				};
+
+				static int currentEasingType = 0;
+				static int currentAnimationType = 0;
+				static float duration = 1.0f;
+
+				ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes));
+				ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes));
+				ImGui::SliderFloat("Duration", &duration, 0.1f, 10.0f);
+
+				if (ImGui::Button("Apply Easing"))
+				{
+					colorModule->SetEasing(
+						static_cast<EasingEffect>(currentEasingType),
+						static_cast<StepAnimation>(currentAnimationType),
+						duration
+					);
+				}
+			}
+
+			ImGui::TreePop();
+		}
+	}
 }
 
 void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
