@@ -86,7 +86,7 @@ void EntityItem::Update(float tick)
 		Transform* myTr = GetOwner()->GetComponent<Transform>();
 
 		Vector3 pB = ((endPos - startPos) / 2) + startPos;
-		pB.y += 5.f;
+		pB.y += 10.f;
 		Vector3 pA = startPos;
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		timer += tick * speed; // 10sec
@@ -105,12 +105,42 @@ void EntityItem::Update(float tick)
 			speed = 2.f;
 			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-			m_state == EItemState::DROPPED;
+			m_state = EItemState::NONE;
 
 		};
 	}
 
 	if (m_state == EItemState::DROPPED)
+	{
+		speed -= tick;
+		if (speed < 1.f) {
+			speed = 1.f;
+		}
+		Transform* myTr = GetOwner()->GetComponent<Transform>();
+
+		Vector3 pB = ((endPos - startPos) / 2) + startPos;
+		//pB.y += 5.f;
+		Vector3 pA = startPos;
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		timer += tick * speed; // 10sec
+		if (timer < 1.f) {
+			Vector3 p0 = Lerp(pA, pB, timer);
+			Vector3 p1 = Lerp(pB, endPos, timer);
+			Vector3 p01 = Lerp(p0, p1, timer);
+
+			myTr->SetPosition(p01);
+		}
+		else
+		{
+			GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+			speed = 2.f;
+			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+			m_state = EItemState::NONE;
+
+		};
+	}
+	if (m_state == EItemState::NONE)
 	{
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
@@ -119,14 +149,24 @@ void EntityItem::Update(float tick)
 		
 	
 }
-void EntityItem::Throw(Mathf::Vector3 ownerForward,float distacne)
+void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
 {
-	m_state == EItemState::THROWN;
+	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+	m_state = EItemState::DROPPED;
+	timer = 0.f;
+	speed = 4.0f;
+	Mathf::Vector3 offset = { ownerForward.x * distance,0, ownerForward.z * distance };
+	endPos = startPos + offset;
+	endPos.y = 0.01;
+}
+void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
+{
+	m_state = EItemState::THROWN;
 	timer = 0.f;
 	isThrow = true;
-	Mathf::Vector3 offset = {ownerForward.x * distacne,0, ownerForward.z * distacne };
+	Mathf::Vector3 offset = {ownerForward.x * distance,0, ownerForward.z * distance };
 	endPos = startPos + offset;
-	endPos.y = 0.1;
+	endPos.y = 0.01;
 }
 
 void EntityItem::SetThrowOwner(Player* player)

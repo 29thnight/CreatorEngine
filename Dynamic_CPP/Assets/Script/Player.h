@@ -34,6 +34,7 @@ public:
 	void CatchAndThrow();
 	void Catch();
 	void Throw();
+	void DropCatchItem();
 	[[Method]]
 	void ThrowEvent();
 	[[Method]]

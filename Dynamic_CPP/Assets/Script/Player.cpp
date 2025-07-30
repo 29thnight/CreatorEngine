@@ -66,7 +66,7 @@ void Player::Start()
 
 
 	player->m_collisionType = 2;
-	m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
+	//m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
 
 
 	GameManager* gm = GameObject::Find("GameManager")->GetComponent<GameManager>();
@@ -172,7 +172,7 @@ void Player::Update(float tick)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack || !m_isCallStart) return;
+	if (isStun || isKnockBack || !m_isCallStart || isDashing) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 
@@ -232,35 +232,27 @@ void Player::Catch()
 
 void Player::Throw()
 {
-
-
-	//float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-	//if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f)) {
-	//	auto item = catchedObject->GetComponent<EntityItem>();
-	//	if (item) {
-	//		item->SetThrowOwner(this);
-	//	}
-	//	catchedObject = nullptr;
-	//	m_nearObject = nullptr; //&&&&&
-	//	if (m_curWeapon)
-	//		m_curWeapon->SetEnabled(true);
-	//}
 	m_animator->SetParameter("OnThrow", true);
+}
 
-	//auto item = catchedObject->GetComponent<EntityItem>();
-	//if (item) {
-	//	item->SetThrowOwner(this);
-	//	item->Throw(player->m_transform.GetForward(),6.0f);
-	//}
-	//catchedObject = nullptr;
-	//m_nearObject = nullptr; //&&&&&
-	//if(m_curWeapon)
-	//	m_curWeapon->SetEnabled(true);
+void Player::DropCatchItem()
+{
+	if (catchedObject != nullptr)
+	{
+		auto item = catchedObject->GetComponent<EntityItem>();
+		if (item) {
+			item->Drop(player->m_transform.GetForward(), 2.0f);
+		}
+
+		catchedObject = nullptr;
+		m_nearObject = nullptr; //&&&&&
+		if (m_curWeapon)
+			m_curWeapon->GetOwner()->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+	}
 }
 
 void Player::ThrowEvent()
 {
-	std::cout << "ThrowEvent" << std::endl;
 	auto item = catchedObject->GetComponent<EntityItem>();
 	if (item) {
 		item->SetThrowOwner(this);
@@ -269,7 +261,7 @@ void Player::ThrowEvent()
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
-		m_curWeapon->GetOwner()->SetEnabled(true);
+		m_curWeapon->GetOwner()->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
 }
 
 void Player::Dash()
@@ -285,24 +277,15 @@ void Player::Dash()
 	{
 		std::cout << "Dubble Dash  " << std::endl;
 	}
-	else if (m_curDashCount == 2)
-	{
-		std::cout << "Tripple Dash  " << std::endl;
-	}
-	else
-	{
-		std::cout << "multiple Dash  " << std::endl;
-	}
 
 	//대쉬 애니메이션중엔 적통과
-	//m_animator->SetParameter("Dash", true);
+	m_animator->SetParameter("OnDash", true);
 	auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
 
+	DropCatchItem();
 	isDashing = true;
 
 	controller->SetKnockBack(m_dashPower, 0.f);
-	m_animator->SetParameter("OnMove", false);
-	//controller->AddFinalMultiplierSpeed(m_dashPower);
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_dashElapsedTime = 0.f;
