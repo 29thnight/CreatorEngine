@@ -105,6 +105,9 @@
 		<ClInclude Include="RaycastHelper.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Weapon.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
@@ -195,6 +198,9 @@
 			<Filter>Common\SourceFile</Filter>
 		</ClCompile>
 		<ClCompile Include="RaycastHelper.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Weapon.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestBehavior.cpp">
