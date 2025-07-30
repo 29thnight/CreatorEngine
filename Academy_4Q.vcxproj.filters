@@ -163,6 +163,9 @@
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiDrawHelperPlayerInput.cpp">
+      <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EngineEntry\Academy_4Q.rc">

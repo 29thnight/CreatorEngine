@@ -27,7 +27,7 @@ public:
 	[[Property]]
 	int index =0; 
 	[[Property]]
-	int AnimationIndex = -1;
+	int AnimationIndex = 0;
 	[[Property]]
 	bool m_isAny = false;
 	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용

@@ -173,6 +173,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
 		CreateFactory::GetInstance()->RegisterFactory("TweenManager", []() { return new TweenManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityResource", []() { return new EntityResource(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEnemy", []() { return new TestEnemy(); });
@@ -219,7 +220,10 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
-		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsDamege", []() { return new IsDamege(); });
+	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase3", []() { return new Phase3(); });
+	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase2", []() { return new Phase2(); });
+	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase1", []() { return new Phase1(); });
+	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsDamege", []() { return new IsDamege(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("TestConCec", []() { return new TestConCec(); });
 
 	}

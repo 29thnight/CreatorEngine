@@ -23,6 +23,16 @@ ReflectionScriptField(Player) \
 	}); \
 	MethodField \
 	({ \
+		meta_method(Move, "dir") \
+		meta_method(CatchAndThrow) \
+		meta_method(ThrowEvent) \
+		meta_method(Dash) \
+		meta_method(StartAttack) \
+		meta_method(Charging) \
+		meta_method(Attack) \
+		meta_method(SwapWeaponLeft) \
+		meta_method(SwapWeaponRight) \
+		meta_method(DeleteCurWeapon) \
 		meta_method(OnPunch) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \

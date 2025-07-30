@@ -63,7 +63,7 @@ public:
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
 	//타입 ,값 ,함수 
 	[[Property]]
-	std::string valueName{};
+	std::string valueName = "None";
 
 	ConditionParameter* valueParameter;
 	[[Property]]

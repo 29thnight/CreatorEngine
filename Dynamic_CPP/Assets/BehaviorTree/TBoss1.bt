@@ -1,0 +1,51 @@
+NodeList:
+  - ID: 1490009177
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [3491696576, 4130526478]
+    Position: {x: 310, y: 29}
+  - ID: 3491696576
+    Type: 2
+    Name: Sequence
+    ParentID: 1490009177
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [3802023265, 1432560489]
+    Position: {x: 102, y: 168}
+  - ID: 3802023265
+    Type: 6
+    Name: Condition
+    ParentID: 3491696576
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsDaed
+    Policy: -858993460
+    Children: ~
+    Position: {x: -106, y: 312}
+  - ID: 1432560489
+    Type: 8
+    Name: Action
+    ParentID: 3491696576
+    IsRoot: false
+    HasScript: true
+    ScriptName: DaedAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 102, y: 360}
+  - ID: 4130526478
+    Type: 3
+    Name: Selector
+    ParentID: 1490009177
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 486, y: 168}

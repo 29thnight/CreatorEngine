@@ -370,7 +370,7 @@ void ColorModuleCS::SetFlickerColor(const std::vector<Mathf::Vector4>& colors, f
 
 void ColorModuleCS::SetEasing(EasingEffect easingType, StepAnimation animationType, float duration)
 {
-    m_easingModule.SetEasinType(easingType);
+    m_easingModule.SetEasingType(easingType);
     m_easingModule.SetAnimationType(animationType);
     m_easingModule.SetDuration(duration);
     m_easingEnable = true;
@@ -402,4 +402,178 @@ bool ColorModuleCS::IsReadyForReuse() const
         m_discreteColorsBuffer != nullptr &&
         m_gradientSRV != nullptr &&
         m_discreteColorsSRV != nullptr;
+}
+
+nlohmann::json ColorModuleCS::SerializeData() const
+{
+    nlohmann::json json;
+
+    // ColorParams 직렬화
+    json["colorParams"] = {
+        {"transitionMode", m_colorParams.transitionMode},
+        {"gradientSize", m_colorParams.gradientSize},
+        {"discreteColorsSize", m_colorParams.discreteColorsSize},
+        {"customFunctionType", m_colorParams.customFunctionType},
+        {"customParam1", m_colorParams.customParam1},
+        {"customParam2", m_colorParams.customParam2},
+        {"customParam3", m_colorParams.customParam3},
+        {"customParam4", m_colorParams.customParam4}
+    };
+
+    // 색상 그라데이션 직렬화
+    json["colorGradient"] = nlohmann::json::array();
+    for (const auto& gradientPoint : m_colorGradient)
+    {
+        nlohmann::json point;
+        point["time"] = gradientPoint.first;
+        point["color"] = {
+            {"x", gradientPoint.second.x},
+            {"y", gradientPoint.second.y},
+            {"z", gradientPoint.second.z},
+            {"w", gradientPoint.second.w}
+        };
+        json["colorGradient"].push_back(point);
+    }
+
+    // 이산 색상 직렬화
+    json["discreteColors"] = nlohmann::json::array();
+    for (const auto& color : m_discreteColors)
+    {
+        nlohmann::json colorJson = {
+            {"x", color.x},
+            {"y", color.y},
+            {"z", color.z},
+            {"w", color.w}
+        };
+        json["discreteColors"].push_back(colorJson);
+    }
+
+    // 이징 설정 직렬화
+    json["easing"] = {
+        {"enabled", m_easingEnable}
+    };
+
+    if (m_easingEnable)
+    {
+        json["easing"]["easingType"] = static_cast<int>(m_easingModule.GetEasingType());
+        json["easing"]["animationType"] = static_cast<int>(m_easingModule.GetAnimationType());
+        json["easing"]["duration"] = m_easingModule.GetDuration();
+    }
+
+    // 상태 정보
+    json["state"] = {
+        {"isInitialized", m_isInitialized},
+        {"particleCapacity", m_particleCapacity}
+    };
+
+    return json;
+}
+
+void ColorModuleCS::DeserializeData(const nlohmann::json& json)
+{
+    // ColorParams 복원
+    if (json.contains("colorParams"))
+    {
+        const auto& colorParamsJson = json["colorParams"];
+
+        if (colorParamsJson.contains("transitionMode"))
+            m_colorParams.transitionMode = colorParamsJson["transitionMode"];
+
+        if (colorParamsJson.contains("gradientSize"))
+            m_colorParams.gradientSize = colorParamsJson["gradientSize"];
+
+        if (colorParamsJson.contains("discreteColorsSize"))
+            m_colorParams.discreteColorsSize = colorParamsJson["discreteColorsSize"];
+
+        if (colorParamsJson.contains("customFunctionType"))
+            m_colorParams.customFunctionType = colorParamsJson["customFunctionType"];
+
+        if (colorParamsJson.contains("customParam1"))
+            m_colorParams.customParam1 = colorParamsJson["customParam1"];
+
+        if (colorParamsJson.contains("customParam2"))
+            m_colorParams.customParam2 = colorParamsJson["customParam2"];
+
+        if (colorParamsJson.contains("customParam3"))
+            m_colorParams.customParam3 = colorParamsJson["customParam3"];
+
+        if (colorParamsJson.contains("customParam4"))
+            m_colorParams.customParam4 = colorParamsJson["customParam4"];
+    }
+
+    // 색상 그라데이션 복원
+    if (json.contains("colorGradient") && json["colorGradient"].is_array())
+    {
+        m_colorGradient.clear();
+        for (const auto& pointJson : json["colorGradient"])
+        {
+            float time = pointJson.value("time", 0.0f);
+            Mathf::Vector4 color(
+                pointJson["color"].value("x", 1.0f),
+                pointJson["color"].value("y", 1.0f),
+                pointJson["color"].value("z", 1.0f),
+                pointJson["color"].value("w", 1.0f)
+            );
+            m_colorGradient.emplace_back(time, color);
+        }
+        m_colorParams.gradientSize = static_cast<int>(m_colorGradient.size());
+    }
+
+    // 이산 색상 복원
+    if (json.contains("discreteColors") && json["discreteColors"].is_array())
+    {
+        m_discreteColors.clear();
+        for (const auto& colorJson : json["discreteColors"])
+        {
+            Mathf::Vector4 color(
+                colorJson.value("x", 1.0f),
+                colorJson.value("y", 1.0f),
+                colorJson.value("z", 1.0f),
+                colorJson.value("w", 1.0f)
+            );
+            m_discreteColors.push_back(color);
+        }
+        m_colorParams.discreteColorsSize = static_cast<int>(m_discreteColors.size());
+    }
+
+    // 이징 설정 복원
+    if (json.contains("easing"))
+    {
+        const auto& easingJson = json["easing"];
+
+        if (easingJson.contains("enabled"))
+            m_easingEnable = easingJson["enabled"];
+
+        if (m_easingEnable && easingJson.contains("easingType") &&
+            easingJson.contains("animationType") && easingJson.contains("duration"))
+        {
+            EasingEffect easingType = static_cast<EasingEffect>(easingJson["easingType"]);
+            StepAnimation animationType = static_cast<StepAnimation>(easingJson["animationType"]);
+            float duration = easingJson["duration"];
+
+            SetEasing(easingType, animationType, duration);
+        }
+    }
+
+    // 상태 정보 복원
+    if (json.contains("state"))
+    {
+        const auto& stateJson = json["state"];
+
+        if (stateJson.contains("particleCapacity"))
+            m_particleCapacity = stateJson["particleCapacity"];
+    }
+
+    if (!m_isInitialized)
+        Initialize();
+
+    // 변경사항을 적용하기 위해 더티 플래그 설정
+    m_colorParamsDirty = true;
+    m_gradientDirty = true;
+    m_discreteColorsDirty = true;
+}
+
+std::string ColorModuleCS::GetModuleType() const
+{
+    return "ColorModuleCS";
 }

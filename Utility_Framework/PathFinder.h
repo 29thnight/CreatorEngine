@@ -74,6 +74,7 @@ namespace InternalPath
 	inline file::path DumpPath{};
 	inline file::path NodeEditorPath{};
 	inline file::path volumeProfilePath{};
+	inline file::path InputMapPath{};
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -102,6 +103,7 @@ namespace InternalPath
 		TerrainSourcePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\Terrain\\").lexically_normal();
 		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
 		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
+		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
 		//dir not exist -> create dir
 
 		std::vector<file::path> paths = {
@@ -118,7 +120,9 @@ namespace InternalPath
 			PrecompiledShaderPath,
 			ProjectSettingsPath,
 			TerrainSourcePath,
-			volumeProfilePath
+			volumeProfilePath,
+			NodeEditorPath,
+			InputMapPath,
 		};
 
 		for (const auto& path : paths)
@@ -282,5 +286,9 @@ public:
 	static inline file::path RelativeToVolumeProfile(const std::string_view& path)
 	{
 		return file::path(InternalPath::volumeProfilePath) / path;
+	}
+	static inline file::path InputMapPath(const std::string_view& path)
+	{
+		return file::path(InternalPath::InputMapPath) / path;
 	}
 };

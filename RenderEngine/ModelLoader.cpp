@@ -957,7 +957,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		std::shared_ptr<GameObject> object = m_scene->CreateGameObject(node->m_name, GameObjectType::Mesh, nextIndex);
-		//m_gameObjects.push_back(object);
+		m_gameObjects.push_back(object);
 		object->m_transform.SetLocalMatrix(node->m_transform);
 		nextIndex = object->m_index;
 	}
@@ -971,15 +971,22 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex)
 {
 	int nextIndex = parentIndex;
+	static std::shared_ptr<GameObject> rootObject{};
 	if (true == isRoot)
 	{
-		auto rootObject = m_scene->GetGameObject(m_modelRootIndex);
+		rootObject = m_scene->GetGameObject(m_modelRootIndex);
 		nextIndex = rootObject->m_index;
 	}
 	else
 	{
 		std::shared_ptr<GameObject> boneObject{};
-		boneObject = m_scene->GetGameObject(bone->m_name);
+		auto it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(), [bone](std::shared_ptr<GameObject> shPtr)
+		{
+			std::string name = shPtr->RemoveSuffixNumberTag();
+			return name == bone->m_name;
+		});
+
+		boneObject = (*it);
 		if (nullptr == boneObject)
 		{
 			boneObject = m_scene->CreateGameObject(bone->m_name, GameObjectType::Bone, nextIndex);

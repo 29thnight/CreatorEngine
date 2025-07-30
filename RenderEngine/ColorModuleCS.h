@@ -1,6 +1,7 @@
 #pragma once
 #include "ParticleModule.h"
 #include "EaseInOut.h"
+#include "ISerializable.h"
 
 using namespace DirectX;
 
@@ -32,7 +33,7 @@ struct ColorParams
 // 파티클 데이터 구조체 (다른 곳에서 정의되어 있다고 가정)
 struct ParticleData;
 
-class ColorModuleCS : public ParticleModule
+class ColorModuleCS : public ParticleModule, public ISerializable
 {
 private:
     // 컴퓨트 셰이더 리소스
@@ -80,6 +81,10 @@ public:
 
     virtual void ResetForReuse();
     virtual bool IsReadyForReuse() const;
+    
+    virtual nlohmann::json SerializeData() const override;
+    virtual void DeserializeData(const nlohmann::json& json) override;
+    virtual std::string GetModuleType() const override;
 
 private:
     // 초기화 메서드

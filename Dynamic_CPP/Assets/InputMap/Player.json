@@ -1,0 +1,113 @@
+{
+    "actions": [
+        {
+            "actionName": "Move",
+            "actionType": "Value",
+            "funName": "Move",
+            "inputType": "GamePad",
+            "key0": "Left Thumbstick",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "StartAttack",
+            "actionType": "Button",
+            "funName": "StartAttack",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "AttackCharging",
+            "actionType": "Button",
+            "funName": "Charging",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "Attack",
+            "actionType": "Button",
+            "funName": "Attack",
+            "inputType": "GamePad",
+            "key0": "A",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "Dash",
+            "actionType": "Button",
+            "funName": "Dash",
+            "inputType": "GamePad",
+            "key0": "B",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "CatchAndThrow",
+            "actionType": "Button",
+            "funName": "CatchAndThrow",
+            "inputType": "GamePad",
+            "key0": "X",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "DeleteWeapon",
+            "actionType": "Button",
+            "funName": "DeleteCurWeapon",
+            "inputType": "GamePad",
+            "key0": "Y",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "SwapWeaponLeft",
+            "actionType": "Button",
+            "funName": "SwapWeaponLeft",
+            "inputType": "GamePad",
+            "key0": "Left Shoulder",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "SwapWeaponeRight",
+            "actionType": "Button",
+            "funName": "SwapWeaponRight",
+            "inputType": "GamePad",
+            "key0": "Right Shoulder",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        }
+    ],
+    "mapName": "Player"
+}

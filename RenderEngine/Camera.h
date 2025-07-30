@@ -71,6 +71,7 @@ public:
 
 	void RegisterContainer();
 	void HandleMovement(float deltaTime);
+	void MoveToTarget(Mathf::Vector3 targetPosition);
 	void UpdateBuffer(bool shadow = false);
 	void UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shadow = false);
 	void UpdateBuffer(ID3D11DeviceContext* deferredContext, bool shadow = false);

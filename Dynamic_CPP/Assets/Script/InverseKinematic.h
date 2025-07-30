@@ -25,10 +25,10 @@ private:
 	GameObject* pole{ nullptr };
 
 	GameObject* firstBone;
-	Vector3 firstBoneEulerAngleOffset{ 0, 90, 0 };
+	Vector3 firstBoneEulerAngleOffset{ 0, 0, 0 };
 	GameObject* secondBone;
-	Vector3 secondBoneEularAngleOffset{ 0, 90, 0 };
+	Vector3 secondBoneEularAngleOffset{ 0, 0, 0 };
 	GameObject* thirdBone;
-	Vector3 thirdBoneEularAngleOffset{ 0, 90, 0 };
+	Vector3 thirdBoneEularAngleOffset{ 0, 0, 0 };
 	bool alignThirdBoneWithTargetRotation = true;
 };

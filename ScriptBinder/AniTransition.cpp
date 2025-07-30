@@ -16,18 +16,48 @@ AniTransition::~AniTransition()
 }
 
 
-bool AniTransition::CheckTransiton()
+bool AniTransition::CheckTransiton(bool isBlend)
 {
-	if (conditions.empty() && m_ownerController->endAnimation == true)
+	auto Progress = m_ownerController->curAnimationProgress;
+	if (isBlend)
 	{
-		return true;
+		Progress = m_ownerController->nextAnimationProgress;
 	}
-	for (auto& condition : conditions)
+	if (hasExitTime) //최소 탈출시간 있을때
 	{
-		if (true == condition.CheckTrans())
-			return true;
+		if (conditions.empty()) //탈출시간은 있는대 조건없으면 탈출시간되면 탈출
+		{
+			if (GetExitTime() <= Progress)
+				return true;
+		}
+		else  //탈출시간 + 조건있으면 둘다만족해야 탈출
+		{
+			if (GetExitTime() <= Progress)
+			{
+				for (auto& condition : conditions)
+				{
+					if (true == condition.CheckTrans())
+						return true;
+				}
+			}
+		}
 	}
-
+	else   //없을떄
+	{
+		if (conditions.empty()) //탈출시간은 없고 조건없으면 애니메이션 끝나면탈출 loop면 탈출불가
+		{
+			if (m_ownerController->endAnimation)
+				return true;
+		}
+		else  //탈출 시간없고 조건있으면 조건만족시 탈출
+		{
+			for (auto& condition : conditions)
+			{
+				if (true == condition.CheckTrans())
+					return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -70,6 +100,8 @@ void AniTransition::SetNextState(AnimationState* _nextState)
 
 std::string AniTransition::GetCurState()
 {
+	if (curState == nullptr)
+		return "None";
 	return curState->m_name;
 }
 std::string AniTransition::GetNextState()

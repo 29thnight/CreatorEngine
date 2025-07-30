@@ -83,13 +83,13 @@ void EffectComponent::Update(float tick)
     }
     else
     {
-#ifdef _DEBUG
-        static int debugCount = 0;
-        if (++debugCount % 60 == 0) {
-            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
-                << proxy->GetInstanceName() << "'" << std::endl;
-        }
-#endif
+//#ifdef _DEBUG
+//        static int debugCount = 0;
+//        if (++debugCount % 60 == 0) {
+//            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
+//                << proxy->GetInstanceName() << "'" << std::endl;
+//        }
+//#endif
     }
 }
 

@@ -82,63 +82,63 @@ void InverseKinematic::LateUpdate(float tick)
     firstBone->m_transform.AddRotation(fQua);
     thirdBone->m_transform.UpdateWorldMatrix();
 
-    Vector3 towardSecondBone = secondBone->m_transform.GetWorldPosition() - firstBone->m_transform.GetWorldPosition();
-    //towardSecondBone.Normalize();
+    //Vector3 towardSecondBone = secondBone->m_transform.GetWorldPosition() - firstBone->m_transform.GetWorldPosition();
+    ////towardSecondBone.Normalize();
 
-    float targetDistance = Vector3::Distance(firstBone->m_transform.GetWorldPosition(), target->m_transform.GetWorldPosition());
+    //float targetDistance = Vector3::Distance(firstBone->m_transform.GetWorldPosition(), target->m_transform.GetWorldPosition());
 
-    // Limit hypotenuse to under the total bone distance to prevent invalid triangles
-    targetDistance = std::min(targetDistance, totalChainLength * 0.9999f);
+    //// Limit hypotenuse to under the total bone distance to prevent invalid triangles
+    //targetDistance = std::min(targetDistance, totalChainLength * 0.9999f);
 
-    // Solve for the angle for the root bone
-    // See https://en.wikipedia.org/wiki/Law_of_cosines
-    float adjacent =
-        (
-            (rootBoneLength * rootBoneLength) +
-            (targetDistance * targetDistance) -
-            (secondBoneLength * secondBoneLength)
-            ) / (2 * targetDistance * rootBoneLength);
-    float angle = std::acos(adjacent) * Mathf::Rad2Deg;
+    //// Solve for the angle for the root bone
+    //// See https://en.wikipedia.org/wiki/Law_of_cosines
+    //float adjacent =
+    //    (
+    //        (rootBoneLength * rootBoneLength) +
+    //        (targetDistance * targetDistance) -
+    //        (secondBoneLength * secondBoneLength)
+    //        ) / (2 * targetDistance * rootBoneLength);
+    //float angle = std::acos(adjacent) * Mathf::Rad2Deg;
 
-    // We rotate around the vector orthogonal to both pole and second bone
-    Vector3 cross = towardPole.Cross(towardSecondBone);
-    cross.Normalize();
+    //// We rotate around the vector orthogonal to both pole and second bone
+    //Vector3 cross = towardPole.Cross(towardSecondBone);
+    //cross.Normalize();
 
-    if (!std::isnan(angle)) {
-        Vector3 t = { firstBone->m_transform.position.x, firstBone->m_transform.position.y, firstBone->m_transform.position.z };
-        Quaternion q = firstBone->m_transform.rotation;
-        RotateAround(t, q, t, cross, -angle);
-        firstBone->m_transform.SetWorldPosition(t);
-        firstBone->m_transform.SetWorldRotation(q);
-    }
-    thirdBone->m_transform.UpdateWorldMatrix();
+    //if (!std::isnan(angle)) {
+    //    Vector3 t = { firstBone->m_transform.position.x, firstBone->m_transform.position.y, firstBone->m_transform.position.z };
+    //    Quaternion q = firstBone->m_transform.rotation;
+    //    RotateAround(t, q, t, cross, -angle);
+    //    firstBone->m_transform.SetWorldPosition(t);
+    //    firstBone->m_transform.SetWorldRotation(q);
+    //}
+    //thirdBone->m_transform.UpdateWorldMatrix();
 
-    // We've rotated the root bone to the right place, so we just 
-    // look at the target from the elbow to get the final rotation
-    Vector3 v1 = target->m_transform.GetWorldPosition() - secondBone->m_transform.GetWorldPosition();
-    //v1.Normalize();
-    Quaternion secondBoneTargetRotation = LookRotationUnityLike(v1, cross);
-    auto sQua = Quaternion::CreateFromYawPitchRoll(
-        secondBoneEularAngleOffset.y,
-        secondBoneEularAngleOffset.x,
-        secondBoneEularAngleOffset.z
-    );
-    //sQua.Normalize();
-    secondBoneTargetRotation = secondBoneTargetRotation * sQua;
-    secondBone->m_transform.SetWorldRotation(secondBoneTargetRotation);
-    thirdBone->m_transform.UpdateWorldMatrix();
+    //// We've rotated the root bone to the right place, so we just 
+    //// look at the target from the elbow to get the final rotation
+    //Vector3 v1 = target->m_transform.GetWorldPosition() - secondBone->m_transform.GetWorldPosition();
+    ////v1.Normalize();
+    //Quaternion secondBoneTargetRotation = LookRotationUnityLike(v1, cross);
+    //auto sQua = Quaternion::CreateFromYawPitchRoll(
+    //    secondBoneEularAngleOffset.y,
+    //    secondBoneEularAngleOffset.x,
+    //    secondBoneEularAngleOffset.z
+    //);
+    ////sQua.Normalize();
+    //secondBoneTargetRotation = secondBoneTargetRotation * sQua;
+    //secondBone->m_transform.SetWorldRotation(secondBoneTargetRotation);
+    //thirdBone->m_transform.UpdateWorldMatrix();
 
-    if (alignThirdBoneWithTargetRotation)
-    {
-        thirdBone->m_transform.SetWorldRotation(target->m_transform.GetWorldQuaternion());
-        thirdBone->m_transform.UpdateWorldMatrix();
-        thirdBone->m_transform.AddRotation(Quaternion::CreateFromYawPitchRoll(
-            thirdBoneEularAngleOffset.y,
-            thirdBoneEularAngleOffset.x,
-            thirdBoneEularAngleOffset.z
-        ));
-        thirdBone->m_transform.UpdateWorldMatrix();
-    }
+    //if (alignThirdBoneWithTargetRotation)
+    //{
+    //    thirdBone->m_transform.SetWorldRotation(target->m_transform.GetWorldQuaternion());
+    //    thirdBone->m_transform.UpdateWorldMatrix();
+    //    thirdBone->m_transform.AddRotation(Quaternion::CreateFromYawPitchRoll(
+    //        thirdBoneEularAngleOffset.y,
+    //        thirdBoneEularAngleOffset.x,
+    //        thirdBoneEularAngleOffset.z
+    //    ));
+    //    thirdBone->m_transform.UpdateWorldMatrix();
+    //}
 }
 
 

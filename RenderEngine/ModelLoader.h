@@ -75,6 +75,7 @@ private:
 	SkeletonLoader m_skeletonLoader;
 
 	std::vector<std::shared_ptr<GameObject>> m_gameObjects{};
+	std::vector<std::string> m_cashedObjectName{};
 
 	Mathf::Vector3 min{};
 	Mathf::Vector3 max{};

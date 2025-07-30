@@ -15,7 +15,6 @@ ReflectionFieldInheritance(Animator, Component) \
 	MethodField \
 	({ \
 		meta_method(UpdateAnimation) \
-		meta_method(CreateController_UI) \
 	}); \
 	FieldEnd(Animator, PropertyAndMethodInheritance) \
 };

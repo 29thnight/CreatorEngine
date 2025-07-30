@@ -510,8 +510,11 @@ bool ParticleSystem::IsReadyForReuse()
 	}
 
 	for (const auto* renderModule : m_renderModules) {
-		if (renderModule && !renderModule->IsReadyForReuse()) {
-			return false;
+		if (renderModule->IsEnabled())
+		{
+			if (renderModule && !renderModule->IsReadyForReuse()) {
+				return false;
+			}
 		}
 	}
 	return true;

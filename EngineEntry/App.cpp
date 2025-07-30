@@ -14,7 +14,7 @@
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
-
+#include "InputActionManager.h"
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -42,6 +42,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	}
 
 	SceneManager::Destroy();
+	EngineSetting::Destroy();
 	EffectManager::Destroy();
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
@@ -56,6 +57,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
+	EngineSetting::GetInstance();
 	PrefabUtility::GetInstance();
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
@@ -121,6 +123,7 @@ void Core::App::Run()
 		m_main->Initialize();
 		g_progressWindow->SetStatusText(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
+		//InputActionManagers->LoadManager();
 		g_progressWindow->SetProgress(100);
 		
 		g_progressWindow->Close();
