@@ -9,6 +9,7 @@ class Matarial;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
+class PlayerInputComponent;
 class TerrainComponent;
 class StateMachineComponent;
 class BehaviorTreeComponent;

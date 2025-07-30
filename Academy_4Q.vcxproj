@@ -209,6 +209,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
+    <ClCompile Include="ImGuiDrawHelperPlayerInput.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">

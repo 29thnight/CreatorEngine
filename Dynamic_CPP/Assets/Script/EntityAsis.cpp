@@ -219,20 +219,20 @@ void EntityAsis::Purification(float tick)
 			auto item = GetPurificationItemInEntityItemQueue();
 			m_currentTailPurificationDuration = 0;
 
-			auto weapon = GameObject::Find("Sword");	// 이부분은 아이템에 등록된 정화무기가 될것.
-			if (weapon)
-			{
-				auto player = item->GetThrowOwner();
-				
-				item->GetComponent<Transform>().SetPosition({2000,0,2000});
-				item->GetOwner()->SetEnabled(false);
-				item->SetThrowOwner(nullptr);
-				//item->GetOwner()->Destroy();
-				if (player)
-				{
-					player->AddWeapon(weapon);
-				}
-			}
+			//auto weapon = GameObject::Find("Sword");	// 이부분은 아이템에 등록된 정화무기가 될것.
+			//if (weapon)
+			//{
+			//	auto player = item->GetThrowOwner();
+			//	
+			//	//item->GetComponent<Transform>().SetPosition({2000,0,2000});
+			//	//item->GetOwner()->SetEnabled(false);
+			//	item->SetThrowOwner(nullptr);
+			//	//item->GetOwner()->Destroy();
+			//	if (player)
+			//	{
+			//		player->AddWeapon(weapon);
+			//	}
+			//}
 		}
 	}
 }

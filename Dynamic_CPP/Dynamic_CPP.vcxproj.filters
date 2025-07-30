@@ -183,6 +183,9 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\Weapon.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -304,6 +307,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Weapon.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

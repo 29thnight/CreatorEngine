@@ -4,6 +4,7 @@
 
 class Entity;
 class ActionMap;
+class Weapon;
 class GameManager : public ModuleBehavior
 {
 public:
@@ -35,13 +36,13 @@ public:
 	const std::vector<Entity*>& GetAsis();
 
 	std::vector<Entity*>& GetResourcePool();
-	std::vector<Entity*>& GetWeaponPiecePool();
+	std::vector<Weapon*>& GetWeaponPiecePool();
 private:
 	std::vector<Entity*> m_entities;
 	ActionMap* playerMap{ nullptr };
 
 	std::vector<Entity*> m_resourcePool;
-	std::vector<Entity*> m_weaponPiecePool;
+	std::vector<Weapon*> m_weaponPiecePool;
 	std::vector<Entity*> m_players;
 	std::vector<Entity*> m_asis;		//테스트나 만약 아시스가 여럿이 나올 경우 대비.
 private:

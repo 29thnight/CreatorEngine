@@ -1825,7 +1825,7 @@ void MenuBarWindow::SHowInputActionMap()
     static int preseletedActionIndex = -1;
     static int seletedActionIndex = -1;
     static int editingActionIndex = -1;
-   
+    static int index = 0;
     if (m_bShowInputActionMapWindow)
     {
         ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
@@ -1841,7 +1841,18 @@ void MenuBarWindow::SHowInputActionMap()
             seletedActionIndex = -1;
             editingActionIndex = -1;
         }
+
+        if (ImGui::Button("Save"))
+        {
+            InputActionManagers->SaveManager();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load"))
+        {
+            InputActionManagers->LoadManager();
+        }
         ImGui::Separator();
+
 
         ImGui::BeginChild("ActionMaps", ImVec2(200, 0), true); // 왼쪽
         ImGui::Text("Action Maps");
@@ -1850,11 +1861,13 @@ void MenuBarWindow::SHowInputActionMap()
         {
             InputActionManagers->AddActionMap();
         }
+
         ImGui::Separator();
         ImGui::Separator();
        
         for (int i = 0; i < InputActionManagers->m_actionMaps.size(); ++i)
         {
+            ImGui::PushID(i);
             if (editingMapIndex != -1 && editingMapIndex ==i)
             {
                 char buffer[128];
@@ -1903,6 +1916,7 @@ void MenuBarWindow::SHowInputActionMap()
                     ImGui::EndPopup();
                 }
             }
+            ImGui::PopID();
         }
         
         ImGui::EndChild();
@@ -1912,11 +1926,14 @@ void MenuBarWindow::SHowInputActionMap()
         ImGui::BeginChild("Actions", ImVec2(300, 0), true); 
         ImGui::Text("Actions");
         ImGui::SameLine();
-        if (ImGui::Button("+"))
+        if (seletedActionMapIndex != -1)
         {
-            if (seletedActionMapIndex != -1)
+            if (ImGui::Button("+"))
             {
-                InputActionManagers->m_actionMaps[seletedActionMapIndex]->AddAction();
+                if (seletedActionMapIndex != -1)
+                {
+                    InputActionManagers->m_actionMaps[seletedActionMapIndex]->AddAction();
+                }
             }
         }
         ImGui::Separator();
@@ -1931,6 +1948,7 @@ void MenuBarWindow::SHowInputActionMap()
             auto map = InputActionManagers->m_actionMaps[seletedActionMapIndex];
             for (int i = 0; i < map->m_actions.size(); ++i)
             {
+                ImGui::PushID(i);
                 if (editingActionIndex != -1 && editingActionIndex == i)
                 {
                     char buffer[128];
@@ -1974,12 +1992,14 @@ void MenuBarWindow::SHowInputActionMap()
                     {
                         if (ImGui::MenuItem("Delete Action"))
                         {
-                            
+                            //delete&&&&&
+                            map->DeleteAction(map->m_actions[seletedActionIndex]->actionName);
                             seletedActionIndex = -1;
                         }
                         ImGui::EndPopup();
                     }
                 }
+                ImGui::PopID();
             }
             
         }
@@ -2034,23 +2054,26 @@ void MenuBarWindow::SHowInputActionMap()
                     ImGui::SameLine();
                     if (action->inputType == InputType::KeyBoard)
                     {
-                        if (ImGui::Button("KeyBoard Key chull"))
+                        if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[0])).c_str()))
                         {
-
+                            floatId = 0;
+                            index = 0;
+                            ImGui::OpenPopup("KeyBaordButtonFloat");
                         }
                     }
                     else if (action->inputType == InputType::GamePad)
                     {
-                        if (ImGui::Button("GamePad Key chull"))
+                        if (ImGui::Button(ControllerButtonString(static_cast<ControllerButton>(action->key[0])).c_str()))
                         {
-
+                            index = 0;
+                            ImGui::OpenPopup("ControllerButton");
                         }
                     }
                     else if (action->inputType == InputType::Mouse)
                     {
                         if (ImGui::Button("Mouse Key chull"))
                         {
-
+                            index = 0;
                         }
                     }
                 }
@@ -2068,11 +2091,12 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("LeftKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(1);
-                            if (ImGui::Button("KeyBoard1"))
+                            if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[0])).c_str()))
                             {
                                 ImGui::PopID();
                                 //첫번째키
                                 floatId = 0;
+                                index = 0;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
                             else
@@ -2082,11 +2106,12 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("RightKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(2);
-                            if (ImGui::Button("KeyBoard2"))
+                            if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[1])).c_str()))
                             {
                                 ImGui::PopID();
                                 //2번째키
                                 floatId = 1;
+                                index = 0;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
                             else
@@ -2096,11 +2121,12 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("DownKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(3);
-                            if (ImGui::Button("KeyBoard3"))
+                            if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[2])).c_str()))
                             {
                                 ImGui::PopID();
                                 //2번째키
                                 floatId = 2;
+                                index = 0;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
                             else
@@ -2110,11 +2136,12 @@ void MenuBarWindow::SHowInputActionMap()
                             ImGui::Text("UpKey : ");
                             ImGui::SameLine();
                             ImGui::PushID(4);
-                            if (ImGui::Button("KeyBoard4"))
+                            if (ImGui::Button(KeyBoardString(static_cast<KeyBoard>(action->key[3])).c_str()))
                             {
                                 ImGui::PopID();
                                 //2번째키
                                 floatId = 3;
+                                index = 0;
                                 ImGui::OpenPopup("KeyBaordButtonFloat");
                             }
                             else
@@ -2130,6 +2157,7 @@ void MenuBarWindow::SHowInputActionMap()
                             if (ImGui::Button(ControllerButtonString(action->m_controllerButton).c_str()))
                             {
                                 //게임패드는 left 스틱 light 스틱 만 넣게끔
+                                index = 0;
                                 ImGui::OpenPopup("ControllerButtonFlaot4");
                             }
                         }
@@ -2137,6 +2165,68 @@ void MenuBarWindow::SHowInputActionMap()
                     
                 }
 
+                
+
+                if (ImGui::CollapsingHeader("Funciton"))
+                {
+                    ImGui::Text("Script : ");
+                    ImGui::SameLine();
+                    if (ImGui::Button(action->m_scriptName.c_str()))
+                    {
+                        ImGui::OpenPopup("selectScript");
+                    }
+
+
+
+                    if (ImGui::BeginPopup("selectScript"))
+                    {
+         
+                        for (auto& script : ScriptManager->GetScriptNames())
+                        {
+                         
+                            if (ImGui::MenuItem(script.c_str()))
+                            {
+                                action->m_scriptName = script;
+                            }
+                            
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::Text("Function : ");
+                    ImGui::SameLine();
+                    if (ImGui::Button(action->funName.c_str()))
+                    {
+                        ImGui::OpenPopup("selectMethod");
+                    }
+
+                    if (ImGui::BeginPopup("selectMethod"))
+                    {
+                        auto type = Meta::Find(action->m_scriptName);
+                        if (type != nullptr)
+                        {
+                            for (auto& method : type->methods)
+                            {
+                                if (ImGui::MenuItem(method.name))
+                                {
+                                    action->funName = method.name;
+                                }
+                            }
+                        }
+                        ImGui::EndPopup();
+                    }
+
+
+                    //char buffer[128];
+                    //strcpy_s(buffer, action->funName.c_str());
+                    //buffer[sizeof(buffer) - 1] = '\0';
+                    //ImGui::SetNextItemWidth(200);
+                    //if (ImGui::InputText("##Rename", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+                    //{
+                    //    // 엔터 눌러서 이름 확정
+                    //    action->funName = buffer;
+                    //}
+                }
 
             }
             if (ImGui::BeginPopup("SelectInputType"))
@@ -2164,7 +2254,6 @@ void MenuBarWindow::SHowInputActionMap()
             std::string popupName = "KeyBaordButtonFloat";
             if (ImGui::BeginPopup(popupName.c_str()))
             {
-                static int index = 0;
                 if (InputManagement->IsWheelDown())
                 {
                     
@@ -2194,6 +2283,42 @@ void MenuBarWindow::SHowInputActionMap()
                 }
                 ImGui::EndPopup();
             }
+            if (ImGui::BeginPopup("ControllerButton"))
+            {
+                
+                if (InputManagement->IsWheelDown())
+                {
+
+                    index++;
+                    int maxIndex = static_cast<int>(controllerButtons.size()) - 10;
+                    if (index > maxIndex)
+                        index = maxIndex;
+                }
+                else if (InputManagement->IsWheelUp())
+                {
+                    index--;
+                    if (index < 0)
+                    {
+                        index = 0;
+                    }
+                }
+                for (int i = 0; i < 10; i++)
+                {
+                    int realIndex = index + i;
+                    if (realIndex >= controllerButtons.size())
+                        break;
+                    if (ImGui::MenuItem(ControllerButtonString(controllerButtons[realIndex]).c_str()))
+                    {
+                        //action->key[floatId] = static_cast<size_t>(controllerButtons[realIndex]);
+                        action->SetControllerButton(controllerButtons[realIndex]);
+                    }
+                }
+                //컨트롤러 버튼 스크롤
+               
+         
+                ImGui::EndPopup();
+            }
+
 
             if (ImGui::BeginPopup("ControllerButtonFlaot4"))
             {
@@ -2205,6 +2330,7 @@ void MenuBarWindow::SHowInputActionMap()
             }
             
         }
+
         ImGui::EndChild();
 
 

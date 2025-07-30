@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Animation.generated.h"
+#include "KeyFrameEvent.h"
 struct NodeAnimation
 {
 	std::string m_name{};
@@ -28,17 +29,6 @@ struct NodeAnimation
 };
 
 
-class KeyFrameEvent
-{
-public:
-	std::string m_eventName;
-	std::string m_scriptName;
-	std::string m_funName;
-	float key = 0;
-	std::function<void()> m_event;
-
-
-};
 
 
 class Animator;
@@ -56,15 +46,20 @@ public:
 	[[Property]]
 	bool m_isLoop = true;
 
-	float preAnimationProgress =0;
-	float curAnimationProgress =0;
 	int preKey = 0;
 	int curKey = 0;
 	void InvokeEvent();
-	void InvokeEvent(Animator* _ownerAnimator);
-	void SetEvent(const std::string& _funName, float progressPercent, std::function<void()> _func);
-	void SetEvent(const std::string& _scriptName, const std::string& _funName, float progressPercent);
+	void InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress, float _preAnimationProgress);
 
+	void AddEvent();
+	void AddEvent(KeyFrameEvent _event);
+	void DeleteEvent(KeyFrameEvent _event);
+	KeyFrameEvent* FindEvent(KeyFrameEvent _event);
+	KeyFrameEvent* FindEvent(const std::string& _eventName, const std::string& _scriptName, const std::string& _funName, float progressPercent);
+	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
+
+
+	[[Property]]
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };
 

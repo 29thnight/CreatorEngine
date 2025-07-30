@@ -479,3 +479,4 @@ EngineVersion.h
 *.ini
 GEMINI.md
 gemini_worker/
+/RenderEngine/DataSystem.cpp

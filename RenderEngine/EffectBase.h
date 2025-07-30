@@ -158,7 +158,7 @@ public:
         }
 
         for (const auto& ps : m_particleSystems) {
-            if (ps && !ps->IsReadyForReuse()) {  
+            if (ps && !ps->IsReadyForReuse()) {
                 return false;
             }
         }

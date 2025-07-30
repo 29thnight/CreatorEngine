@@ -17,6 +17,8 @@
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "TagManager.h"
+#include "PlayerInput.h"
+#include "InputActionManager.h"
 //----------------------------
 #include "NodeFactory.h"
 #include "ExternUI.h"
@@ -496,6 +498,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						if (nullptr != bt)
 						{
 							ImGuiDrawHelperBT(bt);
+						}
+					}
+					else if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<PlayerInputComponent>())
+					{
+						PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
+						if (nullptr != input)
+						{
+							ImGuiDrawHelperPlayerInput(input);
 						}
 					}
 					else if (type)

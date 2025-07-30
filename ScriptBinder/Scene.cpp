@@ -1,7 +1,4 @@
-#include "Scene.h"
-#include "Scene.h"
-#include "Scene.h"
-#include "Scene.h"
+#include "Scene.h"01
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
@@ -87,7 +84,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     
     if (parentIndex >= m_SceneObjects.size())
     {
-        parentIndex = -1; //&&&&&
+        parentIndex = -1; 
     }
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
@@ -675,7 +672,7 @@ void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
 			if (bodyType == EBodyType::STATIC)
 			{
 				//pxScene에 엑터 추가
-				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); //&&&&&trigger
+				Physics->CreateStaticBody(boxInfo, ptr->GetColliderType()); 
 				//콜라이더 정보 저장
 				m_colliderContainer[colliderID] =
 					PhysicsManager::ColliderInfo{ m_boxTypeId,
@@ -1127,15 +1124,18 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		{
 			return;
 		}
-		const auto& bone = animator->m_Skeleton->FindBone(obj->m_name.ToString());
+		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
+		auto transform = animator->m_localTransforms[bone->m_index];
 		if (bone)
 		{
-			model = XMMatrixMultiply(bone->m_localTransform, model);
+			model = XMMatrixMultiply(transform, model);
+			//model = XMMatrixMultiply(bone->m_localTransform, model);
 			obj->m_transform.SetAndDecomposeMatrix(model);
 			//obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
 		}
 		else {
-			model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
+			//model = XMMatrixMultiply(transform, model);
+			 model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 			obj->m_transform.SetAndDecomposeMatrix(model);
 		}
 	}
