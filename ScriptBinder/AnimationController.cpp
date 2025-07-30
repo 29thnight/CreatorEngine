@@ -31,7 +31,10 @@ bool AnimationController::BlendingAnimation(float tick)
 		m_nextState = nullptr;
 		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
 		m_AnimationIndex = m_nextAnimationIndex;
-
+		curAnimationProgress = nextAnimationProgress;
+		preCurAnimationProgress = preNextAnimationProgress;
+		nextAnimationProgress = 0.f;
+		preNextAnimationProgress = 0.f;
 		m_timeElapsed = m_nextTimeElapsed;
 		m_nextTimeElapsed = 0.f;
 		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
@@ -88,14 +91,30 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		}
 	}
 
-	if (m_curState->Transitions.empty()) return nullptr;
+
+	AnimationState* transState = m_curState;
+	if (m_isBlend)
+	{
+		transState = m_nextState;
+	}
+	if (transState->Transitions.empty()) return nullptr;
 
 	
-	for (auto& trans : m_curState->Transitions)
+	for (auto& trans : transState->Transitions)
 	{
-		if (true == trans->CheckTransiton())
+		if (m_isBlend)
 		{
-			return trans;
+			if (true == trans->CheckTransiton(true))
+			{
+				return trans;
+			}
+		}
+		else
+		{
+			if (true == trans->CheckTransiton())
+			{
+				return trans;
+			}
 		}
 	}
 	return nullptr;
@@ -107,13 +126,14 @@ void AnimationController::UpdateState()
 
 	
 	auto trans = CheckTransition();
-	if (needBlend)
+	/*if (needBlend)
 	{
 		trans = nullptr;
-	}
+	}*/
 	//전이가있으면 애니메이션 블렌딩시작 //블렌딩없는 강제변화있을경우 추가필요*****
 	if (nullptr != trans)
 	{
+		
 		endAnimation = false;
 		//curAnimationProgress = 0.f;
 		if (needBlend == true)
@@ -122,7 +142,10 @@ void AnimationController::UpdateState()
 			m_nextState = nullptr;
 			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
 			m_AnimationIndex = m_nextAnimationIndex;
-
+			curAnimationProgress = nextAnimationProgress;
+			preCurAnimationProgress = preNextAnimationProgress;
+			nextAnimationProgress = 0.f;
+			preNextAnimationProgress = 0.f;
 			m_timeElapsed = m_nextTimeElapsed;
 			m_nextTimeElapsed = 0.f;
 			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; //*****
@@ -130,6 +153,9 @@ void AnimationController::UpdateState()
 			m_owner->nextAnimIndex = -1;
 			m_owner->m_isBlend = false;
 			m_isBlend = false;
+
+
+			
 		}
 		
 

@@ -4,7 +4,7 @@
 #include "ModuleBehavior.h"
 void Animation::InvokeEvent()
 {
-	
+	/*
 	if (m_keyFrameEvent.empty())
 		return;
 
@@ -25,10 +25,10 @@ void Animation::InvokeEvent()
 				event.m_event();
 			}
 		}
-	}
+	}*/
 }
 
-void Animation::InvokeEvent(Animator* _ownerAnimator)
+void Animation::InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress, float _preAnimationProgress)
 {
 	if (m_keyFrameEvent.empty())
 		return;
@@ -79,10 +79,10 @@ void Animation::InvokeEvent(Animator* _ownerAnimator)
 	{
 		bool shouldTrigger = false;
 
-		if (curAnimationProgress >= preAnimationProgress)
+		if (_curAnimatonProgress >= _preAnimationProgress)
 		{
 			// 老馆 柳青
-			if (preAnimationProgress < event.key && event.key <= curAnimationProgress)
+			if (_preAnimationProgress < event.key && event.key <= _curAnimatonProgress)
 			{
 				shouldTrigger = true;
 			}
@@ -90,8 +90,8 @@ void Animation::InvokeEvent(Animator* _ownerAnimator)
 		else if (m_isLoop)
 		{
 			// 风橇等 版快
-			if ((event.key > preAnimationProgress && event.key <= 1.0f) ||
-				(event.key >= 0.0f && event.key <= curAnimationProgress))
+			if ((event.key > _preAnimationProgress && event.key <= 1.0f) ||
+				(event.key >= 0.0f && event.key <= _curAnimatonProgress))
 			{
 				shouldTrigger = true;
 			}
@@ -111,14 +111,60 @@ void Animation::InvokeEvent(Animator* _ownerAnimator)
 
 
 
-void Animation::SetEvent(const std::string& _funName, float progressPercent, std::function<void()> _func)
+void Animation::AddEvent()
 {
 	KeyFrameEvent newEvent;
-	newEvent.m_funName = _funName;
-	newEvent.key = progressPercent;
-	newEvent.m_event = _func;
 	m_keyFrameEvent.push_back(newEvent);
 }
+
+void Animation::AddEvent(KeyFrameEvent _event)
+{
+	m_keyFrameEvent.push_back(_event);
+}
+
+void Animation::DeleteEvent(KeyFrameEvent _event)
+{
+	KeyFrameEvent* target = FindEvent(_event);
+	if (target != nullptr)
+	{
+		auto it = std::remove_if(m_keyFrameEvent.begin(), m_keyFrameEvent.end(),
+			[&](KeyFrameEvent& e) {
+				return &e == target;  
+			});
+
+		if (it != m_keyFrameEvent.end())
+		{
+			m_keyFrameEvent.erase(it, m_keyFrameEvent.end());
+		}
+	}
+
+}
+
+KeyFrameEvent* Animation::FindEvent(KeyFrameEvent event)
+{
+
+	for (auto& _event : m_keyFrameEvent)
+	{
+		if(_event == event)
+			return &_event;
+	}
+}
+
+KeyFrameEvent* Animation::FindEvent(const std::string& _eventName, const std::string& _scriptName, const std::string& _funName, float progressPercent)
+{
+	for (auto& _event : m_keyFrameEvent)
+	{
+		if (_event.m_eventName == _eventName && _event.m_scriptName == _scriptName && _event.m_funName == _funName && _event.key == progressPercent)
+		{
+			return &_event;
+		}
+
+	}
+
+	
+}
+
+
 
 void Animation::SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent)
 {

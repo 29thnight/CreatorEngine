@@ -45,7 +45,7 @@ public:
 	void SetNextState(AnimationState* _nextStat);
 	std::string GetCurState();
 	std::string GetNextState();
-	bool CheckTransiton();
+	bool CheckTransiton(bool isBlend = false);
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
 

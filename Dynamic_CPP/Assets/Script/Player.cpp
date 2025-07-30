@@ -88,15 +88,11 @@ void Player::Update(float tick)
 		rb->SetAngularVelocity(Mathf::Vector3::Zero);
 		rb->SetLinearVelocity(Mathf::Vector3::Zero);
 	}
-
-
 	if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
 		if (nearMesh)
 			nearMesh->m_Material->m_materialInfo.m_bitflag = 16;
 	}
-
-
 	if (m_comboCount != 0)
 	{
 		m_comboElapsedTime += tick;
@@ -107,12 +103,10 @@ void Player::Update(float tick)
 			m_comboElapsedTime = 0.f;
 		}
 	}
-
 	if (isCharging)
 	{
 		m_chargingTime += tick;
 	}
-
 	if (m_curDashCount != 0)
 	{
 		m_dubbleDashElapsedTime += tick;
@@ -123,7 +117,6 @@ void Player::Update(float tick)
 			m_dubbleDashElapsedTime = 0.f;
 		}
 	}
-
 	if (isDashing)
 	{
 		m_dashElapsedTime += tick;
@@ -145,7 +138,6 @@ void Player::Update(float tick)
 	}
 	if (isStun)
 	{
-
 		stunTime -= tick;
 		auto controller = player->GetComponent<CharacterControllerComponent>();
 		controller->Move({ 0,0 });
@@ -154,14 +146,11 @@ void Player::Update(float tick)
 			isStun = false;
 		}
 	}
-
-
 	if (isKnockBack)
 	{
 		KnockBackElapsedTime += tick;
 		if (KnockBackElapsedTime >= KnockBackTime)
 		{
-
 			isKnockBack = false;
 			KnockBackElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack();
@@ -171,9 +160,9 @@ void Player::Update(float tick)
 			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
 			auto controller = player->GetComponent<CharacterControllerComponent>();
 			controller->Move({ -forward.x ,-forward.z });
-
 		}
 	}
+
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -188,16 +177,6 @@ void Player::Move(Mathf::Vector2 dir)
 
 	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + -dir.y * Vector2(forward.x, forward.z);
 	moveDir.Normalize();
-
-	/*if (dir.Length() > 0.00001f)
-	{
-		m_animator->SetParameter("OnMove", true);
-	}
-	else
-	{
-		m_animator->SetParameter("OnMove", false);
-	}*/
-
 
 
 	controller->Move(moveDir);

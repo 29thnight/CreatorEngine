@@ -16,18 +16,23 @@ AniTransition::~AniTransition()
 }
 
 
-bool AniTransition::CheckTransiton()
+bool AniTransition::CheckTransiton(bool isBlend)
 {
+	auto Progress = m_ownerController->curAnimationProgress;
+	if (isBlend)
+	{
+		Progress = m_ownerController->nextAnimationProgress;
+	}
 	if (hasExitTime) //최소 탈출시간 있을때
 	{
 		if (conditions.empty()) //탈출시간은 있는대 조건없으면 탈출시간되면 탈출
 		{
-			if (GetExitTime() <= m_ownerController->curAnimationProgress)
+			if (GetExitTime() <= Progress)
 				return true;
 		}
 		else  //탈출시간 + 조건있으면 둘다만족해야 탈출
 		{
-			if (GetExitTime() <= m_ownerController->curAnimationProgress)
+			if (GetExitTime() <= Progress)
 			{
 				for (auto& condition : conditions)
 				{

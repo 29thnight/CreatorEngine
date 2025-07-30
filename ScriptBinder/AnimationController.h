@@ -81,6 +81,9 @@ public:
 	[[Property]]
 	bool useMask = false;
 	float curAnimationProgress = 0.f;
+	float preCurAnimationProgress = 0.f;
+	float nextAnimationProgress = 0.f;
+	float preNextAnimationProgress = 0.f;
 	bool endAnimation = false;
 private:
 	float blendingTime = 0;
