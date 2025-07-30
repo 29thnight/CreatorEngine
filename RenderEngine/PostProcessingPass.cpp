@@ -78,10 +78,24 @@ void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 void PostProcessingPass::ControlPanel()
 {
 	ImGui::PushID(this);
-	ImGui::Checkbox("ApplyBloom",	&m_PostProcessingApply.m_Bloom);
-	ImGui::DragFloat("Threshold",	&m_bloomThreshold.threshold);
-	ImGui::DragFloat("Knee",		&m_bloomThreshold.knee);
-	ImGui::DragFloat("Coefficient", &m_bloomComposite.coefficient);
+	auto& setting = EngineSettingInstance->GetRenderPassSettings().bloom;
+
+	if (ImGui::Checkbox("ApplyBloom",   &m_PostProcessingApply.m_Bloom))
+	{
+		setting.applyBloom = m_PostProcessingApply.m_Bloom;
+	}
+	if (ImGui::DragFloat("Threshold",   &m_bloomThreshold.threshold))
+	{
+		setting.threshold = m_bloomThreshold.threshold;
+	}
+	if (ImGui::DragFloat("Knee",                &m_bloomThreshold.knee))
+	{
+		setting.knee = m_bloomThreshold.knee;
+	}
+	if (ImGui::DragFloat("Coefficient", &m_bloomComposite.coefficient))
+	{
+		setting.coefficient = m_bloomComposite.coefficient;
+	}
 	if (ImGui::DragInt("BlurRadius", &m_bloomBlur.radius, 1.f, 1, GAUSSIAN_BLUR_RADIUS))
 	{
 		GaussianBlurComputeKernel();
@@ -91,14 +105,20 @@ void PostProcessingPass::ControlPanel()
 		GaussianBlurComputeKernel();
 	}
 
-	if (ImGui::Button("Reset")) {
-		m_bloomThreshold.threshold = 0.3f;
-		m_bloomThreshold.knee = 0.5f;
-		m_bloomComposite.coefficient = 0.3f;
-		m_bloomBlur.radius = 7;
-		m_bloomBlur.sigma = 5.f;
-		GaussianBlurComputeKernel();
-	}
+        if (ImGui::Button("Reset")) {
+                m_bloomThreshold.threshold = 0.3f;
+                m_bloomThreshold.knee = 0.5f;
+                m_bloomComposite.coefficient = 0.3f;
+                m_bloomBlur.radius = 7;
+                m_bloomBlur.sigma = 5.f;
+                GaussianBlurComputeKernel();
+                setting.applyBloom = true;
+                setting.threshold = m_bloomThreshold.threshold;
+                setting.knee = m_bloomThreshold.knee;
+                setting.coefficient = m_bloomComposite.coefficient;
+                setting.blurRadius = m_bloomBlur.radius;
+                setting.blurSigma = m_bloomBlur.sigma;
+        }
 	ImGui::PopID();
 
 }

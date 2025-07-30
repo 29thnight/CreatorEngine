@@ -104,14 +104,31 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 
 void ShadowMapPass::ControlPanel()
 {
-	ImGui::Text("ShadowPass");
-	ImGui::Checkbox("Enable2", &m_abled);
-	ImGui::Checkbox("UseCasCade", &g_useCascade);
+        ImGui::Text("ShadowPass");
+        auto& setting = EngineSettingInstance->GetRenderPassSettings().shadow;
 
-	ImGui::Checkbox("Is Cloud On", &isCloudOn);
-	ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f);
-	ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f);
-	ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f");
+        ImGui::Checkbox("Enable2", &m_abled);
+        if (ImGui::Checkbox("UseCasCade", &g_useCascade))
+        {
+                setting.useCascade = g_useCascade;
+        }
+
+        if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
+        {
+                setting.isCloudOn = isCloudOn;
+        }
+        if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
+        {
+                setting.cloudSize = cloudSize;
+        }
+        if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
+        {
+                setting.cloudDirection = cloudDirection;
+        }
+        if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
+        {
+                setting.cloudMoveSpeed = cloudMoveSpeed;
+        }
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};
@@ -147,7 +164,10 @@ void ShadowMapPass::ControlPanel()
 		ImGui::Image((ImTextureID)selectedData->sliceSRV[i], ImVec2(256, 256));
 	}
 
-	ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f);
+        if (ImGui::SliderFloat("epsilon", &m_settingConstant._epsilon, 0.0001f, 0.03f))
+        {
+                setting.epsilon = m_settingConstant._epsilon;
+        }
 }
 
 void ShadowMapPass::Resize(uint32_t width, uint32_t height)

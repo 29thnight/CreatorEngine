@@ -79,28 +79,42 @@ void AAPass::Execute(RenderScene& scene, Camera& camera)
 
 void AAPass::ControlPanel()
 {
-	ImGui::PushID(this);
-	ImGui::Checkbox("Apply AntiAliasing", &m_isApply);
-	if (m_isApply)
-	{
-		ImGui::SliderFloat("Bias", &m_FXAAParameters.Bias, 0.0f, 50.0f);
-		ImGui::SliderFloat("BiasMin", &m_FXAAParameters.BiasMin, 0.0f, 50.0f);
-		ImGui::SliderFloat("SpanMax", &m_FXAAParameters.SpanMax, 0.0f, 100.0f);
-	}
-	if (ImGui::Button("Reset")) {
-		m_FXAAParameters.Bias = 0.688f;
-		m_FXAAParameters.BiasMin = 0.021f;
-		m_FXAAParameters.SpanMax = 8.0f;
-	}
-	ImGui::PopID();
+    ImGui::PushID(this);
+    auto& setting = EngineSettingInstance->GetRenderPassSettings().aa;
 
-	//EngineSettingInstance->GetRenderPassSettingsRW().aa = {
-	//	.isApply = m_isApply,
-	//	.bias = m_FXAAParameters.Bias,
-	//	.biasMin = m_FXAAParameters.BiasMin,
-	//	.spanMax = m_FXAAParameters.SpanMax
-	//};
+    if (ImGui::Checkbox("Apply AntiAliasing", &m_isApply))
+    {
+        setting.isApply = m_isApply;
+    }
 
+    if (m_isApply)
+    {
+        if (ImGui::SliderFloat("Bias", &m_FXAAParameters.Bias, 0.0f, 50.0f))
+        {
+            setting.bias = m_FXAAParameters.Bias;
+        }
+        if (ImGui::SliderFloat("BiasMin", &m_FXAAParameters.BiasMin, 0.0f, 50.0f))
+        {
+            setting.biasMin = m_FXAAParameters.BiasMin;
+        }
+        if (ImGui::SliderFloat("SpanMax", &m_FXAAParameters.SpanMax, 0.0f, 100.0f))
+        {
+            setting.spanMax = m_FXAAParameters.SpanMax;
+        }
+    }
+
+    if (ImGui::Button("Reset"))
+    {
+        m_FXAAParameters.Bias = 0.688f;
+        m_FXAAParameters.BiasMin = 0.021f;
+        m_FXAAParameters.SpanMax = 8.0f;
+
+        setting.bias = m_FXAAParameters.Bias;
+        setting.biasMin = m_FXAAParameters.BiasMin;
+        setting.spanMax = m_FXAAParameters.SpanMax;
+    }
+
+    ImGui::PopID();
 }
 
 void AAPass::ApplySettings(const AAPassSetting& setting)

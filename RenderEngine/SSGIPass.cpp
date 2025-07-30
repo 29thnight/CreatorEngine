@@ -294,35 +294,59 @@ void SSGIPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSGI");
-    ImGui::Checkbox("Enable SSGI", &isOn);
-	ImGui::Checkbox("Use Only SSGI", &useOnlySSGI);
+    auto& setting = EngineSettingInstance->GetRenderPassSettings().ssgi;
+    if (ImGui::Checkbox("Enable SSGI", &isOn))
+    {
+        setting.isOn = isOn;
+    }
+    if (ImGui::Checkbox("Use Only SSGI", &useOnlySSGI))
+    {
+        setting.useOnlySSGI = useOnlySSGI;
+    }
 	//ImGui::Checkbox("Use Bilateral Filter", &useBilateralFiltering);
 	//ImGui::SliderFloat("Sigma Space", &sigmaSpace, 0.0f, 1.0f, "Sigma Space: %.2f");
 	//ImGui::SliderFloat("Sigma Range", &sigmaRange, 0.0f, 1.0f, "Sigma Range: %.2f");
 
-	ImGui::SliderInt("Use Dual Filtering", &useDualFilteringStep, 0, 2, "Step: %d");
-    ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f);
-    ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f);
-	ImGui::SliderFloat("Intensity", &intensity, 0.0f, 10.0f, "Intensity: %.2f");
+    if (ImGui::SliderInt("Use Dual Filtering", &useDualFilteringStep, 0, 2, "Step: %d"))
+    {
+        setting.useDualFilteringStep = useDualFilteringStep;
+    }
+    if (ImGui::SliderFloat("Radius", &radius, 0.0f, 10.0f))
+    {
+        setting.radius = radius;
+    }
+    if (ImGui::SliderFloat("Thickness", &thickness, 0.0f, 1.0f))
+    {
+        setting.thickness = thickness;
+    }
+    if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 10.0f, "Intensity: %.2f"))
+    {
+        setting.intensity = intensity;
+    }
 
     if (ImGui::SliderInt("SSGI Ratio", &ssratio, 1, 4, "SSGI Ratio: %d")) {
         m_pTempTexture->SetSizeRatio({ float(ssratio), float(ssratio)});
-		m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
-		m_pTempTexture3->SetSizeRatio({ float(ssratio * 4), float(ssratio * 4) });
+                m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
+                m_pTempTexture3->SetSizeRatio({ float(ssratio * 4), float(ssratio * 4) });
         m_pTempTexture->ResizeRelease();
         m_pTempTexture2->ResizeRelease();
         m_pTempTexture3->ResizeRelease();
 
-		m_pTempTexture->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
-		m_pTempTexture2->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
-		m_pTempTexture3->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+                m_pTempTexture->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+                m_pTempTexture2->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+                m_pTempTexture3->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+        setting.ssratio = ssratio;
     }
 
-	if (ImGui::Button("Reset")) {
-		radius = 4.f; // Reset to default value
-		thickness = 0.5f; // Reset to default value
-		intensity = 1.f; // Reset to default value
-	}
+        if (ImGui::Button("Reset")) {
+                radius = 4.f; // Reset to default value
+                thickness = 0.5f; // Reset to default value
+                intensity = 1.f; // Reset to default value
+
+                setting.radius = radius;
+                setting.thickness = thickness;
+                setting.intensity = intensity;
+        }
 
     ImGui::PopID();
 }
