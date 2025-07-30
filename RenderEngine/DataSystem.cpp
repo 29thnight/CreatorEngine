@@ -16,7 +16,7 @@
 #include "fa.h"
 #include "ToggleUI.h"
 
-using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, 10>;
+using FileTypeCharArr = std::array<std::pair<DataSystem::FileType, const char*>, (size_t)DataSystem::FileType::End>;
 
 constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::Model,          "Model"				},
@@ -28,7 +28,8 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::CSharpScript,   "CSharpScript"		},
     { DataSystem::FileType::Prefab,         "Prefab"            },
 	{ DataSystem::FileType::Sound,          "Sound"				},
-	{ DataSystem::FileType::HDR,            "HDR"				}
+	{ DataSystem::FileType::HDR,            "HDR"				},
+	{ DataSystem::FileType::VolumeProfile , "VolumeProfile"		}
 }};
 
 // 검색 함수
@@ -65,6 +66,8 @@ DataSystem::FileType GetFileType(const file::path& filepath)
 		return DataSystem::FileType::HDR;
 	else if (filepath.extension() == ".prefab")
 		return DataSystem::FileType::Prefab;
+	else if (filepath.extension() == ".volume")
+		return DataSystem::FileType::VolumeProfile;
 	return DataSystem::FileType::Unknown;
 }
 
@@ -890,7 +893,12 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 				else if (extension == ".prefab")
 				{
 					fileType = FileType::Prefab;
-					iconTexture = (ImTextureID)ModelIcon->m_pSRV;
+					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
+				}
+				else if (extension == ".volume")
+				{
+					fileType = FileType::VolumeProfile;
+					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
 				}
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
@@ -992,6 +1000,10 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 				else if (extension == ".prefab")
 				{
 					apliedIcon = ICON_FA_BOX_OPEN " ";
+				}
+				else if (extension == ".volume")
+				{
+					apliedIcon = ICON_FA_SLIDERS " ";
 				}
 
 				label = apliedIcon + label;

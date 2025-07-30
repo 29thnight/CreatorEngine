@@ -92,7 +92,7 @@ void ColorGradingPass::Execute(RenderScene& scene, Camera& camera)
 void ColorGradingPass::ControlPanel()
 {
         ImGui::PushID(this);
-        auto& setting = EngineSettingInstance->GetRenderPassSettings().colorGrading;
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().colorGrading;
         if (ImGui::Checkbox("ColorGrading", &isOn))
         {
                 setting.isOn = isOn;

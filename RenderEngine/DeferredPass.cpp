@@ -180,7 +180,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 void DeferredPass::ControlPanel()
 {
     ImGui::PushID(this);
-        auto& setting = EngineSettingInstance->GetRenderPassSettings().deferred;
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().deferred;
 
         if (ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion))
         {

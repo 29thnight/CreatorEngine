@@ -205,7 +205,7 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 void ToneMapPass::ControlPanel()
 {
     ImGui::PushID(this);
-    auto& setting = EngineSettingInstance->GetRenderPassSettings().toneMap;
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().toneMap;
     if (ImGui::Checkbox("Use ToneMap", &m_isAbleToneMap))
     {
         setting.isAbleToneMap = m_isAbleToneMap;

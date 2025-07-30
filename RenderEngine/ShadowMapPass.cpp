@@ -105,7 +105,7 @@ void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 void ShadowMapPass::ControlPanel()
 {
         ImGui::Text("ShadowPass");
-        auto& setting = EngineSettingInstance->GetRenderPassSettings().shadow;
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().shadow;
 
         ImGui::Checkbox("Enable2", &m_abled);
         if (ImGui::Checkbox("UseCasCade", &g_useCascade))

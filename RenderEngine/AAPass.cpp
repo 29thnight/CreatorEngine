@@ -80,7 +80,7 @@ void AAPass::Execute(RenderScene& scene, Camera& camera)
 void AAPass::ControlPanel()
 {
     ImGui::PushID(this);
-    auto& setting = EngineSettingInstance->GetRenderPassSettings().aa;
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().aa;
 
     if (ImGui::Checkbox("Apply AntiAliasing", &m_isApply))
     {

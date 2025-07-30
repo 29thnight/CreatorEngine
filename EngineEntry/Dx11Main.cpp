@@ -183,8 +183,8 @@ void DirectX11::Dx11Main::Initialize()
 void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
-    EngineSettingInstance->SaveSettings();
     SceneManagers->Decommissioning();
+    EngineSettingInstance->SaveSettings();
     m_sceneRenderer->Finalize();
     m_deviceResources->RegisterDeviceNotify(nullptr);
     PROFILER_SHUTDOWN();
@@ -220,7 +220,6 @@ void DirectX11::Dx11Main::Update()
     PROFILE_CPU_BEGIN("GameLogic");
     m_timeSystem.Tick([&]
     {
-
         InfoWindow();
         InputManagement->Update(EngineSettingInstance->frameDeltaTime);
 #ifdef EDITOR

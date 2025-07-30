@@ -31,6 +31,8 @@ public:
 		Prefab,
 		Sound,
 		HDR,
+		VolumeProfile,
+		End,
 	};
 
 	enum class TextureFileType

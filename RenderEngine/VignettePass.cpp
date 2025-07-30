@@ -81,7 +81,7 @@ void VignettePass::Execute(RenderScene& scene, Camera& camera)
 void VignettePass::ControlPanel()
 {
         ImGui::PushID(this);
-        auto& setting = EngineSettingInstance->GetRenderPassSettings().vignette;
+        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().vignette;
         if (ImGui::Checkbox("Vignette", &isOn))
         {
                 setting.isOn = isOn;

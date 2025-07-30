@@ -146,7 +146,7 @@ void SSAOPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSAO");
-    auto& setting = EngineSettingInstance->GetRenderPassSettings().ssao;
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().ssao;
 
     if (ImGui::SliderFloat("Radius", &radius, 0.0f, 1.0f))
     {

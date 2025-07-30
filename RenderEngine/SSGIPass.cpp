@@ -294,7 +294,7 @@ void SSGIPass::ControlPanel()
 {
     ImGui::PushID(this);
     ImGui::Text("SSGI");
-    auto& setting = EngineSettingInstance->GetRenderPassSettings().ssgi;
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().ssgi;
     if (ImGui::Checkbox("Enable SSGI", &isOn))
     {
         setting.isOn = isOn;

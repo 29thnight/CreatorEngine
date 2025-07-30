@@ -18,6 +18,8 @@ public:
     void ApplyProfile();
 
     [[Property]]
+	std::string m_volumeProfileName{};
+    [[Property]]
     FileGuid m_volumeProfileGuid{ nullFileGuid };
 
 private:

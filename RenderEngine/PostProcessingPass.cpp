@@ -78,7 +78,7 @@ void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
 void PostProcessingPass::ControlPanel()
 {
 	ImGui::PushID(this);
-	auto& setting = EngineSettingInstance->GetRenderPassSettings().bloom;
+	auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().bloom;
 
 	if (ImGui::Checkbox("ApplyBloom",   &m_PostProcessingApply.m_Bloom))
 	{
