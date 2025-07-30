@@ -116,11 +116,6 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void SetNodeFactory(Singleton<BT::NodeFactory>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<BT::NodeFactory>&>(BTNodeFactory) = funcPtr();
-	}
-
 	EXPORT_API void DeleteModuleBehavior(ModuleBehavior* behavior)
 	{
 		if (behavior)
@@ -151,21 +146,6 @@ extern "C"
 		{
 			delete conditionDecoratorNode;
 		}
-	}
-
-	EXPORT_API void SetPhysicsManager(Singleton<PhysicsManager>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<PhysicsManager>&>(PhysicsManagers) = funcPtr();
-	}
-
-	EXPORT_API void SetPhysics(Singleton<PhysicX>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<PhysicX>&>(Physics) = funcPtr();
-	}
-
-	EXPORT_API void SetObjectAllocator(Singleton<GameObjectPool>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<GameObjectPool>&>(GameObjectPoolInstance) = funcPtr();
 	}
 
 #pragma	endregion

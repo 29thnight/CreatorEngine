@@ -11,6 +11,7 @@
 #include "NodeFactory.h"
 #include "TagManager.h"
 #include "GameObjectPool.h"
+#include "ReflectionRegister.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -455,6 +456,8 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
     try
     {
+        Meta::UndoCommandManager->ClearGameMode();
+		Meta::UndoCommandManager->Clear();
 		resourceTrimEvent.Broadcast();
         //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene.load());
