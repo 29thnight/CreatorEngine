@@ -1,12 +1,18 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "ModuleBehavior.h"
+#include "Entity.h"
 
-class GameManager;
-class TestEnemy : public ModuleBehavior
+enum class CriticalMark
+{
+	P1,
+	P2,
+	None,
+};
+
+class EntityEnemy : public Entity
 {
 public:
-	MODULE_BEHAVIOR_BODY(TestEnemy)
+	MODULE_BEHAVIOR_BODY(EntityEnemy)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,18 +26,8 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
-	
-	void SetCriticalMark(int playerIndex);
 
-	GameObject* Owner;
-	[[Property]]
-	float maxHP = 100;
-	float curHP = maxHP;
-	
-	[[Property]]
-	float detectRange = 5.f;
-	GameManager* gm = nullptr;
-	float targetLostTimer = 0.f;
-	float maxTargetLostTimer = 5.f;
-	Mathf::Vector3 directionToTarget = { 0.f, 0.f, 0.f };
+	void SetCriticalMark(int playerIndex);
+	CriticalMark criticalMark = CriticalMark::None;
+	virtual void Attack(Entity* sender, int damage);
 };

@@ -39,15 +39,7 @@ void Player::Start()
 	}
 
 
-	//playerMap->AddValueAction("Move", 0, InputValueType::Vector2, InputType::KeyBoard, { 'A', 'D', 'S', 'W' },
-	//	[this](Mathf::Vector2 _vector2) {Move(_vector2);});
-	//playerMap->AddButtonAction("Attack", 0, InputType::KeyBoard, 'K', KeyState::Down, [this]() {  Attack();});
-	//playerMap->AddButtonAction("AttackCharging", 0, InputType::KeyBoard, 'K', KeyState::Pressed, [this]() {});
-	//playerMap->AddButtonAction("ChargeAttack", 0, InputType::KeyBoard, 'K', KeyState::Released, [this]() {});
-	//playerMap->AddButtonAction("Dash", 0, InputType::KeyBoard, 'L', KeyState::Down, [this]() {Dash();});
-	//playerMap->AddButtonAction("CatchAndThrow", 0, InputType::KeyBoard, 'J', KeyState::Down, [this]() {CatchAndThrow();});
-	//playerMap->AddButtonAction("SwapWeaponLeft", 0, InputType::KeyBoard, 'Q', KeyState::Down, [this]() {SwapWeaponLeft();});
-	//playerMap->AddButtonAction("SwapWeaponRight", 0, InputType::KeyBoard, 'P', KeyState::Down, [this]() {SwapWeaponRight();});
+
 
 	auto handsocket = GameObject::Find("SwordSocket");
 
@@ -60,7 +52,7 @@ void Player::Start()
 	
 
 
-
+	
 
 	//handsocket.
 
@@ -88,10 +80,7 @@ void Player::Update(float tick)
 		XMVECTOR offsetPos = world + forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; // Y °íÁ¤
 
-		catchedObject->GetComponent<Transform>()->SetPosition(offsetPos);
-		auto rb = catchedObject->GetComponent<RigidBodyComponent>();
-		rb->SetAngularVelocity(Mathf::Vector3::Zero);
-		rb->SetLinearVelocity(Mathf::Vector3::Zero);
+		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
 	}
 	if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
@@ -168,6 +157,8 @@ void Player::Update(float tick)
 		}
 	}
 
+
+
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -222,9 +213,10 @@ void Player::Catch()
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
 
 		m_animator->SetParameter("OnGrab", true);
-		catchedObject = m_nearObject;
+		catchedObject = m_nearObject->GetComponent<EntityItem>();
 		m_nearObject = nullptr;
-		catchedObject->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::TRIGGER);
+		catchedObject->GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::TRIGGER);
+		catchedObject->SetThrowOwner(this);
 		if (m_curWeapon)
 			m_curWeapon->GetOwner()->SetEnabled(false);
 	}
@@ -239,9 +231,8 @@ void Player::DropCatchItem()
 {
 	if (catchedObject != nullptr)
 	{
-		auto item = catchedObject->GetComponent<EntityItem>();
-		if (item) {
-			item->Drop(player->m_transform.GetForward(), 2.0f);
+		if (catchedObject) {
+			catchedObject->Drop(player->m_transform.GetForward(), 2.0f);
 		}
 
 		catchedObject = nullptr;
@@ -253,10 +244,9 @@ void Player::DropCatchItem()
 
 void Player::ThrowEvent()
 {
-	auto item = catchedObject->GetComponent<EntityItem>();
-	if (item) {
-		item->SetThrowOwner(this);
-		item->Throw(player->m_transform.GetForward(), 6.0f);
+	if (catchedObject) {
+		catchedObject->SetThrowOwner(this);
+		catchedObject->Throw(player->m_transform.GetForward(), 6.0f);
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
@@ -315,7 +305,9 @@ void Player::Attack()
 
 	if (m_comboCount == 0)
 	{
-		/*auto obj = GameObject::Find("GumGi");
+		int gumNumber = playerIndex + 1;
+		std::string gumName = "GumGi" + std::to_string(gumNumber);
+		auto obj = GameObject::Find(gumName);
 		auto pos = GetOwner()->m_transform.GetWorldPosition();
 		auto forward2 = GetOwner()->m_transform.GetForward();
 		auto offset{ 2 };
@@ -337,7 +329,7 @@ void Player::Attack()
 			{
 				effect->Apply();
 			}
-		}*/
+		}
 		std::vector<HitResult> hits;
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;
@@ -377,6 +369,7 @@ void Player::Attack()
 	m_animator->SetParameter("Attack", true);
 	std::cout << "Attack!!" << std::endl;
 	std::cout << m_comboCount << "Combo Attack " << std::endl;
+	DropCatchItem();
 	m_comboCount++;
 	m_comboElapsedTime = 0;
 
@@ -432,11 +425,6 @@ void Player::DeleteCurWeapon()
 }
 
 
-
-void Player::OnPunch()
-{
-	std::cout << "ppppuuuunchhhhhhh" << std::endl;
-}
 
 void Player::TestStun()
 {

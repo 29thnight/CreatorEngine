@@ -77,39 +77,103 @@ void EntityItem::Update(float tick)
 			}
 		}
 	}*/
-	if (isThrow)
+
+	if (m_state == EItemState::CATCHED)
 	{
-		speed -= tick;
-		if (speed < 1.f) {
-			speed = 1.f;
-		}
-		Transform* myTr = GetOwner()->GetComponent<Transform>();
-
-		Vector3 pB = ((endPos - startPos) / 2) + startPos;
-		pB.y += 10.f;
-		Vector3 pA = startPos;
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		timer += tick * speed; // 10sec
-		if (timer < 1.f) {
-			Vector3 p0 = Lerp(pA, pB, timer);
-			Vector3 p1 = Lerp(pB, endPos, timer);
-			Vector3 p01 = Lerp(p0, p1, timer);
+		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+		//여기서 아이템을 플레이어 손위에 가게하기?
+		if (asisTail != nullptr)
+		{
+			Transform* tailTransform = asisTail->GetComponent<Transform>();
+			if (tailTransform)
+			{
+				Vector3 tailPos = tailTransform->GetWorldPosition();
+				Vector3 ownerPos = GetOwner()->m_transform.GetWorldPosition();
 
-			myTr->SetPosition(p01);
+				// XZ 평면 거리 계산
+				float dx = tailPos.x - ownerPos.x;
+				float dz = tailPos.z - ownerPos.z;
+				if (abs(dx) < indicatorDistacne && abs(dz) < indicatorDistacne)
+				{
+					isTargettingTail = true;
+					std::cout << "On Indeicator " << std::endl;
+					
+				}
+				else
+				{
+					isTargettingTail = false;
+				}
+			}
+		}
+	}
+
+	if (m_state == EItemState::THROWN)
+	{
+		if (!isTargettingTail)
+		{
+			speed -= tick;
+			if (speed < 1.f) {
+				speed = 1.f;
+			}
+			Transform* myTr = GetOwner()->GetComponent<Transform>();
+			Vector3 pB = ((endPos - startPos) / 2) + startPos;
+			pB.y += 10.f;
+			Vector3 pA = startPos;
+			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+			timer += tick * speed; // 10sec
+			if (timer < 1.f) {
+				Vector3 p0 = Lerp(pA, pB, timer);
+				Vector3 p1 = Lerp(pB, endPos, timer);
+				Vector3 p01 = Lerp(p0, p1, timer);
+				myTr->SetPosition(p01);
+			}
+			else
+			{
+				GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+				speed = 2.f;
+				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+				m_state = EItemState::NONE;
+			};
 		}
 		else
 		{
+			Transform* tailTransform = asisTail->GetComponent<Transform>();
+			if (tailTransform)
+			{
+				speed -= tick;
+				if (speed < 1.f) {
+					speed = 1.f;
+				}
+				Transform* myTr = GetOwner()->GetComponent<Transform>();
+				Mathf::Vector3 tailPos = tailTransform->GetWorldPosition();
+				Vector3 pB = ((tailPos - startPos) / 2) + startPos;
+				pB.y += 10.f;
+				Vector3 pA = startPos;
+				auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+				timer += tick * speed; // 10sec
+				if (timer < 1.f) {
+					Vector3 p0 = Lerp(pA, pB, timer);
+					Vector3 p1 = Lerp(pB, tailPos, timer);
+					Vector3 p01 = Lerp(p0, p1, timer);
+					myTr->SetPosition(p01);
+				}
+				else
+				{
+					GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+					speed = 2.f;
+					rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+					rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+					m_state = EItemState::NONE;
+				};
+			}
+		}
 
-			GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
-			isThrow = false;
-			speed = 2.f;
-			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
-			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
-			m_state = EItemState::NONE;
 
-		};
+
 	}
-
 	if (m_state == EItemState::DROPPED)
 	{
 		speed -= tick;
@@ -161,9 +225,9 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
 }
 void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 {
+	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::THROWN;
 	timer = 0.f;
-	isThrow = true;
 	Mathf::Vector3 offset = {ownerForward.x * distance,0, ownerForward.z * distance };
 	endPos = startPos + offset;
 	endPos.y = 0.01;
@@ -174,6 +238,7 @@ void EntityItem::SetThrowOwner(Player* player)
 	throwOwner = player;
 	asisTail = GameObject::Find("AsisTail");
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
+	m_state = EItemState::CATCHED;
 	
 	/*auto tween = std::make_shared<Tweener<Mathf::Vector3>>([&]() {
 		auto pos = GetOwner()->m_transform.GetWorldPosition();

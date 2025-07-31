@@ -101,6 +101,8 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
 	GameObject::Index index = m_SceneObjects.size();
+
+
     auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {

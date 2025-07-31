@@ -186,6 +186,9 @@
 		<ClInclude Include="Easing.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -312,6 +315,9 @@
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 		<ClCompile Include="Assets\Script\Weapon.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>

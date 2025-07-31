@@ -22,6 +22,7 @@ class CapsuleColliderComponent;
 class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
+class Animator;
 class Scene
 {
 public:
@@ -206,7 +207,6 @@ public:
 
 private:
     std::unordered_set<std::string> m_gameObjectNameSet{};
-	std::unordered_set<std::weak_ptr<GameObject>> m_transformDirtyObjects{};
 	std::vector<LightComponent*>    m_lightComponents;
 	std::vector<MeshRenderer*>      m_allMeshRenderers;
 	std::vector<MeshRenderer*>      m_staticMeshRenderers;
@@ -228,7 +228,7 @@ private:
 	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
 	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
 	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
-
+	std::vector<std::shared_ptr<Animator*>>     m_animators;
     RigidBodyTypeLinkCallback	m_ColliderTypeLinkCallback;
 	ColliderContainerType		m_colliderContainer;
 
