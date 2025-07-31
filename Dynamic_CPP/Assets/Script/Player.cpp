@@ -46,10 +46,16 @@ void Player::Start()
 
 	auto curweapon = GameObject::Find("realSword");
 
-	handsocket->AddChild(curweapon);
-	auto basicWeapon = curweapon->GetComponent<Weapon>();
-	AddWeapon(basicWeapon);
-	
+	if (handsocket)
+	{
+		if (curweapon)
+		{
+			handsocket->AddChild(curweapon);
+			auto basicWeapon = curweapon->GetComponent<Weapon>();
+			AddWeapon(basicWeapon);
+		}
+	}
+
 
 
 	
@@ -61,9 +67,13 @@ void Player::Start()
 	//m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
 
 
-	GameManager* gm = GameObject::Find("GameManager")->GetComponent<GameManager>();
-	gm->PushEntity(this);
-	gm->PushPlayer(this);
+	auto gmobj = GameObject::Find("GameManager");
+	if (gmobj)
+	{
+		auto gm = gmobj->GetComponent<GameManager>();
+		gm->PushEntity(this);
+		gm->PushPlayer(this);
+	}
 
 	camera = GameObject::Find("Main Camera");
 }
@@ -157,8 +167,6 @@ void Player::Update(float tick)
 		}
 	}
 
-
-
 }
 
 void Player::Move(Mathf::Vector2 dir)
@@ -207,6 +215,11 @@ void Player::CatchAndThrow()
 
 void Player::Catch()
 {
+
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	pos.x += 1.1f;
+	GetOwner()->m_transform.SetPosition(pos);
+
 	if (m_nearObject != nullptr)
 	{
 
