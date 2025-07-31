@@ -16,19 +16,119 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 	if (animator)
 	{
 		static bool showControllersWindow = false;
+		static bool showKeyFrameWindow = false;
+		static int  animationIndex = 0;
 		const auto& aniType = Meta::Find(animator->GetTypeID());
 		Meta::DrawProperties(animator, *aniType);
 		Meta::DrawMethods(animator, *aniType);
 		if (ImGui::CollapsingHeader("animations"))
 		{
-			for (auto& animation : animator->m_Skeleton->m_animations)
+			for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
 			{
+				Animation& animation = animator->m_Skeleton->m_animations[i];
 				ImGui::PushID(animation.m_name.c_str());
-				const auto& mat_info_type = Meta::Find("Animation");
-				Meta::DrawProperties(&animation, *mat_info_type);
-
-				ImGui::PopID();
+				ImGui::Text(animation.m_name.c_str());
+				ImGui::Text("Loop");
+				ImGui::SameLine();
+				ImGui::Checkbox("", &animation.m_isLoop);
+				ImGui::Text("KeyFrameEvent");
+				ImGui::SameLine();
+				if (ImGui::Button(ICON_FA_BOX))
+				{
+					ImGui::PopID();
+					animationIndex = i;
+					showKeyFrameWindow = !showKeyFrameWindow;
+				}
+				else
+				{
+					ImGui::PopID();
+				}
+				ImGui::Separator();
 			}
+			ImGui::Separator();
+			if (showKeyFrameWindow)
+			{
+				ImGui::SetNextWindowSize(ImVec2(1100, 400), ImGuiCond_FirstUseEver);
+				bool open = ImGui::Begin("Event", &showKeyFrameWindow);
+				auto& animation = animator->m_Skeleton->m_animations[animationIndex];
+				ImGui::Text(animation.m_name.c_str());
+				if (ImGui::Button("Add Event"))
+				{
+					animation.AddEvent();
+				}
+				ImGui::Separator();
+				ImGui::Separator();
+				if (!animation.m_keyFrameEvent.empty())
+				{
+					int eventIndex = 0;
+					for (auto& event : animation.m_keyFrameEvent)
+					{
+						ImGui::PushID(eventIndex);
+						ImGui::Dummy(ImVec2(10.0f, 0));
+						ImGui::SameLine();
+						ImGui::Text("eventName");
+						ImGui::SameLine();
+						char eventBuffer[128];
+						strcpy_s(eventBuffer, event.m_eventName.c_str());
+						eventBuffer[sizeof(eventBuffer) - 1] = '\0';
+						ImGui::SetNextItemWidth(150);
+						if (ImGui::InputText("##event", eventBuffer, sizeof(eventBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+						{
+							event.m_eventName = eventBuffer;
+						}
+						ImGui::SameLine();
+						ImGui::Dummy(ImVec2(10.0f, 0));
+						ImGui::SameLine();
+						ImGui::Text("scriptName");
+						ImGui::SameLine();
+
+						char scriptBuffer[128];
+						strcpy_s(scriptBuffer, event.m_scriptName.c_str());
+						scriptBuffer[sizeof(scriptBuffer) - 1] = '\0';
+						ImGui::SetNextItemWidth(150);
+						if (ImGui::InputText("##script", scriptBuffer, sizeof(scriptBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+						{
+							event.m_scriptName = scriptBuffer;
+						}
+							
+
+						ImGui::SameLine();
+						ImGui::Dummy(ImVec2(10.0f, 0));
+						ImGui::SameLine();
+						ImGui::Text("funName");
+						ImGui::SameLine();
+
+
+						char funBuffer[128];
+						strcpy_s(funBuffer, event.m_funName.c_str());
+						funBuffer[sizeof(funBuffer) - 1] = '\0';
+						ImGui::SetNextItemWidth(150);
+						if (ImGui::InputText("##fun", funBuffer, sizeof(funBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+						{
+							event.m_funName = funBuffer;
+						}
+						ImGui::SameLine();
+						ImGui::Dummy(ImVec2(10.0f, 0));
+						ImGui::SameLine();
+						ImGui::Text("progress");
+						ImGui::SameLine();
+						ImGui::PushItemWidth(80);
+						ImGui::DragFloat(("Key##" + event.m_eventName).c_str(), &event.key, 0.01f,0.0f, 1.0f);
+						ImGui::PopItemWidth();
+						ImGui::SameLine();
+						if(ImGui::Button("delete"))
+						{
+							animation.DeleteEvent(eventIndex);
+						}
+						ImGui::Separator();
+						eventIndex++;
+						ImGui::PopID();
+					}
+					
+				}
+				ImGui::End();
+			}
+			
 		}
 
 		//if (!animator->m_animationControllers.empty())

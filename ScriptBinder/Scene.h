@@ -23,6 +23,7 @@ class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
 class Transform;
+class Animator;
 class Scene
 {
 public:
@@ -233,7 +234,7 @@ private:
 	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
 	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
 	std::vector<TerrainColliderComponent*>		m_terrainColliderComponents;
-
+	std::vector<std::shared_ptr<Animator*>>     m_animators;
     RigidBodyTypeLinkCallback	m_ColliderTypeLinkCallback;
 	ColliderContainerType		m_colliderContainer;
 

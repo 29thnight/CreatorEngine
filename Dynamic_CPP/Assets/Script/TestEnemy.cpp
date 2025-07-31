@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "GameManager.h"
 #include "Player.h"
-
+#include "EffectComponent.h"
 void TestEnemy::Start()
 {
 	Owner = GetOwner();
@@ -27,7 +27,7 @@ void TestEnemy::Update(float tick)
 	auto players = gm->GetPlayers();
 	auto asis = gm->GetAsis();
 	Mathf::Vector3 enemyPos = Owner->m_transform.GetWorldPosition();
-	for (auto& a : asis) {
+	/*for (auto& a : asis) {
 		Mathf::Vector3 asisPos = a->GetOwner()->m_transform.GetWorldPosition();
 		if (Mathf::Vector3::DistanceSquared(asisPos, enemyPos) < detectRange * detectRange) {
 			targetLostTimer = maxTargetLostTimer;
@@ -44,6 +44,14 @@ void TestEnemy::Update(float tick)
 			directionToTarget = playerPos - enemyPos;
 			directionToTarget.Normalize();
 		}
-	}
+	}*/
+
+	
+}
+
+void TestEnemy::SetCriticalMark(int playerIndex)
+{
+	
+	
 }
 
