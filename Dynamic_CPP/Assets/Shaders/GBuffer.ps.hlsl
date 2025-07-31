@@ -139,10 +139,15 @@ GBufferOutput main(PixelShaderInput IN)
         float2 uv2 = uv * gLayerTiling2;
         float2 uv3 = uv * gLayerTiling3;
         
-        float3 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0).rgb;
-        float3 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0).rgb;
-        float3 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0).rgb;
-        float3 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0).rgb;
+        float4 layer0 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv0, (float) 0), 0);
+            layer0 = SRGBtoLINEAR(layer0);
+        float4 layer1 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv1, (float) 1), 0);
+            layer1 = SRGBtoLINEAR(layer1);
+        float4 layer2 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv2, (float) 2), 0);
+            layer2 = SRGBtoLINEAR(layer2);
+        float4 layer3 = LayerAlbedo.SampleLevel(LinearSampler, float3(uv3, (float) 3), 0);
+            layer3 = SRGBtoLINEAR(layer3);
+        
         
         float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
         
@@ -161,7 +166,7 @@ GBufferOutput main(PixelShaderInput IN)
         albedo = float4(color, 1.0);
 
         //if (gConvertToLinear)
-            albedo = SRGBtoLINEAR(albedo);
+            //albedo = SRGBtoLINEAR(albedo);
         
         occlusion = 1;
         metallic = 0.0;
