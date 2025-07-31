@@ -2,6 +2,9 @@
 #include "ModuleBehavior.h"
 #include "DataSystem.h"
 #include "ReflectionImGuiHelper.h"
+#ifndef YAML_CPP_API
+#define YAML_CPP_API __declspec(dllimport)
+#endif /* YAML_CPP_STATIC_DEFINE */
 
 void ImGuiDrawHelperModuleBehavior(ModuleBehavior* moduleBehavior)
 {

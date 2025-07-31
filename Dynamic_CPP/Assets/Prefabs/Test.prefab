@@ -1,0 +1,34 @@
+m_name: Test_Prefab
+m_isEnabled: true
+m_instanceID: 1312953728
+m_fileGuid: eb8222e8-b385-5d4e-80c4-caaa28d9ae52
+PrefabNode:
+  - GameObject: 2166264123
+    m_name: Test
+    m_isEnabled: true
+    m_instanceID: 1073853659
+    m_transform:
+      position: {x: 0, y: 0, z: 0, w: 1}
+      rotation: {x: -0, y: 0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1, w: 0}
+      m_parentID: 0
+      m_dirty: 0
+    m_index: 1
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: ~
+    m_prefabFileGuid: eb8222e8-b385-5d4e-80c4-caaa28d9ae52
+    m_attachedSoketID: 0
+    m_collisionType: 1
+    m_isStatic: false
+    m_gameObjectType: 0
+    m_tag: Untagged
+    m_layer: Default
+    m_components:
+      - VolumeComponent: 2550505856
+        m_name: VolumeComponent
+        m_isEnabled: true
+        m_instanceID: 3641472427
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_volumeProfileName: ""
+        m_volumeProfileGuid: 00000000-0000-0000-0000-000000000000

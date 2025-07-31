@@ -2,6 +2,10 @@
 #include "ExternUI.h"
 #include "PlayerInput.h"
 #include "InputActionManager.h"
+#ifndef YAML_CPP_API
+#define YAML_CPP_API __declspec(dllimport)
+#endif /* YAML_CPP_STATIC_DEFINE */
+
 void ImGuiDrawHelperPlayerInput(PlayerInputComponent* playerInput)
 {
 	if (playerInput)
