@@ -46,7 +46,7 @@ void TrailRenderModule::Initialize()
 
     // ±íÀÌ ½ºÅÙ½Ç ½ºÅ×ÀÌÆ®
     CD3D11_DEPTH_STENCIL_DESC depthDesc{ CD3D11_DEFAULT() };
-    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     depthDesc.DepthEnable = true;
     depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
     DeviceState::g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);

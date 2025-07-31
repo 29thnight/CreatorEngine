@@ -193,7 +193,7 @@ void TrailGenerateModule::GenerateMesh()
 
         m_lastUpVector = CalculateUpVector(forward, m_lastUpVector);
         Mathf::Vector3 right;
-        right.Cross(forward, m_lastUpVector);
+        forward.Cross(m_lastUpVector, right);
         right.Normalize();
         right *= width * 0.5f;
 
@@ -272,7 +272,7 @@ void TrailGenerateModule::CalculateNormals()
         Mathf::Vector3 edge1 = v1 - v0;
         Mathf::Vector3 edge2 = v2 - v0;
         Mathf::Vector3 normal;
-        normal.Cross(edge1, edge2);
+        edge1.Cross(edge2, normal);
         normal.Normalize();
 
         m_vertices[i0].normal = normal;
@@ -293,15 +293,42 @@ float TrailGenerateModule::CalculateTrailLength() const
 
 Mathf::Vector3 TrailGenerateModule::CalculateUpVector(const Mathf::Vector3& forward, const Mathf::Vector3& lastUp) const
 {
-    if (forward.Dot(lastUp) > 0.99f)
+    if (abs(forward.Dot(lastUp)) > 0.99f)
     {
-        return Mathf::Vector3(0.0f, 1.0f, 0.0f);
+        Mathf::Vector3 fallback = Mathf::Vector3(0.0f, 1.0f, 0.0f);
+        if (abs(forward.Dot(fallback)) > 0.99f)
+        {
+            fallback = Mathf::Vector3(1.0f, 0.0f, 0.0f);
+        }
+        return fallback;
     }
 
     Mathf::Vector3 right = forward.Cross(lastUp);
+    right.Normalize();
+
     Mathf::Vector3 up = right.Cross(forward);
     up.Normalize();
+
     return up;
+}
+
+void TrailGenerateModule::RemoveOldPoints(float maxAge)
+{
+    if (maxAge < 0) maxAge = m_trailLifetime;
+
+    auto it = m_trailPoints.begin();
+    while (it != m_trailPoints.end())
+    {
+        if (m_currentTime - it->timestamp > maxAge)
+        {
+            it = m_trailPoints.erase(it);
+            m_meshDirty = true;
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 void TrailGenerateModule::UpdateBuffers()
