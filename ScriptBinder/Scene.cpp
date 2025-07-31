@@ -265,9 +265,9 @@ void Scene::Start()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
-#ifdef _DEBUG
+#ifndef BUILD_FLAG
 	AllUpdateWorldMatrix();	// render 단계에서 imgui를 통해 transform의 변경이 있으므로 디버그모드에서만 사용.
-#endif // _DEBUG
+#endif // BUILD_FLAG
 
 	SetInternalPhysicData();
 

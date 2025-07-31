@@ -47,11 +47,6 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 			}
 			if (showControllersWindow)
 			{
-
-
-
-
-
 				bool open = ImGui::Begin("Animation Controllers", &showControllersWindow);
 				//int i = 0;
 

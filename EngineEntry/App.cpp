@@ -63,6 +63,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 {
 	GameObjectPool::GetInstance();
 	EngineSetting::GetInstance();
+	InputManager::GetInstance();
 	PrefabUtility::GetInstance();
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();

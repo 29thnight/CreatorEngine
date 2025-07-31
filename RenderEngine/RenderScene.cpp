@@ -29,6 +29,7 @@ RenderScene::~RenderScene()
 void RenderScene::Initialize()
 {
 	m_LightController = new LightController();
+	m_animationJob.SetRenderScene(this);
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -132,7 +133,7 @@ void RenderScene::EraseRenderPassData()
 	}
 }
 
-void RenderScene::RegisterAnimator(Animator* animatorPtr)
+void RenderScene::RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
 {
 	if (nullptr == animatorPtr) return;
 
@@ -149,7 +150,7 @@ void RenderScene::RegisterAnimator(Animator* animatorPtr)
 	}
 }
 
-void RenderScene::UnregisterAnimator(Animator* animatorPtr)
+void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPtr)
 {
 	if (nullptr == animatorPtr) return;
 

@@ -31,16 +31,42 @@ public:
     virtual ~ManagedHeapObject() = default;
 };
 
+// 1. Custom allocator that uses MyAlloc/MyFree
+template<typename T>
+struct MyAllocator {
+    using value_type = T;
+
+    MyAllocator() = default;
+
+    template<typename U>
+    constexpr MyAllocator(const MyAllocator<U>&) noexcept {}
+
+    T* allocate(std::size_t n) {
+        return static_cast<T*>(MyAlloc(n * sizeof(T)));
+    }
+
+    void deallocate(T* p, std::size_t) noexcept {
+        MyFree(p);
+    }
+
+    // For compatibility
+    template<typename U> struct rebind { using other = MyAllocator<U>; };
+};
+
+template<typename T, typename U>
+bool operator==(const MyAllocator<T>&, const MyAllocator<U>&) { return true; }
+
+template<typename T, typename U>
+bool operator!=(const MyAllocator<T>&, const MyAllocator<U>&) { return false; }
+
 template<typename T>
 concept IsManagedObject = std::is_base_of_v<ManagedHeapObject, T>;
 
+// 2. shared_alloc using allocate_shared
 template<typename T, typename... Args>
 std::shared_ptr<T> shared_alloc(Args&&... args)
 {
     static_assert(IsManagedObject<T>, "T must be a ManagedHeapObject");
-    
-    return std::shared_ptr<T>(new T(std::forward<Args>(args)...), [](T* ptr) {
-        ptr->~T();
-        MyFree(ptr);
-    });
+
+    return std::allocate_shared<T>(MyAllocator<T>(), std::forward<Args>(args)...);
 }

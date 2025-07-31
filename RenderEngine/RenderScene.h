@@ -36,7 +36,7 @@ class RenderScene
 public:
 	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
-	using AnimatorMap			= std::unordered_map<size_t, Animator*>;
+	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
 	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
 	using RenderDataMap			= concurrent_unordered_map<size_t, std::shared_ptr<RenderPassData>>;
 public:
@@ -64,8 +64,8 @@ public:
 	void RemoveRenderPassData(size_t cameraIndex);
 	void EraseRenderPassData();
 
-	void RegisterAnimator(Animator* animatorPtr);
-	void UnregisterAnimator(Animator* animatorPtr);
+	void RegisterAnimator(const std::shared_ptr<Animator>& animatorPtr);
+	void UnregisterAnimator(const std::shared_ptr<Animator>& animatorPtr);
 
     void RegisterCommand(MeshRenderer* meshRendererPtr);
     bool InvaildCheckMeshRenderer(MeshRenderer* meshRendererPtr);
@@ -89,6 +89,8 @@ public:
 	Scene* GetScene() { return m_currentScene; }
 
 	void OnProxyDestroy();
+
+	AnimatorMap& GetAnimatorMap() { return m_animatorMap; }
 
 	static concurrent_queue<HashedGuid> RegisteredDestroyProxyGUIDs;
 

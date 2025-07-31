@@ -110,7 +110,7 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
         return nullptr;
     }
 
-    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->Create<Component>(type.name));
+    std::shared_ptr<Component> component = std::shared_ptr<Component>(Meta::MetaFactoryRegistry->CreateShared<Component>(type.name));
 	
     if (component)
     {
