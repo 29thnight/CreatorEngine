@@ -35,6 +35,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 
     sceneObject->SetName(uniqueName);
 	sceneObject->m_ownerScene = this;
+	sceneObject->m_transform.SetDirty();
 
 	m_SceneObjects.push_back(sceneObject);
 
@@ -1257,23 +1258,25 @@ void Scene::AllUpdateWorldMatrix()
 		return;
 	}
 
-	static bool isTriggered = false;
+	std::ranges::for_each(rootObjects, updateModel);
 
-	if (!isTriggered)
-	{
-		std::ranges::for_each(rootObjects, updateModel);
-	}
-	else
-	{
-		UpdateAllTransforms();
-	}
+	//static size_t gameObjectCount = 0;
+	//if (gameObjectCount != m_SceneObjects.size())
+	//{
+	//	std::ranges::for_each(rootObjects, updateModel);
+	//	gameObjectCount = m_SceneObjects.size();
+	//}
+	//else
+	//{
+	//	UpdateAllTransforms();
+	//}
 }
 
 void Scene::RegisterDirtyTransform(Transform* transform)
 {
-	if (!transform) return;
-	std::unique_lock lock(sceneMutex);
-	m_globalDirtySet.insert(transform);
+	//if (!transform) return;
+	//std::unique_lock lock(sceneMutex);
+	//m_globalDirtySet.insert(transform);
 }
 
 void Scene::UpdateAllTransforms()
@@ -1288,7 +1291,8 @@ void Scene::UpdateAllTransforms()
 	{
 		if (rootDirty)
 		{
-			rootDirty->UpdateIfDirty();
+			auto rootObject = rootDirty->GetOwner();
+			UpdateModelRecursive(rootObject->m_index, XMMatrixIdentity());
 		}
 	}
 }

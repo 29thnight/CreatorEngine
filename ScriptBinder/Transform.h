@@ -62,7 +62,7 @@ public:
 
 	void TransformReset();
 
-	void UpdateIfDirty();
+	void UpdateDirty();
 
 private:
 	friend class RenderScene;

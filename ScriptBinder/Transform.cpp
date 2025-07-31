@@ -185,7 +185,8 @@ Mathf::xMatrix Transform::UpdateWorldMatrix()
 		SetAndDecomposeMatrix(worldMatrix);
 		return worldMatrix;
 	}
-	else {
+	else 
+	{
 		UpdateLocalMatrix();
 		m_worldMatrix = m_localMatrix;
 		return m_worldMatrix;
@@ -331,15 +332,10 @@ void Transform::TransformReset()
 	SetDirty();
 }
 
-void Transform::UpdateIfDirty()
+void Transform::UpdateDirty()
 {
-	UpdateWorldMatrix();
-	if (!m_owner) return;
-	for (auto childIndex : m_owner->m_childrenIndices)
+	if (m_owner && m_owner->GetScene())
 	{
-		if (auto child = GameObject::FindIndex(childIndex))
-		{
-			child->m_transform.UpdateIfDirty();
-		}
+		m_owner->GetScene()->RegisterDirtyTransform(this);
 	}
 }
