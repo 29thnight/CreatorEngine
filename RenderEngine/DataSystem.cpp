@@ -277,10 +277,10 @@ void DataSystem::RenderForEditer()
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 		ImGui::PopStyleVar();
+		ImGui::Dummy(ImGui::GetContentRegionAvail());
+		overlayPos = ImGui::GetItemRectMin();
 		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::RelativeToPrefab("")))
 		{
-			ImGui::Dummy(ImGui::GetContentRegionAvail());
-			overlayPos = ImGui::GetItemRectMin();
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
@@ -307,6 +307,7 @@ void DataSystem::RenderForEditer()
 				ImGui::EndDragDropTarget();
 			}
 		}
+		ImGui::SetCursorScreenPos(overlayPos);
 
 		ShowCurrentDirectoryFiles();
 		ImGui::PopStyleColor();
@@ -820,7 +821,6 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 void DataSystem::ShowCurrentDirectoryFilesTile()
 {
-	ImGui::SetCursorScreenPos(overlayPos);
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -944,6 +944,40 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 			if(ImGui::TreeNode(label.c_str()))
 			{
+				if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1))
+				{
+					currentDirectory = entry.path();
+					selectedFileType = GetFileType(entry.path());
+					isRightClicked = true;
+				}
+				if (!entry.path().empty() && std::filesystem::equivalent(entry.path(), PathFinder::RelativeToPrefab("")))
+				{
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+						{
+							auto scene = SceneManagers->GetActiveScene();
+							if (scene)
+							{
+								GameObject::Index index = *static_cast<GameObject::Index*>(payload->Data);
+								auto objPtr = scene->GetGameObject(index);
+								if (objPtr)
+								{
+									GameObject* obj = objPtr.get();
+									Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+									if (prefab)
+									{
+										file::path savePath = PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+										PrefabUtilitys->SavePrefab(prefab, savePath.string());
+										ForceCreateYamlMetaFile(savePath);
+										delete prefab;
+									}
+								}
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+				}
 				ShowCurrentDirectoryFilesTree(entry.path());
 				ImGui::TreePop();
 			}
@@ -1044,7 +1078,7 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 	if (ImGui::BeginPopup("Context Menu"))
 	{
-		if (currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
+		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
