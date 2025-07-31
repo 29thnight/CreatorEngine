@@ -1,0 +1,69 @@
+#pragma once
+#include "Mathf.h"     // Vector2, Rect 등 수학 관련 클래스 포함
+
+// Unity의 RectTransform과 유사한 동작을 하는 UI용 트랜스폼 컴포넌트입니다.
+class RectTransformComponent
+{
+public:
+    // 앵커 프리셋을 쉽게 설정하기 위한 열거형
+    enum class AnchorPreset
+    {
+        TopLeft, TopCenter, TopRight,
+        MiddleLeft, MiddleCenter, MiddleRight,
+        BottomLeft, BottomCenter, BottomRight,
+        StretchLeft, StretchCenter, StretchRight,
+        StretchTop, StretchMiddle, StretchBottom,
+        StretchAll
+    };
+
+public:
+    RectTransformComponent();
+    virtual ~RectTransformComponent() = default;
+
+    // 레이아웃을 업데이트합니다. 부모의 월드 좌표계 사각형을 기준으로 자신의 위치와 크기를 계산합니다.
+    void UpdateLayout(const Mathf::Rect& parentRect);
+
+    // --- Getters & Setters ---
+
+    const Mathf::Vector2& GetAnchorMin() const { return m_anchorMin; }
+    void SetAnchorMin(const Mathf::Vector2& anchorMin) { m_anchorMin = anchorMin; m_isDirty = true; }
+
+    const Mathf::Vector2& GetAnchorMax() const { return m_anchorMax; }
+    void SetAnchorMax(const Mathf::Vector2& anchorMax) { m_anchorMax = anchorMax; m_isDirty = true; }
+
+    const Mathf::Vector2& GetAnchoredPosition() const { return m_anchoredPosition; }
+    void SetAnchoredPosition(const Mathf::Vector2& position) { m_anchoredPosition = position; m_isDirty = true; }
+
+    const Mathf::Vector2& GetSizeDelta() const { return m_sizeDelta; }
+    void SetSizeDelta(const Mathf::Vector2& size) { m_sizeDelta = size; m_isDirty = true; }
+
+    const Mathf::Vector2& GetPivot() const { return m_pivot; }
+    void SetPivot(const Mathf::Vector2& pivot) { m_pivot = pivot; m_isDirty = true; }
+
+    const Mathf::Rect& GetWorldRect() const { return m_worldRect; }
+
+    // 앵커 프리셋을 설정하는 헬퍼 함수
+    void SetAnchorPreset(AnchorPreset preset);
+
+private:
+    // 부모 RectTransform의 사각형을 기준으로 한 최소/최대 앵커 위치 (0.0 ~ 1.0 비율)
+    Mathf::Vector2 m_anchorMin = { 0.5f, 0.5f };
+    Mathf::Vector2 m_anchorMax = { 0.5f, 0.5f };
+
+    // 앵커로부터의 상대적인 위치 오프셋
+    Mathf::Vector2 m_anchoredPosition = { 0.f, 0.f };
+
+    // 앵커들이 한 점에 모여 있을 때의 크기(width, height) 또는
+    // 앵커들이 떨어져 있을 때의 여백(margin) (left, top, right, bottom)
+    Mathf::Vector2 m_sizeDelta = { 100.f, 100.f };
+
+    // 자기 자신의 사각형 내에서의 중심점 (0.0 ~ 1.0 비율)
+    // (0,0)은 좌측 하단, (1,1)은 우측 상단
+    Mathf::Vector2 m_pivot = { 0.5f, 0.5f };
+
+    // 계산된 월드 좌표계 상의 최종 사각형
+    Mathf::Rect m_worldRect;
+
+    // 레이아웃이 변경되었는지 여부
+    bool m_isDirty = true;
+};

@@ -33,8 +33,6 @@
 #include "TerrainGizmoPass.h"
 //작업자 규철 관련
 #include "EffectEditor.h"
-//작업자 세환 관련
-#include "TestPlayer.h"
 #endif // !DYNAMICCPP_EXPORTS
 
 #include "Model.h"

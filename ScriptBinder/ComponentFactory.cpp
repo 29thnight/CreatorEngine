@@ -12,7 +12,8 @@
 #include "NodeEditor.h"
 #include "InvalidScriptComponent.h"
 #include "BehaviorTreeComponent.h"
-
+#include "PlayerInput.h"
+#include "Animation.h"
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -101,6 +102,8 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto animator = static_cast<Animator*>(component);
 			Model* model = nullptr;
 			std::vector<bool> animationBools;
+			std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
+			int aniIndex = 0;
 			if (itNode["m_Skeleton"])
 			{
 				auto& skel = itNode["m_Skeleton"];
@@ -111,6 +114,19 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					{
 						bool _aniBool = animation["m_isLoop"].as<bool>();
 						animationBools.push_back(_aniBool);
+						auto& keyFrameEvents = animation["m_keyFrameEvent"];
+						std::vector<KeyFrameEvent> KeyFrameEventVec;
+						for (auto& keyFrameEvent : keyFrameEvents)
+						{
+							KeyFrameEvent newEvent;
+							Meta::Deserialize(&newEvent, keyFrameEvent);
+							KeyFrameEventVec.push_back(newEvent);
+						}
+						if (!KeyFrameEventVec.empty())
+						{
+							animationKeyFrameMap[aniIndex] = KeyFrameEventVec;
+						}
+						aniIndex++;
 					}
 				}
 			}
@@ -130,9 +146,15 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
 					{
 						animator->m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
+
+						for (auto& event : animationKeyFrameMap[i])
+							animator->m_Skeleton->m_animations[i].AddEvent(event);
 					}
 				}
 			}
+
+
+
 
 			if (itNode["Parameters"])
 			{
@@ -154,11 +176,9 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				for (auto& layer : animationControllerNode)
 				{
 					std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
-					//AnimationController* animationController = new AnimationController();
 					Meta::Deserialize(animationController.get(), layer);
 					animationController->m_owner = animator;
 					animationController->m_nodeEditor = new NodeEditor();
-					//animator->m_Skeleton->m_animations[3].SetEvent("Punch", 10, []() {Debug->Log("Punch! Punch!");});
 					if (animationController->useMask == true)
 					{
 						if (layer["m_avatarMask"])
@@ -214,9 +234,11 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 										{
 											TransCondition newcondition;
 											Meta::Deserialize(&newcondition, condition);
+
 											newcondition.m_ownerController = animationController.get();
-											sharedTransition->conditions.push_back(newcondition);
 											newcondition.SetValue(newcondition.valueName);
+											sharedTransition->conditions.push_back(newcondition);
+											
 				
 										}
 									}
@@ -320,6 +342,15 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			Meta::Deserialize(behaviorTree, itNode);
 			behaviorTree->SetOwner(obj);
 		}
+		else if (componentType->typeID == type_guid(PlayerInputComponent))
+		{
+			auto playerinput = static_cast<PlayerInputComponent*>(component);
+			Meta::Deserialize(playerinput, itNode);
+			playerinput->SetOwner(obj);
+
+			
+			//playerinput->SetActionMap(playerinput->m_actionMapName);
+			}
 		else
 		{
             Meta::Deserialize(reinterpret_cast<void*>(component), *componentType, itNode);

@@ -20,12 +20,14 @@
 #include "RigidBodyComponent.h"
 #include "ColorGradingPassSetting.h"
 #include "DeferredPassSetting.h"
+#include "Prefab.h"
+#include "PlayerInput.h"
+#include "KeyFrameEvent.h"
 #include "Component.h"
 #include "Material.h"
 #include "MaterialInfomation.h"
 #include "Mesh.h"
 #include "ToneMapPassSetting.h"
-#include "TestAniScprit.h"
 #include "ShadowMapPassSetting.h"
 #include "InvalidScriptComponent.h"
 #include "Skeleton.h"
@@ -63,8 +65,6 @@
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
-#include "PlayerInput.h"
-#include "Prefab.h"
 #include "Terrain.h"
 #include "TransCondition.h"
 #include "Transform.h"
@@ -108,6 +108,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(ImageComponent);
     AUTO_REGISTER_CLASS(InputAction);
     AUTO_REGISTER_CLASS(InvalidScriptComponent);
+    AUTO_REGISTER_CLASS(KeyFrameEvent);
     AUTO_REGISTER_CLASS(LightComponent);
     AUTO_REGISTER_CLASS(LightMapping);
     AUTO_REGISTER_CLASS(Material);
@@ -118,7 +119,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(MeshRenderer);
     AUTO_REGISTER_CLASS(ModuleBehavior);
     AUTO_REGISTER_CLASS(Object);
-    AUTO_REGISTER_CLASS(PlayerInput);
+    AUTO_REGISTER_CLASS(PlayerInputComponent);
     AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
     AUTO_REGISTER_CLASS(RenderPassSettings);
@@ -133,7 +134,6 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(StateMachineComponent);
     AUTO_REGISTER_CLASS(TerrainColliderComponent);
     AUTO_REGISTER_CLASS(TerrainComponent);
-    AUTO_REGISTER_CLASS(TestAniScprit);
     AUTO_REGISTER_CLASS(TextComponent);
     AUTO_REGISTER_CLASS(ToneMapPassSetting);
     AUTO_REGISTER_CLASS(TransCondition);

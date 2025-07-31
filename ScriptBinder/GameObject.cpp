@@ -44,6 +44,13 @@ GameObject::GameObject(Scene* scene, size_t instanceID, const std::string_view& 
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
+std::string GameObject::RemoveSuffixNumberTag()
+{
+	// 정규표현식: 끝에 오는 " (숫자)" 또는 "(숫자)" 패턴 제거
+	static const std::regex suffixRegex(R"(\s*\(\d+\)$)");
+	return std::regex_replace(m_name.ToString(), suffixRegex, "");
+}
+
 void GameObject::SetTag(const std::string_view& tag)
 {
 	if (tag.empty() || tag == "Untagged")
@@ -199,6 +206,19 @@ void GameObject::RefreshComponentIdIndices()
 	}
 
 	m_componentIds = std::move(newMap);
+}
+
+void GameObject::AddChild(GameObject* _objcet)
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto oldParent = scene->GetGameObject(_objcet->m_parentIndex);
+
+	auto& siblings = oldParent->m_childrenIndices;
+	std::erase_if(siblings, [&](auto index) { return index == _objcet->m_index; });
+
+	_objcet->m_parentIndex = m_index;
+	m_childrenIndices.push_back(_objcet->m_index);
+	_objcet->m_transform.SetParentID(m_index);
 }
 
 void GameObject::RemoveComponentIndex(uint32 id)

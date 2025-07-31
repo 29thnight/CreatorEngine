@@ -823,8 +823,8 @@ bool MeshModuleGPU::IsReadyForReuse() const
 {
     // GPU 작업이 완료되었고, 렌더링 중이 아닐 때만 재사용 가능
     bool ready = !m_isRendering &&
-        !m_gpuWorkPending.load() &&
-        m_instanceCount == 0;
+        !m_gpuWorkPending.load();
+    //&& m_instanceCount == 0;
 
     // 필수 리소스들이 유효한지 확인
     bool resourcesValid = m_constantBuffer != nullptr &&

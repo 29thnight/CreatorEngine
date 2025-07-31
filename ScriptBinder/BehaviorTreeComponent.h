@@ -39,6 +39,7 @@ public:
 	{
 		m_built.clear(); // Clear the built nodes map
 		m_root.reset(); // Clear the root node
+		m_built.clear();
 	}
 
 public:

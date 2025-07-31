@@ -103,6 +103,7 @@ void TestBehavior::LateUpdate(float tick)
 {
 }
 
+
 void TestBehavior::Move(Mathf::Vector2 value)
 {
 }

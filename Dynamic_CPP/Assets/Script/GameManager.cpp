@@ -9,6 +9,7 @@
 #include "InputManager.h"
 #include "RigidBodyComponent.h"
 #include "RaycastHelper.h"
+#include "Weapon.h"
 void GameManager::Awake()
 {
 	std::cout << "GameManager Awake" << std::endl;
@@ -30,7 +31,7 @@ void GameManager::Awake()
 	if (weaponPiecePool) {
 		for (auto& index : weaponPiecePool->m_childrenIndices) {
 			auto object = GameObject::FindIndex(index);
-			auto entity = object->GetComponent<Entity>();
+			auto entity = object->GetComponent<Weapon>();
 			if (entity)
 				m_weaponPiecePool.push_back(entity);
 		}
@@ -46,10 +47,10 @@ inline static void Loaderererer() {
 void GameManager::Start()
 {
 	std::cout << "GameManager Start" << std::endl;
-	playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
-	playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::N), KeyState::Down, [this]() { Inputblabla(); });
+	//playerMap = SceneManagers->GetInputActionManager()->AddActionMap("Test");
+	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::N), KeyState::Down, [this]() { Inputblabla(); });
 	//playerMap->AddButtonAction("LoadScene", 0, InputType::KeyBoard, KeyBoard::N, KeyState::Down, Loaderererer);
-	playerMap->AddButtonAction("CheatMineResource", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::M), KeyState::Down, [this]() { CheatMiningResource();});
+	//playerMap->AddButtonAction("CheatMineResource", 0, InputType::KeyBoard, static_cast<size_t>(KeyBoard::M), KeyState::Down, [this]() { CheatMiningResource();});
 	//playerMap->AddValueAction("LoadScene", 0, InputValueType::Float, InputType::KeyBoard, { 'N', 'M' }, [this](float value) {Inputblabla(value);});
 }
 
@@ -102,9 +103,29 @@ void GameManager::PushEntity(Entity* entity)
 	}
 }
 
+void GameManager::PushPlayer(Entity* player)
+{
+	m_players.push_back(player);
+}
+
+void GameManager::PushAsis(Entity* asis)
+{
+	m_asis.push_back(asis);
+}
+
 const std::vector<Entity*>& GameManager::GetEntities()
 {
 	return m_entities;
+}
+
+const std::vector<Entity*>& GameManager::GetPlayers()
+{
+	return m_players;
+}
+
+const std::vector<Entity*>& GameManager::GetAsis()
+{
+	return m_asis;
 }
 
 std::vector<Entity*>& GameManager::GetResourcePool()
@@ -113,7 +134,7 @@ std::vector<Entity*>& GameManager::GetResourcePool()
 	return m_resourcePool;
 }
 
-std::vector<Entity*>& GameManager::GetWeaponPiecePool()
+std::vector<Weapon*>& GameManager::GetWeaponPiecePool()
 {
 	// TODO: 여기에 return 문을 삽입합니다.
 	return m_weaponPiecePool;

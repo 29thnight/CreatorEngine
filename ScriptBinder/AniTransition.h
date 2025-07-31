@@ -35,6 +35,7 @@ public:
 		newTrans.SetValue(ownerValueName);
 		newTrans.SetCondition(ownerValueName);
 		conditions.push_back(newTrans);
+		
 	}
 
 	void DeleteCondition(int _index);
@@ -44,7 +45,7 @@ public:
 	void SetNextState(AnimationState* _nextStat);
 	std::string GetCurState();
 	std::string GetNextState();
-	bool CheckTransiton();
+	bool CheckTransiton(bool isBlend = false);
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
 
