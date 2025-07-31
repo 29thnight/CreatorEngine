@@ -317,7 +317,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						prevPosition = position;
 						editingPosition = true;
 					}
-					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.SetDirty();
 				}
 				if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
 				{
@@ -326,12 +326,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						Meta::MakeCustomChangeCommand([=]
 						{
 							selectedSceneObject->m_transform.position = prevPosition;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						},
 						[=]
 						{
 							selectedSceneObject->m_transform.position = position;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						});
 					}
 					editingPosition = false;
@@ -370,7 +370,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						pyr[1] - prevPYR[1],
 						pyr[2] - prevPYR[2]);
 					rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
-					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.SetDirty();
 				}
 				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 				{
@@ -381,12 +381,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						Meta::MakeCustomChangeCommand([=]
 						{
 							selectedSceneObject->m_transform.rotation = prevRotation;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						},
 						[=]
 						{
 							selectedSceneObject->m_transform.rotation = rotation;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						});
 					}
 					editingRotation = false;
@@ -404,7 +404,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						prevScale = scale;
 						editingScale = true;
 					}
-					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.SetDirty();
 				}
 				if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
 				{
@@ -413,12 +413,12 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						Meta::MakeCustomChangeCommand([=]
 						{
 							selectedSceneObject->m_transform.scale = prevScale;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						},
 						[=]
 						{
 							selectedSceneObject->m_transform.scale = scale;
-							selectedSceneObject->m_transform.m_dirty = true;
+							selectedSceneObject->m_transform.SetDirty();
 						});
 					}
 					editingScale = false;
@@ -686,7 +686,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 					selectedSceneObject->m_transform.position = { 0, 0, 0, 1 };
 					selectedSceneObject->m_transform.rotation = XMQuaternionIdentity();
 					selectedSceneObject->m_transform.scale = { 1, 1, 1, 1 };
-					selectedSceneObject->m_transform.m_dirty = true;
+					selectedSceneObject->m_transform.SetDirty();
 					selectedSceneObject->m_transform.UpdateLocalMatrix();
 					ImGui::CloseCurrentPopup();
 				}
