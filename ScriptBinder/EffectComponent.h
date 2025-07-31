@@ -74,6 +74,9 @@ public:
     
     [[Property]]
     std::string m_effectInstanceName;
+
+    std::string GenerateInstanceName(const std::string& templateName);
+
 private:
 
     Mathf::Vector3 m_lastPosition;
