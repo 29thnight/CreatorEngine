@@ -207,10 +207,6 @@ void Scene::DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject)
 	RemoveGameObjectName(sceneObject->GetHashedName().ToString());
 
 	sceneObject->Destroy();
-    for (auto& childIndex : sceneObject->m_childrenIndices)
-    {
-		DestroyGameObject(childIndex);
-    }
 }
 
 void Scene::DestroyGameObject(GameObject::Index index)
@@ -222,11 +218,6 @@ void Scene::DestroyGameObject(GameObject::Index index)
 		{
             RemoveGameObjectName(obj->GetHashedName().ToString());
 			obj->Destroy();
-
-			for (auto& childIndex : obj->m_childrenIndices)
-			{
-				DestroyGameObject(childIndex);
-			}
 		}
 	}
 	else
@@ -1010,6 +1001,7 @@ void Scene::DestroyGameObjects()
 	if (deletedIndices.empty())
 		return;
 
+	std::unordered_map<uint32_t, uint32_t> reparentMap;
     for (auto& obj : m_SceneObjects)
     {
         if (obj && deletedIndices.contains(obj->m_index))
@@ -1020,7 +1012,9 @@ void Scene::DestroyGameObjects()
                     childIdx < m_SceneObjects.size() &&
                     m_SceneObjects[childIdx])
                 {
+					reparentMap[childIdx] = obj->m_parentIndex;
                     m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
+					m_SceneObjects[childIdx]->m_transform.SetParentID(GameObject::INVALID_INDEX);
                 }
             }
 
@@ -1040,6 +1034,7 @@ void Scene::DestroyGameObjects()
     for (auto& obj : m_SceneObjects)
     {
         uint32_t oldIndex = obj->m_index;
+		GameObject::Index newParentIndex = GameObject::INVALID_INDEX;
 
         if (indexMap.contains(obj->m_parentIndex))
         {
@@ -1047,10 +1042,19 @@ void Scene::DestroyGameObjects()
 			obj->m_rootIndex = indexMap[obj->m_rootIndex];
 			obj->m_transform.SetParentID(obj->m_parentIndex);
         }
-        else
-        {
-            obj->m_parentIndex = GameObject::INVALID_INDEX;
-        }
+        else if(auto it = reparentMap.find(oldIndex); it != reparentMap.end())
+		{
+			if (indexMap.contains(it->second))
+				newParentIndex = indexMap[it->second];
+		}
+
+		obj->m_parentIndex = newParentIndex;
+		obj->m_transform.SetParentID(newParentIndex);
+
+		if (GameObject::IsValidIndex(newParentIndex))
+			obj->m_rootIndex = m_SceneObjects[newParentIndex]->m_rootIndex;
+		else if (indexMap.contains(obj->m_rootIndex))
+			obj->m_rootIndex = indexMap[obj->m_rootIndex];
 
         for (auto& childIndex : obj->m_childrenIndices)
         {
@@ -1253,6 +1257,38 @@ void Scene::AllUpdateWorldMatrix()
 		return;
 	}
 
-	std::ranges::for_each(rootObjects, updateModel);
+	static bool isTriggered = false;
+
+	if (!isTriggered)
+	{
+		std::ranges::for_each(rootObjects, updateModel);
+	}
+	else
+	{
+		UpdateAllTransforms();
+	}
 }
 
+void Scene::RegisterDirtyTransform(Transform* transform)
+{
+	if (!transform) return;
+	std::unique_lock lock(sceneMutex);
+	m_globalDirtySet.insert(transform);
+}
+
+void Scene::UpdateAllTransforms()
+{
+	std::unordered_set<Transform*> dirtySet;
+	{
+		std::unique_lock lock(sceneMutex);
+		dirtySet.swap(m_globalDirtySet);
+	}
+
+	for (Transform* rootDirty : dirtySet)
+	{
+		if (rootDirty)
+		{
+			rootDirty->UpdateIfDirty();
+		}
+	}
+}

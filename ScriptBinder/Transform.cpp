@@ -63,7 +63,7 @@ Transform& Transform::operator=(Transform&& rhs) noexcept
 
 Transform& Transform::SetScale(Mathf::Vector3 scale)
 {
-	m_dirty = true;
+	SetDirty();
 	this->scale = Mathf::Vector4(scale);
 
 	return *this;
@@ -71,7 +71,7 @@ Transform& Transform::SetScale(Mathf::Vector3 scale)
 
 Transform& Transform::SetPosition(Mathf::Vector3 pos)
 {
-	m_dirty = true;
+	SetDirty();
 	position = Mathf::Vector4(pos);
 
 	return *this;
@@ -79,7 +79,7 @@ Transform& Transform::SetPosition(Mathf::Vector3 pos)
 
 Transform& Transform::AddPosition(Mathf::Vector3 pos)
 {
-	m_dirty = true;
+	SetDirty();
 	position = DirectX::XMVectorAdd(position, pos);
 
 	return *this;
@@ -87,7 +87,7 @@ Transform& Transform::AddPosition(Mathf::Vector3 pos)
 
 Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 {
-	m_dirty = true;
+	SetDirty();
 	rotation = quaternion;
 
 	return *this;
@@ -95,7 +95,7 @@ Transform& Transform::SetRotation(Mathf::Quaternion quaternion)
 
 Transform& Transform::AddRotation(Mathf::Quaternion quaternion)
 {
-	m_dirty = true;
+	SetDirty();
 	rotation = DirectX::XMQuaternionMultiply(quaternion, rotation);
 
 	return *this;
@@ -203,6 +203,7 @@ void Transform::SetOwner(GameObject* owner)
 	{
 		m_parentID = 0;
 	}
+	SetDirty();
 }
 
 void Transform::SetLocalMatrix(const Mathf::xMatrix& matrix)
@@ -288,7 +289,14 @@ Mathf::Vector3 Transform::GetUp()
 
 void Transform::SetDirty()
 {
-	m_dirty = true;
+	if (!m_dirty)
+	{
+		m_dirty = true;
+		if (m_owner && m_owner->GetScene())
+		{
+			m_owner->GetScene()->RegisterDirtyTransform(this);
+		}
+	}
 }
 
 bool Transform::IsDirty() const
@@ -320,5 +328,18 @@ void Transform::TransformReset()
 	position = { Mathf::xVectorZero };
 	rotation = { Mathf::xVectorZero };
 	scale = { Mathf::xVectorOne };
-	m_dirty = true;
+	SetDirty();
+}
+
+void Transform::UpdateIfDirty()
+{
+	UpdateWorldMatrix();
+	if (!m_owner) return;
+	for (auto childIndex : m_owner->m_childrenIndices)
+	{
+		if (auto child = GameObject::FindIndex(childIndex))
+		{
+			child->m_transform.UpdateIfDirty();
+		}
+	}
 }
