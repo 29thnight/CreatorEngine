@@ -183,6 +183,57 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\GroggyAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP003Impale.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP004DeathWorm.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP005Breath.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BTEntityInitAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -303,6 +354,57 @@
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsGroggy.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\GroggyAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP001BodyAtack.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP002FireBall.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP003Impale.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP004DeathWorm.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP005Breath.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BTEntityInitAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
 	</ItemGroup>

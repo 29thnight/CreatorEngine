@@ -210,6 +210,21 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h" />
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\GroggyAction.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP003Impale.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP004DeathWorm.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BP005Breath.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\BTEntityInitAction.h" />
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
@@ -347,6 +362,66 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsGroggy.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\GroggyAction.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP001BodyAtack.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP002FireBall.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP003Impale.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP004DeathWorm.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP005Breath.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BTEntityInitAction.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
