@@ -37,6 +37,7 @@ public:
 	Transform& SetWorldScale(Mathf::Vector3 scale);
 
 	void SetOwner(GameObject* owner);
+	GameObject* GetOwner() const { return m_owner; }
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;

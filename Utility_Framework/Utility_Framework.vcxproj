@@ -33,6 +33,7 @@
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.OctreeNode.h" />
+    <ClInclude Include="Core.Property.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.h" />

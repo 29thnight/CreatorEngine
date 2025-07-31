@@ -1125,7 +1125,7 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
 	const auto& obj = GetGameObject(objIndex);
-
+	
 	if (!obj || obj->IsDestroyMark())
 	{
 		return;
@@ -1141,7 +1141,6 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
 		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ? 
 			animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
-
 	}
 	else
 	{
@@ -1155,7 +1154,6 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		}
 		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 		obj->m_transform.SetAndDecomposeMatrix(model);
-
 	}
 
 	for (auto& childIndex : obj->m_childrenIndices)
@@ -1255,6 +1253,6 @@ void Scene::AllUpdateWorldMatrix()
 		return;
 	}
 
-	std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateModel);
+	std::ranges::for_each(rootObjects, updateModel);
 }
 
