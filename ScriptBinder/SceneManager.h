@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
+#include "DLLAcrossSingleton.h"
 #include "Core.ThreadPool.h"
 
 class Scene;
@@ -8,10 +9,10 @@ class Object;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
-class SceneManager : public Singleton<SceneManager>
+class SceneManager : public DLLCore::Singleton<SceneManager>
 {
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<SceneManager>;
     SceneManager() = default;
     ~SceneManager() = default;
 
@@ -113,19 +114,19 @@ private:
 	std::atomic_bool                    m_volumeProfileApply{ false };
 };
 
-static auto& SceneManagers = SceneManager::GetInstance();
+static auto SceneManagers = SceneManager::GetInstance();
 #pragma region SceneManagerEvents
-static auto& PlayModeEvent = SceneManagers->PlayModeEvent;
-static auto& InputEvent = SceneManagers->InputEvent;
-static auto& SceneRenderingEvent = SceneManagers->SceneRenderingEvent;
-static auto& OnDrawGizmosEvent = SceneManagers->OnDrawGizmosEvent;
-static auto& GUIRenderingEvent = SceneManagers->GUIRenderingEvent;
-static auto& InternalAnimationUpdateEvent = SceneManagers->InternalAnimationUpdateEvent;
-static auto& activeSceneChangedEvent = SceneManagers->activeSceneChangedEvent;
-static auto& sceneLoadedEvent = SceneManagers->sceneLoadedEvent;
-static auto& sceneUnloadedEvent = SceneManagers->sceneUnloadedEvent;
-static auto& newSceneCreatedEvent = SceneManagers->newSceneCreatedEvent;
-static auto& resetSelectedObjectEvent = SceneManagers->resetSelectedObjectEvent;
-static auto& endOfFrameEvent = SceneManagers->endOfFrameEvent;
-static auto& resourceTrimEvent = SceneManagers->resourceTrimEvent;
+static auto& PlayModeEvent = SceneManager::GetInstance()->PlayModeEvent;
+static auto& InputEvent = SceneManager::GetInstance()->InputEvent;
+static auto& SceneRenderingEvent = SceneManager::GetInstance()->SceneRenderingEvent;
+static auto& OnDrawGizmosEvent = SceneManager::GetInstance()->OnDrawGizmosEvent;
+static auto& GUIRenderingEvent = SceneManager::GetInstance()->GUIRenderingEvent;
+static auto& InternalAnimationUpdateEvent = SceneManager::GetInstance()->InternalAnimationUpdateEvent;
+static auto& activeSceneChangedEvent = SceneManager::GetInstance()->activeSceneChangedEvent;
+static auto& sceneLoadedEvent = SceneManager::GetInstance()->sceneLoadedEvent;
+static auto& sceneUnloadedEvent = SceneManager::GetInstance()->sceneUnloadedEvent;
+static auto& newSceneCreatedEvent = SceneManager::GetInstance()->newSceneCreatedEvent;
+static auto& resetSelectedObjectEvent = SceneManager::GetInstance()->resetSelectedObjectEvent;
+static auto& endOfFrameEvent = SceneManager::GetInstance()->endOfFrameEvent;
+static auto& resourceTrimEvent = SceneManager::GetInstance()->resourceTrimEvent;
 #pragma endregion

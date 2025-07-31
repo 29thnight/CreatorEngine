@@ -33,6 +33,7 @@
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.OctreeNode.h" />
+    <ClInclude Include="Core.Property.h" />
     <ClInclude Include="Core.Random.h" />
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="Core.Thread.h" />
@@ -45,6 +46,7 @@
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
     <ClInclude Include="DirectXHelper.h" />
+    <ClInclude Include="DLLRefHelper.h" />
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
@@ -76,6 +78,7 @@
     <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
     <ClInclude Include="SpinLock.h" />
+    <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
     <ClInclude Include="Trim.h" />
     <ClInclude Include="TypeDefinition.h" />

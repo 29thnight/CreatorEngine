@@ -186,7 +186,7 @@ void EntityItem::SetThrowOwner(Player* player)
 		[](float t) {return Easing::Linear(t);}
 	);
 
-	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween);*/
+	GameObject::Find("GameManager")->GetComponent<TweenManager>()->AddTween(tween); */
 }
 
 Player* EntityItem::GetThrowOwner()

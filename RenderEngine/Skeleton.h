@@ -29,6 +29,7 @@ public:
 	[[Property]]
 	std::vector<Animation> m_animations;
 	std::vector<Bone*> m_bones;
+	std::unordered_map<std::string, Bone*> m_boneMap;
 	[[Property]]
 	Mathf::xMatrix m_rootTransform;
 	Mathf::xMatrix m_globalInverseTransform;

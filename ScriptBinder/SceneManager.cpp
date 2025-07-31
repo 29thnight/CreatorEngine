@@ -11,6 +11,7 @@
 #include "NodeFactory.h"
 #include "TagManager.h"
 #include "GameObjectPool.h"
+#include "ReflectionRegister.h"
 
 void SceneManager::ManagerInitialize()
 {
@@ -51,11 +52,6 @@ void SceneManager::Initialization()
 {
     if(!m_isInitialized)
     {
-        ScriptManager->UpdateSceneManager(SceneManager::GetInstance);
-        ScriptManager->UpdateBTNodeFactory(BT::NodeFactory::GetInstance);
-        ScriptManager->UpdatePhysicsManager(PhysicsManager::GetInstance);
-        ScriptManager->UpdatePhysx(PhysicX::GetInstance);
-		ScriptManager->UpdateObjectAllocFunc(GameObjectPool::GetInstance);
 		m_isInitialized = true;
     }
 
@@ -460,6 +456,8 @@ void SceneManager::CreateEditorOnlyPlayScene()
 
     try
     {
+        Meta::UndoCommandManager->ClearGameMode();
+		Meta::UndoCommandManager->Clear();
 		resourceTrimEvent.Broadcast();
         //resetSelectedObjectEvent.Broadcast();
         sceneNode = Meta::Serialize(m_activeScene.load());

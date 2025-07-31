@@ -166,6 +166,9 @@
     <Filter Include="Classes\Components\Volume">
       <UniqueIdentifier>{01015c03-b349-4cb1-8fc7-90849a47f6d6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\HotLoadSystem\ScriptStringModule">
+      <UniqueIdentifier>{244df224-d5ef-4ab5-abfb-fb6724202b99}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -583,6 +586,9 @@
     </ClInclude>
     <ClInclude Include="VolumeComponent.h">
       <Filter>Classes\Components\Volume</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptStringModule.h">
+      <Filter>Managers\HotLoadSystem\ScriptStringModule</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

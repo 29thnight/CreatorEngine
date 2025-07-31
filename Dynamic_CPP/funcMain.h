@@ -116,16 +116,6 @@ extern "C"
 		return cstrs.data(); // 포인터 배열 반환
 	}
 
-	EXPORT_API void SetSceneManager(Singleton<SceneManager>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<SceneManager>&>(SceneManagers) = funcPtr();
-	}
-
-	EXPORT_API void SetNodeFactory(Singleton<BT::NodeFactory>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<BT::NodeFactory>&>(BTNodeFactory) = funcPtr();
-	}
-
 	EXPORT_API void DeleteModuleBehavior(ModuleBehavior* behavior)
 	{
 		if (behavior)
@@ -158,21 +148,6 @@ extern "C"
 		}
 	}
 
-	EXPORT_API void SetPhysicsManager(Singleton<PhysicsManager>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<PhysicsManager>&>(PhysicsManagers) = funcPtr();
-	}
-
-	EXPORT_API void SetPhysics(Singleton<PhysicX>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<PhysicX>&>(Physics) = funcPtr();
-	}
-
-	EXPORT_API void SetObjectAllocator(Singleton<GameObjectPool>::FGetInstance funcPtr)
-	{
-		const_cast<std::shared_ptr<GameObjectPool>&>(GameObjectPoolInstance) = funcPtr();
-	}
-
 #pragma	endregion
 
 	EXPORT_API void InitModuleFactory()
@@ -198,26 +173,26 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
-	ActionCreateFactory::GetInstance()->RegisterFactory("MageActtack", []() { return new MageActtack(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("RetreatAction", []() { return new RetreatAction(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("TeleportAction", []() { return new TeleportAction(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("DamegeAction", []() { return new DamegeAction(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("ChaseAction", []() { return new ChaseAction(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("Idle", []() { return new Idle(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("AtteckAction", []() { return new AtteckAction(); });
-	ActionCreateFactory::GetInstance()->RegisterFactory("DaedAction", []() { return new DaedAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("MageActtack", []() { return new MageActtack(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("RetreatAction", []() { return new RetreatAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("TeleportAction", []() { return new TeleportAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("DamegeAction", []() { return new DamegeAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("ChaseAction", []() { return new ChaseAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("Idle", []() { return new Idle(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("AtteckAction", []() { return new AtteckAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("DaedAction", []() { return new DaedAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("TestAction", []() { return new TestAction(); });
 	}
 
 	EXPORT_API void InitConditionFactory()
 	{
 		// Register the factory function for BTCondition Automation
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsTeleport", []() { return new IsTeleport(); });
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsMageAttack", []() { return new IsMageAttack(); });
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsReteat", []() { return new IsReteat(); });
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsDetect", []() { return new IsDetect(); });
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsAtteck", []() { return new IsAtteck(); });
-	ConditionCreateFactory::GetInstance()->RegisterFactory("IsDaed", []() { return new IsDaed(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsTeleport", []() { return new IsTeleport(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsMageAttack", []() { return new IsMageAttack(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsReteat", []() { return new IsReteat(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsDetect", []() { return new IsDetect(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsAtteck", []() { return new IsAtteck(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsDaed", []() { return new IsDaed(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("TestCon", []() { return new TestCon(); });
 
 	}
@@ -225,11 +200,17 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
-	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase3", []() { return new Phase3(); });
-	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase2", []() { return new Phase2(); });
-	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase1", []() { return new Phase1(); });
-	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsDamege", []() { return new IsDamege(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase3", []() { return new Phase3(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase2", []() { return new Phase2(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase1", []() { return new Phase1(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsDamege", []() { return new IsDamege(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("TestConCec", []() { return new TestConCec(); });
+
+	}
+
+	EXPORT_API void InitAniBehaviourFactory()
+	{
+		// Register the factory function for AniBehaviour Automation
 
 	}
 }

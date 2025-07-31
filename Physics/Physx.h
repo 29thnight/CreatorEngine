@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utility_Framework/ClassProperty.h"
+#include "DLLAcrossSingleton.h"
 #include <directxtk/SimpleMath.h>
 #include <physx/PxPhysics.h>
 #include <physx/PxPhysicsAPI.h>
@@ -20,9 +20,9 @@
 class PhysicsEventCallback;
 struct ColliderInfo;
  
-class PhysicX : public Singleton<PhysicX>
+class PhysicX : public DLLCore::Singleton<PhysicX>
 {
-	friend class Singleton;
+	friend class DLLCore::Singleton<PhysicX>;
 	using PolygonMesh = std::vector<std::vector<DirectX::SimpleMath::Vector3>>*;
 private:
 	PhysicX() = default;
@@ -283,4 +283,4 @@ public:
 	void DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath::Vector3 end);
 };
 
-static auto& Physics = PhysicX::GetInstance();
+static auto Physics = PhysicX::GetInstance();

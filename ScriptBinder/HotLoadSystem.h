@@ -9,6 +9,7 @@ class GameObject;
 class SceneManager;
 class PhysicsManager;
 class GameObjectPool;
+class AniBehaviour;
 class PhysicX;
 namespace BT
 {
@@ -37,7 +38,12 @@ typedef const char** (*ListBTActionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionDecoratorNodeNamesFunc)(int*);
 
-// 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의
+//에니메이션 FSM 관련 함수 포인터 정의
+typedef AniBehaviour* (*AniBehaviourFunc)(const char*);
+typedef void (*AniBehaviourDeleteFunc)(AniBehaviour* aniBehaviour);
+typedef const char** (*ListAniBehaviourNamesFunc)(int*);
+
+// 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의[deprecated]
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
 typedef void (*SetBTNodeFactoryFunc)(Singleton<BT::NodeFactory>::FGetInstance);
 typedef void (*SetPhysicsManagerFunc)(Singleton<PhysicsManager>::FGetInstance);
@@ -59,52 +65,20 @@ public:
 	void ReloadDynamicLibrary();
 	void ReplaceScriptComponent();
 	void CompileEvent();
-
+	// 스크립트 생성
+	void CreateScriptFile(const std::string_view& name);
 	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
 	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
-	void CreateScriptFile(const std::string_view& name);
 	void RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script);
 	void UnRegisterScriptReflection(const std::string_view& name);
-
+	// 행동 트리 노드 스크립트 생성
 	void CreateActionNodeScript(const std::string_view& name);
 	void CreateConditionNodeScript(const std::string_view& name);
 	void CreateConditionDecoratorNodeScript(const std::string_view& name);
 
-	void UpdateObjectAllocFunc(Singleton<GameObjectPool>::FGetInstance objectPool)
-	{
-		if (!m_setObjectAllocFunc) return;
-
-		m_setObjectAllocFunc(objectPool);
-	}
+	void CreateAniBehaviourScript(const std::string_view& name);
 
 #pragma region Script Build Helper
-	void UpdateSceneManager(Singleton<SceneManager>::FGetInstance sceneManager)
-	{
-		if (!m_setSceneManagerFunc) return;
-
-		m_setSceneManagerFunc(sceneManager);
-	}
-
-	void UpdateBTNodeFactory(Singleton<BT::NodeFactory>::FGetInstance btNodeFactory)
-	{
-		if (!m_setBTNodeFactoryFunc) return;
-
-		m_setBTNodeFactoryFunc(btNodeFactory);
-	}
-
-	void UpdatePhysicsManager(Singleton<PhysicsManager>::FGetInstance physicsManager) 
-	{
-		if (!m_setPhysicsManagerFunc) return;
-
-		m_setPhysicsManagerFunc(physicsManager);
-	}
-
-	void UpdatePhysx(Singleton<PhysicX>::FGetInstance physx) {
-		if (!m_setPhysxFunc) return;
-
-		m_setPhysxFunc(physx);
-	}
-
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
 	{
 		if (!m_scriptFactoryFunc) return nullptr;
@@ -223,14 +197,9 @@ private:
 
 private:
 	HMODULE hDll{};
-	SetObjectAllocFunc m_setObjectAllocFunc{};
-	ModuleBehaviorFunc m_scriptFactoryFunc{};
-	ModuleBehaviorDeleteFunc m_scriptDeleteFunc{};
-	GetScriptNamesFunc m_scriptNamesFunc{};
-	SetSceneManagerFunc m_setSceneManagerFunc{};
-	SetBTNodeFactoryFunc m_setBTNodeFactoryFunc{};
-	SetPhysicsManagerFunc m_setPhysicsManagerFunc{};
-	SetPhysxFunc m_setPhysxFunc{};
+	ModuleBehaviorFunc			m_scriptFactoryFunc{};
+	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
+	GetScriptNamesFunc			m_scriptNamesFunc{};
 
 	std::wstring msbuildPath{};
 	std::wstring command{};
@@ -238,350 +207,20 @@ private:
 	std::atomic_bool m_isStartUp{ false };
 
 private:
-#pragma region Script File String
-	std::string scriptIncludeString
-	{
-		"#pragma once\n"
-		"#include \"Core.Minimal.h\"\n"
-		"#include \"ModuleBehavior.h\"\n"
-		"\n"
-		"class "
-	};
-
-	std::string scriptInheritString
-	{
-		" : public ModuleBehavior\n"
-		"{\n"
-		"public:\n"
-		"	MODULE_BEHAVIOR_BODY("
-	};
-
-	std::string scriptBodyString
-	{
-		")\n"
-		"	virtual void Awake() override {}\n"
-		"	virtual void Start() override;\n"
-		"	virtual void FixedUpdate(float fixedTick) override {}\n"
-		"	virtual void OnTriggerEnter(const Collision& collision) override {}\n"
-		"	virtual void OnTriggerStay(const Collision& collision) override {}\n"
-		"	virtual void OnTriggerExit(const Collision& collision) override {}\n"
-		"	virtual void OnCollisionEnter(const Collision& collision) override {}\n"
-		"	virtual void OnCollisionStay(const Collision& collision) override {}\n"
-		"	virtual void OnCollisionExit(const Collision& collision) override {}\n"
-		"	virtual void Update(float tick) override;\n"
-		"	virtual void LateUpdate(float tick) override {}\n"
-		"	virtual void OnDisable() override  {}\n"
-		"	virtual void OnDestroy() override  {}\n"
-	};
-
-	std::string scriptEndString
-	{
-		"};\n"
-	};
-
-	std::string scriptCppString
-	{
-		"#include \""
-	};
-
-	std::string scriptCppEndString
-	{
-		".h\"\n"
-		"#include \"pch.h\""
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndBodyString
-	{
-		"::Start()\n"
-		"{\n"
-		"}\n"
-		"\n"
-		"void "
-	};
-
-	std::string scriptCppEndUpdateString
-	{
-		"::Update(float tick)\n"
-		"{\n"
-		"}\n"
-		"\n"
-	};
-
-	std::string scriptFactoryIncludeString
-	{
-		"#include \""
-	};
-
-	std::string scriptFactoryFunctionString
-	{
-		"		CreateFactory::GetInstance()->RegisterFactory(\""
-	};
-
-	std::string scriptFactoryFunctionLambdaString
-	{
-		"\", []() { return new "
-	};
-
-	std::string scriptFactoryFunctionEndString
-	{
-		"(); });\n"
-	};
-
-	std::string markerFactoryHeaderString
-	{
-		"// Automation include ScriptClass header"
-	};
-
-	std::string markerFactoryFuncString
-	{
-		"// Register the factory function for TestBehavior Automation"
-	};
-#pragma endregion
-	
-private:
-	BTActionNodeFunc				m_btActionNodeFunc{};
-	BTActionNodeDeleteFunc			m_btActionNodeDeleteFunc{};
-	BTConditionNodeFunc				m_btConditionNodeFunc{};
-	BTConditionNodeDeleteFunc		m_btConditionNodeDeleteFunc{};
-	BTConditionDecoratorNodeFunc	m_btConditionDecoratorNodeFunc{};
-	BTConditionDecoratorNodeDeleteFunc m_btConditionDecoratorNodeDeleteFunc{};
-	ListBTActionNodeNamesFunc		m_listBTActionNodeNamesFunc{};
-	ListBTConditionNodeNamesFunc	m_listBTConditionNodeNamesFunc{};
-	ListBTConditionDecoratorNodeNamesFunc m_listBTConditionDecoratorNodeNamesFunc{};
+	BTActionNodeFunc						m_btActionNodeFunc{};
+	BTActionNodeDeleteFunc					m_btActionNodeDeleteFunc{};
+	BTConditionNodeFunc						m_btConditionNodeFunc{};
+	BTConditionNodeDeleteFunc				m_btConditionNodeDeleteFunc{};
+	BTConditionDecoratorNodeFunc			m_btConditionDecoratorNodeFunc{};
+	BTConditionDecoratorNodeDeleteFunc		m_btConditionDecoratorNodeDeleteFunc{};
+	ListBTActionNodeNamesFunc				m_listBTActionNodeNamesFunc{};
+	ListBTConditionNodeNamesFunc			m_listBTConditionNodeNamesFunc{};
+	ListBTConditionDecoratorNodeNamesFunc	m_listBTConditionDecoratorNodeNamesFunc{};
 
 private:
-#pragma region Action and Condition Node String
-	std::string actionNodeIncludeString
-	{
-		"#include \"Core.Minimal.h\"\n"
-		"#include \"BTHeader.h\"\n"
-		"\n"
-		"using namespace BT;\n"
-		"\n"
-		"class "
-	};
-
-	std::string actionNodeInheritString
-	{
-		" : public ActionNode\n"
-		"{\n"
-		"public:\n"
-		"	BT_ACTION_BODY("
-	};
-
-	std::string actionNodeEndString
-	{
-		")\n"
-		"	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;\n"
-		"};\n"
-	};
-
-	std::string actionNodeCPPString
-	{
-		"#include \""
-	};
-
-	std::string actionNodeCPPEndString
-	{
-		".h\"\n"
-		"#include \"pch.h\"\n"
-		"\n"
-		"NodeStatus "
-	};
-
-	std::string actionNodeCPPEndBodyString
-	{
-		"::Tick(float deltatime, BlackBoard& blackBoard)\n"
-		"{\n"
-		"	return NodeStatus::Success;\n"
-		"}\n"
-	};
-
-	std::string conditionNodeIncludeString
-	{
-		"#include \"Core.Minimal.h\"\n"
-		"#include \"BTHeader.h\"\n"
-		"\n"
-		"using namespace BT;\n"
-		"\n"
-		"class "
-	};
-
-	std::string conditionNodeInheritString
-	{
-		" : public ConditionNode\n"
-		"{\n"
-		"public:\n"
-		"	BT_CONDITION_BODY("
-	};
-
-	std::string conditionNodeEndString
-	{
-		")\n"
-		"	virtual bool ConditionCheck(float deltatime, const BlackBoard& blackBoard) override;\n"
-		"};\n"
-	};
-
-	std::string conditionNodeCPPString
-	{
-		"#include \""
-	};
-
-	std::string conditionNodeCPPEndString
-	{
-		".h\"\n"
-		"#include \"pch.h\"\n"
-		"\n"
-		"bool "
-	};
-
-	std::string conditionNodeCPPEndBodyString
-	{
-		"::ConditionCheck(float deltatime, const BlackBoard& blackBoard)\n"
-		"{\n"
-		"	return false;\n"
-		"}\n"
-	};
-
-	std::string conditionDecoratorNodeIncludeString
-	{
-		"#include \"Core.Minimal.h\"\n"
-		"#include \"BTHeader.h\"\n"
-		"\n"
-		"using namespace BT;\n"
-		"\n"
-		"class "
-	};
-
-	std::string conditionDecoratorNodeInheritString
-	{
-		" : public ConditionDecoratorNode\n"
-		"{\n"
-		"public:\n"
-		"	BT_CONDITIONDECORATOR_BODY("
-	};
-
-	std::string conditionDecoratorNodeEndString
-	{
-		")\n"
-		"	virtual bool ConditionCheck(float deltatime, const BlackBoard& blackBoard) override;\n"
-		"};\n"
-	};
-
-	std::string conditionDecoratorNodeCPPString
-	{
-		"#include \""
-	};
-
-	std::string conditionDecoratorNodeCPPEndString
-	{
-		".h\"\n"
-		"#include \"pch.h\"\n"
-		"\n"
-		"bool "
-	};
-
-	std::string conditionDecoratorNodeCPPEndBodyString
-	{
-		"::ConditionCheck(float deltatime, const BlackBoard& blackBoard)\n"
-		"{\n"
-		"	return false;\n"
-		"}\n"
-	};
-
-	std::string actionFactoryIncludeString
-	{
-		"#include \""
-	};
-
-	std::string actionFactoryFunctionString
-	{
-		"	ActionCreateFactory::GetInstance()->RegisterFactory(\""
-	};
-
-	std::string actionFactoryFunctionLambdaString
-	{
-		"\", []() { return new "
-	};
-
-	std::string actionFactoryFunctionEndString
-	{
-		"(); });\n"
-	};
-
-	std::string conditionFactoryIncludeString
-	{
-		"#include \""
-	};
-
-	std::string conditionFactoryFunctionString
-	{
-		"	ConditionCreateFactory::GetInstance()->RegisterFactory(\""
-	};
-
-	std::string conditionFactoryFunctionLambdaString
-	{
-		"\", []() { return new "
-	};
-
-	std::string conditionFactoryFunctionEndString
-	{
-		"(); });\n"
-	};
-
-	std::string conditionDecoratorFactoryIncludeString
-	{
-		"#include \""
-	};
-
-	std::string conditionDecoratorFactoryFunctionString
-	{
-		"	ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory(\""
-	};
-
-	std::string conditionDecoratorFactoryFunctionLambdaString
-	{
-		"\", []() { return new "
-	};
-
-	std::string conditionDecoratorFactoryFunctionEndString
-	{
-		"(); });\n"
-	};
-
-	std::string markerActionFactoryHeaderString
-	{
-		"// Automation include ActionNodeClass header"
-	};
-
-	std::string markerActionFactoryFuncString
-	{
-		"// Register the factory function for BTAction Automation"
-	};
-
-	std::string markerConditionFactoryHeaderString
-	{
-		"// Automation include ConditionNodeClass header"
-	};
-
-	std::string markerConditionFactoryFuncString
-	{
-		"// Register the factory function for BTCondition Automation"
-	};
-
-	std::string markerConditionDecoratorFactoryHeaderString
-	{
-		"// Automation include ConditionDecoratorNodeClass header"
-	};
-
-	std::string markerConditionDecoratorFactoryFuncString
-	{
-		"// Register the factory function for BTConditionDecorator Automation"
-	};
-
-#pragma endregion
+	AniBehaviourFunc 				m_aniBehaviourFunc{};
+	AniBehaviourDeleteFunc			m_aniBehaviourDeleteFunc{};
+	ListAniBehaviourNamesFunc		m_listAniBehaviourNamesFunc{};
 
 private:
 	using ModuleBehaviorIndexVector = std::vector<std::tuple<GameObject*, size_t, std::string>>;

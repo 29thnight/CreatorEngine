@@ -127,16 +127,18 @@ namespace Meta
             if (!cloned)
                 return;
 
-            GameObject::Index parentIndex = original->m_parentIndex;
-            auto parentObj = m_scene->GetGameObject(parentIndex);
-            if (parentObj && parentIndex != cloned->m_parentIndex)
+            GameObject::Index parentIndex = cloned->m_parentIndex;
+            if (GameObject::IsValidIndex(parentIndex) && parentIndex != 0)
             {
-                auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
-                rootChildren.erase(std::remove(rootChildren.begin(), rootChildren.end(), cloned->m_index), rootChildren.end());
-
-                cloned->m_parentIndex = parentIndex;
-                cloned->m_transform.SetParentID(parentIndex);
-                parentObj->m_childrenIndices.push_back(cloned->m_index);
+                auto parentObj = m_scene->GetGameObject(parentIndex);
+                if (parentObj)
+                {
+                    auto& rootChildren = m_scene->m_SceneObjects[0]->m_childrenIndices;
+                    std::erase(rootChildren, cloned->m_index);
+                    cloned->m_parentIndex = parentIndex;
+                    cloned->m_transform.SetParentID(parentIndex);
+                    parentObj->m_childrenIndices.push_back(cloned->m_index);
+                }
             }
 
             m_scene->AddSelectedSceneObject(cloned);
@@ -157,10 +159,40 @@ namespace Meta
         DuplicateGameObjectsCommand(Scene* scene, std::span<GameObject* const> originals)
             : m_scene(scene)
         {
+            std::unordered_set<GameObject::Index> selectedIndices{};
+            selectedIndices.reserve(originals.size());
+
+            for (auto* obj : originals)
+            {
+                if (obj)
+                    selectedIndices.insert(obj->m_index);
+            }
+
             for (auto* obj : originals)
             {
                 if (!obj)
                     continue;
+
+                GameObject::Index parentIndex = obj->m_parentIndex;
+                bool skip = false;
+
+                while (GameObject::IsValidIndex(parentIndex))
+                {
+                    if (selectedIndices.contains(parentIndex))
+                    {
+                        skip = true;
+                        break;
+                    }
+
+                    auto parentObj = m_scene->GetGameObject(parentIndex);
+                    if (!parentObj)
+                        break;
+                    parentIndex = parentObj->m_parentIndex;
+                }
+
+                if (skip)
+                    continue;
+
                 m_commands.emplace_back(scene, obj->m_index);
             }
         }
