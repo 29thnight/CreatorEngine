@@ -56,7 +56,10 @@ public:
 	DirectX::SimpleMath::Vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	[[Property]]
 	DirectX::SimpleMath::Quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
-
+	[[Property]]
+	float m_radius = 0.55f;
+	[[Property]]
+	float m_height = 2.f;
 	
 	
 	DirectX::SimpleMath::Vector2 m_moveInput{ 0.0f, 0.0f };
@@ -81,8 +84,10 @@ public:
 
 
 	//컨트롤러 정보 반환
-	CharacterControllerInfo GetControllerInfo() const
+	CharacterControllerInfo GetControllerInfo() 
 	{
+		m_controllerInfo.radius = m_radius;
+		m_controllerInfo.height = m_height;
 		return m_controllerInfo;
 	}
 

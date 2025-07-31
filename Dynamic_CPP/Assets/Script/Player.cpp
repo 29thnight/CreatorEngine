@@ -315,7 +315,7 @@ void Player::Attack()
 
 	if (m_comboCount == 0)
 	{
-		auto obj = GameObject::Find("GumGi");
+		/*auto obj = GameObject::Find("GumGi");
 		auto pos = GetOwner()->m_transform.GetWorldPosition();
 		auto forward2 = GetOwner()->m_transform.GetForward();
 		auto offset{ 2 };
@@ -337,7 +337,7 @@ void Player::Attack()
 			{
 				effect->Apply();
 			}
-		}
+		}*/
 		std::vector<HitResult> hits;
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;
@@ -362,7 +362,7 @@ void Player::Attack()
 
 			auto entityItem = object->GetComponent<Entity>();
 			if (entityItem) {
-				entityItem->Attack(this, 10);
+				entityItem->Attack(this, 100);
 			}
 		}
 	}
