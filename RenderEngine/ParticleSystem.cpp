@@ -45,49 +45,25 @@ void ParticleSystem::Update(float delta)
 	if (!m_isRunning)
 		return;
 
-	// 현재 읽기/쓰기 버퍼 결정
-	ID3D11UnorderedAccessView* inputUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
-	ID3D11ShaderResourceView* inputSRV = m_usingBufferA ? m_particleSRV_A : m_particleSRV_B;
-	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
-	ID3D11ShaderResourceView* outputSRV = m_usingBufferA ? m_particleSRV_B : m_particleSRV_A;
-
-	int executedModuleCount = 0;
-
-	// 활성화된 모듈만 실행
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
-	{
-		ParticleModule& module = *it;
-
-		// 비활성화된 모듈은 건너뛰기 (버퍼 스왑도 하지 않음)
-		if (!module.IsEnabled()) {
-			continue;
-		}
-
-		// 버퍼 설정 및 실행
-		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
-		module.Update(delta);
-
-		executedModuleCount++;
-
-		// 실제로 실행된 모듈에 대해서만 버퍼 스왑
-		std::swap(inputUAV, outputUAV);
-		std::swap(inputSRV, outputSRV);
+	// 모듈 연결
+	if (!m_modulesConnected) {
+		AutoConnectModules();
 	}
 
-	// 실제 실행된 모듈 개수가 홀수면 최종 버퍼 상태 변경
-	if (executedModuleCount % 2 == 1) {
-		m_usingBufferA = !m_usingBufferA;
-	}
+	UpdateGenerateModule(delta);
 
-	DeviceState::g_pDeviceContext->Flush();
+	// 기존 시뮬레이션 모듈들 실행
+	ExecuteSimulationModules(delta);
 
-#ifdef _DEBUG
-	static int frameCount = 0;
-	if (++frameCount % 60 == 0) {
-		std::cout << "Executed modules: " << executedModuleCount
-			<< ", Using Buffer A: " << (m_usingBufferA ? "true" : "false") << std::endl;
-	}
-#endif
+
+
+//#ifdef _DEBUG
+//	static int frameCount = 0;
+//	if (++frameCount % 60 == 0) {
+//		std::cout << "Executed modules: " << executedModuleCount
+//			<< ", Using Buffer A: " << (m_usingBufferA ? "true" : "false") << std::endl;
+//	}
+//#endif
 }
 
 void ParticleSystem::Render(RenderScene& scene, Camera& camera)
@@ -168,6 +144,64 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 		}
 	}
 }
+
+void ParticleSystem::UpdateGenerateModule(float delta)
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+		TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module);
+		if (trailModule)
+		{
+			trailModule->SetPosition(m_position);
+			trailModule->Update(delta);
+		}
+	}
+}
+
+void ParticleSystem::ExecuteSimulationModules(float delta)
+{
+	// 현재 읽기/쓰기 버퍼 결정
+	ID3D11UnorderedAccessView* inputUAV = m_usingBufferA ? m_particleUAV_A : m_particleUAV_B;
+	ID3D11ShaderResourceView* inputSRV = m_usingBufferA ? m_particleSRV_A : m_particleSRV_B;
+	ID3D11UnorderedAccessView* outputUAV = m_usingBufferA ? m_particleUAV_B : m_particleUAV_A;
+	ID3D11ShaderResourceView* outputSRV = m_usingBufferA ? m_particleSRV_B : m_particleSRV_A;
+
+	int executedModuleCount = 0;
+
+	// 활성화된 모듈만 실행
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// 비활성화된 모듈은 건너뛰기 (버퍼 스왑도 하지 않음)
+		if (!module.IsEnabled()) {
+			continue;
+		}
+
+		if (module.IsGenerateModule())
+			continue;
+
+		// 버퍼 설정 및 실행
+		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
+		module.Update(delta);
+
+		executedModuleCount++;
+
+		// 실제로 실행된 모듈에 대해서만 버퍼 스왑
+		std::swap(inputUAV, outputUAV);
+		std::swap(inputSRV, outputSRV);
+	}
+
+	// 실제 실행된 모듈 개수가 홀수면 최종 버퍼 상태 변경
+	if (executedModuleCount % 2 == 1) {
+		m_usingBufferA = !m_usingBufferA;
+	}
+
+	DeviceState::g_pDeviceContext->Flush();
+}
+
+
 
 void ParticleSystem::SetPosition(const Mathf::Vector3& position)
 {
@@ -482,6 +516,7 @@ void ParticleSystem::ResetForReuse()
 	m_activeParticleCount = 0;
 	m_effectProgress = 0.0f;
 	m_usingBufferA = true;
+	m_modulesConnected = false;
 
 	// 모듈들 리셋 (멤버 함수 호출)
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
@@ -527,6 +562,46 @@ void ParticleSystem::WaitForGPUCompletion()
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
 		ParticleModule& module = *it;
 		module.WaitForGPUCompletion();
+	}
+}
+
+void ParticleSystem::AutoConnectModules()
+{
+	if (m_modulesConnected) return;
+
+	AutoConnectTrailModules();
+
+	m_modulesConnected = true;
+}
+
+
+void ParticleSystem::AutoConnectTrailModules()
+{
+	TrailGenerateModule* trailGenModule = nullptr;
+	TrailRenderModule* trailRenderModule = nullptr;
+
+	// TrailGenerateModule 찾기
+	for (auto& module : m_moduleList) {
+		if (auto* tgm = dynamic_cast<TrailGenerateModule*>(&module)) {
+			trailGenModule = tgm;
+			break;
+		}
+	}
+
+	// TrailRenderModule 찾기
+	for (auto* renderModule : m_renderModules) {
+		if (auto* trm = dynamic_cast<TrailRenderModule*>(renderModule)) {
+			trailRenderModule = trm;
+			break;
+		}
+	}
+
+	// 연결 및 초기화 상태 검증
+	if (trailGenModule && trailRenderModule) {
+		if (!trailGenModule->IsInitialized()) {
+			trailGenModule->Initialize();
+		}
+		trailRenderModule->SetTrailGenerateModule(trailGenModule);
 	}
 }
 

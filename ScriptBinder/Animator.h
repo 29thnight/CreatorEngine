@@ -13,7 +13,7 @@ constexpr uint32 MAX_BONES{ 512 };
 class Skeleton;
 class AnimationController;
 class Socket;
-class Animator : public Component, public RegistableEvent<Animator>
+class Animator : public Component, public RegistableEvent<Animator>, public std::enable_shared_from_this<Animator>
 {
 public:
     ReflectAnimator

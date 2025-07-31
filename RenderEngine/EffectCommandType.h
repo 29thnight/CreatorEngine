@@ -14,6 +14,7 @@ enum class EffectCommandType
     SetLoop,
     SetDuration,
     ReplaceEffect,
+    PlayWithCustomId,
 };
 
 AUTO_REGISTER_ENUM(EffectCommandType)

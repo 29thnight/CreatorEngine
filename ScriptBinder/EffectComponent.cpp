@@ -120,18 +120,19 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
 
     m_effectTemplateName = effectName;
 
+    // GameObject 기반 고정 인스턴스 이름 생성
+    std::string targetInstanceName = GenerateInstanceName(effectName);
+
     float templateTimeScale, templateDuration;
     bool templateLoop;
 
     if (EffectManagerProxy::GetTemplateSettings(m_effectTemplateName, templateTimeScale, templateLoop, templateDuration))
     {
-        // JSON에서 로드된 원본 설정으로 컴포넌트 변수 업데이트
         m_timeScale = templateTimeScale;
         m_loop = templateLoop;
         m_duration = templateDuration;
     }
 
-    // 위치와 회전 설정
     auto currentPos = GetOwner()->m_transform.GetWorldPosition();
     auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
 
@@ -139,9 +140,14 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
     Mathf::Vector3 currentRot = Mathf::Vector3(pitch, yaw, roll);
 
-    // 기존 이펙트가 있으면 Replace, 없으면 새로 생성
+    // 현재 인스턴스 이름이 다르면 기존 것을 제거하고 새로 생성
+    if (!m_effectInstanceName.empty() && m_effectInstanceName != targetInstanceName) {
+        DestroyCurrentEffect(); // 기존 인스턴스 제거
+        m_effectInstanceName.clear();
+    }
+
     if (!m_effectInstanceName.empty()) {
-        // Replace 명령 (인스턴스 ID 유지)
+        // 같은 인스턴스 이름이면 Replace
         proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->UpdateTempleteName(m_effectTemplateName);
         proxy->UpdatePosition(currentPos);
@@ -154,6 +160,9 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     }
     else {
         // 새로 생성
+        m_effectInstanceName = targetInstanceName;
+
+        proxy->UpdateInstanceName(m_effectInstanceName);
         proxy->UpdateTempleteName(m_effectTemplateName);
         proxy->UpdatePosition(currentPos);
         proxy->UpdateRotation(currentRot);
@@ -161,14 +170,13 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
         proxy->UpdateLoop(m_loop);
         proxy->UpdateDuration(m_duration);
 
-        proxy->PushCommand(EffectCommandType::Play);
+        proxy->PushCommand(EffectCommandType::PlayWithCustomId); // 새 커맨드 타입
     }
 
     m_lastPosition = currentPos;
     m_lastRotation = currentRot;
     m_isPlaying = true;
 }
-
 
 void EffectComponent::ChangeEffect(const std::string& newEffectName)
 {
@@ -271,6 +279,12 @@ void EffectComponent::ForeceUpdatePosition()
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
         m_lastPosition = currentPos;
     }
+}
+
+std::string EffectComponent::GenerateInstanceName(const std::string& templateName)
+{
+    size_t instanceId = GetOwner()->GetInstanceID();
+    return templateName + "_id" + std::to_string(instanceId);
 }
 
 void EffectComponent::ApplyEffectSettings()

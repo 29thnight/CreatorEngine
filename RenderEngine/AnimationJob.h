@@ -15,6 +15,7 @@ public:
     AnimationJob();
     ~AnimationJob();
     void Update(float deltaTime);
+	void SetRenderScene(RenderScene* renderScene) { m_renderScene = renderScene; }
 private:
 	void PrepareAnimation();
     void CleanUp();
@@ -30,8 +31,8 @@ private:
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;
     ThreadPool<std::function<void()>> m_UpdateThreadPool;
-    std::vector<Animator*> m_currAnimator;
     uint32 m_objectSize{};
+	RenderScene* m_renderScene{ nullptr };
 };
 
 #endif // !DYNAMICCPP_EXPORTS

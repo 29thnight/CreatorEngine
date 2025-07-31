@@ -373,7 +373,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
             startWorldMatrices.clear();
             for (auto* target : selectedObjects)
             {
-                    startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
+                startWorldMatrices[target] = target->m_transform.GetWorldMatrix();
             }
         }
 
@@ -390,7 +390,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
         if (!XMMatrixIsIdentity(deltaMat))
         {
             obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-
+			obj->m_transform.UpdateDirty();
 			XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
 			auto itSelf = startWorldMatrices.find(obj);
 			if (itSelf != startWorldMatrices.end())
@@ -411,6 +411,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 						XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 						XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
 						target->m_transform.SetLocalMatrix(targetLocal);
+						target->m_transform.UpdateDirty();
 			        }
 			    }
 			}
@@ -424,11 +425,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				{
 					XMMATRIX copy = oldLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
+					obj->m_transform.UpdateDirty();
 				},
 				[=]
 				{
 					XMMATRIX copy = newLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
+					obj->m_transform.UpdateDirty();
 				}
 			);
 		}
@@ -492,6 +495,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(rotAxis, angle));
 
 			target->m_transform.SetWorldPosition(cam->m_eyePosition);
+			target->m_transform.UpdateDirty();
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {

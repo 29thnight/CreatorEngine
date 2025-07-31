@@ -10,6 +10,8 @@
 #include "Socket.h"
 using namespace DirectX;
 
+std::vector<std::shared_ptr<Animator>> m_currAnimator;
+
 inline float lerp(float a, float b, float f)
 {
     return a + f * (b - a);
@@ -47,24 +49,21 @@ AnimationJob::~AnimationJob()
 void AnimationJob::Update(float deltaTime)
 {
     Scene* scene = SceneManagers->GetActiveScene();
+	RenderScene* renderScene = SceneManagers->GetRenderScene();
     uint32 currSize = scene->m_SceneObjects.size();
 
     m_currAnimator.clear();
-	int counter = 0;
-    for (auto& sceneObj : scene->m_SceneObjects)
+    for (auto& [guid, animator] : renderScene->GetAnimatorMap())
     {
-		auto type = Meta::Find("Animator");
-        Animator* animator = dynamic_cast<Animator*>(sceneObj->GetComponent(*type).get());
         if (nullptr == animator || !animator->IsEnabled()) continue;
 
         m_currAnimator.push_back(animator);
-		counter++;
     }
 
     for(auto& animator : m_currAnimator)
     {
         std::vector<std::shared_ptr<AnimationController>> controllers = animator->m_animationControllers;
-        m_UpdateThreadPool.Enqueue([&, controllers]
+        m_UpdateThreadPool.Enqueue([this, animator, controllers, delta = deltaTime]
         {
             Skeleton* skeleton = animator->m_Skeleton;
             if (!skeleton) return;
@@ -76,7 +75,7 @@ void AnimationJob::Update(float deltaTime)
                     AnimationController* animationcontroller = sharedanimationcontroller.get();
                     if (animationcontroller == nullptr || !animationcontroller->useController) continue;
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond;
                     if (animation.m_isLoop == true)
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
@@ -100,7 +99,7 @@ void AnimationJob::Update(float deltaTime)
                     if (animationcontroller->m_isBlend)
                     {
                         Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
-                        animationcontroller->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animationcontroller->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
                         animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
                         animationcontroller->preNextAnimationProgress = animationcontroller->nextAnimationProgress;
                         animationcontroller->nextAnimationProgress = animationcontroller->m_nextTimeElapsed / nextanimation.m_duration;
@@ -111,10 +110,10 @@ void AnimationJob::Update(float deltaTime)
                         UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
                     }
 
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator, animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
                     if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
                     {
-                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator, animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator.get(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                     }
                     
                 }
@@ -130,7 +129,7 @@ void AnimationJob::Update(float deltaTime)
                 if (animator->m_animationControllers.empty()) //아예없으면
                 {
                     Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
-                    animator->m_TimeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animator->m_TimeElapsed += delta * animation.m_ticksPerSecond;
 
                     if (animation.m_isLoop == true)
                     {
@@ -154,7 +153,7 @@ void AnimationJob::Update(float deltaTime)
                             return;
                         }
                         Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
-                        animator->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animator->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
                         animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
                         UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
                     }
@@ -168,7 +167,7 @@ void AnimationJob::Update(float deltaTime)
                 {
                     animationcontroller = animator->m_animationControllers[0].get();
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    animationcontroller->m_timeElapsed += deltaTime * animation.m_ticksPerSecond;
+                    animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond;
                     animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
                     if (animation.m_isLoop == true)
                     {
@@ -198,7 +197,7 @@ void AnimationJob::Update(float deltaTime)
                             return;
                         }
                         Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
-                        animationcontroller->m_nextTimeElapsed += deltaTime * nextanimation.m_ticksPerSecond;
+                        animationcontroller->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
                         animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
                         UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
                     }
@@ -231,15 +230,12 @@ void AnimationJob::PrepareAnimation()
 {
     m_currAnimator.clear();
     Scene* scene = SceneManagers->GetActiveScene();
+    RenderScene* renderScene = SceneManagers->GetRenderScene();
 	if (nullptr == scene) return;
 
-    uint32 currSize = scene->m_SceneObjects.size();
-
-    for (uint32 i = 0; i < currSize; ++i)
+    for (auto& [guid, animator] : renderScene->GetAnimatorMap())
     {
-        Animator* animator = scene->m_SceneObjects[i]->GetComponent<Animator>();
-        if (nullptr == animator) continue;
-		animator->SetEnabled(true);
+        if (nullptr == animator || !animator->IsEnabled()) continue;
 
         m_currAnimator.push_back(animator);
     }

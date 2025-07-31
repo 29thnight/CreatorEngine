@@ -62,6 +62,8 @@ public:
 
 	std::string PlayEffect(const std::string& templateName);
 
+	std::string PlayEffectWithCustomId(const std::string& templateName, const std::string& customInstanceId);
+
 	EffectBase* GetEffectInstance(const std::string& instanceId);
 
 	EffectBase* GetEffect(std::string_view instanceName);

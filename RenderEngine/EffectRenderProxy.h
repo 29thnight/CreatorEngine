@@ -26,6 +26,7 @@ public:
 	void SetPendingRemoveInstance(const std::string& instanceName) { m_pendingRemoveInstance = instanceName; }
 	const std::string& GetPendingRemoveInstance() const { return m_pendingRemoveInstance; }
 	void ClearPendingRemoveInstance() { m_pendingRemoveInstance.clear(); }
+	void SetInstanceName(const std::string& instanceName) { m_instanceName = instanceName; }
 
 	bool TryPop(EffectCommandType& type)
 	{ 
