@@ -64,6 +64,8 @@ public:
     // 3D 모듈용 설정 메서드
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
     void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
+
+    // cpu 모듈용 설정 메서드
     void RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule);
     void RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule);
 

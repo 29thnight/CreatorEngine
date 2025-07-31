@@ -173,6 +173,7 @@ void TrailRenderModule::UpdateConstantBuffer(const Mathf::Matrix& world, const M
     m_constantBufferData.world = world;
     m_constantBufferData.view = view;
     m_constantBufferData.projection = projection;
+    m_constantBufferData.time = Time->GetTotalSeconds();
 
     DirectX11::UpdateBuffer(m_constantBuffer.Get(), &m_constantBufferData);
 }

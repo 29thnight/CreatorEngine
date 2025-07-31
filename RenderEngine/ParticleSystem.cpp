@@ -50,6 +50,8 @@ void ParticleSystem::Update(float delta)
 		AutoConnectModules();
 	}
 
+	UpdateGenerateModule(delta);
+
 	// 기존 시뮬레이션 모듈들 실행
 	ExecuteSimulationModules(delta);
 
@@ -143,6 +145,20 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 	}
 }
 
+void ParticleSystem::UpdateGenerateModule(float delta)
+{
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+		TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module);
+		if (trailModule)
+		{
+			trailModule->SetPosition(m_position);
+			trailModule->Update(delta);
+		}
+	}
+}
+
 void ParticleSystem::ExecuteSimulationModules(float delta)
 {
 	// 현재 읽기/쓰기 버퍼 결정
@@ -162,6 +178,9 @@ void ParticleSystem::ExecuteSimulationModules(float delta)
 		if (!module.IsEnabled()) {
 			continue;
 		}
+
+		if (module.IsGenerateModule())
+			continue;
 
 		// 버퍼 설정 및 실행
 		module.SetBuffers(inputUAV, inputSRV, outputUAV, outputSRV);
@@ -555,18 +574,21 @@ void ParticleSystem::AutoConnectModules()
 	m_modulesConnected = true;
 }
 
+
 void ParticleSystem::AutoConnectTrailModules()
 {
 	TrailGenerateModule* trailGenModule = nullptr;
 	TrailRenderModule* trailRenderModule = nullptr;
 
-	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
-		if (auto* tgm = dynamic_cast<TrailGenerateModule*>(&(*it))) {
+	// TrailGenerateModule 찾기
+	for (auto& module : m_moduleList) {
+		if (auto* tgm = dynamic_cast<TrailGenerateModule*>(&module)) {
 			trailGenModule = tgm;
 			break;
 		}
 	}
 
+	// TrailRenderModule 찾기
 	for (auto* renderModule : m_renderModules) {
 		if (auto* trm = dynamic_cast<TrailRenderModule*>(renderModule)) {
 			trailRenderModule = trm;
@@ -574,7 +596,11 @@ void ParticleSystem::AutoConnectTrailModules()
 		}
 	}
 
+	// 연결 및 초기화 상태 검증
 	if (trailGenModule && trailRenderModule) {
+		if (!trailGenModule->IsInitialized()) {
+			trailGenModule->Initialize();
+		}
 		trailRenderModule->SetTrailGenerateModule(trailGenModule);
 	}
 }

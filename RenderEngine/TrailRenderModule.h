@@ -8,7 +8,7 @@ struct TrailConstantBuffer
     Mathf::Matrix view;
     Mathf::Matrix projection;
     Mathf::Vector3 cameraPosition;
-    float padding;
+    float time;
 };
 
 class TrailRenderModule : public RenderModules

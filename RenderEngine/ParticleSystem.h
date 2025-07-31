@@ -108,6 +108,8 @@ public:
 
 	void UpdateEffectBasePosition(const Mathf::Vector3& newBasePosition);
 
+	void UpdateGenerateModule(float delta);
+
 	void SetPosition(const Mathf::Vector3& position);
 
 	void ExecuteSimulationModules(float delta);
@@ -161,7 +163,6 @@ public:
 	void AutoConnectModules();
 
 	void AutoConnectTrailModules();
-
 public:
 	std::string m_name{};
 private:

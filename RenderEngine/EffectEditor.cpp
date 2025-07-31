@@ -2673,138 +2673,107 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 
 void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule)
 {
-	if (!trailModule) return;
+	if (!trailModule)
+		return;
 
-	ImGui::Text("Trail Generate Module Settings");
+	ImGui::PushID("TrailGenerateModule");
 
-	// 트레일 활성화/비활성화
-	const auto& params = trailModule->GetTrailParams();
-	bool enableTrail = (params.enableTrail != 0);
-	if (ImGui::Checkbox("Enable Trail", &enableTrail)) {
-		trailModule->EnableTrail(enableTrail);
+	// 모듈 활성화/비활성화
+	bool enabled = trailModule->IsEnabled();
+	if (ImGui::Checkbox("Enable Trail Generation", &enabled)) {
+		trailModule->SetEnabled(enabled);
 	}
 
-	if (!enableTrail) {
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Trail generation is disabled");
+	if (!enabled) {
+		ImGui::PopID();
 		return;
 	}
 
 	ImGui::Separator();
-	ImGui::Text("Trail Parameters");
 
-	// 최소 거리
-	float minDistance = params.minDistance;
-	if (ImGui::DragFloat("Min Distance", &minDistance, 0.01f, 0.01f, 2.0f, "%.3f")) {
-		trailModule->SetMinDistance(minDistance);
-	}
-	ImGui::SameLine();
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("Minimum distance particle must move to generate trail segment");
-	}
+	// 기본 설정
+	if (ImGui::CollapsingHeader("Basic Settings", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		int maxPoints = trailModule->GetMaxTrailPoints();
+		if (ImGui::SliderInt("Max Trail Points", &maxPoints, 10, 500)) {
+			// SetMaxTrailPoints 함수가 없으므로 주석
+			// trailModule->SetMaxTrailPoints(maxPoints);
+		}
 
-	// 트레일 폭
-	float trailWidth = params.trailWidth;
-	if (ImGui::DragFloat("Trail Width", &trailWidth, 0.01f, 0.01f, 5.0f, "%.3f")) {
-		trailModule->SetTrailWidth(trailWidth);
-	}
+		float lifetime = trailModule->GetTrailLifetime();
+		if (ImGui::SliderFloat("Trail Lifetime", &lifetime, 0.1f, 10.0f, "%.2f sec")) {
+			trailModule->SetTrailLifetime(lifetime);
+		}
 
-	// 속도 임계값
-	float velocityThreshold = params.velocityThreshold;
-	if (ImGui::DragFloat("Velocity Threshold", &velocityThreshold, 0.001f, 0.0f, 1.0f, "%.4f")) {
-		trailModule->SetVelocityThreshold(velocityThreshold);
-	}
-	ImGui::SameLine();
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("Minimum velocity required to generate trail");
+		float minDistance = trailModule->GetMinDistance();
+		if (ImGui::SliderFloat("Min Distance", &minDistance, 0.01f, 1.0f, "%.3f")) {
+			trailModule->SetMinDistance(minDistance);
+		}
 	}
 
-	// 최대 트레일 길이
-	float maxTrailLength = params.maxTrailLength;
-	if (ImGui::DragFloat("Max Trail Length", &maxTrailLength, 0.1f, 0.1f, 20.0f)) {
-		trailModule->SetMaxTrailLength(maxTrailLength);
+	// 자동 생성 설정
+	if (ImGui::CollapsingHeader("Auto Generation"))
+	{
+		bool autoGenerate = trailModule->GetAutoGenerateFromPosition();
+		float interval = trailModule->GetAutoAddInterval();
+		if (ImGui::Checkbox("Auto Generate", &autoGenerate) ||
+			ImGui::SliderFloat("Add Interval", &interval, 0.01f, 0.2f, "%.3f sec")) {
+			trailModule->SetAutoGenerationSettings(autoGenerate, interval);
+		}
+
+		Mathf::Vector3 offset = trailModule->GetPositionOffset();
+		float offsetArray[3] = { offset.x, offset.y, offset.z };
+		if (ImGui::DragFloat3("Position Offset", offsetArray, 0.1f)) {
+			trailModule->SetPositionOffset(Mathf::Vector3(offsetArray[0], offsetArray[1], offsetArray[2]));
+		}
 	}
 
-	// 길이에 따른 폭 감소
-	float widthOverLength = params.widthOverLength;
-	if (ImGui::SliderFloat("Width Decay", &widthOverLength, 0.0f, 1.0f, "%.2f")) {
-		trailModule->SetWidthOverLength(widthOverLength);
-	}
-	ImGui::SameLine();
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip("0.0 = constant width, 1.0 = linear decay to zero");
-	}
+	// 외형 설정
+	if (ImGui::CollapsingHeader("Appearance", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		// 너비 설정 (기존 SetWidthCurve 사용)
+		static float startWidth = 1.0f, endWidth = 0.1f;
+		if (ImGui::SliderFloat("Start Width", &startWidth, 0.1f, 10.0f) ||
+			ImGui::SliderFloat("End Width", &endWidth, 0.01f, 5.0f)) {
+			trailModule->SetWidthCurve(startWidth, endWidth);
+		}
 
-	ImGui::Separator();
-	ImGui::Text("Visual Settings");
-
-	// 트레일 색상
-	float trailColor[4] = {
-		params.trailColor.x,
-		params.trailColor.y,
-		params.trailColor.z,
-		params.trailColor.w
-	};
-	if (ImGui::ColorEdit4("Trail Color", trailColor)) {
-		trailModule->SetTrailColor(Mathf::Vector4(trailColor[0], trailColor[1], trailColor[2], trailColor[3]));
+		// 색상 설정 (기존 SetColorCurve 사용)
+		static float startColor[4] = { 1,1,1,1 }, endColor[4] = { 1,1,1,0 };
+		if (ImGui::ColorEdit4("Start Color", startColor) ||
+			ImGui::ColorEdit4("End Color", endColor)) {
+			trailModule->SetColorCurve(
+				Mathf::Vector4(startColor[0], startColor[1], startColor[2], startColor[3]),
+				Mathf::Vector4(endColor[0], endColor[1], endColor[2], endColor[3])
+			);
+		}
 	}
 
 	// UV 설정
-	float uvTiling = params.uvTiling;
-	if (ImGui::DragFloat("UV Tiling", &uvTiling, 0.1f, 0.1f, 10.0f)) {
-		trailModule->SetUVTiling(uvTiling);
+	if (ImGui::CollapsingHeader("UV Settings"))
+	{
+		static bool useLengthBasedUV = true;
+		if (ImGui::Checkbox("Use Length Based UV", &useLengthBasedUV)) {
+			trailModule->SetUVMode(useLengthBasedUV);
+		}
 	}
 
-	float uvScrollSpeed = params.uvScrollSpeed;
-	if (ImGui::DragFloat("UV Scroll Speed", &uvScrollSpeed, 0.1f, -10.0f, 10.0f)) {
-		trailModule->SetUVScrollSpeed(uvScrollSpeed);
+	// 디버그 정보
+	if (ImGui::CollapsingHeader("Debug Info"))
+	{
+		ImGui::Text("Vertex Count: %d", trailModule->GetVertexCount());
+		ImGui::Text("Index Count: %d", trailModule->GetMaxIndexCount());
+
+		if (ImGui::Button("Clear Trail")) {
+			trailModule->Clear();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset")) {
+			trailModule->ResetForReuse();
+		}
 	}
 
-	ImGui::Separator();
-	ImGui::Text("System Status");
-
-	// 시스템 상태 정보
-	ImGui::Text("Max Particles: %u", params.maxParticles);
-	ImGui::Text("Current Time: %.2f", params.currentTime);
-
-	// 프리셋
-	ImGui::Separator();
-	ImGui::Text("Presets");
-
-	if (ImGui::Button("Fire Trail")) {
-		trailModule->SetMinDistance(0.05f);
-		trailModule->SetTrailWidth(0.3f);
-		trailModule->SetVelocityThreshold(0.01f);
-		trailModule->SetMaxTrailLength(1.5f);
-		trailModule->SetWidthOverLength(0.8f);
-		trailModule->SetTrailColor(Mathf::Vector4(1.0f, 0.5f, 0.0f, 0.8f));
-		trailModule->SetUVTiling(2.0f);
-		trailModule->SetUVScrollSpeed(3.0f);
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Magic Trail")) {
-		trailModule->SetMinDistance(0.08f);
-		trailModule->SetTrailWidth(0.2f);
-		trailModule->SetVelocityThreshold(0.005f);
-		trailModule->SetMaxTrailLength(2.5f);
-		trailModule->SetWidthOverLength(0.6f);
-		trailModule->SetTrailColor(Mathf::Vector4(0.5f, 0.8f, 1.0f, 0.7f));
-		trailModule->SetUVTiling(1.5f);
-		trailModule->SetUVScrollSpeed(1.0f);
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Smoke Trail")) {
-		trailModule->SetMinDistance(0.1f);
-		trailModule->SetTrailWidth(0.5f);
-		trailModule->SetVelocityThreshold(0.02f);
-		trailModule->SetMaxTrailLength(3.0f);
-		trailModule->SetWidthOverLength(0.3f);
-		trailModule->SetTrailColor(Mathf::Vector4(0.7f, 0.7f, 0.7f, 0.5f));
-		trailModule->SetUVTiling(1.0f);
-		trailModule->SetUVScrollSpeed(0.5f);
-	}
+	ImGui::PopID();
 }
 
 void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule)
@@ -2928,7 +2897,7 @@ void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderM
 		if (connectedTrailModule) {
 			ImGui::Text("Trail Vertex Buffer: %p", connectedTrailModule->GetVertexBuffer());
 			ImGui::Text("Trail Index Buffer: %p", connectedTrailModule->GetIndexBuffer());
-			ImGui::Text("Vertex Stride: %u bytes", connectedTrailModule->GetVertexStride());
+			//ImGui::Text("Vertex Stride: %u bytes", connectedTrailModule->GetVertexStride());
 		}
 	}
 
