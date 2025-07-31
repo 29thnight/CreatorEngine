@@ -992,83 +992,70 @@ void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
 
 void Scene::DestroyGameObjects()
 {
-    std::unordered_set<uint32_t> deletedIndices;
-    for (const auto& obj : m_SceneObjects)
-    {
-        if (obj && obj->IsDestroyMark())
-            deletedIndices.insert(obj->m_index);
-    }
+	std::unordered_set<uint32_t> deletedIndices;
+	for (const auto& obj : m_SceneObjects)
+	{
+		if (obj && obj->IsDestroyMark())
+			deletedIndices.insert(obj->m_index);
+	}
 
 	if (deletedIndices.empty())
 		return;
 
-	std::unordered_map<uint32_t, uint32_t> reparentMap;
-    for (auto& obj : m_SceneObjects)
-    {
-        if (obj && deletedIndices.contains(obj->m_index))
-        {
-            for (auto childIdx : obj->m_childrenIndices)
-            {
-                if (GameObject::IsValidIndex(childIdx) &&
-                    childIdx < m_SceneObjects.size() &&
-                    m_SceneObjects[childIdx])
-                {
-					reparentMap[childIdx] = obj->m_parentIndex;
-                    m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
-					m_SceneObjects[childIdx]->m_transform.SetParentID(GameObject::INVALID_INDEX);
-                }
-            }
+	for (auto& obj : m_SceneObjects)
+	{
+		if (obj && deletedIndices.contains(obj->m_index))
+		{
+			for (auto childIdx : obj->m_childrenIndices)
+			{
+				if (GameObject::IsValidIndex(childIdx) &&
+					childIdx < m_SceneObjects.size() &&
+					m_SceneObjects[childIdx])
+				{
+					m_SceneObjects[childIdx]->m_parentIndex = GameObject::INVALID_INDEX;
+				}
+			}
 
-            obj->m_childrenIndices.clear();
-            obj.reset();
-        }
-    }
+			obj->m_childrenIndices.clear();
+			obj.reset();
+		}
+	}
 
-    std::erase_if(m_SceneObjects, [](const auto& obj) { return obj == nullptr; });
+	std::erase_if(m_SceneObjects, [](const auto& obj) { return obj == nullptr; });
 
-    std::unordered_map<uint32_t, uint32_t> indexMap;
-    for (uint32_t i = 0; i < m_SceneObjects.size(); ++i)
-    {
-        indexMap[m_SceneObjects[i]->m_index] = i;
-    }
+	std::unordered_map<uint32_t, uint32_t> indexMap;
+	for (uint32_t i = 0; i < m_SceneObjects.size(); ++i)
+	{
+		indexMap[m_SceneObjects[i]->m_index] = i;
+	}
 
-    for (auto& obj : m_SceneObjects)
-    {
-        uint32_t oldIndex = obj->m_index;
-		GameObject::Index newParentIndex = GameObject::INVALID_INDEX;
+	for (auto& obj : m_SceneObjects)
+	{
+		uint32_t oldIndex = obj->m_index;
 
-        if (indexMap.contains(obj->m_parentIndex))
-        {
-            obj->m_parentIndex = indexMap[obj->m_parentIndex];
+		if (indexMap.contains(obj->m_parentIndex))
+		{
+			obj->m_parentIndex = indexMap[obj->m_parentIndex];
 			obj->m_rootIndex = indexMap[obj->m_rootIndex];
 			obj->m_transform.SetParentID(obj->m_parentIndex);
-        }
-        else if(auto it = reparentMap.find(oldIndex); it != reparentMap.end())
+		}
+		else
 		{
-			if (indexMap.contains(it->second))
-				newParentIndex = indexMap[it->second];
+			obj->m_parentIndex = GameObject::INVALID_INDEX;
 		}
 
-		obj->m_parentIndex = newParentIndex;
-		obj->m_transform.SetParentID(newParentIndex);
+		for (auto& childIndex : obj->m_childrenIndices)
+		{
+			if (indexMap.contains(childIndex))
+				childIndex = indexMap[childIndex];
+			else
+				childIndex = GameObject::INVALID_INDEX;
+		}
 
-		if (GameObject::IsValidIndex(newParentIndex))
-			obj->m_rootIndex = m_SceneObjects[newParentIndex]->m_rootIndex;
-		else if (indexMap.contains(obj->m_rootIndex))
-			obj->m_rootIndex = indexMap[obj->m_rootIndex];
+		std::erase_if(obj->m_childrenIndices, GameObject::IsInvalidIndex);
 
-        for (auto& childIndex : obj->m_childrenIndices)
-        {
-            if (indexMap.contains(childIndex))
-                childIndex = indexMap[childIndex];
-            else
-                childIndex = GameObject::INVALID_INDEX;
-        }
-
-        std::erase_if(obj->m_childrenIndices, GameObject::IsInvalidIndex);
-
-        obj->m_index = indexMap[oldIndex];
-    }
+		obj->m_index = indexMap[oldIndex];
+	}
 }
 
 void Scene::DestroyComponents()
