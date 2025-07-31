@@ -86,7 +86,7 @@ public:
 
 
 	// 테스트용 
-	virtual bool IsGenerateModule() const { return true; }
+	virtual bool IsGenerateModule() const { return false; }
 
 protected:
 	// 이징 변수

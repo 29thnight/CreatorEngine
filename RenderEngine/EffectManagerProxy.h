@@ -9,7 +9,7 @@ public:
     // 이펙트 재생 명령
     static EffectManagerProxy CreatePlayCommand(const std::string& templateName) {
         EffectManagerProxy cmd;
-        cmd.m_executeFunction = [templateName](){
+        cmd.m_executeFunction = [templateName]() {
             EffectManagers->PlayEffect(templateName);
             };
         return cmd;
@@ -125,6 +125,15 @@ public:
         float& outDuration)
     {
         return EffectManagers->GetTemplateSettings(templateName, outTimeScale, outLoop, outDuration);
+    }
+
+    static EffectManagerProxy CreatePlayWithCustomIdCommand(const std::string& templateName, const std::string& customInstanceId)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [templateName, customInstanceId]() {
+            return EffectManagers->PlayEffectWithCustomId(templateName, customInstanceId);
+            };
+        return cmd;
     }
 
     //static uint32_t GetCurrentInstanceCounter() {

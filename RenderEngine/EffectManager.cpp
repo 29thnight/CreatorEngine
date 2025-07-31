@@ -119,7 +119,7 @@ std::string EffectManager::PlayEffectWithCustomId(const std::string& templateNam
 	instance->Play();
 	activeEffects[customInstanceId] = std::move(instance);
 
-	std::cout << "Created effect with custom ID: " << customInstanceId << std::endl;
+	std::cout << "Created effect with ID: " << customInstanceId << " (template: " << templateName << ")" << std::endl;
 	return customInstanceId;
 }
 
