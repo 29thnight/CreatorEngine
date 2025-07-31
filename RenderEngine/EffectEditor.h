@@ -9,12 +9,14 @@ enum class EffectModuleType
     MovementModule,
     ColorModule,
     SizeModule,
+    TrailModule,
 };
 
 enum class RenderType
 {
     Billboard,
     Mesh,
+    Trail,
 };
 
 struct TempEmitterInfo {
@@ -62,6 +64,8 @@ public:
     // 3D 모듈용 설정 메서드
     void RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* spawnModule);
     void RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule);
+    void RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule);
+    void RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule);
 
 private:
     // 미리보기용 임시 에미터들
@@ -94,11 +98,13 @@ private:
         {"Movement Module", EffectModuleType::MovementModule},
         {"Color Module", EffectModuleType::ColorModule},
         {"Size Module", EffectModuleType::SizeModule},
+        {"Trail Module", EffectModuleType::TrailModule},
     };
 
     std::vector<RenderInfo> m_availableRenders = {
         {"Billboard Render", RenderType::Billboard},
         {"Mesh Render", RenderType::Mesh},
+        {"Trail Render", RenderType::Trail},
     };
 
     // 모듈 편집 관련

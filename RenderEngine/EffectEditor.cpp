@@ -228,6 +228,10 @@ void EffectEditor::RenderModuleDetailEditor()
 	else if (auto* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(targetModule)) {
 		RenderMeshSpawnModuleEditor(meshSpawnModule);
 	}
+	else if (auto* trailGenModule = dynamic_cast<TrailGenerateModule*>(targetModule))
+	{
+		RenderTrailGenerateModuleEditor(trailGenModule);
+	}
 }
 
 void EffectEditor::RenderRenderModuleDetailEditor()
@@ -248,6 +252,10 @@ void EffectEditor::RenderRenderModuleDetailEditor()
 	}
 	else if (auto* meshRender = dynamic_cast<MeshModuleGPU*>(renderModule)) {
 		RenderMeshModuleGPUEditor(meshRender);
+	}
+	else if (auto* trailRender = dynamic_cast<TrailRenderModule*>(renderModule))
+	{
+		RenderTrailRenderModuleEditor(trailRender);
 	}
 }
 
@@ -884,6 +892,9 @@ void EffectEditor::AddSelectedModule()
 		m_editingEmitter->AddModule<SizeModuleCS>();
 		m_editingEmitter->GetModule<SizeModuleCS>()->Initialize();
 		break;
+	case EffectModuleType::TrailModule:
+		m_editingEmitter->AddModule<TrailGenerateModule>();
+		m_editingEmitter->GetModule<TrailGenerateModule>()->Initialize();
 	}
 }
 
@@ -904,6 +915,10 @@ void EffectEditor::AddSelectedRender()
 		m_editingEmitter->AddRenderModule<MeshModuleGPU>();
 		m_editingEmitter->GetRenderModule<MeshModuleGPU>()->Initialize();
 		break;
+	case RenderType::Trail:
+		m_editingEmitter->SetParticleDatatype(ParticleDataType::Mesh);
+		m_editingEmitter->AddRenderModule<TrailRenderModule>();
+		m_editingEmitter->GetRenderModule<TrailRenderModule>()->Initialize();
 	}
 }
 
@@ -2653,6 +2668,277 @@ void EffectEditor::RenderMeshModuleGPUEditor(MeshModuleGPU* meshModule)
 	}
 	else {
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Polar Clipping Not Supported");
+	}
+}
+
+void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailModule)
+{
+	if (!trailModule) return;
+
+	ImGui::Text("Trail Generate Module Settings");
+
+	// 트레일 활성화/비활성화
+	const auto& params = trailModule->GetTrailParams();
+	bool enableTrail = (params.enableTrail != 0);
+	if (ImGui::Checkbox("Enable Trail", &enableTrail)) {
+		trailModule->EnableTrail(enableTrail);
+	}
+
+	if (!enableTrail) {
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Trail generation is disabled");
+		return;
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Trail Parameters");
+
+	// 최소 거리
+	float minDistance = params.minDistance;
+	if (ImGui::DragFloat("Min Distance", &minDistance, 0.01f, 0.01f, 2.0f, "%.3f")) {
+		trailModule->SetMinDistance(minDistance);
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("Minimum distance particle must move to generate trail segment");
+	}
+
+	// 트레일 폭
+	float trailWidth = params.trailWidth;
+	if (ImGui::DragFloat("Trail Width", &trailWidth, 0.01f, 0.01f, 5.0f, "%.3f")) {
+		trailModule->SetTrailWidth(trailWidth);
+	}
+
+	// 속도 임계값
+	float velocityThreshold = params.velocityThreshold;
+	if (ImGui::DragFloat("Velocity Threshold", &velocityThreshold, 0.001f, 0.0f, 1.0f, "%.4f")) {
+		trailModule->SetVelocityThreshold(velocityThreshold);
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("Minimum velocity required to generate trail");
+	}
+
+	// 최대 트레일 길이
+	float maxTrailLength = params.maxTrailLength;
+	if (ImGui::DragFloat("Max Trail Length", &maxTrailLength, 0.1f, 0.1f, 20.0f)) {
+		trailModule->SetMaxTrailLength(maxTrailLength);
+	}
+
+	// 길이에 따른 폭 감소
+	float widthOverLength = params.widthOverLength;
+	if (ImGui::SliderFloat("Width Decay", &widthOverLength, 0.0f, 1.0f, "%.2f")) {
+		trailModule->SetWidthOverLength(widthOverLength);
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("0.0 = constant width, 1.0 = linear decay to zero");
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Visual Settings");
+
+	// 트레일 색상
+	float trailColor[4] = {
+		params.trailColor.x,
+		params.trailColor.y,
+		params.trailColor.z,
+		params.trailColor.w
+	};
+	if (ImGui::ColorEdit4("Trail Color", trailColor)) {
+		trailModule->SetTrailColor(Mathf::Vector4(trailColor[0], trailColor[1], trailColor[2], trailColor[3]));
+	}
+
+	// UV 설정
+	float uvTiling = params.uvTiling;
+	if (ImGui::DragFloat("UV Tiling", &uvTiling, 0.1f, 0.1f, 10.0f)) {
+		trailModule->SetUVTiling(uvTiling);
+	}
+
+	float uvScrollSpeed = params.uvScrollSpeed;
+	if (ImGui::DragFloat("UV Scroll Speed", &uvScrollSpeed, 0.1f, -10.0f, 10.0f)) {
+		trailModule->SetUVScrollSpeed(uvScrollSpeed);
+	}
+
+	ImGui::Separator();
+	ImGui::Text("System Status");
+
+	// 시스템 상태 정보
+	ImGui::Text("Max Particles: %u", params.maxParticles);
+	ImGui::Text("Current Time: %.2f", params.currentTime);
+
+	// 프리셋
+	ImGui::Separator();
+	ImGui::Text("Presets");
+
+	if (ImGui::Button("Fire Trail")) {
+		trailModule->SetMinDistance(0.05f);
+		trailModule->SetTrailWidth(0.3f);
+		trailModule->SetVelocityThreshold(0.01f);
+		trailModule->SetMaxTrailLength(1.5f);
+		trailModule->SetWidthOverLength(0.8f);
+		trailModule->SetTrailColor(Mathf::Vector4(1.0f, 0.5f, 0.0f, 0.8f));
+		trailModule->SetUVTiling(2.0f);
+		trailModule->SetUVScrollSpeed(3.0f);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Magic Trail")) {
+		trailModule->SetMinDistance(0.08f);
+		trailModule->SetTrailWidth(0.2f);
+		trailModule->SetVelocityThreshold(0.005f);
+		trailModule->SetMaxTrailLength(2.5f);
+		trailModule->SetWidthOverLength(0.6f);
+		trailModule->SetTrailColor(Mathf::Vector4(0.5f, 0.8f, 1.0f, 0.7f));
+		trailModule->SetUVTiling(1.5f);
+		trailModule->SetUVScrollSpeed(1.0f);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Smoke Trail")) {
+		trailModule->SetMinDistance(0.1f);
+		trailModule->SetTrailWidth(0.5f);
+		trailModule->SetVelocityThreshold(0.02f);
+		trailModule->SetMaxTrailLength(3.0f);
+		trailModule->SetWidthOverLength(0.3f);
+		trailModule->SetTrailColor(Mathf::Vector4(0.7f, 0.7f, 0.7f, 0.5f));
+		trailModule->SetUVTiling(1.0f);
+		trailModule->SetUVScrollSpeed(0.5f);
+	}
+}
+
+void EffectEditor::RenderTrailRenderModuleEditor(TrailRenderModule* trailRenderModule)
+{
+	if (!trailRenderModule) return;
+
+	ImGui::Text("Trail Render Module Settings");
+
+	// 트레일 생성 모듈 연결 상태
+	TrailGenerateModule* connectedTrailModule = trailRenderModule->GetTrailGenerateModule();
+	if (connectedTrailModule) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Connected to Trail Generate Module");
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not connected to Trail Generate Module");
+		ImGui::Text("Trail rendering will not work without connection");
+	}
+
+	ImGui::Separator();
+
+	// 카메라 위치 설정
+	ImGui::Text("Camera Settings");
+
+	static bool cameraInitialized = false;
+	static float cameraPos[3] = { 0.0f, 0.0f, 0.0f };
+
+	if (!cameraInitialized) {
+		auto currentCameraPos = trailRenderModule->GetCameraPosition();
+		cameraPos[0] = currentCameraPos.x;
+		cameraPos[1] = currentCameraPos.y;
+		cameraPos[2] = currentCameraPos.z;
+		cameraInitialized = true;
+	}
+
+	if (ImGui::DragFloat3("Camera Position", cameraPos, 0.1f)) {
+		trailRenderModule->SetCameraPosition(Mathf::Vector3(cameraPos[0], cameraPos[1], cameraPos[2]));
+	}
+
+	ImGui::Separator();
+
+	// 텍스처 설정
+	ImGui::Text("Texture Assignment");
+
+	Texture* currentTexture = trailRenderModule->GetAssignedTexture();
+	if (currentTexture) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "Current Texture: %s", currentTexture->m_name.c_str());
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No Texture Assigned");
+		ImGui::Text("Trail will use default white texture");
+	}
+
+	if (!m_textures.empty()) {
+		static int selectedTextureIndex = 0;
+
+		std::string currentTextureName = (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size())
+			? m_textures[selectedTextureIndex]->m_name
+			: "None";
+
+		if (ImGui::BeginCombo("Select Texture", currentTextureName.c_str())) {
+			for (int t = 0; t < m_textures.size(); ++t) {
+				bool isSelected = (selectedTextureIndex == t);
+				std::string textureLabel = m_textures[t]->m_name;
+
+				if (textureLabel.empty()) {
+					textureLabel = "Texture " + std::to_string(t);
+				}
+
+				if (ImGui::Selectable(textureLabel.c_str(), isSelected)) {
+					selectedTextureIndex = t;
+				}
+				if (isSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Assign Texture")) {
+			if (selectedTextureIndex >= 0 && selectedTextureIndex < m_textures.size()) {
+				trailRenderModule->SetTexture(m_textures[selectedTextureIndex]);
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Clear Texture")) {
+			trailRenderModule->SetTexture(nullptr);
+		}
+	}
+	else {
+		ImGui::Text("No textures available");
+		ImGui::Text("Drag and drop texture files to add them");
+	}
+
+	ImGui::Separator();
+
+	// 렌더링 상태 정보
+	ImGui::Text("Rendering Status");
+
+	bool isEnabled = trailRenderModule->IsEnabled();
+	if (ImGui::Checkbox("Enable Rendering", &isEnabled)) {
+		trailRenderModule->SetEnabled(isEnabled);
+	}
+
+	if (trailRenderModule->IsReadyForReuse()) {
+		ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Ready for rendering");
+	}
+	else {
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Not ready (GPU work pending)");
+	}
+
+	ImGui::Separator();
+
+	// 디버그 정보
+	if (ImGui::CollapsingHeader("Debug Info")) {
+		ImGui::Text("Module Address: %p", trailRenderModule);
+		ImGui::Text("Connected Trail Module: %p", connectedTrailModule);
+		ImGui::Text("PSO Valid: %s", trailRenderModule->GetPSO() ? "Yes" : "No");
+
+		if (connectedTrailModule) {
+			ImGui::Text("Trail Vertex Buffer: %p", connectedTrailModule->GetVertexBuffer());
+			ImGui::Text("Trail Index Buffer: %p", connectedTrailModule->GetIndexBuffer());
+			ImGui::Text("Vertex Stride: %u bytes", connectedTrailModule->GetVertexStride());
+		}
+	}
+
+	// 도움말
+	if (ImGui::CollapsingHeader("Help")) {
+		ImGui::BulletText("Trail Render Module displays trails generated by Trail Generate Module");
+		ImGui::BulletText("Both modules must be added to the same ParticleSystem");
+		ImGui::BulletText("Connection happens automatically when both modules are present");
+		ImGui::BulletText("Assign textures for better visual effects");
+		ImGui::BulletText("Camera position affects lighting calculations");
 	}
 }
 

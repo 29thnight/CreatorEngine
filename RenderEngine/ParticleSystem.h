@@ -9,6 +9,8 @@
 #include "MeshSpawnModuleCS.h"
 #include "BillboardModuleGPU.h"
 #include "MeshModuleGPU.h"
+#include "TrailGenerateModule.h"
+#include "TrailRenderModule.h"
 
 enum class ParticleDataType
 {
@@ -108,6 +110,8 @@ public:
 
 	void SetPosition(const Mathf::Vector3& position);
 
+	void ExecuteSimulationModules(float delta);
+
 	Mathf::Vector3 GetWorldPosition() const {
 		return m_effectBasePosition + m_position;
 	}
@@ -154,6 +158,10 @@ public:
 
 	void WaitForGPUCompletion();
 
+	void AutoConnectModules();
+
+	void AutoConnectTrailModules();
+
 public:
 	std::string m_name{};
 private:
@@ -170,6 +178,8 @@ private:
 
 	ParticleDataType m_particleDataType = ParticleDataType::None;
 	size_t m_particleStructSize;
+
+	bool m_modulesConnected = false;
 
 protected:
 	// 렌더 초기화 메소드는 rendermodule에서 정의.
