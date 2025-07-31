@@ -30,6 +30,10 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     skeleton->m_rootBone = parent;
     ProcessBones(boneRoot, parent);
     skeleton->m_bones = std::move(m_bones);
+    for (Bone* bone : skeleton->m_bones)
+    {
+		skeleton->m_boneMap.emplace(bone->m_name, bone);
+	}
     skeleton->m_rootTransform = XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1));
 
     skeleton->m_globalInverseTransform = XMMatrixInverse(NULL, XMMatrixTranspose(XMMATRIX(&boneRoot->mTransformation.a1)));

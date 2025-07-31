@@ -71,13 +71,16 @@ Object* Object::Instantiate(const Object* original, const std::string_view& newN
             cloneGameObject->m_childrenIndices.clear();
             for (auto index : originalGameObject->m_childrenIndices)
             {
-                Scene* activeScene = SceneManagers->GetActiveScene();
-				auto childGameObject = activeScene->GetGameObject(index);
+                Scene* scene = SceneManagers->GetActiveScene();
+                auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+                auto childGameObject = scene->GetGameObject(index);
 				if (childGameObject)
 				{
 					auto childClone = Instantiate(childGameObject.get(), childGameObject->m_name.ToString());
 					GameObject* childCloneGameObject = dynamic_cast<GameObject*>(childClone);
 					childCloneGameObject->m_parentIndex = cloneGameObject->m_index;
+					childCloneGameObject->m_transform.SetParentID(childCloneGameObject->m_parentIndex);
+                    std::erase(rootChildren, childCloneGameObject->m_index);
                     cloneGameObject->m_childrenIndices.push_back(childCloneGameObject->m_index);
 				}
             }

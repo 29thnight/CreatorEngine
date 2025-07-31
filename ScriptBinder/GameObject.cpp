@@ -44,11 +44,10 @@ GameObject::GameObject(Scene* scene, size_t instanceID, const std::string_view& 
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
-std::string GameObject::RemoveSuffixNumberTag()
+const std::string& GameObject::RemoveSuffixNumberTag() const
 {
 	// 정규표현식: 끝에 오는 " (숫자)" 또는 "(숫자)" 패턴 제거
-	static const std::regex suffixRegex(R"(\s*\(\d+\)$)");
-	return std::regex_replace(m_name.ToString(), suffixRegex, "");
+	return m_removedSuffixNumberTag;
 }
 
 void GameObject::SetTag(const std::string_view& tag)
@@ -83,6 +82,10 @@ void GameObject::Destroy()
 	{
 		return;
 	}
+
+	TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
+	TagManager::GetInstance()->RemoveObjectFromLayer(m_layer.ToString(), this);
+
 	m_destroyMark = true;
 
 	for (auto& component : m_components)

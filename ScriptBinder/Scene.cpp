@@ -1,4 +1,4 @@
-#include "Scene.h"01
+#include "Scene.h"
 #include "HotLoadSystem.h"
 #include "GameObjectPool.h"
 #include "ModuleBehavior.h"
@@ -16,6 +16,7 @@
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
 #include "TagManager.h"
+#include <execution>
 
 Scene::Scene()
 {
@@ -40,6 +41,16 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 	const_cast<GameObject::Index&>(sceneObject->m_index) = m_SceneObjects.size() - 1;
 
 	m_SceneObjects[0]->m_childrenIndices.push_back(sceneObject->m_index);
+
+	if (!sceneObject->m_tag.ToString().empty())
+	{
+		TagManager::GetInstance()->AddTagToObject(sceneObject->m_tag.ToString(), sceneObject.get());
+	}
+
+	if (!sceneObject->m_layer.ToString().empty())
+	{
+		TagManager::GetInstance()->AddObjectToLayer(sceneObject->m_layer.ToString(), sceneObject.get());
+	}
 
 	return sceneObject;
 }
@@ -96,6 +107,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
         return nullptr;
     }
 	ptr->m_ownerScene = this;
+	ptr->m_removedSuffixNumberTag = name.data();
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -139,6 +151,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
 
     std::string uniqueName = GenerateUniqueGameObjectName(name);
 
+
     GameObject::Index index = m_SceneObjects.size();
     auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
@@ -147,6 +160,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::
     }
 
 	ptr->m_ownerScene = this;
+	ptr->m_removedSuffixNumberTag = name.data();
 
     std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
     {
@@ -1111,7 +1125,7 @@ void Scene::RemoveGameObjectName(const std::string_view& name)
 void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
 {
 	const auto& obj = GetGameObject(objIndex);
-
+	
 	if (!obj || obj->IsDestroyMark())
 	{
 		return;
@@ -1125,19 +1139,8 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 			return;
 		}
 		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
-		auto transform = animator->m_localTransforms[bone->m_index];
-		if (bone)
-		{
-			model = XMMatrixMultiply(transform, model);
-			//model = XMMatrixMultiply(bone->m_localTransform, model);
-			obj->m_transform.SetAndDecomposeMatrix(model);
-			//obj->m_transform.SetAndDecomposeMatrix(bone->m_globalTransform);
-		}
-		else {
-			//model = XMMatrixMultiply(transform, model);
-			 model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
-			obj->m_transform.SetAndDecomposeMatrix(model);
-		}
+		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ? 
+			animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
 	}
 	else
 	{
@@ -1151,7 +1154,6 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		}
 		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 		obj->m_transform.SetAndDecomposeMatrix(model);
-
 	}
 
 	for (auto& childIndex : obj->m_childrenIndices)
@@ -1243,9 +1245,14 @@ void Scene::SetInternalPhysicData()
 
 void Scene::AllUpdateWorldMatrix()
 {
-	for (auto& objIndex : m_SceneObjects[0]->m_childrenIndices)
+	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
+	auto updateModel = [this](GameObject::Index index){ UpdateModelRecursive(index, XMMatrixIdentity()); };
+
+	if (rootObjects.empty())
 	{
-		UpdateModelRecursive(objIndex, XMMatrixIdentity());
+		return;
 	}
+
+	std::ranges::for_each(rootObjects, updateModel);
 }
 

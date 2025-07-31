@@ -38,7 +38,7 @@ public:
 	~GameObject() override = default;
 
 	HashingString GetHashedName() const { return m_name; }
-	std::string RemoveSuffixNumberTag();
+	const std::string& RemoveSuffixNumberTag() const;
 
     void SetName(const std::string_view& name) { m_name = name.data(); }
     void SetTag(const std::string_view& tag);
@@ -139,6 +139,7 @@ public:
 	Scene* m_ownerScene{ nullptr };
 	Prefab* m_prefab{ nullptr };
 	YAML::Node m_prefabOriginal{};
+	std::string m_removedSuffixNumberTag{};
 };
 
 #include "GameObject.inl"

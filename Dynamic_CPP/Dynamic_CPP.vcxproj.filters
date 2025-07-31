@@ -171,9 +171,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
 			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
-		<ClInclude Include="Easing.h">
-			<Filter>Common\HeaderFile</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
@@ -186,7 +183,7 @@
 		<ClInclude Include="AniBehaviourFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
-		<ClInclude Include="test.h">
+		<ClInclude Include="Easing.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
 	</ItemGroup>

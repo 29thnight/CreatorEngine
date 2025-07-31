@@ -212,7 +212,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
-		<ClInclude Include="test.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp" />
