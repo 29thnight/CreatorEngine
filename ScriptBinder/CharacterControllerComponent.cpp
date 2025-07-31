@@ -6,6 +6,7 @@ void CharacterControllerComponent::OnStart()
 	
 	m_fBaseSpeed = m_movementInfo.maxSpeed;
 	m_fBaseAcceleration = m_movementInfo.acceleration;
+	m_bMoveRestrict.fill(false);
 }
 
 void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
