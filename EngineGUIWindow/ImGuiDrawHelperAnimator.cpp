@@ -720,27 +720,32 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					ImGui::SameLine();
 					if (state->m_isAny == false)
 					{
-						if (ImGui::IsItemDeactivatedAfterEdit())
+						
+	
+						if (ImGui::InputText("##stateName", buffer, sizeof(buffer)))
 						{
-							// 실제 변경 적용은 입력 완료 시점에만 수행
-							nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
-
-							for (auto& st : controller->StateVec)
+							if (ImGui::IsItemDeactivatedAfterEdit())
 							{
-								for (auto& transiton : st->Transitions)
+								// 실제 변경 적용은 입력 완료 시점에만 수행
+								nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+
+								for (auto& st : controller->StateVec)
 								{
-									if (transiton->curStateName == state->m_name)
+									for (auto& transiton : st->Transitions)
 									{
-										transiton->curStateName = buffer;
-									}
-									if (transiton->nextStateName == state->m_name)
-									{
-										transiton->nextStateName = buffer;
+										if (transiton->curStateName == state->m_name)
+										{
+											transiton->curStateName = buffer;
+										}
+										if (transiton->nextStateName == state->m_name)
+										{
+											transiton->nextStateName = buffer;
+										}
 									}
 								}
-							}
 
-							state->m_name = buffer;
+								state->m_name = buffer;
+							}
 						}
 					}
 					else
