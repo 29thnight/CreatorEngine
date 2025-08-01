@@ -39,8 +39,8 @@ public:
 	void Clear();
 
 	// Serialization
-	void Serialize(const std::string_view& name);
-	void Deserialize(const std::string_view& name);
+	void Serialize(std::string_view name);
+	void Deserialize(std::string_view name);
 
 private:
 	friend class MenuBarWindow; // Allow MenuBarWindow to access private members

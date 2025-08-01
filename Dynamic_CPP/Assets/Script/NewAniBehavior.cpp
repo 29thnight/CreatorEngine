@@ -1,5 +1,6 @@
 #include "NewAniBehavior.h"
 #include "pch.h"
+
 void NewAniBehavior::Enter()
 {
 }
