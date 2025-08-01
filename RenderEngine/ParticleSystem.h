@@ -33,6 +33,7 @@ public:
 
 		T* module = new T(std::forward<Args>(args)...);
 		module->OnSystemResized(m_maxParticles);
+		module->SetOwnerSystem(this);
 		m_moduleList.Link(module);
 		return module;
 	}
@@ -42,6 +43,7 @@ public:
 		if (module)
 		{
 			ParticleModule* rawPtr = module.release(); // unique_ptr에서 소유권 해제
+			rawPtr->SetOwnerSystem(this);
 			rawPtr->OnSystemResized(m_maxParticles);
 			m_moduleList.Link(rawPtr);
 		}

@@ -5,6 +5,7 @@
 #include "GameObject.h"
 #include "RenderPassData.h"
 
+class ParticleSystem;
 enum class BillBoardType
 {
     Basic,
@@ -99,7 +100,19 @@ public:
 
     void SetUseEffectProgress(bool use) { m_useEffectProgress = use; }
 
+    // Owner 시스템 설정 및 접근
+    void SetOwnerSystem(ParticleSystem* owner) { m_ownerSystem = owner; }
+    ParticleSystem* GetOwnerSystem() const { return m_ownerSystem; }
+
+    // Owner 시스템이 있는지 확인
+    bool HasOwnerSystem() const { return m_ownerSystem != nullptr; }
+
+    bool IsSystemRunning() const;
+
+
 protected:
+    ParticleSystem* m_ownerSystem;
+
     std::unique_ptr<PipelineStateObject> m_pso;
 
     // 클리핑 관련 데이터를 부모에서 관리

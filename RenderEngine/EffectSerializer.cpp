@@ -263,6 +263,10 @@ std::unique_ptr<ParticleModule> EffectSerializer::DeserializeModule(const nlohma
     {
         module = std::make_unique<SizeModuleCS>();
     }
+    else if (moduleType == "TrailGenerateModule")
+    {
+        module = std::make_unique<TrailGenerateModule>();
+    }
     else
     {
         std::cerr << "Unknown module type: " << moduleType << std::endl;
@@ -328,6 +332,10 @@ std::unique_ptr<RenderModules> EffectSerializer::DeserializeRenderModule(const n
     else if (moduleType == "MeshModuleGPU")
     {
         renderModule = std::make_unique<MeshModuleGPU>();
+    }
+    else if (moduleType == "TrailRenderModule")
+    {
+        renderModule = std::make_unique<TrailRenderModule>();
     }
     else
     {

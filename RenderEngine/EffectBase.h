@@ -136,7 +136,7 @@ public:
     }
 
     // 풀링을 위한 재사용 리셋
-    void ResetForReuse() {
+    virtual void ResetForReuse() {
         Stop();
         m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
@@ -152,7 +152,7 @@ public:
     }
 
     // 재사용 준비 완료 여부 체크
-    bool IsReadyForReuse() const {
+    virtual bool IsReadyForReuse() const {
         if (m_state != EffectState::Stopped) {
             return false;
         }

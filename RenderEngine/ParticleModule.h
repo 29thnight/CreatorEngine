@@ -9,10 +9,12 @@
 
 // easing 위치 고민 현재는 그냥 모든 module에 넣을수 있는 구조
 
+class ParticleSystem;
+
 class ParticleModule : public LinkProperty<ParticleModule>
 {
 public:
-	ParticleModule() : LinkProperty<ParticleModule>(this) {}
+	ParticleModule() : LinkProperty<ParticleModule>(this), m_ownerSystem(nullptr) {}
 	virtual ~ParticleModule() = default;
 	virtual void Initialize() {}
 	virtual void Update(float delta) {}
@@ -22,9 +24,21 @@ public:
 	virtual bool IsReadyForReuse() const { return true; }
 	virtual void WaitForGPUCompletion() {}
 
-
 	void SetEnabled(bool enabled) { m_enabled = enabled; }
 	bool IsEnabled() const { return m_enabled; }
+
+	// Owner 시스템 설정 및 접근
+	void SetOwnerSystem(ParticleSystem* owner) { m_ownerSystem = owner; }
+	ParticleSystem* GetOwnerSystem() const { return m_ownerSystem; }
+
+	// Owner 시스템이 있는지 확인
+	bool HasOwnerSystem() const { return m_ownerSystem != nullptr; }
+
+	// Owner 시스템을 통한 편의 함수들
+	Mathf::Vector3 GetSystemWorldPosition() const;
+	Mathf::Vector3 GetSystemRelativePosition() const;
+	Mathf::Vector3 GetSystemEffectBasePosition() const;
+	bool IsSystemRunning() const;
 
 	void SetEasingType(EasingEffect type)
 	{
@@ -89,6 +103,8 @@ public:
 	virtual bool IsGenerateModule() const { return false; }
 
 protected:
+	ParticleSystem* m_ownerSystem;
+
 	// 이징 변수
 	bool m_useEasing;
 	EasingEffect m_easingType;

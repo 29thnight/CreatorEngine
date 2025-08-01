@@ -2,6 +2,7 @@
 #pragma once
 #include "ParticleModule.h"
 #include "EaseInOut.h"
+#include "ISerializable.h"
 
 using namespace DirectX;
 
@@ -21,7 +22,7 @@ struct alignas(16) SizeParams
     float padding3;              // 16바이트 정렬을 위한 패딩
 };
 
-class SizeModuleCS : public ParticleModule
+class SizeModuleCS : public ParticleModule, public ISerializable
 {
 public:
     SizeModuleCS();
@@ -45,6 +46,59 @@ public:
     // 편의 메서드 (uniform size)
     void SetStartSize(float size) { SetStartSize(XMFLOAT2(size, size)); }
     void SetEndSize(float size) { SetEndSize(XMFLOAT2(size, size)); }
+
+    virtual nlohmann::json SerializeData() const override;
+    virtual void DeserializeData(const nlohmann::json& json) override;
+    virtual std::string GetModuleType() const override;
+
+    XMFLOAT2 GetStartSize() const {
+        return XMFLOAT2(m_sizeParams.startSize.x, m_sizeParams.startSize.y);
+    }
+
+    XMFLOAT2 GetEndSize() const {
+        return XMFLOAT2(m_sizeParams.endSize.x, m_sizeParams.endSize.y);
+    }
+
+    bool GetUseRandomScale() const {
+        return m_sizeParams.useRandomScale != 0;
+    }
+
+    float GetRandomScaleMin() const {
+        return m_sizeParams.randomScaleMin;
+    }
+
+    float GetRandomScaleMax() const {
+        return m_sizeParams.randomScaleMax;
+    }
+
+    bool IsEasingEnabled() const {
+        return m_easingEnable;
+    }
+
+    EasingEffect GetEasingType() const {
+        return m_easingModule.GetEasingType();
+    }
+
+    StepAnimation GetAnimationType() const {
+        return m_easingModule.GetAnimationType();
+    }
+
+    float GetEasingDuration() const {
+        return m_easingModule.GetDuration();
+    }
+
+    UINT GetParticleCapacity() const {
+        return m_particleCapacity;
+    }
+
+    bool IsInitialized() const {
+        return m_isInitialized;
+    }
+
+    // 이징 비활성화 메서드
+    void DisableEasing() {
+        m_easingEnable = false;
+    }
 
 private:
     // 초기화 메서드

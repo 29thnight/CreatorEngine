@@ -491,6 +491,22 @@ void SpawnModuleCS::SetRotateSpeed(float speed)
 	}
 }
 
+
+void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
+{
+	SetEmitterPosition(newPosition);
+}
+
+void SpawnModuleCS::OnSystemResized(UINT maxParticles)
+{
+	if (maxParticles != m_particleCapacity)
+	{
+		m_particleCapacity = maxParticles;
+		m_spawnParams.maxParticles = maxParticles;
+		m_spawnParamsDirty = true;
+	}
+}
+
 nlohmann::json SpawnModuleCS::SerializeData() const
 {
 
@@ -611,19 +627,4 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 std::string SpawnModuleCS::GetModuleType() const
 {
 	return "SpawnModuleCS";
-}
-
-void SpawnModuleCS::OnParticleSystemPositionChanged(const Mathf::Vector3& newPosition)
-{
-	SetEmitterPosition(newPosition);
-}
-
-void SpawnModuleCS::OnSystemResized(UINT maxParticles)
-{
-	if (maxParticles != m_particleCapacity)
-	{
-		m_particleCapacity = maxParticles;
-		m_spawnParams.maxParticles = maxParticles;
-		m_spawnParamsDirty = true;
-	}
 }

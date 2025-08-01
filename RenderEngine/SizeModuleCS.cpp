@@ -238,3 +238,112 @@ bool SizeModuleCS::IsReadyForReuse() const
     return m_isInitialized &&
         m_sizeParamsBuffer != nullptr;
 }
+
+
+nlohmann::json SizeModuleCS::SerializeData() const
+{
+    nlohmann::json json;
+
+    // SizeParams 직렬화
+    json["sizeParams"] = {
+        {"startSize", {
+            {"x", m_sizeParams.startSize.x},
+            {"y", m_sizeParams.startSize.y}
+        }},
+        {"endSize", {
+            {"x", m_sizeParams.endSize.x},
+            {"y", m_sizeParams.endSize.y}
+        }},
+        {"useRandomScale", m_sizeParams.useRandomScale},
+        {"randomScaleMin", m_sizeParams.randomScaleMin},
+        {"randomScaleMax", m_sizeParams.randomScaleMax}
+    };
+
+    // 이징 관련 정보 직렬화
+    json["easing"] = {
+        {"enabled", m_easingEnable},
+        {"type", static_cast<int>(m_easingModule.GetEasingType())},
+        {"animationType", static_cast<int>(m_easingModule.GetAnimationType())},
+        {"duration", m_easingModule.GetDuration()}
+    };
+
+    // 상태 정보
+    json["state"] = {
+        {"isInitialized", m_isInitialized},
+        {"particleCapacity", m_particleCapacity}
+    };
+
+    return json;
+}
+
+void SizeModuleCS::DeserializeData(const nlohmann::json& json)
+{
+    // SizeParams 복원
+    if (json.contains("sizeParams"))
+    {
+        const auto& sizeJson = json["sizeParams"];
+
+        if (sizeJson.contains("startSize"))
+        {
+            const auto& startSizeJson = sizeJson["startSize"];
+            m_sizeParams.startSize.x = startSizeJson.value("x", 0.1f);
+            m_sizeParams.startSize.y = startSizeJson.value("y", 0.1f);
+        }
+
+        if (sizeJson.contains("endSize"))
+        {
+            const auto& endSizeJson = sizeJson["endSize"];
+            m_sizeParams.endSize.x = endSizeJson.value("x", 1.0f);
+            m_sizeParams.endSize.y = endSizeJson.value("y", 1.0f);
+        }
+
+        if (sizeJson.contains("useRandomScale"))
+            m_sizeParams.useRandomScale = sizeJson["useRandomScale"];
+
+        if (sizeJson.contains("randomScaleMin"))
+            m_sizeParams.randomScaleMin = sizeJson["randomScaleMin"];
+
+        if (sizeJson.contains("randomScaleMax"))
+            m_sizeParams.randomScaleMax = sizeJson["randomScaleMax"];
+    }
+
+    // 이징 정보 복원
+    if (json.contains("easing"))
+    {
+        const auto& easingJson = json["easing"];
+
+        if (easingJson.contains("enabled"))
+            m_easingEnable = easingJson["enabled"];
+
+        if (easingJson.contains("type") && easingJson.contains("animationType") && easingJson.contains("duration"))
+        {
+            EasingEffect easingType = static_cast<EasingEffect>(easingJson["type"]);
+            StepAnimation animationType = static_cast<StepAnimation>(easingJson["animationType"]);
+            float duration = easingJson["duration"];
+
+            m_easingModule.SetEasingType(easingType);
+            m_easingModule.SetAnimationType(animationType);
+            m_easingModule.SetDuration(duration);
+        }
+    }
+
+    // 상태 정보 복원
+    if (json.contains("state"))
+    {
+        const auto& stateJson = json["state"];
+
+        if (stateJson.contains("particleCapacity"))
+            m_particleCapacity = stateJson["particleCapacity"];
+    }
+
+    if (!m_isInitialized)
+        Initialize();
+
+    // 변경사항을 적용하기 위해 더티 플래그 설정
+    m_paramsDirty = true;
+}
+
+std::string SizeModuleCS::GetModuleType() const
+{
+    return "SizeModuleCS";
+}
