@@ -19,6 +19,7 @@
 #include "Profiler.h"
 #include "WinProcProxy.h"
 #include "EffectManager.h"
+#include "TagManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
 #include "ResourceAllocator.h"
@@ -52,6 +53,7 @@ void DirectX11::Dx11Main::Initialize()
     XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
     BoundingBox fixedBounds(center, extents);
     CullingManagers->Initialize(fixedBounds, 3, 30);
+    TagManagers->Initialize();
 
     g_progressWindow->SetProgress(50);
     m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
@@ -86,12 +88,6 @@ void DirectX11::Dx11Main::Initialize()
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
         {
-            if (InputActionManagers == nullptr)
-            {
-                Debug->LogDebug("null입니다ㅏㅏ");
-            }
-            else
-                InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
             bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
             if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
@@ -183,6 +179,7 @@ void DirectX11::Dx11Main::Initialize()
 void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
+    TagManagers->Finalize();
     SceneManagers->Decommissioning();
     EngineSettingInstance->SaveSettings();
     m_sceneRenderer->Finalize();

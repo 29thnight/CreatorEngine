@@ -74,10 +74,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &Mathf::xMatrixIdentity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
 
+#ifndef BUILD_FLAG
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
+#endif // !BUILD_FLAG
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
@@ -421,7 +423,7 @@ void SceneRenderer::NewCreateSceneInitialize()
 	{
 		std::cerr << "Error initializing light with shadows: " << e.what() << std::endl;
 	}
-
+	//TODO : skybox 텍스쳐 저장해야한다 씬 별로
 	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
 	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
@@ -436,8 +438,6 @@ void SceneRenderer::NewCreateSceneInitialize()
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	//
-	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
@@ -450,11 +450,12 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 
 void SceneRenderer::SceneRendering()
 {
+#ifndef BUILD_FLAG
 	if (ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
 	}
-
+#endif // !BUILD_FLAG
 	DirectX11::ResetCallCount();
 
 	for (auto& camera : CameraManagement->m_cameras)
@@ -462,6 +463,7 @@ void SceneRenderer::SceneRendering()
 		if (!RenderPassData::VaildCheck(camera)) continue;
 		auto renderData = RenderPassData::GetData(camera);
 
+#ifndef BUILD_FLAG
 		if (camera != m_pEditorCamera.get())
 		{
 			if (EngineSettingInstance->IsGameView())
@@ -473,6 +475,9 @@ void SceneRenderer::SceneRendering()
 				camera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 			}
 		}
+#else
+		camera->m_avoidRenderPass.Clear((flag)RenderPipelinePass::BlitPass);
+#endif // !BUILD_FLAG
 
 		std::wstring w_name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
 		std::string name = "Camera" + std::to_string(camera->m_cameraIndex);

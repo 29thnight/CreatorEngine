@@ -1,11 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "GameObject.h"
 
-class TagManager : public Singleton<TagManager>
+class TagManager : public DLLCore::Singleton<TagManager>
 {
 private:
-	friend Singleton;
+	friend DLLCore::Singleton<TagManager>;
 	TagManager() = default;
 	~TagManager() = default;
 
@@ -150,3 +151,5 @@ private:
     std::unordered_map<std::string, std::vector<GameObject*>> m_layeredObjects{};
 	
 };
+
+static auto TagManagers = TagManager::GetInstance();

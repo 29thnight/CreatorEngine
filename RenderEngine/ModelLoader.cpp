@@ -684,7 +684,7 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 
         if (mat->m_materialInfo.m_useBaseColor)
         {
-            if (Texture* tex = GenerateTexture(baseColorName))
+            if (Texture* tex = GenerateTexture(baseColorName, true))
                 mat->UseBaseColorMap(tex);
         }
         if (mat->m_materialInfo.m_useNormalMap)
@@ -1137,7 +1137,7 @@ GameObject* ModelLoader::GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* no
 	return rootObject.get();
 }
 
-Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index)
+Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index, bool isCompress)
 {
 	bool hasTex = material->GetTextureCount(type) > 0;
 	Texture* texture = nullptr;
@@ -1146,18 +1146,18 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
         aiString str;
         material->GetTexture(type, index, &str);
         std::string textureName = str.C_Str();
-        texture = GenerateTexture(textureName);
+        texture = GenerateTexture(textureName, isCompress);
     }
     return texture;
 }
 
-Texture* ModelLoader::GenerateTexture(const std::string_view& textureName)
+Texture* ModelLoader::GenerateTexture(const std::string_view& textureName, bool isCompress)
 {
     if (textureName.empty())
         return nullptr;
 
     file::path path(textureName);
-    Texture* texture = DataSystems->LoadMaterialTexture(path.string());
+    Texture* texture = DataSystems->LoadMaterialTexture(path.string(), isCompress);
     if (texture)
     {
         texture->m_name = std::string(textureName);

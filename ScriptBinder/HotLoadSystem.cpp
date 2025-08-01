@@ -12,91 +12,14 @@
 #include "DLLRefHelper.h"
 #include "StringHelper.h"
 #include "ScriptStringModule.h"
+#include "AnimationState.h"
+#include "MSBuildHelper.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 constexpr int MAX__COMPILE_ITERATION = 4;
-
-void RunMsbuildWithLiveLog(const std::wstring& commandLine)
-{
-    HANDLE hRead, hWrite;
-    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-    if (!CreatePipe(&hRead, &hWrite, &sa, 0))
-    {
-        __debugbreak();
-    }
-
-    STARTUPINFOW si = { sizeof(STARTUPINFOW) };
-    si.dwFlags |= STARTF_USESTDHANDLES;
-    si.hStdOutput = hWrite;
-    si.hStdError = hWrite;
-    si.hStdInput = NULL;
-
-    PROCESS_INFORMATION pi;
-
-    std::wstring fullCommand = commandLine;
-
-    if (!CreateProcessW(NULL, &fullCommand[0], NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
-    {
-        throw std::runtime_error("Build failed");
-    }
-
-    CloseHandle(hWrite);
-
-    char buffer[4096]{};
-    DWORD bytesRead;
-    std::string leftover;
-
-    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, nullptr))
-    {
-        if (bytesRead == 0) break;
-        buffer[bytesRead] = '\0';
-
-        leftover += buffer;
-
-        size_t pos;
-        while ((pos = leftover.find('\n')) != std::string::npos)
-        {
-            std::string line = leftover.substr(0, pos);
-            leftover.erase(0, pos + 1);
-
-            if (line.empty())
-            {
-                continue;
-            }
-
-			if (line.find("error") != std::string::npos || line.find("error C") != std::string::npos)
-			{
-				Debug->LogError(line);
-			}
-			else if (line.find("오류") != std::string::npos || line.find("경고") != std::string::npos)
-			{
-				Debug->LogDebug(line);
-			}
-			//else
-			//{
-			//	std::string strLine = AnsiToUtf8(line);
-			//	Debug->LogDebug(strLine);
-			//}
-		}
-    }
-
-	DWORD exitCode = 0;
-
-    WaitForSingleObject(pi.hProcess, INFINITE);
-	GetExitCodeProcess(pi.hProcess, &exitCode);
-
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    CloseHandle(hRead);
-
-	if (exitCode != 0)
-	{
-		throw std::runtime_error("Build failed with exit code: " + std::to_string(exitCode));
-	}
-}
 
 void HotLoadSystem::Initialize()
 {
@@ -141,7 +64,6 @@ void HotLoadSystem::Initialize()
 	for (int i = 0; i < scriptCount; ++i)
 	{
 		std::string scriptName = scriptNames[i];
-		std::string scriptFileName = std::string(scriptName);
 		m_scriptNames.push_back(scriptName);
 	}
 
@@ -158,6 +80,14 @@ void HotLoadSystem::Initialize()
 
 	AIManagers->InitalizeBehaviorTreeSystem();
 
+	const char** aniBehaviorNames = nullptr;
+	int aniBehaviorCount = 0;
+	aniBehaviorNames = m_listAniBehaviorNamesFunc(&aniBehaviorCount);
+	for(int i = 0; i < aniBehaviorCount; ++i)
+	{
+		std::string aniBehaviorName = aniBehaviorNames[i];
+		m_aniBehaviorNames.push_back(aniBehaviorName);
+	}
 }
 
 void HotLoadSystem::Shutdown()
@@ -212,6 +142,7 @@ bool HotLoadSystem::IsScriptUpToDate()
 
 void HotLoadSystem::ReloadDynamicLibrary()
 {
+#ifndef BUILD_FLAG
 	if(true == m_isCompileEventInvoked)
 	{
 		g_progressWindow->Launch();
@@ -274,9 +205,52 @@ void HotLoadSystem::ReloadDynamicLibrary()
 		});
 
 		ReplaceScriptComponent();
-		g_progressWindow->Close();
 
+		const char** aniBehaviorNames = nullptr;
+		int aniBehaviorCount = 0;
+		aniBehaviorNames = m_listAniBehaviorNamesFunc(&aniBehaviorCount);
+
+		// 1. 새로운 이름들을 set으로 구성
+		std::unordered_set<std::string> newAniBehaviorNames;
+		for (int i = 0; i < aniBehaviorCount; ++i)
+		{
+			newAniBehaviorNames.insert(aniBehaviorNames[i]);
+		}
+
+		// 2. 기존 이름 중 새로 받은 목록에 없는 것만 삭제 대상으로 추가
+		std::unordered_set<std::string> deleteTargetAniBehaviorNames;
+		for (const std::string& oldName : m_aniBehaviorNames)
+		{
+			if (!newAniBehaviorNames.count(oldName))
+			{
+				deleteTargetAniBehaviorNames.insert(oldName);
+				Debug->LogError("Invalid AniBehavior (deleted): " + oldName);
+			}
+		}
+
+		// 3. 기존 이름 목록 갱신 (중복 가능성 주의)
+		m_aniBehaviorNames.clear();
+		m_aniBehaviorNames.insert(m_aniBehaviorNames.end(), newAniBehaviorNames.begin(), newAniBehaviorNames.end());
+
+		for (auto& aniState : m_aniBehaviorStates)
+		{
+			if (!aniState) continue;
+
+			if(deleteTargetAniBehaviorNames.count(aniState->behaviourName) > 0)
+			{
+				Debug->LogError("Deleting AniBehavior: " + aniState->behaviourName);
+				aniState->ClearBehaviour();
+				continue;
+			}
+			else
+			{
+				aniState->SetBehaviour(aniState->behaviourName, true);
+			}
+		}
+
+		g_progressWindow->Close();
 	}
+#endif
 }
 
 void HotLoadSystem::ReplaceScriptComponent()
@@ -562,6 +536,7 @@ void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string
 
 void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 {
+#ifndef BUILD_FLAG
 	std::string scriptHeaderFileName = std::string(name) + ".h";
 	std::string scriptBodyFileName = std::string(name) + ".cpp";
 	std::string scriptHeaderFilePath = PathFinder::Relative("Script\\" + scriptHeaderFileName).string();
@@ -755,6 +730,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 			throw std::runtime_error("Failed to save XML file");
 		}
 	}
+#endif // BUILD_FLAG
 }
 
 void HotLoadSystem::RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script)
@@ -786,6 +762,7 @@ void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
 
 void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
 {
+#ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
 	{
 		file::create_directories(PathFinder::Relative("BehaviorTree"));
@@ -974,10 +951,12 @@ void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
 			throw std::runtime_error("Failed to save XML file");
 		}
 	}
+#endif // BUILD_FLAG
 }
 
 void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
 {
+#ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
 	{
 		file::create_directories(PathFinder::Relative("BehaviorTree"));
@@ -1170,10 +1149,12 @@ void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
 			throw std::runtime_error("Failed to save XML file");
 		}
 	}
+#endif // BUILD_FLAG
 }
 
 void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& name)
 {
+#ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
 	{
 		file::create_directories(PathFinder::Relative("BehaviorTree"));
@@ -1366,10 +1347,12 @@ void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& n
 			throw std::runtime_error("Failed to save XML file");
 		}
 	}
+#endif // BUILD_FLAG
 }
 
-void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
+void HotLoadSystem::CreateAniBehaviorScript(const std::string_view& name)
 {
+#ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("Script")))
 	{
 		file::create_directories(PathFinder::Relative("Script"));
@@ -1378,16 +1361,16 @@ void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
 	std::string scriptBodyFileName = std::string(name) + ".cpp";
 	std::string scriptHeaderFilePath = PathFinder::Relative("Script\\" + scriptHeaderFileName).string();
 	std::string scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptBodyFileName).string();
-	std::string aniScriptFactoryPath = PathFinder::DynamicSolutionPath("AniBehaviourFactory.h").string();
+	std::string aniScriptFactoryPath = PathFinder::DynamicSolutionPath("AniBehaviorFactory.h").string();
 	std::string aniScriptFactoryFuncPath = PathFinder::DynamicSolutionPath("funcMain.h").string();
 	std::string scriptProjPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj").string();
 	std::string scriptFilterPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.vcxproj.filters").string();
 	std::ofstream scriptFile(scriptHeaderFilePath);
 	if (scriptFile.is_open())
 	{
-		scriptFile << aniBehaviourIncludeString 
-			<< name << aniBehaviourInheritString 
-			<< name << aniBehaviourEndString;
+		scriptFile << AniBehaviorIncludeString 
+			<< name << AniBehaviorInheritString 
+			<< name << AniBehaviorEndString;
 		scriptFile.close();
 	}
 	else
@@ -1399,11 +1382,11 @@ void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
 	if (scriptBodyFile.is_open())
 	{
 		scriptBodyFile
-			<< aniBehaviourCPPString
-			<< name << aniBehaviourCPPEndString
-			<< name << aniBehaviourCPPEndEnterBodyString
-			<< name << aniBehaviourCPPEndUpdateString
-			<< name << aniBehaviourCPPEndExitBodyString;
+			<< AniBehaviorCPPString
+			<< name << AniBehaviorCPPEndString
+			<< "void " << name << AniBehaviorCPPEndEnterBodyString
+			<< "void " << name << AniBehaviorCPPEndUpdateString
+			<< "void " << name << AniBehaviorCPPEndExitBodyString;
 		scriptBodyFile.close();
 	}
 	else
@@ -1419,13 +1402,13 @@ void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
 		buffer << aniScriptFactoryFile.rdbuf();
 		std::string content = buffer.str();
 		aniScriptFactoryFile.close();
-		size_t posHeader = content.find(aniBehaviourMarkerFactoryHeaderString);
+		size_t posHeader = content.find(AniBehaviorMarkerFactoryHeaderString);
 		if (posHeader != std::string::npos)
 		{
 			size_t endLine = content.find('\n', posHeader);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, aniBehaviourFactoryIncludeString.data() + scriptHeaderFileName + "\"\n");
+				content.insert(endLine + 1, AniBehaviorFactoryIncludeString.data() + scriptHeaderFileName + "\"\n");
 			}
 		}
 		else
@@ -1456,13 +1439,13 @@ void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
 		buffer << aniScriptFactoryFuncFile.rdbuf();
 		std::string content = buffer.str();
 		aniScriptFactoryFuncFile.close();
-		size_t posFunc = content.find(aniBehaviourMarkerFactoryFuncString);
+		size_t posFunc = content.find(AniBehaviorMarkerFactoryFuncString);
 		if (posFunc != std::string::npos)
 		{
 			size_t endLine = content.find('\n', posFunc);
 			if (endLine != std::string::npos)
 			{
-				content.insert(endLine + 1, aniBehaviourFactoryFunctionString.data() + std::string(name) + aniBehaviourFactoryFunctionLambdaString.data() + std::string(name) + aniBehaviourFactoryFunctionEndString.data());
+				content.insert(endLine + 1, AniBehaviorFactoryFunctionString.data() + std::string(name) + AniBehaviorFactoryFunctionLambdaString.data() + std::string(name) + AniBehaviorFactoryFunctionEndString.data());
 			}
 		}
 		else
@@ -1553,10 +1536,24 @@ void HotLoadSystem::CreateAniBehaviourScript(const std::string_view& name)
 			throw std::runtime_error("Failed to save XML file");
 		}
 	}
+#endif
+}
+
+void HotLoadSystem::ResetAniBehaviorPtr()
+{
+	std::unique_lock lock(m_scriptFileMutex);
+	for (auto& aniBehavior : m_aniBehaviorStates)
+	{
+		if (aniBehavior)
+		{
+			aniBehavior->ResetBehaviour();
+		}
+	}
 }
 
 void HotLoadSystem::Compile()
 {
+#ifndef BUILD_FLAG
 	file::path scriptPath = PathFinder::Relative("Script\\");
 
 	for(auto& iterPath : file::recursive_directory_iterator(scriptPath))
@@ -1567,9 +1564,11 @@ void HotLoadSystem::Compile()
 			DataSystems->GetAssetMetaWatcher()->CreateYamlMeta(iterPath);
 		}
 	}
+#endif
 
 	if (hDll)
 	{
+#ifndef BUILD_FLAG
 		AIManagers->ClearTreeInAIComponent();
 
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
@@ -1600,6 +1599,8 @@ void HotLoadSystem::Compile()
 		Meta::UndoCommandManager->Clear();
 		Meta::UndoCommandManager->ClearGameMode();
 
+		ResetAniBehaviorPtr();
+
 		while(GetModuleLoadCount(hDll) > 0)
 		{
 			FreeLibrary(hDll);
@@ -1608,8 +1609,10 @@ void HotLoadSystem::Compile()
 		m_scriptNamesFunc		= nullptr;
 		//m_setSceneManagerFunc	= nullptr;
 		hDll					= nullptr;
+#endif
 	}
 
+#ifndef BUILD_FLAG
 	if (EngineSettingInstance->GetMSVCVersion() != MSVCVersion::None)
 	{
 		bool buildSuccess = false;
@@ -1641,6 +1644,7 @@ void HotLoadSystem::Compile()
 	{
 		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
 	}
+#endif
 
 	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
 	hDll = LoadLibraryA(dllPath.string().c_str());
@@ -1747,6 +1751,32 @@ void HotLoadSystem::Compile()
 	// 행동 트리 데코레이터 노드 이름 함수 가져오기
 	m_listBTConditionDecoratorNodeNamesFunc = reinterpret_cast<ListBTConditionDecoratorNodeNamesFunc>(GetProcAddress(hDll, "ListBTConditionDecoratorNode"));
 	if (!m_listBTConditionDecoratorNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 에니메이션 행동 스크립트 이름 함수 가져오기
+	m_listAniBehaviorNamesFunc = reinterpret_cast<ListAniBehaviorNamesFunc>(GetProcAddress(hDll, "ListAniBehavior"));
+	if (!m_listAniBehaviorNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 에니메이션 행동 스크립트 함수 가져오기
+	m_AniBehaviorFunc = reinterpret_cast<AniBehaviorFunc>(GetProcAddress(hDll, "CreateAniBehavior"));
+	if (!m_AniBehaviorFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 에니메이션 행동 스크립트 할당 해제 함수 가져오기
+	m_AniBehaviorDeleteFunc = reinterpret_cast<AniBehaviorDeleteFunc>(GetProcAddress(hDll, "DeleteAniBehavior"));
+	if (!m_AniBehaviorDeleteFunc)
 	{
 		m_isReloading = false;
 		g_progressWindow->SetStatusText(L"Failed to get function address...");

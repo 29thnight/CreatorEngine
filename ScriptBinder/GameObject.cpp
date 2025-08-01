@@ -363,4 +363,16 @@ void GameObject::SetEnabled(bool able)
 	}
 }
 
+void GameObject::SetCollisionType()
+{
+	size_t index = TagManager::GetInstance()->GetLayerIndex(m_layer.ToString());
+	if (index >= TagManager::GetInstance()->GetLayers().size() || index > 32)
+	{
+		Debug->LogError("Invalid layer index: " + std::to_string(index));
+		return;
+	}
+
+	m_collisionType = (uint32)index; // Set the bit corresponding to the layer index
+}
+
 

@@ -9,7 +9,8 @@ enum class ToneMapType
 	Reinhard,
 	ACES,
 	Uncharted2,
-	HDR10
+	HDR10,
+	ACESFilm,
 };
 
 cbuffer ToneMapConstant

@@ -6,10 +6,11 @@
 
 class ModuleBehavior;
 class GameObject;
+class AnimationState;
 class SceneManager;
 class PhysicsManager;
 class GameObjectPool;
-class AniBehaviour;
+class AniBehavior;
 class PhysicX;
 namespace BT
 {
@@ -39,9 +40,9 @@ typedef const char** (*ListBTConditionNodeNamesFunc)(int*);
 typedef const char** (*ListBTConditionDecoratorNodeNamesFunc)(int*);
 
 //에니메이션 FSM 관련 함수 포인터 정의
-typedef AniBehaviour* (*AniBehaviourFunc)(const char*);
-typedef void (*AniBehaviourDeleteFunc)(AniBehaviour* aniBehaviour);
-typedef const char** (*ListAniBehaviourNamesFunc)(int*);
+typedef AniBehavior* (*AniBehaviorFunc)(const char*);
+typedef void (*AniBehaviorDeleteFunc)(AniBehavior* AniBehavior);
+typedef const char** (*ListAniBehaviorNamesFunc)(int*);
 
 // 씬 매니저와 행동 트리 노드 팩토리 업데이트 함수 포인터 정의[deprecated]
 typedef void (*SetSceneManagerFunc)(Singleton<SceneManager>::FGetInstance);
@@ -75,8 +76,8 @@ public:
 	void CreateActionNodeScript(const std::string_view& name);
 	void CreateConditionNodeScript(const std::string_view& name);
 	void CreateConditionDecoratorNodeScript(const std::string_view& name);
-
-	void CreateAniBehaviourScript(const std::string_view& name);
+	// 에니메이션 FSM 스크립트 생성
+	void CreateAniBehaviorScript(const std::string_view& name);
 
 #pragma region Script Build Helper
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
@@ -191,22 +192,72 @@ public:
 	}
 #pragma endregion
 
+#pragma region Ani Build Helper
+	AniBehavior* CreateAniBehavior(const char* name) const
+	{
+		if (!m_AniBehaviorFunc) return nullptr;
+		return m_AniBehaviorFunc(name);
+	}
+
+	void DestroyAniBehavior(AniBehavior* aniBehavior) const
+	{
+		if (!m_AniBehaviorDeleteFunc) return;
+		m_AniBehaviorDeleteFunc(aniBehavior);
+	}
+
+	const char** ListAniBehaviorNames(int* count) const
+	{
+		if (!m_listAniBehaviorNamesFunc) return nullptr;
+		return m_listAniBehaviorNamesFunc(count);
+	}
+
+	void CollectAniBehavior(AnimationState* aniState)
+	{
+		std::unique_lock lock(m_scriptFileMutex);
+		m_aniBehaviorStates.push_back(aniState);
+	}
+
+	void UnCollectAniBehavior(AnimationState* aniState)
+	{
+		std::unique_lock lock(m_scriptFileMutex);
+		std::erase_if(m_aniBehaviorStates, [&](const auto& state)
+		{
+			return state == aniState;
+		});
+	}
+
+	bool IsAniBehaviorExists(const std::string_view& name) const
+	{
+		return std::ranges::find(m_aniBehaviorNames, name) != m_aniBehaviorNames.end();
+	}
+
+	void ResetAniBehaviorPtr();
+
+	std::vector<std::string>& GetAniBehaviorNames()
+	{
+		return m_aniBehaviorNames;
+	}
+#pragma endregion
 
 private:
 	void Compile();
 
 private:
+	// DLL 함수 포인터
 	HMODULE hDll{};
-	ModuleBehaviorFunc			m_scriptFactoryFunc{};
-	ModuleBehaviorDeleteFunc	m_scriptDeleteFunc{};
-	GetScriptNamesFunc			m_scriptNamesFunc{};
-
-	std::wstring msbuildPath{};
-	std::wstring command{};
-	std::wstring rebuildCommand{};
-	std::atomic_bool m_isStartUp{ false };
+private:
+	// Script 관련 함수 포인터
+	ModuleBehaviorFunc						m_scriptFactoryFunc{};
+	ModuleBehaviorDeleteFunc				m_scriptDeleteFunc{};
+	GetScriptNamesFunc						m_scriptNamesFunc{};
+	// msbuild 관련 명령어 및 초기화 변수
+	std::wstring							msbuildPath{};
+	std::wstring							command{};
+	std::wstring							rebuildCommand{};
+	std::atomic_bool						m_isStartUp{ false };
 
 private:
+	// 행동 트리 노드 관련 함수 포인터
 	BTActionNodeFunc						m_btActionNodeFunc{};
 	BTActionNodeDeleteFunc					m_btActionNodeDeleteFunc{};
 	BTConditionNodeFunc						m_btConditionNodeFunc{};
@@ -218,22 +269,31 @@ private:
 	ListBTConditionDecoratorNodeNamesFunc	m_listBTConditionDecoratorNodeNamesFunc{};
 
 private:
-	AniBehaviourFunc 				m_aniBehaviourFunc{};
-	AniBehaviourDeleteFunc			m_aniBehaviourDeleteFunc{};
-	ListAniBehaviourNamesFunc		m_listAniBehaviourNamesFunc{};
+	// 에니메이션 행동 스크립트 관련 함수 포인터
+	AniBehaviorFunc 						m_AniBehaviorFunc{};
+	AniBehaviorDeleteFunc					m_AniBehaviorDeleteFunc{};
+	ListAniBehaviorNamesFunc				m_listAniBehaviorNamesFunc{};
 
 private:
-	using ModuleBehaviorIndexVector = std::vector<std::tuple<GameObject*, size_t, std::string>>;
-	using ModuleBehaviorMetaVector	= std::vector<std::tuple<GameObject*, size_t, MetaYml::Node>>;
+	using ModuleBehaviorIndexVector			= std::vector<std::tuple<GameObject*, size_t, std::string>>;
+	using ModuleBehaviorMetaVector			= std::vector<std::tuple<GameObject*, size_t, MetaYml::Node>>;
+	using AniBehaviorVector					= std::vector<AnimationState*>;
+	
+	// 스크립트 컴포넌트 인덱스와 메타 정보 저장
+	std::vector<std::string>				m_scriptNames{};
+	ModuleBehaviorIndexVector				m_scriptComponentIndexs{};
+	ModuleBehaviorMetaVector				m_scriptComponentMetaIndexs{};
 
-	std::vector<std::string>	m_scriptNames{};
-	ModuleBehaviorIndexVector	m_scriptComponentIndexs{};
-	ModuleBehaviorMetaVector	m_scriptComponentMetaIndexs{};
-	std::thread					m_scriptFileThread{};
-	std::mutex					m_scriptFileMutex{};
-	std::atomic_bool			m_isReloading{ false };
-	std::atomic_bool			m_isCompileEventInvoked{ false };
-	file::file_time_type		m_lastWriteFileTime{};
+	// 에니메이션 행동 스크립트 이름 저장
+	std::vector<std::string>				m_aniBehaviorNames{};
+	AniBehaviorVector 						m_aniBehaviorStates{};
+
+	// 스크립트 빌드 스레드 제어 변수
+	std::thread								m_scriptFileThread{};
+	std::mutex								m_scriptFileMutex{};
+	std::atomic_bool						m_isReloading{ false };
+	std::atomic_bool						m_isCompileEventInvoked{ false };
+	file::file_time_type					m_lastWriteFileTime{};
 };
 
 static auto& ScriptManager = HotLoadSystem::GetInstance();

@@ -59,7 +59,7 @@ public:
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
-	static Texture* LoadFormPath(_In_ const file::path& path);
+	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
 
 	void CreateSRV(
 		_In_ DXGI_FORMAT textureFormat,

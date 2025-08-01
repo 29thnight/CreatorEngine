@@ -395,9 +395,6 @@
     <ClInclude Include="ConditionParameter.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="AniBehaviour.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="AnimationBehviourFatory.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
@@ -589,6 +586,12 @@
     </ClInclude>
     <ClInclude Include="ScriptStringModule.h">
       <Filter>Managers\HotLoadSystem\ScriptStringModule</Filter>
+    </ClInclude>
+    <ClInclude Include="AniBehavior.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="MSBuildHelper.h">
+      <Filter>Managers\HotLoadSystem</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

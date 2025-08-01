@@ -58,8 +58,8 @@ private:
 
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
-    Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0);
-    Texture* GenerateTexture(const std::string_view& textureName);
+    Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0, bool isCompress = false);
+    Texture* GenerateTexture(const std::string_view& textureName, bool isCompress = false);
 
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };

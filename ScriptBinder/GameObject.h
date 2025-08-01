@@ -100,7 +100,7 @@ public:
 	}
 
 	void SetEnabled(bool able) override final;
-	void SetCollisionType(uint32 type) { m_collisionType = type; }
+	void SetCollisionType();
 	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() { return m_ownerScene; }
 

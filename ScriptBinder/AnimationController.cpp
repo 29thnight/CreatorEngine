@@ -1,6 +1,6 @@
 #include "AnimationController.h"
 #include "AnimationState.h"
-#include "AniBehaviour.h"
+#include "AniBehavior.h"
 #include "Animator.h"
 #include "Skeleton.h"
 #include "AvatarMask.h"

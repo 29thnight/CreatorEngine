@@ -34,7 +34,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 float luminance;
                 float4 sampledColor = g_InputTexture[sampleCoord];
                 
-                if (sampledColor.g != 0 && sampledColor.b != 0)
+                if (sampledColor.g != 0 || sampledColor.b != 0)
                 {
                     luminance = dot(sampledColor.rgb, LuminanceFactors);
                 }

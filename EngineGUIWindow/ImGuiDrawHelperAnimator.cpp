@@ -44,6 +44,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 			static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
 			static int AvatarControllerIndex = -1;
 			static bool showAvatarMaskWindow = false;
+			static bool isOpenAniBehaviorPopup = false;
 			if (ImGui::Button(ICON_FA_BOX))
 			{
 				showControllersWindow = !showControllersWindow;
@@ -162,7 +163,6 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 						if (showAvatarMaskWindow)
 						{
-
 							if (ImGui::Begin("AvatarMask", &showAvatarMaskWindow))
 							{
 								// 내용물 UI 작성
@@ -425,9 +425,10 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 				ImGui::EndChild();
 				ImGui::SameLine();
-				ImGui::BeginChild("Inspector Info", ImVec2(1300, 500), false);
+				ImGui::BeginChild("Inspector Info", ImVec2(400, 500), false);
 				ImGui::Text("Inspector");
 				ImGui::Separator();
+				static AnimationState* selectedState = nullptr;
 				if (preSelectIndex != selectedControllerIndex)
 				{
 					linkIndex = -1;
@@ -603,7 +604,6 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 				else if (controller != nullptr && controller->m_nodeEditor->m_selectedType == SelectedType::Node && controller->m_nodeEditor->seletedCurNodeIndex != -1)
 				{
 					nodeEdtior = controller->m_nodeEditor;
-					//&&&&& behaviour script 관리할 공간 만들기필요
 					if (preInspectorIndex != nodeEdtior->seletedCurNodeIndex)
 					{
 						selectedTransitionIndex = -1;
@@ -814,14 +814,163 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 						}
 					}
+					const float buttonWidth = 210.0f; // 버튼의 가로 너비 (임의로 지정 또는 측정)
+					const float windowWidth = ImGui::GetContentRegionAvail().x;
+					float offsetX = (windowWidth - buttonWidth) * 0.5f;
+					std::string stateName{};
+					ImGui::Separator();
+					ImGui::Text("Animation Behaviour");
+					if (nullptr == state->behaviour)
+					{
+						stateName = "None Animation Behaviour";
+					}
+					else
+					{
+						stateName = state->behaviour->m_name;
+					}
+					
+					if (ImGui::Button(stateName.c_str(), ImVec2(buttonWidth, 0)))
+					{
+						if(nullptr != state->behaviour)	
+						{
+							FileGuid fileGuid = DataSystems->GetStemToGuid(state->behaviour->m_name);
+							file::path scriptFullPath = DataSystems->GetFilePath(fileGuid);
+							if (scriptFullPath.empty())
+							{
+								Debug->LogError("Script not found: " + state->behaviour->m_name);
+							}
+							else
+							{
+								file::path slnPath = PathFinder::DynamicSolutionPath("Dynamic_CPP.sln");
+								DataSystems->OpenSolutionAndFile(slnPath, scriptFullPath);
+							}
+						}
+					}
+					
+					// 커서 위치 이동
+					if (offsetX > 0.0f)
+						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+
+					if (ImGui::Button("Add Behaviour", ImVec2(buttonWidth, 0)))
+					{
+						selectedState = state.get();
+						isOpenAniBehaviorPopup = true;
+					}
+
 					ImGui::PopID();
 				}
 				ImGui::EndChild();
+
+				if (isOpenAniBehaviorPopup)
+				{
+					ImGui::OpenPopup("AniBehaviorSelect");
+					isOpenAniBehaviorPopup = false;
+				}
+
+				static ImGuiTextFilter searchFilter;
+
+				ImGui::SetNextWindowSize(ImVec2(350, 0)); // 원하는 사이즈 지정
+				if(ImGui::BeginPopup("AniBehaviorSelect"))
+				{
+					ImGui::Text("Add AniBehavior");
+					ImGui::Separator();
+
+					float availableWidth = ImGui::GetContentRegionAvail().x;
+					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+					// 스크립트 목록을 표시
+					auto aniBehaviors = ScriptManager->GetAniBehaviorNames();
+					for (const auto& script : aniBehaviors)
+					{
+						if (!searchFilter.PassFilter(script.c_str()))
+							continue;
+						if (script.empty())
+						{
+							const_cast<std::string&>(script) = "None";
+						}
+
+						if (ImGui::Selectable(script.c_str()))
+						{
+							if (selectedState)
+							{
+								selectedState->SetBehaviour(script);
+								ImGui::CloseCurrentPopup();
+							}
+						}
+					}
+					if (ImGui::Button("Create New AniBehavior"))
+					{
+						ImGui::OpenPopup("New AniBehavior");
+					}
+					ImGui::EndPopup();
+				}
+
+				ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
+
+				ImGui::SetNextWindowSize(ImVec2(350, 0)); // 원하는 사이즈 지정
+				if (ImGui::BeginPopup("New AniBehavior"))
+				{
+					float availableWidth = ImGui::GetContentRegionAvail().x;
+					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+					static char scriptName[64] = "NewAniBehavior";
+					ImGui::InputText("Name", scriptName, sizeof(scriptName));
+					std::string scriptNameStr(scriptName);
+					auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
+					bool isDisabled = false;
+					if (file::exists(scriptBodyFilePath))
+					{
+						ImGui::Text("Script already exists.");
+						isDisabled = true;
+					}
+					else if (scriptNameStr.empty())
+					{
+						ImGui::Text("Script name cannot be empty.");
+						isDisabled = true;
+					}
+					else if (scriptNameStr.find_first_of("0123456789") == 0)
+					{
+						ImGui::Text("Script name cannot start with a number.");
+						isDisabled = true;
+					}
+					else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
+					{
+						ImGui::Text("Script name contains invalid characters.");
+						isDisabled = true;
+					}
+
+					ImGui::BeginDisabled(isDisabled);
+					if (ImGui::Button("Create and Add"))
+					{
+						if (!scriptNameStr.empty())
+						{
+							try
+							{
+								ScriptManager->CreateAniBehaviorScript(scriptNameStr);
+								ScriptManager->SetCompileEventInvoked(true);
+								ScriptManager->ReloadDynamicLibrary();
+							}
+							catch (const std::exception& e)
+							{
+								Debug->LogError("Failed to create script: " + std::string(e.what()));
+								ImGui::EndDisabled();
+								ImGui::EndPopup();
+								return;
+							}
+
+							selectedState->SetBehaviour(scriptNameStr);
+							scriptNameStr.clear();
+						}
+						else
+						{
+							Debug->LogError("Script name cannot be empty.");
+						}
+					}
+					ImGui::EndDisabled();
+
+					ImGui::EndPopup();
+				}
+
 				ImGui::End();
 			}
-
-
-
 		}
 	}
 }

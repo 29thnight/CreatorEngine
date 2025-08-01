@@ -165,7 +165,7 @@
 		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
-		<ClInclude Include="AniBehaviourFactory.h" />
+		<ClInclude Include="AniBehaviorFactory.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase2.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
@@ -212,6 +212,7 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
+		<ClInclude Include="Assets\Script\NewAniBehavior.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase1.cpp" />
@@ -341,6 +342,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

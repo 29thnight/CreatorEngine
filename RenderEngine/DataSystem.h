@@ -76,7 +76,7 @@ public:
 	//Resource Material
 	void LoadMaterials();
 	Material* LoadMaterialGUID(FileGuid guid);
-    Texture* LoadMaterialTexture(const std::string_view& filePath);
+    Texture* LoadMaterialTexture(const std::string_view& filePath, bool isCompress = false);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음

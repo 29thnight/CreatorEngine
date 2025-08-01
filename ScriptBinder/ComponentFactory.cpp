@@ -11,9 +11,11 @@
 #include "Model.h"
 #include "NodeEditor.h"
 #include "InvalidScriptComponent.h"
+#include "FoliageComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "PlayerInput.h"
 #include "Animation.h"
+
 void ComponentFactory::Initialize()
 {
    auto& registerMap = Meta::MetaDataRegistry->map;
@@ -153,9 +155,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 				}
 			}
 
-
-
-
 			if (itNode["Parameters"])
 			{
 				auto& paramNode = itNode["Parameters"];
@@ -170,7 +169,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 
 			if(itNode["m_animationControllers"])
 			{
-				
 				auto& animationControllerNode = itNode["m_animationControllers"];
 
 				for (auto& layer : animationControllerNode)
@@ -200,8 +198,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 									i++;
 								}
 							}
-							//AvatarMask* avatarMask = new AvatarMask();
-							//Meta::Deserialize(avatarMask, MaskNode);
 							animationController->ReCreateMask(&avatarMask);
 						}
 					}
@@ -315,6 +311,46 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 			auto characterController = static_cast<CharacterControllerComponent*>(component);
 			Meta::Deserialize(characterController, itNode);
 			characterController->SetOwner(obj);
+		}
+		else if (componentType->typeID == type_guid(FoliageComponent))
+		{
+			auto foliage = static_cast<FoliageComponent*>(component);
+			Meta::Deserialize(foliage, itNode);
+
+			auto& types = const_cast<std::vector<FoliageType>&>(foliage->GetFoliageTypes());
+			for (auto& type : types)
+			{
+				if (type.m_modelName.empty())
+					continue;
+
+				Model* model = nullptr;
+				FileGuid guid = DataSystems->GetStemToGuid(type.m_modelName);
+				if (guid != nullFileGuid)
+				{
+					model = DataSystems->LoadModelGUID(guid);
+				}
+				if (!model)
+				{
+					std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
+					for (const auto& ext : exts)
+					{
+						auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
+						if (std::filesystem::exists(path))
+						{
+							model = DataSystems->LoadCashedModel(path.string());
+							break;
+						}
+					}
+				}
+				if (model)
+				{
+					type.m_mesh = model->GetMesh(0);
+					type.m_material = model->GetMaterial(0);
+				}
+			}
+
+			foliage->SetOwner(obj);
+			foliage->SetEnabled(true);
 		}
 		else if(componentType->typeID == type_guid(TerrainComponent))
 		{

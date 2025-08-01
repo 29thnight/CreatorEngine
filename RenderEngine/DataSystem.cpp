@@ -97,6 +97,7 @@ DataSystem::~DataSystem()
 
 void DataSystem::Initialize()
 {
+#ifndef BUILD_FLAG
 	file::path iconpath		= PathFinder::IconPath();
 	UnknownIcon				= Texture::LoadFormPath(iconpath.string() + "Unknown.png");
 	TextureIcon				= Texture::LoadFormPath(iconpath.string() + "Texture.png");
@@ -115,9 +116,10 @@ void DataSystem::Initialize()
 	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
 
 	RenderForEditer();
+#endif
 	m_watcher			= new efsw::FileWatcher();
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
-	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
+	m_assetMetaWatcher	= std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
 	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
 	m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
 	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
@@ -126,6 +128,7 @@ void DataSystem::Initialize()
 
 void DataSystem::Finalize()
 {
+#ifndef BUILD_FLAG
     DeallocateResource(UnknownIcon);
     DeallocateResource(TextureIcon);
     DeallocateResource(ModelIcon);
@@ -138,6 +141,7 @@ void DataSystem::Finalize()
 	DeallocateResource(SpotLightIcon);
 	DeallocateResource(DirectionalLightIcon);
 	DeallocateResource(CameraIcon);
+#endif // !BUILD_FLAG
 
     Models.clear();
     Textures.clear();
@@ -148,6 +152,7 @@ void DataSystem::Finalize()
 
 void DataSystem::RenderForEditer()
 {
+#ifndef BUILD_FLAG
 	ImGui::ContextRegister("SelectMatarial", true, [&]()
 	{
 		static ImGuiTextFilter searchFilter;
@@ -383,6 +388,7 @@ void DataSystem::RenderForEditer()
 	{
 		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
 	}
+#endif // BUILD_FLAG
 }
 
 void DataSystem::MonitorFiles()
@@ -630,7 +636,7 @@ void DataSystem::CopyTextureSelectType(const std::string_view& filePath, Texture
 	CopyTexture(filePath, destination);
 }
 
-Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
+Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath, bool isCompress)
 {
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
 
@@ -641,7 +647,7 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
         return Textures[name].get();
     }
 
-    Texture* texture = Texture::LoadFormPath(destination.string());
+    Texture* texture = Texture::LoadFormPath(destination.string(), isCompress);
 
     if (texture)
     {
@@ -711,16 +717,21 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 
 void DataSystem::OpenContentsBrowser()
 {
+#ifndef BUILD_FLAG
 	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
+#endif
 }
 
 void DataSystem::CloseContentsBrowser()
 {
+#ifndef BUILD_FLAG
 	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+#endif
 }
 
 void DataSystem::ShowDirectoryTree(const file::path& directory)
 {
+#ifndef BUILD_FLAG
 	static file::path MenuDirectory{};
 	static bool isRightClicked = false;
 	for (const auto& entry : file::directory_iterator(directory))
@@ -803,10 +814,12 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 		}
 		ImGui::EndPopup();
 	}
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
+#ifndef BUILD_FLAG
 	if(m_ContentsBrowserStyle == ContentsBrowserStyle::Tile)
 	{
 		ShowCurrentDirectoryFilesTile();
@@ -817,10 +830,12 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 		ShowCurrentDirectoryFilesTree(currentDirectory);
 	}
+#endif
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTile()
 {
+#ifndef BUILD_FLAG
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -925,10 +940,12 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 		}
 		ImGui::EndPopup();
 	}
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 {
+#ifndef BUILD_FLAG
 	static file::path currentDirectory;
 	static FileType selectedFileType = FileType::Unknown;
 	static std::string draggedFileType{};
@@ -1124,11 +1141,12 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 		isHoverAndClicked = false;
 	}
-
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
 {
+#ifndef BUILD_FLAG
 	ImGui::PushID(fileName.c_str());
 	ImGui::BeginGroup();
 	ImU32 color{};
@@ -1247,6 +1265,7 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	}
 
 	ImGui::PopID();
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
@@ -1256,6 +1275,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::CreateVolumeProfile(const file::path& filepath)
 {
+#ifndef BUILD_FLAG
 	VolumeProfile profile;
 	profile.settings = EngineSettingInstance->GetRenderPassSettings();
 
@@ -1276,10 +1296,12 @@ void DataSystem::CreateVolumeProfile(const file::path& filepath)
 	}
 
 	ForceCreateYamlMetaFile(savePath);
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
+#ifndef BUILD_FLAG
     if(filepath.extension() == ".prefab") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
@@ -1287,10 +1309,12 @@ void DataSystem::OpenFile(const file::path& filepath)
 	{
 		MessageBox(NULL, L"Failed Open File", L"Error", MB_OK | MB_ICONERROR);
 	}
+#endif
 }
 
 void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 {
+#ifndef BUILD_FLAG
 	std::wstring args = L"/select,\"" + filePath.wstring() + L"\"";
 
 	HINSTANCE result = ShellExecuteW(
@@ -1307,10 +1331,12 @@ void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 	{
 		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
 	}
+#endif
 }
 
 void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath)
 {
+#ifndef BUILD_FLAG
 	if (m_isExecuteSolution)
 	{
 		return;
@@ -1369,6 +1395,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 	{
 		MessageBoxW(nullptr, L"Visual Studio Execute Failed", L"Error", MB_ICONERROR);
 	}
+#endif // !BUILD_FLAG
 }
 
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const

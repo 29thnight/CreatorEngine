@@ -102,7 +102,7 @@ namespace DirectX11
 	{
 		return DeviceState::g_ClientRect.height;
 	}
-
+#ifndef BUILD_FLAG
 	//[unsafe]
 	inline void BeginEvent(const std::wstring_view& name)
 	{
@@ -124,6 +124,10 @@ namespace DirectX11
 		}
 		DeviceState::g_annotation->EndEvent();
 	}
+#else
+	inline void BeginEvent(const std::wstring_view&) {}
+	inline void EndEvent() {}
+#endif // !BUILD_FLAG
 
 	//[unsafe]
 	inline void UpdateBuffer(ID3D11Buffer* buffer, const void* data)

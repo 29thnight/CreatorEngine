@@ -87,7 +87,6 @@ public:
     const std::vector<Vertex>& GetVertices() { return m_vertices; }
     const std::vector<uint32>& GetIndices() { return m_indices; }
 
-#ifndef BUILD_FLAG
     // 빌드 모드가 아닐 때만 사용
     // 전체 버텍스 업데이트
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
@@ -133,7 +132,6 @@ public:
 
         context->Unmap(m_vertexBuffer.Get(), 0);
     }
-#endif !BUILD_FLAG
 
 private:
     std::string m_name;

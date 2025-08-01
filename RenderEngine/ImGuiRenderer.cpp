@@ -128,7 +128,7 @@ void ImGuiRenderer::BeginRender()
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
 	ImGui::NewFrame();
-
+#ifndef BUILD_FLAG
 	float menuBarSize = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
 	ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
 	ImGuiID id = ImGui::GetID("MainWindowGroup");
@@ -220,6 +220,7 @@ void ImGuiRenderer::BeginRender()
 
     if (firstLoop) firstLoop = false;
 	PROFILE_CPU_END();
+#endif
 }
 
 void ImGuiRenderer::Render()
@@ -229,11 +230,12 @@ void ImGuiRenderer::Render()
 
 	auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
 
-	if(!directoryQueue.empty())
+#ifndef BUILD_FLAG
+	if (!directoryQueue.empty())
 	{
 		DataSystems->SelectTextureType();
 	}
-
+#endif // !BUILD_FLAG
     auto& container = ImGuiRegister::GetInstance()->m_contexts;
 
     for (auto& [name, context] : container)

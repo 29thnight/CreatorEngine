@@ -37,7 +37,9 @@ struct URange
 #define WITH_PROFILING 1
 #endif
 
+#ifndef BUILD_FLAG
 #if WITH_PROFILING
+#endif
 
 /*
 	General
@@ -70,20 +72,6 @@ struct URange
 // Usage:
 //		PROFILE_CPU_END()
 #define PROFILE_CPU_END()							gCPUProfiler.EndEvent()
-
-#else
-
-#define PROFILER_INITIALIZE(size_T, size)
-#define PROFILER_SHUTDOWN()
-
-#define PROFILE_REGISTER_THREAD(...)
-#define PROFILE_FRAME()
-
-#define PROFILE_CPU_SCOPE(...)
-#define PROFILE_CPU_BEGIN(...)
-#define PROFILE_CPU_END()
-
-#endif
 
 // Simple Linear Allocator
 class LinearAllocator
@@ -349,4 +337,19 @@ struct CPUProfileScope
 	CPUProfileScope(const CPUProfileScope&) = delete;
 	CPUProfileScope& operator=(const CPUProfileScope&) = delete;
 };
+
+#else
+
+#define PROFILER_INITIALIZE(size_T, size)
+#define PROFILER_SHUTDOWN()
+
+#define PROFILE_REGISTER_THREAD(...)
+#define PROFILE_FRAME()
+
+#define PROFILE_CPU_SCOPE(...)
+#define PROFILE_CPU_BEGIN(...)
+#define PROFILE_CPU_END()
+
+#endif
+
 #endif // !DYNAMICCPP_EXPORTS

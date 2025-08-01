@@ -21,7 +21,6 @@ void SceneManager::ManagerInitialize()
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
     InputActionManagers->LoadManager();
-	TagManager::GetInstance()->Initialize();
 }
 
 void SceneManager::Editor()

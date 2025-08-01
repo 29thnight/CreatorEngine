@@ -121,9 +121,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SameLine();
 			ImGui::Checkbox("Static", &selectedSceneObject->m_isStatic);
 			
-			auto& tag_manager = TagManager::GetInstance();
-			auto& tags = tag_manager->GetTags();
-			auto& layers = tag_manager->GetLayers();
+			auto& tags = TagManagers->GetTags();
+			auto& layers = TagManagers->GetLayers();
 			int tagCount = static_cast<int>(tags.size());
 			int layerCount = static_cast<int>(layers.size());
 			static int prevTagCount = 0;
@@ -152,8 +151,8 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			auto& selectedTag = selectedSceneObject->m_tag;
 			auto& selectedLayer = selectedSceneObject->m_layer;
 
-			selectedTagIndex = tag_manager->GetTagIndex(selectedTag.ToString());
-			selectedLayerIndex = tag_manager->GetLayerIndex(selectedLayer.ToString());
+			selectedTagIndex = TagManagers->GetTagIndex(selectedTag.ToString());
+			selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
 			if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
 			{
 				selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
@@ -179,9 +178,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						isSelected = (selectedTag == tagNames[i]);
 						if (ImGui::Selectable(tagNames[i], isSelected))
 						{
-							tag_manager->RemoveTagFromObject(selectedTag.ToString(), selectedSceneObject);
+							TagManagers->RemoveTagFromObject(selectedTag.ToString(), selectedSceneObject);
 							selectedTag = tagNames[i];
-							tag_manager->AddTagToObject(selectedTag.ToString(), selectedSceneObject);
+							TagManagers->AddTagToObject(selectedTag.ToString(), selectedSceneObject);
 							selectedTagIndex = i; // 선택된 인덱스 업데이트
 						}
 					}
@@ -195,7 +194,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::Text("Layer");
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
-			if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedTagIndex]))
+			if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 			{
 				for (int i = 0; i < layerCount; ++i)
 				{
@@ -212,9 +211,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 						isSelected = (selectedLayer == layerNames[i]);
 						if (ImGui::Selectable(layerNames[i], isSelected))
 						{
-							tag_manager->RemoveObjectFromLayer(selectedLayer.ToString(), selectedSceneObject);
+							TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), selectedSceneObject);
 							selectedLayer = layerNames[i];
-							tag_manager->AddObjectToLayer(selectedLayer.ToString(), selectedSceneObject);
+							selectedSceneObject->SetCollisionType(); // 충돌 타입 업데이트
+							TagManagers->AddObjectToLayer(selectedLayer.ToString(), selectedSceneObject);
 							selectedLayerIndex = i; // 선택된 인덱스 업데이트
 						}
 					}
@@ -249,10 +249,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				{
 					if (strlen(newTagName) > 0)
 					{
-						tag_manager->AddTag(newTagName);
+						TagManagers->AddTag(newTagName);
 						selectedTag = newTagName;
 						selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
-						tagCount = tag_manager->GetTags().size(); // 태그 개수 업데이트
+						tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -273,10 +273,10 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				{
 					if (strlen(newLayerName) > 0)
 					{
-						tag_manager->AddLayer(newLayerName);
+						TagManagers->AddLayer(newLayerName);
 						selectedLayer = newLayerName;
 						selectedLayerIndex = layerCount; // 새로 추가된 레이어 인덱스
-						layerCount = tag_manager->GetLayers().size(); // 레이어 개수 업데이트
+						layerCount = TagManagers->GetLayers().size(); // 레이어 개수 업데이트
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -531,7 +531,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("AddComponent"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Add Component"); // 노란색 텍스트
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // 노란색 텍스트
 				ImGui::Separator(); // 구분선
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
@@ -576,6 +576,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("Scripts"))
 			{
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "ScriptComponent"); // 노란색 텍스트
+				ImGui::Separator(); // 구분선
+
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
 				for (const auto& type_name : ScriptManager->GetScriptNames())
@@ -615,6 +618,9 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
 			{
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "New ScriptComponent"); // 노란색 텍스트
+				ImGui::Separator(); // 구분선
+
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
 				static char scriptName[64] = "NewBehaviourScript";

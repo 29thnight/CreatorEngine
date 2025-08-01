@@ -75,6 +75,7 @@ namespace InternalPath
 	inline file::path NodeEditorPath{};
 	inline file::path volumeProfilePath{};
 	inline file::path InputMapPath{};
+	inline file::path GameBuildSlnPath{};
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -104,6 +105,7 @@ namespace InternalPath
 		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
 		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
 		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
+		GameBuildSlnPath		= file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
 		//dir not exist -> create dir
 
 		std::vector<file::path> paths = {
@@ -236,6 +238,11 @@ public:
 	static inline file::path VolumeProfilePath()
 	{
 		return InternalPath::volumeProfilePath;
+	}
+
+	static inline file::path GameBuildSlnPath()
+	{
+		return InternalPath::GameBuildSlnPath;
 	}
 
 	static inline file::path DynamicSolutionPath(const std::string_view& path)

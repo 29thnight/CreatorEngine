@@ -122,8 +122,9 @@ private:
         wc.lpfnWndProc = CoreWindow::WndProc;
         wc.hInstance = m_hInstance;
         wc.lpszClassName = L"CoreWindowApp";
+#ifndef BUILD_FLAG
         wc.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ACADEMY4Q));      // 큰 아이콘
-
+#endif // BUILD_FLAG
         RegisterClass(&wc);
     }
 

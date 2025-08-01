@@ -102,7 +102,7 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_vie
 	return temp;
 }
 
-Texture* Texture::LoadFormPath(_In_ const file::path& path)
+Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	if (!file::exists(path) && !file::exists(matPath))
@@ -169,6 +169,31 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path)
 				image
 			)
 		);
+	}
+
+	if(isCompress)
+	{
+		ScratchImage compressedImage{};
+		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
+		{
+			DirectX::TexMetadata tempMetadata = metadata;
+
+			// DXGI_FORMAT_BC1_UNORM (== DXT1)
+			DirectX11::ThrowIfFailed(
+				DirectX::Compress(
+					image.GetImages(),
+					image.GetImageCount(),
+					metadata,
+					DXGI_FORMAT_BC1_UNORM,
+					TEX_COMPRESS_PARALLEL,
+					0.5f,
+					compressedImage
+				)
+			);
+
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
+		}
 	}
 
     Texture* texture = AllocateResource<Texture>();
