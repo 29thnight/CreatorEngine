@@ -216,10 +216,6 @@ void Player::CatchAndThrow()
 void Player::Catch()
 {
 
-	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	pos.x += 1.1f;
-	GetOwner()->m_transform.SetPosition(pos);
-
 	if (m_nearObject != nullptr)
 	{
 
@@ -326,12 +322,12 @@ void Player::Attack()
 			auto pos = GetOwner()->m_transform.GetWorldPosition();
 			auto forward2 = GetOwner()->m_transform.GetForward();
 			auto offset{ 2 };
-			auto offset2 = forward2 * offset;
+			auto offset2 = -forward2 * offset;
 			pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
 			pos.m128_f32[1] = 1;
 			pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
 
-			XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), -forward2, XMVectorSet(0, 1, 0, 0));
+			XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
 			Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
 			obj->m_transform.SetPosition(pos);
 
@@ -350,7 +346,7 @@ void Player::Attack()
 		auto world = player->m_transform.GetWorldPosition();
 		world.m128_f32[1] += 0.5f;
 		auto forward = player->m_transform.GetForward();
-		int size = RaycastAll(world, forward, 10.f, 1u, hits);
+		int size = RaycastAll(world, -forward, 10.f, 1u, hits);
 
 		for (int i = 0; i < size; i++)
 		{

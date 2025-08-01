@@ -81,7 +81,7 @@ public:
 	[[Property]]
 	float m_dashTime = 0.15f;
 	[[Property]]
-	float dashCooldown = 3.f; //대쉬 쿨타임
+	float dashCooldown = 1.f; //대쉬 쿨타임
 	float m_dashCoolElapsedTime = 0.f; //
 	[[Property]]
 	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간
