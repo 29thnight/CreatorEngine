@@ -1,0 +1,17 @@
+{
+    "actions": [
+        {
+            "actionName": "Move",
+            "actionType": "Value",
+            "funName": "Move",
+            "inputType": "KeyBoard",
+            "key0": "W",
+            "key1": "S",
+            "key2": "A",
+            "key3": "D",
+            "keystate": "Down",
+            "scpritName": "Player"
+        }
+    ],
+    "mapName": "PlayerKeyBoard"
+}

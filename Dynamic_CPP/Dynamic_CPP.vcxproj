@@ -129,7 +129,8 @@
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<EnableUAC>false</EnableUAC>
-			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;../$(Platform)\$(Configuration)\SingletonManager.lib;../$(Platform)\$(Configuration)\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;../$(Platform)\$(Configuration)\SingletonManager.lib;../$(Platform)\$(Configuration)\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;DirectXTK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalLibraryDirectories>$(SolutionDir)DirectXTK\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 		</Link>
 		<PreBuildEvent>
 			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
