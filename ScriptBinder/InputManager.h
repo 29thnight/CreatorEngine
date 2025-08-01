@@ -106,10 +106,13 @@ public:
 public:
 	void KeyBoardUpdate();
 	//누름
+	bool IsKeyDown(KeyBoard key) const;
 	bool IsKeyDown(unsigned int key) const;
 	// 누르는중
+	bool IsKeyPressed(KeyBoard key) const;
 	bool IsKeyPressed(unsigned int key) const;
 	//뗌
+	bool IsKeyReleased(KeyBoard key) const;
 	bool IsKeyReleased(unsigned int key) const;
 
 	//키 세팅 변경용?
