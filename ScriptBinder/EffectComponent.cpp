@@ -35,6 +35,12 @@ void EffectComponent::Awake()
 
 void EffectComponent::Update(float tick)
 {
+    m_currentTime += tick;
+
+    if (m_currentTime > m_duration)
+    {
+        m_isPlaying = false;
+    }
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
