@@ -66,18 +66,30 @@ Object* Object::Instantiate(const Object* original, const std::string_view& newN
 		auto originalNode = Meta::Serialize(originalGameObject, *meta);
 
 		Meta::Deserialize(cloneGameObject, originalNode);
+        cloneGameObject->m_childrenIndices.clear();
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (scene)
+            scene->AddGameObject(std::shared_ptr<GameObject>(cloneGameObject));
+
         if(0 < originalGameObject->m_childrenIndices.size())
         {
-            cloneGameObject->m_childrenIndices.clear();
+            //cloneGameObject->m_childrenIndices.clear();
             for (auto index : originalGameObject->m_childrenIndices)
             {
-                Scene* activeScene = SceneManagers->GetActiveScene();
-				auto childGameObject = activeScene->GetGameObject(index);
+                if (!scene) 
+					continue;
+
+                auto& rootChildren = scene->m_SceneObjects[0]->m_childrenIndices;
+                auto childGameObject = scene->GetGameObject(index);
 				if (childGameObject)
 				{
 					auto childClone = Instantiate(childGameObject.get(), childGameObject->m_name.ToString());
 					GameObject* childCloneGameObject = dynamic_cast<GameObject*>(childClone);
 					childCloneGameObject->m_parentIndex = cloneGameObject->m_index;
+					childCloneGameObject->m_transform.SetParentID(childCloneGameObject->m_index);
+                    std::erase(rootChildren, childCloneGameObject->m_index);
+                    childCloneGameObject->m_rootIndex = cloneGameObject->m_rootIndex;
                     cloneGameObject->m_childrenIndices.push_back(childCloneGameObject->m_index);
 				}
             }
@@ -98,11 +110,6 @@ Object* Object::Instantiate(const Object* original, const std::string_view& newN
                 }
 			}
         }
-
-        // ¾À¿¡ µî·Ï
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (scene)
-            scene->AddGameObject(std::shared_ptr<GameObject>(cloneGameObject));
     }
 
     return cloneObj;

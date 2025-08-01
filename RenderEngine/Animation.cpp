@@ -114,11 +114,34 @@ void Animation::InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress,
 void Animation::AddEvent()
 {
 	KeyFrameEvent newEvent;
+	std::string baseName = "newEvent";
+	std::string realName = baseName;
+	int index = 1;
+	// 중복 이름이 존재하면 숫자 붙이기
+	while (FindEventName(realName))
+	{
+		realName = baseName + "(" + std::to_string(index) + ")";
+		index++;
+	}
+
+	newEvent.m_eventName = realName;
 	m_keyFrameEvent.push_back(newEvent);
 }
 
 void Animation::AddEvent(KeyFrameEvent _event)
 {
+	for (auto& event : m_keyFrameEvent)
+	{
+		if (event.m_eventName == _event.m_eventName)
+		{
+			event.m_scriptName = _event.m_scriptName;
+			event.m_funName = _event.m_funName;
+			event.key = _event.key;
+			return;
+		}
+	}
+
+
 	m_keyFrameEvent.push_back(_event);
 }
 
@@ -138,6 +161,14 @@ void Animation::DeleteEvent(KeyFrameEvent _event)
 		}
 	}
 
+}
+
+void Animation::DeleteEvent(int _index)
+{
+	if (_index >= 0 && _index < static_cast<int>(m_keyFrameEvent.size()))
+	{
+		m_keyFrameEvent.erase(m_keyFrameEvent.begin() + _index);
+	}
 }
 
 KeyFrameEvent* Animation::FindEvent(KeyFrameEvent event)
@@ -162,6 +193,18 @@ KeyFrameEvent* Animation::FindEvent(const std::string& _eventName, const std::st
 	}
 
 	
+}
+
+bool Animation::FindEventName(std::string Name)
+{
+
+
+	for (auto& _event : m_keyFrameEvent)
+	{
+		if (_event.m_eventName == Name)
+			return true;
+	}
+	return false;
 }
 
 

@@ -6,6 +6,7 @@ void CharacterControllerComponent::OnStart()
 	
 	m_fBaseSpeed = m_movementInfo.maxSpeed;
 	m_fBaseAcceleration = m_movementInfo.acceleration;
+	m_bMoveRestrict.fill(false);
 }
 
 void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
@@ -106,14 +107,16 @@ void CharacterControllerComponent::EndKnockBack()
 	m_fBaseSpeed = PreSpeed;
 	m_moveInput.y = 0;
 	m_isKnockBack = false;
-	if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
+	m_fFinalMultiplierSpeed = 1.0f;
+
+
+	/*if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
 	{
 		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,-1.0f,0.0f }));
 	}
 	else if (preRotation != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
 		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,1.0f,0.0f }));
-	}
-	m_fFinalMultiplierSpeed = 1.0f;
+	} */
 
 }
 

@@ -37,6 +37,7 @@ public:
 	Transform& SetWorldScale(Mathf::Vector3 scale);
 
 	void SetOwner(GameObject* owner);
+	GameObject* GetOwner() const { return m_owner; }
 
 	Mathf::xMatrix GetLocalMatrix();
 	Mathf::xMatrix GetWorldMatrix() const;
@@ -61,6 +62,8 @@ public:
 
 	void TransformReset();
 
+	void UpdateDirty();
+
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;
@@ -70,7 +73,7 @@ private:
 	uint32 m_parentID{ 0 };
 
 	[[Property]]
-	bool32 m_dirty{ true };
+	bool32 m_dirty{ false };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_inverseMatrix{ XMMatrixIdentity() };

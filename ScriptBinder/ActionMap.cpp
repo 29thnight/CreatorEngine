@@ -226,7 +226,14 @@ void ActionMap::CheckAction()
 					else if(action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_Thumbstick))
 						action->value.v2Value = InputManagement->GetControllerThumbR(action->playerIndex);
 
-					action->valueAction(action->value.v2Value);
+					try
+					{
+						action->valueAction(action->value.v2Value);
+					}
+					catch(const std::exception& e)
+					{
+						std::cerr << "Exception: " << e.what() << std::endl;
+					}
 					break; //&&&&& ÄÁÆ®·Ñ·¯ vector2´Â ÁÂ¿ì ½ºÆ½¸¸
 				}
 

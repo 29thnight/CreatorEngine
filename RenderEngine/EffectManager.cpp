@@ -98,6 +98,31 @@ std::string EffectManager::PlayEffect(const std::string& templateName)
 	return instanceId;
 }
 
+std::string EffectManager::PlayEffectWithCustomId(const std::string& templateName, const std::string& customInstanceId)
+{
+	auto templateIt = templates.find(templateName);
+	if (templateIt == templates.end()) {
+		return "";
+	}
+
+	// 기존에 같은 ID가 있으면 먼저 제거
+	RemoveEffect(customInstanceId);
+
+	auto instance = AcquireFromPool();
+	if (!instance) {
+		std::cerr << "Pool exhausted! Cannot play effect: " << templateName << std::endl;
+		return "";
+	}
+
+	ConfigureInstance(instance.get(), templateIt->second);
+
+	instance->Play();
+	activeEffects[customInstanceId] = std::move(instance);
+
+	std::cout << "Created effect with ID: " << customInstanceId << " (template: " << templateName << ")" << std::endl;
+	return customInstanceId;
+}
+
 EffectBase* EffectManager::GetEffectInstance(const std::string& instanceId)
 {
 	auto it = activeEffects.find(instanceId);
@@ -118,9 +143,10 @@ bool EffectManager::RemoveEffect(std::string_view instanceName)
 {
 	auto it = activeEffects.find(instanceName.data());
 	if (it != activeEffects.end()) {
-		// ID 재활용 코드 제거 (스마트 할당이 알아서 처리)
 		auto effectToReturn = std::move(it->second);
 		activeEffects.erase(it);
+
+		// 수명이 없는 이펙트도 풀에 반환하도록 수정
 		ReturnToPool(std::move(effectToReturn));
 		return true;
 	}

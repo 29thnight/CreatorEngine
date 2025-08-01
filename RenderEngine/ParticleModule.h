@@ -84,6 +84,10 @@ public:
 	ModuleStage GetStage() const { return m_stage; }
 	void SetStage(ModuleStage stage) { m_stage = stage; }
 
+
+	// 테스트용 
+	virtual bool IsGenerateModule() const { return false; }
+
 protected:
 	// 이징 변수
 	bool m_useEasing;

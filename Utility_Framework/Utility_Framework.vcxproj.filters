@@ -103,6 +103,9 @@
     <Filter Include="Core.AngelScriptBind\Type\array">
       <UniqueIdentifier>{46e11ae0-1cd8-4439-8b1d-7e6e240f9000}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core.Property">
+      <UniqueIdentifier>{ad9f4a99-f789-4433-ade5-606e00c3a85b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -288,6 +291,15 @@
     </ClInclude>
     <ClInclude Include="CircleQueue.hpp">
       <Filter>Core.CircleQueue</Filter>
+    </ClInclude>
+    <ClInclude Include="DLLRefHelper.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="StringHelper.h">
+      <Filter>Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.Property.h">
+      <Filter>Core.Property</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

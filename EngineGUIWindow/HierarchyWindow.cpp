@@ -93,11 +93,11 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					Meta::UndoCommandManager->Redo();
 				}
-				if (ImGui::MenuItem("           Copy", "       Ctrl + C", nullptr, !scene->m_selectedSceneObjects.empty()))
+				if (ImGui::MenuItem("       Copy", "       Ctrl + C", nullptr, !scene->m_selectedSceneObjects.empty()))
 				{
 					m_clipboard = scene->m_selectedSceneObjects;
 				}
-				if (ImGui::MenuItem("           Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
+				if (ImGui::MenuItem("       Paste", "	Ctrl + V", nullptr, !m_clipboard.empty()))
 				{
 					scene->ClearSelectedSceneObjects();
 					Meta::UndoCommandManager->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(

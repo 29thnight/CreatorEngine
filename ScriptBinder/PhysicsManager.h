@@ -52,10 +52,13 @@ class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
 class Scene;
-class PhysicsManager : public Singleton<PhysicsManager>
+class PhysicsManager : public DLLCore::Singleton<PhysicsManager>
 {
+private:
+	friend class DLLCore::Singleton<PhysicsManager>;
 
-	friend class Singleton;
+	PhysicsManager() = default;
+	~PhysicsManager() = default;
 	//todo : 
 	// - 물리엔진 초기화 및 업데이트
 	// - 물리엔진 종료
@@ -76,7 +79,6 @@ public:
 		bool bIsRemoveBody = false;
 	};
 
-	
 	struct CollisionCallbackInfo {
 		CollisionData data;
 		ECollisionEventType Type;
@@ -91,10 +93,6 @@ public:
 		bool useGravity;
 	};
 public:
-
-	PhysicsManager() = default;
-	~PhysicsManager() = default;
-
 	// 물리엔진 초기화 및 업데이트
 	void Initialize();
 	void Update(float fixedDeltaTime);
@@ -221,4 +219,4 @@ private:
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
 
-static auto& PhysicsManagers = PhysicsManager::GetInstance();
+static auto PhysicsManagers = PhysicsManager::GetInstance();

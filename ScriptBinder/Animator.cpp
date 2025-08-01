@@ -11,7 +11,8 @@ void Animator::Awake()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
 	{
-		renderScene->RegisterAnimator(this);
+		auto sharedThis = shared_from_this();
+		renderScene->RegisterAnimator(sharedThis);
 	}
 }
 
@@ -39,7 +40,8 @@ void Animator::OnDestroy()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (renderScene)
 	{
-		renderScene->UnregisterAnimator(this);
+		auto sharedThis = shared_from_this();
+		renderScene->UnregisterAnimator(sharedThis);
 	}
 }
 

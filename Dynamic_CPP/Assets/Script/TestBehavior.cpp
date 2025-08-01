@@ -22,7 +22,7 @@ void TestBehavior::Start()
 	// that this behavior is attached to.
 	// You can also use this method to register any event listeners or perform any other
 	// setup tasks that are needed before the behavior starts running.
-	
+	SceneManagers;
 	boxCollider = m_pOwner->GetComponent<BoxColliderComponent>();
 	rigidBody = m_pOwner->GetComponent<RigidBodyComponent>();
 }
@@ -57,46 +57,6 @@ void TestBehavior::OnCollisionExit(const Collision& collider)
 
 void TestBehavior::Update(float tick)
 {
-	m_chargingTime += tick;
-	m_chargingTime > 20.f ? m_chargingTime = 0.f : m_chargingTime;
-
-	if (rigidBody)
-	{
-		bool istriger = rigidBody->IsTrigger();
-		if (istriger)
-		{
-			std::cout << " state : trigger" << std::endl;
-		}
-		else {
-			std::cout << " state : collision" << std::endl;
-		}
-
-		std::cout << " testValue : " << testValue << std::endl;
-		std::cout << " m_chargingTime : " << m_chargingTime << std::endl;
-
-		if (testValue< m_chargingTime)
-		{
-			std::cout << " testValue < m_chargingTime" << std::endl;
-			if (!istriger)
-			{
-				std::cout << " set trigger" << std::endl;
-				rigidBody->SetIsTrigger(true);
-				
-			}
-		}
-
-		if (testValue> m_chargingTime)
-		{
-
-			if (istriger)
-			{
-				rigidBody->SetIsTrigger(false);
-			}
-		}
-
-	}
-
-
 }
 
 void TestBehavior::LateUpdate(float tick)

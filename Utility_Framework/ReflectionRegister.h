@@ -2,6 +2,7 @@
 #include "ClassProperty.h"
 #include "ReflectionType.h"
 #include "MetaStateCommand.h"
+#include "ManagedHeapObject.h"
 #include <functional>
 #include <any>
 #include <typeindex>
@@ -180,6 +181,7 @@ namespace Meta
 
     static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
     using FactoryFunction = std::function<void*()>;
+	using SharedFactoryFunction = std::function<std::shared_ptr<void>()>;
     class IRegistableEvent;
     class FactoryRegistry : public Singleton<FactoryRegistry>
     {
@@ -192,23 +194,37 @@ namespace Meta
         template<typename T>
         void Register()
         {
-            _factories[ToString<T>()] = []() -> T*
+            if constexpr (std::is_base_of_v<ManagedHeapObject, T>)
             {
-                if constexpr (requires { T::Create(); }) // 커스텀 메모리풀 지원
+                _sharedFactories[ToString<T>()] = []() -> std::shared_ptr<T>
                 {
-                    return T::Create();
-                }
-                else
+                    return shared_alloc<T>();
+                };
+			}
+            else
+            {
+                _factories[ToString<T>()] = []() -> T*
                 {
                     return new T();
-                }
-            };
+                };
+            }
         }
 
         void* Create(const std::string& typeName)
         {
             auto it = _factories.find(typeName);
             return (it != _factories.end()) ? it->second() : nullptr;
+        }
+
+        std::shared_ptr<void> CreateShared(const std::string& typeName)
+        {
+			auto it = _sharedFactories.find(typeName);
+            if (it != _sharedFactories.end())
+            {
+                return it->second();
+            }
+
+			return nullptr; // 해당 타입의 팩토리가 없으면 nullptr 반환
         }
 
 		template<typename T>
@@ -222,8 +238,20 @@ namespace Meta
 			return nullptr;
 		}
 
+		template<typename T>
+        std::shared_ptr<T> CreateShared(const std::string& typeName)
+        {
+            auto it = _sharedFactories.find(typeName);
+            if (it != _sharedFactories.end())
+            {
+                return std::static_pointer_cast<T>(it->second());
+            }
+			return nullptr; // 해당 타입의 팩토리가 없으면 nullptr 반환
+        }
+
     private:
         std::unordered_map<std::string, FactoryFunction> _factories;
+		std::unordered_map<std::string, SharedFactoryFunction> _sharedFactories;
     };
 
     static inline auto& MetaFactoryRegistry = FactoryRegistry::GetInstance();

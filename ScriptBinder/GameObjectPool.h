@@ -1,11 +1,12 @@
 #pragma once
 #include "GameObject.h"
+#include "DLLAcrossSingleton.h"
 #include "Core.Minimal.h"
 
-class GameObjectPool : public Singleton<GameObjectPool>
+class GameObjectPool : public DLLCore::Singleton<GameObjectPool>
 {
 private:
-    friend class Singleton;
+    friend class DLLCore::Singleton<GameObjectPool>;
     GameObjectPool() = default;
     ~GameObjectPool() = default;
 
@@ -26,7 +27,7 @@ private:
     MemoryPool<GameObject, 4096> m_pool;
 };
 
-static auto& GameObjectPoolInstance = GameObjectPool::GetInstance();
+static auto GameObjectPoolInstance = GameObjectPool::GetInstance();
 
 namespace ObjectPool
 {

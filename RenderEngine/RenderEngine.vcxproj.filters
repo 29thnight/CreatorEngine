@@ -503,6 +503,9 @@
     <ClCompile Include="TrailGenerateModule.cpp">
       <Filter>RenderPass\EffectPass\555.Generate</Filter>
     </ClCompile>
+    <ClCompile Include="TrailRenderModule.cpp">
+      <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -826,6 +829,9 @@
     <ClInclude Include="KeyFrameEvent.h">
       <Filter>Resources\Skeleton\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="TrailRenderModule.h">
+      <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">
@@ -1040,6 +1046,15 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SizeModule.cs.hlsl">
       <Filter>Shaders\Effect\2D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailMeshGenerate.cs.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailVertex.vs.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailPixel.ps.hlsl">
+      <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

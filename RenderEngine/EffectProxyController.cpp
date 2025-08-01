@@ -78,20 +78,10 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 			{
 			case EffectCommandType::Play:
 			{
-				// PlayEffect 후 반환된 인스턴스 ID를 프록시에 저장
-				std::string instanceId = EffectManagers->PlayEffect(proxy->GetTempleteName());
-				if (!instanceId.empty())
+				if (!proxy->GetInstanceName().empty())
 				{
-					proxy->UpdateInstanceName(instanceId);
-
-					// 현재 설정들을 새로운 인스턴스에 적용
-					if (auto* effect = EffectManagers->GetEffectInstance(instanceId))
-					{
-						effect->SetPosition(proxy->GetPosition());
-						effect->SetTimeScale(proxy->GetTimeScale());
-						effect->SetLoop(proxy->GetLoop());
-						effect->SetDuration(proxy->GetDuration());
-					}
+					command = EffectManagerProxy::CreatePlayCommand(proxy->GetInstanceName());
+					PushEffectCommand(std::move(command));
 				}
 				break;
 			}
@@ -110,24 +100,14 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 				}
 				break;
 			case EffectCommandType::Resume:
-				// Resume의 경우 새로운 인스턴스를 생성해야 함
-				if (!proxy->GetTempleteName().empty())
+			{
+				if (!proxy->GetInstanceName().empty())
 				{
-					std::string instanceId = EffectManagers->PlayEffect(proxy->GetTempleteName());
-					if (!instanceId.empty())
-					{
-						proxy->UpdateInstanceName(instanceId);
-
-						if (auto* effect = EffectManagers->GetEffectInstance(instanceId))
-						{
-							effect->SetPosition(proxy->GetPosition());
-							effect->SetTimeScale(proxy->GetTimeScale());
-							effect->SetLoop(proxy->GetLoop());
-							effect->SetDuration(proxy->GetDuration());
-						}
-					}
+					command = EffectManagerProxy::CreatePlayCommand(proxy->GetInstanceName());
+					PushEffectCommand(std::move(command));
 				}
 				break;
+			}
 			case EffectCommandType::SetPosition:
 				if (!proxy->GetInstanceName().empty())
 				{
@@ -184,15 +164,17 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 					PushEffectCommand(std::move(command));
 				}
 				break;
+
 			case EffectCommandType::ReplaceEffect:
 			{
 				std::string newInstanceId = EffectManagers->ReplaceEffect(
 					proxy->GetInstanceName(),
 					proxy->GetTempleteName()
 				);
-
 				if (!newInstanceId.empty()) {
-					// 인스턴스 ID는 그대로 유지됨
+					// 프록시의 인스턴스 이름 업데이트 (이 부분이 빠져있었음)
+					proxy->SetInstanceName(newInstanceId);
+
 					if (auto* effect = EffectManagers->GetEffectInstance(newInstanceId)) {
 						effect->SetPosition(proxy->GetPosition());
 						effect->SetRotation(proxy->GetRotation());
@@ -203,8 +185,27 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 				}
 				break;
 			}
-			default:
+			case EffectCommandType::PlayWithCustomId:
+			{
+				std::string instanceName = proxy->GetInstanceName();
+				std::string templateName = proxy->GetTempleteName();
+
+				// 커스텀 ID로 이펙트 생성
+				std::string resultInstanceId = EffectManagers->PlayEffectWithCustomId(templateName, instanceName);
+
+				if (!resultInstanceId.empty()) {
+					proxy->SetInstanceName(resultInstanceId);
+
+					if (auto* effect = EffectManagers->GetEffectInstance(resultInstanceId)) {
+						effect->SetPosition(proxy->GetPosition());
+						effect->SetRotation(proxy->GetRotation());
+						effect->SetTimeScale(proxy->GetTimeScale());
+						effect->SetLoop(proxy->GetLoop());
+						effect->SetDuration(proxy->GetDuration());
+					}
+				}
 				break;
+			}
 			}
 		}
 	}
