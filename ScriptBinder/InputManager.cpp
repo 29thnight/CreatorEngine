@@ -1,101 +1,10 @@
 #include "InputManager.h"
 #include <wrl.h>
+#include <iostream>
 
 #pragma comment(lib, "GameInput.lib")
 using namespace Microsoft::WRL;
-std::vector<KeyBoard> keyboradsss =
-{
-    KeyBoard::A,
-    KeyBoard::B,
-    KeyBoard::C,
-    KeyBoard::D,
-    KeyBoard::E,
-    KeyBoard::F,
-    KeyBoard::G,
-    KeyBoard::H,
-    KeyBoard::I,
-    KeyBoard::J,
-    KeyBoard::K,
-    KeyBoard::L,
-    KeyBoard::M,
-    KeyBoard::N,
-    KeyBoard::O,
-    KeyBoard::P,
-    KeyBoard::Q,
-    KeyBoard::R,
-    KeyBoard::S,
-    KeyBoard::T,
-    KeyBoard::U,
-    KeyBoard::V,
-    KeyBoard::W,
-    KeyBoard::X,
-    KeyBoard::Y,
-    KeyBoard::Z,
-    KeyBoard::LeftArrow,
-    KeyBoard::UpArrow,
-    KeyBoard::RightArrow,
-    KeyBoard::DownArrow,
-    KeyBoard::Space,
-    KeyBoard::LeftControl,
-    KeyBoard::RightControl,
-    KeyBoard::LeftShift,
-    KeyBoard::RightShift,
-    KeyBoard::LeftAlt,
-    KeyBoard::RightAlt,
-    KeyBoard::Enter,
-    KeyBoard::Backspace,
-    KeyBoard::Tab,
-    KeyBoard::Escape,
-    KeyBoard::CapsLock,
-    KeyBoard::Insert,
-    KeyBoard::Delete,
-    KeyBoard::Home,
-    KeyBoard::End,
-    KeyBoard::PageUp,
-    KeyBoard::PageDown,
-    KeyBoard::NumLock,
-    KeyBoard::ScrollLock,
-    KeyBoard::F1,
-    KeyBoard::F2,
-    KeyBoard::F3,
-    KeyBoard::F4,
-    KeyBoard::F5,
-    KeyBoard::F6,
-    KeyBoard::F7,
-    KeyBoard::F8,
-    KeyBoard::F9,
-    KeyBoard::F10,
-    KeyBoard::F11,
-    KeyBoard::F12,
-    KeyBoard::Numpad0,
-    KeyBoard::Numpad1,
-    KeyBoard::Numpad2,
-    KeyBoard::Numpad3,
-    KeyBoard::Numpad4,
-    KeyBoard::Numpad5,
-    KeyBoard::Numpad6,
-    KeyBoard::Numpad7,
-    KeyBoard::Numpad8,
-    KeyBoard::Numpad9,
-    KeyBoard::None,
-};
-std::vector<ControllerButton> controllerButtons =
-{
-    ControllerButton::A,
-    ControllerButton::B,
-    ControllerButton::X,
-    ControllerButton::Y,
-    ControllerButton::DPAD_DOWN,
-    ControllerButton::DPAD_LEFT,
-    ControllerButton::DPAD_RIGHT,
-    ControllerButton::DPAD_UP,
-    ControllerButton::START_BUTTON,
-    ControllerButton::BACK_BUTTON,
-    ControllerButton::LEFT_SHOULDER,
-    ControllerButton::RIGHT_SHOULDER,
-    ControllerButton::LEFT_Thumbstick,
-    ControllerButton::RIGHT_Thumbstick,
-};
+
 
 bool InputManager::Initialize(HWND _hwnd)
 {
@@ -125,7 +34,7 @@ void InputManager::Update(float deltaTime)
 
 void InputManager::KeyBoardUpdate()
 {
-    memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);
+    m_curKeyStates.Reset();
 
     ComPtr<IGameInputReading> reading;
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, &reading);
@@ -137,60 +46,25 @@ void InputManager::KeyBoardUpdate()
     uint32_t keyCount = reading->GetKeyCount();
     if (keyCount > 0)
     {
-        GkeyStates.clear();
-        GkeyStates.resize(keyCount);
-
-        reading->GetKeyState(keyCount, GkeyStates.data());
+        m_GameInputKeyStates.clear();
+        m_GameInputKeyStates.resize(keyCount);
+        reading->GetKeyState(keyCount, m_GameInputKeyStates.data());
 
         for (uint32_t i = 0; i < keyCount; ++i)
         {
-            uint8_t virtualKey = GkeyStates[i].virtualKey;
+            uint8_t virtualKey = m_GameInputKeyStates[i].virtualKey;
             if (virtualKey < KEYBOARD_COUNT)
-                curkeyStates[virtualKey] = true;
+                m_curKeyStates.Set(virtualKey);
         }
     }
 
-    keyboardstate.Update();
+    m_keyboardState.Update();
     
 }
 
-bool InputManager::IsKeyDown(KeyBoard key) const
-{
-
-    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Down;
-}
-
-bool InputManager::IsKeyDown(unsigned int key) const
-{
-    return keyboardstate.GetKeyState(key) == KeyState::Down;
-}
-
-bool InputManager::IsKeyPressed(KeyBoard key) const
-{
-    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Pressed;
-}
-
-bool InputManager::IsKeyPressed(unsigned int key) const
-{
-    return keyboardstate.GetKeyState(key) == KeyState::Pressed;
-  
-}
-
-bool InputManager::IsKeyReleased(KeyBoard key) const
-{
-    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Released;
-}
-
-bool InputManager::IsKeyReleased(unsigned int key) const
-{
-    return keyboardstate.GetKeyState(key) == KeyState::Released;
-}
-
-
-
 bool InputManager::IsAnyKeyPressed()
 {
-    if (GkeyStates.size() != 0)
+    if (m_GameInputKeyStates.size() != 0)
     {
 
         // std::cout <<  "키가 눌렸습니다 " << std::endl;
@@ -199,70 +73,54 @@ bool InputManager::IsAnyKeyPressed()
     return false;
 }
 
-bool InputManager::changeKeySet(KeyBoard& changekey)
-{
-
-   
-    //KeyBoardUpdate();
-    //if (IsAnyKeyPressed())
-    //{
-    //    for (auto& keyState : GkeyStates)
-    //    {
-
-    //        pressKey = static_cast<KeyBoard>(keyState.virtualKey);
-    //        break;
-    //    }
-    //    if (pressKey != KeyBoard::None)
-    //    {
-    //        changekey = pressKey;
-    //        pressKey = KeyBoard::None;
-    //        std::cout << "키 변경 완료: " << std::endl;
-    //        //현재 키입력 초기화
-    //        memset(curkeyStates, 0, sizeof(bool) * KEYBOARD_COUNT);
-    //        return true;
-    //    }
-    //}
-    //return false;
-    return false;
-}
-
 void InputManager::MouseUpdate()
 {
     ComPtr<IGameInputReading> reading;
-    memset(curmouseState, 0, sizeof(bool) * mouseCount);
+    //memset(curmouseState, 0, sizeof(bool) * MOUSE_COUNT);
+    m_curMouseState.Reset();
     ResetMouseDelta();
-    _premouseWheelDelta = _mouseWheelDelta;
+    m_prevMouseWheelDelta = m_mouseWheelDelta;
     // 🔹 현재 마우스 입력 읽기
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindMouse, nullptr, &reading);
-    if (FAILED(hr)) {
+    if (FAILED(hr)) 
+    {
         std::cout << "마우스 GetCurrentReading 실패!" << std::endl;
         return;
     }
 
-    if (SUCCEEDED(reading->GetMouseState(&GmouseState))) {
+    if (reading->GetMouseState(&m_GameInputMouseState)) 
+    {
+        m_mousePos.x = m_GameInputMouseState.positionX;
+        m_mousePos.y = m_GameInputMouseState.positionY;
 
-
-        _mousePos.x = GmouseState.positionX;
-        _mousePos.y = GmouseState.positionY;
-        curmouseState[0] = (GmouseState.buttons & GameInputMouseLeftButton) != 0;
-        curmouseState[1] = (GmouseState.buttons & GameInputMouseRightButton) != 0;
-        curmouseState[2] = (GmouseState.buttons & GameInputMouseMiddleButton) != 0;
+        if (m_GameInputMouseState.buttons & GameInputMouseLeftButton)
+        {
+            m_curMouseState.Set((uint8)MouseKey::LEFT);
+        }
+        if (m_GameInputMouseState.buttons & GameInputMouseRightButton)
+        {
+            m_curMouseState.Set((uint8)MouseKey::RIGHT);
+        }
+        if (m_GameInputMouseState.buttons & GameInputMouseMiddleButton)
+        {
+            m_curMouseState.Set((uint8)MouseKey::MIDDLE);
+        }
+       /* curmouseState[1] = (m_GameInputMouseState.buttons & GameInputMouseRightButton) != 0;
+        curmouseState[2] = (m_GameInputMouseState.buttons & GameInputMouseMiddleButton) != 0;*/
         //curmouseState[3] = (mouseState.buttons & GameInputMouseXButton1) != 0; 추가버튼 쓸거면 추가필요
         //curmouseState[4] = (mouseState.buttons & GameInputMouseXButton2) != 0;
-
-
     }
     
-    _mouseWheelDelta = GmouseState.wheelY;
-    _mouseDelta.x = (_mousePos.x - _prevMousePos.x) * 0.5f;
-    _mouseDelta.y = (_mousePos.y - _prevMousePos.y) * 0.5f;
-    mousestate.Update();
+    m_mouseWheelDelta = m_GameInputMouseState.wheelY;
+    m_mouseDelta.x = (m_mousePos.x - m_prevMousePos.x) * 0.5f;
+    m_mouseDelta.y = (m_mousePos.y - m_prevMousePos.y) * 0.5f;
+    m_mouseState.Update();
 }
 
 void InputManager::SetMousePos(POINT pos)
 {
-    _mousePos.x = pos.x;
-    _mousePos.y = pos.y;
+    m_mousePos.x = pos.x;
+    m_mousePos.y = pos.y;
 }
 
 float2 InputManager::GetMousePos()
@@ -270,70 +128,69 @@ float2 InputManager::GetMousePos()
     POINT cursorPos;
     GetCursorPos(&cursorPos);
     ScreenToClient(hwnd, &cursorPos);
-    _mousePos.x = cursorPos.x;
-    _mousePos.y = cursorPos.y;
-    return _mousePos;
+    m_mousePos.x = cursorPos.x;
+    m_mousePos.y = cursorPos.y;
+    return m_mousePos;
 }
 
 float2 InputManager::GetMouseDelta() const
 {
-    return _mouseDelta;
+    return m_mouseDelta;
 }
 
 short InputManager::GetWheelDelta() const
 {
-    return _mouseWheelDelta;
+    return m_mouseWheelDelta;
 }
 
 bool InputManager::IsWheelUp()
 {
-    return _premouseWheelDelta < _mouseWheelDelta;
+    return m_prevMouseWheelDelta < m_mouseWheelDelta;
 }
 
 bool InputManager::IsWheelDown()
 {
-    return _premouseWheelDelta > _mouseWheelDelta;
+    return m_prevMouseWheelDelta > m_mouseWheelDelta;
 }
 
 bool InputManager::IsMouseButtonDown(MouseKey button)
 {
-    return mousestate.GetKeyState(static_cast<size_t>(button)) == KeyState::Down;
+    return m_mouseState.GetKeyState(static_cast<size_t>(button)) == KeyState::Down;
 }
 
 bool InputManager::IsMouseButtonPressed(MouseKey button)
 {
-    return mousestate.GetKeyState(static_cast<size_t>(button)) == KeyState::Pressed;
-   
+    return m_mouseState.GetKeyState(static_cast<size_t>(button)) == KeyState::Pressed;
 }
 
 bool InputManager::IsMouseButtonReleased(MouseKey button)
 {
-    return mousestate.GetKeyState(static_cast<size_t>(button)) == KeyState::Released;
+    return m_mouseState.GetKeyState(static_cast<size_t>(button)) == KeyState::Released;
 }
 
 void InputManager::HideCursor()
 {
-    if (!_isCursorHidden)
+    if (!m_isCursorHidden)
     {
         while (::ShowCursor(FALSE) >= 0);  // Keep hiding cursor until it's fully hidden
-        _isCursorHidden = true;
+        m_isCursorHidden = true;
     }
 }
 
 void InputManager::ShowCursor()
 {
-    if (_isCursorHidden)
+    if (m_isCursorHidden)
     {
         while (::ShowCursor(TRUE) < 0);  // Keep showing cursor until it's fully shown
-        _isCursorHidden = false;
+        m_isCursorHidden = false;
     }
 }
 
 void InputManager::ResetMouseDelta()
 {
-    _prevMousePos = _mousePos;
-    _mouseDelta = { 0, 0 };
-    //_mouseWheelDelta = 0;
+    m_prevMousePos = m_mousePos;
+    m_mouseDelta = { 0, 0 };
+    //m_mouseWheelDelta = 0;
 }
 
 void InputManager::PadUpdate()
@@ -377,56 +234,51 @@ void InputManager::PadUpdate()
 
 void InputManager::GamePadUpdate()
 {
-    // 연결된 게임패드 상태를 읽을 IGameInputReading 객체
-
-
-    //memset(curpadState, 0, sizeof(bool) * padKeyCount);
-
-    for (int i = 0; i < MAX_CONTROLLER; i++)
+    for (int i = 0; i < MAX_CONTROLLER; ++i)
     {
-        ComPtr<IGameInputReading> reading;
-        memset(curpadState[i], 0, sizeof(bool) * padKeyCount);
-        HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, device[i], &reading);
-        if (FAILED(hr)) {
-            //std::cout << "게임패드 GetCurrentReading 실패!" << std::endl;
-            return;
-        }
+        m_curPadState[i].Reset();
 
-        if (device[i] == nullptr)
-        {
+        if (!device[i])
             continue;
-        }
-        // 각 게임패드에 대해 상태를 추적
-        reading->GetGamepadState(&GpadState[i]);
-        
-        
-        curpadState[i][0] = (GpadState[i].buttons & GameInputGamepadA) != 0;
-        curpadState[i][1] = (GpadState[i].buttons & GameInputGamepadB) != 0;
-        curpadState[i][2] = (GpadState[i].buttons & GameInputGamepadX) != 0;
-        curpadState[i][3] = (GpadState[i].buttons & GameInputGamepadY) != 0;
-        curpadState[i][4] = (GpadState[i].buttons & GameInputGamepadDPadUp) != 0;
-        curpadState[i][5] = (GpadState[i].buttons & GameInputGamepadDPadDown) != 0;
-        curpadState[i][6] = (GpadState[i].buttons & GameInputGamepadDPadLeft) != 0;
-        curpadState[i][7] = (GpadState[i].buttons & GameInputGamepadDPadRight) != 0;
 
-        curpadState[i][8] = (GpadState[i].buttons & GameInputGamepadMenu) != 0;
-        curpadState[i][9] = (GpadState[i].buttons & GameInputGamepadView) != 0;
+        ComPtr<IGameInputReading> reading;
+        HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, device[i], &reading);
+        if (FAILED(hr) || !reading)
+            continue;
 
-        curpadState[i][10] = (GpadState[i].buttons & GameInputGamepadLeftShoulder) != 0;
-        curpadState[i][11] = (GpadState[i].buttons & GameInputGamepadRightShoulder) != 0;
-        curpadState[i][12] = (GpadState[i].buttons & GameInputGamepadLeftThumbstick) != 0;
-        curpadState[i][13] = (GpadState[i].buttons & GameInputGamepadRightThumbstick) != 0;
-        
-        curpadState[i][14] = (GpadState[i].buttons & GameInputGamepadNone) != 0;
+        reading->GetGamepadState(&m_GameInputPadState[i]);
+        const auto& buttons = m_GameInputPadState[i].buttons;
 
-        _controllerThumbL[i].x = (GpadState[i].leftThumbstickX);
-        _controllerThumbL[i].y = (GpadState[i].leftThumbstickY);
-        _controllerThumbR[i].x = (GpadState[i].rightThumbstickX);
-        _controllerThumbR[i].y = (GpadState[i].rightThumbstickY);
-        _controllerTriggerL[i] = (GpadState[i].leftTrigger);
-        _controllerTriggerR[i] = (GpadState[i].rightTrigger);
+        if (buttons & GameInputGamepadA)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::A));
+        if (buttons & GameInputGamepadB)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::B));
+        if (buttons & GameInputGamepadX)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::X));
+        if (buttons & GameInputGamepadY)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::Y));
+
+        if (buttons & GameInputGamepadDPadUp)          m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_UP));
+        if (buttons & GameInputGamepadDPadDown)        m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_DOWN));
+        if (buttons & GameInputGamepadDPadLeft)        m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_LEFT));
+        if (buttons & GameInputGamepadDPadRight)       m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_RIGHT));
+
+        if (buttons & GameInputGamepadMenu)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::START_BUTTON));
+        if (buttons & GameInputGamepadView)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::BACK_BUTTON));
+
+        if (buttons & GameInputGamepadLeftShoulder)    m_curPadState[i].Set(static_cast<size_t>(ControllerButton::LEFT_SHOULDER));
+        if (buttons & GameInputGamepadRightShoulder)   m_curPadState[i].Set(static_cast<size_t>(ControllerButton::RIGHT_SHOULDER));
+        if (buttons & GameInputGamepadLeftThumbstick)  m_curPadState[i].Set(static_cast<size_t>(ControllerButton::LEFT_THUMB));
+        if (buttons & GameInputGamepadRightThumbstick) m_curPadState[i].Set(static_cast<size_t>(ControllerButton::RIGHT_THUMB));
+
+        if (buttons & GameInputGamepadNone)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::None));
+
+        m_controllerThumbL[i].x = m_GameInputPadState[i].leftThumbstickX;
+        m_controllerThumbL[i].y = m_GameInputPadState[i].leftThumbstickY;
+        m_controllerThumbR[i].x = m_GameInputPadState[i].rightThumbstickX;
+        m_controllerThumbR[i].y = m_GameInputPadState[i].rightThumbstickY;
+
+        m_controllerTriggerL[i] = m_GameInputPadState[i].leftTrigger;
+        m_controllerTriggerR[i] = m_GameInputPadState[i].rightTrigger;
     }
-    padState.Update();
+
+    m_padState.Update();
 }
 
 bool InputManager::IsControllerConnected(DWORD Index)
@@ -436,32 +288,32 @@ bool InputManager::IsControllerConnected(DWORD Index)
 
 bool InputManager::IsControllerButtonDown(DWORD index, ControllerButton btn) const
 {
-    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Down;
+    return m_padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Down;
 }
 
 bool InputManager::IsControllerButtonPressed(DWORD index, ControllerButton btn) const
 {
-    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Pressed;
+    return m_padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Pressed;
 }
 
 bool InputManager::IsControllerButtonReleased(DWORD index, ControllerButton btn) const
 {
-    return padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Released;
+    return m_padState.GetKeyState(index, static_cast<size_t>(btn)) == KeyState::Released;
 }
 
 bool InputManager::IsControllerTriggerL(DWORD index) const
 {
-    return   _controllerTriggerL[index] > triggerdeadZone;
+    return m_controllerTriggerL[index] > triggerdeadZone;
 }
 
 bool InputManager::IsControllerTriggerR(DWORD index) const
 {
-    return   _controllerTriggerR[index] > triggerdeadZone;
+    return m_controllerTriggerR[index] > triggerdeadZone;
 }
 
 Mathf::Vector2 InputManager::GetControllerThumbL(DWORD index) const
 {
-    float2 stick(_controllerThumbL[index].x, _controllerThumbL[index].y);
+    float2 stick(m_controllerThumbL[index].x, m_controllerThumbL[index].y);
 
     if (std::abs(stick.x) < deadZone) stick.x = 0.0f;
     if (std::abs(stick.y) < deadZone) stick.y = 0.0f;
@@ -472,7 +324,7 @@ Mathf::Vector2 InputManager::GetControllerThumbL(DWORD index) const
 
 Mathf::Vector2 InputManager::GetControllerThumbR(DWORD index) const
 {
-    float2 stick(_controllerThumbR[index].x, _controllerThumbR[index].y);
+    float2 stick(m_controllerThumbR[index].x, m_controllerThumbR[index].y);
     if (std::abs(stick.x) < deadZone) stick.x = 0.0f;
     if (std::abs(stick.y) < deadZone) stick.y = 0.0f;
 
@@ -500,9 +352,9 @@ void InputManager::UpdateControllerVibration(float tick)
     	if (device[i])
     	{
             if (device[i] == nullptr) continue;
-    		if (_controllerVibrationTime[i] > 0.0f)
+    		if (m_controllerVibrationTime[i] > 0.0f)
     		{
-    			_controllerVibrationTime[i] -= tick;
+    			m_controllerVibrationTime[i] -= tick;
     			//SetControllerVibration(i, _controllerVibration[i].wLeftMotorSpeed, _controllerVibration[i].wRightMotorSpeed);
     			SetControllerVibration(i, 0.5f, 0.5f,0.5f, 0.5f);
     		}
@@ -517,7 +369,7 @@ void InputManager::UpdateControllerVibration(float tick)
 void InputManager::SetControllerVibrationTime(DWORD Index, float time)
 {
     
-    _controllerVibrationTime[Index] = time;
+    m_controllerVibrationTime[Index] = time;
 }
 
 

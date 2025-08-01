@@ -27,8 +27,8 @@ public:
 		return m_materialGuid == other.m_materialGuid;
 	}
 
-	static Material* Instantiate(const Material* origin, const std::string_view& newName = {});
-	static std::shared_ptr<Material> InstantiateShared(const Material* origin, const std::string_view& newName = {});
+	static Material* Instantiate(const Material* origin, std::string_view newName = {});
+	static std::shared_ptr<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
 
 //initialize material chainable functions
 public:

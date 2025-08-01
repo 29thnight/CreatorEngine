@@ -32,7 +32,7 @@ Material::~Material()
 {
 }
 
-Material* Material::Instantiate(const Material* origin, const std::string_view& newName)
+Material* Material::Instantiate(const Material* origin, std::string_view newName)
 {
 	if (!origin)
 		return nullptr;
@@ -53,7 +53,7 @@ Material* Material::Instantiate(const Material* origin, const std::string_view& 
 	return cloneMaterial;
 }
 
-std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, const std::string_view& newName)
+std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
 	return std::shared_ptr<Material>(Instantiate(origin, newName), [](Material* mat) { ResourceAllocator::GetInstance()->DeallocateMaterial(mat); });
 }

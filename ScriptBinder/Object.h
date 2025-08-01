@@ -16,8 +16,8 @@ public:
     virtual ~Object() = default;
 
 public:
-    Object(const std::string_view& name) : m_name(name.data()) {}
-	Object(const std::string_view& name, size_t instanceID) : m_name(name.data()), m_instanceID(instanceID) 
+    Object(std::string_view name) : m_name(name.data()) {}
+	Object(std::string_view name, size_t instanceID) : m_name(name.data()), m_instanceID(instanceID) 
     {
 		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
     }
@@ -38,7 +38,7 @@ public:
 
 	static void Destroy(Object* objPtr);
     static void SetDontDestroyOnLoad(Object* objPtr);
-    static Object* Instantiate(const Object* original, const std::string_view& newName);
+    static Object* Instantiate(const Object* original, std::string_view newName);
 
 public:
     [[Property]]

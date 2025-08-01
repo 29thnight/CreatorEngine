@@ -76,7 +76,7 @@ SkyBoxPass::~SkyBoxPass()
 {
 }
 
-void SkyBoxPass::Initialize(const std::string_view& fileName, float size)
+void SkyBoxPass::Initialize(std::string_view fileName, float size)
 {
 	m_fileName = fileName;
 	m_size = size;
@@ -216,7 +216,7 @@ void SkyBoxPass::GenerateCubeMap(RenderScene& scene)
     GenerateEnvironmentMap(scene);
 }
 
-void SkyBoxPass::GenerateCubeMap(const std::string_view& fileName, RenderScene& scene)
+void SkyBoxPass::GenerateCubeMap(std::string_view fileName, RenderScene& scene)
 {
 	m_fileName = fileName;
 	m_skyBoxTexture.reset();

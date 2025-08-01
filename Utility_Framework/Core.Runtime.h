@@ -1,5 +1,6 @@
 #pragma once
-#include "ClassProperty.h"
+#include <string>
+#include <exception>
 
 namespace std
 {

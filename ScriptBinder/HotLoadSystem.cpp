@@ -346,7 +346,7 @@ void HotLoadSystem::CompileEvent()
 	m_isCompileEventInvoked = true;
 }
 
-void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_view& name)
+void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, std::string_view name)
 {
 	auto activeScene = SceneManagers->GetActiveScene();
 	//결국 이렇게되면 .meta파일을 클라이언트가 가지고 있어야 됨...
@@ -458,7 +458,7 @@ void HotLoadSystem::BindScriptEvents(ModuleBehavior* script, const std::string_v
 	}
 }
 
-void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name)
+void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, std::string_view name)
 {
 	auto activeScene = SceneManagers->GetActiveScene();
 
@@ -534,7 +534,7 @@ void HotLoadSystem::UnbindScriptEvents(ModuleBehavior* script, const std::string
 
 }
 
-void HotLoadSystem::CreateScriptFile(const std::string_view& name)
+void HotLoadSystem::CreateScriptFile(std::string_view name)
 {
 #ifndef BUILD_FLAG
 	std::string scriptHeaderFileName = std::string(name) + ".h";
@@ -733,7 +733,7 @@ void HotLoadSystem::CreateScriptFile(const std::string_view& name)
 #endif // BUILD_FLAG
 }
 
-void HotLoadSystem::RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script)
+void HotLoadSystem::RegisterScriptReflection(std::string_view name, ModuleBehavior* script)
 {
 	std::string scriptMetaFile = "Assets\\Script\\" + std::string(name) + ".cpp" + ".meta";
 	file::path scriptMetaFileName = PathFinder::DynamicSolutionPath(scriptMetaFile);
@@ -755,12 +755,12 @@ void HotLoadSystem::RegisterScriptReflection(const std::string_view& name, Modul
 	}
 }
 
-void HotLoadSystem::UnRegisterScriptReflection(const std::string_view& name)
+void HotLoadSystem::UnRegisterScriptReflection(std::string_view name)
 {
 	Meta::Registry::GetInstance()->UnRegister(name.data());
 }
 
-void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
+void HotLoadSystem::CreateActionNodeScript(std::string_view name)
 {
 #ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
@@ -954,7 +954,7 @@ void HotLoadSystem::CreateActionNodeScript(const std::string_view& name)
 #endif // BUILD_FLAG
 }
 
-void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
+void HotLoadSystem::CreateConditionNodeScript(std::string_view name)
 {
 #ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
@@ -1152,7 +1152,7 @@ void HotLoadSystem::CreateConditionNodeScript(const std::string_view& name)
 #endif // BUILD_FLAG
 }
 
-void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& name)
+void HotLoadSystem::CreateConditionDecoratorNodeScript(std::string_view name)
 {
 #ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("BehaviorTree")))
@@ -1350,7 +1350,7 @@ void HotLoadSystem::CreateConditionDecoratorNodeScript(const std::string_view& n
 #endif // BUILD_FLAG
 }
 
-void HotLoadSystem::CreateAniBehaviorScript(const std::string_view& name)
+void HotLoadSystem::CreateAniBehaviorScript(std::string_view name)
 {
 #ifndef BUILD_FLAG
 	if (!file::exists(PathFinder::Relative("Script")))

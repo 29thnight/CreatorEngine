@@ -27,7 +27,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BaseTypeDef.h" />
     <ClInclude Include="Benchmark.hpp" />
+    <ClInclude Include="BitFlag.h" />
     <ClInclude Include="CircleQueue.hpp" />
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="Core.Assert.hpp" />
@@ -50,6 +52,7 @@
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="CoroutineHelper.h" />
     <ClInclude Include="CSVLoader.h" />
+    <ClInclude Include="CSVLoaderHelper.h" />
     <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DeviceResources.h" />
@@ -60,7 +63,7 @@
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
-    <ClInclude Include="ImGuiLogger.h" />
+    <ClInclude Include="TypeIO.h" />
     <ClInclude Include="LinkedListLib.hpp" />
     <ClInclude Include="LogEntry.h" />
     <ClInclude Include="LogSink.h" />
@@ -83,7 +86,6 @@
     <ClInclude Include="ReflectionVectorMapper.h" />
     <ClInclude Include="ReflectionYml.h" />
     <ClInclude Include="RingBuffer.h" />
-    <ClInclude Include="Serializer.h" />
     <ClInclude Include="SimpleIniFile.h" />
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />

@@ -1070,7 +1070,7 @@ void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
 	DirectX11::OMSetRenderTargets(1, &rtv, dsv);
 }
 
-void SceneRenderer::ApplyNewCubeMap(const std::string_view& filename)
+void SceneRenderer::ApplyNewCubeMap(std::string_view filename)
 {
 	m_pSkyBoxPass->GenerateCubeMap(filename, *m_renderScene);
 	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);

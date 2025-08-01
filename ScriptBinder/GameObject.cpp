@@ -18,7 +18,7 @@ GameObject::GameObject() :
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
-GameObject::GameObject(Scene* scene, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
     Object(name),
     m_gameObjectType(type),
     m_index(index), 
@@ -31,7 +31,7 @@ GameObject::GameObject(Scene* scene, const std::string_view& name, GameObjectTyp
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 }
 
-GameObject::GameObject(Scene* scene, size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
+GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
 	Object(name, instanceID),
 	m_gameObjectType(type),
 	m_index(index),
@@ -50,7 +50,7 @@ const std::string& GameObject::RemoveSuffixNumberTag() const
 	return m_removedSuffixNumberTag;
 }
 
-void GameObject::SetTag(const std::string_view& tag)
+void GameObject::SetTag(std::string_view tag)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -63,7 +63,7 @@ void GameObject::SetTag(const std::string_view& tag)
     }
 }
 
-void GameObject::SetLayer(const std::string_view& layer)
+void GameObject::SetLayer(std::string_view layer)
 {
     if (layer.empty())
     {
@@ -126,7 +126,7 @@ std::shared_ptr<Component> GameObject::AddComponent(const Meta::Type& type)
 	return component;
 }
 
-ModuleBehavior* GameObject::AddScriptComponent(const std::string_view& scriptName)
+ModuleBehavior* GameObject::AddScriptComponent(std::string_view scriptName)
 {
     std::shared_ptr<ModuleBehavior> component = std::shared_ptr<ModuleBehavior>(
 		ScriptManager->CreateMonoBehavior(scriptName.data()), 
@@ -254,7 +254,7 @@ void GameObject::RemoveComponentTypeID(uint32 typeID)
 	}
 }
 
-void GameObject::RemoveScriptComponent(const std::string_view& scriptName)
+void GameObject::RemoveScriptComponent(std::string_view scriptName)
 {
 	auto iter = std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ModuleBehavior>(); });
 	if (iter != m_components.end())
@@ -292,7 +292,7 @@ void GameObject::RemoveComponent(Meta::Type& type)
 {
 }
 
-GameObject* GameObject::Find(const std::string_view& name)
+GameObject* GameObject::Find(std::string_view name)
 {
     Scene* scene = SceneManagers->GetActiveScene();
     if (scene)

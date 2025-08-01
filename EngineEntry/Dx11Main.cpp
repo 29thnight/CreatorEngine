@@ -6,7 +6,6 @@
 #include "Physx.h"
 #include "SoundManager.h"
 #include "Benchmark.hpp"
-#include "ImGuiLogger.h"
 #include "TimeSystem.h"
 #include "HotLoadSystem.h"
 #include "DataSystem.h"

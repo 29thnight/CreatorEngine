@@ -56,7 +56,7 @@ std::shared_ptr<GameObject> Scene::AddGameObject(const std::shared_ptr<GameObjec
 	return sceneObject;
 }
 
-void Scene::AddRootGameObject(const std::string_view& name)
+void Scene::AddRootGameObject(std::string_view name)
 {
 	std::string uniqueName{};
 
@@ -87,7 +87,7 @@ void Scene::AddRootGameObject(const std::string_view& name)
 	m_SceneObjects.push_back(newObj);
 }
 
-std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -140,7 +140,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string_view& name
 	return m_SceneObjects[index];
 }
 
-std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index parentIndex)
+std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index parentIndex)
 {
     if (name.empty())
     {
@@ -187,7 +187,7 @@ std::shared_ptr<GameObject> Scene::GetGameObject(GameObject::Index index)
 	return m_SceneObjects[0];
 }
 
-std::shared_ptr<GameObject> Scene::GetGameObject(const std::string_view& name)
+std::shared_ptr<GameObject> Scene::GetGameObject(std::string_view name)
 {
 	HashingString hashedName(name.data());
 	for (auto& obj : m_SceneObjects)
@@ -1098,7 +1098,7 @@ void Scene::DestroyComponents()
 
 }
 
-std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
+std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
 {
 	std::string uniqueName{ name.data() };
 	std::string baseName{ name.data() };
@@ -1111,7 +1111,7 @@ std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
 	return uniqueName;
 }
 
-void Scene::RemoveGameObjectName(const std::string_view& name)
+void Scene::RemoveGameObjectName(std::string_view name)
 {
 	m_gameObjectNameSet.erase(name.data());
 }

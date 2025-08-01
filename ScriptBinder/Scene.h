@@ -36,15 +36,15 @@ public:
 	std::vector<std::shared_ptr<GameObject>> m_SceneObjects;
 
 	std::shared_ptr<GameObject> AddGameObject(const std::shared_ptr<GameObject>& sceneObject);
-	std::shared_ptr<GameObject> CreateGameObject(const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
-	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, const std::string_view& name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
+	std::shared_ptr<GameObject> CreateGameObject(std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
+	std::shared_ptr<GameObject> LoadGameObject(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, GameObject::Index parentIndex = -1);
 	std::shared_ptr<GameObject> GetGameObject(GameObject::Index index);
-	std::shared_ptr<GameObject> GetGameObject(const std::string_view& name);
+	std::shared_ptr<GameObject> GetGameObject(std::string_view name);
 	const std::vector<GameObject*>& GetSelectedSceneObjects() const { return m_selectedSceneObjects; }
 	void AddSelectedSceneObject(GameObject* sceneObject);
 	void RemoveSelectedSceneObject(GameObject* sceneObject);
 	void ClearSelectedSceneObjects();
-	void AddRootGameObject(const std::string_view& name);
+	void AddRootGameObject(std::string_view name);
 	void DestroyGameObject(const std::shared_ptr<GameObject>& sceneObject);
 	void DestroyGameObject(GameObject::Index index);
 
@@ -112,7 +112,7 @@ public:
 
     void AllDestroyMark();
 
-	static Scene* CreateNewScene(const std::string_view& sceneName = "SampleScene")
+	static Scene* CreateNewScene(std::string_view sceneName = "SampleScene")
 	{
 		Scene* allocScene = new Scene();
 		allocScene->m_sceneName = sceneName.data();
@@ -120,7 +120,7 @@ public:
 		return allocScene;
 	}
 
-	static Scene* LoadScene(const std::string_view& name)
+	static Scene* LoadScene(std::string_view name)
 	{
 		Scene* allocScene = new Scene();
 		allocScene->m_sceneName = name.data();
@@ -196,8 +196,8 @@ public:
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
-    std::string GenerateUniqueGameObjectName(const std::string_view& name);
-	void RemoveGameObjectName(const std::string_view& name);
+    std::string GenerateUniqueGameObjectName(std::string_view name);
+	void RemoveGameObjectName(std::string_view name);
     void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
 
 private:

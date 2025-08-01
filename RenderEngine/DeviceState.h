@@ -1,7 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "../Utility_Framework/Core.Minimal.h"
-#include "../Utility_Framework/DeviceResources.h"
+#include "DeviceResources.h"
+#include "LogSystem.h"
 
 namespace DeviceState
 {

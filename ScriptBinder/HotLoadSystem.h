@@ -67,17 +67,17 @@ public:
 	void ReplaceScriptComponent();
 	void CompileEvent();
 	// 스크립트 생성
-	void CreateScriptFile(const std::string_view& name);
-	void BindScriptEvents(ModuleBehavior* script, const std::string_view& name);
-	void UnbindScriptEvents(ModuleBehavior* script, const std::string_view& name);
-	void RegisterScriptReflection(const std::string_view& name, ModuleBehavior* script);
-	void UnRegisterScriptReflection(const std::string_view& name);
+	void CreateScriptFile(std::string_view name);
+	void BindScriptEvents(ModuleBehavior* script, std::string_view name);
+	void UnbindScriptEvents(ModuleBehavior* script, std::string_view name);
+	void RegisterScriptReflection(std::string_view name, ModuleBehavior* script);
+	void UnRegisterScriptReflection(std::string_view name);
 	// 행동 트리 노드 스크립트 생성
-	void CreateActionNodeScript(const std::string_view& name);
-	void CreateConditionNodeScript(const std::string_view& name);
-	void CreateConditionDecoratorNodeScript(const std::string_view& name);
+	void CreateActionNodeScript(std::string_view name);
+	void CreateConditionNodeScript(std::string_view name);
+	void CreateConditionDecoratorNodeScript(std::string_view name);
 	// 에니메이션 FSM 스크립트 생성
-	void CreateAniBehaviorScript(const std::string_view& name);
+	void CreateAniBehaviorScript(std::string_view name);
 
 #pragma region Script Build Helper
 	ModuleBehavior* CreateMonoBehavior(const char* name) const
@@ -109,7 +109,7 @@ public:
 		});
 	}
 
-	bool IsScriptExists(const std::string_view& name) const
+	bool IsScriptExists(std::string_view name) const
 	{
 		return std::ranges::find(m_scriptNames, name) != m_scriptNames.end();
 	}
@@ -226,7 +226,7 @@ public:
 		});
 	}
 
-	bool IsAniBehaviorExists(const std::string_view& name) const
+	bool IsAniBehaviorExists(std::string_view name) const
 	{
 		return std::ranges::find(m_aniBehaviorNames, name) != m_aniBehaviorNames.end();
 	}

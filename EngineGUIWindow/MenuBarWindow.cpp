@@ -2190,11 +2190,8 @@ void MenuBarWindow::SHowInputActionMap()
                         ImGui::OpenPopup("selectScript");
                     }
 
-
-
                     if (ImGui::BeginPopup("selectScript"))
                     {
-         
                         for (auto& script : ScriptManager->GetScriptNames())
                         {
                          
@@ -2270,9 +2267,8 @@ void MenuBarWindow::SHowInputActionMap()
             {
                 if (InputManagement->IsWheelDown())
                 {
-                    
                     index++;
-                    int maxIndex = static_cast<int>(keyboradsss.size()) - 10;
+                    constexpr int maxIndex = (int)keyboardButtons.size() - 10;
                     if (index > maxIndex)
                         index = maxIndex;
                 }
@@ -2287,11 +2283,11 @@ void MenuBarWindow::SHowInputActionMap()
                 for (int i = 0; i < 10; i++)
                 {
                     int realIndex = index + i;
-                    if (realIndex >= keyboradsss.size())
+                    if (realIndex >= keyboardButtons.size())
                         break; 
-                    if (ImGui::MenuItem(KeyBoardString(keyboradsss[realIndex]).c_str()))
+                    if (ImGui::MenuItem(KeyBoardString(keyboardButtons[realIndex]).c_str()))
                     {
-                        action->key[floatId] = static_cast<size_t>(keyboradsss[realIndex]);
+                        action->key[floatId] = static_cast<size_t>(keyboardButtons[realIndex]);
                         
                     }
                 }
@@ -2302,9 +2298,8 @@ void MenuBarWindow::SHowInputActionMap()
                 
                 if (InputManagement->IsWheelDown())
                 {
-
                     index++;
-                    int maxIndex = static_cast<int>(controllerButtons.size()) - 10;
+                    constexpr int maxIndex = (int)controllerButtons.size() - 10;
                     if (index > maxIndex)
                         index = maxIndex;
                 }
@@ -2336,10 +2331,10 @@ void MenuBarWindow::SHowInputActionMap()
 
             if (ImGui::BeginPopup("ControllerButtonFlaot4"))
             {
-                if (ImGui::MenuItem("LEFT_Thumbstick"))
-                    action->SetControllerButton(ControllerButton::LEFT_Thumbstick);
-                else if (ImGui::MenuItem("RIGHT_Thumbstick"))
-                    action->SetControllerButton(ControllerButton::RIGHT_Thumbstick);
+                if (ImGui::MenuItem("LEFT_THUMB"))
+                    action->SetControllerButton(ControllerButton::LEFT_THUMB);
+                else if (ImGui::MenuItem("RIGHT_THUMB"))
+                    action->SetControllerButton(ControllerButton::RIGHT_THUMB);
                 ImGui::EndPopup();
             }
             

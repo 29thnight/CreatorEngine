@@ -122,7 +122,7 @@ VolumetricFogPass::~VolumetricFogPass()
 	Memory::SafeDelete(mFinalVoxelInjectionTexture3DUAV);
 }
 //
-void VolumetricFogPass::Initialize(const std::string_view& fileName)
+void VolumetricFogPass::Initialize(std::string_view fileName)
 {
 	mCurrentVoxelVolumeSizeX = 160;
 	mCurrentVoxelVolumeSizeY = 90;

@@ -300,16 +300,16 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
         auto& selectedSceneObject = scene->m_selectedSceneObject;
         auto& selectedObjects = scene->m_selectedSceneObjects;
 
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
-        bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
-        if (isSelected)
-        {
-            flags |= ImGuiTreeNodeFlags_Selected;
-        }
-        else if (0 == obj->m_parentIndex)
-        {
-            flags |= ImGuiTreeNodeFlags_DefaultOpen;
-        }
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+    bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj.get()) != selectedObjects.end();
+    if (isSelected)
+    {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    else if (0 == obj->m_parentIndex)
+    {
+        flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    }
 
 	if (0 == obj->m_childrenIndices.size())
 	{

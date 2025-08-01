@@ -58,9 +58,6 @@
     <Filter Include="INILoader">
       <UniqueIdentifier>{10a74b62-715e-498d-8216-efd46b990009}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiLogger">
-      <UniqueIdentifier>{3fffb0da-8151-4f4d-9509-894daab7763e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core.Delegate">
       <UniqueIdentifier>{a1b99cd2-1945-4fa3-8a84-dc3ff277e569}</UniqueIdentifier>
     </Filter>
@@ -105,6 +102,9 @@
     </Filter>
     <Filter Include="Core.Property">
       <UniqueIdentifier>{ad9f4a99-f789-4433-ade5-606e00c3a85b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core.definition\Type">
+      <UniqueIdentifier>{82770586-7f15-4429-8c83-84bf5f361838}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -170,12 +170,6 @@
     </ClInclude>
     <ClInclude Include="SimpleIniFile.h">
       <Filter>INILoader</Filter>
-    </ClInclude>
-    <ClInclude Include="Serializer.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiLogger.h">
-      <Filter>ImGuiLogger</Filter>
     </ClInclude>
     <ClInclude Include="FileIO.h">
       <Filter>Utility</Filter>
@@ -276,7 +270,6 @@
     <ClInclude Include="Core.Octree.h">
       <Filter>Core.Container\PointOctree</Filter>
     </ClInclude>
-    <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="Core.Fence.h">
       <Filter>Core.Memory\SyncAPI</Filter>
     </ClInclude>
@@ -300,6 +293,21 @@
     </ClInclude>
     <ClInclude Include="Core.Property.h">
       <Filter>Core.Property</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXHelper.h">
+      <Filter>DirectX11Common</Filter>
+    </ClInclude>
+    <ClInclude Include="CSVLoaderHelper.h">
+      <Filter>CSVLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="BitFlag.h">
+      <Filter>Core.definition</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseTypeDef.h">
+      <Filter>Core.definition\Type</Filter>
+    </ClInclude>
+    <ClInclude Include="TypeIO.h">
+      <Filter>Core.definition\Type</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

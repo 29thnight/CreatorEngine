@@ -1,6 +1,11 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "../Utility_Framework/Core.Minimal.h"
+#include "TypeDefinition.h"
+#include "ClassProperty.h"
+#include "Delegate.h"
+#include <d3d11.h>
+#include <string_view>
+#include <functional>
 
 enum class TextureType
 {
@@ -15,7 +20,7 @@ class Texture
 {
 public:
 	Texture() = default;
-	Texture(ID3D11Texture2D* texture, const std::string_view& name, TextureType type, CD3D11_TEXTURE2D_DESC desc);
+	Texture(ID3D11Texture2D* texture, std::string_view name, TextureType type, CD3D11_TEXTURE2D_DESC desc);
 	Texture(const Texture&) = delete;
 	Texture(Texture&& texture) noexcept;
 	~Texture();
@@ -23,7 +28,7 @@ public:
 	static Texture* Create(
 		_In_ uint32 width, 
 		_In_ uint32 height, 
-		_In_ const std::string_view& name, 
+		_In_ std::string_view name, 
 		_In_ DXGI_FORMAT textureFormat, 
 		_In_ uint32 bindFlags, 
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
@@ -34,7 +39,7 @@ public:
 		_In_ uint32 ratioY,
 		_In_ uint32 width,
 		_In_ uint32 height,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
@@ -42,7 +47,7 @@ public:
 
 	static Texture* CreateCube(
 		_In_ uint32 size,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_opt_ uint32 mipLevels = 1,
@@ -52,7 +57,7 @@ public:
 	static Texture* CreateArray(
 		_In_ uint32 width,
 		_In_ uint32 height,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_ uint32 arrsize = 3,
@@ -152,7 +157,7 @@ private:
 	DXGI_FORMAT m_format{ DXGI_FORMAT_UNKNOWN };
 	CD3D11_TEXTURE2D_DESC m_desc{};
 	bool m_hasRTV{ false };
-	uint32 m_rtvCount = 0;
+	uint32_t m_rtvCount = 0;
 	bool m_isTextureAlpha{ false };
 
 	Core::DelegateHandle m_onReleaseHandle{};

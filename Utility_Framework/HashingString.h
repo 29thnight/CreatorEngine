@@ -25,7 +25,7 @@ public:
 		m_hash = std::hash<std::string_view>{}(str);
 	}
 
-	HashingString(const std::string_view& str)
+	HashingString(std::string_view str)
 	{
 		if (str.empty())
 		{
@@ -57,7 +57,7 @@ public:
 		return *this;
 	}
 
-	HashingString& operator=(const std::string_view& str)
+	HashingString& operator=(std::string_view str)
 	{
 		if (str.empty())
 		{
@@ -95,7 +95,7 @@ public:
 		return m_string;
 	}
 
-	void SetString(const std::string_view& str)
+	void SetString(std::string_view str)
 	{
 		if (nullptr == str.data())
 		{

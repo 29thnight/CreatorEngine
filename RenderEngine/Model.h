@@ -19,14 +19,14 @@ public:
     ~Model();
 
     static Model* LoadModelToScene(Model* model, Scene& Scene);
-    static Model* LoadModel(const std::string_view& filePath);
+    static Model* LoadModel(std::string_view filePath);
 
     static GameObject* LoadModelToSceneObj(Model* model, Scene& Scene);
-	Mesh* GetMesh(const std::string_view& name);
+	Mesh* GetMesh(std::string_view name);
 	Mesh* GetMesh(int index);
-	Material* GetMaterial(const std::string_view& name);
+	Material* GetMaterial(std::string_view name);
 	Material* GetMaterial(int index);
-	Texture* GetTexture(const std::string_view& name);
+	Texture* GetTexture(std::string_view name);
 	Texture* GetTexture(int index);
 
 public:

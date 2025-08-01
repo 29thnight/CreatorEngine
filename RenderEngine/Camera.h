@@ -4,6 +4,7 @@
 #include "DeviceResources.h"
 #include "Texture.h"
 #include "Camera.generated.h"
+#include "BitFlag.h"
 
 #ifdef DYNAMICCPP_EXPORTS
 struct ID3D11Buffer

@@ -111,7 +111,7 @@ void TagManager::Save()
 #endif // !BUILD_FLAG
 }
 
-void TagManager::AddTag(const std::string_view& tag)
+void TagManager::AddTag(std::string_view tag)
 {
 #ifndef BUILD_FLAG
 	if (tag.empty() || tag == "Untagged")
@@ -127,7 +127,7 @@ void TagManager::AddTag(const std::string_view& tag)
 #endif // !BUILD_FLAG
 }
 
-void TagManager::AddLayer(const std::string_view& layer)
+void TagManager::AddLayer(std::string_view layer)
 {
 #ifndef BUILD_FLAG
     if (layer.empty() || 32 < m_layers.size())
@@ -143,7 +143,7 @@ void TagManager::AddLayer(const std::string_view& layer)
 #endif // !BUILD_FLAG
 }
 
-void TagManager::RemoveTag(const std::string_view& tag)
+void TagManager::RemoveTag(std::string_view tag)
 {
 #ifndef BUILD_FLAG
 	if (tag.empty() || tag == "Untagged")
@@ -160,7 +160,7 @@ void TagManager::RemoveTag(const std::string_view& tag)
 #endif // !BUILD_FLAG
 }
 
-void TagManager::RemoveLayer(const std::string_view& layer)
+void TagManager::RemoveLayer(std::string_view layer)
 {
 #ifndef BUILD_FLAG
     if (layer.empty())
@@ -177,7 +177,7 @@ void TagManager::RemoveLayer(const std::string_view& layer)
 #endif // !BUILD_FLAG
 }
 
-bool TagManager::HasTag(const std::string_view& tag) const
+bool TagManager::HasTag(std::string_view tag) const
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -188,7 +188,7 @@ bool TagManager::HasTag(const std::string_view& tag) const
 	return it != m_tagMap.end();
 }
 
-bool TagManager::HasLayer(const std::string_view& layer) const
+bool TagManager::HasLayer(std::string_view layer) const
 {
     if (layer.empty())
     {
@@ -199,7 +199,7 @@ bool TagManager::HasLayer(const std::string_view& layer) const
     return it != m_layerMap.end();
 }
 
-void TagManager::AddTagToObject(const std::string_view& tag, GameObject* object)
+void TagManager::AddTagToObject(std::string_view tag, GameObject* object)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -213,7 +213,7 @@ void TagManager::AddTagToObject(const std::string_view& tag, GameObject* object)
 	}
 }
 
-void TagManager::AddObjectToLayer(const std::string_view& layer, GameObject* object)
+void TagManager::AddObjectToLayer(std::string_view layer, GameObject* object)
 {
     if (layer.empty())
     {
@@ -227,7 +227,7 @@ void TagManager::AddObjectToLayer(const std::string_view& layer, GameObject* obj
     }
 }
 
-void TagManager::RemoveTagFromObject(const std::string_view& tag, GameObject* object)
+void TagManager::RemoveTagFromObject(std::string_view tag, GameObject* object)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -241,7 +241,7 @@ void TagManager::RemoveTagFromObject(const std::string_view& tag, GameObject* ob
 	}
 }
 
-void TagManager::RemoveObjectFromLayer(const std::string_view& layer, GameObject* object)
+void TagManager::RemoveObjectFromLayer(std::string_view layer, GameObject* object)
 {
     if (layer.empty())
     {

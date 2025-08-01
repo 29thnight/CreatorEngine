@@ -10,11 +10,7 @@
 #include <dxgi1_4.h>
 #include <d3d11.h>
 #include <d3d11_3.h>
-#include <d2d1_3.h> // delete this if you don't use
-#include <d2d1effects_2.h> // delete this if you don't use
 #include <DirectXColors.h>
-#include <dwrite.h> // delete this if you don't use
-#include <dwrite_3.h> // delete this if you don't use
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
 #include <directxtk/DDSTextureLoader.h>
@@ -24,7 +20,6 @@
 #include <DirectXMath.h>
 #include <windows.h>
 #include <wincodec.h>
-#include <Xinput.h>
 #include <dxgidebug.h>
 #endif // !DYNAMICCPP_EXPORTS
 #include <comdef.h>
@@ -36,8 +31,6 @@ using namespace Microsoft::WRL;
 //STL
 #include <array>
 #include <algorithm>
-#include <filesystem>
-namespace file = std::filesystem;
 #include <fstream>
 #include <functional>
 #include <new>
@@ -57,7 +50,6 @@ namespace file = std::filesystem;
 #include <vector>
 #include <cstdint>
 #include <ranges>
-constexpr inline auto& foreach = std::ranges::for_each;
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"

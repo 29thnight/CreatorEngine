@@ -1,7 +1,6 @@
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
 #include "IRenderPass.h"
-#include "Camera.h"
+#include "Texture.h"
 #include "LightProperty.h"
 
 constexpr int cascadeCount = 3;
@@ -12,6 +11,7 @@ cbuffer CascadeIndexBuffer
 	uint32_t padding[3]; // 16바이트 정렬
 };
 
+class Camera;
 class Texture;
 class Scene;
 class LightController;
@@ -56,7 +56,7 @@ public:
 	void DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir);
 
 
-	void UseCloudShadowMap(const std::string_view& filename);
+	void UseCloudShadowMap(std::string_view filename);
 	void UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, LightController* lightcontroller);
 	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn = true);
 	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, LightController* lightcontroller, bool isOn = true);

@@ -33,7 +33,7 @@ Model::~Model()
 	}
 }
 
-Model* Model::LoadModel(const std::string_view& filePath)
+Model* Model::LoadModel(std::string_view filePath)
 {
 	file::path path_ = filePath.data();
 	Model* model{};
@@ -131,7 +131,7 @@ Model* Model::LoadModel(const std::string_view& filePath)
 	}
 }
 
-Mesh* Model::GetMesh(const std::string_view& name)
+Mesh* Model::GetMesh(std::string_view name)
 {
 	std::string meshName = name.data();
 	for (auto& mesh : m_Meshes)
@@ -154,7 +154,7 @@ Mesh* Model::GetMesh(int index)
 	return m_Meshes[index];
 }
 
-Material* Model::GetMaterial(const std::string_view& name)
+Material* Model::GetMaterial(std::string_view name)
 {
 	std::string materialName = name.data();
 	for (auto& material : m_Materials)
@@ -175,7 +175,7 @@ Material* Model::GetMaterial(int index)
 	return m_Materials[index];
 }
 
-Texture* Model::GetTexture(const std::string_view& name)
+Texture* Model::GetTexture(std::string_view name)
 {
 	std::string textureName = name.data();
 	for (auto& texture : m_Textures)

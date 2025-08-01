@@ -31,11 +31,11 @@ ModelLoader::ModelLoader(Model* model, Scene* scene) :
 {
 }
 
-ModelLoader::ModelLoader(const std::string_view& fileName)
+ModelLoader::ModelLoader(std::string_view fileName)
 {
 }
 
-ModelLoader::ModelLoader(const aiScene* assimpScene, const std::string_view& fileName) :
+ModelLoader::ModelLoader(const aiScene* assimpScene, std::string_view fileName) :
     m_AIScene(assimpScene),
     m_skeletonLoader(assimpScene)
 {
@@ -1151,7 +1151,7 @@ Texture* ModelLoader::GenerateTexture(aiMaterial* material, aiTextureType type, 
     return texture;
 }
 
-Texture* ModelLoader::GenerateTexture(const std::string_view& textureName, bool isCompress)
+Texture* ModelLoader::GenerateTexture(std::string_view textureName, bool isCompress)
 {
     if (textureName.empty())
         return nullptr;

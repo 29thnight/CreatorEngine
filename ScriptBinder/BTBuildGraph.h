@@ -37,7 +37,7 @@ struct BTBuildGraph
 		Nodes.clear();
 	}
 
-	BTBuildNode* CreateNode(const BehaviorNodeType type, const std::string_view& name, Mathf::Vector2 pos = { 0, 0 })
+	BTBuildNode* CreateNode(const BehaviorNodeType type, std::string_view name, Mathf::Vector2 pos = { 0, 0 })
 	{
 		BTBuildNode node;
 		node.ID = make_guid();

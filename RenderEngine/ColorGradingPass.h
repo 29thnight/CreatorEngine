@@ -10,7 +10,7 @@ public:
 	ColorGradingPass();
 	~ColorGradingPass();
 
-	void Initialize(const std::string_view& fileName);
+	void Initialize(std::string_view fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
         void ApplySettings(const ColorGradingPassSetting& setting);

@@ -291,6 +291,8 @@
     <ClInclude Include="FoliageInstance.h" />
     <ClInclude Include="FoliageType.h" />
     <ClInclude Include="FoliageComponent.h" />
+    <ClInclude Include="KeyArray.h" />
+    <ClInclude Include="KeyBitFlag.h" />
     <ClInclude Include="MSBuildHelper.h" />
     <ClInclude Include="ScriptStringModule.h" />
     <ClInclude Include="VolumeComponent.h" />

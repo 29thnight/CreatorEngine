@@ -170,7 +170,7 @@ void MeshModuleGPU::SetModel(Model* model, int meshIndex)
     m_meshIndex = meshIndex;
 }
 
-void MeshModuleGPU::SetModel(Model* model, const std::string_view& meshName)
+void MeshModuleGPU::SetModel(Model* model, std::string_view meshName)
 {
     if (!model) return;
 

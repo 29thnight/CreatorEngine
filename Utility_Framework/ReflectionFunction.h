@@ -29,12 +29,12 @@ namespace Meta
 		}
     }
 
-    static inline const Type* Find(const std::string_view& name)
+    static inline const Type* Find(std::string_view name)
     {
         return MetaDataRegistry->Find(name.data());
     }
 
-	static inline const EnumType* FindEnum(const std::string_view& name)
+	static inline const EnumType* FindEnum(std::string_view name)
 	{
 		return MetaEnumRegistry->Find(name.data());
 	}

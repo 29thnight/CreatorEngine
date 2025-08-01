@@ -2,6 +2,7 @@
 #include "Texture.h"
 #include "DeviceState.h"
 #include "ResourceAllocator.h"
+#include "SceneManager.h"
 
 std::function<void(Texture*)> TextureHelper::deleter = [](Texture* texture)
 {
@@ -12,7 +13,7 @@ std::function<void(Texture*)> TextureHelper::deleter = [](Texture* texture)
 };
 
 //static functions
-Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
+Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ std::string_view name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
 {
     CD3D11_TEXTURE2D_DESC textureDesc
     {
@@ -38,7 +39,7 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ const std::
 	return temp;
 }
 
-Texture* Texture::Create(uint32 ratioX, uint32 ratioY, uint32 width, uint32 height, const std::string_view& name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+Texture* Texture::Create(uint32 ratioX, uint32 ratioY, uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
 {
 	auto* temp = Create(width / (float)ratioX, height / (float)ratioY, name, textureFormat, bindFlags, data);
 	temp->SetSize({ float(width), float(height) });
@@ -46,7 +47,7 @@ Texture* Texture::Create(uint32 ratioX, uint32 ratioY, uint32 width, uint32 heig
 	return temp;
 }
 
-Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ uint32 mipLevels, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
+Texture* Texture::CreateCube(_In_ uint32 size, _In_ std::string_view name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ uint32 mipLevels, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
 {
 	CD3D11_TEXTURE2D_DESC textureDesc
 	{
@@ -76,7 +77,7 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ const std::string_view& name
 }
 
 
-Texture* Texture::CreateArray(uint32 width, uint32 height, const std::string_view& name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 arrsize, D3D11_SUBRESOURCE_DATA* data)
+Texture* Texture::CreateArray(uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 arrsize, D3D11_SUBRESOURCE_DATA* data)
 {
 	CD3D11_TEXTURE2D_DESC textureDesc
 	{
@@ -215,7 +216,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	return texture;
 }
 
-Texture::Texture(ID3D11Texture2D* texture, const std::string_view& name, TextureType type, CD3D11_TEXTURE2D_DESC desc) :
+Texture::Texture(ID3D11Texture2D* texture, std::string_view name, TextureType type, CD3D11_TEXTURE2D_DESC desc) :
 	m_pTexture(texture),
 	m_name(name),
 	m_textureType(type),

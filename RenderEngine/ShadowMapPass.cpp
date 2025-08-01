@@ -421,7 +421,7 @@ void ShadowMapPass::DevideShadowInfo(Camera& camera, Mathf::Vector4 LightDir)
 	}
 }
 
-void ShadowMapPass::UseCloudShadowMap(const std::string_view& filename)
+void ShadowMapPass::UseCloudShadowMap(std::string_view filename)
 {
 	file::path path = file::path(filename);
 	if (file::exists(path) || nullptr == m_cloudShadowMapTexture)

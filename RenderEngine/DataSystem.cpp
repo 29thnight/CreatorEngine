@@ -432,7 +432,7 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	}
 }
 
-void DataSystem::LoadModel(const std::string_view& filePath)
+void DataSystem::LoadModel(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
@@ -467,7 +467,7 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 	}
 }
 
-Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
+Model* DataSystem::LoadCashedModel(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
@@ -543,7 +543,7 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	}
 }
 
-Texture* DataSystem::LoadTexture(const std::string_view& filePath)
+Texture* DataSystem::LoadTexture(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
@@ -579,7 +579,7 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 	return nullptr;
 }
 
-void DataSystem::CopyHDRTexture(const std::string_view& filePath)
+void DataSystem::CopyHDRTexture(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
@@ -589,7 +589,7 @@ void DataSystem::CopyHDRTexture(const std::string_view& filePath)
 	}
 }
 
-void DataSystem::CopyTexture(const std::string_view& filePath, const file::path& destination)
+void DataSystem::CopyTexture(std::string_view filePath, const file::path& destination)
 {
 	if (filePath != destination && file::exists(filePath) && !file::exists(destination))
 	{
@@ -613,7 +613,7 @@ void DataSystem::SelectTextureType()
 	}
 }
 
-void DataSystem::CopyTextureSelectType(const std::string_view& filePath, TextureFileType type)
+void DataSystem::CopyTextureSelectType(std::string_view filePath, TextureFileType type)
 {
 	file::path destination{};
 	if (type == TextureFileType::Texture)
@@ -636,7 +636,7 @@ void DataSystem::CopyTextureSelectType(const std::string_view& filePath, Texture
 	CopyTexture(filePath, destination);
 }
 
-Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath, bool isCompress)
+Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompress)
 {
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
 

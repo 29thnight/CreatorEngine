@@ -24,8 +24,8 @@ private:
 	ModelLoader();
 	~ModelLoader();
 	ModelLoader(Model* model, Scene* scene);
-	ModelLoader(const std::string_view& fileName);
-	ModelLoader(const aiScene* assimpScene, const std::string_view& fileName);
+	ModelLoader(std::string_view fileName);
+	ModelLoader(const aiScene* assimpScene, std::string_view fileName);
 
 	size_t CountNodes(aiNode* root);
 
@@ -59,7 +59,7 @@ private:
 	GameObject* GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex);
 	GameObject* GenerateSkeletonToSceneObjectHierarchyObj(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
     Texture* GenerateTexture(aiMaterial* material, aiTextureType type, uint32 index = 0, bool isCompress = false);
-    Texture* GenerateTexture(const std::string_view& textureName, bool isCompress = false);
+    Texture* GenerateTexture(std::string_view textureName, bool isCompress = false);
 
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };

@@ -16,7 +16,7 @@ class TerrainMesh
 {
 public:
     // meshWidth: 버텍스가 m_width × m_height로 들어왔다고 가정
-    TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
+    TerrainMesh(std::string_view name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
         D3D11_BUFFER_DESC vbDesc = {};

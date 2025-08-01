@@ -44,7 +44,7 @@ public:
 	void SetModel(Model* model, int meshIndex = 0);
 
 	// 모델 설정 (이름 기반)
-	void SetModel(Model* model, const std::string_view& meshName);
+	void SetModel(Model* model, std::string_view meshName);
 	// 카메라 위치 설정
 	void SetCameraPosition(const Mathf::Vector3& position);
 

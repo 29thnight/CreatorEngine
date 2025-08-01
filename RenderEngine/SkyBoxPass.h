@@ -9,11 +9,11 @@ public:
     SkyBoxPass();
     ~SkyBoxPass();
 
-    void Initialize(const std::string_view& fileName, float size = 25.f);
+    void Initialize(std::string_view fileName, float size = 25.f);
 	void SetRenderTarget(Texture* renderTarget);
 	void SetBackBuffer(ID3D11RenderTargetView* backBuffer);
     void GenerateCubeMap(RenderScene& scene);
-	void GenerateCubeMap(const std::string_view& fileName, RenderScene& scene);
+	void GenerateCubeMap(std::string_view fileName, RenderScene& scene);
 	Texture* GenerateEnvironmentMap(RenderScene& scene);
     Texture* GeneratePrefilteredMap(RenderScene& scene);
     Texture* GenerateBRDFLUT(RenderScene& scene);

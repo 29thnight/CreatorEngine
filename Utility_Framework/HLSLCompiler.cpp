@@ -4,7 +4,7 @@
 
 std::unordered_map<std::string, ComPtr<ID3DBlob>> HLSLCompiler::m_shaderCache;
 
-ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(const std::string_view& filepath)
+ComPtr<ID3DBlob> HLSLCompiler::LoadFormFile(std::string_view filepath)
 {
     file::path filePath{ filepath };
 	std::string fileExtension = filePath.extension().string();
@@ -141,7 +141,7 @@ bool HLSLCompiler::CheckResult(HRESULT hResult, ID3DBlob* shader, ID3DBlob* erro
     return true;
 }
 
-bool HLSLCompiler::CheckExtension(const std::string_view& shaderExtension)
+bool HLSLCompiler::CheckExtension(std::string_view shaderExtension)
 {
     if ("vs" == shaderExtension or
         "ps" == shaderExtension or

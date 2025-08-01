@@ -1,78 +1,53 @@
 #include "KeyState.h"
 #include "InputManager.h"
+
+constexpr KeyState NextKeyState(KeyState current, bool isDown)
+{
+	switch (current)
+	{
+	case KeyState::Idle:
+	case KeyState::Released:
+		return isDown ? KeyState::Down : KeyState::Idle;
+
+	case KeyState::Down:
+	case KeyState::Pressed:
+		return isDown ? KeyState::Pressed : KeyState::Released;
+
+	default:
+		return KeyState::Idle;
+	}
+}
+
 void KeyboardState::Update()
 {
-
 	for (unsigned int i = 0; i < KEYBOARD_COUNT; ++i)
 	{
-		switch (keyboardkeyStates[i])
-		{
-		case KeyState::Down:
-			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Released;
-			break;
-		case KeyState::Pressed:
-			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Pressed : KeyState::Released;
-			break;
-		case KeyState::Released:
-			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Down : KeyState::Idle;
-			break;
-		case KeyState::Idle:
-			keyboardkeyStates[i] = InputManagement->curkeyStates[i] ? KeyState::Down : KeyState::Idle;
-			break;
-		}
+		bool isDown = InputManagement->m_curKeyStates.Test(i);
+		KeyState current = GetKeyState(i);
+		SetKeyState(i, NextKeyState(current, isDown));
 	}
 }
 
 void MouseState::Update()
 {
-
-	for (unsigned int i = 0; i < mouseCount; ++i)
+	for (size_t i = 0; i < MOUSE_COUNT; ++i)
 	{
-		switch (mousekeyStates[i])
-		{
-		case KeyState::Down:
-			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Released;
-			break;
-		case KeyState::Pressed:
-			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Pressed : KeyState::Released;
-			break;
-		case KeyState::Released:
-			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Down : KeyState::Idle;
-			break;
-		case KeyState::Idle:
-			mousekeyStates[i] = InputManagement->curmouseState[i] ? KeyState::Down : KeyState::Idle;
-			break;
-		}
+		bool isDown = InputManagement->m_curMouseState.Test(i);
+		KeyState current = GetKeyState(i);
+		SetKeyState(i, NextKeyState(current, isDown));
 	}
-
 }
-
-
 
 void PadState::Update()
 {
-	for (int padnum = 0; padnum < MAX_CONTROLLER; ++padnum)
+	for (int padNum = 0; padNum < MAX_CONTROLLER; ++padNum)
 	{
-		/*if (false == padConnected[padnum])
-			continue;*/
-		for (unsigned int i = 0; i < padKeyCount; ++i)
+		for (size_t btn = 0; btn < GAMEPAD_KEY_COUNT; ++btn)
 		{
-			switch (padkeyStates[padnum][i])
-			{
-			case KeyState::Down:
-				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Released;
-				break;
-			case KeyState::Pressed:
-				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Pressed : KeyState::Released;
-				break;
-			case KeyState::Released:
-				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Down : KeyState::Idle;
-				break;
-			case KeyState::Idle:
-				padkeyStates[padnum][i] = InputManagement->curpadState[padnum][i] ? KeyState::Down : KeyState::Idle;
-				break;
-			}
+			bool isDown = InputManagement->m_curPadState[padNum].Test(btn);
+			KeyState current = GetKeyState(padNum, btn);
+			SetKeyState(padNum, btn, NextKeyState(current, isDown));
 		}
 	}
-
 }
+

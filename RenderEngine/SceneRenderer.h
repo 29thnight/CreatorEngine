@@ -1,6 +1,5 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Delegate.h"
 #ifndef DYNAMICCPP_EXPORTS //PassData
 #include "DeviceResources.h"
 #include "ForwardPass.h"
@@ -13,7 +12,6 @@
 #include "SpritePass.h"
 #include "BlitPass.h"
 #include "WireFramePass.h"
-#include "GridPass.h"
 #include "AAPass.h"
 #include "PostProcessingPass.h"
 //작업자 용우 관련
@@ -35,7 +33,6 @@
 #include "EffectEditor.h"
 #endif // !DYNAMICCPP_EXPORTS
 
-#include "Model.h"
 #include "LightController.h"
 #include "Camera.h"
 
@@ -81,7 +78,7 @@ private:
 	void InitializeTextures();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
-	void ApplyNewCubeMap(const std::string_view& filename);
+	void ApplyNewCubeMap(std::string_view filename);
 	void UnbindRenderTargets();
 	void ReloadShaders();
 	void ResourceTrim();
