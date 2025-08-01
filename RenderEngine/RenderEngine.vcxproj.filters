@@ -282,6 +282,9 @@
     <Filter Include="Shaders\Effect\Generate">
       <UniqueIdentifier>{6fbdbfb7-b2f9-482c-89e3-aafafdd5c793}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Effect\Special">
+      <UniqueIdentifier>{d8aad0ce-2ca2-488b-99c7-ba0e12875b93}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -1055,6 +1058,9 @@
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailPixel.ps.hlsl">
       <Filter>Shaders\Effect\Generate</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
+      <Filter>Shaders\Effect\Special</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

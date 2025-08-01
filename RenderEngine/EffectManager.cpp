@@ -325,6 +325,22 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	return effect;
 }
 
+void EffectManager::DisableAllModules(EffectBase* effect)
+{
+	for (auto& ps : effect->GetAllParticleSystems()) {
+		// ParticleModule들 비활성화
+		for (auto it = ps->GetModuleList().begin(); it != ps->GetModuleList().end(); ++it) {
+			ParticleModule& module = *it;
+			module.SetEnabled(false);
+		}
+
+		// RenderModule들 비활성화
+		for (auto* renderModule : ps->GetRenderModules()) {
+			renderModule->SetEnabled(false);
+		}
+	}
+}
+
 void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
 {
 	effect->SetDuration(templateConfig.duration);
@@ -420,22 +436,6 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 				module->DeserializeData(templateConfig.trailRenderModuleData["data"]);
 			}
 			module->SetEnabled(true);
-		}
-	}
-}
-
-void EffectManager::DisableAllModules(EffectBase* effect)
-{
-	for (auto& ps : effect->GetAllParticleSystems()) {
-		// ParticleModule들 비활성화
-		for (auto it = ps->GetModuleList().begin(); it != ps->GetModuleList().end(); ++it) {
-			ParticleModule& module = *it;
-			module.SetEnabled(false);
-		}
-
-		// RenderModule들 비활성화
-		for (auto* renderModule : ps->GetRenderModules()) {
-			renderModule->SetEnabled(false);
 		}
 	}
 }

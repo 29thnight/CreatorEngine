@@ -55,7 +55,9 @@ void TrailRenderModule::Initialize()
 
     // 셰이더 설정 (TrailVertex를 렌더링하는 셰이더)
     m_pso->m_vertexShader = &ShaderSystem->VertexShaders["TrailVertex"];
-    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["TrailPixel"];
+
+    // 나중에 이펙트 별로 셰이더 설정할수있게하는 함수 추가할것 (현재는 그냥 고정)
+    m_pso->m_pixelShader = &ShaderSystem->PixelShaders["Dash"];
 
     // 입력 레이아웃 (TrailVertex 구조체)
     D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
