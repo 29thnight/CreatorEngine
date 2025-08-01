@@ -186,7 +186,7 @@ std::string EffectManager::ReplaceEffect(const std::string& instanceId, const st
 	}
 
 	// 기존 인스턴스가 없으면 새로 생성
-	return PlayEffect(newTemplateName);
+	return PlayEffectWithCustomId(newTemplateName, instanceId);
 }
 
 uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
