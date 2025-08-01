@@ -6,6 +6,7 @@ void CharacterControllerComponent::OnStart()
 	
 	m_fBaseSpeed = m_movementInfo.maxSpeed;
 	m_fBaseAcceleration = m_movementInfo.acceleration;
+	m_bMoveRestrict.fill(false);
 }
 
 void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
@@ -49,24 +50,26 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 
 	if (!m_isKnockBack) //&&&&& 넉백당하면어케할지 상의필요
 	{
-		if (inputSquare >= rotationOffsetSquare) {
-			DirectX::SimpleMath::Vector3 flatInput = input;
-			flatInput.y = 0.f; 
-			flatInput.Normalize();
-			//input.Normalize();
-			DirectX::SimpleMath::Quaternion currentRotation = m_transform->GetWorldQuaternion();
-			DirectX::SimpleMath::Quaternion targetRotation;
-			if (flatInput == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f }) {
-				//m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,-1.0f,0.0f }));
-				targetRotation = DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,-1.0f,0.0f });
-			}
-			else if (flatInput != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
-				//m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,1.0f,0.0f }));
-				targetRotation = DirectX::SimpleMath::Quaternion::LookRotation(flatInput, { 0.0f,1.0f,0.0f });
-			}
-			DirectX::SimpleMath::Quaternion newRotation = DirectX::SimpleMath::Quaternion::Slerp(currentRotation, targetRotation, m_rotationSpeed* fixedDeltaTime);
+		DirectX::SimpleMath::Vector3 flatInput = input;
+		flatInput.y = 0.f;
 
-			m_transform->SetRotation(newRotation);
+		if (flatInput.LengthSquared() >= rotationOffsetSquare) {
+			flatInput.Normalize();
+
+			// yaw 계산: Z가 앞이므로 (x, z) 순서 주의
+			float targetYaw = std::atan2(flatInput.x, flatInput.z);  // 라디안 값
+
+			// 현재 회전에서 yaw만 추출
+			DirectX::SimpleMath::Quaternion quator = m_transform->GetWorldQuaternion();
+			DirectX::SimpleMath::Vector3 currentEuler = quator.ToEuler();
+			float currentYaw = currentEuler.y;
+
+			// Slerp 대신 float 보간도 가능하지만, Quaternion 유지하려면 이렇게:
+			DirectX::SimpleMath::Quaternion currentRot = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(currentYaw, 0.0f, 0.0f);
+			DirectX::SimpleMath::Quaternion targetRot = DirectX::SimpleMath::Quaternion::CreateFromYawPitchRoll(targetYaw, 0.0f, 0.0f);
+
+			DirectX::SimpleMath::Quaternion resultRot = DirectX::SimpleMath::Quaternion::Slerp(currentRot, targetRot, m_rotationSpeed * fixedDeltaTime);
+			m_transform->SetRotation(resultRot);
 		}
 	}
 
@@ -106,14 +109,16 @@ void CharacterControllerComponent::EndKnockBack()
 	m_fBaseSpeed = PreSpeed;
 	m_moveInput.y = 0;
 	m_isKnockBack = false;
-	if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
+	m_fFinalMultiplierSpeed = 1.0f;
+
+
+	/*if (preRotation == DirectX::SimpleMath::Vector3{ 0.f, 0.f, 1.f })
 	{
 		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,-1.0f,0.0f }));
 	}
 	else if (preRotation != DirectX::SimpleMath::Vector3{ 0.f, 0.f, 0.f }) {
 		m_transform->SetRotation(DirectX::SimpleMath::Quaternion::LookRotation(preRotation, { 0.0f,1.0f,0.0f }));
-	}
-	m_fFinalMultiplierSpeed = 1.0f;
+	} */
 
 }
 

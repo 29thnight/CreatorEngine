@@ -68,6 +68,11 @@ cbuffer MovementParams : register(b0)
     float orbitalSpeed;
     float3 orbitalAxis;
     
+    float explosiveSpeed;
+    float explosiveDecay;
+    float explosiveRandom;
+    float explosiveSphere;
+    
     int velocityCurveSize;
     int impulseCount;
     float2 pad2;
@@ -182,6 +187,29 @@ float3 GetOrbitalVelocity(float3 position, float time)
     return tangent * orbitalSpeed;
 }
 
+float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex)
+{
+    // 파티클별 고유한 방향 생성 (인덱스 기반)
+    float angle = (float) particleIndex * 2.399963; // 황금각 사용으로 균등 분포
+    float elevation = ((float) particleIndex * 0.618034) - floor((float) particleIndex * 0.618034); // 0~1
+    elevation = (elevation - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
+    
+    float3 explosionDir = float3(
+        cos(angle) * cos(elevation),
+        sin(elevation),
+        sin(angle) * cos(elevation)
+    );
+    
+    // 초기 폭발 속도 (시간에 따라 감소)
+    float speedDecay = 1.0 - pow(normalizedAge, explosiveDecay);
+    
+    // 랜덤성 추가
+    float2 noiseInput = float2(particleIndex * 0.1, currentTime * 0.5);
+    float randomFactor = 1.0 + (noise(noiseInput) - 0.5) * explosiveRandom;
+    
+    return explosionDir * explosiveSpeed * speedDecay * randomFactor;
+}
+
 // 메인 컴퓨트 셰이더 함수
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -216,6 +244,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
         else if (velocityMode == 4) // Orbital
         {
             additionalVelocity += GetOrbitalVelocity(particle.position, currentTime);
+        }
+        else if (velocityMode == 5) // explosive
+        {
+            additionalVelocity += GetExplosiveMovement(particle.position, normalizedAge, particleIndex);
         }
         
         // 기존 velocity에 추가 velocity 더하기

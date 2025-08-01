@@ -136,6 +136,12 @@ void ParticleSystem::UpdateEffectBasePosition(const Mathf::Vector3& newBasePosit
 			meshSpawnModule->SetEmitterPosition(finalWorldPosition);
 			continue;
 		}
+
+		TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module);
+		if (trailModule) {
+			trailModule->SetEmitterPosition(finalWorldPosition);
+			continue;
+		}
 	}
 
 	for (auto* renderModule : m_renderModules) {
@@ -153,7 +159,7 @@ void ParticleSystem::UpdateGenerateModule(float delta)
 		TrailGenerateModule* trailModule = dynamic_cast<TrailGenerateModule*>(&module);
 		if (trailModule)
 		{
-			trailModule->SetPosition(m_position);
+			//trailModule->SetPosition(m_position);
 			trailModule->Update(delta);
 		}
 	}

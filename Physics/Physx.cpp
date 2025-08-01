@@ -143,7 +143,7 @@ bool PhysicX::Initialize()
 	//gDispatcher = PxDefaultCpuDispatcherCreate(2);  
 	// CUDA 초기화
 	PxCudaContextManagerDesc cudaDesc;
-	m_cudaContextManager = PxCreateCudaContextManager(*m_foundation, cudaDesc);
+	/*m_cudaContextManager = PxCreateCudaContextManager(*m_foundation, cudaDesc);
 	if (!m_cudaContextManager || !m_cudaContextManager->contextIsValid())
 	{
 		m_cudaContextManager->release();
@@ -161,7 +161,43 @@ bool PhysicX::Initialize()
 	}
 	else {
 		std::cout << "CUDA context manager creation failed." << std::endl;
+	}*/
+
+
+
+	m_cudaContextManager = PxCreateCudaContextManager(*m_foundation, cudaDesc);
+	if (!m_cudaContextManager || !m_cudaContextManager->contextIsValid())
+	{
+		if (m_cudaContextManager)
+			m_cudaContextManager->release();
+		m_cudaContextManager = nullptr;
+
+		// 실패해도 그냥 넘어가기 (로그만 찍고)
+		std::cout << "CUDA context manager creation failed, continuing without CUDA." << std::endl;
 	}
+
+	// CUDA 컨텍스트가 있으면 사용
+	if (m_cudaContextManager) {
+		m_cudaContext = m_cudaContextManager->getCudaContext();
+		if (m_cudaContext) {
+			std::cout << "CUDA context created successfully." << std::endl;
+		}
+		else {
+			std::cout << "Failed to create CUDA context." << std::endl;
+			// 실패해도 그냥 넘어가기
+		}
+	}
+	else {
+		// CUDA 사용 안 하고 넘어가기
+	}
+
+
+
+
+
+
+
+
 
 
 	//충돌 처리를 위한 콜백 등록

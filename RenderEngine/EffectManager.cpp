@@ -8,13 +8,13 @@
 void EffectManager::Initialize()
 {
 	std::filesystem::path effectPath = PathFinder::Relative("Effect\\");
-	
+
 	// 디렉토리 존재여부
 	if (!std::filesystem::exists(effectPath) || !std::filesystem::is_directory(effectPath)) {
 		std::cout << "Effect folder does not exist" << '\n';
-		return; 
+		return;
 	}
-	  
+
 	try {
 		for (const auto& entry : std::filesystem::directory_iterator(effectPath)) {
 			if (entry.is_regular_file() && entry.path().extension() == ".json") {
@@ -53,7 +53,7 @@ void EffectManager::Execute(RenderScene& scene, Camera& camera)
 	for (auto& [key, effect] : activeEffects) {
 		effect->Render(scene, camera);
 	}
-}	
+}
 
 void EffectManager::Update(float delta)
 {
@@ -119,7 +119,7 @@ std::string EffectManager::PlayEffectWithCustomId(const std::string& templateNam
 	instance->Play();
 	activeEffects[customInstanceId] = std::move(instance);
 
-	std::cout << "Created effect with custom ID: " << customInstanceId << std::endl;
+	std::cout << "Created effect with ID: " << customInstanceId << " (template: " << templateName << ")" << std::endl;
 	return customInstanceId;
 }
 
@@ -132,11 +132,11 @@ EffectBase* EffectManager::GetEffectInstance(const std::string& instanceId)
 
 EffectBase* EffectManager::GetEffect(std::string_view instanceName)
 {
-    auto it = activeEffects.find(instanceName.data());
-    if (it != activeEffects.end()) {
-        return it->second.get();
-    }
-    return nullptr;
+	auto it = activeEffects.find(instanceName.data());
+	if (it != activeEffects.end()) {
+		return it->second.get();
+	}
+	return nullptr;
 }
 
 bool EffectManager::RemoveEffect(std::string_view instanceName)
@@ -186,7 +186,7 @@ std::string EffectManager::ReplaceEffect(const std::string& instanceId, const st
 	}
 
 	// 기존 인스턴스가 없으면 새로 생성
-	return PlayEffect(newTemplateName);
+	return PlayEffectWithCustomId(newTemplateName, instanceId);
 }
 
 uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
@@ -219,6 +219,46 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 	return availableId;
 }
 
+void EffectManager::InitializeUniversalPool()
+{
+	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
+		auto effect = CreateUniversalEffect();
+		if (effect) {
+			universalPool.push(std::move(effect));
+		}
+	}
+
+	std::cout << "Universal pool initialized with " << DEFAULT_POOL_SIZE << " instances" << std::endl;
+}
+
+std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
+{
+	if (universalPool.empty()) {
+		return nullptr;  // 풀 고갈
+	}
+
+	auto instance = std::move(universalPool.front());
+	universalPool.pop();
+
+	// 재사용을 위한 리셋
+	//instance->ResetForReuse();
+
+	return instance;
+}
+
+void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
+{
+	if (effect && effect->IsReadyForReuse()) {
+		// 여기서 정리 작업 수행
+		effect->WaitForGPUCompletion();
+
+		// 상태만 초기화 (Stop 호출하지 않음)
+		effect->ResetForReuse();
+
+		universalPool.push(std::move(effect));
+	}
+}
+
 bool EffectManager::GetTemplateSettings(const std::string& templateName, float& outTimeScale, bool& outLoop, float& outDuration)
 {
 	auto templateIt = templates.find(templateName);
@@ -231,18 +271,6 @@ bool EffectManager::GetTemplateSettings(const std::string& templateName, float& 
 		return true;
 	}
 	return false;
-}
-
-void EffectManager::InitializeUniversalPool()
-{
-	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
-		auto effect = CreateUniversalEffect();
-		if (effect) {
-			universalPool.push(std::move(effect));
-		}
-	}
-
-	std::cout << "Universal pool initialized with " << DEFAULT_POOL_SIZE << " instances" << std::endl;
 }
 
 std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
@@ -276,6 +304,10 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	meshSpawnModule->Initialize();
 	meshSpawnModule->SetEnabled(false);
 
+	auto trailGenerateModule = particleSystem->AddModule<TrailGenerateModule>();
+	trailGenerateModule->Initialize();
+	trailGenerateModule->SetEnabled(false);
+
 	// RenderModule도 초기화
 	auto billboardModule = particleSystem->AddRenderModule<BillboardModuleGPU>();
 	billboardModule->Initialize(); // PSO 생성
@@ -285,35 +317,27 @@ std::unique_ptr<EffectBase> EffectManager::CreateUniversalEffect()
 	meshModule->Initialize(); // PSO 생성
 	meshModule->SetEnabled(false);
 
+	auto trailRenderModule = particleSystem->AddRenderModule<TrailRenderModule>();
+	trailRenderModule->Initialize();
+	trailRenderModule->SetEnabled(false);
+
 	effect->AddParticleSystem(particleSystem);
 	return effect;
 }
 
-std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
+void EffectManager::DisableAllModules(EffectBase* effect)
 {
-	if (universalPool.empty()) {
-		return nullptr;  // 풀 고갈
-	}
+	for (auto& ps : effect->GetAllParticleSystems()) {
+		// ParticleModule들 비활성화
+		for (auto it = ps->GetModuleList().begin(); it != ps->GetModuleList().end(); ++it) {
+			ParticleModule& module = *it;
+			module.SetEnabled(false);
+		}
 
-	auto instance = std::move(universalPool.front());
-	universalPool.pop();
-
-	// 재사용을 위한 리셋
-	//instance->ResetForReuse();
-
-	return instance;
-}
-
-void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
-{
-	if (effect && effect->IsReadyForReuse()) {
-		// 여기서 정리 작업 수행
-		effect->WaitForGPUCompletion();
-
-		// 상태만 초기화 (Stop 호출하지 않음)
-		effect->ResetForReuse();
-
-		universalPool.push(std::move(effect));
+		// RenderModule들 비활성화
+		for (auto* renderModule : ps->GetRenderModules()) {
+			renderModule->SetEnabled(false);
+		}
 	}
 }
 
@@ -378,6 +402,14 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 		}
 	}
 
+	if (templateConfig.moduleConfig.trailGenerateEnable) {
+		if (auto* module = ps->GetModule<TrailGenerateModule>()) {
+			if (!templateConfig.trailGenerateModuleData.empty() && templateConfig.trailGenerateModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.trailGenerateModuleData["data"]);
+			}
+			module->SetEnabled(true);
+		}
+	}
 
 	// RenderModule 데이터 적용 + 활성화
 	if (templateConfig.moduleConfig.billboardEnabled) {
@@ -397,20 +429,13 @@ void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectT
 			module->SetEnabled(true);
 		}
 	}
-}
 
-void EffectManager::DisableAllModules(EffectBase* effect)
-{
-	for (auto& ps : effect->GetAllParticleSystems()) {
-		// ParticleModule들 비활성화
-		for (auto it = ps->GetModuleList().begin(); it != ps->GetModuleList().end(); ++it) {
-			ParticleModule& module = *it;
-			module.SetEnabled(false);
-		}
-
-		// RenderModule들 비활성화
-		for (auto* renderModule : ps->GetRenderModules()) {
-			renderModule->SetEnabled(false);
+	if (templateConfig.moduleConfig.trailEnable) {
+		if (auto* module = ps->GetRenderModule<TrailRenderModule>()) {
+			if (!templateConfig.trailRenderModuleData.empty() && templateConfig.trailRenderModuleData.contains("data")) {
+				module->DeserializeData(templateConfig.trailRenderModuleData["data"]);
+			}
+			module->SetEnabled(true);
 		}
 	}
 }
@@ -480,6 +505,11 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 								moduleConfig.meshSpawnEnabled = true;
 								meshSpawnModuleData = moduleJson;
 							}
+							else if (moduleType == "TrailGenerateModule")
+							{
+								moduleConfig.trailGenerateEnable = true;
+								trailGenerateModuleData = moduleJson;
+							}
 						}
 					}
 				}
@@ -497,6 +527,10 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 							else if (renderModuleType == "MeshModuleGPU") {
 								moduleConfig.meshEnabled = true;
 								meshModuleData = renderModuleJson;
+							}
+							else if (renderModuleType == "TrailRenderModule") {
+								moduleConfig.trailEnable = true;
+								trailRenderModuleData = renderModuleJson;
 							}
 						}
 					}

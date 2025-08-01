@@ -33,7 +33,6 @@ ReflectionScriptField(Player) \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(DeleteCurWeapon) \
-		meta_method(OnPunch) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };

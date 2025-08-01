@@ -193,6 +193,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
 		CreateFactory::GetInstance()->RegisterFactory("TweenManager", []() { return new TweenManager(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityResource", []() { return new EntityResource(); });

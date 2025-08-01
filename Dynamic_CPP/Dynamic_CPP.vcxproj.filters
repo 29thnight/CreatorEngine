@@ -192,6 +192,9 @@
 		<ClInclude Include="Assets\Script\NewAniBehavior.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -325,6 +328,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

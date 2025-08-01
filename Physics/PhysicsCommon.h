@@ -268,7 +268,7 @@ struct CharacterControllerInfo
 	unsigned int layerNumber = 0;	//레이어 넘버
 
 	DirectX::SimpleMath::Vector3 position = {0.0f,0.0f,0.0f};	//위치
-	float height = 8.5f;	//높이
+	float height = 2.0f;	//높이
 	float radius = 0.55f;	//반지름
 	float stepOffset = 0.001f;	//오를 수 있는 계단 높이 (코사인)
 	float slopeLimit = 0.7f;	//오를 수 있는 최대 경사각

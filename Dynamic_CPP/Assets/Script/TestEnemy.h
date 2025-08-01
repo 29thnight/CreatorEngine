@@ -20,13 +20,14 @@ public:
 	virtual void LateUpdate(float tick) override {}
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
-
+	
+	void SetCriticalMark(int playerIndex);
 
 	GameObject* Owner;
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
-
+	
 	[[Property]]
 	float detectRange = 5.f;
 	GameManager* gm = nullptr;

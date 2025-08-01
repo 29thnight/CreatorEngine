@@ -4,6 +4,7 @@
 #include "Player.generated.h"
 class Animator;
 class Weapon;
+class EntityItem;
 class Player : public Entity
 {
 public:
@@ -34,6 +35,7 @@ public:
 	void CatchAndThrow();
 	void Catch();
 	void Throw();
+	void DropCatchItem();
 	[[Method]]
 	void ThrowEvent();
 	[[Method]]
@@ -57,10 +59,7 @@ public:
 	[[Property]]
 	int playerIndex = 0;
 
-	[[Method]]
-	void OnPunch();
 	int m_weaponIndex = 0;
-	int m_playerIndex = 0;
 	[[Property]]
 	float maxHP = 100;
 	float curHP = maxHP;
@@ -114,7 +113,7 @@ public:
 	std::vector<Weapon*> m_weaponInventory;
 	Weapon* m_curWeapon = nullptr;
 	GameObject* player = nullptr;
-	GameObject* catchedObject = nullptr;
+	EntityItem* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
 	Animator* m_animator = nullptr;

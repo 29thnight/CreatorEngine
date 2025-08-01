@@ -79,6 +79,8 @@ public:
 
 private:
 
+    float m_currentTime = 0;
+
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;
 

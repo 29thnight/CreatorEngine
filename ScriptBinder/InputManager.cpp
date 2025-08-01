@@ -154,15 +154,31 @@ void InputManager::KeyBoardUpdate()
     
 }
 
+bool InputManager::IsKeyDown(KeyBoard key) const
+{
+
+    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Down;
+}
+
 bool InputManager::IsKeyDown(unsigned int key) const
 {
     return keyboardstate.GetKeyState(key) == KeyState::Down;
+}
+
+bool InputManager::IsKeyPressed(KeyBoard key) const
+{
+    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Pressed;
 }
 
 bool InputManager::IsKeyPressed(unsigned int key) const
 {
     return keyboardstate.GetKeyState(key) == KeyState::Pressed;
   
+}
+
+bool InputManager::IsKeyReleased(KeyBoard key) const
+{
+    return keyboardstate.GetKeyState(static_cast<size_t>(key)) == KeyState::Released;
 }
 
 bool InputManager::IsKeyReleased(unsigned int key) const

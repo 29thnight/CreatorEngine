@@ -13,10 +13,12 @@ public:
 		bool movementEnabled = false;
 		bool sizeEnabled = false;
 		bool meshSpawnEnabled = false;
+		bool trailGenerateEnable = false;
 
 		// RenderModule 활성화 상태
 		bool billboardEnabled = false;
 		bool meshEnabled = false;
+		bool trailEnable = false;
 	};
 	
 	// 원본 설정
@@ -37,8 +39,11 @@ public:
 	nlohmann::json colorModuleData;
 	nlohmann::json movementModuleData;
 	nlohmann::json sizeModuleData;
+	nlohmann::json trailGenerateModuleData;
+
 	nlohmann::json billboardModuleData;
 	nlohmann::json meshModuleData;
+	nlohmann::json trailRenderModuleData;
 
 	// JSON에서 설정 로드
 	void LoadConfigFromJSON(const nlohmann::json& effectJson);
@@ -75,8 +80,6 @@ public:
 
 	// 읽기만 effects에 접근은 오로지 매니저에서만
 	const std::unordered_map<std::string, UniversalEffectTemplate> GetEffectTemplates() const { return templates; }
-
-	//UINT GetInstanceId() const { return nextInstanceId.load(); }
 
 	void RegisterTemplateFromEditor(const std::string& effectName, const nlohmann::json& effectJson);
 

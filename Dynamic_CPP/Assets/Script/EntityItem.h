@@ -6,10 +6,12 @@ class Player;
 class RigidBodyComponent;
 enum EItemState
 {
-	NONE = 0,
+	NONE = 0,   // 맨땅에 떨어진상태
 	ACQUIERED,  // 아이템 획득
+	CATCHED,    // 플레이어에게 들려있을때
 	THROWN,     // 아이템 던짐
-	DROPPED,
+	DROPPED,    // 플레이어가 들고있다가 던지지못하고 떨궈질때
+	FALLED,     // 벽등에 부딪히고 그냥 떨어질때
 	DESTROYED   // 아이템 파괴
 	// Add more item types as needed
 };
@@ -32,6 +34,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void Drop(Mathf::Vector3 ownerForward, float distance);
 	void Throw(Mathf::Vector3 ownerForward, float distance);
 	void SetThrowOwner(Player* player);
 	Player* GetThrowOwner();
@@ -39,13 +42,14 @@ public:
 public:
 	GameObject* asisTail{ nullptr };
 	RigidBodyComponent* m_rigid = nullptr;
-	bool isThrow = false;
 	Mathf::Vector3 startPos{ 0.f, 0.f, 0.f };
 	Mathf::Vector3 endPos{ 0.f, 0.f, 0.f };
 	float throwDistacne = 6.f;
 	float timer = 0.f;
 	float speed = 2.f;
-	EItemState m_state = EItemState::DROPPED;
+	float indicatorDistacne = 15.0f;
+	EItemState m_state = EItemState::NONE;
+	bool isTargettingTail = false;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
 };

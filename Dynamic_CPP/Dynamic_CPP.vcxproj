@@ -129,7 +129,8 @@
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<EnableUAC>false</EnableUAC>
-			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;../$(Platform)\$(Configuration)\SingletonManager.lib;../$(Platform)\$(Configuration)\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalDependencies>../$(Platform)\$(Configuration)\ScriptBinder.lib;../$(Platform)\$(Configuration)\ImGuiHelper.lib;../$(Platform)\$(Configuration)\Utility_Framework.lib;../$(Platform)\$(Configuration)\RenderEngine.lib;../$(Platform)\$(Configuration)\Physics.lib;../$(Platform)\$(Configuration)\SingletonManager.lib;../$(Platform)\$(Configuration)\ManagedHeap.lib;dxgi.lib;d3d11.lib;dxguid.lib;D3DCompiler.lib;fmodL_vc.lib;fmod_vc.lib;DirectXTK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+			<AdditionalLibraryDirectories>$(SolutionDir)DirectXTK\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 		</Link>
 		<PreBuildEvent>
 			<Command>"../x64\HeaderTool\ScriptReflectionAndFactoryClear.exe"
@@ -212,6 +213,7 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
+		<ClInclude Include="Assets\Script\EntityEnemy.h" />
 		<ClInclude Include="Assets\Script\NewAniBehavior.h" />
 	</ItemGroup>
 	<ItemGroup>
@@ -342,6 +344,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

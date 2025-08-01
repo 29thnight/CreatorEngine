@@ -314,7 +314,7 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 					else if (InputManagement->IsKeyPressed(action->key[3])) action->value.v2Value.y = 1.0f;
 					else action->value.v2Value.y = 0.0f;
 
-					InvokeAction(instance, type, action->funName, { action->value.v2Value.x,action->value.v2Value.y });
+					InvokeAction(instance, type, action->funName, { action->value.v2Value });
 					//action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:

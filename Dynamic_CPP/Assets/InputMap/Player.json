@@ -33,7 +33,7 @@
             "key1": "A",
             "key2": "A",
             "key3": "A",
-            "keystate": "Down",
+            "keystate": "Pressed",
             "scpritName": "Player"
         },
         {
@@ -45,7 +45,7 @@
             "key1": "A",
             "key2": "A",
             "key3": "A",
-            "keystate": "Down",
+            "keystate": "Released",
             "scpritName": "Player"
         },
         {
