@@ -24,6 +24,11 @@ MovementModuleCS::MovementModuleCS()
     m_orbitalData.radius = 5.0f;
     m_orbitalData.speed = 1.0f;
     m_orbitalData.axis = Mathf::Vector3(0, 1, 0);
+
+    m_explosiveData.initialSpeed = 50.0f;
+    m_explosiveData.speedDecay = 2.0f;
+    m_explosiveData.randomFactor = 0.4f;
+    m_explosiveData.sphereRadius = 1.0f;
 }
 
 void MovementModuleCS::Initialize()
@@ -159,6 +164,11 @@ void MovementModuleCS::UpdateConstantBuffers(float delta)
         params->orbitalRadius = m_orbitalData.radius;
         params->orbitalSpeed = m_orbitalData.speed;
         params->orbitalAxis = m_orbitalData.axis;
+
+        params->explosiveSpeed = m_explosiveData.initialSpeed;
+        params->explosiveDecay = m_explosiveData.speedDecay;
+        params->explosiveRandom = m_explosiveData.randomFactor;
+        params->explosiveSphere = m_explosiveData.sphereRadius;
 
         // 배열 크기
         params->velocityCurveSize = static_cast<int>(m_velocityCurve.size());
@@ -347,6 +357,16 @@ void MovementModuleCS::SetOrbitalMotion(const Mathf::Vector3& center, float radi
     m_paramsDirty = true;
 }
 
+void MovementModuleCS::SetExplosiveEffect(float initialSpeed, float speedDecay,
+    float randomFactor, float sphereRadius)
+{
+    m_explosiveData.initialSpeed = initialSpeed;
+    m_explosiveData.speedDecay = speedDecay;
+    m_explosiveData.randomFactor = randomFactor;
+    m_explosiveData.sphereRadius = sphereRadius;
+    m_paramsDirty = true;
+}
+
 void MovementModuleCS::ClearVelocityCurve()
 {
     m_velocityCurve.clear();
@@ -412,6 +432,13 @@ nlohmann::json MovementModuleCS::SerializeData() const
         {"radius", m_orbitalData.radius},
         {"speed", m_orbitalData.speed},
         {"axis", {m_orbitalData.axis.x, m_orbitalData.axis.y, m_orbitalData.axis.z}}
+    };
+
+    json["explosiveData"] = {
+    {"initialSpeed", m_explosiveData.initialSpeed},
+    {"speedDecay", m_explosiveData.speedDecay},
+    {"randomFactor", m_explosiveData.randomFactor},
+    {"sphereRadius", m_explosiveData.sphereRadius}
     };
 
     // 상태 정보
@@ -540,6 +567,19 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
             auto axis = orbitalJson["axis"];
             m_orbitalData.axis = Mathf::Vector3(axis[0], axis[1], axis[2]);
         }
+    }
+
+    if (json.contains("explosiveData"))
+    {
+        const auto& explosiveJson = json["explosiveData"];
+        if (explosiveJson.contains("initialSpeed"))
+            m_explosiveData.initialSpeed = explosiveJson["initialSpeed"];
+        if (explosiveJson.contains("speedDecay"))
+            m_explosiveData.speedDecay = explosiveJson["speedDecay"];
+        if (explosiveJson.contains("randomFactor"))
+            m_explosiveData.randomFactor = explosiveJson["randomFactor"];
+        if (explosiveJson.contains("sphereRadius"))
+            m_explosiveData.sphereRadius = explosiveJson["sphereRadius"];
     }
 
     // 상태 정보 복원
