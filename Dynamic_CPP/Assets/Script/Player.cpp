@@ -121,6 +121,11 @@ void Player::Update(float tick)
 			m_dubbleDashElapsedTime = 0.f;
 		}
 	}
+
+	auto dash1 = GameObject::Find("Dash1");
+	Mathf::Vector3 pos = player->m_transform.GetWorldPosition();
+	dash1->m_transform.SetPosition(pos);
+
 	if (isDashing)
 	{
 		m_dashElapsedTime += tick;
@@ -136,6 +141,15 @@ void Player::Update(float tick)
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
 			controller->Move({ -forward.x ,-forward.z });
+			if (dash1)
+			{
+				auto dasheffect = dash1->GetComponent<EffectComponent>();
+				if (dasheffect)
+				{
+					dasheffect->Apply();
+				}
+			}
+
 
 		}
 
