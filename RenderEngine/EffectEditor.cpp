@@ -2748,7 +2748,7 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 			Mathf::Vector3 currentPos = trailModule->GetPosition();
 			float posArray[3] = { currentPos.x, currentPos.y, currentPos.z };
 			if (ImGui::DragFloat3("Current Position", posArray, 0.1f)) {
-				trailModule->SetPosition(Mathf::Vector3(posArray[0], posArray[1], posArray[2]));
+				trailModule->SetEmitterPosition(Mathf::Vector3(posArray[0], posArray[1], posArray[2]));
 			}
 
 			// 위치 오프셋

@@ -1,5 +1,6 @@
 ﻿#include "RenderModules.h"
 #include "../ShaderSystem.h"
+#include "ParticleSystem.h"
 
 void RenderModules::CleanupRenderState()
 {
@@ -72,4 +73,9 @@ void RenderModules::SetClippingAxis(const Mathf::Vector3& axis)
 	m_clippingParams.polarReferenceDir = normalizedAxis;
 
 	UpdateClippingBuffer();
+}
+
+bool RenderModules::IsSystemRunning() const
+{
+	return m_ownerSystem ? m_ownerSystem->IsRunning() : false;
 }

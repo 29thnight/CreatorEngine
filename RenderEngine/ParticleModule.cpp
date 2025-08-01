@@ -1,4 +1,5 @@
 #include "ParticleModule.h"
+#include "ParticleSystem.h"
 
 float ParticleModule::ApplyEasing(float normalizedTime)
 {
@@ -11,4 +12,24 @@ float ParticleModule::ApplyEasing(float normalizedTime)
 	}
 
 	return normalizedTime;
+}
+
+Mathf::Vector3 ParticleModule::GetSystemWorldPosition() const
+{
+	return m_ownerSystem ? m_ownerSystem->GetWorldPosition() : Mathf::Vector3::Zero;
+}
+
+Mathf::Vector3 ParticleModule::GetSystemRelativePosition() const
+{
+	return m_ownerSystem ? m_ownerSystem->GetRelativePosition() : Mathf::Vector3::Zero;
+}
+
+Mathf::Vector3 ParticleModule::GetSystemEffectBasePosition() const
+{
+	return m_ownerSystem ? m_ownerSystem->GetEffectBasePosition() : Mathf::Vector3::Zero;
+}
+
+bool ParticleModule::IsSystemRunning() const
+{
+	return m_ownerSystem ? m_ownerSystem->IsRunning() : false;
 }

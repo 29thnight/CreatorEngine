@@ -1,6 +1,6 @@
 #include "TrailRenderModule.h"
 #include "ShaderSystem.h"
-#include "DeviceState.h"
+#include "DataSystem.h"
 
 TrailRenderModule::TrailRenderModule()
     : m_trailModule(nullptr)
@@ -219,4 +219,110 @@ void TrailRenderModule::WaitForGPUCompletion()
     }
 
     m_gpuWorkPending = false;
+}
+
+nlohmann::json TrailRenderModule::SerializeData() const
+{
+    nlohmann::json json;
+
+    // 텍스처 정보
+    json["texture"] = {
+        {"hasTexture", m_assignedTexture != nullptr}
+    };
+
+    if (m_assignedTexture)
+    {
+        json["texture"]["name"] = m_assignedTexture->m_name;
+        json["texture"]["assigned"] = true;
+    }
+
+    // 상수 버퍼 데이터
+    json["constantBuffer"] = {
+        {"cameraPosition", {
+            {"x", m_constantBufferData.cameraPosition.x},
+            {"y", m_constantBufferData.cameraPosition.y},
+            {"z", m_constantBufferData.cameraPosition.z}
+        }},
+        {"time", m_constantBufferData.time}
+    };
+
+    // 렌더링 상태
+    json["renderState"] = {
+        {"instanceCount", m_instanceCount}
+    };
+
+    // Trail 모듈 연결 정보
+    json["trailModule"] = {
+        {"connected", m_trailModule != nullptr}
+    };
+
+    return json;
+}
+
+void TrailRenderModule::DeserializeData(const nlohmann::json& json)
+{
+    // 텍스처 정보 복원
+    if (json.contains("texture"))
+    {
+        const auto& textureJson = json["texture"];
+
+        if (textureJson.contains("name"))
+        {
+            std::string textureName = textureJson["name"];
+
+            if (textureName.find('.') == std::string::npos)
+            {
+                textureName += ".png";
+            }
+
+            m_assignedTexture = DataSystems->LoadTexture(textureName);
+
+            if (m_assignedTexture) {
+                std::string nameWithoutExtension = file::path(textureName).stem().string();
+                m_assignedTexture->m_name = nameWithoutExtension;
+            }
+        }
+    }
+
+    // 상수 버퍼 데이터 복원
+    if (json.contains("constantBuffer"))
+    {
+        const auto& cbJson = json["constantBuffer"];
+
+        if (cbJson.contains("cameraPosition"))
+        {
+            const auto& camPosJson = cbJson["cameraPosition"];
+            Mathf::Vector3 cameraPosition(
+                camPosJson.value("x", 0.0f),
+                camPosJson.value("y", 0.0f),
+                camPosJson.value("z", 0.0f)
+            );
+            SetCameraPosition(cameraPosition);
+        }
+
+        if (cbJson.contains("time"))
+        {
+            m_constantBufferData.time = cbJson["time"];
+        }
+    }
+
+    // 렌더링 상태 복원
+    if (json.contains("renderState"))
+    {
+        const auto& renderJson = json["renderState"];
+
+        if (renderJson.contains("instanceCount"))
+        {
+            m_instanceCount = renderJson["instanceCount"];
+        }
+    }
+
+    if (!m_pso) {
+        Initialize();
+    }
+}
+
+std::string TrailRenderModule::GetModuleType() const
+{
+    return "TrailRenderModule";
 }
