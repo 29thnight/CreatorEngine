@@ -1257,7 +1257,8 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 				"Curve",
 				"Impulse",
 				"Wind",
-				"Orbital"
+				"Orbital",
+				"Explosive"
 			};
 
 			int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
@@ -1631,6 +1632,115 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 				ImGui::TreePop();
 			}
 		}
+		// Explosive 설정 (Explosive 모드일 때)
+		else if (currentVelocityMode == 5) // Explosive
+		{
+			if (ImGui::TreeNode("Explosive Settings"))
+			{
+				// 모듈에서 현재 explosive 데이터 가져오기
+				auto explosiveData = movementModule->GetExplosiveData();
+
+				// static 대신 실시간으로 현재 데이터 사용
+				float initialSpeed = explosiveData.initialSpeed;
+				float speedDecay = explosiveData.speedDecay;
+				float randomFactor = explosiveData.randomFactor;
+				float sphereRadius = explosiveData.sphereRadius;
+
+				bool explosiveChanged = false;
+
+				ImGui::Text("Basic Settings:");
+				if (ImGui::SliderFloat("Initial Speed", &initialSpeed, 1.0f, 200.0f))
+					explosiveChanged = true;
+
+				if (ImGui::SliderFloat("Speed Decay", &speedDecay, 0.1f, 5.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Higher values make particles slow down faster");
+
+				ImGui::Text("Distribution:");
+				if (ImGui::SliderFloat("Random Factor", &randomFactor, 0.0f, 1.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("0 = uniform spread, 1 = very random");
+
+				if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 2.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("1.0 = perfect sphere, lower values = flatter distribution");
+
+				// 프리셋 버튼들
+				ImGui::Separator();
+				ImGui::Text("Presets:");
+
+				if (ImGui::Button("Fireworks"))
+				{
+					initialSpeed = 80.0f;
+					speedDecay = 1.5f;
+					randomFactor = 0.3f;
+					sphereRadius = 1.0f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Grenade"))
+				{
+					initialSpeed = 120.0f;
+					speedDecay = 2.5f;
+					randomFactor = 0.6f;
+					sphereRadius = 0.8f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Soft Pop"))
+				{
+					initialSpeed = 30.0f;
+					speedDecay = 0.8f;
+					randomFactor = 0.2f;
+					sphereRadius = 1.2f;
+					explosiveChanged = true;
+				}
+
+				if (ImGui::Button("Ring Burst"))
+				{
+					initialSpeed = 60.0f;
+					speedDecay = 1.2f;
+					randomFactor = 0.1f;
+					sphereRadius = 0.3f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Chaos"))
+				{
+					initialSpeed = 100.0f;
+					speedDecay = 3.0f;
+					randomFactor = 0.8f;
+					sphereRadius = 1.5f;
+					explosiveChanged = true;
+				}
+
+				// 실시간 업데이트
+				if (explosiveChanged)
+				{
+					movementModule->SetExplosiveEffect(
+						initialSpeed,
+						speedDecay,
+						randomFactor,
+						sphereRadius
+					);
+				}
+
+				ImGui::TreePop();
+			}
+			}
+
 
 		ImGui::Separator();
 
