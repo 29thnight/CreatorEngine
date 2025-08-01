@@ -8,7 +8,8 @@ enum class VelocityMode
 	Curve,             // 시간에 따른 곡선
 	Impulse,           // 특정 시점에 충격
 	Wind,              // 바람 효과
-	Orbital            // 궤도 운동
+	Orbital,            // 궤도 운동
+	Explosive,			// 폭발
 };
 
 struct alignas(16) VelocityPoint
@@ -42,6 +43,14 @@ struct OrbitalData
 	float radius;
 	float speed;
 	Mathf::Vector3 axis;     // 회전축
+};
+
+struct ExplosiveData
+{
+	float initialSpeed;      // 초기 폭발 속도
+	float speedDecay;        // 속도 감소율
+	float randomFactor;      // 랜덤 요소 강도
+	float sphereRadius;      // 구형 분포 반지름 (0이면 완전한 구)
 };
 
 class MovementModuleCS : public ParticleModule, public ISerializable
@@ -91,11 +100,14 @@ public:
 
 	void SetOrbitalMotion(const Mathf::Vector3& center, float radius, float speed, const Mathf::Vector3& axis = Mathf::Vector3(0, 1, 0));
 
+	void SetExplosiveEffect(float initialSpeed = 50.0f, float speedDecay = 2.0f, float randomFactor = 0.4f, float sphereRadius = 1.0f);
+
 	VelocityMode GetVelocityMode() const { return m_velocityMode; }
 	const std::vector<VelocityPoint>& GetVelocityCurve() const { return m_velocityCurve; }
 	const std::vector<ImpulseData>& GetImpulses() const { return m_impulses; }
 	const WindData& GetWindData() const { return m_windData; }
 	const OrbitalData& GetOrbitalData() const { return m_orbitalData; }
+    const ExplosiveData& GetExplosiveData() const { return m_explosiveData; }
 
 	void ClearVelocityCurve();
 
@@ -128,6 +140,11 @@ private:
 		float orbitalSpeed;
 		Mathf::Vector3 orbitalAxis;
 
+		float explosiveSpeed;
+		float explosiveDecay;
+		float explosiveRandom;
+		float explosiveSphere;
+
 		int velocityCurveSize;
 		int impulseCount;
 		float2 pad2;
@@ -138,6 +155,8 @@ private:
 	std::vector<ImpulseData> m_impulses;
 	WindData m_windData;
 	OrbitalData m_orbitalData;
+	ExplosiveData m_explosiveData;
+
 	float m_currentTime;
 
 private:
