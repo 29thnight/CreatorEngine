@@ -135,7 +135,7 @@ void Player::Update(float tick)
 		{
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ forward.x ,forward.z });
+			controller->Move({ -forward.x ,-forward.z });
 
 		}
 
@@ -179,7 +179,7 @@ void Player::Move(Mathf::Vector2 dir)
 	Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
 	Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
 
-	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + -dir.y * Vector2(forward.x, forward.z);
+	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + - dir.y * Vector2(forward.x, forward.z);
 	moveDir.Normalize();
 
 
@@ -321,26 +321,29 @@ void Player::Attack()
 		int gumNumber = playerIndex + 1;
 		std::string gumName = "GumGi" + std::to_string(gumNumber);
 		auto obj = GameObject::Find(gumName);
-		auto pos = GetOwner()->m_transform.GetWorldPosition();
-		auto forward2 = GetOwner()->m_transform.GetForward();
-		auto offset{ 2 };
-		auto offset2 = forward2 * offset;
-		pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
-		pos.m128_f32[1] = 1;
-		pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
-
-		XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), -forward2, XMVectorSet(0, 1, 0, 0));
-		Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
-		obj->m_transform.SetPosition(pos);
-		
-		obj->m_transform.SetRotation(swordRotation);
-		obj->m_transform.UpdateWorldMatrix();
 		if (obj)
 		{
-			auto effect = obj->GetComponent<EffectComponent>();
-			if (effect)
+			auto pos = GetOwner()->m_transform.GetWorldPosition();
+			auto forward2 = GetOwner()->m_transform.GetForward();
+			auto offset{ 2 };
+			auto offset2 = forward2 * offset;
+			pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
+			pos.m128_f32[1] = 1;
+			pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
+
+			XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), -forward2, XMVectorSet(0, 1, 0, 0));
+			Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
+			obj->m_transform.SetPosition(pos);
+
+			obj->m_transform.SetRotation(swordRotation);
+			obj->m_transform.UpdateWorldMatrix();
+			if (obj)
 			{
-				effect->Apply();
+				auto effect = obj->GetComponent<EffectComponent>();
+				if (effect)
+				{
+					effect->Apply();
+				}
 			}
 		}
 		std::vector<HitResult> hits;
