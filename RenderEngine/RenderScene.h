@@ -99,6 +99,7 @@ private:
 	friend class InspectorWindow;
 	friend class SceneViewWindow;
 	friend class ProxyCommand;
+	friend class AnimationJob;
 
 	Scene*				m_currentScene{};
 	AnimationJob		m_animationJob{};

@@ -8,7 +8,7 @@
 #include "RenderScene.h"
 #include "SceneManager.h"
 
-const static float pi = XM_PIDIV2 - 0.01f;
+const static float         pi = XM_PIDIV2 - 0.01f;
 const static float pi2 = XM_PI * 2.f;
 
 Camera::Camera() : m_isLinkRenderData(true)

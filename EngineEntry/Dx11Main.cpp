@@ -86,12 +86,6 @@ void DirectX11::Dx11Main::Initialize()
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
         {
-            if (InputActionManagers == nullptr)
-            {
-                Debug->LogDebug("null입니다ㅏㅏ");
-            }
-            else
-                InputActionManagers->Update(deltaSecond);
 #ifdef EDITOR
             bool isPressedCtrl = InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
             if (isPressedCtrl && InputManagement->IsKeyDown('Z'))

@@ -163,7 +163,7 @@
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
-    <ClCompile Include="ImGuiDrawHelperPlayerInput.cpp">
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
   </ItemGroup>

@@ -44,15 +44,17 @@ public:
 	bool m_isLoop = true;
 
 	int preKey = 0;
-	int curKey = 0;
+	int curKey = 0; //&&&&& 실제 사용되는 값인지 확인필요 
 	void InvokeEvent();
 	void InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress, float _preAnimationProgress);
 
 	void AddEvent();
 	void AddEvent(KeyFrameEvent _event);
 	void DeleteEvent(KeyFrameEvent _event);
+	void DeleteEvent(int _index);
 	KeyFrameEvent* FindEvent(KeyFrameEvent _event);
 	KeyFrameEvent* FindEvent(const std::string& _eventName, const std::string& _scriptName, const std::string& _funName, float progressPercent);
+	bool FindEventName(std::string Name);
 	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
 
 
