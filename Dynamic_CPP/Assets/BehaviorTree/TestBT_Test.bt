@@ -8,7 +8,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [686063297]
-    Position: {x: -154, y: -67}
+    Position: {x: -282, y: -131}
   - ID: 686063297
     Type: 3
     Name: Selector
@@ -17,8 +17,8 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [3909499465, 3825938343, 1608338673]
-    Position: {x: 54, y: 61}
+    Children: [3909499465, 3825938343, 1608338673, 1442497393]
+    Position: {x: -122, y: -8}
   - ID: 3909499465
     Type: 2
     Name: Sequence
@@ -149,3 +149,23 @@ NodeList:
     Policy: -858993460
     Children: ~
     Position: {x: -10, y: 536}
+  - ID: 1442497393
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 686063297
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsInitialize
+    Policy: -858993460
+    Children: [2607363938]
+    Position: {x: -624, y: 185}
+  - ID: 2607363938
+    Type: 8
+    Name: Action
+    ParentID: 1442497393
+    IsRoot: false
+    HasScript: true
+    ScriptName: BTEntityInitAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: -634, y: 424}
