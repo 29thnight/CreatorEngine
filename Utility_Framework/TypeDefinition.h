@@ -102,21 +102,42 @@ public:
     }
 
     BitFlag& operator|= (flag flag) noexcept
-	{
-		m_flag |= flag;
-		return *this;
-	}
+    {
+        m_flag |= static_cast<flag>(1U << flag);
+        return *this;
+    }
 
-	BitFlag& operator&= (flag flag) noexcept
-	{
-		m_flag &= flag;
-		return *this;
-	}
+    BitFlag& operator&= (flag flag) noexcept
+    {
+        m_flag &= static_cast<flag>(1U << flag);
+        return *this;
+    }
 
     BitFlag& operator^= (flag flag) noexcept
     {
-        m_flag ^= flag;
-		return *this;
+        m_flag ^= static_cast<flag>(1U << flag);
+        return *this;
+    }
+
+    [[nodiscard]] BitFlag operator|(flag flag) const noexcept
+    {
+        BitFlag result(*this);
+        result |= flag;
+        return result;
+    }
+
+    [[nodiscard]] BitFlag operator&(flag flag) const noexcept
+    {
+        BitFlag result(*this);
+        result &= flag;
+        return result;
+    }
+
+    [[nodiscard]] BitFlag operator^(flag flag) const noexcept
+    {
+        BitFlag result(*this);
+        result ^= flag;
+        return result;
     }
 
 private:
