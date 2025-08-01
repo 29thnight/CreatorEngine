@@ -1188,12 +1188,19 @@ static float CalcMaxPopupHeightFromItemCount(int items_count)
 bool InspectorWindow::BeginNodeCombo(const char* label, const char* preview_value, ImGuiComboFlags flags)
 {
 	using namespace ImGui;
-
-	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
+#if (19213 > IMGUI_VERSION_NUM)
 	ImGuiContext& g = *GImGui;
+
 	bool has_window_size_constraint = (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint) != 0;
 	g.NextWindowData.Flags &= ~ImGuiNextWindowDataFlags_HasSizeConstraint;
+#else
+	ImGuiContext& g = *GImGui;
 
+	bool has_window_size_constraint = (g.NextWindowData.HasFlags & ImGuiNextWindowDataFlags_HasSizeConstraint) != 0;
+	g.NextWindowData.HasFlags &= ~ImGuiNextWindowDataFlags_HasSizeConstraint;
+#endif
+	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
+	
 	ImGuiWindow* window = GetCurrentWindow();
 	if (window->SkipItems)
 		return false;
@@ -1249,8 +1256,13 @@ bool InspectorWindow::BeginNodeCombo(const char* label, const char* preview_valu
 
 	if (has_window_size_constraint)
 	{
+#if (19213 > IMGUI_VERSION_NUM)
 		g.NextWindowData.Flags |= ImGuiNextWindowDataFlags_HasSizeConstraint;
 		g.NextWindowData.SizeConstraintRect.Min.x = ImMax(g.NextWindowData.SizeConstraintRect.Min.x, w);
+#else
+		g.NextWindowData.HasFlags |= ImGuiNextWindowDataFlags_HasSizeConstraint;
+		g.NextWindowData.SizeConstraintRect.Min.x = ImMax(g.NextWindowData.SizeConstraintRect.Min.x, w);
+#endif
 	}
 	else
 	{
