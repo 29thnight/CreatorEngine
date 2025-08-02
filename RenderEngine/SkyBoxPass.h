@@ -14,13 +14,13 @@ public:
 	void SetBackBuffer(ID3D11RenderTargetView* backBuffer);
     void GenerateCubeMap(RenderScene& scene);
 	void GenerateCubeMap(std::string_view fileName, RenderScene& scene);
-	Texture* GenerateEnvironmentMap(RenderScene& scene);
-    Texture* GeneratePrefilteredMap(RenderScene& scene);
-    Texture* GenerateBRDFLUT(RenderScene& scene);
+	Managed::SharedPtr<Texture> GenerateEnvironmentMap(RenderScene& scene);
+    Managed::SharedPtr<Texture> GeneratePrefilteredMap(RenderScene& scene);
+    Managed::SharedPtr<Texture> GenerateBRDFLUT(RenderScene& scene);
 
-    UniqueTexturePtr m_EnvironmentMap { TEXTURE_NULL_INITIALIZER };
-    UniqueTexturePtr m_SpecularMap    { TEXTURE_NULL_INITIALIZER };
-    UniqueTexturePtr m_BRDFLUT        { TEXTURE_NULL_INITIALIZER };
+	Managed::SharedPtr<Texture> m_EnvironmentMap;
+	Managed::SharedPtr<Texture> m_SpecularMap;
+	Managed::SharedPtr<Texture> m_BRDFLUT;
 
     void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
@@ -30,26 +30,24 @@ public:
 	file::path CurrentSkyBoxTextureName() const { return m_fileName; }
 
 private:
-    //skybox 쉐이더는 해당 pass의 기본 pso에 고정시키기
-	VertexShader* m_fullscreenVS{};
-	PixelShader* m_irradiancePS{};
-	PixelShader* m_prefilterPS{};
-	PixelShader* m_brdfPS{};
-	ID3D11RenderTargetView* m_backBuffer{};
+    //skybox 쉐이더는 해당 pass의 기본 pso에 고정
+	VertexShader*				m_fullscreenVS{};
+	PixelShader*				m_irradiancePS{};
+	PixelShader*				m_prefilterPS{};
+	PixelShader*				m_brdfPS{};
+	ID3D11RenderTargetView*		m_backBuffer{};
+	PixelShader*				m_rectToCubeMapPS{};
+	std::unique_ptr<Mesh>		m_skyBoxMesh{};
 
-	PixelShader* m_rectToCubeMapPS{};
+	Managed::UniquePtr<Texture>	m_skyBoxTexture{};
+	Managed::UniquePtr<Texture>	m_skyBoxCubeMap{};
 
-	std::unique_ptr<Mesh> m_skyBoxMesh{};
-
-	UniqueTexturePtr m_skyBoxTexture{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_skyBoxCubeMap{ TEXTURE_NULL_INITIALIZER };
-
-	Camera ortho{ false };
-	Mathf::xMatrix m_scaleMatrix{};
-	Texture* m_RenderTarget{};
-	file::path m_fileName{};
-	bool m_cubeMapGenerationRequired{ true };
-	float m_size{ 25.f };
-	float m_scale{ 40.f };
-	int m_cubeMapSize{ 512 };
+	Camera						ortho{ false };
+	Mathf::xMatrix				m_scaleMatrix{};
+	Texture*					m_RenderTarget{};
+	file::path					m_fileName{};
+	bool						m_cubeMapGenerationRequired{ true };
+	float						m_size{ 25.f };
+	float						m_scale{ 40.f };
+	int							m_cubeMapSize{ 512 };
 };

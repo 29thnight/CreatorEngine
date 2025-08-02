@@ -17,7 +17,7 @@ AUTO_REGISTER_ENUM(BoneRegion)
 class Bone;
 class Animation;
 class Socket;
-class Skeleton
+class Skeleton : public Managed::HeapObject
 {
 public:
    ReflectSkeleton
@@ -50,7 +50,7 @@ public:
 
 std::string ToLower(std::string boneName);
 
-class Bone
+class Bone : public Managed::HeapObject
 {
 public:
 	std::string m_name{};

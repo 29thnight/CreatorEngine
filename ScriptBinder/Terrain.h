@@ -2,7 +2,6 @@
 #include "../Utility_Framework/Core.Thread.hpp"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "ResourceAllocator.h"
 #include "TerrainCollider.h"
 #include "TerrainComponent.generated.h"
 #include "ShaderSystem.h"

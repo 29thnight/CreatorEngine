@@ -11,7 +11,6 @@
 #include "Benchmark.hpp"
 #include "SceneManager.h"
 #include "PrefabUtility.h"
-#include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ToggleUI.h"
@@ -129,18 +128,18 @@ void DataSystem::Initialize()
 void DataSystem::Finalize()
 {
 #ifndef BUILD_FLAG
-    DeallocateResource(UnknownIcon);
-    DeallocateResource(TextureIcon);
-    DeallocateResource(ModelIcon);
-    DeallocateResource(AssetsIcon);
-    DeallocateResource(FolderIcon);
-    DeallocateResource(ShaderIcon);
-    DeallocateResource(CodeIcon);
-	DeallocateResource(MainLightIcon);
-	DeallocateResource(PointLightIcon);
-	DeallocateResource(SpotLightIcon);
-	DeallocateResource(DirectionalLightIcon);
-	DeallocateResource(CameraIcon);
+    delete UnknownIcon;
+    delete TextureIcon;
+    delete ModelIcon;
+    delete AssetsIcon;
+    delete FolderIcon;
+    delete ShaderIcon;
+    delete CodeIcon;
+	delete MainLightIcon;
+	delete PointLightIcon;
+	delete SpotLightIcon;
+	delete DirectionalLightIcon;
+	delete CameraIcon;
 #endif // !BUILD_FLAG
 
     Models.clear();
@@ -414,15 +413,8 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	Model* model = Model::LoadModel(modelPath.string());
 	if (model)
 	{
-		auto deleter = [&](Model* model)
-		{
-			if (model)
-			{
-				DeallocateResource<Model>(model);
-			}
-		};
 
-		Models[name] = std::shared_ptr<Model>(model, deleter);
+		Models[name] = std::shared_ptr<Model>(model);
 
 		return model;
 	}
@@ -447,19 +439,10 @@ void DataSystem::LoadModel(std::string_view filePath)
 		return;
 	}
 
-	Model* model = Model::LoadModel(destination.string());
+	Managed::SharedPtr<Model> model = Model::LoadModelShared(destination.string());
 	if (model)
 	{
-        auto deleter = [&](Model* model)
-        {
-            if (model)
-            {
-                DeallocateResource<Model>(model);
-            }
-        };
-
-		Models[name] = std::shared_ptr<Model>(model, deleter);
-
+		Models[name] = model;
 	}
 	else
 	{
@@ -482,10 +465,10 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 		return Models[name].get();
 	}
 
-    Model* model{};
+	Managed::SharedPtr<Model> model{};
     try
     {
-        model = Model::LoadModel(destination.string());
+        model = Model::LoadModelShared(destination.string());
     }
     catch (const std::exception& e)
     {
@@ -495,16 +478,8 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 
 	if (model)
 	{
-        auto deleter = [&](Model* model)
-        {
-            if (model)
-            {
-                DeallocateResource<Model>(model);
-            }
-        };
-
-		Models[name] = std::shared_ptr<Model>(model, deleter);
-		return model;
+		Models[name] = model;
+		return model.get();
 	}
 }
 
@@ -525,17 +500,11 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
 		return Textures[name].get();
 	}
-	Texture* texture = Texture::LoadFormPath(texturePath.string());
+	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(texturePath.string());
 	if (texture)
 	{
-		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-		{
-			if (texture)
-			{
-				DeallocateResource<Texture>(texture);
-			}
-		});
-		return texture;
+		Textures[name] = texture;
+		return texture.get();
 	}
 	else
 	{
@@ -558,18 +527,12 @@ Texture* DataSystem::LoadTexture(std::string_view filePath)
         return Textures[name].get();
 	}
 
-	Texture* texture = Texture::LoadFormPath(destination.string());
+	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
 
 	if (texture)
 	{
-		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-        {
-            if (texture)
-            {
-                DeallocateResource<Texture>(texture);
-            }
-        });
-        return texture;
+		Textures[name] = texture;
+        return texture.get();
 	}
 	else
 	{
@@ -647,18 +610,12 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
         return Textures[name].get();
     }
 
-    Texture* texture = Texture::LoadFormPath(destination.string(), isCompress);
+    auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
 
     if (texture)
     {
-        Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-        {
-            if (texture)
-            {
-                DeallocateResource<Texture>(texture);
-            }
-        });
-        return texture;
+		Textures[name] = texture;
+        return texture.get();
     }
     else
     {
@@ -670,16 +627,9 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
 
 Material* DataSystem::CreateMaterial()
 {
-	Material* material = AllocateResource<Material>();
+	std::shared_ptr<Material> material = shared_alloc<Material>();
 	if (material)
 	{
-		auto deleter = [&](Material* mat)
-		{
-			if (mat)
-			{
-				DeallocateResource<Material>(mat);
-			}
-		};
 		std::string name = "NewMaterial";
 		int index = 1;
 		while (Materials.find(name) != Materials.end())
@@ -689,9 +639,9 @@ Material* DataSystem::CreateMaterial()
 		material->m_name = name;
 		material->m_fileGuid = make_file_guid(name);
 		
-		Materials[name] = std::shared_ptr<Material>(material, deleter);
+		Materials[name] = material;
 		
-		return material;
+		return material.get();
 	}
 	return nullptr;
 }

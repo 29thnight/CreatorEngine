@@ -30,7 +30,7 @@ class ToneMapPass final : public IRenderPass
 public:
     ToneMapPass();
     ~ToneMapPass();
-    void Initialize(Texture* dest);
+    void Initialize(Managed::SharedPtr<Texture> dest);
 	void ToneMapSetting(bool isAbleToneMap, ToneMapType type);
     void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -40,7 +40,7 @@ public:
 
 
 private:
-    Texture* m_DestTexture{};
+	Managed::WeakPtr<Texture> m_DestTexture{};
 	ComPtr<ID3D11Texture2D> m_readbackTexture[2];
 
 	bool m_isAbleAutoExposure{ true };

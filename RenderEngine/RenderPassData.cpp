@@ -70,7 +70,7 @@ void RenderPassData::Initalize(uint32 index)
 	m_shadowRenderQueue.reserve(800);
 
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
-	Texture* shadowMapTexture = Texture::CreateArray(
+	auto shadowMapTexture = Texture::CreateManagedArray(
 		desc.m_textureWidth,
 		desc.m_textureHeight,
 		"Shadow Map",
@@ -114,7 +114,7 @@ void RenderPassData::Initalize(uint32 index)
 	//안에서 배열은 3으로 고정중 필요하면 수정
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
+	m_shadowMapTexture.swap(shadowMapTexture);
 
 	XMMATRIX identity = XMMatrixIdentity();
 

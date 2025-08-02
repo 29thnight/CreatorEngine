@@ -1,12 +1,16 @@
 #include "Skeleton.h"
-#include "ResourceAllocator.h"
 #include "Socket.h"
 #include "Scene.h"
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
 	{
-        DeallocateResource(bone);
+        delete bone;
+	}
+
+	for (Socket* socket : m_sockets)
+	{
+		Memory::SafeDelete(socket);
 	}
 
 	m_bones.clear();

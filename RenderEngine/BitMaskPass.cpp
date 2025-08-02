@@ -52,6 +52,8 @@ BitMaskPass::BitMaskPass()
 
 BitMaskPass::~BitMaskPass()
 {
+	delete sample;
+    delete pointSample;
 }
 
 void BitMaskPass::Initialize(Texture* bitmask)

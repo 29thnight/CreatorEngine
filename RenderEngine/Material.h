@@ -12,7 +12,7 @@ enum class MaterialRenderingMode
 
 AUTO_REGISTER_ENUM(MaterialRenderingMode);
 
-class Material
+class Material : public Managed::HeapObject
 {
 public:
    ReflectMaterial

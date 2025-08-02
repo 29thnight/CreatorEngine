@@ -56,7 +56,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	ShaderSystem->Initialize();
 
-	Texture* ao = Texture::Create(
+	auto ao = Texture::CreateShared(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"AmbientOcclusion",
@@ -66,7 +66,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 	ao->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	ao->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_ambientOcclusionTexture = MakeUniqueTexturePtr(ao);
+	m_ambientOcclusionTexture = ao;
 
 	//Buffer 생성
 	XMMATRIX identity = XMMatrixIdentity();
@@ -100,19 +100,19 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     m_pSSAOPass->Initialize(
         ao,
         m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture.get(),
-		m_diffuseTexture.get()
+        m_normalTexture,
+		m_diffuseTexture
     );
     m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
 
     //deferredPass
     m_pDeferredPass = std::make_unique<DeferredPass>();
     m_pDeferredPass->Initialize(
-        m_diffuseTexture.get(),
-        m_metalRoughTexture.get(),
-        m_normalTexture.get(),
-        m_emissiveTexture.get(),
-		m_bitmaskTexture.get()
+        m_diffuseTexture,
+        m_metalRoughTexture,
+        m_normalTexture,
+        m_emissiveTexture,
+		m_bitmaskTexture
     );
     m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
 
@@ -126,7 +126,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
 	m_pToneMapPass->Initialize(
-		m_toneMappedColourTexture.get()
+		m_toneMappedColourTexture
 	);
 
     m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
@@ -172,7 +172,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
 
 	m_pUIPass = std::make_unique<UIPass>();
-	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get(), m_spriteBatch.get());
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
@@ -246,7 +246,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
-
+	m_deviceResources.reset();
 }
 
 void SceneRenderer::Finalize()
@@ -258,7 +258,6 @@ void SceneRenderer::Finalize()
 	m_toneMappedColourTexture.reset();
 	m_bitmaskTexture.reset();
 	m_ambientOcclusionTexture.reset();
-	m_toneMappedColourTexture.reset();
 	m_lightingTexture.reset();
 
 	m_pSSAOPass.reset();
@@ -343,7 +342,7 @@ void SceneRenderer::InitializeShadowMapDesc()
 
 void SceneRenderer::InitializeTextures()
 {
-	auto diffuseTexture = TextureHelper::CreateRenderTexture(
+	auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"DiffuseRTV",
@@ -351,7 +350,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_diffuseTexture.swap(diffuseTexture);
 
-	auto metalRoughTexture = TextureHelper::CreateRenderTexture(
+	auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"MetalRoughRTV",
@@ -359,7 +358,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_metalRoughTexture.swap(metalRoughTexture);
 
-	auto normalTexture = TextureHelper::CreateRenderTexture(
+	auto normalTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"NormalRTV",
@@ -367,7 +366,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_normalTexture.swap(normalTexture);
 
-	auto emissiveTexture = TextureHelper::CreateRenderTexture(
+	auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"EmissiveRTV",
@@ -375,7 +374,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_emissiveTexture.swap(emissiveTexture);
 
-	auto bitmaskTexture = TextureHelper::CreateRenderTexture(
+	auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"BitmaskRTV",
@@ -383,7 +382,7 @@ void SceneRenderer::InitializeTextures()
 	);
 	m_bitmaskTexture.swap(bitmaskTexture);
 
-	auto toneMappedColourTexture = TextureHelper::CreateRenderTexture(
+	auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"ToneMappedColourRTV",
@@ -391,7 +390,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
 
-	auto lightingTexture = TextureHelper::CreateRenderTexture(
+	auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"LightingRTV",
@@ -427,13 +426,13 @@ void SceneRenderer::NewCreateSceneInitialize()
 	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
 	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
-	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
-	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
-	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
+	auto envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	auto preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	auto brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
-	lightMap.envMap = envMap;
+	lightMap.envMap = envMap.get();
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
@@ -816,8 +815,8 @@ void SceneRenderer::CreateCommandListPass()
 			else
 			{
 				PROFILE_CPU_BEGIN("DeferredPassCommandList");
-				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
+				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture);
+				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture);
 				m_pDeferredPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
@@ -1073,9 +1072,9 @@ void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
 void SceneRenderer::ApplyNewCubeMap(std::string_view filename)
 {
 	m_pSkyBoxPass->GenerateCubeMap(filename, *m_renderScene);
-	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
-	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
-	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
+	auto envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	auto preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	auto brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);

@@ -59,34 +59,43 @@ DeferredPass::DeferredPass()
 
 DeferredPass::~DeferredPass()
 {
+
 }
 
-void DeferredPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitmask)
+void DeferredPass::Initialize(
+    Managed::SharedPtr<Texture> diffuse, 
+    Managed::SharedPtr<Texture> metalRough, 
+    Managed::SharedPtr<Texture> normals, 
+    Managed::SharedPtr<Texture> emissive, 
+    Managed::SharedPtr<Texture> bitmask)
 {
-    m_DiffuseTexture = diffuse;
+    m_DiffuseTexture    = diffuse;
     m_MetalRoughTexture = metalRough;
-    m_NormalTexture = normals;
-    m_EmissiveTexture = emissive;
-    m_BitmaskTexture = bitmask; 
+    m_NormalTexture     = normals;
+    m_EmissiveTexture   = emissive;
+    m_BitmaskTexture    = bitmask; 
 }
 
-void DeferredPass::UseAmbientOcclusion(Texture* aoMap)
+void DeferredPass::UseAmbientOcclusion(Managed::SharedPtr<Texture> aoMap)
 {
     m_AmbientOcclusionTexture = aoMap;
     //m_UseAmbientOcclusion = true;
 }
 
-void DeferredPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut)
+void DeferredPass::UseEnvironmentMap(
+    Managed::SharedPtr<Texture> envMap, 
+    Managed::SharedPtr<Texture> preFilter, 
+    Managed::SharedPtr<Texture> brdfLut)
 {
-    m_EnvironmentMap = envMap;
-    m_PreFilter = preFilter;
-    m_BrdfLut = brdfLut;
+    m_EnvironmentMap    = envMap;
+    m_PreFilter         = preFilter;
+    m_BrdfLut           = brdfLut;
     //m_UseEnvironmentMap = true;
 }
 
 void DeferredPass::DisableAmbientOcclusion()
 {
-    m_AmbientOcclusionTexture = nullptr;
+    m_AmbientOcclusionTexture.reset();
     m_UseAmbientOcclusion = false;
 }
 
@@ -113,6 +122,29 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
+    if (m_DiffuseTexture.expired()          || 
+        m_MetalRoughTexture.expired()       || 
+        m_NormalTexture.expired()           || 
+        m_EmissiveTexture.expired()         || 
+        m_AmbientOcclusionTexture.expired() ||
+        m_EnvironmentMap.expired()          || 
+        m_PreFilter.expired()               || 
+        m_BrdfLut.expired())
+    {
+        return; // If any texture is expired, skip execution
+	}
+
+	auto diffuseTexture = m_DiffuseTexture.lock();
+	auto metalRoughTexture = m_MetalRoughTexture.lock();
+	auto normalTexture = m_NormalTexture.lock();
+	auto emissiveTexture = m_EmissiveTexture.lock();
+	auto bitmaskTexture = m_BitmaskTexture.lock();
+	auto ambientOcclusionTexture = m_AmbientOcclusionTexture.lock();
+	auto environmentMap = m_EnvironmentMap.lock();
+	auto preFilter = m_PreFilter.lock();
+	auto brdfLut = m_BrdfLut.lock();
+	auto LightEmissiveTexture = m_LightEmissiveTexture.lock();
+
     ID3D11DeviceContext* deferredPtr = deferredContext;
 
     auto& lightManager = scene.m_LightController;
@@ -132,21 +164,21 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     ID3D11ShaderResourceView* srvs[10] = 
     {
         renderData->m_depthStencil->m_pSRV,
-        m_DiffuseTexture->m_pSRV,
-        m_MetalRoughTexture->m_pSRV,
-        m_NormalTexture->m_pSRV,
+        diffuseTexture->m_pSRV,
+        metalRoughTexture->m_pSRV,
+        normalTexture->m_pSRV,
         (isShadowMapRender) ? renderData->m_shadowMapTexture->m_pSRV : nullptr,
-        m_UseAmbientOcclusion ? m_AmbientOcclusionTexture->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
-        m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr,
-        m_EmissiveTexture->m_pSRV
+        m_UseAmbientOcclusion ? ambientOcclusionTexture->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? environmentMap->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? preFilter->m_pSRV : nullptr,
+        m_UseEnvironmentMap ? brdfLut->m_pSRV : nullptr,
+        emissiveTexture->m_pSRV
     };
 
     m_pso->Apply(deferredPtr);
-    ID3D11RenderTargetView* emissiveRtv = m_LightEmissiveTexture->GetRTV();
+    ID3D11RenderTargetView* emissiveRtv = LightEmissiveTexture->GetRTV();
 
-    ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), m_LightEmissiveTexture->GetRTV() };
+    ID3D11RenderTargetView* rtv[2] = { renderData->m_renderTarget->GetRTV(), LightEmissiveTexture->GetRTV() };
     DirectX11::OMSetRenderTargets(deferredPtr, 2, rtv, nullptr);
     DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 
@@ -160,7 +192,7 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
     DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
     DirectX11::PSSetConstantBuffer(deferredPtr, 10, 1, m_shadowcamBuffer.GetAddressOf());
     DirectX11::PSSetShaderResources(deferredPtr, 0, 10, srvs);
-	DirectX11::PSSetShaderResources(deferredPtr, 11, 1, &m_BitmaskTexture->m_pSRV);
+	DirectX11::PSSetShaderResources(deferredPtr, 11, 1, &bitmaskTexture->m_pSRV);
 
     if (lightManager->hasLightWithShadows)
     {
@@ -180,40 +212,41 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
 void DeferredPass::ControlPanel()
 {
     ImGui::PushID(this);
-        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().deferred;
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().deferred;
 
-        if (ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion))
-        {
-                setting.useAmbientOcclusion = m_UseAmbientOcclusion;
-        }
-        if (ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows))
-        {
-                setting.useLightWithShadows = m_UseLightWithShadows;
-        }
-        if (ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap))
-        {
-                setting.useEnvironmentMap = m_UseEnvironmentMap;
-        }
-        if (ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f))
-        {
-                setting.envMapIntensity = m_envMapIntensity;
-        }
+    if (ImGui::Checkbox("Use Ambient Occlusion", &m_UseAmbientOcclusion))
+    {
+        setting.useAmbientOcclusion = m_UseAmbientOcclusion;
+    }
+    if (ImGui::Checkbox("Use Light With Shadows", &m_UseLightWithShadows))
+    {
+        setting.useLightWithShadows = m_UseLightWithShadows;
+    }
+    if (ImGui::Checkbox("Use Environment Map", &m_UseEnvironmentMap))
+    {
+        setting.useEnvironmentMap = m_UseEnvironmentMap;
+    }
+    if (ImGui::SliderFloat("EnvMap Intensity", &m_envMapIntensity, 0.f, 10.f))
+    {
+        setting.envMapIntensity = m_envMapIntensity;
+    }
 
-    if (ImGui::Button("Reset")) {
-                m_UseAmbientOcclusion = true;
-                m_UseEnvironmentMap = true;
-                m_UseLightWithShadows = true;
-                m_envMapIntensity = 1.f;
+    if (ImGui::Button("Reset")) 
+    {
+        m_UseAmbientOcclusion = true;
+        m_UseEnvironmentMap = true;
+        m_UseLightWithShadows = true;
+        m_envMapIntensity = 1.f;
 
-                setting.useAmbientOcclusion = m_UseAmbientOcclusion;
-                setting.useEnvironmentMap = m_UseEnvironmentMap;
-                setting.useLightWithShadows = m_UseLightWithShadows;
-                setting.envMapIntensity = m_envMapIntensity;
+        setting.useAmbientOcclusion = m_UseAmbientOcclusion;
+        setting.useEnvironmentMap = m_UseEnvironmentMap;
+        setting.useLightWithShadows = m_UseLightWithShadows;
+        setting.envMapIntensity = m_envMapIntensity;
     }
     ImGui::PopID();
 }
 
-void DeferredPass::UseLightAndEmissiveRTV(Texture* lightEmissive)
+void DeferredPass::UseLightAndEmissiveRTV(Managed::SharedPtr<Texture> lightEmissive)
 {
     m_LightEmissiveTexture = lightEmissive;
 }

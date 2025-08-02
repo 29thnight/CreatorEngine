@@ -366,7 +366,6 @@
     <ClInclude Include="MeshRendererProxy.h" />
     <ClInclude Include="RenderJob.h" />
     <ClInclude Include="RenderPassData.h" />
-    <ClInclude Include="ResourceAllocator.h" />
     <ClInclude Include="ScreenSpaceReflectionPass.h" />
     <ClInclude Include="ShaderSystem.h" />
     <ClInclude Include="BlitPass.h" />

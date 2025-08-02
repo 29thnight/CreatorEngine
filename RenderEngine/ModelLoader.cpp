@@ -2,7 +2,6 @@
 #include "Benchmark.hpp"
 #include "PathFinder.h"
 #include "DataSystem.h"
-#include "ResourceAllocator.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
 #include "ReflectionYml.h"
@@ -58,7 +57,7 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, std::string_view fileName) 
 	{
 		m_loadType = LoadType::ASSET;
 	}
-	m_model = AllocateResource<Model>();
+	m_model = new Model;
 	m_model->name = filepath.stem().string();
     if(m_AIScene)
     {
@@ -89,7 +88,7 @@ void ModelLoader::ProcessNodes()
 
 ModelNode* ModelLoader::ProcessNode(aiNode* node, int parentIndex)
 {
-	ModelNode* nodeObj = AllocateResource<ModelNode>(node->mName.C_Str());
+	ModelNode* nodeObj = new ModelNode(node->mName.C_Str());
 	nodeObj->m_index = m_model->m_nodes.size();
 	nodeObj->m_parentIndex = parentIndex;
 	nodeObj->m_numMeshes = node->mNumMeshes;
@@ -213,7 +212,7 @@ Mesh* ModelLoader::GenerateMesh(aiMesh* mesh)
 		}
 	}
 
-	Mesh* meshObj = AllocateResource<Mesh>(uniqueName, vertices, indices);
+	Mesh* meshObj = new Mesh(uniqueName, vertices, indices);
 	meshObj->m_materialIndex = mesh->mMaterialIndex;
 	meshObj->m_modelName = m_model->name;
 	//if(!m_model->m_hasBones)
@@ -276,7 +275,7 @@ Material* ModelLoader::GenerateMaterial(int index)
         }
     }
 
-    Material* material = AllocateResource<Material>();
+    auto material = shared_alloc<Material>();
     material->m_name = uniqueName;
 	material->m_fileGuid = m_fileGuid;
 
@@ -349,16 +348,9 @@ Material* ModelLoader::GenerateMaterial(int index)
 		material->SetBaseColor(1, 0, 1);
 	}
 
-	auto deleter = [&](Material* mat)
-	{
-		if (mat)
-		{
-			DeallocateResource<Material>(mat);
-		}
-	};
-	DataSystems->Materials[material->m_name] = std::shared_ptr<Material>(material, deleter);
+	DataSystems->Materials[material->m_name] = material;
 
-	return material;
+	return material.get();
 }
 
 void ModelLoader::ParseModel()
@@ -593,7 +585,7 @@ void ModelLoader::LoadNode(std::ifstream& infile, ModelNode*& node)
     name.resize(nameSize);
     infile.read(name.data(), nameSize);
 
-    node = AllocateResource<ModelNode>(name);
+    node = new ModelNode(name);
 
     infile.read(reinterpret_cast<char*>(&node->m_index), sizeof(node->m_index));
     infile.read(reinterpret_cast<char*>(&node->m_parentIndex), sizeof(node->m_parentIndex));
@@ -620,7 +612,7 @@ void ModelLoader::LoadMesh(std::ifstream& infile, uint32_t size)
         name.resize(nameSize);
         infile.read(name.data(), nameSize);
 
-        auto* mesh = AllocateResource<Mesh>();
+        auto* mesh = new Mesh();
         mesh->m_name = name;
         infile.read(reinterpret_cast<char*>(&mesh->m_materialIndex), sizeof(mesh->m_materialIndex));
 
@@ -656,7 +648,7 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         name.resize(nameSize);
         infile.read(name.data(), nameSize);
 
-        Material* mat = AllocateResource<Material>();
+        auto mat = shared_alloc<Material>();
         mat->m_name = name;
         infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
         infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));
@@ -708,7 +700,10 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
                 mat->UseEmissiveMap(tex);
         }
 
-        m_model->m_Materials.push_back(mat);
+		DataSystems->Materials[mat->m_name] = mat;
+
+        m_model->m_Materials.push_back(mat.get());
+
     }
 }
 
@@ -719,7 +714,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
     if (!hasSkeleton)
         return;
 
-    Skeleton* skeleton = AllocateResource<Skeleton>();
+    Skeleton* skeleton = new Skeleton();
     infile.read(reinterpret_cast<char*>(&skeleton->m_rootTransform), sizeof(XMFLOAT4X4));
     infile.read(reinterpret_cast<char*>(&skeleton->m_globalInverseTransform), sizeof(XMFLOAT4X4));
 
@@ -735,7 +730,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
         name.resize(nameSize);
         infile.read(name.data(), nameSize);
 
-        Bone* bone = AllocateResource<Bone>();
+        Bone* bone = new Bone();
         bone->m_name = name;
         infile.read(reinterpret_cast<char*>(&bone->m_index), sizeof(bone->m_index));
         infile.read(reinterpret_cast<char*>(&bone->m_parentIndex), sizeof(bone->m_parentIndex));

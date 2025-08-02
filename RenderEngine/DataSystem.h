@@ -75,6 +75,8 @@ public:
 	void CopyTextureSelectType(std::string_view filePath, TextureFileType type);
 	//Resource Material
 	void LoadMaterials();
+	void SaveMaterial(Material* material);
+	Material* LoadMaterial(std::string_view name);
 	Material* LoadMaterialGUID(FileGuid guid);
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	Material* CreateMaterial();

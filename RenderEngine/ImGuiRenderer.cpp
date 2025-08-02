@@ -94,6 +94,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 ImGuiRenderer::~ImGuiRenderer()
 {
     Shutdown();
+	m_deviceResources.reset();
 }
 
 void ImGuiRenderer::BeginRender()

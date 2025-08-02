@@ -177,7 +177,7 @@ void VolumetricFogPass::Initialize(std::string_view fileName)
 	file::path path = file::path(fileName);
 	if (file::exists(path))
 	{
-		m_pBlueNoiseTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+		m_pBlueNoiseTexture = Texture::LoadManagedFromPath(fileName);
 	}
 
 	m_CopiedTexture = Texture::Create(

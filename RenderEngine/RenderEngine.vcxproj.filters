@@ -135,9 +135,6 @@
     <Filter Include="Shaders\Effect">
       <UniqueIdentifier>{42155f28-f404-4149-8689-61a9f1ecafec}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ResourceAllocator">
-      <UniqueIdentifier>{ea994bc9-a2bd-4eb1-b992-ec5f941bc061}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderScene">
       <UniqueIdentifier>{8b8366c0-580e-4d7e-99ec-036acc7e136b}</UniqueIdentifier>
     </Filter>
@@ -609,9 +606,6 @@
     </ClInclude>
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="ResourceAllocator.h">
-      <Filter>Asset\ResourceAllocator</Filter>
     </ClInclude>
     <ClInclude Include="AssetMetaWather.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>

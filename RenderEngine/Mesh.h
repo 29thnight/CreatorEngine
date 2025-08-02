@@ -1,9 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Mesh.generated.h"
+#include "ManagedHeapObject.h"
 #include <assimp/Importer.hpp>
 
-struct ModelNode
+struct ModelNode : public Managed::HeapObject
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -95,7 +96,7 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class Mesh
+class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>
 {
 public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체

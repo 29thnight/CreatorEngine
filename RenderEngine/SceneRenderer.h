@@ -125,14 +125,14 @@ private:
 	//buffers
 	ComPtr<ID3D11Buffer>						m_ModelBuffer;
 	//Textures
-	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_metalRoughTexture       { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_normalTexture           { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_bitmaskTexture		   { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_lightingTexture		   { TEXTURE_NULL_INITIALIZER };
+	 Managed::SharedPtr<Texture> m_diffuseTexture          {};
+	 Managed::SharedPtr<Texture> m_metalRoughTexture       {};
+	 Managed::SharedPtr<Texture> m_normalTexture           {};
+	 Managed::SharedPtr<Texture> m_emissiveTexture         {};
+	 Managed::SharedPtr<Texture> m_bitmaskTexture			 {};
+	 Managed::SharedPtr<Texture> m_ambientOcclusionTexture {};
+	 Managed::SharedPtr<Texture> m_toneMappedColourTexture {};
+	 Managed::SharedPtr<Texture> m_lightingTexture		 {};
 
 	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
 	ThreadPool<std::function<void()>>* m_threadPool = nullptr;

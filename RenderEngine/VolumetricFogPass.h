@@ -71,7 +71,7 @@ public:
 	ID3D11Texture3D* mFinalVoxelInjectionTexture3D{};
 
 	Texture* m_pShadowMap{};
-	UniqueTexturePtr m_pBlueNoiseTexture{};
+	Managed::UniquePtr<Texture> m_pBlueNoiseTexture{};
 
 	ID3D11ShaderResourceView* mTempVoxelInjectionTexture3DSRV[2];
 	ID3D11UnorderedAccessView* mTempVoxelInjectionTexture3DUAV[2];

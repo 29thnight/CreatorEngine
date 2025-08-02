@@ -13,9 +13,9 @@ public:
 	void Initialize(std::string_view fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
-        void ApplySettings(const ColorGradingPassSetting& setting);
+    void ApplySettings(const ColorGradingPassSetting& setting);
 
-	UniqueTexturePtr m_pColorGradingTexture{};
+	Managed::UniquePtr<Texture> m_pColorGradingTexture{};
 private:
 	Texture* m_pCopiedTexture{};
 	ComPtr<ID3D11Buffer> m_Buffer{};

@@ -126,6 +126,7 @@ void MeshModuleGPU::CreateCubeMesh()
     {
         delete m_tempCubeMesh;
     }
+
     m_tempCubeMesh = new Mesh("CubeParticle", vertices, indices);
 }
 

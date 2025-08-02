@@ -20,6 +20,10 @@ GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 
 GizmoRenderer::~GizmoRenderer()
 {
+	m_pGridPass.reset();
+	m_pWireFramePass.reset();
+	m_pGizmoPass.reset();
+	m_pGizmoLinePass.reset();
 }
 
 void GizmoRenderer::EditorView()

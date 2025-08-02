@@ -22,7 +22,7 @@ public:
 	SSAOPass();
 	~SSAOPass();
 
-	void Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal, Texture* diffuse);
+	void Initialize(Managed::SharedPtr<Texture> renderTarget, ID3D11ShaderResourceView* depth, Managed::SharedPtr<Texture> normal, Managed::SharedPtr<Texture> diffuse);
 	void ReloadDSV(ID3D11ShaderResourceView* depth);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -30,14 +30,14 @@ public:
 	void Resize(uint32_t width, uint32_t height) override;
 
 private:
-    UniqueTexturePtr m_NoiseTexture{ TEXTURE_NULL_INITIALIZER };
+    Managed::UniquePtr<Texture> m_NoiseTexture;
 	SSAOBuffer m_SSAOBuffer;
 	ComPtr<ID3D11Buffer> m_Buffer;
 	ID3D11ShaderResourceView* m_DepthSRV;
 
-	Texture* m_NormalTexture;
-	Texture* m_RenderTarget;
-	Texture* m_DiffuseTexture;
+	std::weak_ptr<Texture> m_NormalTexture;
+	std::weak_ptr<Texture> m_RenderTarget;
+	std::weak_ptr<Texture> m_DiffuseTexture;
 
 	float radius = 0.1f;
 	float thickness = 0.1f;

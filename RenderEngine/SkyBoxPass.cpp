@@ -99,18 +99,18 @@ void SkyBoxPass::Initialize(std::string_view fileName, float size)
     {
         if (path.extension() == ".dds")
         {
-			m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+			m_skyBoxCubeMap = Texture::LoadManagedFromPath(fileName);
 			m_cubeMapGenerationRequired = false;
         }
         else
         {
-			m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
-            m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
+			m_skyBoxTexture = Texture::LoadManagedFromPath(fileName);
+            m_skyBoxCubeMap = Texture::CreateManagedCube(
                 m_cubeMapSize,
                 "CubeMap",
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
 				D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
-            ));
+            );
 
 			m_skyBoxCubeMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
 			m_skyBoxCubeMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -118,34 +118,34 @@ void SkyBoxPass::Initialize(std::string_view fileName, float size)
         }
     }
 
-	m_EnvironmentMap = MakeUniqueTexturePtr(Texture::CreateCube(
+	m_EnvironmentMap = Texture::CreateSharedCube(
         m_cubeMapSize,
 		"EnvironmentMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
-	));
+	);
 
 	m_EnvironmentMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
 	m_EnvironmentMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	m_SpecularMap = MakeUniqueTexturePtr(Texture::CreateCube(
+	m_SpecularMap = Texture::CreateSharedCube(
 		m_cubeMapSize,
 		"SpecularMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
 		6
-	));
+	);
 
 	m_SpecularMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE, 6);
 	m_SpecularMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT, 6);
 
-	m_BRDFLUT = MakeUniqueTexturePtr(Texture::Create(
+	m_BRDFLUT = Texture::CreateShared(
 		512,
 		512,
 		"BRDF_LUT",
         DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
-	));
+	);
 
 	m_BRDFLUT->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BRDFLUT->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -221,13 +221,13 @@ void SkyBoxPass::GenerateCubeMap(std::string_view fileName, RenderScene& scene)
 	m_fileName = fileName;
 	m_skyBoxTexture.reset();
 
-	m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
-	m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
+	m_skyBoxTexture = Texture::LoadManagedFromPath(fileName);
+	m_skyBoxCubeMap = Texture::CreateManagedCube(
 		m_cubeMapSize,
 		"CubeMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
-	));
+	);
 
 	m_skyBoxCubeMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
 	m_skyBoxCubeMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -236,7 +236,7 @@ void SkyBoxPass::GenerateCubeMap(std::string_view fileName, RenderScene& scene)
 	GenerateCubeMap(scene);
 }
 
-Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
+Managed::SharedPtr<Texture> SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 {
 	auto deviceContext = DeviceState::g_pDeviceContext;
 	D3D11_VIEWPORT viewport = { 0 };
@@ -281,10 +281,10 @@ Texture* SkyBoxPass::GenerateEnvironmentMap(RenderScene& scene)
 	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets();
 
-	return m_EnvironmentMap.get();
+	return m_EnvironmentMap;
 }
 
-Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
+Managed::SharedPtr<Texture> SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 {
 	int mapSize = m_cubeMapSize;
 
@@ -348,10 +348,10 @@ Texture* SkyBoxPass::GeneratePrefilteredMap(RenderScene& scene)
 	DirectX11::UnbindRenderTargets();
 	Memory::SafeDelete(buffer);
 
-	return m_SpecularMap.get();
+	return m_SpecularMap;
 }
 
-Texture* SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
+Managed::SharedPtr<Texture> SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 {
 	D3D11_VIEWPORT viewport = { 0 };
 	viewport.Width = 512;
@@ -376,7 +376,7 @@ Texture* SkyBoxPass::GenerateBRDFLUT(RenderScene& scene)
 	DirectX11::InitSetUp();
 	DirectX11::UnbindRenderTargets();
 
-	return m_BRDFLUT.get();
+	return m_BRDFLUT;
 }
 
 void SkyBoxPass::Execute(RenderScene& scene, Camera& camera)
@@ -440,13 +440,13 @@ void SkyBoxPass::Resize(uint32_t width, uint32_t height)
 {
 	m_skyBoxTexture.reset();
 
-	m_skyBoxTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(m_fileName));
-	m_skyBoxCubeMap = MakeUniqueTexturePtr(Texture::CreateCube(
+	m_skyBoxTexture = Texture::LoadManagedFromPath(m_fileName);
+	m_skyBoxCubeMap = Texture::CreateManagedCube(
 		m_cubeMapSize,
 		"CubeMap",
 		DXGI_FORMAT_R16G16B16A16_FLOAT,
 		D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE
-	));
+	);
 
 	m_skyBoxCubeMap->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_SRV_DIMENSION_TEXTURECUBE);
 	m_skyBoxCubeMap->CreateCubeRTVs(DXGI_FORMAT_R16G16B16A16_FLOAT);

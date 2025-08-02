@@ -9,7 +9,6 @@
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
 #include "EffectProxyController.h"
-#include "ResourceAllocator.h"
 #include "PrefabUtility.h"
 #include "GameObjectPool.h"
 #include "TagManager.h"
@@ -17,12 +16,19 @@
 #include <ppltasks.h>
 #include <ppl.h>
 #include "InputActionManager.h"
+
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
 	PathFinder::Initialize();
 	Log::Initialize();
 
@@ -52,7 +58,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
 	DataSystem::Destroy();
-	ResourceAllocator::Destroy();
 	GameObjectPool::Destroy();
 	PrefabUtility::Destroy();
 
@@ -71,7 +76,6 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
 	DataSystem::GetInstance();
-	ResourceAllocator::GetInstance();
 	PhysicX::GetInstance();
 	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();

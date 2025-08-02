@@ -1,16 +1,7 @@
 #ifndef DYNAMICCPP_EXPORTS
 #include "Texture.h"
 #include "DeviceState.h"
-#include "ResourceAllocator.h"
 #include "SceneManager.h"
-
-std::function<void(Texture*)> TextureHelper::deleter = [](Texture* texture)
-{
-    if (texture)
-    {
-        ResourceAllocator::GetInstance()->DeallocateTexture(texture);
-    }
-};
 
 //static functions
 Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ std::string_view name, _In_ DXGI_FORMAT textureFormat, _In_ uint32 bindFlags, _In_opt_ D3D11_SUBRESOURCE_DATA* data)
@@ -33,15 +24,83 @@ Texture* Texture::Create(_In_ uint32 width, _In_ uint32 height, _In_ std::string
 		)
 	);
 
-	auto* temp = AllocateResource<Texture>(texture, name, TextureType::Texture2D, textureDesc);
+	auto* temp = new Texture(texture, name, TextureType::Texture2D, textureDesc);
 	temp->SetSize({ float(width), float(height) });
 
 	return temp;
 }
 
-Texture* Texture::Create(uint32 ratioX, uint32 ratioY, uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+Managed::UniquePtr<Texture> Texture::CreateManaged(uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		width,
+		height,
+		1,
+		1,
+		bindFlags,
+		D3D11_USAGE_DEFAULT
+	};
+
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+
+	Managed::UniquePtr<Texture> managedPtr = unique_alloc<Texture>(texture, name, TextureType::Texture2D, textureDesc);
+	managedPtr->SetSize({ float(width), float(height) });
+
+	return managedPtr;
+}
+
+Managed::SharedPtr<Texture> Texture::CreateShared(uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		width,
+		height,
+		1,
+		1,
+		bindFlags,
+		D3D11_USAGE_DEFAULT
+	};
+
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+
+	Managed::SharedPtr<Texture> managedPtr = shared_alloc<Texture>(texture, name, TextureType::Texture2D, textureDesc);
+	managedPtr->SetSize({ float(width), float(height) });
+
+	return managedPtr;
+}
+
+Texture* Texture::Create(
+	_In_ uint32 ratioX,
+	_In_ uint32 ratioY,
+	_In_ uint32 width,
+	_In_ uint32 height,
+	_In_ std::string_view name,
+	_In_ DXGI_FORMAT textureFormat,
+	_In_ uint32 bindFlags,
+	_In_opt_ D3D11_SUBRESOURCE_DATA* data)
 {
 	auto* temp = Create(width / (float)ratioX, height / (float)ratioY, name, textureFormat, bindFlags, data);
+	temp->SetSize({ float(width), float(height) });
+	temp->SetSizeRatio({ float(ratioX), float(ratioY) });
+	return temp;
+}
+
+Managed::UniquePtr<Texture> Texture::CreateManaged(uint32 ratioX, uint32 ratioY, uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, D3D11_SUBRESOURCE_DATA* data)
+{
+	auto temp = CreateManaged(width / (float)ratioX, height / (float)ratioY, name, textureFormat, bindFlags, data);
 	temp->SetSize({ float(width), float(height) });
 	temp->SetSizeRatio({ float(ratioX), float(ratioY) });
 	return temp;
@@ -70,9 +129,63 @@ Texture* Texture::CreateCube(_In_ uint32 size, _In_ std::string_view name, _In_ 
 			&textureDesc, data, &texture
 		)
 	);
-	auto* temp = AllocateResource<Texture>(texture, name, TextureType::TextureCube, textureDesc);
+	auto* temp = new Texture(texture, name, TextureType::TextureCube, textureDesc);
 	temp->SetSize({ float(size), float(size) });
 
+	return temp;
+}
+
+Managed::UniquePtr<Texture> Texture::CreateManagedCube(uint32 size, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 mipLevels, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		size,
+		size,
+		6,
+		mipLevels,
+		bindFlags,
+		D3D11_USAGE_DEFAULT,
+		0,
+		1,
+		0,
+		D3D11_RESOURCE_MISC_TEXTURECUBE
+	};
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+	auto temp = unique_alloc<Texture>(texture, name, TextureType::TextureCube, textureDesc);
+	temp->SetSize({ float(size), float(size) });
+	return temp;
+}
+
+Managed::SharedPtr<Texture> Texture::CreateSharedCube(uint32 size, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 mipLevels, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		size,
+		size,
+		6,
+		mipLevels,
+		bindFlags,
+		D3D11_USAGE_DEFAULT,
+		0,
+		1,
+		0,
+		D3D11_RESOURCE_MISC_TEXTURECUBE
+	};
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+	auto temp = shared_alloc<Texture>(texture, name, TextureType::TextureCube, textureDesc);
+	temp->SetSize({ float(size), float(size) });
 	return temp;
 }
 
@@ -97,9 +210,33 @@ Texture* Texture::CreateArray(uint32 width, uint32 height, std::string_view name
 			&textureDesc, data, &texture
 		)
 	);
-	auto* temp = AllocateResource<Texture>(texture, name, TextureType::TextureArray, textureDesc);
+	auto* temp = new Texture(texture, name, TextureType::TextureArray, textureDesc);
 	temp->SetSize({ float(width), float(height) });
 
+	return temp;
+}
+
+Managed::UniquePtr<Texture> Texture::CreateManagedArray(uint32 width, uint32 height, std::string_view name, DXGI_FORMAT textureFormat, uint32 bindFlags, uint32 arrsize, D3D11_SUBRESOURCE_DATA* data)
+{
+	CD3D11_TEXTURE2D_DESC textureDesc
+	{
+		textureFormat,
+		width,
+		height,
+		1,
+		1,
+		bindFlags,
+		D3D11_USAGE_DEFAULT
+	};
+	textureDesc.ArraySize = arrsize;
+	ID3D11Texture2D* texture;
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateTexture2D(
+			&textureDesc, data, &texture
+		)
+	);
+	auto temp = unique_alloc<Texture>(texture, name, TextureType::TextureArray, textureDesc);
+	temp->SetSize({ float(width), float(height) });
 	return temp;
 }
 
@@ -197,7 +334,233 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		}
 	}
 
-    Texture* texture = AllocateResource<Texture>();
+    Texture* texture = new Texture();
+
+	DirectX11::ThrowIfFailed(
+		CreateShaderResourceView(
+			DeviceState::g_pDevice,
+			image.GetImages(),
+			image.GetImageCount(),
+			image.GetMetadata(),
+			&texture->m_pSRV
+		)
+	);
+
+	texture->m_textureType = TextureType::ImageTexture;
+	texture->m_size = { float(metadata.width),float(metadata.height) };
+	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+
+	return texture;
+}
+
+Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
+{
+	file::path matPath = PathFinder::RelativeToMaterial(path.string());
+	if (!file::exists(path) && !file::exists(matPath))
+	{
+		return nullptr;
+	}
+
+	file::path preparePath{};
+	if (file::exists(matPath))
+	{
+		preparePath = matPath;
+	}
+	else
+	{
+		preparePath = path;
+	}
+
+	ScratchImage image{};
+	TexMetadata metadata{};
+
+	Benchmark banch3;
+	if (path.extension() == ".dds")
+	{
+		//load dds
+		DirectX11::ThrowIfFailed(
+			LoadFromDDSFile(
+				preparePath.c_str(),
+				DDS_FLAGS_FORCE_RGB,
+				&metadata,
+				image
+			)
+		);
+	}
+	else if (path.extension() == ".tga")
+	{
+		//load tga
+		DirectX11::ThrowIfFailed(
+			LoadFromTGAFile(
+				preparePath.c_str(),
+				&metadata,
+				image
+			)
+		);
+	}
+	else if (path.extension() == ".hdr")
+	{
+		//load hdr
+		DirectX11::ThrowIfFailed(
+			LoadFromHDRFile(
+				preparePath.c_str(),
+				&metadata,
+				image
+			)
+		);
+	}
+	else
+	{
+		//load wic
+		DirectX11::ThrowIfFailed(
+			LoadFromWICFile(
+				preparePath.c_str(),
+				WIC_FLAGS_NONE,
+				&metadata,
+				image
+			)
+		);
+	}
+
+	if (isCompress)
+	{
+		ScratchImage compressedImage{};
+		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
+		{
+			DirectX::TexMetadata tempMetadata = metadata;
+
+			// DXGI_FORMAT_BC1_UNORM (== DXT1)
+			DirectX11::ThrowIfFailed(
+				DirectX::Compress(
+					image.GetImages(),
+					image.GetImageCount(),
+					metadata,
+					DXGI_FORMAT_BC1_UNORM,
+					TEX_COMPRESS_PARALLEL,
+					0.5f,
+					compressedImage
+				)
+			);
+
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
+		}
+	}
+
+	auto texture = shared_alloc<Texture>();
+
+	DirectX11::ThrowIfFailed(
+		CreateShaderResourceView(
+			DeviceState::g_pDevice,
+			image.GetImages(),
+			image.GetImageCount(),
+			image.GetMetadata(),
+			&texture->m_pSRV
+		)
+	);
+
+	texture->m_textureType = TextureType::ImageTexture;
+	texture->m_size = { float(metadata.width),float(metadata.height) };
+	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+
+	return texture;
+}
+
+Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
+{
+	file::path matPath = PathFinder::RelativeToMaterial(path.string());
+	if (!file::exists(path) && !file::exists(matPath))
+	{
+		return nullptr;
+	}
+
+	file::path preparePath{};
+	if (file::exists(matPath))
+	{
+		preparePath = matPath;
+	}
+	else
+	{
+		preparePath = path;
+	}
+
+	ScratchImage image{};
+	TexMetadata metadata{};
+
+	Benchmark banch3;
+	if (path.extension() == ".dds")
+	{
+		//load dds
+		DirectX11::ThrowIfFailed(
+			LoadFromDDSFile(
+				preparePath.c_str(),
+				DDS_FLAGS_FORCE_RGB,
+				&metadata,
+				image
+			)
+		);
+	}
+	else if (path.extension() == ".tga")
+	{
+		//load tga
+		DirectX11::ThrowIfFailed(
+			LoadFromTGAFile(
+				preparePath.c_str(),
+				&metadata,
+				image
+			)
+		);
+	}
+	else if (path.extension() == ".hdr")
+	{
+		//load hdr
+		DirectX11::ThrowIfFailed(
+			LoadFromHDRFile(
+				preparePath.c_str(),
+				&metadata,
+				image
+			)
+		);
+	}
+	else
+	{
+		//load wic
+		DirectX11::ThrowIfFailed(
+			LoadFromWICFile(
+				preparePath.c_str(),
+				WIC_FLAGS_NONE,
+				&metadata,
+				image
+			)
+		);
+	}
+
+	if (isCompress)
+	{
+		ScratchImage compressedImage{};
+		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
+		{
+			DirectX::TexMetadata tempMetadata = metadata;
+
+			// DXGI_FORMAT_BC1_UNORM (== DXT1)
+			DirectX11::ThrowIfFailed(
+				DirectX::Compress(
+					image.GetImages(),
+					image.GetImageCount(),
+					metadata,
+					DXGI_FORMAT_BC1_UNORM,
+					TEX_COMPRESS_PARALLEL,
+					0.5f,
+					compressedImage
+				)
+			);
+
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
+		}
+	}
+
+	auto texture = unique_alloc<Texture>();
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceView(
@@ -264,7 +627,6 @@ Texture::Texture(Texture&& texture) noexcept
 
 Texture::~Texture()
 {
-	Memory::SafeDelete(m_pTexture);
 	Memory::SafeDelete(m_pSRV);
 	Memory::SafeDelete(m_pDSV);
 	Memory::SafeDelete(m_pUAV);
@@ -283,6 +645,8 @@ Texture::~Texture()
 	{
 		OnResizeEvent -= m_onResizeHandle;
 	}
+
+	Memory::SafeDelete(m_pTexture);
 }
 
 void Texture::CreateSRV(_In_ DXGI_FORMAT textureFormat, _In_opt_ D3D11_SRV_DIMENSION viewDimension, _In_opt_ uint32 mipLevels)
@@ -549,7 +913,6 @@ void Texture::ResizeRelease()
 		return;
 	}
 
-	Memory::SafeDelete(m_pTexture);
 	Memory::SafeDelete(m_pSRV);
 	Memory::SafeDelete(m_pDSV);
 	Memory::SafeDelete(m_pUAV);
@@ -559,6 +922,7 @@ void Texture::ResizeRelease()
 		Memory::SafeDelete(rtv);
 	}
 	m_pRTVs.clear();
+	Memory::SafeDelete(m_pTexture);
 }
 #endif // !DYNAMICCPP_EXPORTS
 

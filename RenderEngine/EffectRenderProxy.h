@@ -8,7 +8,7 @@
 using EffectCommandTypeQueue = concurrent_queue<EffectCommandType>;
 
 class EffectComponent;
-class EffectRenderProxy : public ManagedHeapObject
+class EffectRenderProxy : public Managed::HeapObject
 {
 public:
 	EffectRenderProxy() = default;

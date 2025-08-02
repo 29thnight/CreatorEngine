@@ -426,7 +426,7 @@ void ShadowMapPass::UseCloudShadowMap(std::string_view filename)
 	file::path path = file::path(filename);
 	if (file::exists(path) || nullptr == m_cloudShadowMapTexture)
 	{
-		m_cloudShadowMapTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(filename));
+		m_cloudShadowMapTexture = Texture::LoadManagedFromPath(filename);
 		m_cloudShadowMapTexture->m_textureType = TextureType::ImageTexture;
 	}
 }

@@ -1,5 +1,6 @@
 #include "Sampler.h"
 #include "DeviceState.h"
+#include "Core.Memory.hpp"
 
 Sampler::Sampler(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE addressMode)
 {

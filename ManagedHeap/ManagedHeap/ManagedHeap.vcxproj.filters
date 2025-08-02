@@ -21,7 +21,7 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ManagedHeapObject.h">
+    <ClInclude Include="Managed::HeapObject.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="MemoryManager.h">

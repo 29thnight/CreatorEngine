@@ -541,7 +541,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 			)
 		);
 
-		DirectX::SetName(m_DepthStencilViewSRV.Get(), "RenderTargetViewSRV");
+		DirectX::SetName(m_DepthStencilViewSRV.Get(), "DepthStencilViewSRV");
 
         CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC( D3D11_DEFAULT );
 		DirectX11::ThrowIfFailed(

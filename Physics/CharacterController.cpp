@@ -1,4 +1,5 @@
 #include "CharacterController.h"
+#include "Core.Memory.hpp"
 
 CharacterController::CharacterController()
 {
@@ -14,6 +15,10 @@ CharacterController::~CharacterController()
 		m_controller->release();
 		m_controller = nullptr;
 	}
+	//터지니? 만약에 중앙 통제면, 메니저에서 할당하고 넘겨줘야지...
+	Memory::SafeDelete(m_characterMovement);
+	Memory::SafeDelete(m_filters);
+	Memory::SafeDelete(m_filterData);
 }
 
 void CharacterController::Initialize(const CharacterControllerInfo& info, const CharacterMovementInfo& moveInfo, physx::PxControllerManager* CCTManager, physx::PxMaterial* material, CollisionData* collisionData, unsigned int* collisionMatrix)

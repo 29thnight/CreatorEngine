@@ -20,7 +20,6 @@
 #include "TagManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
-#include "ResourceAllocator.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -28,6 +27,8 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 std::atomic<bool> isGameToRender = false;
+std::atomic<bool> isCB_Thread_End = false;
+std::atomic<bool> isCE_Thread_End = false;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -142,6 +143,8 @@ void DirectX11::Dx11Main::Initialize()
                 CommandBuildThread();
             }
         }
+
+		isCB_Thread_End = true;
     });
 
     m_CE_Thread = std::thread([&]
@@ -168,6 +171,8 @@ void DirectX11::Dx11Main::Initialize()
             CoroutineManagers->yield_OnRender();
             CommandExecuteThread();
         }
+
+		isCE_Thread_End = true;
     });
 
     m_CB_Thread.detach();
@@ -180,6 +185,13 @@ void DirectX11::Dx11Main::Finalize()
     TagManagers->Finalize();
     SceneManagers->Decommissioning();
     EngineSettingInstance->SaveSettings();
+    EngineSettingInstance->renderBarrier.Finalize();
+
+    while(!isCB_Thread_End || !isCE_Thread_End)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+
     m_sceneRenderer->Finalize();
     m_deviceResources->RegisterDeviceNotify(nullptr);
     PROFILER_SHUTDOWN();

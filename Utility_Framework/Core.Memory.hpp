@@ -43,18 +43,13 @@ namespace Memory
   //메모리 해제 : IUnknown을 상속받은 클래스의 경우 Release() 호출 -> 그 외 delete 호출
     inline void SafeDelete(Pointer auto& ptr)
     {
+		if (!ptr) return;  // nullptr 체크
+
 		using PtrType = std::remove_pointer_t<std::remove_reference_t<decltype(ptr)>>;  // 참조 제거한 타입
 		if constexpr (std::derived_from<PtrType, IUnknown>)
 		{
-			if(0 != GetReferanceCounter(ptr))
-			{
-				ptr->Release();
-                ptr = nullptr;
-			}
-            else
-            {
-                ptr = nullptr;
-            }
+			ptr->Release();
+			ptr = nullptr;
 		}
 		else
 		{

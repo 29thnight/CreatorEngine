@@ -33,15 +33,15 @@ public:
 	virtual void Resize(uint32_t width, uint32_t height) override;
 
 public:
-	std::unique_ptr<PipelineStateObject> m_instancePSO;
-	ComPtr<ID3D11Buffer>				m_boneBuffer;
-	ComPtr<ID3D11Buffer>                m_cascadeIndexBuffer;
-	D3D11_VIEWPORT				shadowViewport;
-	ShadowMapConstant			m_settingConstant;
-	FrustumContainer			sliceFrustums;
+	std::unique_ptr<PipelineStateObject>	m_instancePSO;
+	ComPtr<ID3D11Buffer>					m_boneBuffer;
+	ComPtr<ID3D11Buffer>					m_cascadeIndexBuffer;
+	D3D11_VIEWPORT							shadowViewport;
+	ShadowMapConstant						m_settingConstant;
+	FrustumContainer						sliceFrustums;
 
-	UniqueTexturePtr				m_cloudShadowMapTexture{ nullptr };
-	ID3D11Buffer*					m_cloudShadowMapBuffer{ nullptr };
+	Managed::UniquePtr<Texture>				m_cloudShadowMapTexture{ nullptr };
+	ID3D11Buffer*							m_cloudShadowMapBuffer{ nullptr };
 
 	uint32 m_maxInstanceCount{};
 	size_t m_cascadeRatioSize{ 2 };

@@ -194,12 +194,17 @@ namespace Meta
         template<typename T>
         void Register()
         {
-            if constexpr (std::is_base_of_v<ManagedHeapObject, T>)
+            if constexpr (std::is_base_of_v<Managed::HeapObject, T>)
             {
                 _sharedFactories[ToString<T>()] = []() -> std::shared_ptr<T>
                 {
                     return shared_alloc<T>();
                 };
+
+                _factories[ToString<T>()] = []() -> T*
+                {
+                    return new T();
+				};
 			}
             else
             {
