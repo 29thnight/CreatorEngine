@@ -62,6 +62,9 @@ bool operator!=(const MyAllocator<T>&, const MyAllocator<U>&) { return false; }
 template<typename T>
 concept IsManagedObject = std::is_base_of_v<ManagedHeapObject, T>;
 
+template<typename T>
+using ManagedUniquePtr = std::unique_ptr<T, void(*)(T*)>;
+
 // 2. shared_alloc using allocate_shared
 template<typename T, typename... Args>
 std::shared_ptr<T> shared_alloc(Args&&... args)
@@ -69,4 +72,14 @@ std::shared_ptr<T> shared_alloc(Args&&... args)
     static_assert(IsManagedObject<T>, "T must be a ManagedHeapObject");
 
     return std::allocate_shared<T>(MyAllocator<T>(), std::forward<Args>(args)...);
+}
+
+// 3. unique_alloc using custom deleter
+template<typename T, typename... Args>
+ManagedUniquePtr<T> unique_alloc(Args&&... args)
+{
+    static_assert(IsManagedObject<T>, "T must be a ManagedHeapObject");
+
+    T* ptr = new T(std::forward<Args>(args)...);
+    return ManagedUniquePtr<T>(ptr, [](T* p) { MyFree(p); });
 }
