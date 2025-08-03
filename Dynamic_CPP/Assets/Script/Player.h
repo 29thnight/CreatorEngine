@@ -29,6 +29,9 @@ public:
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
 
+
+	virtual void Attack(Entity* sender, int damage) override;
+
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	[[Method]]
@@ -45,7 +48,7 @@ public:
 	[[Method]]
 	void Charging();
 	[[Method]]
-	void Attack();
+	void Attack1();
 	[[Method]]
 	void SwapWeaponLeft();
 	[[Method]]
@@ -100,6 +103,7 @@ public:
 
 	void TestStun();
 	void TestKnockBack();
+	bool isDead = false;
 	bool isStun = false;
 	float stunTime = 0.f;
 	bool isKnockBack = false;

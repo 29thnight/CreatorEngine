@@ -29,7 +29,7 @@ ReflectionScriptField(Player) \
 		meta_method(Dash) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
-		meta_method(Attack) \
+		meta_method(Attack1) \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(DeleteCurWeapon) \

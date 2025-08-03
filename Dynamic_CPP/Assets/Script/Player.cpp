@@ -80,6 +80,11 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
+	if (isDead)
+	{
+		m_animator->SetParameter("OnDead", true);
+	}
+
 	if (catchedObject)
 	{
 		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
@@ -87,7 +92,7 @@ void Player::Update(float tick)
 
 		XMVECTOR forwardVec = XMLoadFloat3(&forward); // Vector3 ¡æ XMVECTOR
 
-		XMVECTOR offsetPos = world + forwardVec * 1.0f;
+		XMVECTOR offsetPos = world + -forwardVec * 1.0f;
 		offsetPos.m128_f32[1] = 1.0f; // Y °íÁ¤
 
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
@@ -183,9 +188,27 @@ void Player::Update(float tick)
 
 }
 
+void Player::Attack(Entity* sender, int damage)
+{
+	if (sender)
+	{
+		auto player = dynamic_cast<Player*>(sender);
+		if (player)
+		{
+			// hit
+			m_currentHP -= std::max(damage, 0);
+			//TestKnockBack();
+			if (m_currentHP <= 0)
+			{
+				isDead = true;
+			}
+		}
+	}
+}
+
 void Player::Move(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack || !m_isCallStart || isDashing) return;
+	if (isStun || isKnockBack || !m_isCallStart || isDashing || isDead) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 
@@ -238,7 +261,7 @@ void Player::Catch()
 		m_animator->SetParameter("OnGrab", true);
 		catchedObject = m_nearObject->GetComponent<EntityItem>();
 		m_nearObject = nullptr;
-		catchedObject->GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::TRIGGER);
+		catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 		catchedObject->SetThrowOwner(this);
 		if (m_curWeapon)
 			m_curWeapon->GetOwner()->SetEnabled(false);
@@ -267,6 +290,7 @@ void Player::DropCatchItem()
 
 void Player::ThrowEvent()
 {
+	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
 		catchedObject->SetThrowOwner(this);
 		catchedObject->Throw(player->m_transform.GetForward(), 6.0f);
@@ -320,13 +344,13 @@ void Player::Charging()
 
 }
 
-void Player::Attack()
+void Player::Attack1()
 {
 	isCharging = false;
 	m_chargingTime = 0.f;
 
 
-	if (m_comboCount == 0)
+	//if (m_comboCount == 0)
 	{
 		int gumNumber = playerIndex + 1;
 		std::string gumName = "GumGi" + std::to_string(gumNumber);
@@ -378,19 +402,17 @@ void Player::Attack()
 				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
 			}
 
-			auto entityItem = object->GetComponent<Entity>();
+			auto entityItem = object->GetComponent<EntityResource>();
 			if (entityItem) {
 				entityItem->Attack(this, 100);
 			}
+
+			auto otherPlayer = object->GetComponent<Player>();
+			if (otherPlayer)
+			{
+				otherPlayer->Attack(this, 100);
+			}
 		}
-	}
-	else if (m_comboCount == 1)
-	{
-
-	}
-	else if (m_comboCount == 2)
-	{
-
 	}
 	m_animator->SetParameter("Attack", true);
 	std::cout << "Attack!!" << std::endl;
