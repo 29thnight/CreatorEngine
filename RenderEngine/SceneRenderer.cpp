@@ -288,6 +288,22 @@ void SceneRenderer::Finalize()
 	delete m_threadPool;
 
 	OnResizeEvent -= m_resizeEventHandle;
+
+	DeviceState::g_pDevice				= nullptr;
+	DeviceState::g_pDeviceContext		= nullptr;
+	DeviceState::g_pDepthStencilView	= nullptr;
+	DeviceState::g_pDepthStencilState	= nullptr;
+	DeviceState::g_pRasterizerState		= nullptr;
+	DeviceState::g_pBlendState			= nullptr;
+	DeviceState::g_backBufferRTV		= nullptr;
+	DeviceState::g_depthStancilSRV		= nullptr;
+	DeviceState::g_annotation			= nullptr;
+
+	CameraManagement->DeleteCamera(m_pEditorCamera->m_cameraIndex);
+	m_pEditorCamera.reset();
+	CameraManagement->Finalize();
+	m_renderScene.reset();
+	m_deviceResources.reset();
 }
 
 void SceneRenderer::InitializeDeviceState()

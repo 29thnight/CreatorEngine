@@ -31,14 +31,14 @@ public:
 
 private:
     Managed::UniquePtr<Texture> m_NoiseTexture;
-	SSAOBuffer m_SSAOBuffer;
-	ComPtr<ID3D11Buffer> m_Buffer;
-	ID3D11ShaderResourceView* m_DepthSRV;
+	SSAOBuffer					m_SSAOBuffer;
+	ComPtr<ID3D11Buffer>		m_Buffer;
+	ID3D11ShaderResourceView*	m_DepthSRV;
 
-	std::weak_ptr<Texture> m_NormalTexture;
-	std::weak_ptr<Texture> m_RenderTarget;
-	std::weak_ptr<Texture> m_DiffuseTexture;
+	std::weak_ptr<Texture>		m_NormalTexture;
+	std::weak_ptr<Texture>		m_RenderTarget;
+	std::weak_ptr<Texture>		m_DiffuseTexture;
 
-	float radius = 0.1f;
-	float thickness = 0.1f;
+	float						radius = 0.1f;
+	float						thickness = 0.1f;
 };

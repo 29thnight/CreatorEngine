@@ -9,8 +9,7 @@ struct PixelShaderInput
 };
 
 static const float PI = 3.14159265359;
-static const uint NumSamples = 1024;
-
+static const uint SAMPLE_COUNT = 1024u;
 static const float BLUR_MIP_LEVEL = 7.0f;
 static const float HARD_CLAMP = 1.2f; // 최대 RGB 채널 제한
 static const float MAX_LUMINANCE = 1.5f; // 전체 밝기 기준 컷오프
@@ -44,29 +43,22 @@ float Luminance(float3 color)
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
-float3 ToneMapFilmic(float3 color)
-{
-    color = max(0, color - 0.004f);
-    return (color * (6.2f * color + 0.5f)) / (color * (6.2f * color + 1.7f) + 0.06f);
-}
-
 float4 main(PixelShaderInput IN) : SV_TARGET
 {
-    float3 N = normalize(IN.texCoord);
-    float3 up = abs(N.y) < 0.999 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-    float3 right = normalize(cross(up, N));
+    float3 N            = normalize(IN.texCoord);
+    float3 up           = abs(N.y) < 0.999 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+    float3 right        = normalize(cross(up, N));
+    float3 irradiance   = float3(0.0, 0.0, 0.0);
+    
     up = cross(N, right);
-
-    float3 irradiance = float3(0.0, 0.0, 0.0);
-
-    for (uint i = 0; i < NumSamples; ++i)
+    
+    for (uint i = 0; i < SAMPLE_COUNT; ++i)
     {
-        float2 Xi = Hammersley(i, NumSamples);
+        float2 Xi       = Hammersley(i, SAMPLE_COUNT);
         float3 localDir = SampleHemisphereCosine(Xi);
-        float3 L = normalize(localDir.x * right + localDir.y * up + localDir.z * N);
-        float NoL = localDir.z;
-
-        float3 color = CubeMap.SampleLevel(LinearSampler, L, BLUR_MIP_LEVEL).rgb;
+        float3 L        = normalize(localDir.x * right + localDir.y * up + localDir.z * N);
+        float  NoL      = localDir.z;
+        float3 color    = CubeMap.SampleLevel(LinearSampler, L, BLUR_MIP_LEVEL).rgb;
 
         // 하드 채널 클램프
         color = min(color, HARD_CLAMP);
@@ -81,13 +73,10 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         irradiance += color * NoL;
     }
 
-    irradiance *= (PI / NumSamples);
+    irradiance *= (PI / SAMPLE_COUNT);
 
     // 로그에서 돌아오기
     irradiance = pow(irradiance, 1.0f / LOG_POWER);
-
-    // 최종 출력에 톤매핑
-    irradiance = ToneMapFilmic(irradiance);
 
     return float4(irradiance, 1.0);
 }

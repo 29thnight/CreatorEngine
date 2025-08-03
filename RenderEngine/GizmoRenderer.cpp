@@ -24,6 +24,9 @@ GizmoRenderer::~GizmoRenderer()
 	m_pWireFramePass.reset();
 	m_pGizmoPass.reset();
 	m_pGizmoLinePass.reset();
+	m_pRenderer = nullptr;
+	m_pEditorCamera = nullptr;
+	m_renderScene = nullptr;
 }
 
 void GizmoRenderer::EditorView()

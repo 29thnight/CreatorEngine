@@ -5,23 +5,11 @@
 #include <concepts>
 #include "MemoryManager.h"
 
-template<typename T>
-struct FunctionDeleter
-{
-    using DeleterFunc = void(*)(T*);
-    DeleterFunc func = [](T* p) { MyFree(p); };
-
-    void operator()(T* p) const
-    {
-        if (func) func(p);
-    }
-};
-
-//할당 영역을 명확하게 하기 위한 using 선언
 namespace Managed
 {
+    //할당 영역을 명확하게 하기 위한 using 선언
     template<typename T>
-    using UniquePtr = std::unique_ptr<T, FunctionDeleter<T>>;
+    using UniquePtr = std::unique_ptr<T>;
 
     template<typename T>
     using SharedPtr = std::shared_ptr<T>;
@@ -67,11 +55,13 @@ struct MyAllocator {
     template<typename U>
     constexpr MyAllocator(const MyAllocator<U>&) noexcept {}
 
-    T* allocate(std::size_t n) {
+    T* allocate(std::size_t n) 
+    {
         return static_cast<T*>(MyAlloc(n * sizeof(T)));
     }
 
-    void deallocate(T* p, std::size_t) noexcept {
+    void deallocate(T* p, std::size_t) noexcept 
+    {
         MyFree(p);
     }
 

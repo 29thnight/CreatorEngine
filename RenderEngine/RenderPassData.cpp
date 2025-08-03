@@ -39,6 +39,27 @@ RenderPassData::RenderPassData() : m_shadowCamera(false)
 RenderPassData::~RenderPassData()
 {
 	ClearRenderQueue();
+	ClearShadowRenderQueue();
+	ClearCullDataBuffer();
+	ClearShadowRenderDataBuffer();
+	m_isInitalized = false;
+
+	m_renderTarget.reset();
+	m_depthStencil.reset();
+	for (auto& srv : sliceSRV)
+	{
+		Memory::SafeDelete(srv);
+	}
+
+	for (auto& dsv : m_shadowMapDSVarr)
+	{
+		Memory::SafeDelete(dsv);
+	}
+
+	m_shadowMapTexture.reset();
+	m_SSRPrevTexture.reset();
+	m_ViewBuffer.Reset();
+	m_ProjBuffer.Reset();
 }
 
 void RenderPassData::Initalize(uint32 index)
@@ -56,7 +77,6 @@ void RenderPassData::Initalize(uint32 index)
 		DXGI_FORMAT_R16G16B16A16_FLOAT
 	);
 	m_renderTarget.swap(renderTexture);
-
 
 	auto depthStencil = TextureHelper::CreateDepthTexture(
 		DeviceState::g_ClientRect.width,

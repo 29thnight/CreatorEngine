@@ -87,48 +87,36 @@ void ShadowMapPass::Initialize(uint32 width, uint32 height)
 
 void ShadowMapPass::Execute(RenderScene& scene, Camera& camera)
 {
-	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
-	if (nullptr != cmdQueuePtr)
-	{
-		while (!cmdQueuePtr->empty())
-		{
-			ID3D11CommandList* CommandJob;
-			if (cmdQueuePtr->try_pop(CommandJob))
-			{
-				DirectX11::ExecuteCommandList(CommandJob, true);
-				Memory::SafeDelete(CommandJob);
-			}
-		}
-	}
+	ExecuteCommandList(scene, camera);
 }
 
 void ShadowMapPass::ControlPanel()
 {
-        ImGui::Text("ShadowPass");
-        auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().shadow;
+    ImGui::Text("ShadowPass");
+    auto& setting = EngineSettingInstance->GetRenderPassSettingsRW().shadow;
 
-        ImGui::Checkbox("Enable2", &m_abled);
-        if (ImGui::Checkbox("UseCasCade", &g_useCascade))
-        {
-                setting.useCascade = g_useCascade;
-        }
+    ImGui::Checkbox("Enable2", &m_abled);
+    if (ImGui::Checkbox("UseCasCade", &g_useCascade))
+    {
+        setting.useCascade = g_useCascade;
+    }
 
-        if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
-        {
-                setting.isCloudOn = isCloudOn;
-        }
-        if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
-        {
-                setting.cloudSize = cloudSize;
-        }
-        if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
-        {
-                setting.cloudDirection = cloudDirection;
-        }
-        if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
-        {
-                setting.cloudMoveSpeed = cloudMoveSpeed;
-        }
+    if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
+    {
+        setting.isCloudOn = isCloudOn;
+    }
+    if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
+    {
+        setting.cloudSize = cloudSize;
+    }
+    if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
+    {
+        setting.cloudDirection = cloudDirection;
+    }
+    if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
+    {
+        setting.cloudMoveSpeed = cloudMoveSpeed;
+    }
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};

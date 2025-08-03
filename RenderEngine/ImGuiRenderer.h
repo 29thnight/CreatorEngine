@@ -16,6 +16,6 @@ public:
     void Shutdown();
 
 private:
-    std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
+    std::weak_ptr<DirectX11::DeviceResources> m_deviceResources;
 };
 #endif // !DYNAMICCPP_EXPORTS

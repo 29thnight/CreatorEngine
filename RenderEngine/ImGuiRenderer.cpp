@@ -82,9 +82,10 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 #pragma endregion
     // Setup Platform/Renderer backends
-	ImGui_ImplWin32_Init(m_deviceResources->GetWindow()->GetHandle());
-    ID3D11Device* device = m_deviceResources->GetD3DDevice();
-    ID3D11DeviceContext* deviceContext = m_deviceResources->GetD3DDeviceContext();
+	auto deviceResource = m_deviceResources.lock();
+	ImGui_ImplWin32_Init(deviceResource->GetWindow()->GetHandle());
+    ID3D11Device* device = deviceResource->GetD3DDevice();
+    ID3D11DeviceContext* deviceContext = deviceResource->GetD3DDeviceContext();
     ImGui_ImplDX11_Init(device, deviceContext);
 
 	//RegisterDisplaySizeHandler();
@@ -106,7 +107,7 @@ void ImGuiRenderer::BeginRender()
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
 	
 	RECT rect;
-	HWND hWnd = m_deviceResources->GetWindow()->GetHandle();
+	HWND hWnd = m_deviceResources.lock()->GetWindow()->GetHandle();
 	GetClientRect(hWnd, &rect);
 
 	ImVec2 newSize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
@@ -267,5 +268,7 @@ void ImGuiRenderer::Shutdown()
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+
+	m_deviceResources.reset();
 }
 #endif // !DYNAMICCPP_EXPORTS

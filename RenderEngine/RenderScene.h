@@ -38,7 +38,7 @@ public:
 	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
 	using AnimatorMap			= std::unordered_map<size_t, std::shared_ptr<Animator>>;
 	using AnimationPalleteMap	= std::unordered_map<size_t, std::pair<bool, DirectX::XMMATRIX*>>;
-	using RenderDataMap			= concurrent_unordered_map<size_t, std::shared_ptr<RenderPassData>>;
+	using RenderDataMap			= std::vector<std::shared_ptr<RenderPassData>>;
 public:
 	RenderScene() = default;
 	~RenderScene();
@@ -106,7 +106,7 @@ private:
 	ProxyMap			m_proxyMap;
 	AnimatorMap			m_animatorMap;
 	AnimationPalleteMap m_palleteMap;
-	RenderDataMap		m_renderDataMap;
+	RenderDataMap		m_renderDataMap{ 10, nullptr };
 	ID3D11Buffer*		m_ModelBuffer{};
 	std::atomic_flag	m_proxyMapFlag{};
 	bool				m_isPlaying = false;

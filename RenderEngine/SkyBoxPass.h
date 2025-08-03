@@ -18,16 +18,17 @@ public:
     Managed::SharedPtr<Texture> GeneratePrefilteredMap(RenderScene& scene);
     Managed::SharedPtr<Texture> GenerateBRDFLUT(RenderScene& scene);
 
-	Managed::SharedPtr<Texture> m_EnvironmentMap;
-	Managed::SharedPtr<Texture> m_SpecularMap;
-	Managed::SharedPtr<Texture> m_BRDFLUT;
-
     void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
 	void Resize(uint32_t width, uint32_t height) override;
 
 	file::path CurrentSkyBoxTextureName() const { return m_fileName; }
+
+public:
+	Managed::SharedPtr<Texture> m_EnvironmentMap;
+	Managed::SharedPtr<Texture> m_SpecularMap;
+	Managed::SharedPtr<Texture> m_BRDFLUT;
 
 private:
     //skybox 쉐이더는 해당 pass의 기본 pso에 고정

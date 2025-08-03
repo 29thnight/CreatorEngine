@@ -144,6 +144,20 @@ private:
 	friend class Singleton<CameraContainer>;
 
 public:
+	void Finalize()
+	{
+		for (auto& camera : m_cameras)
+		{
+			if (nullptr != camera)
+			{
+				delete camera;
+				camera = nullptr;
+			}
+		}
+		m_cameras.clear();
+	}
+
+public:
 	int AddCamera(Camera* camera)
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
