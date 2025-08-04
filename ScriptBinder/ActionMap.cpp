@@ -221,9 +221,9 @@ void ActionMap::CheckAction()
 					action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:
-					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_Thumbstick))
+					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbL(action->playerIndex);
-					else if(action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_Thumbstick))
+					else if(action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbR(action->playerIndex);
 
 					try
@@ -314,13 +314,13 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 					else if (InputManagement->IsKeyPressed(action->key[3])) action->value.v2Value.y = 1.0f;
 					else action->value.v2Value.y = 0.0f;
 
-					InvokeAction(instance, type, action->funName, { action->value.v2Value.x,action->value.v2Value.y });
+					InvokeAction(instance, type, action->funName, { action->value.v2Value });
 					//action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:
-					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_Thumbstick))
+					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbL(playerIndex);
-					else if (action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_Thumbstick))
+					else if (action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbR(playerIndex);
 
 

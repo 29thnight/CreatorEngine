@@ -1,6 +1,7 @@
 #pragma once
 #include "RenderModules.h"
 #include "TrailGenerateModule.h"
+#include "ISerializable.h"
 
 struct TrailConstantBuffer
 {
@@ -11,7 +12,7 @@ struct TrailConstantBuffer
     float time;
 };
 
-class TrailRenderModule : public RenderModules
+class TrailRenderModule : public RenderModules, public ISerializable
 {
 public:
     TrailRenderModule();
@@ -35,6 +36,10 @@ public:
     // 카메라 위치 설정
     void SetCameraPosition(const Mathf::Vector3& position);
     Mathf::Vector3 GetCameraPosition() const { return m_constantBufferData.cameraPosition; }
+
+    virtual nlohmann::json SerializeData() const override;
+    virtual void DeserializeData(const nlohmann::json& json) override;
+    virtual std::string GetModuleType() const override;
 
 private:
     void UpdateConstantBuffer(const Mathf::Matrix& world, const Mathf::Matrix& view, const Mathf::Matrix& projection);

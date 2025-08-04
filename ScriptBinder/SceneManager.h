@@ -34,14 +34,14 @@ public:
     Scene* GetActiveScene() { return m_activeScene; }
     Scene* GetScene(size_t index) { return m_scenes[index]; }
 
-    Scene* CreateScene(const std::string_view& name = "SampleScene");
-	Scene* SaveScene(const std::string_view& name = "SampleScene");
-    Scene* LoadSceneImmediate(const std::string_view& name = "SampleScene");
-	Scene* LoadScene(const std::string_view& name = "SampleScene");
+    Scene* CreateScene(std::string_view name = "SampleScene");
+	Scene* SaveScene(std::string_view name = "SampleScene");
+    Scene* LoadSceneImmediate(std::string_view name = "SampleScene");
+	Scene* LoadScene(std::string_view name = "SampleScene");
 
-	void SaveSceneAsync(const std::string_view& name = "SampleScene");
-	std::future<Scene*> LoadSceneAsync(const std::string_view& name = "SampleScene");
-    void LoadSceneAsyncAndWaitCallback(const std::string_view& name = "SampleScene");
+	void SaveSceneAsync(std::string_view name = "SampleScene");
+	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
+    void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
 
     void WaitForSceneLoad();
 

@@ -44,7 +44,7 @@ public:
 	void SetModel(Model* model, int meshIndex = 0);
 
 	// 모델 설정 (이름 기반)
-	void SetModel(Model* model, const std::string_view& meshName);
+	void SetModel(Model* model, std::string_view meshName);
 	// 카메라 위치 설정
 	void SetCameraPosition(const Mathf::Vector3& position);
 
@@ -101,29 +101,29 @@ private:
 	float m_clippingAnimationSpeed = 1.0f;
 
 private:
-	ComPtr<ID3D11Buffer> m_constantBuffer;
-	MeshConstantBuffer m_constantBufferData;
+	ComPtr<ID3D11Buffer> m_constantBuffer{};
+	MeshConstantBuffer m_constantBufferData{};
 
 	// 클리핑 버퍼
-	ComPtr<ID3D11Buffer> m_clippingBuffer;
+	ComPtr<ID3D11Buffer> m_clippingBuffer{};
 
 	// 메시 관련
-	MeshType m_meshType;
-	Model* m_model;                    // 현재 사용 중인 모델
-	int m_meshIndex;                   // 모델 내 메시 인덱스
-	Mesh* m_tempCubeMesh;              // 임시 큐브 메시 (프리미티브용)
+	MeshType m_meshType{};
+	Model* m_model{};                    // 현재 사용 중인 모델
+	int m_meshIndex{};                   // 모델 내 메시 인덱스
+	Mesh* m_tempCubeMesh{};              // 임시 큐브 메시 (프리미티브용)
 
 	// 파티클 관련
-	ID3D11ShaderResourceView* m_particleSRV;
-	UINT m_instanceCount;
+	ID3D11ShaderResourceView* m_particleSRV{};
+	UINT m_instanceCount{};
 
 	// 상대 기반
-	Mathf::Matrix m_worldMatrix;
-	Mathf::Matrix m_invWorldMatrix;
-	bool m_useRelativeClipping;
+	Mathf::Matrix m_worldMatrix{};
+	Mathf::Matrix m_invWorldMatrix{};
+	bool m_useRelativeClipping{};
 
-	ComPtr<ID3D11Buffer> m_polarClippingBuffer;
-	PolarClippingParams m_polarClippingParams;
+	ComPtr<ID3D11Buffer> m_polarClippingBuffer{};
+	PolarClippingParams m_polarClippingParams{};
 	bool m_isPolarClippingAnimating = false;
 	float m_polarClippingAnimationSpeed = 1.0f;
 

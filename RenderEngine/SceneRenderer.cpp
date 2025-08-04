@@ -56,7 +56,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	ShaderSystem->Initialize();
 
-	Texture* ao = Texture::Create(
+	auto ao = Texture::CreateShared(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"AmbientOcclusion",
@@ -66,7 +66,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	);
 	ao->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	ao->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_ambientOcclusionTexture = MakeUniqueTexturePtr(ao);
+	m_ambientOcclusionTexture = ao;
 
 	//Buffer 생성
 	XMMATRIX identity = XMMatrixIdentity();
@@ -74,10 +74,12 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_ModelBuffer = DirectX11::CreateBuffer(sizeof(Mathf::xMatrix), D3D11_BIND_FLAG::D3D11_BIND_CONSTANT_BUFFER, &Mathf::xMatrixIdentity);
 	DirectX::SetName(m_ModelBuffer.Get(), "ModelBuffer");
 
+#ifndef BUILD_FLAG
 	m_pEditorCamera = std::make_shared<Camera>();
 	m_pEditorCamera->RegisterContainer();
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
+#endif // !BUILD_FLAG
 
 	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
@@ -98,19 +100,19 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
     m_pSSAOPass->Initialize(
         ao,
         m_deviceResources->GetDepthStencilViewSRV(),
-        m_normalTexture.get(),
-		m_diffuseTexture.get()
+        m_normalTexture,
+		m_diffuseTexture
     );
     m_pSSAOPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssao);
 
     //deferredPass
     m_pDeferredPass = std::make_unique<DeferredPass>();
     m_pDeferredPass->Initialize(
-        m_diffuseTexture.get(),
-        m_metalRoughTexture.get(),
-        m_normalTexture.get(),
-        m_emissiveTexture.get(),
-		m_bitmaskTexture.get()
+        m_diffuseTexture,
+        m_metalRoughTexture,
+        m_normalTexture,
+        m_emissiveTexture,
+		m_bitmaskTexture
     );
     m_pDeferredPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().deferred);
 
@@ -124,7 +126,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
 	m_pToneMapPass->Initialize(
-		m_toneMappedColourTexture.get()
+		m_toneMappedColourTexture
 	);
 
     m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
@@ -170,7 +172,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
 
 	m_pUIPass = std::make_unique<UIPass>();
-	m_pUIPass->Initialize(m_toneMappedColourTexture.get(),m_spriteBatch.get());
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get(), m_spriteBatch.get());
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
@@ -244,7 +246,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 SceneRenderer::~SceneRenderer()
 {
-
+	m_deviceResources.reset();
 }
 
 void SceneRenderer::Finalize()
@@ -256,7 +258,6 @@ void SceneRenderer::Finalize()
 	m_toneMappedColourTexture.reset();
 	m_bitmaskTexture.reset();
 	m_ambientOcclusionTexture.reset();
-	m_toneMappedColourTexture.reset();
 	m_lightingTexture.reset();
 
 	m_pSSAOPass.reset();
@@ -287,6 +288,22 @@ void SceneRenderer::Finalize()
 	delete m_threadPool;
 
 	OnResizeEvent -= m_resizeEventHandle;
+
+	DeviceState::g_pDevice				= nullptr;
+	DeviceState::g_pDeviceContext		= nullptr;
+	DeviceState::g_pDepthStencilView	= nullptr;
+	DeviceState::g_pDepthStencilState	= nullptr;
+	DeviceState::g_pRasterizerState		= nullptr;
+	DeviceState::g_pBlendState			= nullptr;
+	DeviceState::g_backBufferRTV		= nullptr;
+	DeviceState::g_depthStancilSRV		= nullptr;
+	DeviceState::g_annotation			= nullptr;
+
+	CameraManagement->DeleteCamera(m_pEditorCamera->m_cameraIndex);
+	m_pEditorCamera.reset();
+	CameraManagement->Finalize();
+	m_renderScene.reset();
+	m_deviceResources.reset();
 }
 
 void SceneRenderer::InitializeDeviceState()
@@ -341,7 +358,7 @@ void SceneRenderer::InitializeShadowMapDesc()
 
 void SceneRenderer::InitializeTextures()
 {
-	auto diffuseTexture = TextureHelper::CreateRenderTexture(
+	auto diffuseTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"DiffuseRTV",
@@ -349,7 +366,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_diffuseTexture.swap(diffuseTexture);
 
-	auto metalRoughTexture = TextureHelper::CreateRenderTexture(
+	auto metalRoughTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"MetalRoughRTV",
@@ -357,7 +374,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_metalRoughTexture.swap(metalRoughTexture);
 
-	auto normalTexture = TextureHelper::CreateRenderTexture(
+	auto normalTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"NormalRTV",
@@ -365,7 +382,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_normalTexture.swap(normalTexture);
 
-	auto emissiveTexture = TextureHelper::CreateRenderTexture(
+	auto emissiveTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"EmissiveRTV",
@@ -373,7 +390,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_emissiveTexture.swap(emissiveTexture);
 
-	auto bitmaskTexture = TextureHelper::CreateRenderTexture(
+	auto bitmaskTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"BitmaskRTV",
@@ -381,7 +398,7 @@ void SceneRenderer::InitializeTextures()
 	);
 	m_bitmaskTexture.swap(bitmaskTexture);
 
-	auto toneMappedColourTexture = TextureHelper::CreateRenderTexture(
+	auto toneMappedColourTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"ToneMappedColourRTV",
@@ -389,7 +406,7 @@ void SceneRenderer::InitializeTextures()
 	);
     m_toneMappedColourTexture.swap(toneMappedColourTexture);
 
-	auto lightingTexture = TextureHelper::CreateRenderTexture(
+	auto lightingTexture = TextureHelper::CreateSharedRenderTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
 		"LightingRTV",
@@ -421,23 +438,21 @@ void SceneRenderer::NewCreateSceneInitialize()
 	{
 		std::cerr << "Error initializing light with shadows: " << e.what() << std::endl;
 	}
-
+	//TODO : skybox 텍스쳐 저장해야한다 씬 별로
 	m_renderScene->m_LightController->UseCloudShadowMap(PathFinder::Relative("Cloud\\Cloud.png").string());
 
 	m_pSkyBoxPass->GenerateCubeMap(*m_renderScene);
-	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
-	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
-	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
+	auto envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	auto preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	auto brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
-	lightMap.envMap = envMap;
+	lightMap.envMap = envMap.get();
 }
 
 void SceneRenderer::OnWillRenderObject(float deltaTime)
 {
-	//
-	//TODO : 이 부분은 PreDepth로 적용해보고 프레임 얼마나 늘어나는지 테스트 필요
 }
 
 void SceneRenderer::EndOfFrame(float deltaTime)
@@ -450,11 +465,12 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 
 void SceneRenderer::SceneRendering()
 {
+#ifndef BUILD_FLAG
 	if (ShaderSystem->IsReloading())
 	{
 		ReloadShaders();
 	}
-
+#endif // !BUILD_FLAG
 	DirectX11::ResetCallCount();
 
 	for (auto& camera : CameraManagement->m_cameras)
@@ -462,6 +478,7 @@ void SceneRenderer::SceneRendering()
 		if (!RenderPassData::VaildCheck(camera)) continue;
 		auto renderData = RenderPassData::GetData(camera);
 
+#ifndef BUILD_FLAG
 		if (camera != m_pEditorCamera.get())
 		{
 			if (EngineSettingInstance->IsGameView())
@@ -473,6 +490,9 @@ void SceneRenderer::SceneRendering()
 				camera->m_avoidRenderPass.Set((flag)RenderPipelinePass::BlitPass);
 			}
 		}
+#else
+		camera->m_avoidRenderPass.Clear((flag)RenderPipelinePass::BlitPass);
+#endif // !BUILD_FLAG
 
 		std::wstring w_name =  L"Camera" + std::to_wstring(camera->m_cameraIndex);
 		std::string name = "Camera" + std::to_string(camera->m_cameraIndex);
@@ -811,8 +831,8 @@ void SceneRenderer::CreateCommandListPass()
 			else
 			{
 				PROFILE_CPU_BEGIN("DeferredPassCommandList");
-				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture.get());
-				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture.get());
+				m_pDeferredPass->UseAmbientOcclusion(m_ambientOcclusionTexture);
+				m_pDeferredPass->UseLightAndEmissiveRTV(m_lightingTexture);
 				m_pDeferredPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
@@ -1065,12 +1085,12 @@ void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
 	DirectX11::OMSetRenderTargets(1, &rtv, dsv);
 }
 
-void SceneRenderer::ApplyNewCubeMap(const std::string_view& filename)
+void SceneRenderer::ApplyNewCubeMap(std::string_view filename)
 {
 	m_pSkyBoxPass->GenerateCubeMap(filename, *m_renderScene);
-	Texture* envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
-	Texture* preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
-	Texture* brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
+	auto envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
+	auto preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);
+	auto brdfLUT = m_pSkyBoxPass->GenerateBRDFLUT(*m_renderScene);
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);

@@ -231,6 +231,21 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
+		<ClInclude Include="AniBehaviorFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
+		<ClInclude Include="Easing.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewAniBehavior2.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewAniBehavior.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -397,6 +412,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewAniBehavior2.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

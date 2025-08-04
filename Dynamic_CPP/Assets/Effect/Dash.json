@@ -1,0 +1,111 @@
+{
+    "currentTime": 0.0,
+    "duration": -1.0,
+    "isPaused": false,
+    "isPlaying": false,
+    "loop": true,
+    "name": "Dash",
+    "particleSystems": [
+        {
+            "isRunning": true,
+            "maxParticles": 1,
+            "modules": [
+                {
+                    "data": {
+                        "autoGeneration": {
+                            "autoAddInterval": 0.05000000074505806,
+                            "autoGenerateFromPosition": true
+                        },
+                        "easing": {
+                            "easingDuration": 0.0,
+                            "easingType": 0,
+                            "useEasing": false
+                        },
+                        "endColor": {
+                            "w": 0.0,
+                            "x": 0.0,
+                            "y": 0.20000000298023224,
+                            "z": 1.0
+                        },
+                        "lastUpVector": {
+                            "x": 0.0,
+                            "y": 0.8949329257011414,
+                            "z": -0.4462006688117981
+                        },
+                        "position": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "positionOffset": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                        },
+                        "startColor": {
+                            "w": 1.0,
+                            "x": 0.0,
+                            "y": 0.5,
+                            "z": 1.0
+                        },
+                        "state": {
+                            "currentTime": 57.9528694152832,
+                            "isInitialized": true,
+                            "meshDirty": true
+                        },
+                        "trailParams": {
+                            "endWidth": 0.10000000149011612,
+                            "maxTrailPoints": 100,
+                            "minDistance": 0.10000000149011612,
+                            "startWidth": 1.0,
+                            "trailLifetime": 2.0,
+                            "useLengthBasedUV": true
+                        }
+                    },
+                    "stage": 4,
+                    "type": "TrailGenerateModule",
+                    "useEasing": false
+                }
+            ],
+            "name": "NewEmitter",
+            "particleDataType": 2,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "renderModules": [
+                {
+                    "data": {
+                        "constantBuffer": {
+                            "cameraPosition": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "time": 300.96661376953125
+                        },
+                        "renderState": {
+                            "instanceCount": 1
+                        },
+                        "texture": {
+                            "assigned": true,
+                            "hasTexture": true,
+                            "name": "Eff_PC_charge_DefaultMaterial_BaseColor"
+                        },
+                        "trailModule": {
+                            "connected": true
+                        }
+                    },
+                    "type": "TrailRenderModule"
+                }
+            ]
+        }
+    ],
+    "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "timeScale": 1.0
+}

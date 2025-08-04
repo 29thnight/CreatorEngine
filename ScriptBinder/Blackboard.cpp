@@ -206,7 +206,7 @@ void BlackBoard::RenameKey(const std::string& curKey, const std::string& newKey)
 	}
 }
 
-void BlackBoard::Serialize(const std::string_view& name)
+void BlackBoard::Serialize(std::string_view name)
 {
 	if (m_name != name)
 	{
@@ -241,7 +241,7 @@ void BlackBoard::Serialize(const std::string_view& name)
 	out.flush();
 }
 
-void BlackBoard::Deserialize(const std::string_view& name)
+void BlackBoard::Deserialize(std::string_view name)
 {
 	if (m_name != name)
 	{

@@ -1,26 +1,38 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "AniTransition.h"
+#include "AniBehavior.h"
 #include "AnimationState.generated.h"
 class AnimationController;
-class AniBehaviour;
+
 class AnimationState
 {	
 public:
    ReflectAnimationState
 	[[Serializable]]
-	AnimationState() = default;
-	~AnimationState();
-	AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name) {}
+	AnimationState();
+   ~AnimationState();
+   AnimationState(AnimationController* Owner, std::string name);
 
 	std::vector<AniTransition*> FindTransitions(const std::string& toStateName);
 
-	void SetBehaviour(std::string name);
+	void ClearBehaviour()
+	{
+		ResetBehaviour();
+		behaviourName.clear();
+	}
+
+	void ResetBehaviour()
+	{
+		behaviour.reset();
+		behaviour = nullptr;
+	}
+	void SetBehaviour(std::string name, bool isReload = false);
 	[[Property]]
 	std::string m_name{};
-
+	[[Property]]
 	std::string behaviourName{};
-	AniBehaviour* behaviour{};
+	std::shared_ptr<AniBehavior> behaviour{};
 	AnimationController* m_ownerController{};
 	[[Property]]
 	std::vector<std::shared_ptr<AniTransition>> Transitions;

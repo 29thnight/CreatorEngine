@@ -1,7 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "../Utility_Framework/Core.Minimal.h"
-#include "../Utility_Framework/DeviceResources.h"
+#include "DeviceResources.h"
+#include "LogSystem.h"
 
 namespace DeviceState
 {
@@ -102,7 +102,7 @@ namespace DirectX11
 	{
 		return DeviceState::g_ClientRect.height;
 	}
-
+#ifndef BUILD_FLAG
 	//[unsafe]
 	inline void BeginEvent(const std::wstring_view& name)
 	{
@@ -124,6 +124,10 @@ namespace DirectX11
 		}
 		DeviceState::g_annotation->EndEvent();
 	}
+#else
+	inline void BeginEvent(const std::wstring_view&) {}
+	inline void EndEvent() {}
+#endif // !BUILD_FLAG
 
 	//[unsafe]
 	inline void UpdateBuffer(ID3D11Buffer* buffer, const void* data)

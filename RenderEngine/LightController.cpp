@@ -170,7 +170,7 @@ void LightController::CreateShadowCommandList(ID3D11DeviceContext* deferredConte
 	}
 }
 
-void LightController::UseCloudShadowMap(const std::string_view& filename)
+void LightController::UseCloudShadowMap(std::string_view filename)
 {
 	m_shadowMapPass->UseCloudShadowMap(filename);
 }

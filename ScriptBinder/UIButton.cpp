@@ -28,8 +28,8 @@ void UIButton::UpdateCollider()
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
 {
-	Mathf::Vector2 gameViewPos = InputManagement->GameViewpos;
-	Mathf::Vector2 gameViewSize = InputManagement->GameViewsize;
+	Mathf::Vector2 gameViewPos = InputManagement->m_gameViewPos;
+	Mathf::Vector2 gameViewSize = InputManagement->m_gameViewSize;
 	Mathf::Vector2 screenSize = { DirectX11::GetWidth(), DirectX11::GetHeight() };
 	float localX = (_mousePos.x - gameViewPos.x) * (screenSize.x / gameViewSize.x);
 	float localY = (_mousePos.y - gameViewPos.y) * (screenSize.y / gameViewSize.y);

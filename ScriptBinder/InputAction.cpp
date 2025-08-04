@@ -84,8 +84,8 @@ std::string ControllerButtonString(ControllerButton _btn)
 	case ControllerButton::BACK_BUTTON:      return "Back";
 	case ControllerButton::LEFT_SHOULDER:    return "Left Shoulder";
 	case ControllerButton::RIGHT_SHOULDER:   return "Right Shoulder";
-	case ControllerButton::LEFT_Thumbstick:  return "Left Thumbstick";
-	case ControllerButton::RIGHT_Thumbstick: return "Right Thumbstick";
+	case ControllerButton::LEFT_THUMB:  return "Left Thumbstick";
+	case ControllerButton::RIGHT_THUMB: return "Right Thumbstick";
 	case ControllerButton::None:             return "None";
 	case ControllerButton::MAX:              return "MAX";
 	default:                                 return "Unknown";
@@ -106,8 +106,8 @@ ControllerButton ParseControllerButton(const std::string& str)
     if (str == "Back")             return ControllerButton::BACK_BUTTON;
     if (str == "Left Shoulder")    return ControllerButton::LEFT_SHOULDER;
     if (str == "Right Shoulder")   return ControllerButton::RIGHT_SHOULDER;
-    if (str == "Left Thumbstick")  return ControllerButton::LEFT_Thumbstick;
-    if (str == "Right Thumbstick") return ControllerButton::RIGHT_Thumbstick;
+    if (str == "Left Thumbstick")  return ControllerButton::LEFT_THUMB;
+    if (str == "Right Thumbstick") return ControllerButton::RIGHT_THUMB;
     if (str == "None")             return ControllerButton::None;
     if (str == "MAX")              return ControllerButton::MAX;
     return ControllerButton::None; // 기본값 혹은 오류 처리용

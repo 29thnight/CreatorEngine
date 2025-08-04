@@ -6,6 +6,7 @@ static const int ToneMap_Reinhard   = 0;
 static const int ToneMap_ACES       = 1;
 static const int ToneMap_Uncharted2 = 2;
 static const int ToneMap_HDR10      = 3;
+static const int ToneMap_Unreal     = 4;
 
 Texture2D Colour : register(t0);
 
@@ -39,9 +40,10 @@ float3 LinearToPQ(float3 color)
     const float c2 = 18.8515625f;
     const float c3 = 18.6875f;
     
-    // color 는 선형 공간의 값이며, 일반적으로 피크 밝기(예: 1000nit 혹은 4000nit 등) 기준으로 정규화되어 있어야 합니다.
-    // 필요에 따라 정규화 단계를 추가하세요.
-    float3 Lp = pow(color, m1);
+    const float MaxHDR10Nits = 1000.0f;
+    float3 normalizedColor = color * (MaxHDR10Nits / 10000.0f);
+
+    float3 Lp = pow(normalizedColor, m1);
     float3 numerator = c1 + c2 * Lp;
     float3 denominator = 1.0f + c3 * Lp;
     float3 pqValue = pow(numerator / denominator, m2);
@@ -91,6 +93,26 @@ float3 uncharted2_filmic(float3 v)
     float3 W = float3(11.2f, 11.2f, 11.2f);
     float3 white_scale = float3(1.0f, 1.0f, 1.0f) / uncharted2_tonemap_partial(W);
     return curr * white_scale;
+}
+
+float3 ACESFilmic(float3 color)
+{
+    const float3x3 ACESInputMat =
+    {
+        0.59719, 0.35458, 0.04823,
+        0.07600, 0.90834, 0.01566,
+        0.02840, 0.13383, 0.83777
+    };
+    const float3x3 ACESOutputMat =
+    {
+        1.60475, -0.53108, -0.07367,
+        -0.10208,  1.10813, -0.00605,
+        -0.00327, -0.07276,  1.07602
+    };
+    color = mul(ACESInputMat, color);
+    color = RRTAndODTFit(color);
+    color = mul(ACESOutputMat, color);
+    return saturate(color);
 }
 
 float3 ReinhardToneMapping(float3 color)
@@ -148,6 +170,9 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         break;
     case ToneMap_Uncharted2:
             toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
+        break;
+    case ToneMap_Unreal:
+            toneMapped = ACESFilmic(colour.rgb * toneMapExposure);
         break;
     case ToneMap_HDR10:
             toneMapped = LinearToPQ(colour.rgb * toneMapExposure);

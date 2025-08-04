@@ -1090,6 +1090,20 @@ void EffectEditor::SyncResourcesFromLoadedEmitters()
 				}
 			}
 
+			// TrailRenderModule 체크
+			if (auto* trailRenderModule = dynamic_cast<TrailRenderModule*>(renderModule)) {
+
+				Texture* assignedTexture = trailRenderModule->GetAssignedTexture();
+				if (assignedTexture) {
+					std::cout << "    -> Texture found: " << assignedTexture->m_name << " (ptr: " << assignedTexture << ")" << std::endl;
+					textureFoundCount++;
+					AddTextureToEditorList(assignedTexture);
+				}
+				else {
+					std::cout << "    -> No texture assigned" << std::endl;
+				}
+			}
+
 			// 만약 둘 다 아니라면
 			if (!dynamic_cast<MeshModuleGPU*>(renderModule) && !dynamic_cast<BillboardModuleGPU*>(renderModule)) {
 				std::cout << "    -> Unknown render module type: " << typeid(*renderModule).name() << std::endl;
@@ -1243,7 +1257,8 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 				"Curve",
 				"Impulse",
 				"Wind",
-				"Orbital"
+				"Orbital",
+				"Explosive"
 			};
 
 			int currentVelocityMode = static_cast<int>(movementModule->GetVelocityMode());
@@ -1617,6 +1632,115 @@ void EffectEditor::RenderMovementModuleEditor(MovementModuleCS* movementModule)
 				ImGui::TreePop();
 			}
 		}
+		// Explosive 설정 (Explosive 모드일 때)
+		else if (currentVelocityMode == 5) // Explosive
+		{
+			if (ImGui::TreeNode("Explosive Settings"))
+			{
+				// 모듈에서 현재 explosive 데이터 가져오기
+				auto explosiveData = movementModule->GetExplosiveData();
+
+				// static 대신 실시간으로 현재 데이터 사용
+				float initialSpeed = explosiveData.initialSpeed;
+				float speedDecay = explosiveData.speedDecay;
+				float randomFactor = explosiveData.randomFactor;
+				float sphereRadius = explosiveData.sphereRadius;
+
+				bool explosiveChanged = false;
+
+				ImGui::Text("Basic Settings:");
+				if (ImGui::SliderFloat("Initial Speed", &initialSpeed, 1.0f, 200.0f))
+					explosiveChanged = true;
+
+				if (ImGui::SliderFloat("Speed Decay", &speedDecay, 0.1f, 5.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Higher values make particles slow down faster");
+
+				ImGui::Text("Distribution:");
+				if (ImGui::SliderFloat("Random Factor", &randomFactor, 0.0f, 1.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("0 = uniform spread, 1 = very random");
+
+				if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 2.0f))
+					explosiveChanged = true;
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("1.0 = perfect sphere, lower values = flatter distribution");
+
+				// 프리셋 버튼들
+				ImGui::Separator();
+				ImGui::Text("Presets:");
+
+				if (ImGui::Button("Fireworks"))
+				{
+					initialSpeed = 80.0f;
+					speedDecay = 1.5f;
+					randomFactor = 0.3f;
+					sphereRadius = 1.0f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Grenade"))
+				{
+					initialSpeed = 120.0f;
+					speedDecay = 2.5f;
+					randomFactor = 0.6f;
+					sphereRadius = 0.8f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Soft Pop"))
+				{
+					initialSpeed = 30.0f;
+					speedDecay = 0.8f;
+					randomFactor = 0.2f;
+					sphereRadius = 1.2f;
+					explosiveChanged = true;
+				}
+
+				if (ImGui::Button("Ring Burst"))
+				{
+					initialSpeed = 60.0f;
+					speedDecay = 1.2f;
+					randomFactor = 0.1f;
+					sphereRadius = 0.3f;
+					explosiveChanged = true;
+				}
+				ImGui::SameLine();
+
+				if (ImGui::Button("Chaos"))
+				{
+					initialSpeed = 100.0f;
+					speedDecay = 3.0f;
+					randomFactor = 0.8f;
+					sphereRadius = 1.5f;
+					explosiveChanged = true;
+				}
+
+				// 실시간 업데이트
+				if (explosiveChanged)
+				{
+					movementModule->SetExplosiveEffect(
+						initialSpeed,
+						speedDecay,
+						randomFactor,
+						sphereRadius
+					);
+				}
+
+				ImGui::TreePop();
+			}
+			}
+
 
 		ImGui::Separator();
 
@@ -2067,6 +2191,221 @@ void EffectEditor::RenderColorModuleEditor(ColorModuleCS* colorModule)
 
 void EffectEditor::RenderSizeModuleEditor(SizeModuleCS* sizeModule)
 {
+	if (!sizeModule) return;
+
+	ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+	if (ImGui::CollapsingHeader("Size Module"))
+	{
+		// 모듈 활성화 체크박스
+		bool enabled = sizeModule->IsEnabled();
+		if (ImGui::Checkbox("Enable Size Module", &enabled))
+		{
+			sizeModule->SetEnabled(enabled);
+		}
+
+		if (!enabled)
+		{
+			ImGui::BeginDisabled();
+		}
+
+		ImGui::Separator();
+
+		// 시작 크기 설정
+		XMFLOAT2 startSize = sizeModule->GetStartSize();
+		if (ImGui::DragFloat2("Start Size", &startSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetStartSize(startSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Initial size of particles (Width, Height)");
+		}
+
+		// 끝 크기 설정
+		XMFLOAT2 endSize = sizeModule->GetEndSize();
+		if (ImGui::DragFloat2("End Size", &endSize.x, 0.01f, 0.01f, 10.0f, "%.2f"))
+		{
+			sizeModule->SetEndSize(endSize);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("Final size of particles (Width, Height)");
+		}
+
+		ImGui::Separator();
+
+		// 랜덤 스케일 설정
+		ImGui::Text("Random Scale");
+
+		bool useRandomScale = sizeModule->GetUseRandomScale();
+		if (ImGui::Checkbox("Use Random Scale", &useRandomScale))
+		{
+			float minScale = sizeModule->GetRandomScaleMin();
+			float maxScale = sizeModule->GetRandomScaleMax();
+			sizeModule->SetRandomScale(useRandomScale, minScale, maxScale);
+		}
+
+		if (useRandomScale)
+		{
+			ImGui::Indent();
+
+			float minScale = sizeModule->GetRandomScaleMin();
+			if (ImGui::DragFloat("Min Scale", &minScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float maxScale = sizeModule->GetRandomScaleMax();
+				if (minScale > maxScale) maxScale = minScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			float maxScale = sizeModule->GetRandomScaleMax();
+			if (ImGui::DragFloat("Max Scale", &maxScale, 0.01f, 0.1f, 5.0f, "%.2f"))
+			{
+				float minScale = sizeModule->GetRandomScaleMin();
+				if (maxScale < minScale) minScale = maxScale;
+				sizeModule->SetRandomScale(true, minScale, maxScale);
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		// 이징 설정
+		ImGui::Text("Easing Animation");
+
+		bool easingEnabled = sizeModule->IsEasingEnabled();
+		if (ImGui::Checkbox("Enable Easing", &easingEnabled))
+		{
+			if (easingEnabled)
+			{
+				sizeModule->SetEasing(EasingEffect::Linear, StepAnimation::StepLoopForward, 1.0f);
+			}
+			else
+			{
+				sizeModule->DisableEasing();
+			}
+		}
+
+		if (easingEnabled)
+		{
+			ImGui::Indent();
+
+			// 이징 타입 선택
+			const char* easingTypes[] = {
+				"Linear",
+				"InSine", "OutSine", "InOutSine",
+				"InQuad", "OutQuad", "InOutQuad",
+				"InCubic", "OutCubic", "InOutCubic",
+				"InQuart", "OutQuart", "InOutQuart",
+				"InQuint", "OutQuint", "InOutQuint",
+				"InExpo", "OutExpo", "InOutExpo",
+				"InCirc", "OutCirc", "InOutCirc",
+				"InBack", "OutBack", "InOutBack",
+				"InElastic", "OutElastic", "InOutElastic",
+				"InBounce", "OutBounce", "InOutBounce"
+			};
+			int currentEasingType = static_cast<int>(sizeModule->GetEasingType());
+			if (ImGui::Combo("Easing Type", &currentEasingType, easingTypes, IM_ARRAYSIZE(easingTypes)))
+			{
+				EasingEffect easingType = static_cast<EasingEffect>(currentEasingType);
+				StepAnimation animationType = sizeModule->GetAnimationType();
+				float duration = sizeModule->GetEasingDuration();
+				sizeModule->SetEasing(easingType, animationType, duration);
+			}
+
+			// 애니메이션 타입 선택
+			const char* animationTypes[] = {
+				"Once Forward", "Once Back", "Once PingPong",
+				"Loop Forward", "Loop Back", "Loop PingPong"
+			};
+			int currentAnimationType = static_cast<int>(sizeModule->GetAnimationType());
+			if (ImGui::Combo("Animation Type", &currentAnimationType, animationTypes, IM_ARRAYSIZE(animationTypes)))
+			{
+				EasingEffect easingType = sizeModule->GetEasingType();
+				StepAnimation animationType = static_cast<StepAnimation>(currentAnimationType);
+				float duration = sizeModule->GetEasingDuration();
+				sizeModule->SetEasing(easingType, animationType, duration);
+			}
+
+			// 지속시간 설정
+			float duration = sizeModule->GetEasingDuration();
+			if (ImGui::DragFloat("Duration", &duration, 0.1f, 0.1f, 10.0f, "%.1f sec"))
+			{
+				EasingEffect easingType = sizeModule->GetEasingType();
+				StepAnimation animationType = sizeModule->GetAnimationType();
+				sizeModule->SetEasing(easingType, animationType, duration);
+			}
+
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		// 프리셋 버튼들
+		ImGui::Text("Presets");
+
+		if (ImGui::Button("Small to Large"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(0.1f, 0.1f));
+			sizeModule->SetEndSize(XMFLOAT2(2.0f, 2.0f));
+			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Large to Small"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(2.0f, 2.0f));
+			sizeModule->SetEndSize(XMFLOAT2(0.1f, 0.1f));
+			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Constant Size"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(1.0f, 1.0f));
+			sizeModule->SetEndSize(XMFLOAT2(1.0f, 1.0f));
+			sizeModule->SetRandomScale(true, 0.8f, 1.2f);
+		}
+
+		if (ImGui::Button("Explosion Effect"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(0.05f, 0.05f));
+			sizeModule->SetEndSize(XMFLOAT2(3.0f, 3.0f));
+			sizeModule->SetRandomScale(true, 0.5f, 1.5f);
+			sizeModule->SetEasing(EasingEffect::OutExpo, StepAnimation::StepOnceForward, 2.0f);
+		}
+		ImGui::SameLine();
+
+		if (ImGui::Button("Pulse Effect"))
+		{
+			sizeModule->SetStartSize(XMFLOAT2(0.5f, 0.5f));
+			sizeModule->SetEndSize(XMFLOAT2(1.5f, 1.5f));
+			sizeModule->SetRandomScale(false, 0.5f, 2.0f);
+			sizeModule->SetEasing(EasingEffect::InOutSine, StepAnimation::StepLoopPingPong, 1.0f);
+		}
+
+		// 디버그 정보 (디버그 모드에서만 표시)
+#ifdef _DEBUG
+		if (ImGui::TreeNode("Debug Info"))
+		{
+			ImGui::Text("Is Initialized: %s", sizeModule->IsInitialized() ? "Yes" : "No");
+			ImGui::Text("Particle Capacity: %u", sizeModule->GetParticleCapacity());
+			ImGui::Text("Ready for Reuse: %s", sizeModule->IsReadyForReuse() ? "Yes" : "No");
+
+			if (ImGui::Button("Reset Module"))
+			{
+				sizeModule->ResetForReuse();
+			}
+
+			ImGui::TreePop();
+		}
+#endif
+
+		if (!enabled)
+		{
+			ImGui::EndDisabled();
+		}
+	}
 }
 
 void EffectEditor::RenderBillboardModuleGPUEditor(BillboardModuleGPU* billboardModule)
@@ -2748,7 +3087,7 @@ void EffectEditor::RenderTrailGenerateModuleEditor(TrailGenerateModule* trailMod
 			Mathf::Vector3 currentPos = trailModule->GetPosition();
 			float posArray[3] = { currentPos.x, currentPos.y, currentPos.z };
 			if (ImGui::DragFloat3("Current Position", posArray, 0.1f)) {
-				trailModule->SetPosition(Mathf::Vector3(posArray[0], posArray[1], posArray[2]));
+				trailModule->SetEmitterPosition(Mathf::Vector3(posArray[0], posArray[1], posArray[2]));
 			}
 
 			// 위치 오프셋

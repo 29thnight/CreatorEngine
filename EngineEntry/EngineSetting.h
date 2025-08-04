@@ -73,6 +73,12 @@ public:
 	bool SaveSettings();
 	bool LoadSettings();
 
+	std::wstring GetBuildGameName() const { return m_buildGameName; }
+	void SetBuildGameName(const std::wstring& name) { m_buildGameName = name; }
+
+	std::wstring GetStartupSceneName() const { return m_startupSceneName; }
+	void SetStartupSceneName(const std::wstring& name) { m_startupSceneName = name; }
+
 	std::atomic<bool> m_isRenderPaused{ false };
 
 	std::atomic_flag gameToRenderLock = ATOMIC_FLAG_INIT;
@@ -91,6 +97,8 @@ private:
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };
     RenderPassSettings m_renderPassSettings{};
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
+	std::wstring m_buildGameName{ L"Train Your Asis" };
+	std::wstring m_startupSceneName{ L"SampleScene" };
 };
 
 static auto EngineSettingInstance = EngineSetting::GetInstance();

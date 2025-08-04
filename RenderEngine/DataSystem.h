@@ -63,20 +63,22 @@ public:
 	//Resource Model
 	void LoadModels();
 	Model* LoadModelGUID(FileGuid guid);
-	void LoadModel(const std::string_view& filePath);
-	Model* LoadCashedModel(const std::string_view& filePath);
+	void LoadModel(std::string_view filePath);
+	Model* LoadCashedModel(std::string_view filePath);
 	//Resource Texture
 	void LoadTextures();
 	Texture* LoadTextureGUID(FileGuid guid);
-	Texture* LoadTexture(const std::string_view& filePath);
-	void CopyHDRTexture(const std::string_view& filePath);
-	void CopyTexture(const std::string_view& filePath, const file::path& destination);
+	Texture* LoadTexture(std::string_view filePath);
+	void CopyHDRTexture(std::string_view filePath);
+	void CopyTexture(std::string_view filePath, const file::path& destination);
 	void SelectTextureType();
-	void CopyTextureSelectType(const std::string_view& filePath, TextureFileType type);
+	void CopyTextureSelectType(std::string_view filePath, TextureFileType type);
 	//Resource Material
 	void LoadMaterials();
+	void SaveMaterial(Material* material);
+	Material* LoadMaterial(std::string_view name);
 	Material* LoadMaterialGUID(FileGuid guid);
-    Texture* LoadMaterialTexture(const std::string_view& filePath);
+    Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	Material* CreateMaterial();
 	SpriteFont* LoadSFont(const std::wstring_view& filePath);
 	// File Operations //파일 시스템에 접근이 가능하기 문에 보안상 이슈가 있을 가능성 있음

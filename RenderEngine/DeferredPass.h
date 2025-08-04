@@ -9,28 +9,29 @@ class DeferredPass final : public IRenderPass
 public:
     DeferredPass();
     ~DeferredPass();
-    void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitmask);
-    void UseAmbientOcclusion(Texture* aoMap);
-    void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
+    void Initialize(Managed::SharedPtr<Texture> diffuse, Managed::SharedPtr<Texture> metalRough, 
+        Managed::SharedPtr<Texture> normals, Managed::SharedPtr<Texture> emissive, Managed::SharedPtr<Texture> bitmask);
+    void UseAmbientOcclusion(Managed::SharedPtr<Texture> aoMap);
+    void UseEnvironmentMap(Managed::SharedPtr<Texture> envMap, Managed::SharedPtr<Texture> preFilter, Managed::SharedPtr<Texture> brdfLut);
     void DisableAmbientOcclusion();
     void Execute(RenderScene& scene, Camera& camera) override;
     void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
         void ApplySettings(const DeferredPassSetting& setting);
 
-    void UseLightAndEmissiveRTV(Texture* lightEmissive);
+    void UseLightAndEmissiveRTV(Managed::SharedPtr<Texture> lightEmissive);
 private:
-    Texture* m_DiffuseTexture{};
-    Texture* m_MetalRoughTexture{};
-    Texture* m_NormalTexture{};
-    Texture* m_EmissiveTexture{};
-    Texture* m_BitmaskTexture{};
-    Texture* m_AmbientOcclusionTexture{};
-    Texture* m_EnvironmentMap{};
-    Texture* m_PreFilter{};
-    Texture* m_BrdfLut{};
+    Managed::WeakPtr<Texture> m_DiffuseTexture{};
+    Managed::WeakPtr<Texture> m_MetalRoughTexture{};
+    Managed::WeakPtr<Texture> m_NormalTexture{};
+    Managed::WeakPtr<Texture> m_EmissiveTexture{};
+    Managed::WeakPtr<Texture> m_BitmaskTexture{};
+    Managed::WeakPtr<Texture> m_AmbientOcclusionTexture{};
+    Managed::WeakPtr<Texture> m_EnvironmentMap{};
+    Managed::WeakPtr<Texture> m_PreFilter{};
+    Managed::WeakPtr<Texture> m_BrdfLut{};
 
-    Texture* m_LightEmissiveTexture{};
+    Managed::WeakPtr<Texture> m_LightEmissiveTexture{};
 
     bool m_UseAmbientOcclusion{ true };
     bool m_UseEnvironmentMap{ true };

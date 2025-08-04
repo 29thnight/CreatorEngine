@@ -97,7 +97,10 @@ ForwardPass::~ForwardPass()
 {
 }
 
-void ForwardPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut)
+void ForwardPass::UseEnvironmentMap(
+	Managed::SharedPtr<Texture> envMap,
+	Managed::SharedPtr<Texture> preFilter,
+	Managed::SharedPtr<Texture> brdfLut)
 {
 	m_EnvironmentMap = envMap;
 	m_PreFilter = preFilter;
@@ -106,26 +109,24 @@ void ForwardPass::UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture
 
 void ForwardPass::Execute(RenderScene& scene, Camera& camera)
 {
-	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
-
-	if (nullptr != cmdQueuePtr)
-	{
-		while (!cmdQueuePtr->empty())
-		{
-			ID3D11CommandList* CommandJob;
-			if (cmdQueuePtr->try_pop(CommandJob))
-			{
-				DirectX11::ExecuteCommandList(CommandJob, true);
-				Memory::SafeDelete(CommandJob);
-			}
-		}
-	}
+	ExecuteCommandList(scene, camera);
 }
 
 void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
+
+	if(m_EnvironmentMap.expired() || 
+	   m_PreFilter.expired() || 
+	   m_BrdfLut.expired())
+	{
+		return; // Ensure environment maps are set before proceeding
+	}
+
+	auto envMap = m_EnvironmentMap.lock();
+	auto preFilter = m_PreFilter.lock();
+	auto brdfLut = m_BrdfLut.lock();
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
 
@@ -171,9 +172,9 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 
 	ID3D11ShaderResourceView* envSRVs[3] = {
-		m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
-		m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
-		m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr
+		m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? preFilter->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? brdfLut->m_pSRV : nullptr
 	};
 	DirectX11::PSSetShaderResources(deferredPtr, 6, 3, envSRVs);
 
@@ -269,47 +270,6 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
-	/*for (auto& PrimitiveRenderProxy : renderData->m_forwardQueue)
-	{
-		scene.UpdateModel(PrimitiveRenderProxy->m_worldMatrix, deferredPtr);
-
-		HashedGuid animatorGuid = PrimitiveRenderProxy->m_animatorGuid;
-		if (PrimitiveRenderProxy->m_isAnimationEnabled && HashedGuid::INVAILD_ID != animatorGuid)
-		{
-			if (animatorGuid != currentAnimatorGuid)
-			{
-				DirectX11::UpdateBuffer(deferredPtr, m_boneBuffer.Get(), PrimitiveRenderProxy->m_finalTransforms);
-				currentAnimatorGuid = PrimitiveRenderProxy->m_animatorGuid;
-			}
-		}
-
-		Material* mat = PrimitiveRenderProxy->m_Material;
-		DirectX11::UpdateBuffer(deferredPtr, m_materialBuffer.Get(), &mat->m_materialInfo);
-
-		if (mat->m_pBaseColor)
-		{
-			DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &mat->m_pBaseColor->m_pSRV);
-		}
-		if (mat->m_pNormal)
-		{
-			DirectX11::PSSetShaderResources(deferredPtr, 1, 1, &mat->m_pNormal->m_pSRV);
-		}
-		if (mat->m_pOccRoughMetal)
-		{
-			DirectX11::PSSetShaderResources(deferredPtr, 2, 1, &mat->m_pOccRoughMetal->m_pSRV);
-		}
-		if (mat->m_AOMap)
-		{
-			DirectX11::PSSetShaderResources(deferredPtr, 3, 1, &mat->m_AOMap->m_pSRV);
-		}
-		if (mat->m_pEmissive)
-		{
-			DirectX11::PSSetShaderResources(deferredPtr, 5, 1, &mat->m_pEmissive->m_pSRV);
-		}
-
-		PrimitiveRenderProxy->Draw(deferredPtr);
-	}*/
-
 	ID3D11DepthStencilState* nullDepthStencilState = nullptr;
 	ID3D11BlendState* nullBlendState = nullptr;
 
@@ -329,6 +289,17 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto data = RenderPassData::GetData(&camera);
+
+	if (m_EnvironmentMap.expired() ||
+		m_PreFilter.expired() ||
+		m_BrdfLut.expired())
+	{
+		return; // Ensure environment maps are set before proceeding
+	}
+
+	auto envMap = m_EnvironmentMap.lock();
+	auto preFilter = m_PreFilter.lock();
+	auto brdfLut = m_BrdfLut.lock();
 
 	ID3D11DeviceContext* deferredPtr = deferredContext;
 	m_instancePSO->Apply(deferredPtr);
@@ -352,9 +323,9 @@ void ForwardPass::CreateFoliageCommandList(ID3D11DeviceContext* deferredContext,
 	DirectX11::PSSetConstantBuffer(deferredPtr, 3, 1, m_Buffer.GetAddressOf());
 
 	ID3D11ShaderResourceView* envSRVs[3] = {
-		m_UseEnvironmentMap ? m_EnvironmentMap->m_pSRV : nullptr,
-		m_UseEnvironmentMap ? m_PreFilter->m_pSRV : nullptr,
-		m_UseEnvironmentMap ? m_BrdfLut->m_pSRV : nullptr
+		m_UseEnvironmentMap ? envMap->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? preFilter->m_pSRV : nullptr,
+		m_UseEnvironmentMap ? brdfLut->m_pSRV : nullptr
 	};
 	DirectX11::PSSetShaderResources(deferredPtr, 6, 3, envSRVs);
 

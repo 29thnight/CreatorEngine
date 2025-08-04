@@ -9,17 +9,19 @@
 
 namespace Core
 {
-	class App final
+	class App final : public Noncopyable
 	{
 	public:
 		App() = default;
 		~App() = default;
+		//App Func
 		void Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height);
 		void Finalize();
 		void SetWindow(CoreWindow& coreWindow);
         void RegisterHandler(CoreWindow& coreWindow);
 		void Load();
 		void Run();
+		//Window Event Func
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
@@ -30,11 +32,11 @@ namespace Core
 		LRESULT HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
 
 	private:
-        HWND m_hWnd{ nullptr };
+        HWND										m_hWnd{ nullptr };
 		std::shared_ptr<DirectX11::DeviceResources> m_deviceResources;
-		std::unique_ptr<DirectX11::Dx11Main> m_main;
-		bool m_windowClosed{ false };
-		bool m_windowVisible{ true };
+		std::unique_ptr<DirectX11::Dx11Main>		m_main;
+		bool										m_windowClosed{ false };
+		bool										m_windowVisible{ true };
 	};
 }
 #endif // !DYNAMICCPP_EXPORTS

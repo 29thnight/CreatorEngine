@@ -11,8 +11,8 @@ class ImGuiRenderContext
 {
 public:
 	ImGuiRenderContext() = default;
-	ImGuiRenderContext(const std::string_view& name) : m_name(name) {}
-	ImGuiRenderContext(const std::string_view& name, ImGuiWindowFlags flags) : m_name(name), m_flags(flags) {}
+	ImGuiRenderContext(std::string_view name) : m_name(name) {}
+	ImGuiRenderContext(std::string_view name, ImGuiWindowFlags flags) : m_name(name), m_flags(flags) {}
 
 	void AddContext(std::function<void()> function)
 	{
@@ -30,11 +30,6 @@ public:
 		if (it != m_subContexts.end())
 		{
 			m_subContexts.erase(it);
-			std::cout << "Sub-context \"" << name << "\" removed successfully.\n";
-		}
-		else
-		{
-			std::cout << "Sub-context \"" << name << "\" not found.\n";
 		}
 	}
 
@@ -52,12 +47,6 @@ public:
 			return;
 		}
 
-		//auto tempFlags = m_flags;
-		//if (ImGui::GetCurrentWindow()->DockIsActive)
-		//{
-		//	tempFlags |= ImGuiWindowFlags_NoMove;
-		//}
-
 		if (ImGui::Begin(m_name.data(), m_isPopup ? &m_opened : 0, m_flags))
 		{
 			ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -66,12 +55,6 @@ public:
 				ImGui::End();
 				return;
 			}
-
-			//if (m_isPopup)
-			//{
-			//	ImGui::BringWindowToFocusFront(window);
-			//	ImGui::BringWindowToDisplayFront(window);
-			//}
 
 			for (auto& context : m_contexts)
 			{

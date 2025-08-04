@@ -34,7 +34,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     SceneManagers->AddDontDestroyOnLoad(objPtr);
 }
 
-Object* Object::Instantiate(const Object* original, const std::string_view& newName)
+Object* Object::Instantiate(const Object* original, std::string_view newName)
 {
     if (!original)
         return nullptr;

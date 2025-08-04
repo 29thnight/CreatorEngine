@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ParticleModule.h"
+#include "ISerializable.h"
 
 struct TrailVertex
 {
@@ -18,7 +19,7 @@ struct TrailPoint
     Mathf::Vector4 color;
 };
 
-class TrailGenerateModule : public ParticleModule
+class TrailGenerateModule : public ParticleModule, public ISerializable
 {
 public:
     TrailGenerateModule();
@@ -39,7 +40,7 @@ public:
     void SetWidthCurve(float startWidth, float endWidth) { m_startWidth = startWidth; m_endWidth = endWidth; }
     void SetColorCurve(const Mathf::Vector4& startColor, const Mathf::Vector4& endColor) { m_startColor = startColor; m_endColor = endColor; }
     void SetUVMode(bool useLengthBased) { m_useLengthBasedUV = useLengthBased; }
-    void SetPosition(const Mathf::Vector3& position) { m_position = position + m_positionOffset; }
+    void SetEmitterPosition(const Mathf::Vector3& position) { m_position = position + m_positionOffset; }
     void SetPositionOffset(const Mathf::Vector3& offset) { m_positionOffset = offset; }
     void SetAutoGenerationSettings(bool enable, float interval) { m_autoGenerateFromPosition = enable; m_autoAddInterval = interval; }
     void SetMaxTrailPoints(UINT maxPoints) { m_maxTrailPoints = maxPoints; }
@@ -86,6 +87,9 @@ public:
     const std::vector<TrailVertex>& GetVertices() const { return m_vertices; }
     const std::vector<UINT>& GetIndices() const { return m_indices; }
 
+    virtual nlohmann::json SerializeData() const override;
+    virtual void DeserializeData(const nlohmann::json& json) override;
+    virtual std::string GetModuleType() const override;
 
 private:
     void UpdateBuffers();

@@ -50,12 +50,12 @@ ColorGradingPass::~ColorGradingPass()
 {
 }
 
-void ColorGradingPass::Initialize(const std::string_view& fileName)
+void ColorGradingPass::Initialize(std::string_view fileName)
 {
 	file::path path = file::path(fileName);
 	if (file::exists(path))
 	{
-		m_pColorGradingTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+		m_pColorGradingTexture = Texture::LoadManagedFromPath(fileName);
 	}
 }
 

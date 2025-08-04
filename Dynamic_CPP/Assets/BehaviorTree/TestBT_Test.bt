@@ -67,12 +67,12 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1558418268, 1856270841]
+    Children: [1856270841]
     Position: {x: 246, y: 269}
   - ID: 1558418268
     Type: 6
     Name: Condition
-    ParentID: 700856674
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: IsAtteck

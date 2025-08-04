@@ -287,7 +287,7 @@ namespace DirectX
     };
     // 디버깅을 지원하려면 개체에 이름을 할당하세요.
 #if defined(_DEBUG)
-    inline void SetName(DXObjects auto pObject, const std::string_view& name)
+    inline void SetName(DXObjects auto pObject, std::string_view name)
     {
         pObject->SetPrivateData(WKPDID_D3DDebugObjectName, (uint32)name.length(), name.data());
     }
@@ -299,7 +299,7 @@ namespace DirectX
         return ss.str();
 	}
 #else
-    inline void SetName(DXObjects auto, const std::string_view&)
+    inline void SetName(DXObjects auto, std::string_view)
     {
     }
 

@@ -1,12 +1,16 @@
 #include "Skeleton.h"
-#include "ResourceAllocator.h"
 #include "Socket.h"
 #include "Scene.h"
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)
 	{
-        DeallocateResource(bone);
+        delete bone;
+	}
+
+	for (Socket* socket : m_sockets)
+	{
+		Memory::SafeDelete(socket);
 	}
 
 	m_bones.clear();
@@ -74,7 +78,7 @@ std::string ToLower(std::string boneName)
 
 }
 
-void Skeleton::MakeSocket(const std::string_view& socketName)
+void Skeleton::MakeSocket(std::string_view socketName)
 {
 	//animator·Î¿Å±è
 	/*Socket* socket = FindSocket(socketName);
@@ -91,7 +95,7 @@ void Skeleton::MakeSocket(const std::string_view& socketName)
 	m_sockets.push_back(newSocket);*/
 }
 
-Socket* Skeleton::FindSocket(const std::string_view& socketName)
+Socket* Skeleton::FindSocket(std::string_view socketName)
 {
 	for (auto& socket : m_sockets)
 	{
@@ -102,7 +106,7 @@ Socket* Skeleton::FindSocket(const std::string_view& socketName)
 	return nullptr;
 }
 
-void Skeleton::DeleteSocket(const std::string_view& socketName)
+void Skeleton::DeleteSocket(std::string_view socketName)
 {
 	auto it = std::find_if(m_sockets.begin(), m_sockets.end(),
 		[&](const Socket* socket) 
@@ -112,7 +116,7 @@ void Skeleton::DeleteSocket(const std::string_view& socketName)
 	m_sockets.erase(it, m_sockets.end());
 }
 
-Bone* Skeleton::FindBone(const std::string_view& _name)
+Bone* Skeleton::FindBone(std::string_view _name)
 {
 	//for (Bone* bone : m_bones)
 	//{

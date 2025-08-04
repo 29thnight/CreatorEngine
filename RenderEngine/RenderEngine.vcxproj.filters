@@ -135,9 +135,6 @@
     <Filter Include="Shaders\Effect">
       <UniqueIdentifier>{42155f28-f404-4149-8689-61a9f1ecafec}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\ResourceAllocator">
-      <UniqueIdentifier>{ea994bc9-a2bd-4eb1-b992-ec5f941bc061}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RenderScene">
       <UniqueIdentifier>{8b8366c0-580e-4d7e-99ec-036acc7e136b}</UniqueIdentifier>
     </Filter>
@@ -278,6 +275,12 @@
     </Filter>
     <Filter Include="RenderPass\EffectPass\555.Generate">
       <UniqueIdentifier>{0cdfa8c0-5b0d-4f24-b2d6-47d90edf6ef7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Effect\Generate">
+      <UniqueIdentifier>{6fbdbfb7-b2f9-482c-89e3-aafafdd5c793}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Effect\Special">
+      <UniqueIdentifier>{d8aad0ce-2ca2-488b-99c7-ba0e12875b93}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -603,9 +606,6 @@
     </ClInclude>
     <ClInclude Include="ShaderSystem.h">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="ResourceAllocator.h">
-      <Filter>Asset\ResourceAllocator</Filter>
     </ClInclude>
     <ClInclude Include="AssetMetaWather.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
@@ -1047,13 +1047,16 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\SizeModule.cs.hlsl">
       <Filter>Shaders\Effect\2D</Filter>
     </FxCompile>
-    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailMeshGenerate.cs.hlsl">
-      <Filter>Shaders\Effect\3D</Filter>
-    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailVertex.vs.hlsl">
-      <Filter>Shaders\Effect\3D</Filter>
+      <Filter>Shaders\Effect\Generate</Filter>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailPixel.ps.hlsl">
+      <Filter>Shaders\Effect\Generate</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
+      <Filter>Shaders\Effect\Special</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\TrailMeshGenerate.cs.hlsl">
       <Filter>Shaders\Effect\3D</Filter>
     </FxCompile>
   </ItemGroup>

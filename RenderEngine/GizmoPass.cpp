@@ -6,7 +6,6 @@
 #include "LightComponent.h"
 #include "Scene.h"
 #include "GizmoCbuffer.h"
-#include "ResourceAllocator.h"
 
 constexpr int MAIN_LIGHT_INDEX = 0;
 
@@ -70,11 +69,11 @@ GizmoPass::GizmoPass()
 
 GizmoPass::~GizmoPass()
 {
-	DeallocateResource(MainLightIcon);
-	DeallocateResource(PointLightIcon);
-	DeallocateResource(SpotLightIcon);
-	DeallocateResource(DirectionalLightIcon);
-	DeallocateResource(CameraIcon);
+	delete MainLightIcon;
+	delete PointLightIcon;
+	delete SpotLightIcon;
+	delete DirectionalLightIcon;
+	delete CameraIcon;
 }
 
 void GizmoPass::Execute(RenderScene& scene, Camera& camera)

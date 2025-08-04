@@ -56,7 +56,7 @@ namespace Core
 	{
 	public:
 		Delegate() : nextID_(1) {}
-		~Delegate() = default;
+		~Delegate();
 
 		DelegateHandle AddLambda(CallableWithSignature<Ret, Args...> auto&& func, int priority = 0);
 		template <typename T>
@@ -70,7 +70,7 @@ namespace Core
 		template <typename R = Ret>
 		std::vector<std::future<R>> AsyncBroadcast(Args... args);
 
-		Delegate& operator()(const Args&... args)
+		Delegate& operator()(Args... args)
 		{
 			Broadcast(args...);
 			return *this;

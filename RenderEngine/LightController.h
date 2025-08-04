@@ -1,6 +1,5 @@
 #pragma once
 #include "ShadowMapPass.h"
-#include "LightProperty.h"
 
 class Texture;
 class Scene;
@@ -29,7 +28,7 @@ public:
 	void RenderAnyShadowMap(RenderScene& scene, Camera& camera);
 	void CreateShadowCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera);
 
-	void UseCloudShadowMap(const std::string_view& filename);
+	void UseCloudShadowMap(std::string_view filename);
 	void UpdateCloudBuffer(ID3D11DeviceContext* defferdContext);
 	void PSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn = true);
 	void CSBindCloudShadowMap(ID3D11DeviceContext* defferdContext, bool isOn = true);

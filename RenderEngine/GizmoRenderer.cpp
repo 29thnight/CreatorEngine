@@ -10,14 +10,23 @@ GizmoRenderer::GizmoRenderer(SceneRenderer* pRenderer) :
 	m_renderScene(pRenderer->m_renderScene.get()),
 	m_pEditorCamera(pRenderer->m_pEditorCamera.get())
 {
+#ifndef BUILD_FLAG
 	m_pGridPass = std::make_unique<GridPass>();
 	m_pWireFramePass = std::make_unique<WireFramePass>();
 	m_pGizmoPass = std::make_unique<GizmoPass>();
 	m_pGizmoLinePass = std::make_unique<GizmoLinePass>();
+#endif // !BUILD_FLAG
 }
 
 GizmoRenderer::~GizmoRenderer()
 {
+	m_pGridPass.reset();
+	m_pWireFramePass.reset();
+	m_pGizmoPass.reset();
+	m_pGizmoLinePass.reset();
+	m_pRenderer = nullptr;
+	m_pEditorCamera = nullptr;
+	m_renderScene = nullptr;
 }
 
 void GizmoRenderer::EditorView()
@@ -30,13 +39,16 @@ void GizmoRenderer::EditorView()
 
 void GizmoRenderer::ShowGridSettings()
 {
+#ifndef BUILD_FLAG
     ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
     m_pGridPass->GridSetting();
     ImGui::End();
+#endif // !BUILD_FLAG
 }
 
 void GizmoRenderer::OnDrawGizmos()
 {
+#ifndef BUILD_FLAG
 	PROFILE_CPU_BEGIN("OnDrawGizmos");
 	//[*] GridPass
 	{
@@ -83,5 +95,6 @@ void GizmoRenderer::OnDrawGizmos()
 		PROFILE_CPU_END();
 	}
 	PROFILE_CPU_END();
+#endif
 }
 #endif // !DYNAMICCPP_EXPORTS

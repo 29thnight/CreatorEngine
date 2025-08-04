@@ -28,7 +28,7 @@ namespace DirectX11
 	public:
 		Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources);
 		~Dx11Main();
-
+		//Game ControlLoop Func
 		void Initialize();
 		void Finalize();
 		void CreateWindowSizeDependentResources();
@@ -37,7 +37,7 @@ namespace DirectX11
         void InfoWindow();
         void OnGui();
 		void DisableOrEnable();
-
+		//RenderPipeline Func
 		void CommandBuildThread();
 		void CommandExecuteThread();
 
@@ -48,6 +48,7 @@ namespace DirectX11
 		virtual void OnDeviceRestored() override;
 
 	private:
+		//Dx11 Helper
 		std::shared_ptr<DeviceResources> m_deviceResources;
 		TimeSystem m_timeSystem;
 		//Renderer
@@ -67,20 +68,14 @@ namespace DirectX11
 		Core::DelegateHandle m_OnGizmoEventHandle;
         Core::DelegateHandle m_GUIRenderingEventHandle;
 		Core::DelegateHandle m_EndOfFrameEventHandle;
-		
+		//RenderPipeLine Thread
 		std::thread m_CB_Thread;
 		std::thread m_CE_Thread;
-
-		//std::unique_ptr<Scene> m_scene;
-		//BT_Editor m_btEditor;
+		//Thread control flag
 		bool m_isGameView = false;
 		std::atomic_bool m_isLoading = false;
 		std::atomic_bool m_isChangeScene = false;
 		std::atomic_bool m_isInvokeResize = false;
-
-		bool m_isSelectUI = false;
-		bool m_isSelectText = false;
-
 	};
 }
 #endif // !DYNAMICCPP_EXPORTS

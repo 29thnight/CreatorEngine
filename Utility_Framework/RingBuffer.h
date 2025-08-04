@@ -26,13 +26,23 @@ public:
 
     std::vector<T> get_all()
     {
+        std::vector<T> result;
         size_t size = buffer_.size();
-		std::vector<T> result(size);
 
-        for (size_t i = 0; i < size; ++i) 
+        if (size < maxSize_)
         {
-            size_t idx = (head_ + i) % size;
-            result[i] = buffer_[idx];
+            // 아직 가득 차지 않았으면 그대로 복사
+            result = buffer_;
+        }
+        else
+        {
+            // head_부터 순서대로 복사
+            result.resize(maxSize_);
+            for (size_t i = 0; i < maxSize_; ++i)
+            {
+                size_t idx = (head_ + i) % maxSize_;
+                result[i] = buffer_[idx];
+            }
         }
 
         return result;
