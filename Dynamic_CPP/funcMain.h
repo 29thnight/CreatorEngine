@@ -7,7 +7,6 @@
 #include "SceneManager.h"
 #include "NodeFactory.h"
 #include "AniBehaviorFactory.h"
-#include "GameObjectPool.h"
 
 extern "C"
 {
