@@ -29,6 +29,9 @@ public:
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
 
+
+	virtual void Attack(Entity* sender, int damage) override;
+
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	[[Method]]
@@ -45,7 +48,7 @@ public:
 	[[Method]]
 	void Charging();
 	[[Method]]
-	void Attack();
+	void Attack1();
 	[[Method]]
 	void SwapWeaponLeft();
 	[[Method]]
@@ -81,7 +84,7 @@ public:
 	[[Property]]
 	float m_dashTime = 0.15f;
 	[[Property]]
-	float dashCooldown = 3.f; //대쉬 쿨타임
+	float dashCooldown = 1.f; //대쉬 쿨타임
 	float m_dashCoolElapsedTime = 0.f; //
 	[[Property]]
 	float dubbleDashTime = 0.5f; //더블대쉬 가능한시간
@@ -100,6 +103,7 @@ public:
 
 	void TestStun();
 	void TestKnockBack();
+	bool isDead = false;
 	bool isStun = false;
 	float stunTime = 0.f;
 	bool isKnockBack = false;

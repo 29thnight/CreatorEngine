@@ -16,6 +16,13 @@ enum EItemState
 	// Add more item types as needed
 };
 
+
+enum class EItemType
+{
+	Mushroom,
+	Mineral,
+	Fruit,
+};
 class EntityItem : public Entity
 {
 public:
