@@ -25,7 +25,7 @@ void TestEffect::Update(float tick)
 		obj->m_transform.SetPosition(Mathf::Vector3(x, y, z));
 		auto objE = obj->AddComponent<EffectComponent>();
 		objE->Awake();
-		objE->PlayEffectByName("Death");
+		objE->PlayEffectByName("gg");
 	}
 
 	if (InputManagement->IsKeyPressed(KeyBoard::LeftArrow))
