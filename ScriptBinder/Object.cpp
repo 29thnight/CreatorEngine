@@ -31,7 +31,21 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
         return;
     }
     objPtr->m_dontDestroyOnLoad = true;
-    SceneManagers->AddDontDestroyOnLoad(objPtr);
+
+	auto scene = SceneManagers->GetActiveScene();
+    if (!scene)
+    {
+        Debug->LogError("No active scene found to add DontDestroyOnLoad object.");
+        return;
+	}
+
+	// DontDestroyOnLoad 객체는 씬에 추가하지 않고, SceneManagers에 등록
+	auto gameObject = dynamic_cast<GameObject*>(objPtr);
+    if (gameObject)
+    {
+        auto sharedObj = scene->m_SceneObjects[gameObject->m_index];
+        SceneManagers->AddDontDestroyOnLoad(sharedObj);
+    }
 }
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)

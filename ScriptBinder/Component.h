@@ -7,7 +7,7 @@
 
 class GameObject;
 class Transform;
-class Component : public Object, public Managed::HeapObject
+class Component : public Object
 {
 public:
    ReflectComponent

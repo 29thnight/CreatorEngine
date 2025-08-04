@@ -188,6 +188,7 @@
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h" />
 		<ClInclude Include="Assets\Script\AsisMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
+		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="Easing.h" />
@@ -235,6 +236,7 @@
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
+		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />

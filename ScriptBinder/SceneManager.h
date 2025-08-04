@@ -1,11 +1,10 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "Object.h"
 #include "ReflectionYml.h"
 #include "DLLAcrossSingleton.h"
 #include "Core.ThreadPool.h"
 
 class Scene;
-class Object;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
@@ -47,10 +46,10 @@ public:
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
-    void AddDontDestroyOnLoad(Object* objPtr);
+    void AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
     
 	std::vector<Scene*>& GetScenes() { return m_scenes; }
-	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
+	std::vector<std::shared_ptr<Object>>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
 	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
@@ -106,7 +105,7 @@ private:
 
 private:
     std::vector<Scene*>                 m_scenes{};
-    std::vector<Object*>                m_dontDestroyOnLoadObjects{};
+    std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
 	std::string                         m_LoadSceneName{};

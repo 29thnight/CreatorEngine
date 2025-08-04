@@ -458,9 +458,6 @@
     <ClInclude Include="TagManager.h">
       <Filter>Managers\TagManager</Filter>
     </ClInclude>
-    <ClInclude Include="GameObjectPool.h">
-      <Filter>Managers\Pool</Filter>
-    </ClInclude>
     <ClInclude Include="IProjectSetting.h">
       <Filter>Interfaces</Filter>
     </ClInclude>

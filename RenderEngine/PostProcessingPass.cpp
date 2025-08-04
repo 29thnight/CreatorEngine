@@ -104,20 +104,20 @@ void PostProcessingPass::ControlPanel()
 		GaussianBlurComputeKernel();
 	}
 
-        if (ImGui::Button("Reset")) {
-                m_bloomThreshold.threshold = 0.3f;
-                m_bloomThreshold.knee = 0.5f;
-                m_bloomComposite.coefficient = 0.3f;
-                m_bloomBlur.radius = 7;
-                m_bloomBlur.sigma = 5.f;
-                GaussianBlurComputeKernel();
-                setting.applyBloom = true;
-                setting.threshold = m_bloomThreshold.threshold;
-                setting.knee = m_bloomThreshold.knee;
-                setting.coefficient = m_bloomComposite.coefficient;
-                setting.blurRadius = m_bloomBlur.radius;
-                setting.blurSigma = m_bloomBlur.sigma;
-        }
+    if (ImGui::Button("Reset")) {
+            m_bloomThreshold.threshold = 0.3f;
+            m_bloomThreshold.knee = 0.5f;
+            m_bloomComposite.coefficient = 0.3f;
+            m_bloomBlur.radius = 7;
+            m_bloomBlur.sigma = 5.f;
+            GaussianBlurComputeKernel();
+            setting.applyBloom = true;
+            setting.threshold = m_bloomThreshold.threshold;
+            setting.knee = m_bloomThreshold.knee;
+            setting.coefficient = m_bloomComposite.coefficient;
+            setting.blurRadius = m_bloomBlur.radius;
+            setting.blurSigma = m_bloomBlur.sigma;
+    }
 	ImGui::PopID();
 
 }

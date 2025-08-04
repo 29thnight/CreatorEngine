@@ -140,32 +140,26 @@ void BillboardModuleGPU::SetTexture(Texture* texture)
 
 void BillboardModuleGPU::ResetForReuse()
 {
-	// 렌더 상태 초기화
+	std::lock_guard<std::mutex> lock(m_resetMutex);
+
+	// 논리적 상태만 리셋
 	m_instanceCount = 0;
 	m_maxCount = 0;
 	m_isRendering = false;
-	m_gpuWorkPending = false;
-
-	// 타입을 기본값으로 리셋
 	m_BillBoardType = BillBoardType::Basic;
 
-	// 리소스 참조 해제 (실제 리소스는 해제하지 않음)
+	// 리소스 참조만 해제
 	m_particleSRV = nullptr;
 	m_assignedTexture = nullptr;
 
-	// 상수 버퍼 초기화
-	if (m_ModelBuffer) {
-		m_ModelConstantBuffer = {}; // 구조체 초기화
-		m_ModelConstantBuffer.world = Mathf::Matrix::Identity;
-		m_ModelConstantBuffer.view = Mathf::Matrix::Identity;
-		m_ModelConstantBuffer.projection = Mathf::Matrix::Identity;
-	}
+	// 상수 버퍼 데이터만 리셋
+	m_ModelConstantBuffer = {};
+	m_ModelConstantBuffer.world = Mathf::Matrix::Identity;
+	m_ModelConstantBuffer.view = Mathf::Matrix::Identity;
+	m_ModelConstantBuffer.projection = Mathf::Matrix::Identity;
 
-	// 모듈 비활성화 (다음 사용까지)
-	//SetEnabled(false);
-
-	// 디버그 출력
-	OutputDebugStringA("BillboardModule: Reset for reuse completed\n");
+	// GPU 플래그 리셋
+	m_gpuWorkPending = false;
 }
 
 bool BillboardModuleGPU::IsReadyForReuse() const
@@ -186,19 +180,7 @@ bool BillboardModuleGPU::IsReadyForReuse() const
 
 void BillboardModuleGPU::WaitForGPUCompletion()
 {
-	if (!m_gpuWorkPending.load()) {
-		return; // GPU 작업이 없으면 바로 리턴
-	}
-
-	auto& deviceContext = DeviceState::g_pDeviceContext;
-	if (deviceContext) {
-		deviceContext->Flush();
-	}
-
-	// GPU 작업 완료 플래그 리셋
 	m_gpuWorkPending = false;
-
-	OutputDebugStringA("BillboardModule: GPU completion wait finished\n");
 }
 
 void BillboardModuleGPU::SetupRenderTarget(RenderPassData* renderData)

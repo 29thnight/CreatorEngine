@@ -7,7 +7,6 @@
 #include "SceneManager.h"
 #include "NodeFactory.h"
 #include "AniBehaviorFactory.h"
-#include "GameObjectPool.h"
 
 extern "C"
 {
@@ -193,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
 		CreateFactory::GetInstance()->RegisterFactory("TweenManager", []() { return new TweenManager(); });

@@ -211,15 +211,6 @@ bool TrailRenderModule::IsReadyForReuse() const
 
 void TrailRenderModule::WaitForGPUCompletion()
 {
-    if (!m_gpuWorkPending.load())
-        return;
-
-    auto& deviceContext = DeviceState::g_pDeviceContext;
-    if (deviceContext)
-    {
-        deviceContext->Flush();
-    }
-
     m_gpuWorkPending = false;
 }
 

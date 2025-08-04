@@ -1,6 +1,5 @@
 #include "Scene.h"
 #include "HotLoadSystem.h"
-#include "GameObjectPool.h"
 #include "ModuleBehavior.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
@@ -70,21 +69,13 @@ void Scene::AddRootGameObject(std::string_view name)
 	}
 
 	GameObject::Index index = m_SceneObjects.size();
-	auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
+	auto ptr = shared_alloc<GameObject>(this, uniqueName, GameObjectType::Empty, index, -1);
 	if (nullptr == ptr)
 	{
 		return;
 	}
 
-	std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
-	{
-		if (obj)
-		{
-			ObjectPool::Deallocate(obj);
-		}
-	});
-
-	m_SceneObjects.push_back(newObj);
+	m_SceneObjects.push_back(ptr);
 }
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameObjectType type, GameObject::Index parentIndex)
@@ -104,7 +95,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
 	GameObject::Index index = m_SceneObjects.size();
 
 
-    auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
+    auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         return nullptr;
@@ -112,29 +103,21 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(std::string_view name, GameO
 	ptr->m_ownerScene = this;
 	ptr->m_removedSuffixNumberTag = name.data();
 
-    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
-    {
-        if (obj)
-        {
-            ObjectPool::Deallocate(obj);
-        }
-    });
-
-	m_SceneObjects.push_back(newObj);
+	m_SceneObjects.push_back(ptr);
 	auto parentObj = GetGameObject(parentIndex);
 	if (parentObj->m_index != index)
 	{
 		parentObj->m_childrenIndices.push_back(index);
 	}
 
-	if (!newObj->m_tag.ToString().empty())
+	if (!ptr->m_tag.ToString().empty())
 	{
-		TagManager::GetInstance()->AddTagToObject(newObj->m_tag.ToString(), newObj.get());
+		TagManager::GetInstance()->AddTagToObject(ptr->m_tag.ToString(), ptr.get());
 	}
 
-	if (!newObj->m_layer.ToString().empty())
+	if (!ptr->m_layer.ToString().empty())
 	{
-		TagManager::GetInstance()->AddObjectToLayer(newObj->m_layer.ToString(), newObj.get());
+		TagManager::GetInstance()->AddObjectToLayer(ptr->m_layer.ToString(), ptr.get());
 	}
 
 	return m_SceneObjects[index];
@@ -156,7 +139,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string
 
 
     GameObject::Index index = m_SceneObjects.size();
-    auto ptr = ObjectPool::Allocate<GameObject>(this, uniqueName, type, index, parentIndex);
+    auto ptr = shared_alloc<GameObject>(this, uniqueName, type, index, parentIndex);
     if (nullptr == ptr)
     {
         return nullptr;
@@ -165,15 +148,7 @@ std::shared_ptr<GameObject> Scene::LoadGameObject(size_t instanceID, std::string
 	ptr->m_ownerScene = this;
 	ptr->m_removedSuffixNumberTag = name.data();
 
-    std::shared_ptr<GameObject> newObj(ptr, [&](GameObject* obj)
-    {
-        if (obj)
-        {
-            ObjectPool::Deallocate(obj);
-        }
-    });
-
-    m_SceneObjects.push_back(newObj);
+    m_SceneObjects.push_back(ptr);
 
     return m_SceneObjects[index];
 }
