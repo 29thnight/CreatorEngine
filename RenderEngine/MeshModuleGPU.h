@@ -127,4 +127,5 @@ private:
 	bool m_isPolarClippingAnimating = false;
 	float m_polarClippingAnimationSpeed = 1.0f;
 
+	std::mutex m_resetMutex;
 };

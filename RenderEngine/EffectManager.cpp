@@ -234,6 +234,8 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 	return availableId;
 }
 
+// 풀 관련 **************************************************************************************************************************************************
+
 void EffectManager::InitializeUniversalPool()
 {
 	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
@@ -261,9 +263,11 @@ std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
-	// 재사용을 위한 리셋 (이미 ReturnToPool에서 했지만 안전장치)
+	// 재사용 준비 상태 확인 (D3D 호출 없이)
 	if (!instance->IsReadyForReuse()) {
-		instance->ResetForReuse();
+		std::cerr << "Warning: Pool instance not ready for reuse!" << std::endl;
+		// 강제로 새 인스턴스 생성
+		return CreateUniversalEffect();
 	}
 
 	std::cout << "Acquired from pool. Remaining pool size: " << universalPool.size() << std::endl;
@@ -274,36 +278,25 @@ void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
 	if (!effect) return;
 
-	// GPU 작업이 완료될 때까지 대기
-	effect->WaitForGPUCompletion();
-
-	// 강제로 정지 상태로 만들기
+	// 1. 논리적 정리만 (D3D 호출 없음)
 	if (effect->GetState() != EffectState::Stopped) {
 		effect->Stop();
 	}
 
-	// 재사용 준비가 완료될 때까지 여러 번 시도
-	int retryCount = 0;
-	const int maxRetries = 3;
+	// 2. 논리적 리셋만 (스레드 안전)
+	effect->ResetForReuse();
 
-	while (retryCount < maxRetries && !effect->IsReadyForReuse()) {
-		effect->WaitForGPUCompletion();
-		effect->ResetForReuse();
-
-		// 짧은 대기 후 다시 확인
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		retryCount++;
-	}
-
+	// 3. 바로 풀에 반환 (GPU 대기 없음)
 	if (effect->IsReadyForReuse()) {
 		universalPool.push(std::move(effect));
 		std::cout << "Effect returned to pool. Pool size: " << universalPool.size() << std::endl;
 	}
 	else {
-		std::cerr << "Warning: Effect could not be prepared for reuse after " << maxRetries << " attempts" << std::endl;
-		// 풀에 반환하지 않고 메모리에서 해제 (메모리 누수 방지)
+		std::cerr << "Warning: Effect not ready for reuse" << std::endl;
 	}
 }
+
+//***********************************************************************************************************************************************************
 
 bool EffectManager::GetTemplateSettings(const std::string& templateName, float& outTimeScale, bool& outLoop, float& outDuration)
 {

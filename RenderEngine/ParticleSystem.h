@@ -162,6 +162,8 @@ public:
 
 	void WaitForGPUCompletion();
 
+	void InitializeParticleIndicesLogical();
+
 	void AutoConnectModules();
 
 	void AutoConnectTrailModules();

@@ -516,34 +516,39 @@ void ParticleSystem::SetEffectProgress(float progress)
 	}
 }
 
+// 풀 관련 **************************************************************************************************************************************************
+
 void ParticleSystem::ResetForReuse()
 {
-	// 실행 정지
+	// GPU 작업 완료 대기 제거 - 필요 없음
+	// WaitForGPUCompletion(); // 제거
+
+	// 논리적 상태만 리셋
 	m_isRunning = false;
 	m_activeParticleCount = 0;
 	m_effectProgress = 0.0f;
 	m_usingBufferA = true;
 	m_modulesConnected = false;
 
-	// GPU 작업 완료 대기
-	WaitForGPUCompletion();
-
-	// 모듈들 리셋
+	// 모듈들 논리적 리셋 (각 모듈이 스레드 안전하게 처리)
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
 		ParticleModule& module = *it;
 		if (module.IsEnabled()) {
-			module.ResetForReuse();
+			module.ResetForReuse(); // 각 모듈이 뮤텍스로 보호됨
 		}
 	}
 
 	for (auto* renderModule : m_renderModules) {
 		if (renderModule && renderModule->IsEnabled()) {
-			renderModule->ResetForReuse();
+			renderModule->ResetForReuse(); // 각 모듈이 뮤텍스로 보호됨
 		}
 	}
 
-	// 파티클 데이터 초기화
-	InitializeParticleIndices();
+	// CPU 데이터만 초기화
+	for (auto& particle : m_particleData) {
+		particle.isActive = 0;
+	}
+	m_activeParticleCount = 0;
 }
 
 bool ParticleSystem::IsReadyForReuse()
@@ -580,13 +585,16 @@ bool ParticleSystem::IsReadyForReuse()
 
 void ParticleSystem::WaitForGPUCompletion()
 {
-	DeviceState::g_pDeviceContext->Flush();
-
+	// 실제 GPU 대기는 필요 없음
+	// 각 모듈의 WaitForGPUCompletion도 실제로는 아무 작업 안함
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
 		ParticleModule& module = *it;
-		module.WaitForGPUCompletion();
+		module.WaitForGPUCompletion(); // 빈 함수
 	}
 }
+
+//***********************************************************************************************************************************************************
+
 
 void ParticleSystem::AutoConnectModules()
 {

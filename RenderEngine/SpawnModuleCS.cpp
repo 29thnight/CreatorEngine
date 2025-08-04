@@ -287,33 +287,24 @@ void SpawnModuleCS::ResetForReuse()
 {
 	if (!m_enabled) return;
 
-	// 스폰 관련 상태 초기화
+	std::lock_guard<std::mutex> lock(m_resetMutex); // 뮤텍스 보호
+
+	// 논리적 상태 리셋
 	m_spawnParams.currentTime = 0.0f;
 	m_spawnParams.deltaTime = 0.0f;
 	m_forcePositionUpdate = true;
 	m_spawnParamsDirty = true;
 	m_templateDirty = true;
 
-	// 이전 위치 리셋
+	// 위치/회전 리셋
 	m_previousEmitterPosition = Mathf::Vector3(0.0f, 0.0f, 0.0f);
 	m_spawnParams.previousEmitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_spawnParams.emitterPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
-
-	// 회전 리셋
 	m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	m_spawnParams.forceRotationUpdate = 0;
-
-	// 난수 상태 리셋
-	if (m_randomStateBuffer) {
-		UINT newSeed = m_randomGenerator();
-		D3D11_MAPPED_SUBRESOURCE mappedResource;
-		if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_randomStateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
-			memcpy(mappedResource.pData, &newSeed, sizeof(UINT));
-			DeviceState::g_pDeviceContext->Unmap(m_randomStateBuffer, 0);
-		}
-	}
 }
+
 
 bool SpawnModuleCS::IsReadyForReuse() const
 {
@@ -322,33 +313,6 @@ bool SpawnModuleCS::IsReadyForReuse() const
 		m_spawnParamsBuffer != nullptr &&
 		m_templateBuffer != nullptr;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // 설정 메서드들
 void SpawnModuleCS::SetEmitterPosition(const Mathf::Vector3& position)
