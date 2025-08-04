@@ -1,7 +1,7 @@
 Test:
   - key: Asis
     value:
-      Type: 9
+      Type: 8
       BoolValue: false
       IntValue: 0
       FloatValue: 0
@@ -15,6 +15,26 @@ Test:
       BoolValue: false
       IntValue: 0
       FloatValue: 3
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Player2
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: 2P
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: eTargetRange
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 10
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
@@ -69,16 +89,6 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eTargetRange
-    value:
-      Type: 3
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 10
-      StringValue: ""
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: Identity
     value:
       Type: 4
@@ -96,6 +106,16 @@ Test:
       IntValue: 100
       FloatValue: 0
       StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Player1
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: 1P
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}

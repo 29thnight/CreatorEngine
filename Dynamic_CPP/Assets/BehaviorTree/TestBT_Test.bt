@@ -8,7 +8,7 @@ NodeList:
     ScriptName: ""
     Policy: -858993460
     Children: [686063297]
-    Position: {x: -282, y: -131}
+    Position: {x: -90, y: -243}
   - ID: 686063297
     Type: 3
     Name: Selector
@@ -17,18 +17,18 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [3909499465, 3825938343, 1608338673, 1442497393]
-    Position: {x: -122, y: -8}
+    Children: [1442497393, 3909499465, 1608338673, 3825938343]
+    Position: {x: -74, y: -35}
   - ID: 3909499465
     Type: 2
     Name: Sequence
-    ParentID: 686063297
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
     Children: [1191098861, 1220802128]
-    Position: {x: -282, y: 205}
+    Position: {x: -266, y: 216}
   - ID: 1191098861
     Type: 6
     Name: Condition
@@ -52,7 +52,7 @@ NodeList:
   - ID: 3825938343
     Type: 3
     Name: Selector
-    ParentID: 686063297
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: ""
@@ -67,8 +67,8 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1856270841]
-    Position: {x: 246, y: 269}
+    Children: [1856270841, 1558418268]
+    Position: {x: 230, y: 253}
   - ID: 1558418268
     Type: 6
     Name: Condition
@@ -78,7 +78,7 @@ NodeList:
     ScriptName: IsAtteck
     Policy: -858993460
     Children: ~
-    Position: {x: 214, y: 408}
+    Position: {x: 182, y: 376}
   - ID: 3380368976
     Type: 2
     Name: Sequence
@@ -132,13 +132,13 @@ NodeList:
   - ID: 1608338673
     Type: 5
     Name: ConditionDecorator
-    ParentID: 686063297
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: IsDamege
     Policy: -858993460
     Children: [3264712637]
-    Position: {x: 6, y: 213}
+    Position: {x: -42, y: 213}
   - ID: 3264712637
     Type: 8
     Name: Action

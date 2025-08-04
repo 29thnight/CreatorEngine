@@ -8,6 +8,7 @@ bool IsInitialize::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (!HasIdentity)
 	{
 		std::cout << "IsInitialize ConditionCheck: No Identity key found in blackboard." << std::endl;
+		//Debug->Log("IsInitialize ConditionCheck: No Identity key found in blackboard.");
 		return false; // No Identity key, cannot determine if it's initialized
 	}
 
@@ -23,6 +24,7 @@ bool IsInitialize::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	if (isInitialized)
 	{
 		std::cout << "IsInitialize ConditionCheck: Entity is initialized." << std::endl;
+		//Debug->Log("IsInitialize ConditionCheck: Entity is initialized.");
 		return false; // Entity is initialized -> skip initialize action
 	}
 	else
