@@ -25,7 +25,12 @@ void TestEffect::Update(float tick)
 		obj->m_transform.SetPosition(Mathf::Vector3(x, y, z));
 		auto objE = obj->AddComponent<EffectComponent>();
 		objE->Awake();
-		objE->PlayEffectByName("gg");
+		objE->PlayEffectByName("Dash2");
+	}
+
+	if(InputManagement->IsKeyDown(KeyBoard::K))
+	{
+		auto comp = GetOwner()->GetComponent<EffectComponent>()->m_isEnabled = false;
 	}
 
 	if (InputManagement->IsKeyPressed(KeyBoard::LeftArrow))
