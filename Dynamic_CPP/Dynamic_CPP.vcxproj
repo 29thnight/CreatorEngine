@@ -214,7 +214,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
 		<ClInclude Include="Assets\Script\EntityEnemy.h" />
-		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\NewAniBehavior.h" />
 	</ItemGroup>
 	<ItemGroup>
@@ -352,7 +351,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEffect.cpp">
 		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
