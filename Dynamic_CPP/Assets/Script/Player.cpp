@@ -85,6 +85,17 @@ void Player::Update(float tick)
 		m_animator->SetParameter("OnDead", true);
 	}
 
+	if (isAttacking)
+	{
+		attackElapsedTime += tick;
+		auto controller = player->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
+		if (attackElapsedTime >= attackTime)
+		{
+			attackElapsedTime = 0.f;
+			isAttacking = false;
+		}
+	}
 	if (catchedObject)
 	{
 		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
@@ -208,7 +219,7 @@ void Player::Attack(Entity* sender, int damage)
 
 void Player::Move(Mathf::Vector2 dir)
 {
-	if (isStun || isKnockBack || !m_isCallStart || isDashing || isDead) return;
+	if (isStun || isKnockBack || !m_isCallStart || isDashing || isDead || isAttacking) return;
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 
@@ -285,6 +296,7 @@ void Player::DropCatchItem()
 		m_nearObject = nullptr; //&&&&&
 		if (m_curWeapon)
 			m_curWeapon->GetOwner()->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+		m_animator->SetParameter("OnDrop", true);
 	}
 }
 
@@ -349,78 +361,80 @@ void Player::Attack1()
 	isCharging = false;
 	m_chargingTime = 0.f;
 
-
-	//if (m_comboCount == 0)
+	if (isAttacking == false)
 	{
-		int gumNumber = playerIndex + 1;
-		std::string gumName = "GumGi" + std::to_string(gumNumber);
-		auto obj = GameObject::Find(gumName);
-		if (obj)
+		isAttacking = true;
+		//if (m_comboCount == 0)
 		{
-			auto pos = GetOwner()->m_transform.GetWorldPosition();
-			auto forward2 = GetOwner()->m_transform.GetForward();
-			auto offset{ 2 };
-			auto offset2 = -forward2 * offset;
-			pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
-			pos.m128_f32[1] = 1;
-			pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
-
-			XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
-			Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
-			obj->m_transform.SetPosition(pos);
-
-			obj->m_transform.SetRotation(swordRotation);
-			obj->m_transform.UpdateWorldMatrix();
+			int gumNumber = playerIndex + 1;
+			std::string gumName = "GumGi" + std::to_string(gumNumber);
+			auto obj = GameObject::Find(gumName);
 			if (obj)
 			{
-				auto effect = obj->GetComponent<EffectComponent>();
-				if (effect)
+				auto pos = GetOwner()->m_transform.GetWorldPosition();
+				auto forward2 = GetOwner()->m_transform.GetForward();
+				auto offset{ 2 };
+				auto offset2 = -forward2 * offset;
+				pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
+				pos.m128_f32[1] = 1;
+				pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
+
+				XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
+				Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
+				obj->m_transform.SetPosition(pos);
+
+				obj->m_transform.SetRotation(swordRotation);
+				obj->m_transform.UpdateWorldMatrix();
+				if (obj)
 				{
-					effect->Apply();
+					auto effect = obj->GetComponent<EffectComponent>();
+					if (effect)
+					{
+						effect->Apply();
+					}
+				}
+			}
+			std::vector<HitResult> hits;
+			auto world = player->m_transform.GetWorldPosition();
+			world.m128_f32[1] += 0.5f;
+			auto forward = player->m_transform.GetForward();
+			int size = RaycastAll(world, -forward, 10.f, 1u, hits);
+
+			for (int i = 0; i < size; i++)
+			{
+				auto object = hits[i].hitObject;
+				if (object == GetOwner()) continue;
+
+				std::cout << object->m_name.data() << std::endl;
+				auto enemy = object->GetComponent<TestEnemy>();
+				if (enemy)
+				{
+					enemy->curHP -= 10.f;
+					std::cout << enemy->curHP << std::endl;
+					auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
+
+					rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
+				}
+
+				auto entityItem = object->GetComponent<EntityResource>();
+				if (entityItem) {
+					entityItem->Attack(this, 100);
+				}
+
+				auto otherPlayer = object->GetComponent<Player>();
+				if (otherPlayer)
+				{
+					otherPlayer->Attack(this, 100);
 				}
 			}
 		}
-		std::vector<HitResult> hits;
-		auto world = player->m_transform.GetWorldPosition();
-		world.m128_f32[1] += 0.5f;
-		auto forward = player->m_transform.GetForward();
-		int size = RaycastAll(world, -forward, 10.f, 1u, hits);
-
-		for (int i = 0; i < size; i++)
-		{
-			auto object = hits[i].hitObject;
-			if (object == GetOwner()) continue;
-
-			std::cout << object->m_name.data() << std::endl;
-			auto enemy = object->GetComponent<TestEnemy>();
-			if (enemy)
-			{
-				enemy->curHP -= 10.f;
-				std::cout << enemy->curHP << std::endl;
-				auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
-
-				rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
-			}
-
-			auto entityItem = object->GetComponent<EntityResource>();
-			if (entityItem) {
-				entityItem->Attack(this, 100);
-			}
-
-			auto otherPlayer = object->GetComponent<Player>();
-			if (otherPlayer)
-			{
-				otherPlayer->Attack(this, 100);
-			}
-		}
+		m_animator->SetParameter("Attack", true);
+		std::cout << "Attack!!" << std::endl;
+		DropCatchItem();
+		m_comboCount++;
+		m_comboElapsedTime = 0;
+		attackElapsedTime = 0;
 	}
-	m_animator->SetParameter("Attack", true);
-	std::cout << "Attack!!" << std::endl;
-	std::cout << m_comboCount << "Combo Attack " << std::endl;
-	DropCatchItem();
-	m_comboCount++;
-	m_comboElapsedTime = 0;
-
 }
 
 void Player::SwapWeaponLeft()

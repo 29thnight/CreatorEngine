@@ -101,6 +101,9 @@ public:
 	[[Property]]
 	float detectAngle = 30.f;
 
+	bool isAttacking = false;
+	float attackTime = 0.980f;
+	float attackElapsedTime = 0.f;
 	void TestStun();
 	void TestKnockBack();
 	bool isDead = false;

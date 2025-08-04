@@ -43,7 +43,18 @@ void EntityItem::Start()
 	box->SetDynamicFriction(100.f);
 
 
-
+	if (itemCode == 0)
+	{
+		itemType = EItemType::Mushroom;
+	}
+	else if(itemCode == 1)
+	{
+		itemType = EItemType::Mineral;
+	}
+	else if (itemCode == 2)
+	{
+		itemType = EItemType::Fruit;
+	}
 }
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
@@ -51,6 +62,9 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 	if (collision.otherObj->m_tag == "Rock")
 	{
 		GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 		m_state = EItemState::FALLED;
 		std::cout << collision.otherObj->m_name.ToString() << "OnTriggerEnter Item" << std::endl;
 	}
@@ -127,7 +141,7 @@ void EntityItem::Update(float tick)
 			}
 			Transform* myTr = GetOwner()->GetComponent<Transform>();
 			Vector3 pB = ((endPos - startPos) / 2) + startPos;
-			pB.y += 10.f;
+			pB.y += 7.f;
 			Vector3 pA = startPos;
 			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 			timer += tick * speed; // 10sec
@@ -192,10 +206,11 @@ void EntityItem::Update(float tick)
 		Transform* myTr = GetOwner()->GetComponent<Transform>();
 
 		Vector3 pB = ((endPos - startPos) / 2) + startPos;
-		//pB.y += 5.f;
 		Vector3 pA = startPos;
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
-		timer += tick * speed; // 10sec
+		timer += tick * speed;
+		timer = std::min(timer, 1.0f); // 1.0 이상 못 넘어가게 제한
+
 		if (timer < 1.f) {
 			Vector3 p0 = Lerp(pA, pB, timer);
 			Vector3 p1 = Lerp(pB, endPos, timer);
@@ -205,13 +220,13 @@ void EntityItem::Update(float tick)
 		}
 		else
 		{
-			GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+			myTr->SetPosition(endPos);  // 위치 보정 필수!
+			rigid->SetIsTrigger(false);
 			speed = 2.f;
 			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			m_state = EItemState::NONE;
-
-		};
+		}
 	}
 
 	if (m_state == EItemState::FALLED)
@@ -235,7 +250,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
 	speed = 4.0f;
 	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
-	endPos.y = 0.01;
+	endPos.y = 1;
 }
 void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 {
@@ -244,7 +259,7 @@ void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 	timer = 0.f;
 	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
-	endPos.y = 0.01;
+	endPos.y = 1;
 }
 
 void EntityItem::SetThrowOwner(Player* player)
