@@ -8,9 +8,6 @@
 #include "RenderScene.h"
 #include "SceneManager.h"
 
-const static float         pi = XM_PIDIV2 - 0.01f;
-const static float pi2 = XM_PI * 2.f;
-
 Camera::Camera() : m_isLinkRenderData(true)
 {
 	m_aspectRatio = DeviceState::g_aspectRatio;
@@ -43,6 +40,26 @@ Camera::~Camera()
 		CameraManagement->DeleteCamera(m_cameraIndex);
 		auto renderScene = SceneManagers->GetRenderScene();
 		renderScene->RemoveRenderPassData(m_cameraIndex);
+	}
+
+	if (m_ViewBuffer)
+	{
+		m_ViewBuffer.Reset();
+	}
+
+	if (m_ProjBuffer)
+	{
+		m_ProjBuffer.Reset();
+	}
+
+	if (m_CascadeViewBuffer)
+	{
+		m_CascadeViewBuffer.Reset();
+	}
+
+	if (m_CascadeProjBuffer)
+	{
+		m_CascadeProjBuffer.Reset();
 	}
 }
 
@@ -163,27 +180,27 @@ void Camera::HandleMovement(float deltaTime)
 	constexpr float minSpeed = 10.f;
 	constexpr float maxSpeed = 100.f;
 
-	if (InputManagement->IsKeyPressed('W') || ImGui::GetIO().KeysData[ImGuiKey_W].Down)
+	if (InputManagement->IsKeyPressed('W') || ImGui::IsKeyDown(ImGuiKey_W))
 	{
 		z += 1.f;
 	}
-	if (InputManagement->IsKeyPressed('S') || ImGui::GetIO().KeysData[ImGuiKey_S].Down)
+	if (InputManagement->IsKeyPressed('S') || ImGui::IsKeyDown(ImGuiKey_S))
 	{
 		z -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('A') || ImGui::GetIO().KeysData[ImGuiKey_A].Down)
+	if (InputManagement->IsKeyPressed('A') || ImGui::IsKeyDown(ImGuiKey_A))
 	{
 		x -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('D') || ImGui::GetIO().KeysData[ImGuiKey_D].Down)
+	if (InputManagement->IsKeyPressed('D') || ImGui::IsKeyDown(ImGuiKey_D))
 	{
 		x += 1.f;
 	}
-	if (InputManagement->IsKeyPressed('Q') || ImGui::GetIO().KeysData[ImGuiKey_Q].Down)
+	if (InputManagement->IsKeyPressed('Q') || ImGui::IsKeyDown(ImGuiKey_Q))
 	{
 		y -= 1.f;
 	}
-	if (InputManagement->IsKeyPressed('E') || ImGui::GetIO().KeysData[ImGuiKey_E].Down)
+	if (InputManagement->IsKeyPressed('E') || ImGui::IsKeyDown(ImGuiKey_E))
 	{
 		y += 1.f;
 	}
@@ -206,7 +223,7 @@ void Camera::HandleMovement(float deltaTime)
 
 	XMVECTOR m_rotationQuat = XMQuaternionIdentity();
 	//Change the Camera Rotaition Quaternion Not Use XMQuaternionRotationRollPitchYaw
-	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT))
+	if (InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
 	{
 		// 마우스 이동량 가져오기
 		deltaPitch += InputManagement->GetMouseDelta().y * 0.01f;
@@ -264,8 +281,8 @@ void Camera::UpdateBufferCascade(ID3D11DeviceContext* deferredContext, bool shad
 		DirectX::SetName(m_CascadeProjBuffer.Get(), "CameraCascadeProjBuffer");
 	}
 
-	Mathf::xMatrix view[cascadeCount];
-	Mathf::xMatrix proj[cascadeCount];
+	Mathf::xMatrix view[cascadeCount]{};
+	Mathf::xMatrix proj[cascadeCount]{};
 	for(auto i : std::views::iota(0, cascadeCount))
 	{
 		ApplyShadowInfo(i);

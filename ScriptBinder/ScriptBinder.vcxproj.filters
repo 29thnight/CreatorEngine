@@ -169,6 +169,9 @@
     <Filter Include="Managers\HotLoadSystem\ScriptStringModule">
       <UniqueIdentifier>{244df224-d5ef-4ab5-abfb-fb6724202b99}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Managers\InputManager\Helper">
+      <UniqueIdentifier>{d694ed34-b81e-4dee-8544-f2efb39a76f5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -395,9 +398,6 @@
     <ClInclude Include="ConditionParameter.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="AniBehaviour.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="AnimationBehviourFatory.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
@@ -457,9 +457,6 @@
     </ClInclude>
     <ClInclude Include="TagManager.h">
       <Filter>Managers\TagManager</Filter>
-    </ClInclude>
-    <ClInclude Include="GameObjectPool.h">
-      <Filter>Managers\Pool</Filter>
     </ClInclude>
     <ClInclude Include="IProjectSetting.h">
       <Filter>Interfaces</Filter>
@@ -589,6 +586,18 @@
     </ClInclude>
     <ClInclude Include="ScriptStringModule.h">
       <Filter>Managers\HotLoadSystem\ScriptStringModule</Filter>
+    </ClInclude>
+    <ClInclude Include="AniBehavior.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="MSBuildHelper.h">
+      <Filter>Managers\HotLoadSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyBitFlag.h">
+      <Filter>Managers\InputManager\Helper</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyArray.h">
+      <Filter>Managers\InputManager\Helper</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

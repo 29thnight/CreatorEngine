@@ -3,12 +3,12 @@
 #include "Object.h"
 #include "ReflectionYml.h"
 
-Prefab* PrefabUtility::CreatePrefab(const GameObject* source, const std::string_view& name)
+Prefab* PrefabUtility::CreatePrefab(const GameObject* source, std::string_view name)
 {
     return Prefab::CreateFromGameObject(source, name);
 }
 
-GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, const std::string_view& name)
+GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_view name)
 {
     if (!prefab)
         return nullptr;

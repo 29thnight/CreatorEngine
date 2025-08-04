@@ -56,20 +56,7 @@ TerrainGizmoPass::TerrainGizmoPass()
 
 void TerrainGizmoPass::Execute(RenderScene& scene, Camera& camera)
 {
-    auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
-
-    if (nullptr != cmdQueuePtr)
-    {
-        while (!cmdQueuePtr->empty())
-        {
-            ID3D11CommandList* CommandJob;
-            if (cmdQueuePtr->try_pop(CommandJob))
-            {
-                DirectX11::ExecuteCommandList(CommandJob, true);
-                Memory::SafeDelete(CommandJob);
-            }
-        }
-    }
+    ExecuteCommandList(scene, camera);
 }
 
 void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)

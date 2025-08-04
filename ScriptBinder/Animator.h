@@ -45,8 +45,8 @@ public:
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
 
-    Socket* MakeSocket(const std::string_view& socketName,const std::string_view& boneName);
-    Socket* FindSocket(const std::string_view& socketName);
+    Socket* MakeSocket(std::string_view socketName,std::string_view boneName);
+    Socket* FindSocket(std::string_view socketName);
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};

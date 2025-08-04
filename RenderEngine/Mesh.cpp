@@ -28,7 +28,7 @@ void CreateLODBuffers(
 	DirectX::SetName(outLODResource.indexBuffer.Get(), meshName + "LOD" + std::to_string(lodIndex) + "IndexBuffer");
 }
 
-Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
+Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
 	m_name(_name),
 	m_vertices(_vertices),
 	m_indices(_indices)
@@ -78,7 +78,7 @@ Mesh::Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, 
 	DirectX::SetName(m_indexBuffer.Get(), m_name + "IndexBuffer");
 }
 
-Mesh::Mesh(const std::string_view& _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
+Mesh::Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
 	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices))
 {
 	m_vertexBuffer = DirectX11::CreateBuffer(sizeof(Vertex) * m_vertices.size(), D3D11_BIND_VERTEX_BUFFER, m_vertices.data());

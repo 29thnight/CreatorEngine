@@ -16,6 +16,12 @@ void ShaderResourceSystem::Initialize()
 	m_isReloading = false;
 }
 
+void ShaderResourceSystem::Finalize()
+{
+	RemoveShaders();
+	HLSLCompiler::CleanUpCache();
+}
+
 void ShaderResourceSystem::LoadShaders()
 {
 	try

@@ -14,19 +14,17 @@
 #include "CharacterController.h"
 #include "RagdollPhysics.h"
 
-
-
-
 class PhysicsEventCallback;
 struct ColliderInfo;
  
 class PhysicX : public DLLCore::Singleton<PhysicX>
 {
+private:
 	friend class DLLCore::Singleton<PhysicX>;
 	using PolygonMesh = std::vector<std::vector<DirectX::SimpleMath::Vector3>>*;
-private:
 	PhysicX() = default;
 	~PhysicX() = default;
+
 public:
 	// IPhysicsSystem
 	//core
@@ -200,8 +198,8 @@ public:
 
 
 private:
-	physx::PxDefaultAllocator		m_allocator;
-	physx::PxDefaultErrorCallback	m_errorCallback;
+	physx::PxDefaultAllocator		m_allocator{};
+	physx::PxDefaultErrorCallback	m_errorCallback{};
 
 	
 	physx::PxPvd* pvd = nullptr;
@@ -217,43 +215,43 @@ private:
 	//physx::PxControllerManager* m_controllerManager = nullptr;
 	
 	//===========================================================================================
-	PhysicsEventCallback* m_eventCallback;
+	PhysicsEventCallback* m_eventCallback{};
 
-	unsigned int m_collisionMatrix[32];
+	unsigned int m_collisionMatrix[32]{};
 
-	std::vector<physx::PxActor*> m_removeActorList; //삭제할 액터들
+	std::vector<physx::PxActor*> m_removeActorList{}; //삭제할 액터들
 
 	//==================================================================================
 	//rigid body 관리용
-	std::unordered_map<unsigned int, RigidBody*> m_rigidBodyContainer; //rigid body 관리용
-	std::vector<RigidBody*> m_updateActors; //업데이트 할 액터들
+	std::unordered_map<unsigned int, RigidBody*> m_rigidBodyContainer{}; //rigid body 관리용
+	std::vector<RigidBody*> m_updateActors{}; //업데이트 할 액터들
 
 	//==================================================================================
 	//collision data 관리용
-	std::unordered_map<unsigned int, CollisionData*> m_collisionDataContainer; //collision data 관리용
-	std::vector<unsigned int>m_removeCollisionIds; //삭제할 collision data id들
+	std::unordered_map<unsigned int, CollisionData*> m_collisionDataContainer{}; //collision data 관리용
+	std::vector<unsigned int>m_removeCollisionIds{}; //삭제할 collision data id들
 
 	//==================================================================================
 	//character controller 관리용
-	physx::PxControllerManager* m_characterControllerManager;
-	std::unordered_map<unsigned int, CharacterController*> m_characterControllerContainer; //character controller 관리용
+	physx::PxControllerManager* m_characterControllerManager{};
+	std::unordered_map<unsigned int, CharacterController*> m_characterControllerContainer{}; //character controller 관리용
 
-	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_waittingCCTList; //대기중인 캐릭터 컨트롤러 리스트
-	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_updateCCTList; //업데이트 할 캐릭터 컨트롤러 리스트
+	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_waittingCCTList{}; //대기중인 캐릭터 컨트롤러 리스트
+	std::vector<std::pair<CharacterControllerInfo, CharacterMovementInfo>> m_updateCCTList{}; //업데이트 할 캐릭터 컨트롤러 리스트
 
 	//==================================================================================
 	//Ragdoll 관리용
-	std::unordered_map<unsigned int, RagdollPhysics*> m_ragdollContainer; //ragdoll 관리용
-	std::unordered_map<unsigned int, RagdollPhysics*> m_simulationRagdollContainer; //ragdoll 시뮬레이션 관리용
+	std::unordered_map<unsigned int, RagdollPhysics*> m_ragdollContainer{}; //ragdoll 관리용
+	std::unordered_map<unsigned int, RagdollPhysics*> m_simulationRagdollContainer{}; //ragdoll 시뮬레이션 관리용
 
 	//=================================================================================
 	//Debug data 관리용
-	std::unordered_map<unsigned int, PolygonMesh> mDebugPolygon;
+	std::unordered_map<unsigned int, PolygonMesh> mDebugPolygon{};
 
-	std::unordered_map<unsigned int, std::vector<unsigned int>> mDebugIndices;
-	std::unordered_map<unsigned int, std::vector<DirectX::SimpleMath::Vector3>> mDebugVertices;
+	std::unordered_map<unsigned int, std::vector<unsigned int>> mDebugIndices{};
+	std::unordered_map<unsigned int, std::vector<DirectX::SimpleMath::Vector3>> mDebugVertices{};
 
-	std::unordered_map<unsigned int, std::vector<std::pair<DirectX::SimpleMath::Vector3, DirectX::SimpleMath::Vector3>>> mDebugHeightField;
+	std::unordered_map<unsigned int, std::vector<std::pair<DirectX::SimpleMath::Vector3, DirectX::SimpleMath::Vector3>>> mDebugHeightField{};
 
 	void extractDebugConvexMesh(physx::PxRigidActor* body, physx::PxShape* shape,std::vector<std::vector<DirectX::SimpleMath::Vector3>>& debuPolygon);
 

@@ -6,7 +6,6 @@
 #include "Physx.h"
 #include "SoundManager.h"
 #include "Benchmark.hpp"
-#include "ImGuiLogger.h"
 #include "TimeSystem.h"
 #include "HotLoadSystem.h"
 #include "DataSystem.h"
@@ -15,13 +14,12 @@
 #include "EngineSetting.h"
 #include "CullingManager.h"
 #include "UIManager.h"
-#include "InputActionManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
 #include "EffectManager.h"
+#include "TagManager.h"
 #include "AIManager.h"
 #include "EffectProxyController.h"
-#include "ResourceAllocator.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -29,6 +27,8 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 std::atomic<bool> isGameToRender = false;
+std::atomic<bool> isCB_Thread_End = false;
+std::atomic<bool> isCE_Thread_End = false;
 
 DirectX11::Dx11Main::Dx11Main(const std::shared_ptr<DeviceResources>& deviceResources)	: m_deviceResources(deviceResources)
 {
@@ -52,6 +52,7 @@ void DirectX11::Dx11Main::Initialize()
     XMFLOAT3 extents = { 2000.f, 2000.f, 2000.f };
     BoundingBox fixedBounds(center, extents);
     CullingManagers->Initialize(fixedBounds, 3, 30);
+    TagManagers->Initialize();
 
     g_progressWindow->SetProgress(50);
     m_sceneRenderer = std::make_shared<SceneRenderer>(m_deviceResources);
@@ -134,6 +135,14 @@ void DirectX11::Dx11Main::Initialize()
 
     m_CB_Thread = std::thread([&]
     {
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (SUCCEEDED(hr))
+        {
+            // COM 객체 생성 및 사용
+
+            CoUninitialize();
+        }
+
         PROFILE_REGISTER_THREAD("[CB-Thread]");
         while (isGameToRender)
         {
@@ -142,10 +151,20 @@ void DirectX11::Dx11Main::Initialize()
                 CommandBuildThread();
             }
         }
+
+		isCB_Thread_End = true;
     });
 
     m_CE_Thread = std::thread([&]
     {
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (SUCCEEDED(hr))
+        {
+            // COM 객체 생성 및 사용
+
+            CoUninitialize();
+        }
+
         PROFILE_REGISTER_THREAD("[CE-Thread]");
         while (isGameToRender)
         {
@@ -168,6 +187,8 @@ void DirectX11::Dx11Main::Initialize()
             CoroutineManagers->yield_OnRender();
             CommandExecuteThread();
         }
+
+		isCE_Thread_End = true;
     });
 
     m_CB_Thread.detach();
@@ -177,9 +198,20 @@ void DirectX11::Dx11Main::Initialize()
 void DirectX11::Dx11Main::Finalize()
 {
     isGameToRender = false;
+    TagManagers->Finalize();
     SceneManagers->Decommissioning();
     EngineSettingInstance->SaveSettings();
+    EngineSettingInstance->renderBarrier.Finalize();
+
+    while(!isCB_Thread_End || !isCE_Thread_End)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+
     m_sceneRenderer->Finalize();
+    ShaderSystem->Finalize();
+    OnResizeReleaseEvent.Clear();
+	OnResizeEvent.Clear();
     m_deviceResources->RegisterDeviceNotify(nullptr);
     PROFILER_SHUTDOWN();
 }

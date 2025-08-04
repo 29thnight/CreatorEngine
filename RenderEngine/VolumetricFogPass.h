@@ -10,7 +10,7 @@ class ShadowMapPass;
 //public:
 //	VolumetricFogMain();
 //	~VolumetricFogMain();
-//	void Initialize(const std::string_view& fileName, UINT volumeSizeX, UINT volumeSizeY);
+//	void Initialize(std::string_view fileName, UINT volumeSizeX, UINT volumeSizeY);
 //	void Prepare();
 //	void Execute(RenderScene& scene, Camera& camera) override;
 //	void ControlPanel() override;
@@ -37,7 +37,7 @@ class VolumetricFogPass final : public IRenderPass
 public:
 	VolumetricFogPass();
 	~VolumetricFogPass();
-	void Initialize(const std::string_view& fileName);
+	void Initialize(std::string_view fileName);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -71,7 +71,7 @@ public:
 	ID3D11Texture3D* mFinalVoxelInjectionTexture3D{};
 
 	Texture* m_pShadowMap{};
-	UniqueTexturePtr m_pBlueNoiseTexture{};
+	Managed::UniquePtr<Texture> m_pBlueNoiseTexture{};
 
 	ID3D11ShaderResourceView* mTempVoxelInjectionTexture3DSRV[2];
 	ID3D11UnorderedAccessView* mTempVoxelInjectionTexture3DUAV[2];

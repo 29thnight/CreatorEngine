@@ -8,15 +8,15 @@
 using EffectCommandTypeQueue = concurrent_queue<EffectCommandType>;
 
 class EffectComponent;
-class EffectRenderProxy : public ManagedHeapObject
+class EffectRenderProxy : public Managed::HeapObject
 {
 public:
 	EffectRenderProxy() = default;
 	~EffectRenderProxy() = default;
 
 	void PushCommand(const EffectCommandType& type) { m_commandTypeQueue.push(type); }
-	void UpdateTempleteName(const std::string_view& templeteName) { m_templateName = templeteName;  }
-	void UpdateInstanceName(const std::string_view& instnaceedName) { m_instanceName = instnaceedName; }
+	void UpdateTempleteName(std::string_view templeteName) { m_templateName = templeteName;  }
+	void UpdateInstanceName(std::string_view instnaceedName) { m_instanceName = instnaceedName; }
 	void UpdatePosition(const Mathf::Vector3& pos) { m_commandPosition = pos; }
 	void UpdateRotation(const Mathf::Vector3& rot) { m_commandRotation = rot;  }
 	void UpdateTimeScale(const float& timeScale) { m_timeScale = timeScale; }

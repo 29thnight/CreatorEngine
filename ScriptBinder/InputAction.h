@@ -86,7 +86,7 @@ public:
 			}
 			else if (inputType == InputType::GamePad)
 			{
-				SetControllerButton(ControllerButton::LEFT_Thumbstick);
+				SetControllerButton(ControllerButton::LEFT_THUMB);
 			}
 			else if (inputType == InputType::Mouse) //»ç½Ç»ó ¸ø¾¸ ¤·¤·
 			{

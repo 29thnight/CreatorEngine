@@ -39,6 +39,27 @@ RenderPassData::RenderPassData() : m_shadowCamera(false)
 RenderPassData::~RenderPassData()
 {
 	ClearRenderQueue();
+	ClearShadowRenderQueue();
+	ClearCullDataBuffer();
+	ClearShadowRenderDataBuffer();
+	m_isInitalized = false;
+
+	m_renderTarget.reset();
+	m_depthStencil.reset();
+	for (auto& srv : sliceSRV)
+	{
+		Memory::SafeDelete(srv);
+	}
+
+	for (auto& dsv : m_shadowMapDSVarr)
+	{
+		Memory::SafeDelete(dsv);
+	}
+
+	m_shadowMapTexture.reset();
+	m_SSRPrevTexture.reset();
+	m_ViewBuffer.Reset();
+	m_ProjBuffer.Reset();
 }
 
 void RenderPassData::Initalize(uint32 index)
@@ -57,7 +78,6 @@ void RenderPassData::Initalize(uint32 index)
 	);
 	m_renderTarget.swap(renderTexture);
 
-
 	auto depthStencil = TextureHelper::CreateDepthTexture(
 		DeviceState::g_ClientRect.width,
 		DeviceState::g_ClientRect.height,
@@ -70,7 +90,7 @@ void RenderPassData::Initalize(uint32 index)
 	m_shadowRenderQueue.reserve(800);
 
 	ShadowMapRenderDesc& desc = RenderScene::g_shadowMapDesc;
-	Texture* shadowMapTexture = Texture::CreateArray(
+	auto shadowMapTexture = Texture::CreateManagedArray(
 		desc.m_textureWidth,
 		desc.m_textureHeight,
 		"Shadow Map",
@@ -114,7 +134,7 @@ void RenderPassData::Initalize(uint32 index)
 	//안에서 배열은 3으로 고정중 필요하면 수정
 	shadowMapTexture->CreateSRV(DXGI_FORMAT_R32_FLOAT, D3D11_SRV_DIMENSION_TEXTURE2DARRAY);
 	shadowMapTexture->m_textureType = TextureType::ImageTexture;
-	m_shadowMapTexture = MakeUniqueTexturePtr(shadowMapTexture);
+	m_shadowMapTexture.swap(shadowMapTexture);
 
 	XMMATRIX identity = XMMatrixIdentity();
 

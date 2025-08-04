@@ -1,5 +1,4 @@
 #include "SkeletonLoader.h"
-#include "ResourceAllocator.h"
 
 SkeletonLoader::SkeletonLoader(const aiScene* scene) :
     m_scene(scene)
@@ -13,7 +12,7 @@ SkeletonLoader::~SkeletonLoader()
 
 Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
 {
-    Skeleton* skeleton = AllocateResource<Skeleton>();
+    Skeleton* skeleton = new Skeleton();
     aiNode* boneRoot = FindBoneRoot(root);
 
     if (boneRoot == nullptr)
@@ -23,7 +22,7 @@ Skeleton* SkeletonLoader::GenerateSkeleton(aiNode* root)
     }
 
     // Parent is not a bone recorded
-    Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixTranspose(XMMATRIX(&root->mTransformation.a1)));
+    Bone* parent = new Bone(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixTranspose(XMMATRIX(&root->mTransformation.a1)));
     //Bone* parent = AllocateResource<Bone>(std::string(boneRoot->mName.data), m_bones.size(), XMMatrixIdentity());
     m_bones.push_back(parent);
 
@@ -47,7 +46,7 @@ int SkeletonLoader::AddBone(aiBone* _bone)
     std::string boneName(_bone->mName.data);
     if (m_boneMap.find(boneName) == m_boneMap.end())
     {
-        Bone* bone = AllocateResource<Bone>(boneName, m_bones.size(), XMMatrixTranspose(XMMATRIX(&_bone->mOffsetMatrix.a1)));
+        Bone* bone = new Bone(boneName, m_bones.size(), XMMatrixTranspose(XMMATRIX(&_bone->mOffsetMatrix.a1)));
         m_bones.push_back(bone);
         m_boneMap.emplace(boneName, bone);
     }

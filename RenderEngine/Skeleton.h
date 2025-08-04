@@ -17,7 +17,7 @@ AUTO_REGISTER_ENUM(BoneRegion)
 class Bone;
 class Animation;
 class Socket;
-class Skeleton
+class Skeleton : public Managed::HeapObject
 {
 public:
    ReflectSkeleton
@@ -39,10 +39,10 @@ public:
 	static constexpr uint32 MAX_BONES{ 512 };
 
 	bool HasSocket() { return !m_sockets.empty(); }
-	void MakeSocket(const std::string_view& socketName);
-	Socket* FindSocket(const std::string_view& socketName);
-	void DeleteSocket(const std::string_view& socketName);
-	Bone* FindBone(const std::string_view& _name);
+	void MakeSocket(std::string_view socketName);
+	Socket* FindSocket(std::string_view socketName);
+	void DeleteSocket(std::string_view socketName);
+	Bone* FindBone(std::string_view _name);
 
 	void MarkRegionSkeleton();
 	void MarkRegion(Bone* bone, BoneRegion region);
@@ -50,7 +50,7 @@ public:
 
 std::string ToLower(std::string boneName);
 
-class Bone
+class Bone : public Managed::HeapObject
 {
 public:
 	std::string m_name{};

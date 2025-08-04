@@ -12,7 +12,6 @@
 #include "Core.Random.h"
 #include "PositionMapPass.h"
 #include "LightmapPass.h"
-#include "ResourceAllocator.h"
 #include "ProgressWindow.h"
 
 namespace lm {
@@ -302,25 +301,25 @@ namespace lm {
 	{
 		for (auto& lightmap : lightmaps)
 		{
-			DeallocateResource(lightmap);
+			delete lightmap;
 		}
 		for (auto& indirect : indirectMaps)
 		{
-			DeallocateResource(indirect);
+			delete indirect;
 		}
 		for (auto& env : environmentMaps)
 		{
-			DeallocateResource(env);
+			delete env;
 		}
 		for (auto& dir : directionalMaps)
 		{
-			DeallocateResource(dir);
+			delete dir;
 		}
 		lightmaps.clear();
 		indirectMaps.clear();
 		environmentMaps.clear();
 		directionalMaps.clear();
-		DeallocateResource(tempTexture);
+		delete tempTexture;
 		tempTexture = nullptr;
 
 		/*structuredLightBufferSRV->Release();

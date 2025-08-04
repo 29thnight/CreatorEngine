@@ -131,4 +131,13 @@ virtual const Meta::Type& ScriptReflect()\
     }\
     virtual ~T() = default; \
 
+#define ANIBEHAVIOR_BODY(T) \
+    T() \
+    { \
+        m_name = #T; \
+        m_typeID = TypeTrait::GUIDCreator::GetTypeID<AniBehavior>(); \
+        m_scriptTypeID = TypeTrait::GUIDCreator::GetTypeID<T>(); \
+    }\
+    virtual ~T() = default; \
+
 #pragma endregion

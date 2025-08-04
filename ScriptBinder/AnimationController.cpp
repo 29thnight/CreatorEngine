@@ -1,6 +1,6 @@
 #include "AnimationController.h"
 #include "AnimationState.h"
-#include "AniBehaviour.h"
+#include "AniBehavior.h"
 #include "Animator.h"
 #include "Skeleton.h"
 #include "AvatarMask.h"
@@ -12,8 +12,7 @@ void AnimationController::SetNextState(std::string stateName)
 
 AnimationController::~AnimationController()
 {
-	if (m_nodeEditor)
-		delete m_nodeEditor;
+	Memory::SafeDelete(m_nodeEditor);
 	DeleteAvatarMask();
 }
 

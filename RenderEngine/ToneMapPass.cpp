@@ -5,7 +5,6 @@
 #include "DeviceState.h"
 #include "Camera.h"
 #include "TimeSystem.h"
-#include "ResourceAllocator.h"
 
 ToneMapPass::ToneMapPass()
 {
@@ -82,14 +81,12 @@ ToneMapPass::~ToneMapPass()
 
     for (auto* tex : m_downsampleTextures)
     {
-        DeallocateResource(tex);
+        delete tex;
     }
     m_downsampleTextures.clear();
-
-	//Memory::SafeDelete(m_pAutoExposureReadBuffer);
 }
 
-void ToneMapPass::Initialize(Texture* dest)
+void ToneMapPass::Initialize(Managed::SharedPtr<Texture> dest)
 {
     m_DestTexture = dest;
 }
@@ -105,80 +102,84 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
-	float deltaTime = Time->GetElapsedSeconds();
-	static float elapsedTime = 0.0f;
+    float deltaTime = Time->GetElapsedSeconds();
 	static float targetExposure = 1.0f;
 	static float currentExposure = 1.0f;
 
-    elapsedTime += deltaTime;
-
 	if (!camera.m_avoidRenderPass.Test((flag)RenderPipelinePass::AutoExposurePass))
     {
-        if (elapsedTime >= 1.0f)
+        DirectX11::CSSetShader(m_pAutoExposureEvalCS->GetShader(), 0, 0);
+
+        if (m_isAbleAutoExposure && !m_downsampleTextures.empty())
         {
-            elapsedTime = 0.0f;
-            DirectX11::CSSetShader(m_pAutoExposureEvalCS->GetShader(), 0, 0);
-
-            if (m_isAbleAutoExposure && !m_downsampleTextures.empty())
+            ID3D11ShaderResourceView* currentSRV = renderData->m_renderTarget->m_pSRV;
+            const UINT offsets[]{ 0 };
+            for (auto* tex : m_downsampleTextures)
             {
-                ID3D11ShaderResourceView* currentSRV = renderData->m_renderTarget->m_pSRV;
-                const UINT offsets[]{ 0 };
-                for (auto* tex : m_downsampleTextures)
-                {
-                    uint32_t groupX = (tex->GetWidth() + 31) / 32;
-                    uint32_t groupY = (tex->GetHeight() + 31) / 32;
+                uint32_t groupX = (tex->GetWidth() + 31) / 32;
+                uint32_t groupY = (tex->GetHeight() + 31) / 32;
 
-                    DirectX11::CSSetShaderResources(0, 1, &currentSRV);
-                    DirectX11::CSSetUnorderedAccessViews(0, 1, &tex->m_pUAV, offsets);
-                    DirectX11::Dispatch(groupX, groupY, 1);
-                    ID3D11ShaderResourceView* nullSRV = nullptr;
-                    ID3D11UnorderedAccessView* nullUAV = nullptr;
-                    DirectX11::CSSetShaderResources(0, 1, &nullSRV);
-                    DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
-                    currentSRV = tex->m_pSRV;
-                }
-
-                ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
-                DeviceState::g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
-                D3D11_MAPPED_SUBRESOURCE mapped{};
-                if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(
-                    m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
-                {
-                    const float lumEpsilon = 0.05f;
-                    float luminance = *reinterpret_cast<float*>(mapped.pData);
-                    DeviceState::g_pDeviceContext->Unmap(m_readbackTexture[m_readIndex].Get(), 0);
-
-                    float EV100 = log2((m_fNumber * m_fNumber) / m_shutterTime * (100.0f / m_ISO));
-                    float exposureManual = 1.0f / pow(2.0f, EV100 + m_exposureCompensation);
-                    float targetLuminance = 0.5f; // 중간 회색 기준값 (원하는 값으로 조정 가능)
-                    float exposureAuto = targetLuminance / (luminance + 1e-4f);
-
-                    float exposureFinal = exposureManual * exposureAuto;
-
-                    if (fabs(exposureFinal - targetExposure) > lumEpsilon)
-                    {
-                        targetExposure = exposureFinal;
-                    }
-                }
-
-                std::swap(m_readIndex, m_writeIndex);
+                DirectX11::CSSetShaderResources(0, 1, &currentSRV);
+                DirectX11::CSSetUnorderedAccessViews(0, 1, &tex->m_pUAV, offsets);
+                DirectX11::Dispatch(groupX, groupY, 1);
+                ID3D11ShaderResourceView* nullSRV = nullptr;
+                ID3D11UnorderedAccessView* nullUAV = nullptr;
+                DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+                DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+                currentSRV = tex->m_pSRV;
             }
+
+            ID3D11Resource* lastResource = m_downsampleTextures.back()->m_pTexture;
+            DeviceState::g_pDeviceContext->CopyResource(m_readbackTexture[m_writeIndex].Get(), lastResource);
+            D3D11_MAPPED_SUBRESOURCE mapped{};
+            if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(
+                m_readbackTexture[m_readIndex].Get(), 0, D3D11_MAP_READ, 0, &mapped)))
+            {
+                const float lumEpsilon = 0.05f;
+                float luminance = *reinterpret_cast<float*>(mapped.pData);
+                DeviceState::g_pDeviceContext->Unmap(m_readbackTexture[m_readIndex].Get(), 0);
+
+                float EV100 = log2((m_fNumber * m_fNumber) / m_shutterTime * (100.0f / m_ISO));
+                float exposureManual = 1.0f / pow(2.0f, EV100 + m_exposureCompensation);
+                float targetLuminance = 0.5f; // 중간 회색 기준값 (원하는 값으로 조정 가능)
+                float exposureAuto = targetLuminance / (luminance + 1e-4f);
+
+                float exposureFinal = exposureManual * exposureAuto;
+
+                if (fabs(exposureFinal - targetExposure) > lumEpsilon)
+                {
+                    targetExposure = exposureFinal;
+                }
+            }
+
+            std::swap(m_readIndex, m_writeIndex);
+        }
+        else
+        {
+            targetExposure = m_toneMapConstant.toneMapExposure;
         }
     }
 
-    constexpr float epsilon = 0.01f; // Small value to avoid oscillation
-    float diff = fabs(targetExposure - m_toneMapConstant.toneMapExposure);
-
-    if (diff > epsilon)
+    if (m_isAbleAutoExposure)
     {
-        float speed = (targetExposure > m_toneMapConstant.toneMapExposure) ? m_speedBrightness : m_speedDarkness;
+        constexpr float epsilon = 0.01f; // Small value to avoid oscillation
+        float diff = fabs(targetExposure - m_toneMapConstant.toneMapExposure);
 
-        currentExposure = Mathf::Lerp(m_toneMapConstant.toneMapExposure, targetExposure, speed * deltaTime);
+        if (diff > epsilon)
+        {
+            float speed = (targetExposure > m_toneMapConstant.toneMapExposure) ? m_speedBrightness : m_speedDarkness;
+            float t = std::clamp(speed * deltaTime, 0.0f, 1.0f);
+            currentExposure = Mathf::Lerp(m_toneMapConstant.toneMapExposure, targetExposure, t);
+        }
+        else
+        {
+            currentExposure = targetExposure; // Snap to target if close enough
+        }
     }
     else
     {
-		currentExposure = targetExposure; // Snap to target if close enough
-    }
+        currentExposure = m_toneMapConstant.toneMapExposure;
+	}
 
     m_toneMapConstant.toneMapExposure = currentExposure;
 	m_toneMapConstant.toneMapExposure = std::max(m_toneMapConstant.toneMapExposure, 0.01f); // Ensure exposure is not zero
@@ -189,13 +190,13 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-    ID3D11RenderTargetView* renderTargets[] = { m_DestTexture->GetRTV() };
+    ID3D11RenderTargetView* renderTargets[] = { m_DestTexture.lock()->GetRTV()};
     DirectX11::OMSetRenderTargets(1, renderTargets, nullptr);
 
     DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);
     DirectX11::Draw(4, 0);
 
-    DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_DestTexture->m_pTexture);
+    DirectX11::CopyResource(renderData->m_renderTarget->m_pTexture, m_DestTexture.lock()->m_pTexture);
 
     ID3D11ShaderResourceView* nullSRV = nullptr;
     DirectX11::PSSetShaderResources(0, 1, &nullSRV);
@@ -211,34 +212,34 @@ void ToneMapPass::ControlPanel()
         setting.isAbleToneMap = m_isAbleToneMap;
     }
     ImGui::SetNextWindowFocus();
-    if (ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10"))
+    if (ImGui::Combo("ToneMap Type", (int*)&m_toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10\0ACESFlim"))
     {
         setting.toneMapType = (int)m_toneMapType;
     }
     ImGui::Separator();
     ImGui::Text("Auto Exposure Settings");
-        if (ImGui::Checkbox("Use Auto Exposure", &m_isAbleAutoExposure))
-        {
-                setting.isAbleAutoExposure = m_isAbleAutoExposure;
-        }
-    if (ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", ImGuiSliderFlags_NoInput))
+    if (ImGui::Checkbox("Use Auto Exposure", &m_isAbleAutoExposure))
+    {
+        setting.isAbleAutoExposure = m_isAbleAutoExposure;
+    }
+    if (ImGui::DragFloat("ToneMap Exposure", &m_toneMapConstant.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", m_isAbleAutoExposure? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None))
     {
         setting.toneMapExposure = m_toneMapConstant.toneMapExposure;
     }
     ImGui::Separator();
 	ImGui::Text("Auto Exposure Settings");
-        if (ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f))
-                setting.fNumber = m_fNumber;
-        if (ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f))
-                setting.shutterTime = m_shutterTime;
-        if (ImGui::DragFloat("ISO", &m_ISO, 50.0f, 50.0f, 6400.0f))
-                setting.ISO = m_ISO;
-        if (ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f))
-                setting.exposureCompensation = m_exposureCompensation;
-        if (ImGui::DragFloat("Speed Brightness", &m_speedBrightness, 0.01f, 0.1f, 10.0f))
-                setting.speedBrightness = m_speedBrightness;
-        if (ImGui::DragFloat("Speed Darkness", &m_speedDarkness, 0.01f, 0.1f, 10.0f))
-                setting.speedDarkness = m_speedDarkness;
+    if (ImGui::DragFloat("fNumber", &m_fNumber, 0.01f, 1.0f, 32.0f))
+            setting.fNumber = m_fNumber;
+    if (ImGui::DragFloat("Shutter Time", &m_shutterTime, 0.001f, 0.000125f, 30.0f))
+            setting.shutterTime = m_shutterTime;
+    if (ImGui::DragFloat("ISO", &m_ISO, 50.0f, 50.0f, 6400.0f))
+            setting.ISO = m_ISO;
+    if (ImGui::DragFloat("Exposure Compensation", &m_exposureCompensation, 0.01f, -5.0f, 5.0f))
+            setting.exposureCompensation = m_exposureCompensation;
+    if (ImGui::DragFloat("Speed Brightness", &m_speedBrightness, 0.01f, 0.1f, 10.0f))
+            setting.speedBrightness = m_speedBrightness;
+    if (ImGui::DragFloat("Speed Darkness", &m_speedDarkness, 0.01f, 0.1f, 10.0f))
+            setting.speedDarkness = m_speedDarkness;
     ImGui::PopID();
 }
 
@@ -246,7 +247,7 @@ void ToneMapPass::PrepareDownsampleTextures(uint32_t width, uint32_t height)
 {
     for (auto* tex : m_downsampleTextures)
     {
-        DeallocateResource(tex);
+        delete tex;
     }
     m_downsampleTextures.clear();
 
@@ -279,19 +280,19 @@ void ToneMapPass::Resize(uint32_t width, uint32_t height)
 
 void ToneMapPass::ApplySettings(const ToneMapPassSetting& setting)
 {
-    m_isAbleAutoExposure = setting.isAbleAutoExposure;
-    m_isAbleToneMap = setting.isAbleToneMap;
-    m_fNumber = setting.fNumber;
-    m_shutterTime = setting.shutterTime;
-    m_ISO = setting.ISO;
-    m_exposureCompensation = setting.exposureCompensation;
-    m_speedBrightness = setting.speedBrightness;
-    m_speedDarkness = setting.speedDarkness;
-    m_toneMapType = ToneMapType(setting.toneMapType);
-    m_toneMapConstant.filmSlope = setting.filmSlope;
-    m_toneMapConstant.filmToe = setting.filmToe;
-    m_toneMapConstant.filmShoulder = setting.filmShoulder;
-    m_toneMapConstant.filmBlackClip = setting.filmBlackClip;
-    m_toneMapConstant.filmWhiteClip = setting.filmWhiteClip;
-    m_toneMapConstant.toneMapExposure = setting.toneMapExposure;
+    m_isAbleAutoExposure                = setting.isAbleAutoExposure;
+    m_isAbleToneMap                     = setting.isAbleToneMap;
+    m_fNumber                           = setting.fNumber;
+    m_shutterTime                       = setting.shutterTime;
+    m_ISO                               = setting.ISO;
+    m_exposureCompensation              = setting.exposureCompensation;
+    m_speedBrightness                   = setting.speedBrightness;
+    m_speedDarkness                     = setting.speedDarkness;
+    m_toneMapType                       = static_cast<ToneMapType>(setting.toneMapType);
+    m_toneMapConstant.filmSlope         = setting.filmSlope;
+    m_toneMapConstant.filmToe           = setting.filmToe;
+    m_toneMapConstant.filmShoulder      = setting.filmShoulder;
+    m_toneMapConstant.filmBlackClip     = setting.filmBlackClip;
+    m_toneMapConstant.filmWhiteClip     = setting.filmWhiteClip;
+    m_toneMapConstant.toneMapExposure   = setting.toneMapExposure;
 }

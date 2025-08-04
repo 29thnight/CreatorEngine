@@ -1,11 +1,10 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "Object.h"
 #include "ReflectionYml.h"
 #include "DLLAcrossSingleton.h"
 #include "Core.ThreadPool.h"
 
 class Scene;
-class Object;
 class MeshRenderer;
 class RenderScene;
 class InputActionManager;
@@ -34,23 +33,23 @@ public:
     Scene* GetActiveScene() { return m_activeScene; }
     Scene* GetScene(size_t index) { return m_scenes[index]; }
 
-    Scene* CreateScene(const std::string_view& name = "SampleScene");
-	Scene* SaveScene(const std::string_view& name = "SampleScene");
-    Scene* LoadSceneImmediate(const std::string_view& name = "SampleScene");
-	Scene* LoadScene(const std::string_view& name = "SampleScene");
+    Scene* CreateScene(std::string_view name = "SampleScene");
+	Scene* SaveScene(std::string_view name = "SampleScene");
+    Scene* LoadSceneImmediate(std::string_view name = "SampleScene");
+	Scene* LoadScene(std::string_view name = "SampleScene");
 
-	void SaveSceneAsync(const std::string_view& name = "SampleScene");
-	std::future<Scene*> LoadSceneAsync(const std::string_view& name = "SampleScene");
-    void LoadSceneAsyncAndWaitCallback(const std::string_view& name = "SampleScene");
+	void SaveSceneAsync(std::string_view name = "SampleScene");
+	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
+    void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
 
     void WaitForSceneLoad();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
-    void AddDontDestroyOnLoad(Object* objPtr);
+    void AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
     
 	std::vector<Scene*>& GetScenes() { return m_scenes; }
-	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
+	std::vector<std::shared_ptr<Object>>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
 	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
@@ -106,7 +105,7 @@ private:
 
 private:
     std::vector<Scene*>                 m_scenes{};
-    std::vector<Object*>                m_dontDestroyOnLoadObjects{};
+    std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
 	std::string                         m_LoadSceneName{};

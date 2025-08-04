@@ -16,7 +16,7 @@ class TerrainMesh
 {
 public:
     // meshWidth: 버텍스가 m_width × m_height로 들어왔다고 가정
-    TerrainMesh(const std::string_view& name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
+    TerrainMesh(std::string_view name, const std::vector<Vertex>& vertices, const std::vector<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
         D3D11_BUFFER_DESC vbDesc = {};
@@ -87,7 +87,6 @@ public:
     const std::vector<Vertex>& GetVertices() { return m_vertices; }
     const std::vector<uint32>& GetIndices() { return m_indices; }
 
-#ifndef BUILD_FLAG
     // 빌드 모드가 아닐 때만 사용
     // 전체 버텍스 업데이트
     void UpdateVertexBuffer(const Vertex* srcVertices, uint32_t vertexCount)
@@ -133,7 +132,6 @@ public:
 
         context->Unmap(m_vertexBuffer.Get(), 0);
     }
-#endif !BUILD_FLAG
 
 private:
     std::string m_name;

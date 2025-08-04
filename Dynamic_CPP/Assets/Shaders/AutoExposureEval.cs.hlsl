@@ -3,7 +3,7 @@
 Texture2D<float4> g_InputTexture : register(t0);
 RWTexture2D<float> g_OutputTexture : register(u0);
 
-static const float3 LuminanceFactors = float3(0.2126, 0.7152, 0.0722);
+static const float3 LuminanceFactors = float3(0.299f, 0.587f, 0.114f);
 
 [numthreads(32, 32, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -34,9 +34,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 float luminance;
                 float4 sampledColor = g_InputTexture[sampleCoord];
                 
-                if (sampledColor.g != 0 && sampledColor.b != 0)
+                if (sampledColor.g != 0 || sampledColor.b != 0)
                 {
-                    luminance = dot(sampledColor.rgb, LuminanceFactors);
+                    luminance = max(dot(sampledColor.rgb, LuminanceFactors), 0.0001f);
                 }
                 else
                 {

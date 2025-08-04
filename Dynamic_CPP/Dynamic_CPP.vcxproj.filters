@@ -180,11 +180,17 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="AniBehaviourFactory.h">
+		<ClInclude Include="AniBehaviorFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
 		<ClInclude Include="Easing.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewAniBehavior2.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\NewAniBehavior.h">
+			<Filter>Script</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
@@ -319,6 +325,12 @@
 		</ClInclude>
 		<ClCompile Include="Assets\Script\Weapon.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewAniBehavior2.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
+			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>

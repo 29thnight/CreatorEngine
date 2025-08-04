@@ -4,7 +4,7 @@
 #include "Mesh.h"
 #include "Sampler.h"
 #include "RenderableComponents.h"
-#include "ResourceAllocator.h"
+
 struct alignas(16) PositionMapBuffer
 {
 	int positionMapWidth;
@@ -199,16 +199,16 @@ void PositionMapPass::ClearTextures()
 {
 	for (auto& texture : m_positionMapTextures)
 	{
-		DeallocateResource(texture.second);
+		delete texture.second;
 	}
 	m_positionMapTextures.clear();
 	for (auto& texture : m_normalMapTextures)
 	{
-		DeallocateResource(texture.second);
+		delete texture.second;
 	}
 	m_normalMapTextures.clear();
 	
-	DeallocateResource(tempTexture);
+	delete tempTexture;
 	tempTexture = nullptr;
 }
 

@@ -2,15 +2,14 @@
 #pragma once
 #include "LogSink.h"
 #include "ClassProperty.h"
+#include "DLLAcrossSingleton.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <imgui.h>
 
-class DebugClass : public Singleton<DebugClass>
+class DebugClass : public DLLCore::Singleton<DebugClass>
 {
 private:
-	friend class Singleton;
+	friend class DLLCore::Singleton<DebugClass>;
     DebugClass() = default;
 	~DebugClass() = default;
 
@@ -20,32 +19,32 @@ public:
 	void Initialize();
 	void Finalize();
 
-	void LogWarning(const std::string_view& message)
+	void LogWarning(std::string_view message)
 	{
 		spdlog::warn(message);
 	}
 
-	void Log(const std::string_view& message)
+	void Log(std::string_view message)
 	{
 		spdlog::info(message);
 	}
 
-	void LogError(const std::string_view& message)
+	void LogError(std::string_view message)
 	{
 		spdlog::error(message);
 	}
 
-	void LogDebug(const std::string_view& message)
+	void LogDebug(std::string_view message)
 	{
 		spdlog::debug(message);
 	}
 
-	void LogTrace(const std::string_view& message)
+	void LogTrace(std::string_view message)
 	{
 		spdlog::trace(message);
 	}
 
-	void LogCritical(const std::string_view& message)
+	void LogCritical(std::string_view message)
 	{
 		spdlog::critical(message);
 	}
@@ -86,30 +85,20 @@ public:
 	}
 };
 
-inline auto& Debug = DebugClass::GetInstance();
+static auto Debug = DebugClass::GetInstance();
 
 namespace Log
 {
 	inline void Initialize() 
     {
+		DebugClass::GetInstance();
 		Debug->Initialize();
 	}
 
 	inline void Finalize()
 	{
 		Debug->Finalize();
-
+		DebugClass::Destroy();
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
-
-    inline ImVec4 GetColorForLevel(spdlog::level::level_enum level) 
-    {
-        switch (level) 
-        {
-        case spdlog::level::info: return { 1.0f, 1.0f, 1.0f, 1.0f };
-        case spdlog::level::warn: return { 1.0f, 1.0f, 0.0f, 1.0f };
-        case spdlog::level::err:  return { 1.0f, 0.3f, 0.3f, 1.0f };
-        default: return { 1.0f, 1.0f, 1.0f, 1.0f };
-        }
-    }
 }

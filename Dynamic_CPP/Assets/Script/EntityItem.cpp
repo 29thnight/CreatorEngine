@@ -9,6 +9,7 @@
 #include "RigidBodyComponent.h"
 #include "Player.h"
 
+#include "GameObject.h"
 #include "TweenManager.h"
 
 using namespace Mathf;
@@ -47,6 +48,12 @@ void EntityItem::Start()
 
 void EntityItem::OnTriggerEnter(const Collision& collision)
 {
+	if (collision.otherObj->m_tag == "Rock")
+	{
+		GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+		m_state = EItemState::FALLED;
+		std::cout << collision.otherObj->m_name.ToString() << "OnTriggerEnter Item" << std::endl;
+	}
 	//std::cout << "OnTriggerEnter Item" << std::endl;
 }
 
@@ -57,6 +64,7 @@ void EntityItem::OnTriggerExit(const Collision& collision)
 
 void EntityItem::OnCollisionEnter(const Collision& collision)
 {
+	
 }
 
 void EntityItem::OnCollisionExit(const Collision& collision)
@@ -131,7 +139,7 @@ void EntityItem::Update(float tick)
 			}
 			else
 			{
-				GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+				GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
 				speed = 2.f;
 				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -162,7 +170,8 @@ void EntityItem::Update(float tick)
 				}
 				else
 				{
-					GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+
+					GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
 					speed = 2.f;
 					rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 					rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -196,13 +205,18 @@ void EntityItem::Update(float tick)
 		}
 		else
 		{
-			GetOwner()->GetComponent<BoxColliderComponent>()->SetColliderType(EColliderType::COLLISION);
+			GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
 			speed = 2.f;
 			rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 			rigid->SetAngularVelocity(Mathf::Vector3::Zero);
 			m_state = EItemState::NONE;
 
 		};
+	}
+
+	if (m_state == EItemState::FALLED)
+	{
+		//Áß·Â¿¡ÀÇÇØ ¶³¾îÁü
 	}
 	if (m_state == EItemState::NONE)
 	{
@@ -219,7 +233,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
 	m_state = EItemState::DROPPED;
 	timer = 0.f;
 	speed = 4.0f;
-	Mathf::Vector3 offset = { ownerForward.x * distance,0, ownerForward.z * distance };
+	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
 	endPos.y = 0.01;
 }
@@ -228,7 +242,7 @@ void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::THROWN;
 	timer = 0.f;
-	Mathf::Vector3 offset = {ownerForward.x * distance,0, ownerForward.z * distance };
+	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
 	endPos.y = 0.01;
 }

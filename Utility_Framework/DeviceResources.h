@@ -1,7 +1,7 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "Core.Definition.h"
-#include "Delegate.h"
+//#include "Delegate.h"
 
 using namespace Microsoft::WRL;
 

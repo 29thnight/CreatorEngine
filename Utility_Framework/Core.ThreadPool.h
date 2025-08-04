@@ -81,9 +81,24 @@ public:
 
     int GetThreadCount() const { return m_numThreads; }
 
+    void SetThreadInitCallback(std::function<void()> callback)
+    {
+        m_threadInitCallback = std::move(callback);
+    }
+
 private:
     void WorkerLoop(int threadIndex)
     {
+        if (m_threadInitCallback)
+        {
+            static thread_local bool s_initialized = [&]()
+            {
+                m_threadInitCallback();
+                return true;
+            }();
+            (void)s_initialized;
+        }
+
         while (!m_exitFlag.load(std::memory_order_acquire))
         {
             m_semaphore->acquire();
@@ -118,4 +133,6 @@ private:
     HANDLE m_waitEvent = nullptr;
     DWORD_PTR m_affinityMask = 0;
     int m_threadPriority = THREAD_PRIORITY_NORMAL;
+
+    std::function<void()> m_threadInitCallback;
 };

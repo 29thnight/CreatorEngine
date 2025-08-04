@@ -4,6 +4,7 @@
 #include "DeviceResources.h"
 #include "Texture.h"
 #include "Camera.generated.h"
+#include "BitFlag.h"
 
 #ifdef DYNAMICCPP_EXPORTS
 struct ID3D11Buffer
@@ -141,6 +142,20 @@ private:
 	}
 	~CameraContainer() = default;
 	friend class Singleton<CameraContainer>;
+
+public:
+	void Finalize()
+	{
+		for (auto& camera : m_cameras)
+		{
+			if (nullptr != camera)
+			{
+				delete camera;
+				camera = nullptr;
+			}
+		}
+		m_cameras.clear();
+	}
 
 public:
 	int AddCamera(Camera* camera)

@@ -4,13 +4,14 @@
 CoreWindow* CoreWindow::s_instance = nullptr;
 CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
 DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
-
+#ifndef BUILD_FLAG
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
+#endif // !BUILD_FLAG
 LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     CoreWindow* self = nullptr;
 
+#ifndef BUILD_FLAG
     if (message == WM_SETCURSOR)
     {
         // 커서 설정
@@ -25,6 +26,7 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
         WinProcProxy::GetInstance()->PushMessage(hWnd, message, wParam, lParam);
     }
+#endif // !BUILD_FLAG
 
     if (message == WM_NCCREATE)
     {

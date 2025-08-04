@@ -6,6 +6,7 @@
 #include "Core.Memory.hpp"
 #include "DirectXColors.h"
 #include "DeviceState.h"
+
 using namespace DirectX;
 
 namespace DisplayMetrics
@@ -406,11 +407,19 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
         swapChainDesc.SampleDesc.Quality = 0;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
-        swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
+        swapChainDesc.BufferCount = 3;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
         swapChainDesc.Scaling = scaling;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+
+        DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
+
+        swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+        swapChainFullscreenDesc.RefreshRate.Denominator = 1;
+        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+        swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+        swapChainFullscreenDesc.Windowed = TRUE;
 
         DirectX11::ThrowIfFailed(
             m_d3dDevice.As(&m_dxgiDevice)
@@ -449,7 +458,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 		DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
         DirectX11::ThrowIfFailed(
-            m_dxgiDevice->SetMaximumFrameLatency(1)
+            m_dxgiDevice->SetMaximumFrameLatency(3)
         );
 
         ComPtr<ID3D11Texture2D1> backBuffer;
@@ -532,7 +541,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 			)
 		);
 
-		DirectX::SetName(m_DepthStencilViewSRV.Get(), "RenderTargetViewSRV");
+		DirectX::SetName(m_DepthStencilViewSRV.Get(), "DepthStencilViewSRV");
 
         CD3D11_RASTERIZER_DESC rasterizerDesc = CD3D11_RASTERIZER_DESC( D3D11_DEFAULT );
 		DirectX11::ThrowIfFailed(
@@ -614,7 +623,7 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
     swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
-    swapChainDesc.BufferCount = 2;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
+    swapChainDesc.BufferCount = 3;									// 이중 버퍼링을 사용하여 대기 시간을 최소화합니다.
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.Flags = 0;
     swapChainDesc.Scaling = scaling;
@@ -640,11 +649,6 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
         )
     );
 
-    dxgiFactory->MakeWindowAssociation(
-        m_window->GetHandle(),
-        DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER
-    );
-
     DirectX11::ThrowIfFailed(
         swapChain.As(&m_swapChain)
     );
@@ -652,7 +656,7 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
     DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
     DirectX11::ThrowIfFailed(
-        m_dxgiDevice->SetMaximumFrameLatency(1)
+        m_dxgiDevice->SetMaximumFrameLatency(3)
     );
 
     ComPtr<ID3D11Texture2D1> backBuffer;

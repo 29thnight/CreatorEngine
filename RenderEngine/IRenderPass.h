@@ -30,7 +30,6 @@ using CommandQueue = concurrent_queue<ID3D11CommandList*>;
 class IRenderPass abstract : public IViewEvent
 {
 public:
-	using CommandQueueMap = std::unordered_map<size_t, std::array<CommandQueue, 10>>;
 	using FrameQueueArray = std::array<std::array<CommandQueue, 10>, 3>;
 public:
 	IRenderPass()
@@ -60,6 +59,22 @@ public:
 
 	//virtual std::string ToString() abstract;
 	virtual void Execute(RenderScene& scene, Camera& camera) abstract;
+	void ExecuteCommandList(RenderScene& scene, Camera& camera)
+	{
+		size_t prevIndex = (m_frame.load(std::memory_order_relaxed) + 1) % 3;
+
+		auto& frameQueue = m_frameQueues[prevIndex][camera.m_cameraIndex];
+		while (!frameQueue.empty())
+		{
+			ID3D11CommandList* command;
+			if (frameQueue.try_pop(command))
+			{
+				DirectX11::ExecuteCommandList(command, true);
+				Memory::SafeDelete(command);
+			}
+		}
+		frameQueue.clear();
+	}
 	virtual void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) {}
 	virtual void ControlPanel() {};
 	void ReloadShaders() { m_pso->ReloadShaders(); }

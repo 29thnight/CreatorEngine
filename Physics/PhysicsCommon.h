@@ -251,7 +251,7 @@ struct HeightFieldColliderInfo
 
 //캐릭터 이동에 대한 정보
 struct CharacterMovementInfo {
-	float maxSpeed = 0.025f;	//최대 속도
+	float maxSpeed = 0.025f;	//최대 속도 //&&&&&speed
 	float acceleration = 1.0f;	//가속도
 	float staticFriction = 0.4f;	//정적 물체 마찰 계수
 	float dynamicFriction = 0.1f;	//동적 물체 마찰 계수

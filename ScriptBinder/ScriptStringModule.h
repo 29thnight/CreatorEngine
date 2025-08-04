@@ -335,84 +335,84 @@ constexpr std::string_view markerConditionDecoratorFactoryFuncString
 #pragma endregion
 
 #pragma region AnimationFSM Scirpt String
-constexpr std::string_view aniBehaviourIncludeString
+constexpr std::string_view AniBehaviorIncludeString
 {
 	"#include \"Core.Minimal.h\"\n"
-	"#include \"AniBehaviour.h\"\n"
+	"#include \"AniBehavior.h\"\n"
 	"\n"
 	"class "
 };
-constexpr std::string_view aniBehaviourInheritString
+constexpr std::string_view AniBehaviorInheritString
 {
-	" : public AniBehaviour\n"
+	" : public AniBehavior\n"
 	"{\n"
 	"public:\n"
-	"	AniBehaviour_BODY("
+	"	ANIBEHAVIOR_BODY("
 };
-constexpr std::string_view aniBehaviourEndString
+constexpr std::string_view AniBehaviorEndString
 {
 	")\n"
 	"	virtual void Enter() override;\n"
 	"	virtual void Update(float tick) override;\n"
-	"	virtual void Exit() override {}\n"
+	"	virtual void Exit() override;\n"
 	"};\n"
 };
-constexpr std::string_view aniBehaviourCPPString
+constexpr std::string_view AniBehaviorCPPString
 {
 	"#include \""
 };
-constexpr std::string_view aniBehaviourCPPEndString
+constexpr std::string_view AniBehaviorCPPEndString
 {
 	".h\"\n"
 	"#include \"pch.h\"\n"
 };
-constexpr std::string_view aniBehaviourCPPEndEnterBodyString
+constexpr std::string_view AniBehaviorCPPEndEnterBodyString
 {
 	"::Enter()\n"
 	"{\n"
-	"}\n"
+	"}\n\n"
 };
 
-constexpr std::string_view aniBehaviourCPPEndUpdateString
+constexpr std::string_view AniBehaviorCPPEndUpdateString
 {
 	"::Update(float deltaTime)\n"
 	"{\n"
-	"}\n"
+	"}\n\n"
 };
-constexpr std::string_view aniBehaviourCPPEndExitBodyString
+constexpr std::string_view AniBehaviorCPPEndExitBodyString
 {
 	"::Exit()\n"
 	"{\n"
 	"}\n"
 };
 
-constexpr std::string_view aniBehaviourFactoryIncludeString
+constexpr std::string_view AniBehaviorFactoryIncludeString
 {
 	"#include \""
 };
 
-constexpr std::string_view aniBehaviourFactoryFunctionString
+constexpr std::string_view AniBehaviorFactoryFunctionString
 {
-	"		AniBehaviourFactory::GetInstance()->RegisterFactory(\""
+	"		AniBehaviorFactory::GetInstance()->RegisterFactory(\""
 };
 
-constexpr std::string_view aniBehaviourFactoryFunctionLambdaString
+constexpr std::string_view AniBehaviorFactoryFunctionLambdaString
 {
 	"\", []() { return new "
 };
 
-constexpr std::string_view aniBehaviourFactoryFunctionEndString
+constexpr std::string_view AniBehaviorFactoryFunctionEndString
 {
 	"(); });\n"
 };
 
-constexpr std::string_view aniBehaviourMarkerFactoryHeaderString
+constexpr std::string_view AniBehaviorMarkerFactoryHeaderString
 {
 	"// Automation include AniScriptClass header"
 };
 
-constexpr std::string_view aniBehaviourMarkerFactoryFuncString
+constexpr std::string_view AniBehaviorMarkerFactoryFuncString
 {
-	"// Register the factory function for AniBehaviour Automation"
+	"// Register the factory function for AniBehavior Automation"
 };
 #pragma endregion

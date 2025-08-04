@@ -3,7 +3,7 @@
 #include "PrefabUtility.h"
 #include "TagManager.h"
 
-Prefab::Prefab(const std::string_view& name, const GameObject* source)
+Prefab::Prefab(std::string_view name, const GameObject* source)
     : Object(name)
 {
     m_typeID = TypeTrait::GUIDCreator::GetTypeID<Prefab>();
@@ -13,7 +13,7 @@ Prefab::Prefab(const std::string_view& name, const GameObject* source)
     }
 }
 
-Prefab* Prefab::CreateFromGameObject(const GameObject* source, const std::string_view& name)
+Prefab* Prefab::CreateFromGameObject(const GameObject* source, std::string_view name)
 {
     if (!source)
         return nullptr;
@@ -22,7 +22,7 @@ Prefab* Prefab::CreateFromGameObject(const GameObject* source, const std::string
     return new Prefab(prefabName, source);
 }
 
-GameObject* Prefab::Instantiate(const std::string_view& newName) const
+GameObject* Prefab::Instantiate(std::string_view newName) const
 {
     if (!m_prefabData)
         return nullptr;
@@ -90,7 +90,7 @@ MetaYml::Node Prefab::SerializeRecursive(const GameObject* obj)
 GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     Scene* scene,
     GameObject::Index parent,
-    const std::string_view& overrideName) const
+    std::string_view overrideName) const
 {
     if (!scene || !node)
         return nullptr;

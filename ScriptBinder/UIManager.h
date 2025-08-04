@@ -12,15 +12,15 @@ class UIManager : public Singleton<UIManager>
 public:
 	friend class Singleton;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
-	std::shared_ptr<GameObject> MakeCanvas(const std::string_view& name = "Canvas");
+	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
 
 	//오브젝이름 /쓸 정보 / 어느캔버스 기본0
-	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeImage(const std::string_view& name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
-	std::shared_ptr<GameObject> MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeText(const std::string_view& name, SpriteFont* Sfont, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
-	std::shared_ptr<GameObject> MakeText(const std::string_view& name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, Texture* texture,GameObject* canvas = nullptr,Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeImage(std::string_view name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos = { 960,540 },GameObject* canvas = nullptr);
+	std::shared_ptr<GameObject> MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
+	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
 
 	void DeleteCanvas(std::string canvasName);

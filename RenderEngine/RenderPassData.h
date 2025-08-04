@@ -15,10 +15,10 @@ public:
 	static constexpr int STORE_FRAME_COUNT = 3;
 	static constexpr int cascadeCount = 3;
 public:
-	UniqueTexturePtr		  m_renderTarget{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr		  m_depthStencil{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr		  m_shadowMapTexture{ TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr		  m_SSRPrevTexture{ TEXTURE_NULL_INITIALIZER };
+	Managed::UniquePtr<Texture> m_renderTarget;
+	Managed::UniquePtr<Texture> m_depthStencil;
+	Managed::UniquePtr<Texture> m_shadowMapTexture;
+	Managed::UniquePtr<Texture> m_SSRPrevTexture;
 	ID3D11DepthStencilView*   m_shadowMapDSVarr[cascadeCount]{};
 	ID3D11ShaderResourceView* sliceSRV[cascadeCount]{};
 	FrameProxyFindInstanceIDs m_findProxyVec[STORE_FRAME_COUNT];

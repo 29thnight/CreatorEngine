@@ -6,11 +6,13 @@
 #include "BTConditionDecoratorFactory.h"
 #include "SceneManager.h"
 #include "NodeFactory.h"
+#include "AniBehaviorFactory.h"
 #include "GameObjectPool.h"
 
 extern "C"
 {
 #pragma region Exported Functions
+#pragma region Module Behavior Functions
 	EXPORT_API ModuleBehavior* CreateModuleBehavior(const char* className)
 	{
 		std::string classNameStr(className);
@@ -40,7 +42,8 @@ extern "C"
 
 		return cstrs.data(); // 포인터 배열 반환
 	}
-
+#pragma endregion
+#pragma region Behavior Tree Node Functions
 	EXPORT_API BT::ActionNode* CreateBTActionNode(const char* className)
 	{
 		std::string classNameStr(className);
@@ -115,7 +118,34 @@ extern "C"
 			*outCount = static_cast<int>(cstrs.size());
 		return cstrs.data(); // 포인터 배열 반환
 	}
+#pragma endregion
+#pragma region Animation Behavior Functions
+	EXPORT_API AniBehavior* CreateAniBehavior(const char* className)
+	{
+		std::string classNameStr(className);
+		return AniBehaviorFactory::GetInstance()->CreateInstance(classNameStr);
+	}
 
+	EXPORT_API const char** ListAniBehavior(int* outCount)
+	{
+		static std::vector<std::string> nameVector;
+		static std::vector<const char*> cstrs;
+		nameVector.clear();
+		cstrs.clear();
+		for (const auto& [name, func] : AniBehaviorFactory::GetInstance()->factoryMap)
+		{
+			nameVector.push_back(name);
+		}
+		for (auto& name : nameVector)
+		{
+			cstrs.push_back(name.c_str());
+		}
+		if (outCount)
+			*outCount = static_cast<int>(cstrs.size());
+		return cstrs.data(); // 포인터 배열 반환
+	}
+#pragma endregion
+#pragma region Memory Management Functions
 	EXPORT_API void DeleteModuleBehavior(ModuleBehavior* behavior)
 	{
 		if (behavior)
@@ -148,8 +178,18 @@ extern "C"
 		}
 	}
 
+	EXPORT_API void DeleteAniBehavior(AniBehavior* aniBehavior)
+	{
+		if (aniBehavior)
+		{
+			delete aniBehavior;
+		}
+	}
+#pragma endregion
+
 #pragma	endregion
 
+#pragma region Initialization Functions
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
@@ -210,9 +250,11 @@ extern "C"
 
 	}
 
-	EXPORT_API void InitAniBehaviourFactory()
+	EXPORT_API void InitAniBehaviorFactory()
 	{
-		// Register the factory function for AniBehaviour Automation
+		// Register the factory function for AniBehavior Automation
+		AniBehaviorFactory::GetInstance()->RegisterFactory("NewAniBehavior", []() { return new NewAniBehavior(); });
 
 	}
+#pragma endregion
 }

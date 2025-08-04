@@ -221,9 +221,9 @@ void ActionMap::CheckAction()
 					action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:
-					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_Thumbstick))
+					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbL(action->playerIndex);
-					else if(action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_Thumbstick))
+					else if(action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbR(action->playerIndex);
 
 					try
@@ -318,9 +318,9 @@ void ActionMap::CheckAction(int playerIndex,void* instance, const Meta::Type* ty
 					//action->valueAction(action->value.v2Value);
 					break;
 				case InputType::GamePad:
-					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_Thumbstick))
+					if (action->key[0] == static_cast<size_t>(ControllerButton::LEFT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbL(playerIndex);
-					else if (action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_Thumbstick))
+					else if (action->key[0] == static_cast<size_t>(ControllerButton::RIGHT_THUMB))
 						action->value.v2Value = InputManagement->GetControllerThumbR(playerIndex);
 
 

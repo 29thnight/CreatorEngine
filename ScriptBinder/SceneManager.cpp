@@ -10,7 +10,6 @@
 #include "InputActionManager.h"
 #include "NodeFactory.h"
 #include "TagManager.h"
-#include "GameObjectPool.h"
 #include "ReflectionRegister.h"
 
 void SceneManager::ManagerInitialize()
@@ -21,7 +20,6 @@ void SceneManager::ManagerInitialize()
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
     InputActionManagers->LoadManager();
-	TagManager::GetInstance()->Initialize();
 }
 
 void SceneManager::Editor()
@@ -159,9 +157,35 @@ void SceneManager::Decommissioning()
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
+
+	PlayModeEvent.Clear();
+	InputEvent.Clear();
+	SceneRenderingEvent.Clear();
+	OnDrawGizmosEvent.Clear();
+	GUIRenderingEvent.Clear();
+    InternalAnimationUpdateEvent.Clear();
+    endOfFrameEvent.Clear();
+    sceneLoadedEvent.Clear();
+    sceneUnloadedEvent.Clear();
+    activeSceneChangedEvent.Clear();
+    newSceneCreatedEvent.Clear();
+    resourceTrimEvent.Clear();
+    m_activeScene = nullptr;
+    m_activeSceneIndex = 0;
+
+    for(auto& scene : m_scenes)
+    {
+        if (scene)
+        {
+            scene->OnDisable();
+			scene->AllDestroyMark();
+            scene->OnDestroy();
+            delete scene;
+        }
+	}
 }
 
-Scene* SceneManager::CreateScene(const std::string_view& name)
+Scene* SceneManager::CreateScene(std::string_view name)
 {
     resourceTrimEvent.Broadcast();
     Scene* allocScene = Scene::CreateNewScene(name);
@@ -199,7 +223,7 @@ Scene* SceneManager::CreateScene(const std::string_view& name)
     return allocScene;
 }
 
-Scene* SceneManager::SaveScene(const std::string_view& name)
+Scene* SceneManager::SaveScene(std::string_view name)
 {
 	std::string fileStem = name.data();
 	//std::string fileExtension = ".creator";
@@ -226,7 +250,7 @@ Scene* SceneManager::SaveScene(const std::string_view& name)
     sceneFileOut.close();
 }
 
-Scene* SceneManager::LoadSceneImmediate(const std::string_view& name)
+Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
 	std::string loadSceneName = name.data();
 
@@ -293,7 +317,7 @@ Scene* SceneManager::LoadSceneImmediate(const std::string_view& name)
 	return m_activeScene;
 }
 
-Scene* SceneManager::LoadScene(const std::string_view& name)
+Scene* SceneManager::LoadScene(std::string_view name)
 {
     std::string loadSceneName = name.data();
     Scene* scene{ nullptr };
@@ -343,11 +367,11 @@ Scene* SceneManager::LoadScene(const std::string_view& name)
 	return scene;
 }
 
-void SceneManager::SaveSceneAsync(const std::string_view& name)
+void SceneManager::SaveSceneAsync(std::string_view name)
 {
 }
 
-std::future<Scene*> SceneManager::LoadSceneAsync(const std::string_view& name)
+std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
 {
     return std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
         try
@@ -377,7 +401,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(const std::string_view& name)
     });
 }
 
-void SceneManager::LoadSceneAsyncAndWaitCallback(const std::string_view& name)
+void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 {
     // std::launch::async ensures the task runs on a new thread immediately.
     m_loadingSceneFuture = std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
@@ -432,7 +456,7 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
     sceneLoadedEvent.Broadcast();
 }
 
-void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
+void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 {
     if (objPtr)
     {

@@ -8,7 +8,7 @@ private:
 	friend class Singleton;
 	friend class ImGuiRenderer;
 public:
-	void Register(const std::string_view& name, std::function<void()> function)
+	void Register(std::string_view name, std::function<void()> function)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -18,7 +18,7 @@ public:
 		m_contexts[name.data()].AddContext(function);
 	}
 
-	void Register(const std::string_view& name, std::function<void()> function, ImGuiWindowFlags flags)
+	void Register(std::string_view name, std::function<void()> function, ImGuiWindowFlags flags)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -27,7 +27,7 @@ public:
 		m_contexts[name.data()].AddContext(function);
 	}
 
-	void Register(const std::string_view& name, bool isPopup, std::function<void()> function)
+	void Register(std::string_view name, bool isPopup, std::function<void()> function)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -43,7 +43,7 @@ public:
 		}
 	}
 
-	void Register(const std::string_view& name, bool isPopup, std::function<void()> function, ImGuiWindowFlags flags)
+	void Register(std::string_view name, bool isPopup, std::function<void()> function, ImGuiWindowFlags flags)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -58,7 +58,7 @@ public:
 		}
 	}
 
-	void Register(const std::string_view& name, const std::string_view& subName, std::function<void()> function)
+	void Register(std::string_view name, std::string_view subName, std::function<void()> function)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -67,7 +67,7 @@ public:
 		m_contexts[name.data()].AddSubContext(subName.data(), function);
 	}
 
-	void Register(const std::string_view& name, const std::string_view& subName, std::function<void()> function, ImGuiWindowFlags flags)
+	void Register(std::string_view name, std::string_view subName, std::function<void()> function, ImGuiWindowFlags flags)
 	{
 		if (m_contexts.find(name.data()) == m_contexts.end())
 		{
@@ -76,12 +76,12 @@ public:
 		m_contexts[name.data()].AddSubContext(subName.data(), function);
 	}
 
-	void Unregister(const std::string_view& name)
+	void Unregister(std::string_view name)
 	{
 		m_contexts.erase(name.data());
 	}
 
-	void Unregister(const std::string_view& name, const std::string_view& subName)
+	void Unregister(std::string_view name, std::string_view subName)
 	{
 		auto it = m_contexts.find(name.data());
 		if (it != m_contexts.end())
@@ -90,7 +90,7 @@ public:
 		}
 	}
 
-	ImGuiRenderContext& GetContext(const std::string_view& name)
+	ImGuiRenderContext& GetContext(std::string_view name)
 	{
 		return m_contexts[name.data()];
 	}

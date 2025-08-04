@@ -82,9 +82,10 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 #pragma endregion
     // Setup Platform/Renderer backends
-	ImGui_ImplWin32_Init(m_deviceResources->GetWindow()->GetHandle());
-    ID3D11Device* device = m_deviceResources->GetD3DDevice();
-    ID3D11DeviceContext* deviceContext = m_deviceResources->GetD3DDeviceContext();
+	auto deviceResource = m_deviceResources.lock();
+	ImGui_ImplWin32_Init(deviceResource->GetWindow()->GetHandle());
+    ID3D11Device* device = deviceResource->GetD3DDevice();
+    ID3D11DeviceContext* deviceContext = deviceResource->GetD3DDeviceContext();
     ImGui_ImplDX11_Init(device, deviceContext);
 
 	//RegisterDisplaySizeHandler();
@@ -94,6 +95,7 @@ ImGuiRenderer::ImGuiRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 ImGuiRenderer::~ImGuiRenderer()
 {
     Shutdown();
+	m_deviceResources.reset();
 }
 
 void ImGuiRenderer::BeginRender()
@@ -105,7 +107,7 @@ void ImGuiRenderer::BeginRender()
 	DirectX11::OMSetRenderTargets(1, &DeviceState::g_backBufferRTV, nullptr);
 	
 	RECT rect;
-	HWND hWnd = m_deviceResources->GetWindow()->GetHandle();
+	HWND hWnd = m_deviceResources.lock()->GetWindow()->GetHandle();
 	GetClientRect(hWnd, &rect);
 
 	ImVec2 newSize = ImVec2((float)(rect.right - rect.left), (float)(rect.bottom - rect.top));
@@ -128,7 +130,7 @@ void ImGuiRenderer::BeginRender()
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
 	ImGui::NewFrame();
-
+#ifndef BUILD_FLAG
 	float menuBarSize = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
 	ImVec2 workCenter{ ImGui::GetMainViewport()->GetWorkCenter() };
 	ImGuiID id = ImGui::GetID("MainWindowGroup");
@@ -220,6 +222,7 @@ void ImGuiRenderer::BeginRender()
 
     if (firstLoop) firstLoop = false;
 	PROFILE_CPU_END();
+#endif
 }
 
 void ImGuiRenderer::Render()
@@ -229,11 +232,12 @@ void ImGuiRenderer::Render()
 
 	auto& directoryQueue = DataSystems->m_LoadTextureAssetQueue;
 
-	if(!directoryQueue.empty())
+#ifndef BUILD_FLAG
+	if (!directoryQueue.empty())
 	{
 		DataSystems->SelectTextureType();
 	}
-
+#endif // !BUILD_FLAG
     auto& container = ImGuiRegister::GetInstance()->m_contexts;
 
     for (auto& [name, context] : container)
@@ -264,5 +268,7 @@ void ImGuiRenderer::Shutdown()
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+
+	m_deviceResources.reset();
 }
 #endif // !DYNAMICCPP_EXPORTS

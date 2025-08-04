@@ -1,5 +1,5 @@
 #include "Material.h"
-#include "ResourceAllocator.h"
+#include "DataSystem.h"
 
 Material::Material()
 {
@@ -32,30 +32,32 @@ Material::~Material()
 {
 }
 
-Material* Material::Instantiate(const Material* origin, const std::string_view& newName)
+Material* Material::Instantiate(const Material* origin, std::string_view newName)
+{
+	return InstantiateShared(origin, newName).get();
+}
+
+std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
 	if (!origin)
 		return nullptr;
 
-	// Create a new Material instance // 뭐지 왜 다 만들어져 있는거지? ㅋㅋㅋ
-	Material* cloneMaterial = AllocateResource<Material>(*origin);
+	// Create a new Material instance
+	auto cloneMaterial = shared_alloc<Material>(*origin);
 
-    // 수정된 코드
-    if (newName.empty()) 
+	// 수정된 코드
+	if (newName.empty())
 	{
-        cloneMaterial->m_name = origin->m_name + "_Clone";
-    } 
-	else 
+		cloneMaterial->m_name = origin->m_name + "_Clone";
+	}
+	else
 	{
-        cloneMaterial->m_name = std::string(newName);
-    }
+		cloneMaterial->m_name = std::string(newName);
+	}
+
+	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
 
 	return cloneMaterial;
-}
-
-std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, const std::string_view& newName)
-{
-	return std::shared_ptr<Material>(Instantiate(origin, newName), [](Material* mat) { ResourceAllocator::GetInstance()->DeallocateMaterial(mat); });
 }
 
 Material& Material::SetBaseColor(Mathf::Color3 color)

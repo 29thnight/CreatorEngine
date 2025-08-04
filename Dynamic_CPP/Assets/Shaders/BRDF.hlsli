@@ -110,30 +110,4 @@ float3 ImportanceSampleGGX(float2 st, float3 N, float roughness)
     return normalize(sampleVec);
 }
 
-// 아직 수정중.
-//float3 BRDF_PBR(float3 albedo, float3 normal, float roughness, float metallic, Light light, SurfaceInfo surf)
-//{
-//    float3 F0 = float3(0.04, 0.04, 0.04);
-//    F0 = lerp(F0, albedo, metallic);
-    
-//    LightingInfo li = EvalLightingInfo(surf, light);
-
-//        // cook-torrance brdf
-//    float NDF = DistributionGGX(saturate(li.NdotH), roughness);
-//    float G = GeometrySmith(saturate(surf.NdotV), saturate(li.NdotL), roughness);
-//    float3 F = fresnelSchlick(saturate(dot(li.H, surf.V)), F0);
-//    float3 kS = F;
-//    float3 kD = float3(1.0, 1.0, 1.0) - kS;
-//    kD *= 1.0 - metallic;
-
-//    float NdotL = saturate(li.NdotL); // clamped n dot l
-
-//    float3 numerator = NDF * G * F;
-//    float denominator = 4.0 * saturate(surf.NdotV) * NdotL;
-//    float3 specular = numerator / max(denominator, 0.001);
-//    float3 diffuse = kD * albedo / PI;
-    
-//    return (diffuse + specular) * light.color.rgb * li.attenuation * NdotL * (li.shadowFactor);
-//}
-
 #endif

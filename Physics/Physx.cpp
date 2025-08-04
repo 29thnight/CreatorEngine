@@ -191,15 +191,6 @@ bool PhysicX::Initialize()
 		// CUDA 사용 안 하고 넘어가기
 	}
 
-
-
-
-
-
-
-
-
-
 	//충돌 처리를 위한 콜백 등록
 	m_eventCallback = new PhysicsEventCallback();
 
