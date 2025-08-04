@@ -7,7 +7,7 @@
 
 class RenderScene;
 class SceneManager;
-class Object : public IObject
+class Object : public IObject, public Managed::HeapObject
 {
 public:
    ReflectObject

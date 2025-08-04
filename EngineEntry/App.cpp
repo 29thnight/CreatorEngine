@@ -10,7 +10,6 @@
 #include "EngineSetting.h"
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
-#include "GameObjectPool.h"
 #include "TagManager.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
@@ -60,7 +59,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
 	DataSystem::Destroy();
-	GameObjectPool::Destroy();
 	PrefabUtility::Destroy();
 
 	Log::Finalize();
@@ -70,7 +68,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
-	GameObjectPool::GetInstance();
 	EngineSetting::GetInstance();
 	TagManager::GetInstance();
 	InputManager::GetInstance();

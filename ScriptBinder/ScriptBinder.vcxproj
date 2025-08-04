@@ -346,7 +346,6 @@
     <ClInclude Include="GameObjectType.h" />
     <ClInclude Include="IAIComponent.h" />
     <ClInclude Include="GameObject.h" />
-    <ClInclude Include="GameObjectPool.h" />
     <ClInclude Include="HotLoadSystem.h" />
     <ClInclude Include="ActionMap.h" />
     <ClInclude Include="InputAction.h" />

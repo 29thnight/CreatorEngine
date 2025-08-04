@@ -10,7 +10,6 @@
 #include "InputActionManager.h"
 #include "NodeFactory.h"
 #include "TagManager.h"
-#include "GameObjectPool.h"
 #include "ReflectionRegister.h"
 
 void SceneManager::ManagerInitialize()
@@ -158,6 +157,32 @@ void SceneManager::Decommissioning()
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
+
+	PlayModeEvent.Clear();
+	InputEvent.Clear();
+	SceneRenderingEvent.Clear();
+	OnDrawGizmosEvent.Clear();
+	GUIRenderingEvent.Clear();
+    InternalAnimationUpdateEvent.Clear();
+    endOfFrameEvent.Clear();
+    sceneLoadedEvent.Clear();
+    sceneUnloadedEvent.Clear();
+    activeSceneChangedEvent.Clear();
+    newSceneCreatedEvent.Clear();
+    resourceTrimEvent.Clear();
+    m_activeScene = nullptr;
+    m_activeSceneIndex = 0;
+
+    for(auto& scene : m_scenes)
+    {
+        if (scene)
+        {
+            scene->OnDisable();
+			scene->AllDestroyMark();
+            scene->OnDestroy();
+            delete scene;
+        }
+	}
 }
 
 Scene* SceneManager::CreateScene(std::string_view name)
@@ -431,7 +456,7 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
     sceneLoadedEvent.Broadcast();
 }
 
-void SceneManager::AddDontDestroyOnLoad(Object* objPtr)
+void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
 {
     if (objPtr)
     {
