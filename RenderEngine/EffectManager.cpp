@@ -62,9 +62,24 @@ void EffectManager::Update(float delta)
 		auto& effect = it->second;
 		effect->Update(delta);
 
+		// 풀 반환 조건을 더 관대하게 수정
+		bool shouldReturn = false;
+
 		if (effect->GetState() == EffectState::Stopped) {
+			shouldReturn = true;
+		}
+		// 무한 이펙트가 오래 실행되고 있으면 강제 정리 (선택적)
+		//else if (effect->GetDuration() < 0 && effect->GetCurrentTime() > 60.0f) {
+		//	effect->Stop();
+		//	shouldReturn = true;
+		//}
+
+		if (shouldReturn) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
+
+			// GPU 작업 완료 대기 후 풀에 반환
+			effectToReturn->WaitForGPUCompletion();
 			ReturnToPool(std::move(effectToReturn));
 		}
 		else {
@@ -233,29 +248,60 @@ void EffectManager::InitializeUniversalPool()
 
 std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 {
+	// 풀이 비어있으면 새로 생성
 	if (universalPool.empty()) {
-		return nullptr;  // 풀 고갈
+		std::cout << "Pool empty, creating new effect instance" << std::endl;
+		auto newEffect = CreateUniversalEffect();
+		if (newEffect) {
+			return newEffect;
+		}
+		return nullptr;
 	}
 
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
-	// 재사용을 위한 리셋
-	//instance->ResetForReuse();
+	// 재사용을 위한 리셋 (이미 ReturnToPool에서 했지만 안전장치)
+	if (!instance->IsReadyForReuse()) {
+		instance->ResetForReuse();
+	}
 
+	std::cout << "Acquired from pool. Remaining pool size: " << universalPool.size() << std::endl;
 	return instance;
 }
 
 void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
-	if (effect && effect->IsReadyForReuse()) {
-		// 여기서 정리 작업 수행
-		effect->WaitForGPUCompletion();
+	if (!effect) return;
 
-		// 상태만 초기화 (Stop 호출하지 않음)
+	// GPU 작업이 완료될 때까지 대기
+	effect->WaitForGPUCompletion();
+
+	// 강제로 정지 상태로 만들기
+	if (effect->GetState() != EffectState::Stopped) {
+		effect->Stop();
+	}
+
+	// 재사용 준비가 완료될 때까지 여러 번 시도
+	int retryCount = 0;
+	const int maxRetries = 3;
+
+	while (retryCount < maxRetries && !effect->IsReadyForReuse()) {
+		effect->WaitForGPUCompletion();
 		effect->ResetForReuse();
 
+		// 짧은 대기 후 다시 확인
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		retryCount++;
+	}
+
+	if (effect->IsReadyForReuse()) {
 		universalPool.push(std::move(effect));
+		std::cout << "Effect returned to pool. Pool size: " << universalPool.size() << std::endl;
+	}
+	else {
+		std::cerr << "Warning: Effect could not be prepared for reuse after " << maxRetries << " attempts" << std::endl;
+		// 풀에 반환하지 않고 메모리에서 해제 (메모리 누수 방지)
 	}
 }
 

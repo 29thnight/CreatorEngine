@@ -517,47 +517,64 @@ void ParticleSystem::SetEffectProgress(float progress)
 }
 
 void ParticleSystem::ResetForReuse()
-{  
+{
+	// 실행 정지
 	m_isRunning = false;
 	m_activeParticleCount = 0;
 	m_effectProgress = 0.0f;
 	m_usingBufferA = true;
 	m_modulesConnected = false;
 
-	// 모듈들 리셋 (멤버 함수 호출)
+	// GPU 작업 완료 대기
+	WaitForGPUCompletion();
+
+	// 모듈들 리셋
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
 		ParticleModule& module = *it;
-		module.ResetForReuse();  // ParticleModule의 메서드 호출
+		if (module.IsEnabled()) {
+			module.ResetForReuse();
+		}
 	}
 
 	for (auto* renderModule : m_renderModules) {
-		if (renderModule) {
-			renderModule->ResetForReuse();  // RenderModule의 메서드 호출
+		if (renderModule && renderModule->IsEnabled()) {
+			renderModule->ResetForReuse();
 		}
 	}
+
+	// 파티클 데이터 초기화
+	InitializeParticleIndices();
 }
 
 bool ParticleSystem::IsReadyForReuse()
 {
+	// 실행 중이면 재사용 불가
 	if (m_isRunning) {
 		return false;
 	}
 
+	// GPU 작업 완료 대기 (추가)
+	DeviceState::g_pDeviceContext->Flush();
+
+	// 모든 모듈이 재사용 준비가 되었는지 확인
 	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it) {
 		const ParticleModule& module = *it;
-		if (!module.IsReadyForReuse()) {
+
+		// 활성화된 모듈만 확인 (비활성화된 모듈은 스킵)
+		if (module.IsEnabled() && !module.IsReadyForReuse()) {
 			return false;
 		}
 	}
 
+	// 렌더 모듈들도 확인
 	for (const auto* renderModule : m_renderModules) {
-		if (renderModule->IsEnabled())
-		{
-			if (renderModule && !renderModule->IsReadyForReuse()) {
+		if (renderModule && renderModule->IsEnabled()) {
+			if (!renderModule->IsReadyForReuse()) {
 				return false;
 			}
 		}
 	}
+
 	return true;
 }
 

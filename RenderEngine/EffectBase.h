@@ -137,13 +137,18 @@ public:
 
     // 풀링을 위한 재사용 리셋
     virtual void ResetForReuse() {
-        Stop();
+        // 상태 강제 정지
         m_state = EffectState::Stopped;
         m_currentTime = 0.0f;
+
+        // 위치/회전 초기화
         m_position = Mathf::Vector3(0, 0, 0);
         m_rotation = Mathf::Vector3(0, 0, 0);
 
-        // ParticleSystem들 리셋 (멤버 함수 호출)
+        // GPU 작업 완료 대기
+        WaitForGPUCompletion();
+
+        // ParticleSystem들 리셋
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->ResetForReuse();
@@ -151,19 +156,32 @@ public:
         }
     }
 
+
     // 재사용 준비 완료 여부 체크
     virtual bool IsReadyForReuse() const {
+        // 정지 상태가 아니면 재사용 불가
         if (m_state != EffectState::Stopped) {
             return false;
         }
 
+        // ParticleSystem들이 재사용 준비가 되었는지 확인
         for (const auto& ps : m_particleSystems) {
-            if (ps && !ps->IsReadyForReuse()) {
-                return false;
+            if (ps) {
+                // GPU 작업이 완료되지 않았으면 잠시 대기
+                if (!ps->IsReadyForReuse()) {
+                    // 한 번 더 기회를 주기 위해 GPU 완료 대기
+                    ps->WaitForGPUCompletion();
+
+                    // 다시 한 번 확인
+                    if (!ps->IsReadyForReuse()) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
     }
+
 
     // GPU 작업 완료 대기
     void WaitForGPUCompletion() {
@@ -171,6 +189,14 @@ public:
             if (ps) {
                 ps->WaitForGPUCompletion();
             }
+        }
+
+        // 전체 GPU 파이프라인 플러시
+        if (DeviceState::g_pDeviceContext) {
+            DeviceState::g_pDeviceContext->Flush();
+
+            // 추가 동기화 (필요한 경우)
+            //std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 
