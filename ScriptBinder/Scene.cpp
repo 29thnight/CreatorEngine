@@ -1036,7 +1036,7 @@ void Scene::DestroyGameObjects()
 
 	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
 	{
-		return obj && !obj->IsDontDestroyOnLoad();
+		return obj && obj->IsDontDestroyOnLoad();
 	});
 
 	if (eraseSize > 0)
