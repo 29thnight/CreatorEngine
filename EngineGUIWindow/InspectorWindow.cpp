@@ -953,6 +953,9 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 					ImGui::Combo("Type", &typeIndex, typeNames.data(), static_cast<int>(typeNames.size()));
 					g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex);
 				}
+				// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
+				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
+				// 세기 슬라이더
 				ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
 
 				ImGui::SeparatorText("Foliage Mesh");
@@ -973,6 +976,13 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 					}
 					ImGui::EndDragDropTarget();
 				}
+				int foliageMode = static_cast<int>(g_CurrentBrush->m_foliageMode);
+				const char* fModes[] = { "Paint", "Erase" };
+				if (ImGui::Combo("Action", &foliageMode, fModes, 2))
+				{
+					g_CurrentBrush->m_foliageMode = static_cast<TerrainBrush::FoliageMode>(foliageMode);
+				}
+
 				ImGui::SeparatorText("Foliage Asset");
 				if (ImGui::Button("Save Foliage"))
 				{
