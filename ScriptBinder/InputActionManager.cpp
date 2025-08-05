@@ -198,8 +198,8 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 				}
 				else if (action->inputType == InputType::GamePad)
 				{
-					if (ParseControllerButton(keyname) == ControllerButton::LEFT_Thumbstick ||
-						ParseControllerButton(keyname) == ControllerButton::RIGHT_Thumbstick
+					if (ParseControllerButton(keyname) == ControllerButton::LEFT_THUMB ||
+						ParseControllerButton(keyname) == ControllerButton::RIGHT_THUMB
 						)
 					{
 						action->SetControllerButton(ParseControllerButton(keyname));

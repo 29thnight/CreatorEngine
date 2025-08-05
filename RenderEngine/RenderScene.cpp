@@ -24,10 +24,25 @@ ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 RenderScene::~RenderScene()
 {
 	Memory::SafeDelete(m_LightController);
+
+	SpinLock lock(m_proxyMapFlag);
+	m_proxyMap.clear();
+	m_animatorMap.clear();
+	for (auto& pair : m_palleteMap)
+	{
+		if (pair.second.second)
+		{
+			std::free(pair.second.second);
+			pair.second.second = nullptr;
+		}
+	}
+	m_palleteMap.clear();
+	m_renderDataMap.clear();
 }
 
 void RenderScene::Initialize()
 {
+	m_renderDataMap.resize(10);
 	m_LightController = new LightController();
 	m_animationJob.SetRenderScene(this);
 }
@@ -79,56 +94,45 @@ void RenderScene::UpdateModel(const Mathf::xMatrix& model, ID3D11DeviceContext* 
 
 RenderPassData* RenderScene::AddRenderPassData(size_t cameraIndex)
 {
-	auto it = m_renderDataMap.find(cameraIndex);
-	if (it != m_renderDataMap.end())
+	auto ptr = m_renderDataMap[cameraIndex];
+	if (nullptr != ptr)
 	{
-		return it->second.get();
+		return ptr.get();
 	}
 
 	auto newRenderData = std::make_shared<RenderPassData>();
 	newRenderData->Initalize(cameraIndex);
-	//m_renderDataMap[cameraIndex] = newRenderData;
-	m_renderDataMap.insert({ cameraIndex, newRenderData });
+	m_renderDataMap[cameraIndex] = newRenderData;
+	//m_renderDataMap.insert({ cameraIndex, newRenderData });
 
 	return newRenderData.get();
 }
 
 RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
 {
-	auto it = m_renderDataMap.find(cameraIndex);
-	if (it == m_renderDataMap.end())
-	{
-		return nullptr;
-	}
-
-	return it->second.get();
+	auto sharedPtr = m_renderDataMap[cameraIndex];
+	return sharedPtr.get();
 }
 
 void RenderScene::RemoveRenderPassData(size_t cameraIndex)
 {
-	auto it = m_renderDataMap.find(cameraIndex);
-	if (it != m_renderDataMap.end())
+	auto sharedPtr = m_renderDataMap[cameraIndex];
+	if (nullptr != sharedPtr)
 	{
-		it->second->m_isDestroy = true;
+		sharedPtr->m_isDestroy = true;
 	}
 }
 
 void RenderScene::EraseRenderPassData()
 {
-	auto begin = m_renderDataMap.unsafe_begin(0);
-	auto end = m_renderDataMap.unsafe_end(0);
-
-	for(auto it = begin; it != end;)
+	for(auto& ptr : m_renderDataMap)
 	{
-		if (it->second->m_isDestroy)
+		if (nullptr == ptr) continue;
+
+		if (ptr->m_isDestroy)
 		{
-			it->second.reset();
-			m_renderDataMap.unsafe_erase(it->first);
-			it = m_renderDataMap.unsafe_begin(0);
-		}
-		else
-		{
-			++it;
+			ptr.reset();
+			ptr = nullptr;
 		}
 	}
 }

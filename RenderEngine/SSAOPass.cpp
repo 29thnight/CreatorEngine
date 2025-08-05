@@ -44,14 +44,13 @@ SSAOPass::~SSAOPass()
 {
 }
 
-void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth, Texture* normal, Texture* diffuse)
+void SSAOPass::Initialize(Managed::SharedPtr<Texture> renderTarget, ID3D11ShaderResourceView* depth, Managed::SharedPtr<Texture> normal, Managed::SharedPtr<Texture> diffuse)
 {
 	m_DepthSRV = depth;
 	m_NormalTexture = normal;
 	m_RenderTarget = renderTarget;
     m_DiffuseTexture = diffuse;
 
-	
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // random floats between 0.0 - 1.0
     std::default_random_engine generator;
 
@@ -90,9 +89,9 @@ void SSAOPass::Initialize(Texture* renderTarget, ID3D11ShaderResourceView* depth
     D3D11_SUBRESOURCE_DATA data{};
     data.pSysMem = rotation.data();
     data.SysMemPitch = 4 * 4; // 4 pixels width, 4 bytes (32 bits)
-    Texture* tex = Texture::Create(4, 4, "Noise Tex", DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_BIND_SHADER_RESOURCE, &data);
+    auto tex = Texture::CreateManaged(4, 4, "Noise Tex", DXGI_FORMAT_R8G8B8A8_SNORM, D3D11_BIND_SHADER_RESOURCE, &data);
     tex->CreateSRV(DXGI_FORMAT_R8G8B8A8_SNORM);
-    m_NoiseTexture = MakeUniqueTexturePtr(tex);
+    m_NoiseTexture.swap(tex);
 }
 
 void SSAOPass::ReloadDSV(ID3D11ShaderResourceView* depth)
@@ -105,11 +104,25 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
     if (!RenderPassData::VaildCheck(&camera)) return;
     auto renderData = RenderPassData::GetData(&camera);
 
+	auto renderTarget = m_RenderTarget.lock();
+	auto normalTexture = m_NormalTexture.lock();
+	auto diffuseTexture = m_DiffuseTexture.lock();
+
+    if (m_RenderTarget.expired() || 
+        m_NormalTexture.expired() || 
+        m_DiffuseTexture.expired() || 
+        !renderTarget || 
+        !normalTexture || 
+        !diffuseTexture)
+    {
+        return; // Ensure textures are valid
+	}
+
     m_pso->Apply();
 
-	DirectX11::ClearRenderTargetView(m_RenderTarget->GetRTV(), Colors::Transparent);
+	DirectX11::ClearRenderTargetView(renderTarget->GetRTV(), Colors::Transparent);
 
-	ID3D11RenderTargetView* rtv = m_RenderTarget->GetRTV();
+	ID3D11RenderTargetView* rtv = renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
 	Mathf::xMatrix view = camera.CalculateView();
@@ -129,9 +142,9 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
 
     ID3D11ShaderResourceView* srvs[4] = { 
         renderData->m_depthStencil->m_pSRV, 
-        m_NormalTexture->m_pSRV, 
+        normalTexture->m_pSRV,
         m_NoiseTexture->m_pSRV, 
-        m_DiffuseTexture->m_pSRV 
+        diffuseTexture->m_pSRV
     };
     DirectX11::PSSetShaderResources(0, 4, srvs);
 

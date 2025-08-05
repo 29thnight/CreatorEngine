@@ -212,6 +212,8 @@ void MeshSpawnModuleCS::ResetForReuse()
 {
     if (!m_enabled) return;
 
+    std::lock_guard<std::mutex> lock(m_resetMutex);
+
     // 스폰 관련 상태 초기화
     m_spawnParams.currentTime = 0.0f;
     m_spawnParams.deltaTime = 0.0f;
@@ -228,16 +230,6 @@ void MeshSpawnModuleCS::ResetForReuse()
     m_spawnParams.emitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.previousEmitterRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_spawnParams.forceRotationUpdate = 0;
-
-    // 난수 상태 리셋
-    //if (m_randomStateBuffer) {
-    //    UINT newSeed = m_randomGenerator();
-    //    D3D11_MAPPED_SUBRESOURCE mappedResource;
-    //    if (SUCCEEDED(DeviceState::g_pDeviceContext->Map(m_randomStateBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
-    //        memcpy(mappedResource.pData, &newSeed, sizeof(UINT));
-    //        DeviceState::g_pDeviceContext->Unmap(m_randomStateBuffer, 0);
-    //    }
-    //}
 }
 
 bool MeshSpawnModuleCS::IsReadyForReuse() const
@@ -247,8 +239,6 @@ bool MeshSpawnModuleCS::IsReadyForReuse() const
         m_spawnParamsBuffer != nullptr &&
         m_templateBuffer != nullptr;
 }
-
-
 
 std::string MeshSpawnModuleCS::GetModuleType() const
 {

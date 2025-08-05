@@ -11,7 +11,6 @@
 #include "Benchmark.hpp"
 #include "SceneManager.h"
 #include "PrefabUtility.h"
-#include "ResourceAllocator.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ToggleUI.h"
@@ -97,6 +96,7 @@ DataSystem::~DataSystem()
 
 void DataSystem::Initialize()
 {
+#ifndef BUILD_FLAG
 	file::path iconpath		= PathFinder::IconPath();
 	UnknownIcon				= Texture::LoadFormPath(iconpath.string() + "Unknown.png");
 	TextureIcon				= Texture::LoadFormPath(iconpath.string() + "Texture.png");
@@ -115,9 +115,10 @@ void DataSystem::Initialize()
 	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
 
 	RenderForEditer();
+#endif
 	m_watcher			= new efsw::FileWatcher();
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
-	m_assetMetaWatcher = std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
+	m_assetMetaWatcher	= std::make_shared<AssetMetaWatcher>(m_assetMetaRegistry.get());
 	m_assetMetaWatcher->ScanAndGenerateMissingMeta(PathFinder::Relative());
 	m_assetMetaWatcher->ScanAndCleanupInvalidMeta(PathFinder::Relative());
 	m_watcher->addWatch(PathFinder::Relative().string(), m_assetMetaWatcher.get(), true);
@@ -126,18 +127,20 @@ void DataSystem::Initialize()
 
 void DataSystem::Finalize()
 {
-    DeallocateResource(UnknownIcon);
-    DeallocateResource(TextureIcon);
-    DeallocateResource(ModelIcon);
-    DeallocateResource(AssetsIcon);
-    DeallocateResource(FolderIcon);
-    DeallocateResource(ShaderIcon);
-    DeallocateResource(CodeIcon);
-	DeallocateResource(MainLightIcon);
-	DeallocateResource(PointLightIcon);
-	DeallocateResource(SpotLightIcon);
-	DeallocateResource(DirectionalLightIcon);
-	DeallocateResource(CameraIcon);
+#ifndef BUILD_FLAG
+    delete UnknownIcon;
+    delete TextureIcon;
+    delete ModelIcon;
+    delete AssetsIcon;
+    delete FolderIcon;
+    delete ShaderIcon;
+    delete CodeIcon;
+	delete MainLightIcon;
+	delete PointLightIcon;
+	delete SpotLightIcon;
+	delete DirectionalLightIcon;
+	delete CameraIcon;
+#endif // !BUILD_FLAG
 
     Models.clear();
     Textures.clear();
@@ -148,6 +151,7 @@ void DataSystem::Finalize()
 
 void DataSystem::RenderForEditer()
 {
+#ifndef BUILD_FLAG
 	ImGui::ContextRegister("SelectMatarial", true, [&]()
 	{
 		static ImGuiTextFilter searchFilter;
@@ -383,6 +387,7 @@ void DataSystem::RenderForEditer()
 	{
 		ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
 	}
+#endif // BUILD_FLAG
 }
 
 void DataSystem::MonitorFiles()
@@ -408,15 +413,8 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	Model* model = Model::LoadModel(modelPath.string());
 	if (model)
 	{
-		auto deleter = [&](Model* model)
-		{
-			if (model)
-			{
-				DeallocateResource<Model>(model);
-			}
-		};
 
-		Models[name] = std::shared_ptr<Model>(model, deleter);
+		Models[name] = std::shared_ptr<Model>(model);
 
 		return model;
 	}
@@ -426,7 +424,7 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 	}
 }
 
-void DataSystem::LoadModel(const std::string_view& filePath)
+void DataSystem::LoadModel(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
@@ -441,19 +439,10 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 		return;
 	}
 
-	Model* model = Model::LoadModel(destination.string());
+	Managed::SharedPtr<Model> model = Model::LoadModelShared(destination.string());
 	if (model)
 	{
-        auto deleter = [&](Model* model)
-        {
-            if (model)
-            {
-                DeallocateResource<Model>(model);
-            }
-        };
-
-		Models[name] = std::shared_ptr<Model>(model, deleter);
-
+		Models[name] = model;
 	}
 	else
 	{
@@ -461,7 +450,7 @@ void DataSystem::LoadModel(const std::string_view& filePath)
 	}
 }
 
-Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
+Model* DataSystem::LoadCashedModel(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Models\\") / file::path(filePath).filename();
@@ -476,10 +465,10 @@ Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
 		return Models[name].get();
 	}
 
-    Model* model{};
+	Managed::SharedPtr<Model> model{};
     try
     {
-        model = Model::LoadModel(destination.string());
+        model = Model::LoadModelShared(destination.string());
     }
     catch (const std::exception& e)
     {
@@ -489,16 +478,8 @@ Model* DataSystem::LoadCashedModel(const std::string_view& filePath)
 
 	if (model)
 	{
-        auto deleter = [&](Model* model)
-        {
-            if (model)
-            {
-                DeallocateResource<Model>(model);
-            }
-        };
-
-		Models[name] = std::shared_ptr<Model>(model, deleter);
-		return model;
+		Models[name] = model;
+		return model.get();
 	}
 }
 
@@ -519,17 +500,11 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 		Debug->Log("TextureLoader::LoadTexture : Texture already loaded");
 		return Textures[name].get();
 	}
-	Texture* texture = Texture::LoadFormPath(texturePath.string());
+	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(texturePath.string());
 	if (texture)
 	{
-		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-		{
-			if (texture)
-			{
-				DeallocateResource<Texture>(texture);
-			}
-		});
-		return texture;
+		Textures[name] = texture;
+		return texture.get();
 	}
 	else
 	{
@@ -537,7 +512,7 @@ Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 	}
 }
 
-Texture* DataSystem::LoadTexture(const std::string_view& filePath)
+Texture* DataSystem::LoadTexture(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("Textures\\") / file::path(filePath).filename();
@@ -552,18 +527,12 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
         return Textures[name].get();
 	}
 
-	Texture* texture = Texture::LoadFormPath(destination.string());
+	Managed::SharedPtr<Texture> texture = Texture::LoadSharedFromPath(destination.string());
 
 	if (texture)
 	{
-		Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-        {
-            if (texture)
-            {
-                DeallocateResource<Texture>(texture);
-            }
-        });
-        return texture;
+		Textures[name] = texture;
+        return texture.get();
 	}
 	else
 	{
@@ -573,7 +542,7 @@ Texture* DataSystem::LoadTexture(const std::string_view& filePath)
 	return nullptr;
 }
 
-void DataSystem::CopyHDRTexture(const std::string_view& filePath)
+void DataSystem::CopyHDRTexture(std::string_view filePath)
 {
 	file::path source = filePath;
 	file::path destination = PathFinder::Relative("HDR\\") / file::path(filePath).filename();
@@ -583,7 +552,7 @@ void DataSystem::CopyHDRTexture(const std::string_view& filePath)
 	}
 }
 
-void DataSystem::CopyTexture(const std::string_view& filePath, const file::path& destination)
+void DataSystem::CopyTexture(std::string_view filePath, const file::path& destination)
 {
 	if (filePath != destination && file::exists(filePath) && !file::exists(destination))
 	{
@@ -607,7 +576,7 @@ void DataSystem::SelectTextureType()
 	}
 }
 
-void DataSystem::CopyTextureSelectType(const std::string_view& filePath, TextureFileType type)
+void DataSystem::CopyTextureSelectType(std::string_view filePath, TextureFileType type)
 {
 	file::path destination{};
 	if (type == TextureFileType::Texture)
@@ -630,7 +599,7 @@ void DataSystem::CopyTextureSelectType(const std::string_view& filePath, Texture
 	CopyTexture(filePath, destination);
 }
 
-Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
+Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompress)
 {
     file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
 
@@ -641,18 +610,12 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
         return Textures[name].get();
     }
 
-    Texture* texture = Texture::LoadFormPath(destination.string());
+    auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
 
     if (texture)
     {
-        Textures[name] = std::shared_ptr<Texture>(texture, [&](Texture* texture)
-        {
-            if (texture)
-            {
-                DeallocateResource<Texture>(texture);
-            }
-        });
-        return texture;
+		Textures[name] = texture;
+        return texture.get();
     }
     else
     {
@@ -664,16 +627,9 @@ Texture* DataSystem::LoadMaterialTexture(const std::string_view& filePath)
 
 Material* DataSystem::CreateMaterial()
 {
-	Material* material = AllocateResource<Material>();
+	std::shared_ptr<Material> material = shared_alloc<Material>();
 	if (material)
 	{
-		auto deleter = [&](Material* mat)
-		{
-			if (mat)
-			{
-				DeallocateResource<Material>(mat);
-			}
-		};
 		std::string name = "NewMaterial";
 		int index = 1;
 		while (Materials.find(name) != Materials.end())
@@ -683,9 +639,9 @@ Material* DataSystem::CreateMaterial()
 		material->m_name = name;
 		material->m_fileGuid = make_file_guid(name);
 		
-		Materials[name] = std::shared_ptr<Material>(material, deleter);
+		Materials[name] = material;
 		
-		return material;
+		return material.get();
 	}
 	return nullptr;
 }
@@ -711,16 +667,21 @@ SpriteFont* DataSystem::LoadSFont(const std::wstring_view& filePath)
 
 void DataSystem::OpenContentsBrowser()
 {
+#ifndef BUILD_FLAG
 	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Open();
+#endif
 }
 
 void DataSystem::CloseContentsBrowser()
 {
+#ifndef BUILD_FLAG
 	ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser").Close();
+#endif
 }
 
 void DataSystem::ShowDirectoryTree(const file::path& directory)
 {
+#ifndef BUILD_FLAG
 	static file::path MenuDirectory{};
 	static bool isRightClicked = false;
 	for (const auto& entry : file::directory_iterator(directory))
@@ -803,10 +764,12 @@ void DataSystem::ShowDirectoryTree(const file::path& directory)
 		}
 		ImGui::EndPopup();
 	}
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ShowCurrentDirectoryFiles()
 {
+#ifndef BUILD_FLAG
 	if(m_ContentsBrowserStyle == ContentsBrowserStyle::Tile)
 	{
 		ShowCurrentDirectoryFilesTile();
@@ -817,10 +780,12 @@ void DataSystem::ShowCurrentDirectoryFiles()
 
 		ShowCurrentDirectoryFilesTree(currentDirectory);
 	}
+#endif
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTile()
 {
+#ifndef BUILD_FLAG
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -925,10 +890,12 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 		}
 		ImGui::EndPopup();
 	}
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 {
+#ifndef BUILD_FLAG
 	static file::path currentDirectory;
 	static FileType selectedFileType = FileType::Unknown;
 	static std::string draggedFileType{};
@@ -1124,11 +1091,12 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 
 		isHoverAndClicked = false;
 	}
-
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directory, const std::string& fileName, FileType& fileType, const ImVec2& tileSize)
 {
+#ifndef BUILD_FLAG
 	ImGui::PushID(fileName.c_str());
 	ImGui::BeginGroup();
 	ImU32 color{};
@@ -1247,6 +1215,7 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 	}
 
 	ImGui::PopID();
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
@@ -1256,6 +1225,7 @@ void DataSystem::ForceCreateYamlMetaFile(const file::path& filepath)
 
 void DataSystem::CreateVolumeProfile(const file::path& filepath)
 {
+#ifndef BUILD_FLAG
 	VolumeProfile profile;
 	profile.settings = EngineSettingInstance->GetRenderPassSettings();
 
@@ -1276,10 +1246,12 @@ void DataSystem::CreateVolumeProfile(const file::path& filepath)
 	}
 
 	ForceCreateYamlMetaFile(savePath);
+#endif // !BUILD_FLAG
 }
 
 void DataSystem::OpenFile(const file::path& filepath)
 {
+#ifndef BUILD_FLAG
     if(filepath.extension() == ".prefab") { PrefabEditors->Open(filepath.string()); return; }
 	HINSTANCE result = ShellExecute(NULL, L"open", filepath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 
@@ -1287,10 +1259,12 @@ void DataSystem::OpenFile(const file::path& filepath)
 	{
 		MessageBox(NULL, L"Failed Open File", L"Error", MB_OK | MB_ICONERROR);
 	}
+#endif
 }
 
 void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 {
+#ifndef BUILD_FLAG
 	std::wstring args = L"/select,\"" + filePath.wstring() + L"\"";
 
 	HINSTANCE result = ShellExecuteW(
@@ -1307,10 +1281,12 @@ void DataSystem::OpenExplorerSelectFile(const std::filesystem::path& filePath)
 	{
 		MessageBoxW(nullptr, L"Failed to open file in Explorer.", L"Error", MB_OK | MB_ICONERROR);
 	}
+#endif
 }
 
 void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path& filepath)
 {
+#ifndef BUILD_FLAG
 	if (m_isExecuteSolution)
 	{
 		return;
@@ -1369,6 +1345,7 @@ void DataSystem::OpenSolutionAndFile(const file::path& slnPath, const file::path
 	{
 		MessageBoxW(nullptr, L"Visual Studio Execute Failed", L"Error", MB_ICONERROR);
 	}
+#endif // !BUILD_FLAG
 }
 
 FileGuid DataSystem::GetFileGuid(const file::path& filepath) const

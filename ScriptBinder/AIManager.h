@@ -28,7 +28,7 @@ public:
 
 	void UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiComponent);
 
-	BT::BTNode::NodePtr CreateNode(const std::string_view& nodeName);
+	BT::BTNode::NodePtr CreateNode(std::string_view nodeName);
 
 	void ClearTreeInAIComponent();
 

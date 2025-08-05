@@ -9,7 +9,10 @@ public:
 	ForwardPass();
 	~ForwardPass();
 
-	void UseEnvironmentMap(Texture* envMap, Texture* preFilter, Texture* brdfLut);
+	void UseEnvironmentMap(
+		Managed::SharedPtr<Texture> envMap,
+		Managed::SharedPtr<Texture> preFilter,
+		Managed::SharedPtr<Texture> brdfLut);
 
 	void Execute(RenderScene& scene, Camera& camera);
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
@@ -17,9 +20,9 @@ public:
 	void ControlPanel() override;
 private:
 	std::unique_ptr<PipelineStateObject> m_instancePSO;
-	Texture* m_EnvironmentMap{};
-	Texture* m_PreFilter{};
-	Texture* m_BrdfLut{};
+	Managed::WeakPtr<Texture> m_EnvironmentMap{};
+	Managed::WeakPtr<Texture> m_PreFilter{};
+	Managed::WeakPtr<Texture> m_BrdfLut{};
 
 	uint32 m_maxInstanceCount{};
 	bool m_UseEnvironmentMap{ true };

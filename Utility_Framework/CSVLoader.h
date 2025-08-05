@@ -1,63 +1,20 @@
 #pragma once
 //#include "Core.Memory.hpp"
 #include <vector>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <utility>
+#include "CSVLoaderHelper.h"
 #include "TypeDefinition.h"
 
-template<typename T>
-inline T convertFromString(const std::string& str);
-
-template<>
-inline int convertFromString<int>(const std::string& str)
-{
-    return std::stoi(str);
-}
-
-template<>
-inline float convertFromString<float>(const std::string& str)
-{
-    return std::stof(str);
-}
-
-template<>
-inline bool convertFromString<bool>(const std::string& str)
-{
-    return (str == "true" || str == "TRUE");
-}
-
-template<>
-inline long double convertFromString<long double>(const std::string& str)
-{
-    return std::stold(str);
-}
-
-template<>
-inline std::string convertFromString<std::string>(const std::string& str)
-{
-    return str;
-}
-
-template<>
-inline uint32 convertFromString<uint32>(const std::string& str)
-{
-    return static_cast<uint32>(std::stoi(str));
-}
-
-template<typename... Types>
 class CSVReader
 {
 public:
-    using RowType = std::tuple<Types...>;
-    CSVReader(const std::string& filename)
+    using Row = CSVRowView;
+
+    explicit CSVReader(const std::string& filename, bool skipHeader = true)
     {
         std::ifstream file(filename);
         if (!file.is_open())
         {
-            throw std::runtime_error("Could not open file");
+            throw std::runtime_error("Could not open file: " + filename);
         }
 
         std::string line;
@@ -66,73 +23,55 @@ public:
             throw std::runtime_error("File is empty or cannot read the first line");
         }
 
+        if (skipHeader)
+        {
+            parseHeader(line);
+        }
+        else
+        {
+            parseRow(line);
+        }
+
         while (std::getline(file, line))
         {
-            std::vector<std::string> row;
-            std::istringstream stream(line);
-            std::string cell;
-
-            while (std::getline(stream, cell, ','))
-            {
-                row.push_back(cell);
-            }
-
-            if (!row.empty())
-            {
-                data.push_back(parseRow(row));
-            }
+            parseRow(line);
         }
 
         file.close();
     }
 
-public:
-    void printData() const
-    {
-        for (const auto& row : data)
-        {
-            printRow(row);
-            std::cout << std::endl;
-        }
-    }
-
-    template<typename Func>
-    void forEach(Func&& func) const
-    {
-		if (data.empty())
-		{
-			return;
-		}
-
-        for (const auto& row : data)
-        {
-            std::apply(std::forward<Func>(func), row);
-        }
-    }
-
-public:
-    template<std::size_t... I>
-    RowType parseRowImpl(const std::vector<std::string>& row, std::index_sequence<I...>) const
-    {
-        return RowType{ convertFromString<typename std::tuple_element<I, RowType>::type>(row[I])... };
-    }
-
-    RowType parseRow(const std::vector<std::string>& row) const
-    {
-        return parseRowImpl(row, std::make_index_sequence<sizeof...(Types)>{});
-    }
-
-    template<std::size_t... I>
-    void printRowImpl(const RowType& row, std::index_sequence<I...>) const
-    {
-        ((std::cout << std::get<I>(row) << " "), ...);
-    }
-
-    void printRow(const RowType& row) const
-    {
-        printRowImpl(row, std::make_index_sequence<sizeof...(Types)>{});
-    }
+    auto begin() const noexcept { return m_viewData.begin(); }
+    auto end() const noexcept { return m_viewData.end(); }
 
 private:
-    std::vector<RowType> data;
+    std::unordered_map<std::string, std::size_t> m_headerMap;
+    std::vector<std::vector<std::string>> m_rawData;
+    std::vector<CSVRowView> m_viewData;
+
+    void parseHeader(const std::string& headerLine)
+    {
+        std::istringstream ss(headerLine);
+        std::string cell;
+        std::size_t index = 0;
+
+        while (std::getline(ss, cell, ','))
+        {
+            m_headerMap[cell] = index++;
+        }
+    }
+
+    void parseRow(const std::string& line)
+    {
+        std::vector<std::string> row;
+        std::istringstream ss(line);
+        std::string cell;
+
+        while (std::getline(ss, cell, ','))
+        {
+            row.emplace_back(std::move(cell));
+        }
+
+        m_rawData.emplace_back(std::move(row));
+        m_viewData.emplace_back(m_rawData.back(), m_headerMap);
+    }
 };

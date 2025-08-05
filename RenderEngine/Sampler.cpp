@@ -1,5 +1,6 @@
 #include "Sampler.h"
 #include "DeviceState.h"
+#include "Core.Memory.hpp"
 
 Sampler::Sampler(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE addressMode)
 {
@@ -19,12 +20,12 @@ Sampler::~Sampler()
 	Memory::SafeDelete(m_SamplerState);
 }
 
-void Sampler::Use(uint32 slot)
+void Sampler::Use(uint32_t slot)
 {
 	DeviceState::g_pDeviceContext->PSSetSamplers(slot, 1, &m_SamplerState);
 }
 
-void Sampler::Use(ID3D11DeviceContext* deferredContext, uint32 slot)
+void Sampler::Use(ID3D11DeviceContext* deferredContext, uint32_t slot)
 {
 	deferredContext->PSSetSamplers(slot, 1, &m_SamplerState);
 }

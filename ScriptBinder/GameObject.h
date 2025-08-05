@@ -30,8 +30,8 @@ public:
     ReflectGameObject
     [[Serializable(Inheritance:Object)]]
 	GameObject();
-	GameObject(Scene* scene, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
-	GameObject(Scene* scene, size_t instanceID, const std::string_view& name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
+	GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex);
 	GameObject(GameObject&) = delete;
 	GameObject(GameObject&&) noexcept = default;
 	GameObject& operator=(GameObject&) = delete;
@@ -40,14 +40,14 @@ public:
 	HashingString GetHashedName() const { return m_name; }
 	const std::string& RemoveSuffixNumberTag() const;
 
-    void SetName(const std::string_view& name) { m_name = name.data(); }
-    void SetTag(const std::string_view& tag);
-    void SetLayer(const std::string_view& layer);
+    void SetName(std::string_view name) { m_name = name.data(); }
+    void SetTag(std::string_view tag);
+    void SetLayer(std::string_view layer);
 
 	virtual void Destroy() override final;
 
 	std::shared_ptr<Component> AddComponent(const Meta::Type& type);
-	ModuleBehavior* AddScriptComponent(const std::string_view& scriptName);
+	ModuleBehavior* AddScriptComponent(std::string_view scriptName);
     std::shared_ptr<Component> GetComponent(const Meta::Type& type);
 	std::shared_ptr<Component> GetComponentByTypeID(uint32 id);
 	void RefreshComponentIdIndices();
@@ -75,7 +75,7 @@ public:
 
 	void RemoveComponentIndex(uint32 id);
 	void RemoveComponentTypeID(uint32 typeID);
-	void RemoveScriptComponent(const std::string_view& scriptName);
+	void RemoveScriptComponent(std::string_view scriptName);
 	void RemoveScriptComponent(ModuleBehavior* ptr);
 	void RemoveComponent(Meta::Type& type);
 
@@ -84,7 +84,7 @@ public:
 
 	GameObjectType GetType() const { return m_gameObjectType; }
 
-    static GameObject* Find(const std::string_view& name);
+    static GameObject* Find(std::string_view name);
 	static GameObject* FindIndex(GameObject::Index index);
 	static GameObject* FindInstanceID(const HashedGuid& guid);
 	static GameObject* FindAttachedID(const HashedGuid& guid);
@@ -100,7 +100,7 @@ public:
 	}
 
 	void SetEnabled(bool able) override final;
-	void SetCollisionType(uint32 type) { m_collisionType = type; }
+	void SetCollisionType();
 	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() { return m_ownerScene; }
 

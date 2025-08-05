@@ -126,6 +126,7 @@ void MeshModuleGPU::CreateCubeMesh()
     {
         delete m_tempCubeMesh;
     }
+
     m_tempCubeMesh = new Mesh("CubeParticle", vertices, indices);
 }
 
@@ -170,7 +171,7 @@ void MeshModuleGPU::SetModel(Model* model, int meshIndex)
     m_meshIndex = meshIndex;
 }
 
-void MeshModuleGPU::SetModel(Model* model, const std::string_view& meshName)
+void MeshModuleGPU::SetModel(Model* model, std::string_view meshName)
 {
     if (!model) return;
 
@@ -785,6 +786,8 @@ void MeshModuleGPU::ResetForReuse()
 {
     if (!m_enabled) return;
 
+    std::lock_guard<std::mutex> lock(m_resetMutex);
+
     // 렌더 상태 초기화
     m_instanceCount = 0;
     m_isRendering = false;
@@ -823,8 +826,8 @@ bool MeshModuleGPU::IsReadyForReuse() const
 {
     // GPU 작업이 완료되었고, 렌더링 중이 아닐 때만 재사용 가능
     bool ready = !m_isRendering &&
-        !m_gpuWorkPending.load();
-    //&& m_instanceCount == 0;
+        !m_gpuWorkPending.load()
+        && m_instanceCount == 0;
 
     // 필수 리소스들이 유효한지 확인
     bool resourcesValid = m_constantBuffer != nullptr &&
@@ -835,15 +838,5 @@ bool MeshModuleGPU::IsReadyForReuse() const
 
 void MeshModuleGPU::WaitForGPUCompletion()
 {
-    if (!m_gpuWorkPending.load()) {
-        return; // GPU 작업이 없으면 바로 리턴
-    }
-
-    auto& deviceContext = DeviceState::g_pDeviceContext;
-    if (deviceContext) {
-        deviceContext->Flush();
-    }
-
-    // GPU 작업 완료 플래그 리셋
     m_gpuWorkPending = false;
 }

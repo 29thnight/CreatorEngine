@@ -13,6 +13,10 @@ public:
 
 	~Barrier()
 	{
+	}
+
+	void Finalize()
+	{
 		// 소멸 상태로 전환
 		m_destroyed.store(true, std::memory_order_release);
 		// 한 번이라도 대기 중인 스레드가 깰 수 있도록 generation 증가

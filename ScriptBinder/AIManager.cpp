@@ -46,7 +46,7 @@ void AIManager::UnRegisterAIComponent(GameObject* gameObject, IAIComponent* aiCo
 	}
 }
 
-BT::BTNode::NodePtr AIManager::CreateNode(const std::string_view& nodeName)
+BT::BTNode::NodePtr AIManager::CreateNode(std::string_view nodeName)
 {
 	return BTNodeFactory->Create(nodeName.data());
 }

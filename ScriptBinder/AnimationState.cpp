@@ -1,12 +1,23 @@
 #include "AnimationState.h"
+#include "AniBehavior.h"
+#include "HotLoadSystem.h"
 #include "AnimationBehviourFatory.h"
+
+AnimationState::AnimationState()
+{
+	ScriptManager->CollectAniBehavior(this);
+}
 
 AnimationState::~AnimationState()
 {
-	if (behaviour)
-		delete behaviour;
+	behaviour.reset();
+	ScriptManager->UnCollectAniBehavior(this);
 }
 
+AnimationState::AnimationState(AnimationController* Owner, std::string name) : m_ownerController(Owner), m_name(name)
+{
+	ScriptManager->CollectAniBehavior(this);
+}
 
 std::vector<AniTransition*> AnimationState::FindTransitions(const std::string& toStateName)
 {
@@ -22,11 +33,32 @@ std::vector<AniTransition*> AnimationState::FindTransitions(const std::string& t
 	return aniTransitions;
 }
 
-void AnimationState::SetBehaviour(std::string name)
+void AnimationState::SetBehaviour(std::string name, bool isReload)
 {
-	behaviour = AnimationFactorys->CreateBehaviour(name);
-	if(behaviour == nullptr)
-		return;
-	//behaviourName = behaviour->name;
+	if (isReload)
+	{
+		behaviour = nullptr;
+	}
+	else
+	{
+		behaviourName = name;
+		behaviour.reset();
+		behaviour = nullptr;
+	}
+
+	//behaviour = AnimationFactorys->CreateBehaviour(name);
+	behaviour = std::shared_ptr<AniBehavior>(ScriptManager->CreateAniBehavior(behaviourName.c_str()),
+		[](AniBehavior* ptr)
+		{
+			if (ptr)
+			{
+				ScriptManager->DestroyAniBehavior(ptr);
+			}
+		}
+	);
+;
+
+	if(behaviour == nullptr) return;
+
 	behaviour->m_ownerController = this->m_ownerController;
 }

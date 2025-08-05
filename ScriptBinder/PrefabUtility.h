@@ -16,8 +16,8 @@ public:
     Core::Delegate<void, GameObject&> prefabInstanceReverted;
     Core::Delegate<void, GameObject&> prefabInstanceUnpacked;
 
-    Prefab* CreatePrefab(const GameObject* source, const std::string_view& name = "");
-    GameObject* InstantiatePrefab(const Prefab* prefab, const std::string_view& name = "");
+    Prefab* CreatePrefab(const GameObject* source, std::string_view name = "");
+    GameObject* InstantiatePrefab(const Prefab* prefab, std::string_view name = "");
     void RegisterInstance(GameObject* instance, const Prefab* prefab);
     void UpdateInstances(const Prefab* prefab);
     bool SavePrefab(const Prefab* prefab, const std::string& path);

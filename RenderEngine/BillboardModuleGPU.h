@@ -74,6 +74,6 @@ private:
     std::vector<BillboardVertex> m_vertices;
     std::vector<uint32> m_indices;
 
-
+    std::mutex m_resetMutex;
 };
 

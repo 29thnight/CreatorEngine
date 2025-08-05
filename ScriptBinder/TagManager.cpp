@@ -4,34 +4,47 @@
 
 void TagManager::Initialize()
 {
-        m_tags.reserve(10);
-        m_tagMap.reserve(10);
-        m_taggedObjects.reserve(10);
-        m_layers.reserve(10);
-        m_layerMap.reserve(10);
-        m_layeredObjects.reserve(10);
+    m_tags.reserve(32);
+    m_tagMap.reserve(32);
+    m_taggedObjects.reserve(300);
+    m_layers.reserve(32);
+    m_layerMap.reserve(32);
+    m_layeredObjects.reserve(300);
 
-	// Initialize the tag map with some default tags if needed
-	m_tagMap["Untagged"] = 0;
-	m_tagMap["Respawn"] = 1;
-	m_tagMap["Finish"] = 2;
-	m_tagMap["MainCamera"] = 3;
-	m_tagMap["Player"] = 4;
-	m_tagMap["GameController"] = 5;
+#ifndef BUILD_FLAG
+    file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
+    if(!file::exists(path))
+    {
+        // Initialize the tag map with some default tags if needed
+        m_tagMap["Untagged"] = 0;
+        m_tagMap["Respawn"] = 1;
+        m_tagMap["Finish"] = 2;
+        m_tagMap["MainCamera"] = 3;
+        m_tagMap["Player"] = 4;
+        m_tagMap["GameController"] = 5;
 
-    m_tags = { "Untagged", "Respawn", "Finish", "MainCamera", "Player", "GameController" };
+        m_tags = { "Untagged", "Respawn", "Finish", "MainCamera", "Player", "GameController" };
 
-    m_layerMap["Default"] = 0;
-	m_layerMap["TransparentFX"] = 1;
-	m_layerMap["Ignore RayCast"] = 2;
-	m_layerMap["Water"] = 3;
-	m_layerMap["UI"] = 4;
+        m_layerMap["Default"] = 0;
+        m_layerMap["TransparentFX"] = 1;
+        m_layerMap["Ignore RayCast"] = 2;
+        m_layerMap["Water"] = 3;
+        m_layerMap["UI"] = 4;
 
-    m_layers = { "Default", "TransparentFX", "Ignore RayCast", "Water", "UI" };
+        m_layers = { "Default", "TransparentFX", "Ignore RayCast", "Water", "UI" };
+	    
+        Save();
+    }
+#endif // !BUILD_FLAG
+
+	Load();
 }
 
 void TagManager::Finalize()
 {
+#ifndef BUILD_FLAG
+    Save();
+#endif // !BUILD_FLAG
     m_tags.clear();
     m_tagMap.clear();
     m_taggedObjects.clear();
@@ -43,12 +56,12 @@ void TagManager::Finalize()
 void TagManager::Load()
 {
     file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
-
+#ifndef BUILD_FLAG
     if (!file::exists(path))
     {
-        Save();
         return;
     }
+#endif // !BUILD_FLAG
 
     YAML::Node root = YAML::LoadFile(path.string());
 
@@ -79,6 +92,7 @@ void TagManager::Load()
 
 void TagManager::Save()
 {
+#ifndef BUILD_FLAG
     file::path path = PathFinder::ProjectSettingPath("TagManager.asset");
 
     YAML::Node root;
@@ -94,10 +108,12 @@ void TagManager::Save()
     std::ofstream fout(path);
     fout << root;
     fout.close();
+#endif // !BUILD_FLAG
 }
 
-void TagManager::AddTag(const std::string_view& tag)
+void TagManager::AddTag(std::string_view tag)
 {
+#ifndef BUILD_FLAG
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -108,11 +124,13 @@ void TagManager::AddTag(const std::string_view& tag)
 		m_tags.push_back(tag.data());
 		m_tagMap[tag.data()] = m_tags.size() - 1;
 	}
+#endif // !BUILD_FLAG
 }
 
-void TagManager::AddLayer(const std::string_view& layer)
+void TagManager::AddLayer(std::string_view layer)
 {
-    if (layer.empty())
+#ifndef BUILD_FLAG
+    if (layer.empty() || 32 < m_layers.size())
     {
         return;
     }
@@ -122,10 +140,12 @@ void TagManager::AddLayer(const std::string_view& layer)
         m_layers.push_back(layer.data());
         m_layerMap[layer.data()] = m_layers.size() - 1;
     }
+#endif // !BUILD_FLAG
 }
 
-void TagManager::RemoveTag(const std::string_view& tag)
+void TagManager::RemoveTag(std::string_view tag)
 {
+#ifndef BUILD_FLAG
 	if (tag.empty() || tag == "Untagged")
 	{
 		return; // Avoid adding empty tags
@@ -137,10 +157,12 @@ void TagManager::RemoveTag(const std::string_view& tag)
 		m_tags.erase(std::remove(m_tags.begin(), m_tags.end(), tag.data()), m_tags.end());
 		m_tagMap.erase(it);
 	}
+#endif // !BUILD_FLAG
 }
 
-void TagManager::RemoveLayer(const std::string_view& layer)
+void TagManager::RemoveLayer(std::string_view layer)
 {
+#ifndef BUILD_FLAG
     if (layer.empty())
     {
         return;
@@ -152,9 +174,10 @@ void TagManager::RemoveLayer(const std::string_view& layer)
         m_layers.erase(std::remove(m_layers.begin(), m_layers.end(), layer.data()), m_layers.end());
         m_layerMap.erase(it);
     }
+#endif // !BUILD_FLAG
 }
 
-bool TagManager::HasTag(const std::string_view& tag) const
+bool TagManager::HasTag(std::string_view tag) const
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -165,7 +188,7 @@ bool TagManager::HasTag(const std::string_view& tag) const
 	return it != m_tagMap.end();
 }
 
-bool TagManager::HasLayer(const std::string_view& layer) const
+bool TagManager::HasLayer(std::string_view layer) const
 {
     if (layer.empty())
     {
@@ -176,7 +199,7 @@ bool TagManager::HasLayer(const std::string_view& layer) const
     return it != m_layerMap.end();
 }
 
-void TagManager::AddTagToObject(const std::string_view& tag, GameObject* object)
+void TagManager::AddTagToObject(std::string_view tag, GameObject* object)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -190,7 +213,7 @@ void TagManager::AddTagToObject(const std::string_view& tag, GameObject* object)
 	}
 }
 
-void TagManager::AddObjectToLayer(const std::string_view& layer, GameObject* object)
+void TagManager::AddObjectToLayer(std::string_view layer, GameObject* object)
 {
     if (layer.empty())
     {
@@ -204,7 +227,7 @@ void TagManager::AddObjectToLayer(const std::string_view& layer, GameObject* obj
     }
 }
 
-void TagManager::RemoveTagFromObject(const std::string_view& tag, GameObject* object)
+void TagManager::RemoveTagFromObject(std::string_view tag, GameObject* object)
 {
 	if (tag.empty() || tag == "Untagged")
 	{
@@ -218,7 +241,7 @@ void TagManager::RemoveTagFromObject(const std::string_view& tag, GameObject* ob
 	}
 }
 
-void TagManager::RemoveObjectFromLayer(const std::string_view& layer, GameObject* object)
+void TagManager::RemoveObjectFromLayer(std::string_view layer, GameObject* object)
 {
     if (layer.empty())
     {

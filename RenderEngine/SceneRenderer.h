@@ -1,6 +1,5 @@
 #pragma once
 #include "Core.Minimal.h"
-#include "Delegate.h"
 #ifndef DYNAMICCPP_EXPORTS //PassData
 #include "DeviceResources.h"
 #include "ForwardPass.h"
@@ -13,7 +12,6 @@
 #include "SpritePass.h"
 #include "BlitPass.h"
 #include "WireFramePass.h"
-#include "GridPass.h"
 #include "AAPass.h"
 #include "PostProcessingPass.h"
 //작업자 용우 관련
@@ -35,12 +33,8 @@
 #include "EffectEditor.h"
 #endif // !DYNAMICCPP_EXPORTS
 
-#include "Model.h"
 #include "LightController.h"
 #include "Camera.h"
-
-const static float pi = XM_PIDIV2 - 0.01f;
-const static float pi2 = XM_PI * 2.f;
 
 class Scene;
 class RenderPassWindow;
@@ -81,12 +75,12 @@ private:
 	void InitializeTextures();
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
-	void ApplyNewCubeMap(const std::string_view& filename);
+	void ApplyNewCubeMap(std::string_view filename);
 	void UnbindRenderTargets();
 	void ReloadShaders();
 	void ResourceTrim();
 
-	std::shared_ptr<RenderScene> m_renderScene{};
+	std::shared_ptr<RenderScene>				m_renderScene{};
 
 #ifndef DYNAMICCPP_EXPORTS //PassData
 	//device
@@ -128,21 +122,21 @@ private:
 	//buffers
 	ComPtr<ID3D11Buffer>						m_ModelBuffer;
 	//Textures
-	UniqueTexturePtr m_diffuseTexture          { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_metalRoughTexture       { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_normalTexture           { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_emissiveTexture         { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_bitmaskTexture		   { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_ambientOcclusionTexture { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_toneMappedColourTexture { TEXTURE_NULL_INITIALIZER };
-	UniqueTexturePtr m_lightingTexture		   { TEXTURE_NULL_INITIALIZER };
+	 Managed::SharedPtr<Texture>				m_diffuseTexture{};
+	 Managed::SharedPtr<Texture>				m_metalRoughTexture{};
+	 Managed::SharedPtr<Texture>				m_normalTexture{};
+	 Managed::SharedPtr<Texture>				m_emissiveTexture{};
+	 Managed::SharedPtr<Texture>				m_bitmaskTexture{};
+	 Managed::SharedPtr<Texture>				m_ambientOcclusionTexture{};
+	 Managed::SharedPtr<Texture>				m_toneMappedColourTexture{};
+	 Managed::SharedPtr<Texture>				m_lightingTexture{};
 
-	std::shared_ptr<SpriteBatch> m_spriteBatch = nullptr;
-	ThreadPool<std::function<void()>>* m_threadPool = nullptr;
-	std::unique_ptr<RenderThreadPool> m_commandThreadPool = nullptr;
+	std::shared_ptr<SpriteBatch>				m_spriteBatch = nullptr;
+	ThreadPool<std::function<void()>>*			m_threadPool = nullptr;
+	std::unique_ptr<RenderThreadPool>			m_commandThreadPool = nullptr;
 #endif // !DYNAMICCPP_EXPORTS
 	//Editor Camera
-	std::shared_ptr<Camera> m_pEditorCamera{};
+	std::shared_ptr<Camera>						m_pEditorCamera{};
 
 	lm::LightMap lightMap;
 //Debug
@@ -151,8 +145,8 @@ public:
 	void SetLightmapPass()  { useTestLightmap = !useTestLightmap; }
 
 private:
-    bool useWireFrame       { false };
-	bool m_bShowRenderState { false };
-	std::atomic_bool useTestLightmap{ false };
-	bool m_bShowGridSettings{ false };
+    bool										useWireFrame		{ false };
+	bool										m_bShowRenderState	{ false };
+	std::atomic_bool							useTestLightmap		{ false };
+	bool										m_bShowGridSettings	{ false };
 };

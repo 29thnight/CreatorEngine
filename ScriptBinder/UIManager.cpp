@@ -7,7 +7,7 @@
 #include "InputManager.h"
 #include "TextComponent.h"
 
-std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
+std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
 	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Empty);
 	newObj->AddComponent<Canvas>();
@@ -16,7 +16,7 @@ std::shared_ptr<GameObject> UIManager::MakeCanvas(const std::string_view& name)
 	return newObj;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Texture* texture, GameObject* canvas,Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* texture, GameObject* canvas,Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -45,7 +45,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name,Te
 	return newImage;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture* texture, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -71,7 +71,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(const std::string_view& name, T
 }
 
 
-std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos , GameObject* canvas)
+std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos , GameObject* canvas)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -96,7 +96,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 
 
 
-std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, std::string_view canvasname,  Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -124,7 +124,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(const std::string_view& name, 
 	return newButton;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(const std::string_view& name, SpriteFont* Sfont, GameObject* canvas, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
@@ -144,7 +144,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(const std::string_view& name, Sp
 	return newText;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeText(const std::string_view& name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();

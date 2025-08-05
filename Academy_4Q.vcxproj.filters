@@ -57,6 +57,9 @@
     <Filter Include="Window\InspectorWindow\CustomInspector">
       <UniqueIdentifier>{0653c8f2-d894-4946-a610-6ee3fc83195e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Builder">
+      <UniqueIdentifier>{05e04b99-572e-49cc-b5c8-8e1eab96363f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
@@ -119,6 +122,9 @@
     <ClInclude Include="EngineGUIWindow\ExternUI.h">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClInclude>
+    <ClInclude Include="GameBuilderSystem.h">
+      <Filter>Builder</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
@@ -165,6 +171,9 @@
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
+    </ClCompile>
+    <ClCompile Include="GameBuilderSystem.cpp">
+      <Filter>Builder</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

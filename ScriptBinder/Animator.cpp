@@ -115,7 +115,7 @@ AnimationController* Animator::GetController(std::string name)
     return nullptr;
 }
 
-Socket* Animator::MakeSocket(const std::string_view& socketName, const std::string_view& boneName)
+Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneName)
 {
 	Socket* socket = m_Skeleton->FindSocket(socketName);
 	if (socket) return socket;
@@ -130,7 +130,7 @@ Socket* Animator::MakeSocket(const std::string_view& socketName, const std::stri
 	return newSocket;
 }
 
-Socket* Animator::FindSocket(const std::string_view& socketName)
+Socket* Animator::FindSocket(std::string_view socketName)
 {
 	return m_Skeleton->FindSocket(socketName);
 }

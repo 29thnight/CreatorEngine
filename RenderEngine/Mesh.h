@@ -1,9 +1,10 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Mesh.generated.h"
+#include "ManagedHeapObject.h"
 #include <assimp/Importer.hpp>
 
-struct ModelNode
+struct ModelNode : public Managed::HeapObject
 {
 	std::string m_name;
 	Mathf::Matrix m_transform{ XMMatrixIdentity() };
@@ -15,7 +16,7 @@ struct ModelNode
 	std::vector<uint32> m_meshes;
 
 	ModelNode() = default;
-	ModelNode(const std::string_view& name) : m_name(name) {}
+	ModelNode(std::string_view name) : m_name(name) {}
 };
 
 struct Vertex
@@ -95,7 +96,7 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class Mesh
+class Mesh : public Managed::HeapObject, public std::enable_shared_from_this<Mesh>
 {
 public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체
@@ -110,8 +111,8 @@ public:
    ReflectMesh
     [[Serializable]]
 	Mesh() = default;
-	Mesh(const std::string_view& _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
-	Mesh(const std::string_view& _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);
+	Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
+	Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 

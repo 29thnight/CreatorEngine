@@ -1,11 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "GameObject.h"
 
-class TagManager : public Singleton<TagManager>
+class TagManager : public DLLCore::Singleton<TagManager>
 {
 private:
-	friend Singleton;
+	friend DLLCore::Singleton<TagManager>;
 	TagManager() = default;
 	~TagManager() = default;
 
@@ -14,13 +15,13 @@ public:
 	void Finalize();
 	void Load();
     void Save();
-    void AddTag(const std::string_view& tag);
-    void RemoveTag(const std::string_view& tag);
-    bool HasTag(const std::string_view& tag) const;
+    void AddTag(std::string_view tag);
+    void RemoveTag(std::string_view tag);
+    bool HasTag(std::string_view tag) const;
 
-    void AddLayer(const std::string_view& layer);
-    void RemoveLayer(const std::string_view& layer);
-    bool HasLayer(const std::string_view& layer) const;
+    void AddLayer(std::string_view layer);
+    void RemoveLayer(std::string_view layer);
+    bool HasLayer(std::string_view layer) const;
 
     std::vector<std::string>& GetTags()
     {
@@ -32,7 +33,7 @@ public:
         return m_layers;
     }
 
-    size_t GetTagIndex(const std::string_view& tag) const
+    size_t GetTagIndex(std::string_view tag) const
     {
         if (tag.empty() || tag == "Untagged")
         {
@@ -46,7 +47,7 @@ public:
         return 0; // "Untagged" index
 	}
 
-    size_t GetLayerIndex(const std::string_view& layer) const
+    size_t GetLayerIndex(std::string_view layer) const
     {
         if (layer.empty())
         {
@@ -60,13 +61,13 @@ public:
         return 0; // Default layer index
 	}
 
-    void AddTagToObject(const std::string_view& tag, GameObject* object);
-    void RemoveTagFromObject(const std::string_view& tag, GameObject* object);
+    void AddTagToObject(std::string_view tag, GameObject* object);
+    void RemoveTagFromObject(std::string_view tag, GameObject* object);
 
-    void AddObjectToLayer(const std::string_view& layer, GameObject* object);
-    void RemoveObjectFromLayer(const std::string_view& layer, GameObject* object);
+    void AddObjectToLayer(std::string_view layer, GameObject* object);
+    void RemoveObjectFromLayer(std::string_view layer, GameObject* object);
 
-    std::vector<GameObject*> GetObjectsInLayer(const std::string_view& layer) const
+    std::vector<GameObject*> GetObjectsInLayer(std::string_view layer) const
     {
         if (layer.empty())
         {
@@ -81,7 +82,7 @@ public:
         return {};
     }
 
-    GameObject* GetObjectInLayer(const std::string_view& layer) const
+    GameObject* GetObjectInLayer(std::string_view layer) const
     {
         if (layer.empty())
         {
@@ -96,7 +97,7 @@ public:
         return nullptr;
     }
 
-	std::vector<GameObject*> GetObjectsWithTag(const std::string_view& tag) const
+	std::vector<GameObject*> GetObjectsWithTag(std::string_view tag) const
 	{
 		if (tag.empty() || tag == "Untagged")
 		{
@@ -111,7 +112,7 @@ public:
 		return {};
 	}
 
-	GameObject* GetObjectWithTag(const std::string_view& tag) const
+	GameObject* GetObjectWithTag(std::string_view tag) const
 	{
 		if (tag.empty() || tag == "Untagged")
 		{
@@ -150,3 +151,5 @@ private:
     std::unordered_map<std::string, std::vector<GameObject*>> m_layeredObjects{};
 	
 };
+
+static auto TagManagers = TagManager::GetInstance();

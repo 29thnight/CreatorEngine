@@ -1,5 +1,4 @@
 #include "MeshOptimizer.h"
-#include "ResourceAllocator.h"
 #include <meshoptimizer.h>
 #include <stdexcept>
 

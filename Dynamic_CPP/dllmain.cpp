@@ -14,6 +14,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         InitActionFactory();
         InitConditionFactory();
         InitConditionDecoratorFactory();
+        InitAniBehaviorFactory();
 		InitModuleFactory();
         break;
     case DLL_THREAD_ATTACH:

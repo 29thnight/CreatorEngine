@@ -66,6 +66,8 @@ private:
 	Mathf::Vector3 m_previousEmitterPosition;
 	bool m_forcePositionUpdate;
 
+	std::mutex m_resetMutex;
+
 public:
 	MeshSpawnModuleCS();
 	virtual ~MeshSpawnModuleCS();

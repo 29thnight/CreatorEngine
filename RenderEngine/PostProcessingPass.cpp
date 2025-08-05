@@ -4,7 +4,6 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
-#include "ResourceAllocator.h"
 
 #pragma warning(disable: 2398)
 PostProcessingPass::PostProcessingPass()
@@ -54,7 +53,7 @@ PostProcessingPass::PostProcessingPass()
 PostProcessingPass::~PostProcessingPass()
 {
 	//Memory::SafeDelete(m_CopiedTexture);
-    DeallocateResource(m_CopiedTexture);
+    delete m_CopiedTexture;
 
 }
 
@@ -105,20 +104,20 @@ void PostProcessingPass::ControlPanel()
 		GaussianBlurComputeKernel();
 	}
 
-        if (ImGui::Button("Reset")) {
-                m_bloomThreshold.threshold = 0.3f;
-                m_bloomThreshold.knee = 0.5f;
-                m_bloomComposite.coefficient = 0.3f;
-                m_bloomBlur.radius = 7;
-                m_bloomBlur.sigma = 5.f;
-                GaussianBlurComputeKernel();
-                setting.applyBloom = true;
-                setting.threshold = m_bloomThreshold.threshold;
-                setting.knee = m_bloomThreshold.knee;
-                setting.coefficient = m_bloomComposite.coefficient;
-                setting.blurRadius = m_bloomBlur.radius;
-                setting.blurSigma = m_bloomBlur.sigma;
-        }
+    if (ImGui::Button("Reset")) {
+            m_bloomThreshold.threshold = 0.3f;
+            m_bloomThreshold.knee = 0.5f;
+            m_bloomComposite.coefficient = 0.3f;
+            m_bloomBlur.radius = 7;
+            m_bloomBlur.sigma = 5.f;
+            GaussianBlurComputeKernel();
+            setting.applyBloom = true;
+            setting.threshold = m_bloomThreshold.threshold;
+            setting.knee = m_bloomThreshold.knee;
+            setting.coefficient = m_bloomComposite.coefficient;
+            setting.blurRadius = m_bloomBlur.radius;
+            setting.blurSigma = m_bloomBlur.sigma;
+    }
 	ImGui::PopID();
 
 }

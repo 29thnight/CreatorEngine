@@ -189,10 +189,10 @@ float3 GetOrbitalVelocity(float3 position, float time)
 
 float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex)
 {
-    // 파티클별 고유한 방향 생성 (인덱스 기반)
-    float angle = (float) particleIndex * 2.399963; // 황금각 사용으로 균등 분포
-    float elevation = ((float) particleIndex * 0.618034) - floor((float) particleIndex * 0.618034); // 0~1
-    elevation = (elevation - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
+    // 파티클별 고유한 방향 생성 (시간 + 인덱스 기반으로 진짜 랜덤하게)
+    float2 seed = float2(particleIndex * 0.1 + currentTime * 1.5, particleIndex * 0.3 + currentTime * 0.7);
+    float angle = noise(seed) * 6.28318; // 0~2π
+    float elevation = (noise(seed + 100.0) - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
     
     float3 explosionDir = float3(
         cos(angle) * cos(elevation),
@@ -203,8 +203,8 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     // 초기 폭발 속도 (시간에 따라 감소)
     float speedDecay = 1.0 - pow(normalizedAge, explosiveDecay);
     
-    // 랜덤성 추가
-    float2 noiseInput = float2(particleIndex * 0.1, currentTime * 0.5);
+    // 랜덤성 추가 (시간도 포함해서 더 랜덤하게)
+    float2 noiseInput = float2(particleIndex * 0.1 + currentTime, currentTime * 0.5 + particleIndex * 0.07);
     float randomFactor = 1.0 + (noise(noiseInput) - 0.5) * explosiveRandom;
     
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;

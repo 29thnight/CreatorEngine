@@ -31,12 +31,5 @@ private:
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
-	void ImguiDrawLuaScriptPopup();
-
-
-	//node editor combo
-	bool BeginNodeCombo(const char* label, const char* preview_value, ImGuiComboFlags flags = 0);
-	void EndNodeCombo();
-
 };
 #endif // !DYNAMICCPP_EXPORTS

@@ -13,6 +13,7 @@ private:
 
 public:
 	void Initialize();
+	void Finalize();
 	void LoadShaders();
 	void ReloadShaders();
 	void HLSLIncludeReloadShaders();

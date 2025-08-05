@@ -62,9 +62,24 @@ void EffectManager::Update(float delta)
 		auto& effect = it->second;
 		effect->Update(delta);
 
+		// 풀 반환 조건을 더 관대하게 수정
+		bool shouldReturn = false;
+
 		if (effect->GetState() == EffectState::Stopped) {
+			shouldReturn = true;
+		}
+		// 무한 이펙트가 오래 실행되고 있으면 강제 정리 (선택적)
+		//else if (effect->GetDuration() < 0 && effect->GetCurrentTime() > 60.0f) {
+		//	effect->Stop();
+		//	shouldReturn = true;
+		//}
+
+		if (shouldReturn) {
 			auto effectToReturn = std::move(effect);
 			it = activeEffects.erase(it);
+
+			// GPU 작업 완료 대기 후 풀에 반환
+			effectToReturn->WaitForGPUCompletion();
 			ReturnToPool(std::move(effectToReturn));
 		}
 		else {
@@ -219,6 +234,8 @@ uint32_t EffectManager::GetSmartAvailableId(const std::string& templateName)
 	return availableId;
 }
 
+// 풀 관련 **************************************************************************************************************************************************
+
 void EffectManager::InitializeUniversalPool()
 {
 	for (int i = 0; i < DEFAULT_POOL_SIZE; ++i) {
@@ -233,31 +250,53 @@ void EffectManager::InitializeUniversalPool()
 
 std::unique_ptr<EffectBase> EffectManager::AcquireFromPool()
 {
+	// 풀이 비어있으면 새로 생성
 	if (universalPool.empty()) {
-		return nullptr;  // 풀 고갈
+		std::cout << "Pool empty, creating new effect instance" << std::endl;
+		auto newEffect = CreateUniversalEffect();
+		if (newEffect) {
+			return newEffect;
+		}
+		return nullptr;
 	}
 
 	auto instance = std::move(universalPool.front());
 	universalPool.pop();
 
-	// 재사용을 위한 리셋
-	//instance->ResetForReuse();
+	// 재사용 준비 상태 확인 (D3D 호출 없이)
+	if (!instance->IsReadyForReuse()) {
+		std::cerr << "Warning: Pool instance not ready for reuse!" << std::endl;
+		// 강제로 새 인스턴스 생성
+		return CreateUniversalEffect();
+	}
 
+	std::cout << "Acquired from pool. Remaining pool size: " << universalPool.size() << std::endl;
 	return instance;
 }
 
 void EffectManager::ReturnToPool(std::unique_ptr<EffectBase> effect)
 {
-	if (effect && effect->IsReadyForReuse()) {
-		// 여기서 정리 작업 수행
-		effect->WaitForGPUCompletion();
+	if (!effect) return;
 
-		// 상태만 초기화 (Stop 호출하지 않음)
-		effect->ResetForReuse();
+	// 1. 논리적 정리만 (D3D 호출 없음)
+	if (effect->GetState() != EffectState::Stopped) {
+		effect->Stop();
+	}
 
+	// 2. 논리적 리셋만 (스레드 안전)
+	effect->ResetForReuse();
+
+	// 3. 바로 풀에 반환 (GPU 대기 없음)
+	if (effect->IsReadyForReuse()) {
 		universalPool.push(std::move(effect));
+		std::cout << "Effect returned to pool. Pool size: " << universalPool.size() << std::endl;
+	}
+	else {
+		std::cerr << "Warning: Effect not ready for reuse" << std::endl;
 	}
 }
+
+//***********************************************************************************************************************************************************
 
 bool EffectManager::GetTemplateSettings(const std::string& templateName, float& outTimeScale, bool& outLoop, float& outDuration)
 {

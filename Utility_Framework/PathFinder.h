@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <Windows.h>
+#include <iostream>
 
 inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
 
@@ -75,6 +76,7 @@ namespace InternalPath
 	inline file::path NodeEditorPath{};
 	inline file::path volumeProfilePath{};
 	inline file::path InputMapPath{};
+	inline file::path GameBuildSlnPath{};
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -104,6 +106,7 @@ namespace InternalPath
 		NodeEditorPath			= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\NodeEditor\\").lexically_normal();
 		volumeProfilePath		= file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\VolumeProfile\\").lexically_normal();
 		InputMapPath            = file::path(base).append("..\\..\\Dynamic_CPP\\Assets\\InputMap\\").lexically_normal();
+		GameBuildSlnPath		= file::path(base).append("..\\..\\GameBuild.sln").lexically_normal();
 		//dir not exist -> create dir
 
 		std::vector<file::path> paths = {
@@ -153,7 +156,7 @@ public:
 		return InternalPath::DumpPath;
 	}
 
-	static inline file::path Relative(const std::string_view& path)
+	static inline file::path Relative(std::string_view path)
     {
         return file::path(InternalPath::DataPath) / path;
     }
@@ -163,7 +166,7 @@ public:
 		return file::path(InternalPath::ShaderSourcePath);
 	}
 
-	static inline file::path RelativeToShader(const std::string_view& path)
+	static inline file::path RelativeToShader(std::string_view path)
 	{
 		return file::path(InternalPath::ShaderSourcePath) / path;
 	}
@@ -173,12 +176,12 @@ public:
 		return file::path(InternalPath::PrecompiledShaderPath);
 	}
 
-    static inline file::path RelativeToExecutable(const std::string_view& path)
+    static inline file::path RelativeToExecutable(std::string_view path)
     {
         return file::path(InternalPath::ExecuteablePath) / path;
     }
 
-	static inline file::path RelativeToMaterial(const std::string_view& path)
+	static inline file::path RelativeToMaterial(std::string_view path)
 	{
 		return file::path(InternalPath::MaterialSourcePath) / path;
 	}
@@ -238,56 +241,61 @@ public:
 		return InternalPath::volumeProfilePath;
 	}
 
-	static inline file::path DynamicSolutionPath(const std::string_view& path)
+	static inline file::path GameBuildSlnPath()
+	{
+		return InternalPath::GameBuildSlnPath;
+	}
+
+	static inline file::path DynamicSolutionPath(std::string_view path)
 	{
 		return file::path(InternalPath::DynamicSolutionDir) / path;
 	}
 
-	static inline file::path ProjectSettingPath(const std::string_view& path)
+	static inline file::path ProjectSettingPath(std::string_view path)
 	{
 		return file::path(InternalPath::ProjectSettingsPath) / path;
 	}
 
-	static inline file::path TerrainSourcePath(const std::string_view& path)
+	static inline file::path TerrainSourcePath(std::string_view path)
 	{
 		return file::path(InternalPath::TerrainSourcePath) / path;
 	}
 
-	static inline file::path NodeEditorPath(const std::string_view& path)
+	static inline file::path NodeEditorPath(std::string_view path)
 	{
 		return file::path(InternalPath::NodeEditorPath) / path;
 	}
 
-	static inline file::path RelativeToModel(const std::string_view& path)
+	static inline file::path RelativeToModel(std::string_view path)
 	{
 		return file::path(InternalPath::ModelSourcePath) / path;
 	}
 
-	static inline file::path RelativeToTexture(const std::string_view& path)
+	static inline file::path RelativeToTexture(std::string_view path)
 	{
 		return file::path(InternalPath::TextureSourcePath) / path;
 	}
 
-	static inline file::path RelativeToUISource(const std::string_view& path)
+	static inline file::path RelativeToUISource(std::string_view path)
 	{
 		return file::path(InternalPath::UISourcePath) / path;
 	}
 
-	static inline file::path RelativeToPrefab(const std::string_view& path)
+	static inline file::path RelativeToPrefab(std::string_view path)
 	{
 		return file::path(InternalPath::PrefabSourcePath) / path;
 	}
 
-	static inline file::path RelativeToBaseProject(const std::string_view& path)
+	static inline file::path RelativeToBaseProject(std::string_view path)
 	{
 		return file::path(InternalPath::BaseProjectPath) / path;
 	}
 
-	static inline file::path RelativeToVolumeProfile(const std::string_view& path)
+	static inline file::path RelativeToVolumeProfile(std::string_view path)
 	{
 		return file::path(InternalPath::volumeProfilePath) / path;
 	}
-	static inline file::path InputMapPath(const std::string_view& path)
+	static inline file::path InputMapPath(std::string_view path)
 	{
 		return file::path(InternalPath::InputMapPath) / path;
 	}

@@ -15,8 +15,11 @@
 #include "BTBuildGraph.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
+#include "TagManager.h"
 #include "EngineSetting.h"
 #include "ToggleUI.h"
+
+constexpr int MAX_LAYER_SIZE = 32;
 
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
@@ -165,43 +168,53 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
 
     ImGui::ContextRegister("CollisionMatrixPopup", true, [&]() 
     {
+        const auto& layers = TagManager::GetInstance()->GetLayers();
+        const int layerCount = static_cast<int>(layers.size());
+        const int matrixSize = std::min(layerCount, 32); // 최대 32개 제한
+        const float checkboxSize = ImGui::GetFrameHeight();
+        const float cellSize = checkboxSize;
+
         ImGui::Text("Collision Matrix");
         ImGui::Separator();
         //todo::grid matrix
         if(collisionMatrix.empty()){
             collisionMatrix = PhysicsManagers->GetCollisionMatrix();
         }
-        int flags = ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize;
-
-        if (ImGui::BeginChild("Matrix", ImVec2(0, 0), flags))
+        if (ImGui::BeginChild("CollisionMatrix", ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize))
         {
             ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2, 2));
-            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1.0f, 1.0f, 1.0f, 0.0f)); // 진한 줄 - 반투명 흰색
-            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));  // 연한 줄 - 더 투명
+            ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, 0.5f); // 기울기 설정
+            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1, 1, 1, 0));
+            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1, 1, 1, 0));
 
-            const int matrixSize = 32;
-            const float checkboxSize = ImGui::GetFrameHeight();
-            const float cellWidth = checkboxSize;
+            const ImGuiTableFlags tableFlags =
+                ImGuiTableFlags_SizingFixedFit |
+                ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+                ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
+                ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
+                ImGuiTableFlags_Hideable;
 
-            // 총 열 개수 = 인덱스 번호 포함해서 33개
-            if (ImGui::BeginTable("CollisionMatrixTable", matrixSize + 1,
-                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit))
+            if (ImGui::BeginTable("CollisionMatrixTable", matrixSize + 1, tableFlags))
             {
                 // -------------------------
-                // 첫 번째 헤더 행
+                // 1. TableSetupColumn 설정
                 // -------------------------
-                ImGui::TableNextRow();
-                for (int col = -1; col < matrixSize; ++col)
+                ImGui::TableSetupColumn(" ", ImGuiTableColumnFlags_NoHeaderLabel); // 좌측 인덱스용
+                for (int col = 0; col < matrixSize; ++col)
                 {
-                    ImGui::TableNextColumn();
-                    if (col >= 0)
-                        ImGui::Text("%2d", col);
-                    else
-                        ImGui::Text("   "); // 좌상단 빈칸
+                    ImGui::TableSetupColumn(
+                        layers[col].c_str(),
+                        ImGuiTableColumnFlags_AngledHeader | ImGuiTableColumnFlags_NoHide
+                    );
                 }
 
                 // -------------------------
-                // 본문 행 렌더링
+                // 2. 헤더 렌더링
+                // -------------------------
+                ImGui::TableAngledHeadersRow(); // 대각선 헤더 출력
+
+                // -------------------------
+                // 3. 본문 렌더링
                 // -------------------------
                 for (int row = 0; row < matrixSize; ++row)
                 {
@@ -211,25 +224,25 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                         ImGui::TableNextColumn();
                         if (col == -1)
                         {
-                            // 행 번호
-                            ImGui::Text("%2d", row);
+                            // 행 인덱스 이름 출력
+                            ImGui::TextUnformatted(layers[row].c_str());
                         }
                         else
                         {
-                            ImGui::PushID(row * matrixSize + col);
-
+                            ImGui::PushID(row * MAX_LAYER_SIZE + col);
                             if (row <= col)
                             {
-                                bool checkboxValue = (bool)collisionMatrix[row][col];
-                                ImGui::Checkbox("##chk", &checkboxValue);
-                                collisionMatrix[row][col] = (uint8_t)checkboxValue;
+                                bool value = collisionMatrix[row][col] != 0;
+                                if (ImGui::Checkbox("##chk", &value))
+                                {
+                                    collisionMatrix[row][col] = (uint8_t)value;
+                                    collisionMatrix[col][row] = (uint8_t)value; // 대칭
+                                }
                             }
                             else
                             {
-                                // 시각적으로 동일한 크기 확보
-                                ImGui::Dummy(ImVec2(cellWidth, checkboxSize));
+                                ImGui::Dummy(ImVec2(cellSize, checkboxSize));
                             }
-
                             ImGui::PopID();
                         }
                     }
@@ -238,10 +251,11 @@ MenuBarWindow::MenuBarWindow(SceneRenderer* ptr) :
                 ImGui::EndTable();
             }
 
-            ImGui::PopStyleColor(2); // 설정한 2개 색상 pop
-            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar(2);
             ImGui::EndChild();
         }
+
 
         ImGui::Separator();
         if (ImGui::Button("Save"))
@@ -2176,11 +2190,8 @@ void MenuBarWindow::SHowInputActionMap()
                         ImGui::OpenPopup("selectScript");
                     }
 
-
-
                     if (ImGui::BeginPopup("selectScript"))
                     {
-         
                         for (auto& script : ScriptManager->GetScriptNames())
                         {
                          
@@ -2256,9 +2267,8 @@ void MenuBarWindow::SHowInputActionMap()
             {
                 if (InputManagement->IsWheelDown())
                 {
-                    
                     index++;
-                    int maxIndex = static_cast<int>(keyboradsss.size()) - 10;
+                    constexpr int maxIndex = (int)keyboardButtons.size() - 10;
                     if (index > maxIndex)
                         index = maxIndex;
                 }
@@ -2273,11 +2283,11 @@ void MenuBarWindow::SHowInputActionMap()
                 for (int i = 0; i < 10; i++)
                 {
                     int realIndex = index + i;
-                    if (realIndex >= keyboradsss.size())
+                    if (realIndex >= keyboardButtons.size())
                         break; 
-                    if (ImGui::MenuItem(KeyBoardString(keyboradsss[realIndex]).c_str()))
+                    if (ImGui::MenuItem(KeyBoardString(keyboardButtons[realIndex]).c_str()))
                     {
-                        action->key[floatId] = static_cast<size_t>(keyboradsss[realIndex]);
+                        action->key[floatId] = static_cast<size_t>(keyboardButtons[realIndex]);
                         
                     }
                 }
@@ -2288,9 +2298,8 @@ void MenuBarWindow::SHowInputActionMap()
                 
                 if (InputManagement->IsWheelDown())
                 {
-
                     index++;
-                    int maxIndex = static_cast<int>(controllerButtons.size()) - 10;
+                    constexpr int maxIndex = (int)controllerButtons.size() - 10;
                     if (index > maxIndex)
                         index = maxIndex;
                 }
@@ -2322,10 +2331,10 @@ void MenuBarWindow::SHowInputActionMap()
 
             if (ImGui::BeginPopup("ControllerButtonFlaot4"))
             {
-                if (ImGui::MenuItem("LEFT_Thumbstick"))
-                    action->SetControllerButton(ControllerButton::LEFT_Thumbstick);
-                else if (ImGui::MenuItem("RIGHT_Thumbstick"))
-                    action->SetControllerButton(ControllerButton::RIGHT_Thumbstick);
+                if (ImGui::MenuItem("LEFT_THUMB"))
+                    action->SetControllerButton(ControllerButton::LEFT_THUMB);
+                else if (ImGui::MenuItem("RIGHT_THUMB"))
+                    action->SetControllerButton(ControllerButton::RIGHT_THUMB);
                 ImGui::EndPopup();
             }
             

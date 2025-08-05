@@ -1,6 +1,12 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "../Utility_Framework/Core.Minimal.h"
+#include "TypeDefinition.h"
+#include "ClassProperty.h"
+#include "ManagedHeapObject.h"
+#include "Delegate.h"
+#include <d3d11.h>
+#include <string_view>
+#include <functional>
 
 enum class TextureType
 {
@@ -11,11 +17,11 @@ enum class TextureType
 	ImageTexture,
 };
 
-class Texture
+class Texture : public Managed::HeapObject
 {
 public:
 	Texture() = default;
-	Texture(ID3D11Texture2D* texture, const std::string_view& name, TextureType type, CD3D11_TEXTURE2D_DESC desc);
+	Texture(ID3D11Texture2D* texture, std::string_view name, TextureType type, CD3D11_TEXTURE2D_DESC desc);
 	Texture(const Texture&) = delete;
 	Texture(Texture&& texture) noexcept;
 	~Texture();
@@ -23,9 +29,27 @@ public:
 	static Texture* Create(
 		_In_ uint32 width, 
 		_In_ uint32 height, 
-		_In_ const std::string_view& name, 
+		_In_ std::string_view name, 
 		_In_ DXGI_FORMAT textureFormat, 
 		_In_ uint32 bindFlags, 
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Managed::UniquePtr<Texture> CreateManaged(
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Managed::SharedPtr<Texture> CreateShared(
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
@@ -34,7 +58,18 @@ public:
 		_In_ uint32 ratioY,
 		_In_ uint32 width,
 		_In_ uint32 height,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Managed::UniquePtr<Texture> CreateManaged(
+		_In_ uint32 ratioX,
+		_In_ uint32 ratioY,
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
@@ -42,7 +77,25 @@ public:
 
 	static Texture* CreateCube(
 		_In_ uint32 size,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ uint32 mipLevels = 1,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Managed::UniquePtr<Texture> CreateManagedCube(
+		_In_ uint32 size,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_opt_ uint32 mipLevels = 1,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Managed::SharedPtr<Texture> CreateSharedCube(
+		_In_ uint32 size,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_opt_ uint32 mipLevels = 1,
@@ -52,14 +105,34 @@ public:
 	static Texture* CreateArray(
 		_In_ uint32 width,
 		_In_ uint32 height,
-		_In_ const std::string_view& name,
+		_In_ std::string_view name,
 		_In_ DXGI_FORMAT textureFormat,
 		_In_ uint32 bindFlags,
 		_In_ uint32 arrsize = 3,
 		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
 	);
 
-	static Texture* LoadFormPath(_In_ const file::path& path);
+	static Managed::UniquePtr<Texture> CreateManagedArray(
+		_In_ uint32 width,
+		_In_ uint32 height,
+		_In_ std::string_view name,
+		_In_ DXGI_FORMAT textureFormat,
+		_In_ uint32 bindFlags,
+		_In_ uint32 arrsize = 3,
+		_In_opt_ D3D11_SUBRESOURCE_DATA* data = nullptr
+	);
+
+	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
+
+	static Managed::SharedPtr<Texture> LoadSharedFromPath(
+		_In_ const file::path& path, 
+		bool isCompress = false
+	);
+
+	static Managed::UniquePtr<Texture> LoadManagedFromPath(
+		_In_ const file::path& path, 
+		bool isCompress = false
+	);
 
 	void CreateSRV(
 		_In_ DXGI_FORMAT textureFormat,
@@ -152,7 +225,7 @@ private:
 	DXGI_FORMAT m_format{ DXGI_FORMAT_UNKNOWN };
 	CD3D11_TEXTURE2D_DESC m_desc{};
 	bool m_hasRTV{ false };
-	uint32 m_rtvCount = 0;
+	uint32_t m_rtvCount = 0;
 	bool m_isTextureAlpha{ false };
 
 	Core::DelegateHandle m_onReleaseHandle{};
@@ -176,11 +249,9 @@ static auto& OnResizeEvent = TextureManager::GetInstance()->OnTextureResizeEvent
 
 namespace TextureHelper
 {
-    extern std::function<void(Texture*)> deleter;
-
-	inline std::unique_ptr<Texture, decltype(deleter)> CreateRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
+	inline Managed::UniquePtr<Texture> CreateRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
 	{
-		Texture* tex = Texture::Create(
+		Managed::UniquePtr<Texture> tex = Texture::CreateManaged(
 			width, 
 			height, 
 			name, 
@@ -191,12 +262,28 @@ namespace TextureHelper
 		tex->CreateSRV(format);
 		tex->CreateUAV(format);
 
-        return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
+		return tex;
 	}
 
-	inline std::unique_ptr<Texture, decltype(deleter)> CreateDepthTexture(int width, int height, const std::string name)
+	inline Managed::SharedPtr<Texture> CreateSharedRenderTexture(int width, int height, const std::string name, DXGI_FORMAT format)
 	{
-		Texture* tex = Texture::Create(
+		Managed::SharedPtr<Texture> tex = Texture::CreateShared(
+			width,
+			height,
+			name,
+			format,
+			D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
+		);
+		tex->CreateRTV(format);
+		tex->CreateSRV(format);
+		tex->CreateUAV(format);
+
+		return tex;
+	}
+
+	inline Managed::UniquePtr<Texture> CreateDepthTexture(int width, int height, const std::string name)
+	{
+		Managed::UniquePtr<Texture> tex = Texture::CreateManaged(
 			width,
 			height,
 			name,
@@ -206,18 +293,22 @@ namespace TextureHelper
 		tex->CreateDSV(DXGI_FORMAT_D24_UNORM_S8_UINT);
 		tex->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
 
-		return std::unique_ptr<Texture, decltype(deleter)>(tex, deleter);
+		return tex;
 	}
-}
 
-using UniqueTexturePtr = std::unique_ptr<Texture, decltype(TextureHelper::deleter)>;
+	inline Managed::SharedPtr<Texture> CreateSharedDepthTexture(int width, int height, const std::string name)
+	{
+		Managed::SharedPtr<Texture> tex = Texture::CreateManaged(
+			width,
+			height,
+			name,
+			DXGI_FORMAT_R24G8_TYPELESS,
+			D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE
+		);
+		tex->CreateDSV(DXGI_FORMAT_D24_UNORM_S8_UINT);
+		tex->CreateSRV(DXGI_FORMAT_R24_UNORM_X8_TYPELESS);
 
-#ifndef TEXTURE_NULL_INITIALIZER
-#define TEXTURE_NULL_INITIALIZER UniqueTexturePtr(nullptr, TextureHelper::deleter)
-#endif
-
-inline UniqueTexturePtr MakeUniqueTexturePtr(Texture* texture)
-{
-    return UniqueTexturePtr(texture, TextureHelper::deleter);
+		return tex;
+	}
 }
 #endif // !DYNAMICCPP_EXPORTS

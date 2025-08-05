@@ -16,7 +16,7 @@ cbuffer CompositeParams
 cbuffer BlurParams
 {
     float coefficients[GAUSSIAN_BLUR_RADIUS + 1];
-    float sigma{ 5.f };
+    float sigma{ 3.f };
     int radius{ GAUSSIAN_BLUR_RADIUS };
     int direction{};
     float _padding{};

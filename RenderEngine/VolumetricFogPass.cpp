@@ -122,7 +122,7 @@ VolumetricFogPass::~VolumetricFogPass()
 	Memory::SafeDelete(mFinalVoxelInjectionTexture3DUAV);
 }
 //
-void VolumetricFogPass::Initialize(const std::string_view& fileName)
+void VolumetricFogPass::Initialize(std::string_view fileName)
 {
 	mCurrentVoxelVolumeSizeX = 160;
 	mCurrentVoxelVolumeSizeY = 90;
@@ -177,7 +177,7 @@ void VolumetricFogPass::Initialize(const std::string_view& fileName)
 	file::path path = file::path(fileName);
 	if (file::exists(path))
 	{
-		m_pBlueNoiseTexture = MakeUniqueTexturePtr(Texture::LoadFormPath(fileName));
+		m_pBlueNoiseTexture = Texture::LoadManagedFromPath(fileName);
 	}
 
 	m_CopiedTexture = Texture::Create(
@@ -193,20 +193,7 @@ void VolumetricFogPass::Initialize(const std::string_view& fileName)
 
 void VolumetricFogPass::Execute(RenderScene& scene, Camera& camera)
 {
-	auto cmdQueuePtr = GetCommandQueue(camera.m_cameraIndex);
-	
-	if (nullptr != cmdQueuePtr)
-	{
-		while (!cmdQueuePtr->empty())
-		{
-			ID3D11CommandList* CommandJob;
-			if (cmdQueuePtr->try_pop(CommandJob))
-			{
-				DirectX11::ExecuteCommandList(CommandJob, true);
-				Memory::SafeDelete(CommandJob);
-			}
-		}
-	}
+	ExecuteCommandList(scene, camera);
 }
 
 void VolumetricFogPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)

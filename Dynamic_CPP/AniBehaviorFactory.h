@@ -1,20 +1,19 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Export.h"
-#include "AniBehaviour.h"
 
 // Automation include AniScriptClass header
+#include "NewAniBehavior.h"
 
-
-class AniBehaviourFactory : public Singleton<AniBehaviourFactory>
+class AniBehaviorFactory : public Singleton<AniBehaviorFactory>
 {
 private:
 	friend class Singleton;
-	AniBehaviourFactory() = default;
-	~AniBehaviourFactory() = default;
+	AniBehaviorFactory() = default;
+	~AniBehaviorFactory() = default;
 public:
 	// Register a factory function for creating AniBehaviour instances
-	void RegisterFactory(const std::string& className, std::function<AniBehaviour* ()> factoryFunction)
+	void RegisterFactory(const std::string& className, std::function<AniBehavior* ()> factoryFunction)
 	{
 		if (factoryMap.find(className) != factoryMap.end())
 		{
@@ -25,7 +24,7 @@ public:
 		factoryMap[className] = factoryFunction;
 	}
 	// Create a ModuleBehavior instance using the registered factory function
-	AniBehaviour* CreateInstance(const std::string& className)
+	AniBehavior* CreateInstance(const std::string& className)
 	{
 		auto it = factoryMap.find(className);
 		if (it != factoryMap.end())
@@ -34,5 +33,5 @@ public:
 		}
 		return nullptr; // or throw an exception
 	}
-	std::unordered_map<std::string, std::function<AniBehaviour* ()>> factoryMap;
+	std::unordered_map<std::string, std::function<AniBehavior* ()>> factoryMap;
 };
