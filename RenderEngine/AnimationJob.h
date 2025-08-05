@@ -14,8 +14,10 @@ class AnimationJob
 public:
     AnimationJob();
     ~AnimationJob();
+
     void Update(float deltaTime);
 	void SetRenderScene(RenderScene* renderScene) { m_renderScene = renderScene; }
+	void Finalize();
 private:
 	void PrepareAnimation();
     void CleanUp();
@@ -30,7 +32,7 @@ private:
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;
-    ThreadPool<std::function<void()>> m_UpdateThreadPool;
+    ThreadPool<std::function<void()>>* m_UpdateThreadPool;
     uint32 m_objectSize{};
 	RenderScene* m_renderScene{ nullptr };
 };

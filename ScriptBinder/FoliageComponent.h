@@ -19,6 +19,9 @@ public:
     void Update(float deltaTime) override;
     void OnDestroy() override;
 
+	void SaveFoliageAsset(const file::path& savePath);
+	void LoadFoliageAsset(FileGuid assetGuid);
+
     void AddFoliageType(const FoliageType& type);
     void RemoveFoliageType(uint32 typeID);
 
@@ -34,11 +37,9 @@ public:
     const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
     const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }
 
-private:
     [[Property]]
     FileGuid m_foliageAssetGuid{};
-    [[Property]]
+private:
     std::vector<FoliageType> m_foliageTypes{};
-    [[Property]]
     std::vector<FoliageInstance> m_foliageInstances{};
 };

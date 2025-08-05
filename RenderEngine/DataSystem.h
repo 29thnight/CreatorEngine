@@ -15,6 +15,7 @@
 class ModelLoader;
 class Model;
 class Material;
+class VolumeProfile;
 class DataSystem : public DLLCore::Singleton<DataSystem>
 {
 public:
@@ -48,6 +49,11 @@ public:
 		Model,
 		Material,
 		Skeleton,
+	};
+
+	struct FileTypeIcon {
+		FileType type;
+		ImTextureID icon;
 	};
 
 private:
@@ -111,6 +117,13 @@ public:
 
 	void ForceCreateYamlMetaFile(const file::path& filepath);
 	void CreateVolumeProfile(const file::path& filepath);
+	void SaveExistVolumeProfile(FileGuid guid, VolumeProfile* volume);
+	
+	void AddSupportExtension(std::string_view ext);
+
+	void RemoveSupportExtension(std::string_view ext);
+
+	bool IsSupportExtension(std::string_view ext) const;
 
 	std::unordered_map<std::string, std::shared_ptr<Model>>	Models;
 	std::unordered_map<std::string, std::shared_ptr<Material>> Materials;
@@ -144,6 +157,9 @@ public:
 	ImFont* smallFont{};
 	ImFont* extraSmallFont{};
 
+	std::unordered_map<std::string_view, FileTypeIcon> kExtensionMap{};
+
+
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
 
@@ -161,7 +177,7 @@ private:
 	file::path currentDirectory{};
 	efsw::FileWatcher* m_watcher{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
-	std::shared_ptr<AssetMetaWatcher> m_assetMetaWatcher{};
+	std::shared_ptr<AssetMetaWatcher>  m_assetMetaWatcher{};
 
 	static std::atomic_bool m_isExecuteSolution;
 };

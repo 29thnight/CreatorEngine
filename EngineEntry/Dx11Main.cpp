@@ -136,11 +136,9 @@ void DirectX11::Dx11Main::Initialize()
     m_CB_Thread = std::thread([&]
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        if (SUCCEEDED(hr))
+        if (FAILED(hr))
         {
-            // COM 객체 생성 및 사용
-
-            CoUninitialize();
+            return;
         }
 
         PROFILE_REGISTER_THREAD("[CB-Thread]");
@@ -153,18 +151,16 @@ void DirectX11::Dx11Main::Initialize()
         }
 
 		isCB_Thread_End = true;
+        CoUninitialize();
     });
 
     m_CE_Thread = std::thread([&]
     {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        if (SUCCEEDED(hr))
+        if (FAILED(hr))
         {
-            // COM 객체 생성 및 사용
-
-            CoUninitialize();
+            return;
         }
-
         PROFILE_REGISTER_THREAD("[CE-Thread]");
         while (isGameToRender)
         {
@@ -189,6 +185,7 @@ void DirectX11::Dx11Main::Initialize()
         }
 
 		isCE_Thread_End = true;
+        CoUninitialize();
     });
 
     m_CB_Thread.detach();

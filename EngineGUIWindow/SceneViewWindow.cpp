@@ -647,6 +647,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			const char* droppedFilePath = (const char*)HDRPayload->Data;
 			file::path filename = droppedFilePath;
 			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+			EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
 			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
 		}
 
@@ -714,12 +715,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 								{
-									if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage || terrainBrush->m_mode == TerrainBrush::Mode::EraseFoliage)
+									if (terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
 									{
 										FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
 										if (foliage)
 										{
-											if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage)
+											if (terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
 											{
 												foliage->AddRandomInstancesInBrush(terrainComponent, *terrainBrush, terrainBrush->m_foliageTypeID, terrainBrush->m_foliageDensity);
 											}
@@ -737,12 +738,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 										terrainComponent->ApplyBrush(*terrainBrush);
 									}
 								}
-
-									//if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-									//	terrainComponent->ApplyBrush(*terrainBrush);
-									//}
-									// 
-								//}
 							}
 						}
 					}

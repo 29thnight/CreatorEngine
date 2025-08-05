@@ -151,9 +151,15 @@ void SceneManager::DisableOrEnable()
 
 void SceneManager::Decommissioning()
 {
-    m_activeScene.load()->OnDisable();
-    m_activeScene.load()->AllDestroyMark();
-    m_activeScene.load()->OnDestroy();
+    for (auto& scene : m_scenes)
+    {
+        if (scene)
+        {
+            scene->OnDisable();
+            scene->AllDestroyMark();
+            scene->OnDestroy();
+        }
+    }
 
     Memory::SafeDelete(m_inputActionManager);
     Memory::SafeDelete(m_threadPool);
@@ -177,9 +183,6 @@ void SceneManager::Decommissioning()
     {
         if (scene)
         {
-            scene->OnDisable();
-			scene->AllDestroyMark();
-            scene->OnDestroy();
             delete scene;
         }
 	}
@@ -308,6 +311,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		m_activeSceneIndex = m_scenes.size() - 1;
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
+        m_activeScene.load()->Reset();
 	}
 	catch (const std::exception& e)
 	{
@@ -444,7 +448,6 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
         oldScene->OnDisable();
         oldScene->OnDestroy();
         std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
-        delete oldScene;
     }
 
     resourceTrimEvent.Broadcast();
@@ -454,6 +457,9 @@ void SceneManager::ActivateScene(Scene* sceneToActivate)
 
     activeSceneChangedEvent.Broadcast();
     sceneLoadedEvent.Broadcast();
+    m_activeScene.load()->Reset();
+
+    delete oldScene;
 }
 
 void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)

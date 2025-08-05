@@ -9,7 +9,7 @@ settings:
     thickness: 0.100000001
   shadow:
     useCascade: true
-    isCloudOn: true
+    isCloudOn: false
     cloudSize: {x: 4, y: 4}
     cloudDirection: {x: 1, y: 1}
     cloudMoveSpeed: 0.000300000014
@@ -42,10 +42,10 @@ settings:
     isOn: true
     lerp: 0
   toneMap:
-    isAbleAutoExposure: true
+    isAbleAutoExposure: false
     isAbleToneMap: true
     fNumber: 4
-    shutterTime: 16
+    shutterTime: 8
     ISO: 100
     exposureCompensation: 0
     speedBrightness: 3
@@ -56,4 +56,5 @@ settings:
     filmShoulder: 0.25999999
     filmBlackClip: 0
     filmWhiteClip: 0.0399999991
-    toneMapExposure: 1
+    toneMapExposure: 0.537
+  skyboxTextureName: rosendal_park_sunset_puresky_4k.hdr

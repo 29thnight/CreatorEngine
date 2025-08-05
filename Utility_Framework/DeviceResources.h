@@ -58,6 +58,7 @@ namespace DirectX11
 		CoreWindow* GetWindow() const { return m_window; }
 
 	private:
+		bool CheckHDRSupport(ComPtr<IDXGIAdapter> adapter);
 		void CreateDeviceIndependentResources();
 		void CreateDeviceResources();
 		void CreateWindowSizeDependentResources();
@@ -94,6 +95,7 @@ namespace DirectX11
 		Sizef m_logicalSize;
 		float m_dpi;
 		float m_effectiveDpi;
+		bool  m_supportHDR;
 
 		IDeviceNotify* m_deviceNotify;
 	};

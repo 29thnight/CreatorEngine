@@ -378,6 +378,7 @@
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SSGIPassSetting.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
+    <ClInclude Include="SubsurfaceScatteringPassSetting.h" />
     <ClInclude Include="SwapEvent.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
@@ -416,6 +417,7 @@
     <ClInclude Include="ToneMapPass.h" />
     <ClInclude Include="VignettePass.h" />
     <ClInclude Include="VignettePassSetting.h" />
+    <ClInclude Include="VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumetricFogPass.h" />
     <ClInclude Include="VolumeProfile.h" />
     <ClInclude Include="WireFramePass.h" />

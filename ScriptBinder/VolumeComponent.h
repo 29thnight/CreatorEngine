@@ -15,7 +15,11 @@ public:
     void Awake() override;
     void OnDestroy() override;
 
-    void ApplyProfile();
+	void LoadProfile(FileGuid profileGuid);
+    VolumeProfile& GetVolumeProfile() { return m_profile; }
+
+    void UpdateProfileEditMode();
+	bool IsProfileLoaded() const { return m_isProfileLoaded; }
 
     [[Property]]
 	std::string m_volumeProfileName{};
@@ -25,4 +29,5 @@ public:
 private:
     RenderPassSettings m_prevSettings{};
     VolumeProfile m_profile{};
+    bool m_isProfileLoaded{ false };
 };

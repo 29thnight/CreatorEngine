@@ -832,6 +832,12 @@
     <ClInclude Include="TrailRenderModule.h">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClInclude>
+    <ClInclude Include="VolumetricFogPassSetting.h">
+      <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
+    </ClInclude>
+    <ClInclude Include="SubsurfaceScatteringPassSetting.h">
+      <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomComposite.ps.hlsl">

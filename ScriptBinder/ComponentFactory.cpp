@@ -324,7 +324,17 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		else if (componentType->typeID == type_guid(FoliageComponent))
 		{
 			auto foliage = static_cast<FoliageComponent*>(component);
-			Meta::Deserialize(foliage, itNode);
+
+			MetaYml::Node FoliageGuid = itNode["m_foliageAssetGuid"];
+			if(FoliageGuid.IsNull())
+			{
+				Debug->LogError("FoliageComponent is missing m_foliageAssetGuid");
+				return;
+			}
+
+			foliage->m_foliageAssetGuid = FoliageGuid.as<std::string>();
+
+			foliage->LoadFoliageAsset(foliage->m_foliageAssetGuid);
 
 			auto& types = const_cast<std::vector<FoliageType>&>(foliage->GetFoliageTypes());
 			for (auto& type : types)
@@ -357,6 +367,25 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					type.m_material = model->GetMaterial(0);
 				}
 			}
+
+			MetaYml::Node foliageInstanceNode = itNode["m_foliageInstances"];
+
+			for(auto& instance : foliage->GetFoliageInstances())
+			{
+				Mathf::Matrix modelMatrix = Mathf::xMatrixIdentity;
+				Mathf::Vector3 position = instance.m_position;
+				Mathf::Vector3 rotation = instance.m_rotation;
+				Mathf::Vector3 scale = instance.m_scale;
+
+				modelMatrix = Mathf::Matrix::CreateScale(scale) *
+					Mathf::Matrix::CreateRotationX(Mathf::ToRadians(rotation.x)) *
+					Mathf::Matrix::CreateRotationY(Mathf::ToRadians(rotation.y)) *
+					Mathf::Matrix::CreateRotationZ(Mathf::ToRadians(rotation.z)) *
+					Mathf::Matrix::CreateTranslation(position);
+
+				const_cast<Mathf::xMatrix&>(instance.m_worldMatrix) = modelMatrix;
+			}
+
 
 			foliage->SetOwner(obj);
 			foliage->SetEnabled(true);
