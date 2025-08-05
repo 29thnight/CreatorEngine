@@ -5,7 +5,6 @@
 #include "Physx.h"
 #include "SoundManager.h"
 #include "Benchmark.hpp"
-#include "ImGuiLogger.h"
 #include "TimeSystem.h"
 #include "HotLoadSystem.h"
 #include "DataSystem.h"
@@ -21,13 +20,14 @@
 #include "AIManager.h"
 #include "TagManager.h"
 #include "EffectProxyController.h"
-#include "ResourceAllocator.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 //#include "SwapEvent.h"
 
 std::atomic<bool> isGameToRender = false;
+std::atomic<bool> isCB_Thread_End = false;
+std::atomic<bool> isCE_Thread_End = false;
 
 DirectX11::GameMain::GameMain(const std::shared_ptr<DeviceResources>& deviceResources) : m_deviceResources(deviceResources)
 {
@@ -85,6 +85,12 @@ void DirectX11::GameMain::Initialize()
 
     m_CB_Thread = std::thread([&]
     {
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (FAILED(hr))
+        {
+            return;
+        }
+
         while (isGameToRender)
         {
             if (!m_isInvokeResize)
@@ -92,10 +98,19 @@ void DirectX11::GameMain::Initialize()
                 CommandBuildThread();
             }
         }
+
+        isCB_Thread_End = true;
+        CoUninitialize();
     });
 
     m_CE_Thread = std::thread([&]
     {
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (FAILED(hr))
+        {
+            return;
+        }
+
         while (isGameToRender)
         {
             if (m_isInvokeResize)
@@ -107,6 +122,9 @@ void DirectX11::GameMain::Initialize()
             CoroutineManagers->yield_OnRender();
             CommandExecuteThread();
         }
+
+        isCE_Thread_End = true;
+        CoUninitialize();
     });
 
     m_CB_Thread.detach();
@@ -121,7 +139,17 @@ void DirectX11::GameMain::Finalize()
     TagManagers->Finalize();
     SceneManagers->Decommissioning();
     EngineSettingInstance->SaveSettings();
+    EngineSettingInstance->renderBarrier.Finalize();
+
+    while (!isCB_Thread_End || !isCE_Thread_End)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
     m_sceneRenderer->Finalize();
+    ShaderSystem->Finalize();
+    OnResizeReleaseEvent.Clear();
+    OnResizeEvent.Clear();
     m_deviceResources->RegisterDeviceNotify(nullptr);
 }
 

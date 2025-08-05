@@ -86,6 +86,11 @@ public:
         m_threadInitCallback = std::move(callback);
     }
 
+    void SetThreadExitCallback(std::function<void()> callback)
+    {
+        m_threadExitCallback = std::move(callback);
+	}
+
 private:
     void WorkerLoop(int threadIndex)
     {
@@ -118,6 +123,11 @@ private:
                 }
             }
         }
+
+        if (m_threadExitCallback)
+        {
+            m_threadExitCallback();
+		}
     }
 
 private:
@@ -135,4 +145,5 @@ private:
     int m_threadPriority = THREAD_PRIORITY_NORMAL;
 
     std::function<void()> m_threadInitCallback;
+	std::function<void()> m_threadExitCallback;
 };

@@ -47,6 +47,8 @@ public:
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
     void AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
+	void RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr);
+	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
     
 	std::vector<Scene*>& GetScenes() { return m_scenes; }
 	std::vector<std::shared_ptr<Object>>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
@@ -102,7 +104,7 @@ private:
 	void DeleteEditorOnlyPlayScene();
     void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
     void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
-
+	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode);
 private:
     std::vector<Scene*>                 m_scenes{};
     std::vector<std::shared_ptr<Object>>m_dontDestroyOnLoadObjects{};

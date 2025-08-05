@@ -63,27 +63,27 @@ private:
 public:
     //Events
     //Initialization
-    Core::Delegate<void> AwakeEvent{};
-    Core::Delegate<void> OnEnableEvent{};
-    Core::Delegate<void> StartEvent{};
+    Core::Delegate<void>					AwakeEvent{};
+    Core::Delegate<void>					OnEnableEvent{};
+    Core::Delegate<void>					StartEvent{};
 
     //Physics
-    Core::Delegate<void, float>            FixedUpdateEvent{};
-	Core::Delegate<void, float>            InternalPhysicsUpdateEvent{};
-    Core::Delegate<void, const Collision&> OnTriggerEnterEvent{};
-    Core::Delegate<void, const Collision&> OnTriggerStayEvent{};
-    Core::Delegate<void, const Collision&> OnTriggerExitEvent{};
-    Core::Delegate<void, const Collision&> OnCollisionEnterEvent{};
-	Core::Delegate<void, const Collision&> OnCollisionStayEvent{};
-	Core::Delegate<void, const Collision&> OnCollisionExitEvent{};
+    Core::Delegate<void, float>				FixedUpdateEvent{};
+	Core::Delegate<void, float>				InternalPhysicsUpdateEvent{};
+    Core::Delegate<void, const Collision&>	OnTriggerEnterEvent{};
+    Core::Delegate<void, const Collision&>	OnTriggerStayEvent{};
+    Core::Delegate<void, const Collision&>	OnTriggerExitEvent{};
+    Core::Delegate<void, const Collision&>	OnCollisionEnterEvent{};
+	Core::Delegate<void, const Collision&>	OnCollisionStayEvent{};
+	Core::Delegate<void, const Collision&>	OnCollisionExitEvent{};
 
     //Game logic
-    Core::Delegate<void, float> UpdateEvent{};
-    Core::Delegate<void, float> LateUpdateEvent{};
+    Core::Delegate<void, float>				UpdateEvent{};
+    Core::Delegate<void, float>				LateUpdateEvent{};
 
     //Disable or Enable
-    Core::Delegate<void> OnDisableEvent{};
-    Core::Delegate<void> OnDestroyEvent{};
+    Core::Delegate<void>					OnDisableEvent{};
+    Core::Delegate<void>					OnDestroyEvent{};
 
 public:
     //EventBroadcaster
@@ -205,9 +205,9 @@ private:
 
 public:
     void AllUpdateWorldMatrix();
-
+	[[deprecated]]
 	void RegisterDirtyTransform(Transform* transform);
-
+	[[deprecated]]
 	void UpdateAllTransforms();
 
 private:

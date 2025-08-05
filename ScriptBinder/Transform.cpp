@@ -293,11 +293,11 @@ void Transform::SetDirty()
 	if (!m_dirty)
 	{
 		m_dirty = true;
-		if (m_owner && m_owner->GetScene())
-		{
-			m_owner->GetScene()->RegisterDirtyTransform(this);
-		}
 	}
+	//	if (m_owner && m_owner->GetScene())
+	//	{
+	//		m_owner->GetScene()->RegisterDirtyTransform(this);
+	//	}
 }
 
 bool Transform::IsDirty() const
@@ -336,6 +336,6 @@ void Transform::UpdateDirty()
 {
 	if (m_owner && m_owner->GetScene())
 	{
-		m_owner->GetScene()->RegisterDirtyTransform(this);
+		//m_owner->GetScene()->RegisterDirtyTransform(this);
 	}
 }

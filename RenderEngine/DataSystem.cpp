@@ -11,6 +11,7 @@
 #include "Benchmark.hpp"
 #include "SceneManager.h"
 #include "PrefabUtility.h"
+#include "FileDialog.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ToggleUI.h"
@@ -30,6 +31,32 @@ constexpr FileTypeCharArr FileTypeStringTable{{
 	{ DataSystem::FileType::HDR,            "HDR"				},
 	{ DataSystem::FileType::VolumeProfile , "VolumeProfile"		}
 }};
+
+static const std::unordered_map<std::string_view, std::string_view> kExtensionToIcon = {
+	// 모델 파일
+	{ ".fbx", ICON_FA_CUBE " " },
+	{ ".gltf", ICON_FA_CUBE " " },
+	{ ".obj", ICON_FA_CUBE " " },
+	{ ".glb", ICON_FA_CUBE " " },
+
+	// 이미지 파일
+	{ ".png", ICON_FA_IMAGE " " },
+	{ ".dds", ICON_FA_IMAGE " " },
+	{ ".hdr", ICON_FA_IMAGE " " },
+
+	// 쉐이더, 코드 파일
+	{ ".hlsl", ICON_FA_FILE_CONTRACT " " },
+	{ ".cpp",  ICON_FA_FILE_CODE " " },
+	{ ".cs",   ICON_FA_FILE_CODE " " },
+
+	// 오디오 파일
+	{ ".wav", ICON_FA_FILE_AUDIO " " },
+	{ ".mp3", ICON_FA_FILE_AUDIO " " },
+
+	// 프리팹, 볼륨 등
+	{ ".prefab", ICON_FA_BOX_OPEN " " },
+	{ ".volume", ICON_FA_SLIDERS " " },
+};
 
 // 검색 함수
 constexpr const char* FileTypeToString(DataSystem::FileType type)
@@ -113,6 +140,24 @@ void DataSystem::Initialize()
 	smallFont				= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
 	extraSmallFont			= ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
 	m_ContentsBrowserStyle = EngineSettingInstance->GetContentsBrowserStyle();
+
+	kExtensionMap =
+	{
+		{ ".fbx",	 { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
+		{ ".gltf",   { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
+		{ ".obj",    { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
+		{ ".glb",    { FileType::Model,			(ImTextureID)ModelIcon->m_pSRV }	},
+		{ ".png",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
+		{ ".dds",    { FileType::Texture,		(ImTextureID)TextureIcon->m_pSRV }	},
+		{ ".hdr",    { FileType::HDR,			(ImTextureID)TextureIcon->m_pSRV }	},
+		{ ".hlsl",   { FileType::Shader,		(ImTextureID)ShaderIcon->m_pSRV }	},
+		{ ".cpp",    { FileType::CppScript,		(ImTextureID)CodeIcon->m_pSRV }		},
+		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)CodeIcon->m_pSRV }		},
+		{ ".wav",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
+		{ ".mp3",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
+		{ ".prefab", { FileType::Prefab,		(ImTextureID)AssetsIcon->m_pSRV }	},
+		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)AssetsIcon->m_pSRV }	},
+	};
 
 	RenderForEditer();
 #endif
@@ -808,62 +853,14 @@ void DataSystem::ShowCurrentDirectoryFilesTile()
 				continue;
 
 			std::string extension = entry.path().extension().string();
-			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
-				extension == ".glb" || extension == ".png" || extension == ".dds" ||
-				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
-				extension == ".prefab")
+			if (IsSupportExtension(extension))
 			{
 				ImTextureID iconTexture{};
 				FileType fileType = FileType::Unknown;
-				if (extension == ".fbx" ||
-					extension == ".gltf" ||
-					extension == ".obj" ||
-					extension == ".glb")
+				if (auto it = kExtensionMap.find(extension); it != kExtensionMap.end())
 				{
-					fileType = FileType::Model;
-					iconTexture = (ImTextureID)ModelIcon->m_pSRV;
-				}
-				else if (extension == ".png" || extension == ".dds")
-				{
-					fileType = FileType::Texture;
-					iconTexture = (ImTextureID)TextureIcon->m_pSRV;
-				}
-				else if (extension == ".hdr")
-				{
-					fileType = FileType::HDR;
-					iconTexture = (ImTextureID)TextureIcon->m_pSRV;
-				}
-				else if (extension == ".hlsl")
-				{
-					fileType = FileType::Shader;
-					iconTexture = (ImTextureID)ShaderIcon->m_pSRV;
-				}
-				else if (extension == ".cpp")
-				{
-					fileType = FileType::CppScript;
-					iconTexture = (ImTextureID)CodeIcon->m_pSRV;
-				}
-				else if (extension == ".cs")
-				{
-					fileType = FileType::CSharpScript;
-					iconTexture = (ImTextureID)CodeIcon->m_pSRV;
-				}
-				else if (extension == ".wav" || extension == ".mp3")
-				{
-					fileType = FileType::Sound;
-					iconTexture = (ImTextureID)UnknownIcon->m_pSRV;
-				}
-				else if (extension == ".prefab")
-				{
-					fileType = FileType::Prefab;
-					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
-				}
-				else if (extension == ".volume")
-				{
-					fileType = FileType::VolumeProfile;
-					iconTexture = (ImTextureID)AssetsIcon->m_pSRV;
+					fileType = it->second.type;
+					iconTexture = it->second.icon;
 				}
 
 				DrawFileTile(iconTexture, entry.path(), entry.path().filename().string(), fileType);
@@ -955,56 +952,14 @@ void DataSystem::ShowCurrentDirectoryFilesTree(const file::path& directory)
 				continue;
 
 			std::string extension = entry.path().extension().string();
-			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-
-			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-			if (extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
-				extension == ".glb" || extension == ".png" || extension == ".dds" ||
-				extension == ".hdr" || extension == ".hlsl" || extension == ".cpp" ||
-				extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
-				extension == ".prefab")
+			if (IsSupportExtension(extension))
 			{
 				std::string label = entry.path().filename().string();
 				std::string apliedIcon;
 
-				if (extension == ".fbx" ||
-					extension == ".gltf" ||
-					extension == ".obj" ||
-					extension == ".glb")
+				if(auto it = kExtensionToIcon.find(extension); it != kExtensionToIcon.end())
 				{
-					apliedIcon = ICON_FA_CUBE " ";
-				}
-				else if (extension == ".png" || extension == ".dds")
-				{
-					apliedIcon = ICON_FA_IMAGE " ";
-				}
-				else if (extension == ".hdr")
-				{
-					apliedIcon = ICON_FA_IMAGE " ";
-				}
-				else if (extension == ".hlsl")
-				{
-					apliedIcon = ICON_FA_FILE_CONTRACT " ";
-				}
-				else if (extension == ".cpp")
-				{
-					apliedIcon = ICON_FA_FILE_CODE " ";
-				}
-				else if (extension == ".cs")
-				{
-					apliedIcon = ICON_FA_FILE_CODE " ";
-				}
-				else if (extension == ".wav" || extension == ".mp3")
-				{
-					apliedIcon = ICON_FA_FILE_AUDIO " ";
-				}
-				else if (extension == ".prefab")
-				{
-					apliedIcon = ICON_FA_BOX_OPEN " ";
-				}
-				else if (extension == ".volume")
-				{
-					apliedIcon = ICON_FA_SLIDERS " ";
+					apliedIcon = it->second;
 				}
 
 				label = apliedIcon + label;
@@ -1183,8 +1138,8 @@ void DataSystem::DrawFileTile(ImTextureID iconTexture, const file::path& directo
 		color = IM_COL32(255, 0, 255, 255);
 		break;
         case FileType::Prefab:
-                color = IM_COL32(0, 128, 255, 255);
-                break;
+        color = IM_COL32(0, 128, 255, 255);
+        break;
 	case FileType::Sound:
 		color = IM_COL32(255, 255, 0, 255);
 		break;
@@ -1229,15 +1184,17 @@ void DataSystem::CreateVolumeProfile(const file::path& filepath)
 	VolumeProfile profile;
 	profile.settings = EngineSettingInstance->GetRenderPassSettings();
 
-	std::string baseName = "NewVolumeProfile";
-	file::path savePath = filepath / (baseName + ".volume");
+	file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::VolumeProfilePath());
+
+	std::string baseName = savePath.stem().string();
+	file::path fullPath = filepath / (baseName + ".volume");
 	int index = 1;
-	while (std::filesystem::exists(savePath))
+	while (std::filesystem::exists(fullPath))
 	{
-		savePath = filepath / (baseName + std::to_string(index++) + ".volume");
+		fullPath = filepath / (baseName + std::to_string(index++) + ".volume");
 	}
 
-	std::ofstream fout(savePath);
+	std::ofstream fout(fullPath);
 	if (fout.is_open())
 	{
 		YAML::Node node = Meta::Serialize(&profile);
@@ -1245,8 +1202,53 @@ void DataSystem::CreateVolumeProfile(const file::path& filepath)
 		fout.close();
 	}
 
-	ForceCreateYamlMetaFile(savePath);
+	ForceCreateYamlMetaFile(fullPath);
 #endif // !BUILD_FLAG
+}
+
+void DataSystem::SaveExistVolumeProfile(FileGuid guid, VolumeProfile* volume)
+{
+#ifndef BUILD_FLAG
+	file::path savePath = m_assetMetaRegistry->GetPath(guid);
+	if (savePath.empty())
+	{
+		Debug->LogError("DataSystem::SaveExistVolumeProfile : Save path is empty");
+		return;
+	}
+
+	std::ofstream fout(savePath);
+	if (fout.is_open())
+	{
+		YAML::Node node = Meta::Serialize(volume);
+		fout << node;
+		fout.close();
+	}
+#endif // !BUILD_FLAG
+}
+
+void DataSystem::AddSupportExtension(std::string_view ext)
+{
+	if (m_assetMetaWatcher)
+	{
+		m_assetMetaWatcher->AddRegisteredFile(ext.data());
+	}
+}
+
+void DataSystem::RemoveSupportExtension(std::string_view ext)
+{
+	if (m_assetMetaWatcher)
+	{
+		m_assetMetaWatcher->RemoveRegisteredFile(ext.data());
+	}
+}
+
+bool DataSystem::IsSupportExtension(std::string_view ext) const
+{
+	if (m_assetMetaWatcher)
+	{
+		return m_assetMetaWatcher->IsRegisteredFile(ext.data());
+	}
+	return false;
 }
 
 void DataSystem::OpenFile(const file::path& filepath)

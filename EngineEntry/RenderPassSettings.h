@@ -1,6 +1,4 @@
 #pragma once
-#include "AAPassSetting.h"
-#include "SSAOPassSetting.h"
 #include "ShadowMapPassSetting.h"
 #include "DeferredPassSetting.h"
 #include "BloomSetting.h"
@@ -8,6 +6,8 @@
 #include "VignettePassSetting.h"
 #include "ColorGradingPassSetting.h"
 #include "ToneMapPassSetting.h"
+#include "AAPassSetting.h"
+#include "SSAOPassSetting.h"
 #include "RenderPassSettings.generated.h"
 
 struct RenderPassSettings
@@ -17,21 +17,23 @@ struct RenderPassSettings
     RenderPassSettings() = default;
 
 	[[Property]]
-    AAPassSetting aa{};
+    AAPassSetting           aa{};
 	[[Property]]
-    SSAOPassSetting ssao{};
+    SSAOPassSetting         ssao{};
 	[[Property]]
-    ShadowMapPassSetting shadow{};
+    ShadowMapPassSetting    shadow{};
 	[[Property]]
-    DeferredPassSetting deferred{};
+    DeferredPassSetting     deferred{};
 	[[Property]]
-    BloomPassSetting bloom{};
+    BloomPassSetting        bloom{};
 	[[Property]]
-    SSGIPassSetting ssgi{};
+    SSGIPassSetting         ssgi{};
 	[[Property]]
-    VignettePassSetting vignette{};
+    VignettePassSetting     vignette{};
 	[[Property]]
     ColorGradingPassSetting colorGrading{};
 	[[Property]]
-    ToneMapPassSetting toneMap{};
+    ToneMapPassSetting      toneMap{};
+    [[Property]]
+    std::string             skyboxTextureName{ "rosendal_park_sunset_puresky_4k.hdr" };
 };

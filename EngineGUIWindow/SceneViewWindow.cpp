@@ -390,7 +390,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
         if (!XMMatrixIsIdentity(deltaMat))
         {
             obj->m_transform.SetLocalMatrix(newLocalMatrix); // delta가 바뀔 때만 변경사항을 적용.
-			obj->m_transform.UpdateDirty();
 			XMMATRIX newWorld = obj->m_transform.GetWorldMatrix();
 			auto itSelf = startWorldMatrices.find(obj);
 			if (itSelf != startWorldMatrices.end())
@@ -411,7 +410,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 						XMMATRIX parentWorldInverse = XMMatrixInverse(nullptr, parentWorld);
 						XMMATRIX targetLocal = XMMatrixMultiply(targetWorld, parentWorldInverse);
 						target->m_transform.SetLocalMatrix(targetLocal);
-						target->m_transform.UpdateDirty();
 			        }
 			    }
 			}
@@ -425,13 +423,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				{
 					XMMATRIX copy = oldLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
-					obj->m_transform.UpdateDirty();
 				},
 				[=]
 				{
 					XMMATRIX copy = newLocalMatrix;
 					obj->m_transform.SetLocalMatrix(copy);
-					obj->m_transform.UpdateDirty();
 				}
 			);
 		}
@@ -495,7 +491,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			target->m_transform.SetWorldRotation(DirectX::XMQuaternionRotationAxis(rotAxis, angle));
 
 			target->m_transform.SetWorldPosition(cam->m_eyePosition);
-			target->m_transform.UpdateDirty();
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
@@ -647,6 +642,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			const char* droppedFilePath = (const char*)HDRPayload->Data;
 			file::path filename = droppedFilePath;
 			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+			EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
 			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
 		}
 
@@ -714,12 +710,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 								{
-									if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage || terrainBrush->m_mode == TerrainBrush::Mode::EraseFoliage)
+									if (terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
 									{
 										FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
 										if (foliage)
 										{
-											if (terrainBrush->m_mode == TerrainBrush::Mode::PaintFoliage)
+											if (terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
 											{
 												foliage->AddRandomInstancesInBrush(terrainComponent, *terrainBrush, terrainBrush->m_foliageTypeID, terrainBrush->m_foliageDensity);
 											}
@@ -737,12 +733,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 										terrainComponent->ApplyBrush(*terrainBrush);
 									}
 								}
-
-									//if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-									//	terrainComponent->ApplyBrush(*terrainBrush);
-									//}
-									// 
-								//}
 							}
 						}
 					}

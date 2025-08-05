@@ -9,7 +9,5 @@ struct VolumeProfile
     VolumeProfile() = default;
 
     [[Property]]
-	std::string profileName{};
-    [[Property]]
     RenderPassSettings settings{};
 };

@@ -229,14 +229,43 @@ void DirectX11::DeviceResources::ReportLiveDeviceObjects()
 #if defined(_DEBUG)
 	if (m_debugDevice != nullptr)
 	{
-		m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+		m_debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_IGNORE_INTERNAL);
 	}
 
     if (m_dxgiDebug != nullptr)
     {
-        m_dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
+        m_dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
 	}
 #endif
+}
+
+bool DirectX11::DeviceResources::CheckHDRSupport(ComPtr<IDXGIAdapter> adapter)
+{
+	bool isHDRSupported = false;
+    UINT outputIndex = 0;
+    ComPtr<IDXGIOutput> output;
+
+    while (adapter->EnumOutputs(outputIndex, &output) != DXGI_ERROR_NOT_FOUND)
+    {
+        // IDXGIOutput → IDXGIOutput6으로 업캐스팅
+        ComPtr<IDXGIOutput6> output6;
+        if (SUCCEEDED(output.As(&output6)))
+        {
+            DXGI_OUTPUT_DESC1 desc1;
+            if (SUCCEEDED(output6->GetDesc1(&desc1)))
+            {
+                if (desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)
+                {
+					isHDRSupported = true;
+                }
+            }
+        }
+
+        output.Reset();
+        outputIndex++;
+    }
+
+	return isHDRSupported;
 }
 
 void DirectX11::DeviceResources::CreateDeviceIndependentResources()
@@ -248,7 +277,7 @@ void DirectX11::DeviceResources::CreateDeviceResources()
 {
     // 이 플래그는 API 기본값과 다른 색 채널 순서의 표면에 대한 지원을
     // 추가합니다. Direct2D와의 호환성을 위해 필요합니다.
-    UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+    UINT creationFlags = D3D11_CREATE_DEVICE_DISABLE_GPU_TIMEOUT;
 
 #if defined(_DEBUG)
     if (DirectX11::SdkLayersAvailable())
@@ -378,10 +407,10 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
             2,
             lround(m_d3dRenderTargetSize.width),
             lround(m_d3dRenderTargetSize.height),
-            DXGI_FORMAT_R8G8B8A8_UNORM,
+            m_supportHDR ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM,
             0
         );
-
+        
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
         {
             HandleDeviceLost();
@@ -394,6 +423,21 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
     }
     else
     {
+        DirectX11::ThrowIfFailed(
+            m_d3dDevice.As(&m_dxgiDevice)
+        );
+
+        DirectX11::ThrowIfFailed(
+            m_dxgiDevice->GetAdapter(&m_deviceAdapter)
+        );
+
+        m_supportHDR = CheckHDRSupport(m_deviceAdapter);
+
+        ComPtr<IDXGIFactory2> dxgiFactory;
+        DirectX11::ThrowIfFailed(
+            m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
+        );
+
         DXGI_SCALING scaling = DisplayMetrics::SupportHighResolutions ? DXGI_SCALING_NONE : DXGI_SCALING_STRETCH;
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
 
@@ -402,7 +446,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         swapChainDesc.Width = lround(m_d3dRenderTargetSize.width);		// 창의 크기를 맞춥니다.
         swapChainDesc.Height = lround(m_d3dRenderTargetSize.height);
-        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
+        swapChainDesc.Format = m_supportHDR ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
         swapChainDesc.Stereo = false;
         swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
         swapChainDesc.SampleDesc.Quality = 0;
@@ -421,18 +465,6 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         swapChainFullscreenDesc.Windowed = TRUE;
 
-        DirectX11::ThrowIfFailed(
-            m_d3dDevice.As(&m_dxgiDevice)
-        );
-
-        DirectX11::ThrowIfFailed(
-            m_dxgiDevice->GetAdapter(&m_deviceAdapter)
-        );
-
-        ComPtr<IDXGIFactory2> dxgiFactory;
-        DirectX11::ThrowIfFailed(
-            m_deviceAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory))
-        );
 
         ComPtr<IDXGISwapChain1> swapChain;
         DirectX11::ThrowIfFailed(
@@ -457,6 +489,12 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
 		DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
+        m_swapChain->SetColorSpace1(
+            m_supportHDR
+            ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020  // HDR10
+            : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709     // SDR
+        );
+
         DirectX11::ThrowIfFailed(
             m_dxgiDevice->SetMaximumFrameLatency(3)
         );
@@ -467,7 +505,7 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
         );
 
 		D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
-		renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		renderTargetViewDesc.Format = swapChainDesc.Format;
 		renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 		renderTargetViewDesc.Texture2D.MipSlice = 0;
 
@@ -618,7 +656,7 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
 
     swapChainDesc.Width = lround(m_d3dRenderTargetSize.width);		// 창의 크기를 맞춥니다.
     swapChainDesc.Height = lround(m_d3dRenderTargetSize.height);
-    swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
+    swapChainDesc.Format = m_supportHDR ? DXGI_FORMAT_R10G10B10A2_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;				// 가장 일반적인 스왑 체인 형식입니다.
     swapChainDesc.Stereo = false;
     swapChainDesc.SampleDesc.Count = 1;								// 다중 샘플링을 사용하지 마십시오.
     swapChainDesc.SampleDesc.Quality = 0;
@@ -653,6 +691,12 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
         swapChain.As(&m_swapChain)
     );
 
+    m_swapChain->SetColorSpace1(
+        m_supportHDR
+        ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020  // HDR10
+        : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709     // SDR
+    );
+
     DirectX::SetName(m_swapChain.Get(), "IDXGISwapChain1");
 
     DirectX11::ThrowIfFailed(
@@ -665,7 +709,7 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
     );
 
     D3D11_RENDER_TARGET_VIEW_DESC1 renderTargetViewDesc = {};
-    renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    renderTargetViewDesc.Format = swapChainDesc.Format;
     renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     renderTargetViewDesc.Texture2D.MipSlice = 0;
 

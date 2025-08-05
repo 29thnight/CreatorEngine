@@ -13,6 +13,7 @@ class PlayerInputComponent;
 class TerrainComponent;
 class StateMachineComponent;
 class BehaviorTreeComponent;
+class VolumeComponent;
 class InspectorWindow
 {
 public:
@@ -31,5 +32,6 @@ private:
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);
+	void ImGuiDrawHelperVolume(VolumeComponent* volumeComponent);
 };
 #endif // !DYNAMICCPP_EXPORTS

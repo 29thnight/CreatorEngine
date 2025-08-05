@@ -40,8 +40,8 @@ struct TerrainBrush
         ID3D11ShaderResourceView* m_maskSRV{ nullptr }; // 브러시 마스크 SRV
     };
 
-
-    enum class Mode { Raise, Lower, Flatten, PaintLayer, PaintFoliage, EraseFoliage } m_mode;
+    enum class Mode { Raise, Lower, Flatten, PaintLayer, FoliageMode } m_mode;
+	enum class FoliageMode { Paint, Erase } m_foliageMode;
     DirectX::XMFLOAT2 m_center;
 	bool m_isEditMode{ false }; // 편집 모드 여부
     float m_radius{ 1.0f };

@@ -24,14 +24,22 @@ public:
         }
 
         // 각 워커 스레드에서 1회 COM 초기화 수행
-        m_pool.SetThreadInitCallback([] {
-            static thread_local bool s_comInitialized = [] {
+        m_pool.SetThreadInitCallback([] 
+        {
+            static thread_local bool s_comInitialized = [] 
+            {
                 HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
                 if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
                     DirectX11::ThrowIfFailed(hr);
                 return true;
-                }();
-            });
+            }();
+        });
+
+		// 각 워커 스레드에서 COM 해제
+        m_pool.SetThreadExitCallback([] 
+        {
+            CoUninitialize();
+		});
     }
 
     ~RenderThreadPool()
