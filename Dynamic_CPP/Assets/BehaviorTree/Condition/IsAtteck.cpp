@@ -8,6 +8,25 @@ bool IsAtteck::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	//this based target logic
 	bool isTarget = blackBoard.HasKey("Target");
 	bool useAttack = blackBoard.HasKey("AtkRange");
+	bool hasState = blackBoard.HasKey("State");
+	bool hasAtkDelay = blackBoard.HasKey("AtkDelay");
+
+
+	if (hasState) {
+		std::string state = blackBoard.GetValueAsString("State");
+		if (state == "Atteck") {
+			if (hasAtkDelay) {
+				float AtkDelay = blackBoard.GetValueAsFloat("AtkDelay");
+
+				if (AtkDelay > 0.0f) {
+					std::cout << "IsAtteck ConditionCheck: Attack duration has ended." << std::endl;
+					return true; // Attack duration has ended, can attack
+				}
+			}
+		}
+	}
+
+
 
 	if (!useAttack)
 	{

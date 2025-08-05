@@ -66,7 +66,7 @@ bool IsChase::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 	}
 
 
-
+	std::cout << "closed Target Out ranage" << std::endl;
 
 	return false;
 }

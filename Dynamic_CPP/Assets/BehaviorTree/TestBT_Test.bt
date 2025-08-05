@@ -67,7 +67,7 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [1856270841, 1558418268]
+    Children: [1558418268, 1856270841]
     Position: {x: 406, y: 269}
   - ID: 1558418268
     Type: 6
@@ -78,7 +78,7 @@ NodeList:
     ScriptName: IsAtteck
     Policy: -858993460
     Children: ~
-    Position: {x: 358, y: 456}
+    Position: {x: 230, y: 520}
   - ID: 3380368976
     Type: 2
     Name: Sequence
