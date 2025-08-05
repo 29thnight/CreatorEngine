@@ -145,6 +145,7 @@ public:
 	void SetLightmapPass()  { useTestLightmap = !useTestLightmap; }
 
 private:
+	std::string                                 m_currentSkyTextureName{};
     bool										useWireFrame		{ false };
 	bool										m_bShowRenderState	{ false };
 	std::atomic_bool							useTestLightmap		{ false };

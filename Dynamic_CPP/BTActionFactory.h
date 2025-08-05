@@ -4,6 +4,15 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "DetectAndTargetingAction.h"
+#include "BTEntityInitAction.h"
+#include "BP005Breath.h"
+#include "BP004DeathWorm.h"
+#include "BP003Impale.h"
+#include "BP002FireBall.h"
+#include "BP001BodyAtack.h"
+#include "BossIdleAction.h"
+#include "GroggyAction.h"
 #include "MageActtack.h"
 #include "RetreatAction.h"
 #include "TeleportAction.h"

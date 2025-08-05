@@ -51,6 +51,9 @@
 		<ClInclude Include="CreateFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
+		<ClInclude Include="AniBehaviourFactory.h">
+			<Filter>Script\CreateFactory</Filter>
+		</ClInclude>
 		<ClInclude Include="Assets\Script\TestBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -87,12 +90,6 @@
 		<ClInclude Include="Assets\Script\TestTreeBehavior.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\AsisFeed.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -105,20 +102,26 @@
 		<ClInclude Include="RaycastHelper.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		<ClInclude Include="Assets\Script\TestEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClInclude Include="Assets\Script\EntityResource.h">
+			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDaed.h">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClInclude Include="Assets\Script\TweenManager.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Easing.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\EntityEnemy.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\TestAction.h">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\DaedAction.h">
 			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsAtteck.h">
-			<Filter>BehaviorTree\Condition</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\AtteckAction.h">
 			<Filter>BehaviorTree\Action</Filter>
@@ -126,20 +129,77 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\Idle.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\Action\ChaseAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TestEnemy.h">
-			<Filter>Script\ScriptClass</Filter>
+		<ClInclude Include="Assets\BehaviorTree\Action\DamegeAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP003Impale.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP004DeathWorm.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BP005Breath.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\BTEntityInitAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\GroggyAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\TestCon.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsDaed.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsAtteck.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsDetect.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsMageAttack.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase1.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
@@ -153,32 +213,23 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.h">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\DamegeAction.h">
-			<Filter>BehaviorTree\Action</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\EntityResource.h">
-			<Filter>Script\ScriptClass</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\TweenManager.h">
-			<Filter>Script\ScriptClass</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsReteat.h">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsMageAttack.h">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Condition\IsTeleport.h">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\TeleportAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h">
-			<Filter>BehaviorTree\Action</Filter>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClInclude>
 		<ClInclude Include="AniBehaviorFactory.h">
 			<Filter>Script\CreateFactory</Filter>
@@ -197,6 +248,15 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestEffect.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -230,12 +290,6 @@
 		<ClCompile Include="Assets\Script\TestTreeBehavior.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\AsisFeed.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -245,20 +299,29 @@
 		<ClCompile Include="Assets\Script\InverseKinematic.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
-			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		<ClCompile Include="Assets\Script\TestEnemy.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClCompile Include="Assets\Script\EntityResource.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDaed.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClCompile Include="Assets\Script\TweenManager.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClInclude Include="Assets\Script\Weapon.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClCompile Include="Assets\Script\Weapon.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
+			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TestAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\DaedAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsAtteck.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\AtteckAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
@@ -266,20 +329,71 @@
 		<ClCompile Include="Assets\BehaviorTree\Action\Idle.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\ChaseAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TestEnemy.cpp">
-			<Filter>Script\ScriptClass</Filter>
+		<ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\TeleportAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\RetreatAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BossIdleAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP001BodyAtack.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP002FireBall.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP003Impale.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP004DeathWorm.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BP005Breath.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\BTEntityInitAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\GroggyAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\TestCon.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsDaed.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsAtteck.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsDetect.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsReteat.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsMageAttack.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsTeleport.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsGroggy.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\TestConCec.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsDamege.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
@@ -293,38 +407,23 @@
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\Phase3.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\DamegeAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP1IsPatten.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\EntityResource.cpp">
-			<Filter>Script\ScriptClass</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\BP2IsPatten.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\TweenManager.cpp">
-			<Filter>Script\ScriptClass</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossAtteck.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsReteat.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsBossRangeAttack.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsMageAttack.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsInitialize.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Condition\IsTeleport.cpp">
-			<Filter>BehaviorTree\Condition</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\TeleportAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\RetreatAction.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\BehaviorTree\Action\MageActtack.cpp">
-			<Filter>BehaviorTree\Action</Filter>
-		</ClCompile>
-		<ClInclude Include="Assets\Script\Weapon.h">
-			<Filter>Script\ScriptClass</Filter>
-		</ClInclude>
-		<ClCompile Include="Assets\Script\Weapon.cpp">
-			<Filter>Script\ScriptClass</Filter>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\NewAniBehavior2.cpp">
 			<Filter>Script</Filter>
@@ -337,6 +436,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

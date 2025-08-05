@@ -48,6 +48,7 @@ public:
 
 	void Initialize();
 	void SetScene(Scene* scene) { m_currentScene = scene; }
+	void Finalize();
 
 	void SetBuffers(ID3D11Buffer* modelBuffer);
 

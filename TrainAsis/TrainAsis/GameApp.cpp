@@ -8,10 +8,8 @@
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
 #include "EffectProxyController.h"
-#include "ResourceAllocator.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
-#include "GameObjectPool.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -23,6 +21,13 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
+	HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+
 	PathFinder::Initialize();
 	Log::Initialize();
 
@@ -52,18 +57,17 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	EffectProxyController::Destroy();
 	InputManager::Destroy();
 	DataSystem::Destroy();
-	ResourceAllocator::Destroy();
-	GameObjectPool::Destroy();
 	PrefabUtility::Destroy();
 
 	Log::Finalize();
+
+	CoUninitialize();
 
 	return 0;
 }
 
 void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width, int height)
 {
-	GameObjectPool::GetInstance();
 	EngineSetting::GetInstance();
 	TagManager::GetInstance();
 	InputManager::GetInstance();
@@ -71,7 +75,6 @@ void GameBuilder::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int
 	EffectManager::GetInstance();
 	EffectProxyController::GetInstance();
 	DataSystem::GetInstance();
-	ResourceAllocator::GetInstance();
 	PhysicX::GetInstance();
 	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();

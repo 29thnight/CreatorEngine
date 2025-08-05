@@ -12,6 +12,7 @@ class PhysicsManager;
 class GameObjectPool;
 class AniBehavior;
 class PhysicX;
+class Scene;
 namespace BT
 {
 	class NodeFactory;
@@ -65,6 +66,7 @@ public:
 	bool IsScriptUpToDate();
 	void ReloadDynamicLibrary();
 	void ReplaceScriptComponent();
+	void ReplaceScriptComponentTargetScene(Scene* targetScene);
 	void CompileEvent();
 	// 스크립트 생성
 	void CreateScriptFile(std::string_view name);

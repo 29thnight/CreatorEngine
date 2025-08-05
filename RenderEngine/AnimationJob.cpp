@@ -31,9 +31,9 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
     return -1;
 }
 
-AnimationJob::AnimationJob() :
-    m_UpdateThreadPool(8)
+AnimationJob::AnimationJob()
 {
+	m_UpdateThreadPool = new ThreadPool<std::function<void()>>(8); // 8 threads for animation updates
 	m_sceneLoadedHandle = SceneManagers->sceneLoadedEvent.AddRaw(this, &AnimationJob::PrepareAnimation);
     m_AnimationUpdateHandle = SceneManagers->InternalAnimationUpdateEvent.AddRaw(this, &AnimationJob::Update);
 	m_sceneUnloadedHandle = SceneManagers->sceneUnloadedEvent.AddRaw(this, &AnimationJob::CleanUp);
@@ -44,6 +44,12 @@ AnimationJob::~AnimationJob()
 	SceneManagers->sceneLoadedEvent.Remove(m_sceneLoadedHandle);
 	SceneManagers->InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
     SceneManagers->sceneUnloadedEvent.Remove(m_sceneUnloadedHandle);
+}
+
+void AnimationJob::Finalize()
+{
+    delete m_UpdateThreadPool;
+	m_currAnimator.clear();
 }
 
 void AnimationJob::Update(float deltaTime)
@@ -63,7 +69,7 @@ void AnimationJob::Update(float deltaTime)
     for(auto& animator : m_currAnimator)
     {
         std::vector<std::shared_ptr<AnimationController>> controllers = animator->m_animationControllers;
-        m_UpdateThreadPool.Enqueue([this, animator, controllers, delta = deltaTime]
+        m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime]
         {
             Skeleton* skeleton = animator->m_Skeleton;
             if (!skeleton) return;
@@ -232,7 +238,7 @@ void AnimationJob::Update(float deltaTime)
         });
     }
 
-    m_UpdateThreadPool.NotifyAllAndWait();
+    m_UpdateThreadPool->NotifyAllAndWait();
 }
 
 void AnimationJob::PrepareAnimation()

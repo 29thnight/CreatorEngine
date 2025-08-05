@@ -2,7 +2,7 @@
 #include <string>
 #include <Windows.h>
 
-std::string AnsiToUtf8(const std::string& ansiStr)
+inline std::string AnsiToUtf8(const std::string& ansiStr)
 {
     // ANSI → Wide
     int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiStr.c_str(), -1, nullptr, 0);
@@ -15,4 +15,13 @@ std::string AnsiToUtf8(const std::string& ansiStr)
     WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &utf8[0], utf8Len, nullptr, nullptr);
 
     return utf8;
+}
+
+// 모든 문자를 소문자로 변환
+inline std::string ToLower(std::string_view str)
+{
+    std::string result(str);
+    std::transform(result.begin(), result.end(), result.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return result;
 }

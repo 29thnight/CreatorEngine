@@ -285,6 +285,29 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 					DrawSceneObject(obj);
 					ImGui::PopID();
 				}
+
+				auto& dontDistroyObj = SceneManagers->GetDontDestroyOnLoadObjects();
+				if (!dontDistroyObj.empty())
+				{
+					ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+					if (ImGui::TreeNodeEx("[ Dont Destroy On Load ]", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						for (const auto& obj : dontDistroyObj)
+						{
+							if (!obj || !obj->m_containDontDestroyOnLoad) continue;
+
+							auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+							if (gameObject)
+							{
+								ImGui::PushID((int)gameObject.get());
+								DrawSceneObject(gameObject);
+								ImGui::PopID();
+							}
+						}
+						ImGui::TreePop();
+					}
+				}
+
 				ImGui::TreePop();
 			}
 		}

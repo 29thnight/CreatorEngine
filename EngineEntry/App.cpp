@@ -23,11 +23,9 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-	if (SUCCEEDED(hr))
+	if (FAILED(hr))
 	{
-		// COM 객체 생성 및 사용
-
-		CoUninitialize();
+		return hr;
 	}
 
 	PathFinder::Initialize();
@@ -62,6 +60,8 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	PrefabUtility::Destroy();
 
 	Log::Finalize();
+
+	CoUninitialize();
 
 	return 0;
 }

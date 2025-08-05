@@ -1033,6 +1033,21 @@ void Scene::DestroyGameObjects()
 
 		obj->m_index = indexMap[oldIndex];
 	}
+
+	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
+	{
+		return obj && !obj->IsDontDestroyOnLoad();
+	});
+
+	if (eraseSize > 0)
+	{
+		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
+		for (auto& obj : m_SceneObjects)
+		{
+			obj->m_containDontDestroyOnLoad = true;
+		}
+	}
+
 }
 
 void Scene::DestroyComponents()
@@ -1224,16 +1239,20 @@ void Scene::AllUpdateWorldMatrix()
 
 	std::ranges::for_each(rootObjects, updateModel);
 
-	//static size_t gameObjectCount = 0;
-	//if (gameObjectCount != m_SceneObjects.size())
-	//{
-	//	std::ranges::for_each(rootObjects, updateModel);
-	//	gameObjectCount = m_SceneObjects.size();
-	//}
-	//else
-	//{
-	//	UpdateAllTransforms();
-	//}
+	// Update DontDestroyOnLoad objects
+	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();
+	if (0 < size)
+	{
+		auto& dontDestroyObjects = SceneManagers->GetDontDestroyOnLoadObjects();
+		for (auto& obj : dontDestroyObjects)
+		{
+			auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+			if (gameObject && gameObject->IsEnabled())
+			{
+				UpdateModelRecursive(gameObject->m_index, XMMatrixIdentity());
+			}
+		}
+	}
 }
 
 void Scene::RegisterDirtyTransform(Transform* transform)
@@ -1245,18 +1264,18 @@ void Scene::RegisterDirtyTransform(Transform* transform)
 
 void Scene::UpdateAllTransforms()
 {
-	std::unordered_set<Transform*> dirtySet;
-	{
-		std::unique_lock lock(sceneMutex);
-		dirtySet.swap(m_globalDirtySet);
-	}
+	//std::unordered_set<Transform*> dirtySet;
+	//{
+	//	std::unique_lock lock(sceneMutex);
+	//	dirtySet.swap(m_globalDirtySet);
+	//}
 
-	for (Transform* rootDirty : dirtySet)
-	{
-		if (rootDirty)
-		{
-			auto rootObject = rootDirty->GetOwner();
-			UpdateModelRecursive(rootObject->m_index, XMMatrixIdentity());
-		}
-	}
+	//for (Transform* rootDirty : dirtySet)
+	//{
+	//	if (rootDirty)
+	//	{
+	//		auto rootObject = rootDirty->GetOwner();
+	//		UpdateModelRecursive(rootObject->m_index, XMMatrixIdentity());
+	//	}
+	//}
 }

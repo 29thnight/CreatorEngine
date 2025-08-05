@@ -4,6 +4,13 @@
 #include "BTHeader.h"
 
 // Automation include ConditionDecoratorNodeClass header
+#include "IsUseAsis.h"
+#include "BP2IsPatten.h"
+#include "IsInitialize.h"
+#include "IsBossRangeAttack.h"
+#include "BP1IsPatten.h"
+#include "IsBossAtteck.h"
+#include "IsStartBoss.h"
 #include "Phase3.h"
 #include "Phase2.h"
 #include "Phase1.h"

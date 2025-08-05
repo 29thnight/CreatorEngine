@@ -48,6 +48,84 @@ void FoliageComponent::OnDestroy()
     }
 }
 
+void FoliageComponent::SaveFoliageAsset(const file::path& savePath)
+{
+	file::path path = savePath.string() + ".foliage";
+	std::ofstream outFile(path);
+    if (!outFile.is_open())
+    {
+        std::cerr << "Failed to open file for saving foliage asset: " << path << std::endl;
+        return;
+	}
+
+	MetaYml::Node assetNode;
+    for (auto& type : m_foliageTypes)
+    {
+        MetaYml::Node typeNode = Meta::Serialize(&type);
+        assetNode["FoliageAsset"]["Types"].push_back(typeNode);
+	}
+
+    for (auto& instance : m_foliageInstances)
+    {
+        MetaYml::Node instanceNode = Meta::Serialize(&instance);
+        assetNode["FoliageAsset"]["Instances"].push_back(instanceNode);
+	}
+
+    outFile << assetNode;
+    outFile.close();
+    outFile.flush();
+	DataSystems->ForceCreateYamlMetaFile(path);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Ensure file is written before next operation
+	FileGuid metaGuid = DataSystems->GetFileGuid(path);
+    if (metaGuid != nullFileGuid)
+    {
+        m_foliageAssetGuid = metaGuid;
+        assetNode["FoliageAsset"]["Guid"] = m_foliageAssetGuid.ToString();
+    }
+    else
+    {
+        std::cerr << "Failed to generate GUID for foliage asset: " << path << std::endl;
+        return;
+	}
+
+	std::cout << "Foliage asset saved successfully: " << path << std::endl;
+}
+
+void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
+{
+    auto assetPath = DataSystems->GetFilePath(assetGuid);
+    if (assetPath.empty())
+    {
+        std::cerr << "Asset GUID not found: " << assetGuid.ToString() << std::endl;
+        return;
+    }
+
+    MetaYml::Node assetNode = MetaYml::LoadFile(assetPath.string());
+    if (assetNode.IsNull() || !assetNode["FoliageAsset"])
+    {
+        std::cerr << "Invalid foliage asset file: " << assetPath << std::endl;
+        return;
+    }
+
+    m_foliageTypes.clear();
+    m_foliageInstances.clear();
+    for (const auto& typeNode : assetNode["FoliageAsset"]["Types"])
+    {
+        FoliageType type;
+        Meta::Deserialize(&type, typeNode);
+        AddFoliageType(type);
+    }
+
+    for (const auto& instanceNode : assetNode["FoliageAsset"]["Instances"])
+    {
+        FoliageInstance instance;
+        Meta::Deserialize(&instance, instanceNode);
+        AddFoliageInstance(instance);
+    }
+	std::cout << "Foliage asset loaded successfully: " << assetPath << std::endl;
+}
+
 void FoliageComponent::AddFoliageType(const FoliageType& type)
 {
     m_foliageTypes.push_back(type);

@@ -214,6 +214,15 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("DetectAndTargetingAction", []() { return new DetectAndTargetingAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BTEntityInitAction", []() { return new BTEntityInitAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("GroggyAction", []() { return new GroggyAction(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP005Breath", []() { return new BP005Breath(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP004DeathWorm", []() { return new BP004DeathWorm(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP003Impale", []() { return new BP003Impale(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP002FireBall", []() { return new BP002FireBall(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BP001BodyAtack", []() { return new BP001BodyAtack(); });
+		ActionCreateFactory::GetInstance()->RegisterFactory("BossIdleAction", []() { return new BossIdleAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("MageActtack", []() { return new MageActtack(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("RetreatAction", []() { return new RetreatAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("TeleportAction", []() { return new TeleportAction(); });
@@ -228,6 +237,8 @@ extern "C"
 	EXPORT_API void InitConditionFactory()
 	{
 		// Register the factory function for BTCondition Automation
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsChase", []() { return new IsChase(); });
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsGroggy", []() { return new IsGroggy(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsTeleport", []() { return new IsTeleport(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsMageAttack", []() { return new IsMageAttack(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsReteat", []() { return new IsReteat(); });
@@ -241,6 +252,13 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsUseAsis", []() { return new IsUseAsis(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsStartBoss", []() { return new IsStartBoss(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsInitialize", []() { return new IsInitialize(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsBossRangeAttack", []() { return new IsBossRangeAttack(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsBossAtteck", []() { return new IsBossAtteck(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("BP2IsPatten", []() { return new BP2IsPatten(); });
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("BP1IsPatten", []() { return new BP1IsPatten(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase3", []() { return new Phase3(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase2", []() { return new Phase2(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("Phase1", []() { return new Phase1(); });

@@ -23,6 +23,17 @@ ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
 RenderScene::~RenderScene()
 {
+}
+
+void RenderScene::Initialize()
+{
+	m_renderDataMap.resize(10);
+	m_LightController = new LightController();
+	m_animationJob.SetRenderScene(this);
+}
+
+void RenderScene::Finalize()
+{
 	Memory::SafeDelete(m_LightController);
 
 	SpinLock lock(m_proxyMapFlag);
@@ -38,13 +49,7 @@ RenderScene::~RenderScene()
 	}
 	m_palleteMap.clear();
 	m_renderDataMap.clear();
-}
-
-void RenderScene::Initialize()
-{
-	m_renderDataMap.resize(10);
-	m_LightController = new LightController();
-	m_animationJob.SetRenderScene(this);
+	m_animationJob.Finalize();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)

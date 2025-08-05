@@ -170,9 +170,11 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         break;
     case ToneMap_Uncharted2:
             toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
+            toneMapped = LINEARtoSRGB(toneMapped);
         break;
     case ToneMap_Unreal:
             toneMapped = ACESFilmic(colour.rgb * toneMapExposure);
+            toneMapped = LINEARtoSRGB(toneMapped);
         break;
     case ToneMap_HDR10:
             toneMapped = LinearToPQ(colour.rgb * toneMapExposure);
