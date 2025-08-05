@@ -5,6 +5,7 @@
 class Animator;
 class Weapon;
 class EntityItem;
+class Socket;
 class Player : public Entity
 {
 public:
@@ -101,6 +102,9 @@ public:
 	[[Property]]
 	float detectAngle = 30.f;
 
+	bool isAttacking = false;
+	float attackTime = 0.980f;
+	float attackElapsedTime = 0.f;
 	void TestStun();
 	void TestKnockBack();
 	bool isDead = false;
@@ -123,4 +127,7 @@ public:
 	Animator* m_animator = nullptr;
 
 	GameObject* camera = nullptr;
+
+	Socket* handSocket;
+	GameObject* aniOwener = nullptr;
 };

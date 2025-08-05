@@ -115,24 +115,71 @@ AnimationController* Animator::GetController(std::string name)
     return nullptr;
 }
 
-Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneName)
+GameObject* Animator::FindBoneRecursive(GameObject* parent, const std::string& boneName)
 {
-	Socket* socket = m_Skeleton->FindSocket(socketName);
-	if (socket) return socket;
-	GameObject* obj = GameObject::Find(boneName);
-	SceneManagers->GetActiveScene()->CreateGameObject(socketName, GameObjectType::Empty, obj->m_index);
+	if (!parent) return nullptr;
 
-	Socket* newSocket = new Socket();
-	newSocket->m_name = socketName;
-	newSocket->GameObjectIndex = obj->m_index;
-	newSocket->m_ObjectName = boneName;
-	m_Skeleton->m_sockets.push_back(newSocket);
-	return newSocket;
+	for (int childIndex : parent->m_childrenIndices)
+	{
+		GameObject* child = GameObject::FindIndex(childIndex);
+		if (!child) continue;
+
+		if (child->m_name == boneName)
+			return child;
+
+		// 자식의 자식들도 탐색
+		if (GameObject* result = FindBoneRecursive(child, boneName))
+			return result;
+	}
+
+	return nullptr;
+}
+
+Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneName, GameObject* object)
+{
+	if (Socket* socket = FindSocket(socketName); socket)
+		return socket;
+
+	// 먼저 자식 구조 전체에서 boneName을 찾는다 (재귀적 탐색)
+	std::string realBoneName = boneName.data();
+	GameObject* socketBone = FindBoneRecursive(object, realBoneName);
+
+	// 없으면 (1)~(100)까지 이름 붙여서 찾는다
+	int index = 1;
+	while (!socketBone && index <= 10)
+	{
+		std::string indexedName = realBoneName + " (" + std::to_string(index) + ")";
+		socketBone = FindBoneRecursive(object, indexedName);
+		if (socketBone)
+		{
+			realBoneName = indexedName;  // 실제 본 이름 업데이트
+			break;
+		}
+		++index;
+	}
+
+	// 찾았으면 소켓 생성 후 반환
+	if (socketBone)
+	{
+		Socket* newSocket = new Socket();
+		newSocket->m_name = socketName;
+		newSocket->GameObjectIndex = 9999 + index; // 임의의 인덱스
+		newSocket->m_ObjectName = boneName;
+		socketvec.push_back(newSocket);
+		return newSocket;
+	}
+	return nullptr;
 }
 
 Socket* Animator::FindSocket(std::string_view socketName)
 {
-	return m_Skeleton->FindSocket(socketName);
+	for (auto& socket : socketvec)
+	{
+		if (socket->m_name == socketName)
+			return socket;
+	}
+
+	return nullptr;
 }
 
 void Animator::DeleteParameter(int index)

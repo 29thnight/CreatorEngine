@@ -192,6 +192,7 @@
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
 		<ClInclude Include="Easing.h" />
+		<ClInclude Include="ItemType.h" />
 		<ClInclude Include="RaycastHelper.h" />
 		<ClInclude Include="BTActionFactory.h" />
 		<ClInclude Include="BTConditionFactory.h" />

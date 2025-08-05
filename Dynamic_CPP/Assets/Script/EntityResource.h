@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Entity.h"
-
+#include "ItemType.h"
+#include "EntityResource.generated.h"
 class EntityResource : public Entity
 {
 public:
+   ReflectEntityResource
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityResource)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -21,4 +24,8 @@ public:
 	virtual void OnDestroy() override  {}
 
 	virtual void Attack(Entity* sender, int damage);
+
+	[[Property]]
+	int  itemCode = 0;
+	EItemType itemType = EItemType::Mushroom;
 };

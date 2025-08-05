@@ -6,17 +6,7 @@
 Socket::Socket()
 {
 	AttachObjects.clear();
-	m_activeSceneChangedEventHandle = SceneManagers->activeSceneChangedEvent.AddLambda([&]
-	{
-		for (auto& ID : AttachObejctIndex)
-		{
-			GameObject* gameObject = GameObject::FindAttachedID(ID);
-			if (gameObject)
-			{
-				AttachObjects.push_back(gameObject);
-			}
-		}
-	});
+
 }
 Socket::~Socket()
 {

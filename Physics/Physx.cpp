@@ -956,6 +956,17 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
 		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(dynamicBody->GetScale()) * dxMatrix * dynamicBody->GetOffsetTranslation();
 		CopyVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
+		DirectX::SimpleMath::Vector3& velocity = rigidBodyData.linearVelocity;
+
+		if (std::abs(velocity.x) < 0.01f)
+		{
+			velocity.x = 0.0f;
+		}
+
+		if (std::abs(velocity.z) < 0.01f)
+		{
+			velocity.z = 0.0f;
+		}
 		CopyVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
 
 		physx::PxRigidDynamicLockFlags flags = pxBody->getRigidDynamicLockFlags();

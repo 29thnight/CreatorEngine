@@ -1036,7 +1036,7 @@ void Scene::DestroyGameObjects()
 
 	size_t eraseSize = std::erase_if(m_SceneObjects, [](const auto& obj)
 	{
-		return obj && !obj->IsDontDestroyOnLoad();
+		return obj && obj->IsDontDestroyOnLoad();
 	});
 
 	if (eraseSize > 0)
@@ -1122,7 +1122,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		{
 			return;
 		}
-		const auto& bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
+		const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
 		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ? 
 			animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
 	}

@@ -118,17 +118,17 @@ void Skeleton::DeleteSocket(std::string_view socketName)
 
 Bone* Skeleton::FindBone(std::string_view _name)
 {
-	//for (Bone* bone : m_bones)
-	//{
-	//	if (bone->m_name == _name)
-	//		return bone;
-	//}
+	for (Bone* bone : m_bones)
+	{
+		if (bone->m_name == _name)
+			return bone;
+	}
 
-	auto it = m_boneMap.find(std::string(_name));
+	/*auto it = m_boneMap.find(std::string(_name));
 	if (it != m_boneMap.end())
 	{
 		return it->second;
-	}
+	}*/
 
 	return nullptr;
 }

@@ -293,9 +293,9 @@ void HotLoadSystem::ReplaceScriptComponent()
 				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
 				const auto& scriptType = newScript->ScriptReflect();
 
-				for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				for (auto& [_gameObject, idx, node] : m_scriptComponentMetaIndexs)
 				{
-					if (gameObject == gameObject && index == idx)
+					if (_gameObject == gameObject && index == idx)
 					{
 						Meta::Deserialize(scriptPtr, scriptType, node);
 						break;

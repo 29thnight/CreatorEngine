@@ -101,6 +101,22 @@ void EntityAsis::Start()
 
 void EntityAsis::OnTriggerEnter(const Collision& collision)
 {
+	auto item = collision.otherObj->GetComponent<EntityItem>();
+	if (item) {
+		if (item->m_state != EItemState::THROWN) return;
+		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
+		auto owner = item->GetThrowOwner();
+		if (owner) {
+			bool result = AddItem(item);
+
+			if (!result) {
+				// »πµÊ¿ª Ω«∆–«ﬂ¿ª ∂ß.
+			}
+			else {
+				// »πµÊ«ﬂ¿ª ∂ß √≥∏Æ.
+			}
+		}
+	}
 }
 
 void EntityAsis::OnCollisionEnter(const Collision& collision)
