@@ -205,9 +205,9 @@ private:
 
 public:
     void AllUpdateWorldMatrix();
-
+	[[deprecated]]
 	void RegisterDirtyTransform(Transform* transform);
-
+	[[deprecated]]
 	void UpdateAllTransforms();
 
 private:

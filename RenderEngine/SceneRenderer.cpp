@@ -300,8 +300,10 @@ void SceneRenderer::Finalize()
 	DeviceState::g_depthStancilSRV		= nullptr;
 	DeviceState::g_annotation			= nullptr;
 
+#ifndef BUILD_FLAG
 	CameraManagement->DeleteCamera(m_pEditorCamera->m_cameraIndex);
 	m_pEditorCamera.reset();
+#endif
 	CameraManagement->Finalize();
 	m_renderScene->Finalize();
 	m_renderScene.reset();

@@ -9,6 +9,11 @@ class RenderScene;
 class SceneManager;
 class Object : public IObject, public Managed::HeapObject
 {
+private:
+    friend class SceneManager;
+    friend class RenderScene;
+    friend class Prefab;
+    friend class PrefabUtility;
 public:
    ReflectObject
     [[Serializable]]
@@ -42,14 +47,12 @@ public:
 
 public:
     [[Property]]
-    HashingString m_name{ "Object" };
+    HashingString           m_name{ "Object" };
     [[Property]]
-	bool m_isEnabled{ true };
+	bool                    m_isEnabled{ true };
+	bool                    m_containDontDestroyOnLoad{ false };
+
 protected:
-    friend class SceneManager;
-    friend class RenderScene;
-    friend class Prefab;
-    friend class PrefabUtility;
 	HashedGuid              m_typeID{ type_guid(Object) };
     [[Property]]
     HashedGuid              m_instanceID{ make_guid() };

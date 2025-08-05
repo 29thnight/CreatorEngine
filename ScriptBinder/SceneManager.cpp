@@ -237,7 +237,6 @@ Scene* SceneManager::SaveScene(std::string_view name)
 	MetaYml::Node assetsBundleNode{};
 
     m_activeScene.load()->m_SceneObjects[0]->m_name = saveSceneFileName.stem().string();
-
     try
     {
         sceneNode = Meta::Serialize(m_activeScene.load());
@@ -247,6 +246,22 @@ Scene* SceneManager::SaveScene(std::string_view name)
 		Debug->LogError(e.what());
 		return nullptr;
 	}
+
+    if (0 < m_dontDestroyOnLoadObjects.size())
+    {
+        MetaYml::Node dontDestroyOnLoadNode;
+        for (auto obj : m_dontDestroyOnLoadObjects)
+        {
+			if (!obj) continue;
+
+            auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+            if (gameObject)
+            {
+                dontDestroyOnLoadNode.push_back(Meta::Serialize(gameObject.get()));
+            }
+        }
+		sceneNode["DontDestroyOnLoadObjects"] = dontDestroyOnLoadNode;
+    }
 
 	sceneFileOut << sceneNode;
 
@@ -305,6 +320,19 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
             DesirealizeGameObject(type, objNode);
         }
+
+        for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+        {
+            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            if (!type)
+            {
+                Debug->LogError("Failed to extract type from YAML node.");
+                continue;
+            }
+            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+		}
+
+        RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
         m_activeScene.load()->AllUpdateWorldMatrix();
 
 		m_scenes.push_back(m_activeScene);
@@ -357,7 +385,21 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
             DesirealizeGameObject(scene, type, objNode);
         }
+
+        for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+        {
+            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            if (!type)
+            {
+                Debug->LogError("Failed to extract type from YAML node.");
+                continue;
+            }
+            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+        }
+
+		RebindEventDontDestroyOnLoadObjects(scene);
         scene->AllUpdateWorldMatrix();
+
 
         m_scenes.push_back(scene);
         sceneLoadedEvent.Broadcast();
@@ -393,6 +435,19 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
                 DesirealizeGameObject(newScene, type, objNode);
             }
+
+            for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+            {
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type)
+                {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+            }
+
+            RebindEventDontDestroyOnLoadObjects(newScene);
             newScene->AllUpdateWorldMatrix();
             return newScene;
         }
@@ -424,6 +479,20 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                 }
                 DesirealizeGameObject(newScene, type, objNode);
             }
+
+            for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+            {
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type)
+                {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+            }
+
+            RebindEventDontDestroyOnLoadObjects(newScene);
+
             newScene->AllUpdateWorldMatrix();
             return newScene;
         }
@@ -468,6 +537,35 @@ void SceneManager::AddDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
     {
         m_dontDestroyOnLoadObjects.push_back(objPtr);
     }
+}
+
+void SceneManager::RemoveDontDestroyOnLoad(std::shared_ptr<Object> objPtr)
+{
+    if (objPtr)
+    {
+        objPtr->Destroy();
+        std::erase_if(m_dontDestroyOnLoadObjects,
+			[&](const auto& obj) { return obj == objPtr; });
+	}
+}
+
+void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
+{
+    for (const auto& obj : m_dontDestroyOnLoadObjects)
+    {
+		auto gameObject = std::dynamic_pointer_cast<GameObject>(obj);
+        if (gameObject)
+        {
+            auto components = gameObject->m_components;
+            for (const auto& component : components)
+            {
+                if (auto* regEvent = dynamic_cast<IRegistableEvent*>(component.get()))
+                {
+                    regEvent->RegisterOverriddenEvents(scene);
+                }
+            }
+		}
+	}
 }
 
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
@@ -550,7 +648,7 @@ void SceneManager::DeleteEditorOnlyPlayScene()
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
 {
-    if (type->typeID == TypeTrait::GUIDCreator::GetTypeID<GameObject>())
+    if (type->typeID == type_guid(GameObject))
     {
         auto obj = m_activeScene.load()->LoadGameObject(
             itNode["m_instanceID"].as<size_t>(),
@@ -635,4 +733,54 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             }
         }
     }
+}
+
+void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode)
+{
+    if (type->typeID == type_guid(GameObject))
+    {
+        auto it = std::find_if(m_dontDestroyOnLoadObjects.begin(), m_dontDestroyOnLoadObjects.end(),
+			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].as<size_t>(); });
+        if(it != m_dontDestroyOnLoadObjects.end())
+        {
+            Debug->LogWarning("Object with instance ID " + std::to_string(itNode["m_instanceID"].as<size_t>()) + " already exists in DontDestroyOnLoad.");
+            return; // Object already exists, skip deserialization
+		}
+
+        auto obj = targetScene->LoadGameObject(
+            itNode["m_instanceID"].as<size_t>(),
+            itNode["m_name"].as<std::string>(),
+            GameObjectType::Empty,
+            itNode["m_parentIndex"].as<GameObject::Index>()
+        ).get();
+        if (obj)
+        {
+            Meta::Deserialize(obj, itNode);
+            if (!obj->m_tag.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_tag.ToString(), obj);
+            }
+            if (!obj->m_layer.ToString().empty())
+            {
+                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
+            }
+        }
+        if (itNode["m_components"])
+        {
+            for (const auto& componentNode : itNode["m_components"])
+            {
+                try
+                {
+                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                }
+                catch (const std::exception& e)
+                {
+                    Debug->LogError(e.what());
+                    continue;
+                }
+            }
+        }
+
+        Object::SetDontDestroyOnLoad(obj);
+	}
 }
