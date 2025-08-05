@@ -7,13 +7,16 @@ bool Phase1::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 
 	if (Identity != "Boss1") return false;
 
-	int maxHp = blackBoard.GetValueAsInt("eHP");
-	int hp = blackBoard.GetValueAsInt("eCurrentHP");
+	int maxHp = blackBoard.GetValueAsInt("HP");
+	int hp = blackBoard.GetValueAsInt("CurrHP");
 
 	float hpRatio = static_cast<float>(hp) / static_cast<float>(maxHp);
 
+
+	std::cout << "HPRatio is : "<< hpRatio << " Phase1 is " << ((bool)(hpRatio > 0.7f) ? "True" : "False") << std::endl;
 	if (hpRatio > 0.7f) {
 		// 100% ~ 70% HP 
+
 		return true; // Condition met
 	}
 

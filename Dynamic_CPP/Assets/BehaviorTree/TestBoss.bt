@@ -1,0 +1,321 @@
+NodeList:
+  - ID: 3368862560
+    Type: 2
+    Name: RootSequence
+    ParentID: 0
+    IsRoot: true
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2909484821]
+    Position: {x: 54, y: -83}
+  - ID: 3085729526
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 0
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsStartBoss
+    Policy: -858993460
+    Children: [2962364666]
+    Position: {x: 166, y: 229}
+  - ID: 2962364666
+    Type: 3
+    Name: Selector
+    ParentID: 3085729526
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2064983766, 1873635089]
+    Position: {x: 166, y: 445}
+  - ID: 2064983766
+    Type: 2
+    Name: Sequence
+    ParentID: 2962364666
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [4052772550, 610069546]
+    Position: {x: -58, y: 621}
+  - ID: 4052772550
+    Type: 6
+    Name: Condition
+    ParentID: 2064983766
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsDaed
+    Policy: -858993460
+    Children: ~
+    Position: {x: -202, y: 744}
+  - ID: 610069546
+    Type: 8
+    Name: Action
+    ParentID: 2064983766
+    IsRoot: false
+    HasScript: true
+    ScriptName: DaedAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: -10, y: 856}
+  - ID: 1873635089
+    Type: 3
+    Name: Selector
+    ParentID: 2962364666
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [388110750, 2352774322]
+    Position: {x: 438, y: 653}
+  - ID: 388110750
+    Type: 2
+    Name: Sequence
+    ParentID: 0
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2777517053, 556753943]
+    Position: {x: 262, y: 792}
+  - ID: 2777517053
+    Type: 6
+    Name: Condition
+    ParentID: 388110750
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsGroggy
+    Policy: -858993460
+    Children: ~
+    Position: {x: 230, y: 936}
+  - ID: 556753943
+    Type: 8
+    Name: Action
+    ParentID: 388110750
+    IsRoot: false
+    HasScript: true
+    ScriptName: GroggyAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 294, y: 1080}
+  - ID: 2352774322
+    Type: 3
+    Name: Selector
+    ParentID: 1873635089
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [1614775041, 32730461, 105462486]
+    Position: {x: 950, y: 824}
+  - ID: 1614775041
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 2352774322
+    IsRoot: false
+    HasScript: true
+    ScriptName: Phase1
+    Policy: -858993460
+    Children: [1141096989]
+    Position: {x: 662, y: 1109}
+  - ID: 1141096989
+    Type: 3
+    Name: Selector
+    ParentID: 1614775041
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2136493294, 1276063414]
+    Position: {x: 646, y: 1405}
+  - ID: 32730461
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 2352774322
+    IsRoot: false
+    HasScript: true
+    ScriptName: Phase2
+    Policy: -858993460
+    Children: [3767162789]
+    Position: {x: 1334, y: 1112}
+  - ID: 105462486
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 2352774322
+    IsRoot: false
+    HasScript: true
+    ScriptName: Phase3
+    Policy: -858993460
+    Children: [236703681]
+    Position: {x: 1990, y: 1093}
+  - ID: 3767162789
+    Type: 3
+    Name: Selector
+    ParentID: 32730461
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [3564968372, 1038815889]
+    Position: {x: 1446, y: 1400}
+  - ID: 236703681
+    Type: 3
+    Name: Selector
+    ParentID: 105462486
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 2086, y: 1373}
+  - ID: 2136493294
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 1141096989
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsBossAtteck
+    Policy: -858993460
+    Children: [1006585412]
+    Position: {x: 502, y: 1573}
+  - ID: 1006585412
+    Type: 3
+    Name: Selector
+    ParentID: 2136493294
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [140118624, 3498744570]
+    Position: {x: 502, y: 1736}
+  - ID: 1276063414
+    Type: 8
+    Name: Action
+    ParentID: 1141096989
+    IsRoot: false
+    HasScript: true
+    ScriptName: BossIdleAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 790, y: 1592}
+  - ID: 140118624
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 1006585412
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP1IsPatten
+    Policy: -858993460
+    Children: [1293155472]
+    Position: {x: 150, y: 1941}
+  - ID: 1293155472
+    Type: 8
+    Name: Action
+    ParentID: 140118624
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP003Impale
+    Policy: -858993460
+    Children: ~
+    Position: {x: 134, y: 2168}
+  - ID: 3498744570
+    Type: 3
+    Name: Selector
+    ParentID: 1006585412
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [2794705496, 1940847270]
+    Position: {x: 646, y: 1949}
+  - ID: 2794705496
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 3498744570
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsBossRangeAttack
+    Policy: -858993460
+    Children: [3698449786]
+    Position: {x: 486, y: 2117}
+  - ID: 3698449786
+    Type: 8
+    Name: Action
+    ParentID: 2794705496
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP002FireBall
+    Policy: -858993460
+    Children: ~
+    Position: {x: 486, y: 2328}
+  - ID: 1940847270
+    Type: 8
+    Name: Action
+    ParentID: 3498744570
+    IsRoot: false
+    HasScript: true
+    ScriptName: BP001BodyAtack
+    Policy: -858993460
+    Children: ~
+    Position: {x: 806, y: 2120}
+  - ID: 21276095
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 0
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsInitialize
+    Policy: -858993460
+    Children: [2790103376]
+    Position: {x: -90, y: 197}
+  - ID: 2790103376
+    Type: 8
+    Name: Action
+    ParentID: 21276095
+    IsRoot: false
+    HasScript: true
+    ScriptName: BTEntityInitAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: -138, y: 376}
+  - ID: 2909484821
+    Type: 3
+    Name: Selector
+    ParentID: 3368862560
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [21276095, 3085729526]
+    Position: {x: 38, y: 45}
+  - ID: 3564968372
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 3767162789
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsBossAtteck
+    Policy: -858993460
+    Children: [1558511766]
+    Position: {x: 1302, y: 1605}
+  - ID: 1038815889
+    Type: 8
+    Name: Action
+    ParentID: 3767162789
+    IsRoot: false
+    HasScript: true
+    ScriptName: BossIdleAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 1590, y: 1608}
+  - ID: 1558511766
+    Type: 3
+    Name: Selector
+    ParentID: 3564968372
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: ~
+    Position: {x: 1270, y: 1805}
