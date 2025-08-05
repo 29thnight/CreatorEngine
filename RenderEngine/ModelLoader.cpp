@@ -275,7 +275,7 @@ Material* ModelLoader::GenerateMaterial(int index)
         }
     }
 
-    auto material = shared_alloc<Material>();
+    auto material = std::make_shared<Material>();
     material->m_name = uniqueName;
 	material->m_fileGuid = m_fileGuid;
 
@@ -648,7 +648,7 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         name.resize(nameSize);
         infile.read(name.data(), nameSize);
 
-        auto mat = shared_alloc<Material>();
+        auto mat = std::make_shared<Material>();
         mat->m_name = name;
         infile.read(reinterpret_cast<char*>(&mat->m_materialInfo), sizeof(MaterialInfomation));
         infile.read(reinterpret_cast<char*>(&mat->m_renderingMode), sizeof(mat->m_renderingMode));

@@ -672,7 +672,7 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
 
 Material* DataSystem::CreateMaterial()
 {
-	std::shared_ptr<Material> material = shared_alloc<Material>();
+	std::shared_ptr<Material> material = std::make_shared<Material>();
 	if (material)
 	{
 		std::string name = "NewMaterial";

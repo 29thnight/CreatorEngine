@@ -43,7 +43,7 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 		return nullptr;
 
 	// Create a new Material instance
-	auto cloneMaterial = shared_alloc<Material>(*origin);
+	auto cloneMaterial = std::make_shared<Material>(*origin);
 
 	// 수정된 코드
 	if (newName.empty())
