@@ -2,6 +2,7 @@
 #include "Core.Minimal.h"
 #include "Entity.h"
 
+class BehaviorTreeComponent;
 enum class CriticalMark
 {
 	P1,
@@ -30,4 +31,6 @@ public:
 	void SetCriticalMark(int playerIndex);
 	CriticalMark criticalMark = CriticalMark::None;
 	virtual void Attack(Entity* sender, int damage);
+	bool isDead;
+	BehaviorTreeComponent* enemyBT;
 };

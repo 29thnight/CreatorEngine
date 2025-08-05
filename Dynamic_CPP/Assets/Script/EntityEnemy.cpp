@@ -2,9 +2,11 @@
 #include "pch.h"
 #include "Player.h"
 #include "EffectComponent.h"
-
+#include "BehaviorTreeComponent.h"
 void EntityEnemy::Start()
 {
+	enemyBT =GetOwner()->GetComponent<BehaviorTreeComponent>();
+
 }
 
 void EntityEnemy::Update(float tick)
@@ -29,6 +31,14 @@ void EntityEnemy::Update(float tick)
 
 		}
 	}
+
+
+
+	if (isDead)
+	{
+		//effect
+		Destroy();
+	}
 }
 
 void EntityEnemy::SetCriticalMark(int playerIndex)
@@ -51,8 +61,13 @@ void EntityEnemy::Attack(Entity* sender, int damage)
 		auto player = dynamic_cast<Player*>(sender);
 		if (player)
 		{
+			
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);
+			if (m_currentHP >= 0)
+			{
+				isDead = true;
+			}
 		}
 	}
 }

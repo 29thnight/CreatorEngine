@@ -26,9 +26,11 @@ void Player::Start()
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
+
 		if (animator)
 		{
 			m_animator = animator;
+			aniOwener = GameObject::FindIndex(child);
 			break;
 		}
 
@@ -39,23 +41,22 @@ void Player::Start()
 	}
 
 
+	handSocket= m_animator->MakeSocket("handsocket","hand.R", aniOwener);
 
+	
 
-	auto handsocket = GameObject::Find("SwordSocket");
+	std::string gumName = "Sword" + std::to_string(playerIndex +1);
+	auto obj = GameObject::Find(gumName);
+	if (obj && handSocket)
+	{
+		handSocket->AttachObject(obj);
+		auto curweapon = obj->GetComponent<Weapon>();
+		AddWeapon(curweapon);
 
-
+	}
 	auto curweapon = GameObject::Find("realSword");
 
-	if (handsocket)
-	{
-		if (curweapon)
-		{
-			handsocket->AddChild(curweapon);
-			auto basicWeapon = curweapon->GetComponent<Weapon>();
-			AddWeapon(basicWeapon);
-		}
-	}
-
+	
 
 
 	
@@ -208,6 +209,7 @@ void Player::Attack(Entity* sender, int damage)
 		{
 			// hit
 			m_currentHP -= std::max(damage, 0);
+			DropCatchItem();
 			//TestKnockBack();
 			if (m_currentHP <= 0)
 			{
@@ -264,7 +266,7 @@ void Player::CatchAndThrow()
 void Player::Catch()
 {
 
-	if (m_nearObject != nullptr)
+	if (m_nearObject != nullptr && catchedObject ==nullptr)
 	{
 
 		auto rigidbody = m_nearObject->GetComponent<RigidBodyComponent>();
@@ -275,7 +277,7 @@ void Player::Catch()
 		catchedObject->GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(true);
 		catchedObject->SetThrowOwner(this);
 		if (m_curWeapon)
-			m_curWeapon->GetOwner()->SetEnabled(false);
+			m_curWeapon->SetEnabled(false);
 	}
 }
 
@@ -295,7 +297,7 @@ void Player::DropCatchItem()
 		catchedObject = nullptr;
 		m_nearObject = nullptr; //&&&&&
 		if (m_curWeapon)
-			m_curWeapon->GetOwner()->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+			m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
 		m_animator->SetParameter("OnDrop", true);
 	}
 }
@@ -310,7 +312,7 @@ void Player::ThrowEvent()
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
-		m_curWeapon->GetOwner()->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+		m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
 }
 
 void Player::Dash()
@@ -467,7 +469,7 @@ void Player::AddWeapon(Weapon* weapon)
 
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
-	m_curWeapon->GetOwner()->SetEnabled(true);
+	m_curWeapon->SetEnabled(true);
 
 }
 
@@ -481,7 +483,7 @@ void Player::DeleteCurWeapon()
 	if (it != m_weaponInventory.end())
 	{
 		m_weaponInventory.erase(it);
-		m_curWeapon->GetOwner()->SetEnabled(false);
+		m_curWeapon->SetEnabled(false);
 		m_curWeapon = nullptr;
 	}
 }

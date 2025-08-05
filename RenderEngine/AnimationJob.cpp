@@ -210,12 +210,21 @@ void AnimationJob::Update(float deltaTime)
                 
             }
 
-            if (skeleton->HasSocket())
+            if (animator->HasSocket())
             {
-                for (auto& socket : skeleton->m_sockets)
+                if (SceneManagers->m_isGameStart == false || animator->GetOwner() == nullptr)
                 {
-                    socket->transform.SetLocalMatrix(socket->m_boneMatrix);
-                    socket->Update();
+
+
+                }
+                else
+                {
+
+                    for (auto& socket : animator->socketvec)
+                    {
+                        socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                        socket->Update();
+                    }
                 }
             }
 
@@ -441,14 +450,21 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     
-    if (skeleton->HasSocket())
+    if (animator.HasSocket())
     {
-        for (auto& socket : skeleton->m_sockets)
+        if (SceneManagers->m_isGameStart == false || animator.GetOwner() == nullptr)
         {
-            if (bone->m_name == socket->m_ObjectName)
+
+        }
+        else
+        {
+            for (auto& socket : animator.socketvec)
             {
-                socket->m_boneMatrix = globalTransform * socket->m_offset;
-                socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                if (bone->m_name == socket->m_ObjectName)
+                {
+                    socket->m_boneMatrix = globalTransform * socket->m_offset;
+                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                }
             }
         }
     }

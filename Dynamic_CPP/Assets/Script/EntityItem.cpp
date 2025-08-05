@@ -99,7 +99,13 @@ void EntityItem::Update(float tick)
 			}
 		}
 	}*/
-
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	if (abs(pos.y) <= 0.013f)
+	{
+		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
+		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
+		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
+	}
 	if (m_state == EItemState::CATCHED)
 	{
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
@@ -250,7 +256,7 @@ void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
 	speed = 4.0f;
 	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
-	endPos.y = 1;
+	endPos.y = 0.2f;
 }
 void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 {
@@ -259,7 +265,7 @@ void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
 	timer = 0.f;
 	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
 	endPos = startPos + offset;
-	endPos.y = 1;
+	endPos.y = 0.2f;
 }
 
 void EntityItem::SetThrowOwner(Player* player)

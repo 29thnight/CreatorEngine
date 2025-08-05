@@ -54,11 +54,13 @@ public:
 	
 	[[Property]]
 	float indicatorDistacne = 15.0f; 
-	EItemState m_state = EItemState::NONE;
+	EItemState m_state = EItemState::FALLED;
 	bool isTargettingTail = false;
 	[[Property]]
 	int  itemCode = 0;
 	EItemType itemType = EItemType::Mushroom;
+
+	bool OnGround;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
 };

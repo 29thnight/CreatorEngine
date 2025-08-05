@@ -5,6 +5,7 @@
 class Animator;
 class Weapon;
 class EntityItem;
+class Socket;
 class Player : public Entity
 {
 public:
@@ -126,4 +127,7 @@ public:
 	Animator* m_animator = nullptr;
 
 	GameObject* camera = nullptr;
+
+	Socket* handSocket;
+	GameObject* aniOwener = nullptr;
 };

@@ -25,7 +25,7 @@ public:
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
-	virtual void OnTriggerEnter(const Collision& collision) override {}
+	virtual void OnTriggerEnter(const Collision& collision) override;
 	virtual void OnTriggerStay(const Collision& collision) override {}
 	virtual void OnTriggerExit(const Collision& collision) override {}
 	virtual void OnCollisionEnter(const Collision& collision) override {}
@@ -36,9 +36,10 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
+	void SetEnabled(bool able);
 	std::string itemName = "None";
 	ItemType itemType = ItemType::Basic;
-
+	int OwnerPlayerIndex = 0;
 	int durabiMax = 5;
 	int durabiConsume_Attack = 1;
 	int durabiConsume_Charged = 3;
@@ -63,5 +64,6 @@ public:
 	float buffRange = 1.0f; //아군에게 같이?
 	float buffKnockbackPower = 0.15f; //일반공격 + 버프넉백
 	int buffStackMax = 30; 
+	
 	
 };

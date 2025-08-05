@@ -160,8 +160,8 @@ void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPt
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
-	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
-	if (m_palleteMap.find(animatorGuid) != m_palleteMap.end()) return;
+	if (m_animatorMap.find(animatorGuid) == m_animatorMap.end()) return;
+	if (m_palleteMap.find(animatorGuid) == m_palleteMap.end()) return;
 
 	m_animatorMap.erase(animatorGuid);
 
