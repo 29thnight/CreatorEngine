@@ -249,6 +249,15 @@
 		<ClInclude Include="Assets\Script\TestEffect.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -427,6 +436,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\TestEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
+			<Filter>BehaviorTree\ConditionDecorator</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Condition\IsChase.cpp">
+			<Filter>BehaviorTree\Condition</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

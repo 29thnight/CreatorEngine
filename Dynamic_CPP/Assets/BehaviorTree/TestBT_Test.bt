@@ -38,7 +38,7 @@ NodeList:
     ScriptName: IsDaed
     Policy: -858993460
     Children: ~
-    Position: {x: -426, y: 360}
+    Position: {x: -362, y: 360}
   - ID: 1220802128
     Type: 8
     Name: Action
@@ -48,7 +48,7 @@ NodeList:
     ScriptName: DaedAction
     Policy: -858993460
     Children: ~
-    Position: {x: -154, y: 376}
+    Position: {x: -314, y: 536}
   - ID: 3825938343
     Type: 3
     Name: Selector
@@ -57,18 +57,18 @@ NodeList:
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [700856674, 3380368976, 2108044870]
+    Children: [2754018510, 700856674, 3240466497, 3380368976, 2108044870]
     Position: {x: 390, y: 109}
   - ID: 700856674
     Type: 2
     Name: Sequence
-    ParentID: 3825938343
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
     Children: [1856270841, 1558418268]
-    Position: {x: 230, y: 253}
+    Position: {x: 406, y: 269}
   - ID: 1558418268
     Type: 6
     Name: Condition
@@ -78,17 +78,17 @@ NodeList:
     ScriptName: IsAtteck
     Policy: -858993460
     Children: ~
-    Position: {x: 182, y: 376}
+    Position: {x: 358, y: 456}
   - ID: 3380368976
     Type: 2
     Name: Sequence
-    ParentID: 3825938343
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: ""
     Policy: -858993460
-    Children: [574968042, 3513064655]
-    Position: {x: 470, y: 264}
+    Children: [574968042, 4286035256]
+    Position: {x: 806, y: 264}
   - ID: 574968042
     Type: 6
     Name: Condition
@@ -98,37 +98,37 @@ NodeList:
     ScriptName: IsDetect
     Policy: -858993460
     Children: ~
-    Position: {x: 470, y: 408}
+    Position: {x: 758, y: 424}
   - ID: 2108044870
     Type: 8
     Name: Action
-    ParentID: 3825938343
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: Idle
     Policy: -858993460
     Children: ~
-    Position: {x: 822, y: 248}
+    Position: {x: 1014, y: 248}
   - ID: 1856270841
     Type: 8
     Name: Action
-    ParentID: 700856674
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: AtteckAction
     Policy: -858993460
     Children: ~
-    Position: {x: 230, y: 568}
+    Position: {x: 422, y: 616}
   - ID: 3513064655
     Type: 8
     Name: Action
-    ParentID: 3380368976
+    ParentID: 0
     IsRoot: false
     HasScript: true
     ScriptName: ChaseAction
     Policy: -858993460
     Children: ~
-    Position: {x: 486, y: 568}
+    Position: {x: 646, y: 600}
   - ID: 1608338673
     Type: 5
     Name: ConditionDecorator
@@ -148,7 +148,7 @@ NodeList:
     ScriptName: DamegeAction
     Policy: -858993460
     Children: ~
-    Position: {x: -10, y: 536}
+    Position: {x: -74, y: 472}
   - ID: 1442497393
     Type: 5
     Name: ConditionDecorator
@@ -169,3 +169,53 @@ NodeList:
     Policy: -858993460
     Children: ~
     Position: {x: -634, y: 424}
+  - ID: 2754018510
+    Type: 2
+    Name: Sequence
+    ParentID: 3825938343
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [711360861]
+    Position: {x: 198, y: 269}
+  - ID: 3240466497
+    Type: 2
+    Name: Sequence
+    ParentID: 3825938343
+    IsRoot: false
+    HasScript: true
+    ScriptName: ""
+    Policy: -858993460
+    Children: [89034692, 3513064655]
+    Position: {x: 598, y: 269}
+  - ID: 711360861
+    Type: 5
+    Name: ConditionDecorator
+    ParentID: 2754018510
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsUseAsis
+    Policy: -858993460
+    Children: ~
+    Position: {x: 166, y: 405}
+  - ID: 89034692
+    Type: 6
+    Name: Condition
+    ParentID: 3240466497
+    IsRoot: false
+    HasScript: true
+    ScriptName: IsChase
+    Policy: -858993460
+    Children: ~
+    Position: {x: 534, y: 456}
+  - ID: 4286035256
+    Type: 8
+    Name: Action
+    ParentID: 3380368976
+    IsRoot: false
+    HasScript: true
+    ScriptName: DetectAndTargetingAction
+    Policy: -858993460
+    Children: ~
+    Position: {x: 854, y: 600}

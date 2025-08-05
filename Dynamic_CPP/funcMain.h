@@ -214,6 +214,7 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("DetectAndTargetingAction", []() { return new DetectAndTargetingAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BTEntityInitAction", []() { return new BTEntityInitAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("GroggyAction", []() { return new GroggyAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BP005Breath", []() { return new BP005Breath(); });
@@ -236,6 +237,7 @@ extern "C"
 	EXPORT_API void InitConditionFactory()
 	{
 		// Register the factory function for BTCondition Automation
+		ConditionCreateFactory::GetInstance()->RegisterFactory("IsChase", []() { return new IsChase(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsGroggy", []() { return new IsGroggy(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsTeleport", []() { return new IsTeleport(); });
 		ConditionCreateFactory::GetInstance()->RegisterFactory("IsMageAttack", []() { return new IsMageAttack(); });
@@ -250,6 +252,7 @@ extern "C"
 	EXPORT_API void InitConditionDecoratorFactory()
 	{
 		// Register the factory function for BTConditionDecorator Automation
+		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsUseAsis", []() { return new IsUseAsis(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsStartBoss", []() { return new IsStartBoss(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsInitialize", []() { return new IsInitialize(); });
 		ConditionDecoratorCreateFactory::GetInstance()->RegisterFactory("IsBossRangeAttack", []() { return new IsBossRangeAttack(); });

@@ -9,12 +9,12 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eAtkRange
+  - key: HP
     value:
-      Type: 3
+      Type: 2
       BoolValue: false
-      IntValue: 0
-      FloatValue: 3
+      IntValue: 100
+      FloatValue: 0
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
@@ -39,7 +39,7 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eChaseOutDuration
+  - key: ChaseOutDuration
     value:
       Type: 3
       BoolValue: false
@@ -49,23 +49,23 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eSpeed
+  - key: Player1
     value:
-      Type: 3
+      Type: 8
       BoolValue: false
       IntValue: 0
-      FloatValue: 3
-      StringValue: ""
+      FloatValue: 0
+      StringValue: 1P
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: eChaseRange
+  - key: Identity
     value:
-      Type: 3
+      Type: 4
       BoolValue: false
       IntValue: 0
-      FloatValue: 10
-      StringValue: ""
+      FloatValue: 0
+      StringValue: MonterNormal
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
@@ -89,33 +89,33 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: Identity
+  - key: AtkRange
     value:
-      Type: 4
+      Type: 3
       BoolValue: false
       IntValue: 0
-      FloatValue: 0
-      StringValue: MonterNormal
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: HP
-    value:
-      Type: 2
-      BoolValue: false
-      IntValue: 100
-      FloatValue: 0
+      FloatValue: 3
       StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: Player1
+  - key: ChaseRange
     value:
-      Type: 8
+      Type: 3
       BoolValue: false
       IntValue: 0
-      FloatValue: 0
-      StringValue: 1P
+      FloatValue: 10
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Speed
+    value:
+      Type: 3
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 3
+      StringValue: ""
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}

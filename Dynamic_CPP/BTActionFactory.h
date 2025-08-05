@@ -4,6 +4,7 @@
 #include "BTHeader.h"
 
 // Automation include ActionNodeClass header
+#include "DetectAndTargetingAction.h"
 #include "BTEntityInitAction.h"
 #include "BP005Breath.h"
 #include "BP004DeathWorm.h"

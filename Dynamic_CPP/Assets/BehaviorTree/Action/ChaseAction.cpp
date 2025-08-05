@@ -3,31 +3,56 @@
 
 NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	bool isSpeed = blackBoard.HasKey("Speed");
+	bool HasState = blackBoard.HasKey("State");
+
+	//self
 	Transform* selfTransform = m_owner->GetComponent<Transform>();
 	Mathf::Vector3 pos = selfTransform->GetWorldPosition();
 
-	Transform asisTransform = blackBoard.GetValueAsTransform("Asis");
-	Mathf::Vector3 asispos = asisTransform.GetWorldPosition();
-
+	GameObject* closedTarget = blackBoard.GetValueAsGameObject("ClosedTarget");
 	CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
+	Mathf::Vector3 targetpos = Mathf::Vector3::Zero;
 
-	Mathf::Vector3 dir = asispos - pos;
+	Transform* closedTransform = nullptr;
+	if (closedTarget) {
+		closedTransform = closedTarget->GetComponent<Transform>();
+		if (closedTransform) {
+			targetpos = closedTransform->GetWorldPosition();
+		}
+		else {
+			std::cout << "ChaseAction: ClosedTarget Transform not found." << std::endl;
+			return NodeStatus::Failure; // Handle case where closedTarget Transform is not found
+		}
+	}
+
+	float speed = 0.0f;
+	if (isSpeed)
+	{
+		speed = blackBoard.GetValueAsFloat("Speed");
+	}
+	else {
+		std::cout << "not found Speed don`t move";
+	}
+
+	Mathf::Vector3 dir = targetpos - pos;
+	
 	Mathf::Vector2 dir2D = { dir.x, dir.z }; // Assuming y is up, we only care about x and z for 2D direction
-
+	
 	dir2D.Normalize();
 	
-	float Speed = blackBoard.GetValueAsFloat("eNorSpeed");
+	
 
 	bool isAnime = blackBoard.HasKey("AnimeState");
 	
 
 	//selfTransform->AddPosition(dir * Speed * deltatime);
 	if (movement) {
-		movement->Move(dir2D * Speed * deltatime);
-		//std::cout << "ChaseAction executed. Moving towards target." << std::endl;
-		if (isAnime)
+		movement->Move(dir2D * speed * deltatime);
+		std::cout << "ChaseAction executed. Moving towards target." << std::endl;
+		if (HasState)
 		{
-			std::string state = blackBoard.GetValueAsString("AnimeState");
+			std::string state = blackBoard.GetValueAsString("State");
 			if (state == "Move")
 			{
 				//std::cout << "Chase action already in progress." << std::endl;
@@ -35,12 +60,18 @@ NodeStatus ChaseAction::Tick(float deltatime, BlackBoard& blackBoard)
 			}
 			else
 			{
-				blackBoard.SetValueAsString("AnimeState", "Move");
+				blackBoard.SetValueAsString("State", "Move");
 				//std::cout << "Switching to Move state." << std::endl;
 			}
 		}
 	}
-
+	
+	//start chacing is atteck targetting setting
+	//setting Target
+	if (closedTarget)
+	{
+		blackBoard.SetValueAsGameObject("Target", closedTarget->ToString());
+	}
 
 	return NodeStatus::Success;
 }
