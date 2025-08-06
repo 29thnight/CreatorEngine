@@ -440,7 +440,36 @@ void Player::Attack1()
 			auto world = player->m_transform.GetWorldPosition();
 			world.m128_f32[1] += 0.5f;
 			auto forward = player->m_transform.GetForward();
+
+		
+
+			Mathf::Vector3 dir = world;
+
+			Mathf::Vector3 dir1 = dir;
+			Mathf::Vector3 dir2 = dir;
+
+			//지금 바라보는 방향에서 좌우가 x인가 z인가 판별
+			if (std::abs(dir.x) > std::abs(dir.z)) // x축이 더 크면 좌우
+			{
+				dir1.x += 0.5f; // 오른쪽으로 약간 이동
+				dir2.x -= 0.5f; // 왼쪽으로 약간 이동
+			}
+			else // z축이 더 크면 앞뒤
+			{
+				dir1.z += 0.5f; // 앞으로 약간 이동
+				dir2.z -= 0.5f; // 뒤로 약간 이동
+			}
+
+
+			
 			int size = RaycastAll(world, -forward, 3.f, 1u, hits);
+			std::vector<HitResult> hits1;
+			int size1 = RaycastAll(world, dir1, 3.0f, 1u, hits1);
+			std::vector<HitResult> hits2;
+			int size2 = RaycastAll(world, dir2, 3.0f, 1u, hits2);
+
+			hits.insert(hits.end(), hits1.begin(), hits1.end());
+			hits.insert(hits.end(), hits2.begin(), hits2.end());
 
 			for (int i = 0; i < size; i++)
 			{
@@ -459,11 +488,11 @@ void Player::Attack1()
 					entityItem->Attack(this, 100);
 				}
 
-				auto otherPlayer = object->GetComponent<Player>();
+				/*auto otherPlayer = object->GetComponent<Player>();
 				if (otherPlayer)
 				{
 					otherPlayer->Attack(this, 100);
-				}
+				}*/
 			}
 		}
 		m_animator->SetParameter("Attack", true);

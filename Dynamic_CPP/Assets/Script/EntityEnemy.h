@@ -5,6 +5,7 @@
 class BehaviorTreeComponent;
 class BlackBoard;
 class HitResult;
+class Animator;
 enum class CriticalMark
 {
 	P1,
@@ -39,6 +40,6 @@ public:
 	bool isDamage = false;
 
 	int attackCount = 0;
-
+	Animator* m_animator;
 	void MeleeAttack();
 };
