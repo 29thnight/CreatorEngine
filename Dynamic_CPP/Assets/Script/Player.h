@@ -6,6 +6,7 @@ class Animator;
 class Weapon;
 class EntityItem;
 class Socket;
+class EffectComponent;
 class Player : public Entity
 {
 public:
@@ -127,6 +128,9 @@ public:
 	GameObject* m_preNearObject = nullptr;
 	Animator* m_animator = nullptr;
 
+
+	GameObject* dashObj = nullptr;
+	EffectComponent* dashEffect = nullptr;
 	GameObject* camera = nullptr;
 
 	Socket* handSocket;

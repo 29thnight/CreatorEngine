@@ -255,13 +255,27 @@ void EntityAsis::Purification(float tick)
 			//	weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
 			//}
+			static int index = 1;
+			std::string weaponName = "MeleeWeapon";
+			auto curweapon = GameObject::Find(weaponName);
+			if (!curweapon)
+			{
+				while (!curweapon && index <= 35)
+				{
+					std::string realWeaponName = weaponName + " (" + std::to_string(index) + ")";
+					curweapon = GameObject::Find(realWeaponName);
+					if (curweapon)
+					{
+						break;
+					}
+				}
+			}
 
-			auto curweapon = GameObject::Find("MeleeWeapon");
+
 			if (curweapon)
 			{
 				auto weaponcom = curweapon->GetComponent<Weapon>();
 				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
-				weaponcom->OwnerPlayerIndex = player->playerIndex;
 
 			}
 			

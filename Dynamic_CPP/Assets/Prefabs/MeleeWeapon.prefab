@@ -1,12 +1,12 @@
 m_name: MeleeWeapon_Prefab
 m_isEnabled: true
-m_instanceID: 2986855683
+m_instanceID: 598013178
 m_fileGuid: 5ea20cc1-76e7-5178-bc7f-c7159a7de3eb
 PrefabNode:
   - GameObject: 2166264123
     m_name: MeleeWeapon
     m_isEnabled: true
-    m_instanceID: 3507741430
+    m_instanceID: 2580402285
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
@@ -26,15 +26,16 @@ PrefabNode:
     m_layer: Default
     m_components:
       - ModuleBehavior: 1399118904
+        itemtype: 1
         m_name: Weapon
         m_isEnabled: true
-        m_instanceID: 4041934114
+        m_instanceID: 1303808348
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_scriptGuid: 02dd75e2-3ca5-5cd1-905f-62f17f32462d
       - RigidBodyComponent: 2204703439
         m_name: RigidBodyComponent
         m_isEnabled: true
-        m_instanceID: 2233514354
+        m_instanceID: 3023548296
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_bodyType: 1
         LinearDamping: 0.00999999978
@@ -50,7 +51,7 @@ PrefabNode:
       - BoxColliderComponent: 4263226401
         m_name: BoxColliderComponent
         m_isEnabled: true
-        m_instanceID: 2876155781
+        m_instanceID: 2488056586
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_boxExtent: {x: 2, y: 2, z: 2}
         m_posOffset: {x: 0, y: 0, z: 0}
@@ -59,7 +60,7 @@ PrefabNode:
       - GameObject: 2166264123
         m_name: Weapon_Sword_02
         m_isEnabled: true
-        m_instanceID: 3828616012
+        m_instanceID: 830389187
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0.707106769, y: 0, z: 0, w: 0.707106829}
@@ -81,7 +82,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 1545148965
+            m_instanceID: 3695028605
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: Weapon_Sword_02

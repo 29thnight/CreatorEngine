@@ -50,7 +50,12 @@ public:
             throw std::underflow_error("Queue is empty. Cannot dequeue item.");
         }
         T item = arr[head];
-        arr.erase(arr.begin() + head);
+        if constexpr (std::is_pointer_v<T>) {
+            arr[head] = nullptr;
+        }
+        else {
+            arr[head] = T();
+        }
         head = (head + 1) % capacity;
         count--;
         return item;

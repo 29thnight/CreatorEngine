@@ -60,12 +60,13 @@ void Player::Start()
 
 
 	
-
-	//handsocket.
-
+	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
+	dashEffect = dashObj->AddComponent<EffectComponent>();
+	dashEffect->Awake();
+	dashEffect->m_effectTemplateName ="Dash";
 
 	player->m_collisionType = 2;
-	//m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
+
 
 
 	auto gmobj = GameObject::Find("GameManager");
@@ -81,6 +82,11 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	pos.y += 0.5;
+	dashObj->m_transform.SetPosition(pos);
+
+
 	if (isDead)
 	{
 		m_animator->SetParameter("OnDead", true);
@@ -139,9 +145,6 @@ void Player::Update(float tick)
 		}
 	}
 
-	auto dash1 = GameObject::Find("Dash1");
-	Mathf::Vector3 pos = player->m_transform.GetWorldPosition();
-	dash1->m_transform.SetPosition(pos);
 
 	if (isDashing)
 	{
@@ -152,20 +155,14 @@ void Player::Update(float tick)
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+			dashEffect->StopEffect();
 		}
 		else
 		{
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
 			controller->Move({ -forward.x ,-forward.z });
-			if (dash1)
-			{
-				auto dasheffect = dash1->GetComponent<EffectComponent>();
-				if (dasheffect)
-				{
-					dasheffect->Apply();
-				}
-			}
+			
 
 
 		}
@@ -319,7 +316,7 @@ void Player::Dash()
 {
 	if (m_curDashCount >= dashAmount) return;   //최대 대시횟수만큼했으면 못함
 	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //이미 대시했을떄 더블대시타임안에 다시안하면 못함
-
+	dashEffect->Apply();
 	if (m_curDashCount == 0)
 	{
 		std::cout << "Dash  " << std::endl;
@@ -382,13 +379,13 @@ void Player::Attack1()
 			auto obj = GameObject::Find(gumName);
 			if (obj)
 			{
-				auto pos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 				auto forward2 = GetOwner()->m_transform.GetForward();
 				auto offset{ 2 };
 				auto offset2 = -forward2 * offset;
-				pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
-				pos.m128_f32[1] = 1;
-				pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
+				pos.x = pos.x + offset2.x;
+				pos.y = 1;
+				pos.z = pos.z + offset2.z;
 
 				XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
 				Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
@@ -402,7 +399,7 @@ void Player::Attack1()
 					if (effect)
 					{
 						effect->ChangeEffect(effectName);
-						effect->Apply();
+						//effect->Apply();
 					}
 				}
 			}
@@ -410,7 +407,7 @@ void Player::Attack1()
 			auto world = player->m_transform.GetWorldPosition();
 			world.m128_f32[1] += 0.5f;
 			auto forward = player->m_transform.GetForward();
-			int size = RaycastAll(world, -forward, 10.f, 1u, hits);
+			int size = RaycastAll(world, -forward, 3.f, 1u, hits);
 
 			for (int i = 0; i < size; i++)
 			{
@@ -447,31 +444,44 @@ void Player::Attack1()
 
 void Player::SwapWeaponLeft()
 {
-	//m_weaponIndex--;
-	//std::cout << "left weapon equipped" << std::endl;
-	/*if (m_curWeapon != nullptr)
+	m_weaponIndex--;
+	if (m_weaponIndex <= 0)
+	{
+		m_weaponIndex = 0;
+	}
+	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
-	}*/
+	}
 }
 
 void Player::SwapWeaponRight()
 {
-	//m_weaponIndex++;
-	////std::cout << "right weapon equipped" << std::endl;
-	//if (m_curWeapon != nullptr)
-	//{
-	//	m_curWeapon->SetEnabled(false);
-	//	m_curWeapon = m_weaponInventory[m_weaponIndex];
-	//	m_curWeapon->SetEnabled(true);
-	//}
+	m_weaponIndex++;
+	if (m_weaponIndex >= 3)
+	{
+		m_weaponIndex = 3;
+	}
+	if (m_curWeapon != nullptr)
+	{
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = m_weaponInventory[m_weaponIndex];
+		m_curWeapon->SetEnabled(true);
+	}
 }
 
 void Player::AddWeapon(Weapon* weapon)
 {
-	if (m_weaponInventory.size() >= 4) return;
+	if (m_weaponInventory.size() >= 4)
+	{
+		weapon->GetOwner()->Destroy();
+		return;
+
+
+		//리턴하고 던져진무기 죽이기
+	}
 
 	if (m_curWeapon)
 	{

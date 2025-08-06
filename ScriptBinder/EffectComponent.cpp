@@ -32,12 +32,12 @@ void EffectComponent::Awake()
 
 void EffectComponent::Update(float tick)
 {
-    m_currentTime += tick;
-
-    if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
-    {
-        StopEffect();
-    }
+    //m_currentTime += tick;
+    //
+    //if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
+    //{
+    //    StopEffect();
+    //}
 
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
