@@ -464,6 +464,11 @@ void Player::SwapWeaponRight()
 	{
 		m_weaponIndex = 3;
 	}
+
+	if ( m_weaponInventory.size() <= m_weaponIndex)
+	{
+		m_weaponIndex--;
+	}
 	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);

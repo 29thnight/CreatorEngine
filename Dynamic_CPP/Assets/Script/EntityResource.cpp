@@ -4,6 +4,8 @@
 #include "GameManager.h"
 #include "RigidBodyComponent.h"
 #include "EntityItem.h"
+#include "SceneManager.h"
+#include "EffectComponent.h"
 void EntityResource::Start()
 {
 }
@@ -52,6 +54,10 @@ void EntityResource::Attack(Entity* sender, int damage)
 					tempidx++;
 				}
 				GetOwner()->Destroy();
+				auto pung = GameObject::Find("Pung2");
+				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+				pung->m_transform.SetPosition(pos);
+				pung->GetComponent<EffectComponent>()->Apply();
 			}
 		}
 	}

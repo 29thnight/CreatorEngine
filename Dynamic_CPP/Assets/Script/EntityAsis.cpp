@@ -267,6 +267,16 @@ void EntityAsis::Purification(float tick)
 			static int index = 1;
 			std::string weaponName = "MeleeWeapon";
 			auto curweapon = GameObject::Find(weaponName);
+			if (curweapon)
+			{
+				auto weapon2 = curweapon->GetComponent<Weapon>();
+				
+				if (weapon2->OwnerPlayerIndex != -1)
+				{
+					curweapon = nullptr;
+				}
+					
+			}
 			if (!curweapon)
 			{
 				while (!curweapon && index <= 35)

@@ -52,7 +52,7 @@ public:
 	Mathf::Vector3 endPos{};
 	float timer = 0.f;
 	float speed = 3.0f;
-	int OwnerPlayerIndex = 0;
+	int OwnerPlayerIndex = -1;
 	GameObject* ownerPlayer = nullptr; //날아갈 경로찾는ㅇ요
 	int durabiMax = 5;
 	int durabiConsume_Attack = 1;
