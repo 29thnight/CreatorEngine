@@ -255,15 +255,15 @@ void Player::Move(Mathf::Vector2 dir)
 	auto controller = player->GetComponent<CharacterControllerComponent>();
 	if (!controller) return;
 
-	auto worldRot = camera->m_transform.GetWorldQuaternion();
-	Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
-	Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
+	//auto worldRot = camera->m_transform.GetWorldQuaternion();
+	//Vector3 right = XMVector3Rotate(Vector3::Right, worldRot);
+	//Vector3 forward = XMVector3Cross(Vector3::Up, right);// XMVector3Rotate(Vector3::Forward, worldRot);
 
-	Vector2 moveDir = dir.x * Vector2(right.x, right.z) + - dir.y * Vector2(forward.x, forward.z);
-	moveDir.Normalize();
+	//Vector2 moveDir = dir.x * Vector2(right.x, right.z) + - dir.y * Vector2(forward.x, forward.z);
+	//moveDir.Normalize();
 
 
-	controller->Move(moveDir);
+	controller->Move(dir);
 	if (controller->IsOnMove())
 	{
 		/*if (m_curWeapon)
