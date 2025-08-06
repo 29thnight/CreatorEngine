@@ -54,6 +54,7 @@ static const std::unordered_map<std::string_view, std::string_view> kExtensionTo
 	{ ".mp3", ICON_FA_FILE_AUDIO " " },
 
 	// 프리팹, 볼륨 등
+	{ ".terrain", ICON_FA_MOUNTAIN " " },
 	{ ".prefab", ICON_FA_BOX_OPEN " " },
 	{ ".volume", ICON_FA_SLIDERS " " },
 };
@@ -155,6 +156,7 @@ void DataSystem::Initialize()
 		{ ".cs",     { FileType::CSharpScript,	(ImTextureID)CodeIcon->m_pSRV }		},
 		{ ".wav",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
 		{ ".mp3",    { FileType::Sound,			(ImTextureID)UnknownIcon->m_pSRV }	},
+		{ ".terrain",{ FileType::TerrainTexture, (ImTextureID)TextureIcon->m_pSRV } },
 		{ ".prefab", { FileType::Prefab,		(ImTextureID)AssetsIcon->m_pSRV }	},
 		{ ".volume", { FileType::VolumeProfile,	(ImTextureID)AssetsIcon->m_pSRV }	},
 	};

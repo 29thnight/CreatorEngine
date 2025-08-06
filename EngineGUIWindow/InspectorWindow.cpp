@@ -914,10 +914,10 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 				//save , load
 				if (ImGui::Button("Save Terrain"))
 				{
-					file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::Relative("Terrain"));
+					file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::Relative("Terrain\\"));
 					if (savePath != L"") {
 						std::wstring folderPath = savePath.parent_path().wstring();
-						std::wstring fileName = savePath.filename().wstring();
+						std::wstring fileName = savePath.stem().wstring();
 						terrainComponent->Save(folderPath, fileName);
 					}
 				}

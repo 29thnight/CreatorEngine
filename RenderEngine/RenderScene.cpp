@@ -121,6 +121,11 @@ RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
 
 void RenderScene::RemoveRenderPassData(size_t cameraIndex)
 {
+	if (m_renderDataMap.empty())
+	{
+		return;
+	}
+
 	auto sharedPtr = m_renderDataMap[cameraIndex];
 	if (nullptr != sharedPtr)
 	{
