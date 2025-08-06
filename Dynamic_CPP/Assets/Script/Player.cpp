@@ -201,8 +201,8 @@ void Player::Attack(Entity* sender, int damage)
 {
 	if (sender)
 	{
-		auto player = dynamic_cast<Player*>(sender);
-		if (player)
+		auto enemy = dynamic_cast<EntityEnemy*>(sender);
+		if (enemy)
 		{
 			// hit
 			m_currentHP -= std::max(damage, 0);

@@ -14,8 +14,8 @@ void EntityEnemy::Start()
 
 void EntityEnemy::Update(float tick)
 {
-	/*Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;*/
+	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
 	if (criticalMark != CriticalMark::None)
 	{
@@ -111,7 +111,7 @@ void EntityEnemy::MeleeAttack()
 	
 
 	std::vector<HitResult> hits;
-	int size = RaycastAll(pos,forward, 10.f, 1u, hits);
+	int size = RaycastAll(pos,forward, 2.f, 1u, hits);
 	/*if (dir != Mathf::Vector3::Zero)
 	{
 		dir.Normalize();
@@ -133,7 +133,11 @@ void EntityEnemy::MeleeAttack()
 		std::cout << object->m_name.data() << std::endl;
 
 		//todo : 알아서 바꾸셈 player 인지 확인 하고 데미지를 주든 알아서하셈
-		object->Destroy();
+		Player* player = object->GetComponent<Player>();
+		if (player)
+		{
+			player->Attack(this, 0);
+		}
 	}
 	
 	attackCount -= 1;
