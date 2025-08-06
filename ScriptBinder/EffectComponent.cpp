@@ -32,7 +32,10 @@ void EffectComponent::Awake()
 
 void EffectComponent::Update(float tick)
 {
-    m_currentTime += tick;
+    if (m_isPlaying)
+    {
+        m_currentTime += tick;
+    }
 
     if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
     {
@@ -120,6 +123,7 @@ void EffectComponent::PlayEffectByName(const std::string& effectName)
     if (!proxy) return;
 
     m_effectTemplateName = effectName;
+    m_currentTime = 0.0f;
 
     // GameObject의 instanceID를 사용해서 고정 인스턴스 이름 생성
     size_t gameObjectId = GetOwner()->GetInstanceID();
