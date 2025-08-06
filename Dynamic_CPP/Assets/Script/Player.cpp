@@ -19,6 +19,7 @@
 #include "EntityResource.h"
 #include "Weapon.h"
 #include "GameManager.h"
+#include "EntityEnemy.h"
 void Player::Start()
 {
 	player = GetOwner();
@@ -408,14 +409,10 @@ void Player::Attack1()
 				if (object == GetOwner()) continue;
 
 				std::cout << object->m_name.data() << std::endl;
-				auto enemy = object->GetComponent<TestEnemy>();
+				auto enemy = object->GetComponent<EntityEnemy>();
 				if (enemy)
 				{
-					enemy->curHP -= 10.f;
-					std::cout << enemy->curHP << std::endl;
-					auto rigid = enemy->GetOwner()->GetComponent<RigidBodyComponent>();
-
-					rigid->AddForce({ forward.x * AttackPowerX,AttackPowerY,forward.z * AttackPowerX }, EForceMode::IMPULSE);
+					enemy->Attack(this, 100);
 				}
 
 				auto entityItem = object->GetComponent<EntityResource>();

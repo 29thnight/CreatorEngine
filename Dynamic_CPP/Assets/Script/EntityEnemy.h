@@ -3,6 +3,7 @@
 #include "Entity.h"
 
 class BehaviorTreeComponent;
+class BlackBoard;
 enum class CriticalMark
 {
 	P1,
@@ -33,4 +34,6 @@ public:
 	virtual void Attack(Entity* sender, int damage);
 	bool isDead;
 	BehaviorTreeComponent* enemyBT;
+	BlackBoard* blackBoard;
+	bool isDamage = false;
 };

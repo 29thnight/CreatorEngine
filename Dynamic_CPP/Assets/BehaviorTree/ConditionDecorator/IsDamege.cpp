@@ -1,11 +1,28 @@
 #include "IsDamege.h"
 #include "pch.h"
-
+#include "TestEnemy.h"
 bool IsDamege::ConditionCheck(float deltatime, const BlackBoard& blackBoard)
 {
 	bool isAnime = blackBoard.HasKey("AnimeState");
 	bool isDelayDamageAction = blackBoard.HasKey("DelayDamageAction");
 	float delayDamageTime = 0.0f;
+
+	bool hasDamage = blackBoard.HasKey("Damage");
+	int damage=0;
+	if (hasDamage)
+	{
+		damage = blackBoard.GetValueAsInt("Damage");
+	}
+	else
+	{
+		return false;
+	}
+
+
+	if (damage > 0) {
+		return true;
+	}
+
 
 	if (isDelayDamageAction)
 	{
