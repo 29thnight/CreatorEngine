@@ -9,7 +9,6 @@ ReflectionField(Transform) \
 		meta_property(rotation) \
 		meta_property(scale) \
 		meta_property(m_parentID) \
-		meta_property(m_dirty) \
 	}); \
 	FieldEnd(Transform, PropertyOnly) \
 };

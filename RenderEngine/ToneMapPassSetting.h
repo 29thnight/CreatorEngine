@@ -13,17 +13,17 @@ struct ToneMapPassSetting
     [[Property]]
     bool isAbleToneMap{ true };
     [[Property]]
-    float fNumber{ 8.f };
+    float fNumber{ 4.85f };
     [[Property]]
-    float shutterTime{ 8.f };
+    float shutterTime{ 16.f };
     [[Property]]
-    float ISO{ 100.f };
+    float ISO{ 75.f };
     [[Property]]
-    float exposureCompensation{ 0.f };
+    float exposureCompensation{ 0.2f };
     [[Property]]
-    float speedBrightness{ 3.f };
+    float speedBrightness{ 0.002f };
     [[Property]]
-    float speedDarkness{ 1.7f };
+    float speedDarkness{ 0.002f };
     [[Property]]
     int toneMapType{ 1 };
     [[Property]]

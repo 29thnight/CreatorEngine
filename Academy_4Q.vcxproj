@@ -177,6 +177,7 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineEntry\EngineSetting.h" />
     <ClInclude Include="EngineEntry\EngineVersion.h" />
     <ClInclude Include="EngineEntry\framework.h" />
+    <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
     <ClInclude Include="EngineEntry\GameObjectCommand.h" />
     <ClInclude Include="EngineEntry\ProgressWindow.h" />
     <ClInclude Include="EngineEntry\ProjectSetting.h" />
@@ -192,12 +193,12 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClInclude Include="EngineGUIWindow\RenderPassWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
-    <ClInclude Include="GameBuilderSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\App.cpp" />
     <ClCompile Include="EngineEntry\Dx11Main.cpp" />
     <ClCompile Include="EngineEntry\EngineSetting.cpp" />
+    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
     <ClCompile Include="EngineEntry\ProjectSetting.cpp" />
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
@@ -212,7 +213,6 @@ for /F "delims=" %%i in (version.txt) do echo #define ENGINE_VERSION "%%i" &gt;&
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\RenderPassWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
-    <ClCompile Include="GameBuilderSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="ImGuiHelper\ImGuiHelper.vcxproj">

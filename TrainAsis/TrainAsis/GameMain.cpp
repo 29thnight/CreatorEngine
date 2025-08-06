@@ -53,7 +53,6 @@ void DirectX11::GameMain::Initialize()
     ScriptManager->Initialize();
     Sound->initialize((int)ChannelType::MaxChannel);
     DataSystems->Initialize();
-    //여기 이제 최초 씬 준비해야함.
     SceneManagers->CreateScene();
 
     m_InputEvenetHandle = InputEvent.AddLambda([&](float deltaSecond)
@@ -80,6 +79,10 @@ void DirectX11::GameMain::Initialize()
 
     SceneManagers->ManagerInitialize();
     PhysicsManagers->Initialize();
+
+    std::wstring sceneName = /*EngineSettingInstance->GetStartupSceneName()*/L"TestPresentation8.creator";
+    file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
+    SceneManagers->LoadSceneImmediate(scenePath.string());
 
     isGameToRender = true;
 

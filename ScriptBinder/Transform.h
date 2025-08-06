@@ -71,8 +71,6 @@ private:
 	GameObject* m_owner{ nullptr };
 	[[Property]]
 	uint32 m_parentID{ 0 };
-
-	[[Property]]
 	bool32 m_dirty{ false };
 	Mathf::xMatrix m_worldMatrix{ XMMatrixIdentity() };
 	Mathf::xMatrix m_localMatrix{ XMMatrixIdentity() };

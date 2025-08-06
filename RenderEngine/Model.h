@@ -10,6 +10,12 @@
 #include "AnimatorData.h"
 #include "ManagedHeapObject.h"
 
+enum class ModelLoadType
+{
+    FormAsset,
+	Form3DModel,
+};
+
 class ModelLoader;
 class DataSystem;
 class SceneRenderer;
@@ -33,7 +39,10 @@ public:
 
 public:
     std::string	            name{};
+	FileGuid	            guid{};
     file::path	            path{};
+	file::file_time_type    lastWriteTime{};
+	ModelLoadType           loadType{ ModelLoadType::Form3DModel };
 
     AnimatorData*           m_animator{};
     Skeleton*               m_Skeleton{};

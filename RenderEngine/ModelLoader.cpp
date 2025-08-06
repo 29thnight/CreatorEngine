@@ -58,6 +58,15 @@ ModelLoader::ModelLoader(const aiScene* assimpScene, std::string_view fileName) 
 		m_loadType = LoadType::ASSET;
 	}
 	m_model = new Model;
+	if(m_loadType == LoadType::ASSET)
+	{
+		m_model->loadType = ModelLoadType::FormAsset;
+	}
+	m_model->lastWriteTime = file::last_write_time(filepath);
+
+	m_fileGuid = DataSystems->GetStemToGuid(filepath.stem().string());
+	m_model->guid = m_fileGuid;
+	m_model->path = filepath.string();
 	m_model->name = filepath.stem().string();
     if(m_AIScene)
     {

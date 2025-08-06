@@ -137,7 +137,7 @@
     <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">
-    <OutDir>$(SolutionDir)Bin\Editor\</OutDir>
+    <OutDir>$(SolutionDir)$(Platform)\GameBuild\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

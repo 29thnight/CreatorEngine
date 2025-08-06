@@ -29,6 +29,6 @@ private:
 	//float time = 0.016f;
 	int maxRayCount = 20;
 
-	bool isOn{ true };
+	bool isOn{ false };
 };
 

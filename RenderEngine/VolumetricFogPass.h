@@ -45,11 +45,11 @@ public:
 private:
 	bool isOn{ true };
 
-	float mAnisotropy = 0.05f;
-	float mDensity = 0.350f;
+	float mAnisotropy = 0.109f;
+	float mDensity = 0.101f;
 	float mStrength = 2.0f;
 	float mThicknessFactor = 0.01f;
-	float mBlendingWithSceneColorFactor = 1.0f;
+	float mBlendingWithSceneColorFactor = 0.851f;
 	float mPreviousFrameBlendFactor = 0.95f;
 
 	float mCustomNearPlane = 0.5f;

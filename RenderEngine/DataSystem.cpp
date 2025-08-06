@@ -480,7 +480,7 @@ void DataSystem::LoadModel(std::string_view filePath)
 		file::copy_file(source, destination, file::copy_options::update_existing);
 	}
 	std::string name = file::path(filePath).stem().string();
-	if (Models.find(name) != Models.end())
+	if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
 		return;
@@ -505,8 +505,9 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 	{
 		file::copy_file(source, destination, file::copy_options::update_existing);
 	}
+
 	std::string name = file::path(filePath).stem().string();
-	if (Models.find(name) != Models.end())
+	if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
 	{
 		Debug->Log("ModelLoader::LoadModel : Model already loaded");
 		return Models[name].get();

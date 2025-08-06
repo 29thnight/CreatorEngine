@@ -13,11 +13,11 @@ struct ShadowMapPassSetting
     [[Property]]
     bool isCloudOn{ true };
     [[Property]]
-    Mathf::Vector2 cloudSize{ 4.f, 4.f };
+    Mathf::Vector2 cloudSize{ 7.f, 7.f };
     [[Property]]
     Mathf::Vector2 cloudDirection{ 1.f, 1.f };
     [[Property]]
-    float cloudMoveSpeed{ 0.0003f };
+    float cloudMoveSpeed{ 0.00006f };
     [[Property]]
 	float cloudAlpha{ 1.f };
     [[Property]]

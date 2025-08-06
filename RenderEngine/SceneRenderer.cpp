@@ -35,6 +35,8 @@
 #include "EffectComponent.h"
 #include "EffectProxyController.h"
 
+#include "Profiler.h"
+
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -121,7 +123,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_currentSkyTextureName = PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string();
+	m_currentSkyTextureName = PathFinder::Relative("HDR\\rustig_koppie_puresky_8k.hdr").string();
 	m_pSkyBoxPass->Initialize(m_currentSkyTextureName);
 	
 	//toneMapPass
@@ -462,10 +464,18 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
+	PROFILE_CPU_BEGIN("EraseRenderPassData");
 	m_renderScene->EraseRenderPassData();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("RenderUpdate");
 	m_renderScene->Update(deltaTime);
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("OnProxyDestroy");
 	m_renderScene->OnProxyDestroy();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
+	PROFILE_CPU_END();
 }
 
 void SceneRenderer::SceneRendering()
