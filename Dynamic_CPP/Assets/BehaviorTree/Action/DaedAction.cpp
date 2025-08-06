@@ -5,6 +5,22 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
 	// Example action: Print a message to the console
 	
+	Transform* selfTransform = m_owner->GetComponent<Transform>();
+	Mathf::Quaternion rotation = selfTransform->GetWorldQuaternion();
+	Mathf::Quaternion targetRotation = Mathf::Quaternion().CreateFromYawPitchRoll(0.0f, 90.0f, 0.0f); // Example target rotation
+
+	Mathf::Quaternion newRotation = Mathf::Quaternion::Slerp(rotation, targetRotation, deltatime * 0.1f); // Smoothly interpolate towards the target rotation
+
+	if (rotation != newRotation)
+	{
+		selfTransform->SetRotation(newRotation);
+		std::cout << "DaedAction: Rotating to new orientation." << std::endl;
+	}
+	else
+	{
+		std::cout << "DaedAction: Already at target orientation." << std::endl;
+	}
+
 	bool isAnime = blackBoard.HasKey("AnimeState");
 	if (isAnime)
 	{
@@ -17,6 +33,7 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 		else
 		{
+			
 			blackBoard.SetValueAsString("AnimeState", "Daed");
 			std::cout << "Switching to Daed state." << std::endl;
 		}
