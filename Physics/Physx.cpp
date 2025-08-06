@@ -564,13 +564,21 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 
 	//충돌 필터 데이터
 	physx::PxQueryFilterData filterData;
-	filterData.data.word0 = in.layerNumber;
-	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
-
 	filterData.flags = physx::PxQueryFlag::eSTATIC 
 		| physx::PxQueryFlag::eDYNAMIC
 		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerNumber == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		filterData.data.word1 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerNumber;
+		filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+	}
 
 	BlockRaycastQueryFilter queryFilter;
 
@@ -618,14 +626,26 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 
 	//충돌 필터 데이터
 	physx::PxQueryFilterData filterData;
-	filterData.data.word0 = in.layerNumber;
-	filterData.data.word1 = m_collisionMatrix[in.layerNumber];
-
 	filterData.flags = physx::PxQueryFlag::eSTATIC
 		| physx::PxQueryFlag::eDYNAMIC
 		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
+
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerNumber == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		filterData.data.word1 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerNumber;
+		filterData.data.word1 = m_collisionMatrix[in.layerNumber];
+	}
+
+	
+
 	
 
 	TouchRaycastQueryFilter queryFilter;

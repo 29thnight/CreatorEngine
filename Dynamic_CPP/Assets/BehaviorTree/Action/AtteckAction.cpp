@@ -25,7 +25,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		atkDelayTime = atkDelay; // Default attack delay time if not set in blackboard
 	}
-	 
+	
 	static float elapsedTime = 0.0f;
 	if (hasState)
 	{
@@ -39,6 +39,8 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 				elapsedTime = 0.0f; // Reset elapsed time after attack
 				//animation->SetParameter("AtteckOn", false); // Reset attack parameter
 				//std::cout << "AtteckAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
+
+				blackBoard.SetValueAsInt("AttackCount", 1); // Set Enemy attack count to 1
 				std::cout << "Attack completed." << std::endl;
 				return NodeStatus::Success; // Attack action completed successfully
 			}
