@@ -40,9 +40,9 @@ void EntityEnemy::Update(float tick)
 
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
 
-	if (attackCount > 0) {
+	//if (attackCount > 0) {
 		MeleeAttack();
-	}
+	//}
 
 
 	if (isDead)
@@ -88,14 +88,36 @@ void EntityEnemy::MeleeAttack()
 {
 	if (isDead) return;
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-	//bool hasDir = blackBoard->HasKey("AttackDirection");
-	//Mathf::Vector3 dir = hasDir ? blackBoard->GetValueAsVector3("AttackDirection") : Mathf::Vector3::Zero;
+	bool hasDir = blackBoard->HasKey("AttackDirection");
+	Mathf::Vector3 dir;
+	if (!hasDir) {
+		return; // 공격 방향이 없으면 리턴
+	}
+	dir = blackBoard->GetValueAsVector3("AttackDirection");
+
 	//dir.z = -dir.z; // z축 반전, z축이 앞으로 가도록
-	//dir.y = 0.f; // y축은 무시하고 수평 방향으로만 공격
+	dir.y = 0.f; // y축은 무시하고 수평 방향으로만 공격
 	//transform forward base 나중에 쓰자
-	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	//Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
 	//pos += forward * 2.f;
 	//케릭터 높이 고려 기본 높이 0.5로 판단
+
+	//궤적에 따른 레이방향 2개 추가
+	Mathf::Vector3 dir1 = dir;
+	Mathf::Vector3 dir2 = dir;
+	
+	//지금 바라보는 방향에서 좌우가 x인가 z인가 판별
+	if (std::abs(dir.x) > std::abs(dir.z)) // x축이 더 크면 좌우
+	{
+		dir1.x += 0.5f; // 오른쪽으로 약간 이동
+		dir2.x -= 0.5f; // 왼쪽으로 약간 이동
+	}
+	else // z축이 더 크면 앞뒤
+	{
+		dir1.z += 0.5f; // 앞으로 약간 이동
+		dir2.z -= 0.5f; // 뒤로 약간 이동
+	}
+
 	pos.y = 0.5f; // ray cast height 
 	//forward.y = 0.5f; // ray cast height
 
@@ -111,17 +133,16 @@ void EntityEnemy::MeleeAttack()
 	
 
 	std::vector<HitResult> hits;
-	int size = RaycastAll(pos,forward, 2.f, 1u, hits);
-	/*if (dir != Mathf::Vector3::Zero)
-	{
-		dir.Normalize();
-	}
-	else
-	{
-		dir = GetOwner()->m_transform.GetForward();
-	}*/
-	//UINT layerMask = 0xffffffff; // Assuming layer 0 is the player layer
-	//int size = RaycastAll(pos, dir, 100.f, ~0, hits);
+	int size = RaycastAll(pos, dir, 2.f, ~0, hits);
+
+	std::vector<HitResult> hits1;
+	int size1 = RaycastAll(pos, dir1, 1.7f, ~0, hits1);
+	std::vector<HitResult> hits2;
+	int size2 = RaycastAll(pos, dir2, 1.7f, ~0, hits2);
+
+	hits.insert(hits.end(), hits1.begin(), hits1.end());
+	hits.insert(hits.end(), hits2.begin(), hits2.end());
+
 
 	//std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
 	std::cout << "Hit Count: " << size << std::endl;

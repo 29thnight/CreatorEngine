@@ -28,5 +28,5 @@ private:
 	[[Property]]
 	float followSpeed{ 2.0f };
 	[[Property]]
-	Mathf::Vector3 offset{ 20.f, 20.f, -7.f };
+	Mathf::Vector3 offset{ 0.f, 20.f, -7.f };
 };
