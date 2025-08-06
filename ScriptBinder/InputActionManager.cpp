@@ -95,7 +95,7 @@ void InputActionManager::LoadManager()
 {
 	ClearActionMaps();
 	namespace fs = std::filesystem;
-	fs::path dirPath = InternalPath::InputMapPath;
+	fs::path dirPath = PathFinder::InputMapPath();
 	if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
 	{
 		std::cerr << "Directory does not exist: " << dirPath << std::endl;

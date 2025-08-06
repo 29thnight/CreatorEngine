@@ -32,7 +32,7 @@ public:
 
 
 	virtual void Attack(Entity* sender, int damage) override;
-
+	virtual void OnRay() override;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	[[Method]]
@@ -60,6 +60,7 @@ public:
 	void DeleteWeapon(int index);
 	void DeleteWeapon(Weapon* weapon);
 	void FindNearObject(GameObject* gameObject);
+	
 	[[Property]]
 	int playerIndex = 0;
 

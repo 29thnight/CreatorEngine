@@ -50,7 +50,6 @@ void Player::Start()
 	auto obj = GameObject::Find(gumName);
 	if (obj && handSocket)
 	{
-		handSocket->AttachObject(obj);
 		auto curweapon = obj->GetComponent<Weapon>();
 		AddWeapon(curweapon);
 
@@ -371,6 +370,15 @@ void Player::Attack1()
 		{
 			int gumNumber = playerIndex + 1;
 			std::string gumName = "GumGi" + std::to_string(gumNumber);
+			std::string effectName;
+			if (m_curWeapon->itemType== ItemType::Basic)
+			{
+				effectName = "gg";
+			}
+			else
+			{
+				effectName = "LargeGG";
+			}
 			auto obj = GameObject::Find(gumName);
 			if (obj)
 			{
@@ -393,6 +401,7 @@ void Player::Attack1()
 					auto effect = obj->GetComponent<EffectComponent>();
 					if (effect)
 					{
+						effect->ChangeEffect(effectName);
 						effect->Apply();
 					}
 				}
@@ -464,9 +473,14 @@ void Player::AddWeapon(Weapon* weapon)
 {
 	if (m_weaponInventory.size() >= 4) return;
 
+	if (m_curWeapon)
+	{
+		m_curWeapon->SetEnabled(false);
+	}
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
 	m_curWeapon->SetEnabled(true);
+	handSocket->AttachObject(m_curWeapon->GetOwner());
 
 }
 
@@ -528,6 +542,32 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
+void Player::OnRay()
+{
+	std::vector<HitResult> hits;
+	auto world = player->m_transform.GetWorldPosition();
+	world.m128_f32[1] += 0.35f;
+	auto forward = player->m_transform.GetForward();
+	int size = RaycastAll(world, -forward, 3.f, 1u, hits);
+	//부채꼴로 여러방
+	for (int i = 0; i < size; i++)
+	{
+		auto object = hits[i].hitObject;
+		if (object == GetOwner()) continue;
+
+		auto enemy = object->GetComponent<EntityEnemy>();
+		if (enemy)
+		{
+			enemy->Attack(this, 100);
+		}
+
+		auto entityItem = object->GetComponent<EntityResource>();
+		if (entityItem) {
+			entityItem->Attack(this, 100);
+		}
+	}
+}
+
 
 
 
@@ -535,6 +575,18 @@ void Player::OnTriggerEnter(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
+
+	auto weapon = collision.otherObj->GetComponent<Weapon>();
+	if (weapon && weapon->OwnerPlayerIndex == playerIndex)
+	{
+		AddWeapon(weapon);
+		weapon->ownerPlayer = nullptr;
+		auto weaponrigid = weapon->GetOwner()->GetComponent<RigidBodyComponent>();
+		if (weaponrigid)
+		{
+			weaponrigid->SetEnabled(false);
+		}
+	}
 
 
 }

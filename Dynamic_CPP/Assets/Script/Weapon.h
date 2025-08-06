@@ -1,6 +1,7 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "Weapon.generated.h"
 
 enum class ItemType
 {
@@ -18,9 +19,14 @@ enum class BuffType
 	Explosion,
 	None,
 };
+
+
+class Player;
 class Weapon : public ModuleBehavior
 {
 public:
+   ReflectWeapon
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(Weapon)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -38,8 +44,16 @@ public:
 
 	void SetEnabled(bool able);
 	std::string itemName = "None";
+	[[Property]]
+	int itemtype = 0;
 	ItemType itemType = ItemType::Basic;
+	void Throw(Player* _player,Mathf::Vector3 statrPos);
+	Mathf::Vector3 startPos{};
+	Mathf::Vector3 endPos{};
+	float timer = 0.f;
+	float speed = 3.0f;
 	int OwnerPlayerIndex = 0;
+	GameObject* ownerPlayer = nullptr; //날아갈 경로찾는ㅇ요
 	int durabiMax = 5;
 	int durabiConsume_Attack = 1;
 	int durabiConsume_Charged = 3;
