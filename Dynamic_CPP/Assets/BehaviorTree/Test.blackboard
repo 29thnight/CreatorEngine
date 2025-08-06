@@ -1,14 +1,4 @@
 Test:
-  - key: Asis
-    value:
-      Type: 8
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 0
-      StringValue: Asis
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: HP
     value:
       Type: 2
@@ -16,6 +6,16 @@ Test:
       IntValue: 100
       FloatValue: 0
       StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Asis
+    value:
+      Type: 8
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Asis
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
@@ -39,6 +39,16 @@ Test:
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: Identity
+    value:
+      Type: 4
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: MonterNormal
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
   - key: ChaseOutDuration
     value:
       Type: 3
@@ -56,16 +66,6 @@ Test:
       IntValue: 0
       FloatValue: 0
       StringValue: 1P
-      Vec2Value: {x: 0, y: 0}
-      Vec3Value: {x: 0, y: 0, z: 0}
-      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
-  - key: Identity
-    value:
-      Type: 4
-      BoolValue: false
-      IntValue: 0
-      FloatValue: 0
-      StringValue: MonterNormal
       Vec2Value: {x: 0, y: 0}
       Vec3Value: {x: 0, y: 0, z: 0}
       Vec4Value: {x: 0, y: 0, z: 0, w: 0}
