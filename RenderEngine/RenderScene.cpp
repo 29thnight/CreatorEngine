@@ -23,6 +23,17 @@ ShadowMapRenderDesc RenderScene::g_shadowMapDesc{};
 
 RenderScene::~RenderScene()
 {
+}
+
+void RenderScene::Initialize()
+{
+	m_renderDataMap.resize(10);
+	m_LightController = new LightController();
+	m_animationJob.SetRenderScene(this);
+}
+
+void RenderScene::Finalize()
+{
 	Memory::SafeDelete(m_LightController);
 
 	SpinLock lock(m_proxyMapFlag);
@@ -38,13 +49,7 @@ RenderScene::~RenderScene()
 	}
 	m_palleteMap.clear();
 	m_renderDataMap.clear();
-}
-
-void RenderScene::Initialize()
-{
-	m_renderDataMap.resize(10);
-	m_LightController = new LightController();
-	m_animationJob.SetRenderScene(this);
+	m_animationJob.Finalize();
 }
 
 void RenderScene::SetBuffers(ID3D11Buffer* modelBuffer)
@@ -116,6 +121,11 @@ RenderPassData* RenderScene::GetRenderPassData(size_t cameraIndex)
 
 void RenderScene::RemoveRenderPassData(size_t cameraIndex)
 {
+	if (m_renderDataMap.empty())
+	{
+		return;
+	}
+
 	auto sharedPtr = m_renderDataMap[cameraIndex];
 	if (nullptr != sharedPtr)
 	{
@@ -160,8 +170,8 @@ void RenderScene::UnregisterAnimator(const std::shared_ptr<Animator>& animatorPt
 
 	HashedGuid animatorGuid = animatorPtr->GetInstanceID();
 
-	if (m_animatorMap.find(animatorGuid) != m_animatorMap.end()) return;
-	if (m_palleteMap.find(animatorGuid) != m_palleteMap.end()) return;
+	if (m_animatorMap.find(animatorGuid) == m_animatorMap.end()) return;
+	if (m_palleteMap.find(animatorGuid) == m_palleteMap.end()) return;
 
 	m_animatorMap.erase(animatorGuid);
 

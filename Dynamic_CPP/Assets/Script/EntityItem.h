@@ -1,7 +1,8 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Entity.h"
-
+#include "EntityItem.generated.h"
+#include "ItemType.h"
 class Player;
 class RigidBodyComponent;
 enum EItemState
@@ -17,15 +18,11 @@ enum EItemState
 };
 
 
-enum class EItemType
-{
-	Mushroom,
-	Mineral,
-	Fruit,
-};
 class EntityItem : public Entity
 {
 public:
+   ReflectEntityItem
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityItem)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -54,9 +51,16 @@ public:
 	float throwDistacne = 6.f;
 	float timer = 0.f;
 	float speed = 2.f;
-	float indicatorDistacne = 15.0f;
-	EItemState m_state = EItemState::NONE;
+	
+	[[Property]]
+	float indicatorDistacne = 15.0f; 
+	EItemState m_state = EItemState::FALLED;
 	bool isTargettingTail = false;
+	[[Property]]
+	int  itemCode = 0;
+	EItemType itemType = EItemType::Mushroom;
+
+	bool OnGround;
 private:
 	Player* throwOwner{ nullptr }; // 이 아이템을 던진 객체.
 };

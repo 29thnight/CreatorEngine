@@ -1,0 +1,31 @@
+Boss1:
+  - key: Identity
+    value:
+      Type: 4
+      BoolValue: false
+      IntValue: 0
+      FloatValue: 0
+      StringValue: Boss1
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: IsStart
+    value:
+      Type: 1
+      BoolValue: true
+      IntValue: 0
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}
+  - key: HP
+    value:
+      Type: 2
+      BoolValue: false
+      IntValue: 100
+      FloatValue: 0
+      StringValue: ""
+      Vec2Value: {x: 0, y: 0}
+      Vec3Value: {x: 0, y: 0, z: 0}
+      Vec4Value: {x: 0, y: 0, z: 0, w: 0}

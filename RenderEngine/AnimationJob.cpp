@@ -31,9 +31,9 @@ int CurrentKeyIndex(std::vector<T>& keys, double time)
     return -1;
 }
 
-AnimationJob::AnimationJob() :
-    m_UpdateThreadPool(8)
+AnimationJob::AnimationJob()
 {
+	m_UpdateThreadPool = new ThreadPool<std::function<void()>>(8); // 8 threads for animation updates
 	m_sceneLoadedHandle = SceneManagers->sceneLoadedEvent.AddRaw(this, &AnimationJob::PrepareAnimation);
     m_AnimationUpdateHandle = SceneManagers->InternalAnimationUpdateEvent.AddRaw(this, &AnimationJob::Update);
 	m_sceneUnloadedHandle = SceneManagers->sceneUnloadedEvent.AddRaw(this, &AnimationJob::CleanUp);
@@ -44,6 +44,12 @@ AnimationJob::~AnimationJob()
 	SceneManagers->sceneLoadedEvent.Remove(m_sceneLoadedHandle);
 	SceneManagers->InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
     SceneManagers->sceneUnloadedEvent.Remove(m_sceneUnloadedHandle);
+}
+
+void AnimationJob::Finalize()
+{
+    delete m_UpdateThreadPool;
+	m_currAnimator.clear();
 }
 
 void AnimationJob::Update(float deltaTime)
@@ -63,7 +69,7 @@ void AnimationJob::Update(float deltaTime)
     for(auto& animator : m_currAnimator)
     {
         std::vector<std::shared_ptr<AnimationController>> controllers = animator->m_animationControllers;
-        m_UpdateThreadPool.Enqueue([this, animator, controllers, delta = deltaTime]
+        m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime]
         {
             Skeleton* skeleton = animator->m_Skeleton;
             if (!skeleton) return;
@@ -210,12 +216,21 @@ void AnimationJob::Update(float deltaTime)
                 
             }
 
-            if (skeleton->HasSocket())
+            if (animator->HasSocket())
             {
-                for (auto& socket : skeleton->m_sockets)
+                if (SceneManagers->m_isGameStart == false || animator->GetOwner() == nullptr)
                 {
-                    socket->transform.SetLocalMatrix(socket->m_boneMatrix);
-                    socket->Update();
+
+
+                }
+                else
+                {
+
+                    for (auto& socket : animator->socketvec)
+                    {
+                        socket->transform.SetLocalMatrix(socket->m_boneMatrix);
+                        socket->Update();
+                    }
                 }
             }
 
@@ -223,7 +238,7 @@ void AnimationJob::Update(float deltaTime)
         });
     }
 
-    m_UpdateThreadPool.NotifyAllAndWait();
+    m_UpdateThreadPool->NotifyAllAndWait();
 }
 
 void AnimationJob::PrepareAnimation()
@@ -441,14 +456,21 @@ void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,const DirectX:
     //bone->m_globalTransform = globalTransform;
     animator.m_FinalTransforms[bone->m_index] = bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
     
-    if (skeleton->HasSocket())
+    if (animator.HasSocket())
     {
-        for (auto& socket : skeleton->m_sockets)
+        if (SceneManagers->m_isGameStart == false || animator.GetOwner() == nullptr)
         {
-            if (bone->m_name == socket->m_ObjectName)
+
+        }
+        else
+        {
+            for (auto& socket : animator.socketvec)
             {
-                socket->m_boneMatrix = globalTransform * socket->m_offset;
-                socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                if (bone->m_name == socket->m_ObjectName)
+                {
+                    socket->m_boneMatrix = globalTransform * socket->m_offset;
+                    socket->m_boneMatrix = socket->m_boneMatrix * animator.GetOwner()->m_transform.GetWorldMatrix();
+                }
             }
         }
     }

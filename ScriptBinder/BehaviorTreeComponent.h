@@ -27,12 +27,11 @@ public:
 	void Awake() override;
 	void Update(float deltaSecond) override;
 	void OnDestroy() override;
-
+	BlackBoard* GetBlackBoard();
 private:
 	// Behavior Tree 관련 메서드
 	BTNode::NodePtr BuildTree(const BTBuildGraph& graph);
 	BTNode::NodePtr BuildTreeRecursively(const HashedGuid& nodeId, const BTBuildGraph& graph);
-
 public:
 	void GraphToBuild();
 	void ClearTree() 

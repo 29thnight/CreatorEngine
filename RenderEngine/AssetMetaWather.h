@@ -1,5 +1,6 @@
 #pragma once
 #include <efsw/efsw.hpp>
+#include "StringHelper.h"
 #include "AssetMetaRegistry.h"
 #include <regex>
 #include <yaml-cpp/yaml.h>
@@ -198,11 +199,7 @@ private:
             return false;
         }
         
-        return  extension == ".fbx" || extension == ".gltf" || extension == ".obj" ||
-                extension == ".png" || extension == ".dds" || extension == ".hdr" ||
-                extension == ".hlsl" || extension == ".cpp" || extension == ".glb" ||
-                extension == ".cs" || extension == ".wav" || extension == ".mp3" ||
-                extension == ".terrain" || extension == ".bt" || extension == ".blackboard";
+        return IsRegisteredFile(extension);
     }
 
     void HandleMoved(const std::filesystem::path& dir, const std::string& oldName, const std::string& newName) 
@@ -343,7 +340,30 @@ public:
         fout.flush();
     }
 
+    void AddRegisteredFile(const std::string& extension)
+    {
+        m_registeredFiles.insert(extension);
+	}
+
+    void RemoveRegisteredFile(const std::string& extension)
+    {
+        m_registeredFiles.erase(extension);
+    }
+
+    bool IsRegisteredFile(const std::string& extension) const
+    {
+        return m_registeredFiles.contains(ToLower(extension));
+	}
+
 private:
     AssetMetaRegistry* m_assetMetaRegistry;
+	std::unordered_set<std::string> m_registeredFiles{
+        ".fbx", ".gltf", ".obj",
+        ".png", ".dds", ".hdr",
+        ".hlsl", ".cpp", ".glb",
+        ".cs", ".wav", ".mp3", ".ogg",
+        ".terrain", ".bt", ".blackboard",
+        ".prefab", ".volume"
+    };
     bool m_isStartUp{ false };
 };

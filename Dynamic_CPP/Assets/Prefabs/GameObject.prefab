@@ -1,23 +1,23 @@
-m_name: GameObject_Prefab
+m_name: GameObject
 m_isEnabled: true
-m_instanceID: 3984336348
-m_fileGuid: 2e27ed79-429f-5dc4-8ad6-67a3a6a71730
+m_instanceID: 62090987
+m_fileGuid: 00000000-0000-0000-0000-000000000000
 PrefabNode:
   - GameObject: 2166264123
     m_name: GameObject
     m_isEnabled: true
-    m_instanceID: 3677563262
+    m_instanceID: 299279572
     m_transform:
       position: {x: 0, y: 0, z: 0, w: 1}
       rotation: {x: -0, y: 0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1, w: 0}
       m_parentID: 0
       m_dirty: 0
-    m_index: 1
+    m_index: 3
     m_parentIndex: 0
     m_rootIndex: 0
-    m_childrenIndices: [2]
-    m_prefabFileGuid: 2e27ed79-429f-5dc4-8ad6-67a3a6a71730
+    m_childrenIndices: [4]
+    m_prefabFileGuid: be5b3569-4df6-52b8-ae90-3ee81b2f5cdb
     m_attachedSoketID: 0
     m_collisionType: 1
     m_isStatic: false
@@ -28,25 +28,25 @@ PrefabNode:
       - InvalidScriptComponent: 3306612392
         m_name: InvalidScriptComponent
         m_isEnabled: true
-        m_instanceID: 3113549597
+        m_instanceID: 365609125
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_errorMessage: ~
     children:
       - GameObject: 2166264123
         m_name: Asis_01
         m_isEnabled: true
-        m_instanceID: 3825696028
+        m_instanceID: 161696268
         m_transform:
           position: {x: 0, y: 0, z: 0, w: 1}
           rotation: {x: -0, y: 0, z: -0, w: 1}
           scale: {x: 1, y: 1, z: 1, w: 0}
-          m_parentID: 1
+          m_parentID: 3
           m_dirty: 0
-        m_index: 2
-        m_parentIndex: 1
+        m_index: 4
+        m_parentIndex: 3
         m_rootIndex: 0
         m_childrenIndices: ~
-        m_prefabFileGuid: 2e27ed79-429f-5dc4-8ad6-67a3a6a71730
+        m_prefabFileGuid: be5b3569-4df6-52b8-ae90-3ee81b2f5cdb
         m_attachedSoketID: 0
         m_collisionType: 1
         m_isStatic: false
@@ -57,7 +57,7 @@ PrefabNode:
           - MeshRenderer: 659998325
             m_name: MeshRenderer
             m_isEnabled: true
-            m_instanceID: 3923178546
+            m_instanceID: 3985338138
             m_FileID: 00000000-0000-0000-0000-000000000000
             m_Material:
               m_name: TT_checker_512x512_UV_GRID

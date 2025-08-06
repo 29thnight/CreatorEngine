@@ -26,7 +26,7 @@ private:
 
 	uint32 m_maxInstanceCount{};
 	bool m_UseEnvironmentMap{ true };
-	float m_envMapIntensity{ 0.2f };
+	float m_envMapIntensity{ 1.0f };
 
 	ComPtr<ID3D11Buffer> m_Buffer{};
 	ComPtr<ID3D11Buffer> m_materialBuffer;

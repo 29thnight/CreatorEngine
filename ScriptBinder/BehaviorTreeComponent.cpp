@@ -129,6 +129,11 @@ BTNode::NodePtr BehaviorTreeComponent::BuildTreeRecursively(const HashedGuid& no
 	return node;
 }
 
+BlackBoard* BehaviorTreeComponent::GetBlackBoard()
+{
+	return m_pBlackboard;
+}
+
 void BehaviorTreeComponent::GraphToBuild()
 {
 	file::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);

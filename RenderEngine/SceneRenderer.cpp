@@ -121,7 +121,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_pSkyBoxPass->Initialize(PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string());
+	m_currentSkyTextureName = PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string();
+	m_pSkyBoxPass->Initialize(m_currentSkyTextureName);
 	
 	//toneMapPass
 	m_pToneMapPass = std::make_unique<ToneMapPass>();
@@ -299,8 +300,10 @@ void SceneRenderer::Finalize()
 	DeviceState::g_depthStancilSRV		= nullptr;
 	DeviceState::g_annotation			= nullptr;
 
+#ifndef BUILD_FLAG
 	CameraManagement->DeleteCamera(m_pEditorCamera->m_cameraIndex);
 	m_pEditorCamera.reset();
+#endif
 	CameraManagement->Finalize();
 	m_renderScene.reset();
 	m_deviceResources.reset();
@@ -472,6 +475,20 @@ void SceneRenderer::SceneRendering()
 	}
 #endif // !BUILD_FLAG
 	DirectX11::ResetCallCount();
+
+	bool isVolumeProfileApplied = SceneManagers->IsVolumeProfileApply();
+	if(isVolumeProfileApplied)
+	{
+		auto& Settings					= EngineSettingInstance->GetRenderPassSettings();
+		std::string_view prevSkyboxName = m_currentSkyTextureName;
+		std::string_view currSkyboxName = Settings.skyboxTextureName;
+		if(!currSkyboxName.empty() && prevSkyboxName != currSkyboxName)
+		{
+			std::string fullPath = PathFinder::Relative("HDR\\").string() + currSkyboxName.data();
+			ApplyNewCubeMap(fullPath);
+			m_currentSkyTextureName = currSkyboxName;
+		}
+	}
 
 	for (auto& camera : CameraManagement->m_cameras)
 	{
@@ -946,6 +963,10 @@ void SceneRenderer::ApplyVolumeProfile()
 	{
 		m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
 	}
+	if (m_pToneMapPass)
+	{
+		m_pToneMapPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().toneMap);
+	}
 }
 
 void SceneRenderer::PrepareRender()
@@ -1087,6 +1108,7 @@ void SceneRenderer::SetRenderTargets(Texture& texture, bool enableDepthTest)
 
 void SceneRenderer::ApplyNewCubeMap(std::string_view filename)
 {
+	m_currentSkyTextureName = filename;
 	m_pSkyBoxPass->GenerateCubeMap(filename, *m_renderScene);
 	auto envMap = m_pSkyBoxPass->GenerateEnvironmentMap(*m_renderScene);
 	auto preFilter = m_pSkyBoxPass->GeneratePrefilteredMap(*m_renderScene);

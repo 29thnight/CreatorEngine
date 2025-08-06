@@ -378,6 +378,7 @@
     <ClInclude Include="SSGIPass.h" />
     <ClInclude Include="SSGIPassSetting.h" />
     <ClInclude Include="SubsurfaceScatteringPass.h" />
+    <ClInclude Include="SubsurfaceScatteringPassSetting.h" />
     <ClInclude Include="SwapEvent.h" />
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
@@ -416,6 +417,7 @@
     <ClInclude Include="ToneMapPass.h" />
     <ClInclude Include="VignettePass.h" />
     <ClInclude Include="VignettePassSetting.h" />
+    <ClInclude Include="VolumetricFogPassSetting.h" />
     <ClInclude Include="VolumetricFogPass.h" />
     <ClInclude Include="VolumeProfile.h" />
     <ClInclude Include="WireFramePass.h" />
@@ -543,6 +545,7 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\Dash.ps.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='GameBuild|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\DownDualFiltering.cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

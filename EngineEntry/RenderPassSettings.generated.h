@@ -14,6 +14,7 @@ ReflectionField(RenderPassSettings) \
 		meta_property(vignette) \
 		meta_property(colorGrading) \
 		meta_property(toneMap) \
+		meta_property(skyboxTextureName) \
 	}); \
 	FieldEnd(RenderPassSettings, PropertyOnly) \
 };

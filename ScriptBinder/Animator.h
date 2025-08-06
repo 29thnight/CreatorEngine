@@ -21,6 +21,7 @@ public:
     Animator()
     {
         m_name = "Animator"; m_typeID = TypeTrait::GUIDCreator::GetTypeID<Animator>();
+        socketvec.clear();
     }
     virtual ~Animator()
     {
@@ -30,6 +31,11 @@ public:
             delete param; // 하나씩 해제
         }
         Parameters.clear(); // 벡터 비우기
+        for (auto& socket : socketvec)
+        {
+            delete socket;
+        }
+        socketvec.clear();
     }
 
     void Awake() override;
@@ -45,7 +51,8 @@ public:
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
 
-    Socket* MakeSocket(std::string_view socketName,std::string_view boneName);
+    GameObject* FindBoneRecursive(GameObject* parent, const std::string& boneName);
+    Socket* MakeSocket(std::string_view socketName,std::string_view boneName, GameObject* object);
     Socket* FindSocket(std::string_view socketName);
     [[Property]]
     Skeleton* m_Skeleton{ nullptr };
@@ -64,6 +71,12 @@ public:
     FileGuid m_Motion{};
     XMMATRIX blendtransform;
 
+
+    std::vector<Socket*> socketvec;
+    bool HasSocket()
+    { 
+        return !socketvec.empty();
+    };
     [[Property]]
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     [[Property]]

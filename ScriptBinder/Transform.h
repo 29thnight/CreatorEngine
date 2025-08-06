@@ -61,7 +61,7 @@ public:
 	void SetParentID(uint32 id);
 
 	void TransformReset();
-
+	[[deprecated]]
 	void UpdateDirty();
 
 private:

@@ -3,8 +3,18 @@
 
 NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	
+	int damage = blackBoard.GetValueAsInt("Damage");
+	int currHP = blackBoard.GetValueAsInt("CurrHP");
 
-	bool isDelayDamageAction = blackBoard.HasKey("DelayDamageAction");
+	currHP -=damage;
+
+	blackBoard.SetValueAsInt("CurrHP", currHP);
+	blackBoard.SetValueAsInt("Damage", 0);
+
+	//todo ::  엑션 보여줄 시간이랑 넉백효과 넣어라
+
+	/*bool isDelayDamageAction = blackBoard.HasKey("DelayDamageAction");
 	float delayDamageTime = 0.0f;
 	if (isDelayDamageAction)
 	{
@@ -17,6 +27,6 @@ NodeStatus DamegeAction::Tick(float deltatime, BlackBoard& blackBoard)
 		blackBoard.SetValueAsFloat("DelayDamageAction", 2.0f);
 	}
 
-	std::cout << "Damege action executed successfully." << std::endl;
+	std::cout << "Damege action executed successfully." << std::endl;*/
 	return NodeStatus::Success;
 }

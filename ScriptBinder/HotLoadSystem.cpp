@@ -293,9 +293,9 @@ void HotLoadSystem::ReplaceScriptComponent()
 				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
 				const auto& scriptType = newScript->ScriptReflect();
 
-				for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				for (auto& [_gameObject, idx, node] : m_scriptComponentMetaIndexs)
 				{
-					if (gameObject == gameObject && index == idx)
+					if (_gameObject == gameObject && index == idx)
 					{
 						Meta::Deserialize(scriptPtr, scriptType, node);
 						break;
@@ -339,6 +339,89 @@ void HotLoadSystem::ReplaceScriptComponent()
 
 		m_isReloading = false;
 	}
+}
+
+void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
+{
+	auto activeScene = SceneManagers->GetActiveScene();
+	activeScene->m_selectedSceneObject = nullptr;
+
+	auto& gameObjects = activeScene->m_SceneObjects;
+	std::unordered_set<GameObject*> gameObjectSet;
+
+	for (auto& gameObject : gameObjects)
+		gameObjectSet.insert(gameObject.get());
+
+	for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
+	{
+		if (!gameObjectSet.contains(gameObject)) continue; // 게임 오브젝트가 씬에 존재하지 않으면 스킵
+
+		auto* newScript = CreateMonoBehavior(name.c_str());
+		if (nullptr == newScript)
+		{
+			Debug->LogError("Failed to create script: " + std::string(name));
+			continue;
+		}
+
+		if (SceneManagers->m_isGameStart)
+		{
+			ScriptManager->BindScriptEvents(newScript, name);
+		}
+
+		newScript->SetOwner(gameObject);
+		auto sharedScript = std::shared_ptr<Component>(newScript);
+		if (index >= gameObject->m_components.size())
+		{
+			gameObject->m_components.push_back(sharedScript);
+			size_t backIndex = gameObject->m_components.size() - 1;
+			gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+
+			void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
+			const auto& scriptType = newScript->ScriptReflect();
+
+			for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+			{
+				if (gameObject == gameObject && index == idx)
+				{
+					Meta::Deserialize(scriptPtr, scriptType, node);
+					break;
+				}
+			}
+		}
+		else
+		{
+			if (nullptr != gameObject->m_components[index])
+			{
+				auto node = Meta::Serialize(gameObject->m_components[index].get());
+
+				gameObject->m_components[index].swap(sharedScript);
+				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
+				const auto& scriptType = newScript->ScriptReflect();
+
+				Meta::Deserialize(scriptPtr, scriptType, node);
+			}
+			else
+			{
+				gameObject->m_components[index].swap(sharedScript);
+				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
+				const auto& scriptType = newScript->ScriptReflect();
+
+				for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				{
+					if (gameObject == gameObject && index == idx)
+					{
+						Meta::Deserialize(scriptPtr, scriptType, node);
+						break;
+					}
+				}
+			}
+
+
+		}
+		newScript->m_scriptGuid = DataSystems->GetFilenameToGuid(name + ".cpp");
+	}
+
+	m_scriptComponentIndexs.clear();
 }
 
 void HotLoadSystem::CompileEvent()
