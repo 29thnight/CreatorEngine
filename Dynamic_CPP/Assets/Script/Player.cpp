@@ -20,8 +20,12 @@
 #include "Weapon.h"
 #include "GameManager.h"
 #include "EntityEnemy.h"
+
+#include "CameraComponent.h"
 void Player::Start()
 {
+	std::cout << Mathf::Vector3::Forward.z << std::endl;
+
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
 	for (auto& child : childred)
@@ -195,6 +199,35 @@ void Player::Update(float tick)
 		}
 	}
 
+}
+
+void Player::LateUpdate(float tick)
+{
+	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	auto cam = camComponent->GetCamera();
+	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+
+	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	float w = XMVectorGetW(clipSpacePos);
+	if (w < 0.001f) {
+		// 원래 위치 반환.
+		GetOwner()->m_transform.SetPosition(worldpos);
+		return;
+	}
+	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+
+	float clamp_limit = 0.9f;
+	XMVECTOR clampedNdcPos = XMVectorClamp(
+		ndcPos,
+		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	);
+	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+
+	GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::Attack(Entity* sender, int damage)
