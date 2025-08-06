@@ -22,8 +22,11 @@ NodeStatus DaedAction::Tick(float deltatime, BlackBoard& blackBoard)
 		}
 	}
 
+	
 
 	std::cout << "DaedAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
+	//애니메이션 행동  mowner eney-scropt -> isdead =true  // scrpit에서 죽이기
+	
 	// You can access and modify the blackboard data here if needed
 	// For example, you might want to set a value in the blackboard
 	// blackBoard.SetValue("SomeKey", "SomeValue");
