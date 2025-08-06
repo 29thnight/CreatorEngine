@@ -482,6 +482,8 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	std::wcout << L"Terrain saved to: " << m_terrainTargetPath << std::endl;
 	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
 
+	DataSystem::GetInstance()->ForceCreateYamlMetaFile(m_terrainTargetPath);
+
 	ofs.flush();
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -499,7 +501,6 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 			}
 		}
 	}
-
 }
 
 bool TerrainComponent::Load(const std::wstring& filePath)

@@ -305,7 +305,6 @@ void SceneRenderer::Finalize()
 	m_pEditorCamera.reset();
 #endif
 	CameraManagement->Finalize();
-	m_renderScene->Finalize();
 	m_renderScene.reset();
 	m_deviceResources.reset();
 }
