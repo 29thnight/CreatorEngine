@@ -380,112 +380,10 @@ void EffectManager::DisableAllModules(EffectBase* effect)
 	}
 }
 
-void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
-{
-	effect->SetDuration(templateConfig.duration);
-	effect->SetLoop(templateConfig.loop);
-	effect->SetName(templateConfig.name);
-
-	auto& ps = effect->GetAllParticleSystems()[0];
-
-	// 파티클 시스템 설정
-	ps->ResizeParticleSystem(templateConfig.maxParticles);
-	ps->SetParticleDatatype(templateConfig.dataType);
-
-	// 모든 모듈 비활성화
-	DisableAllModules(effect);
-
-	// ParticleModule 데이터 적용 + 활성화
-	if (templateConfig.moduleConfig.spawnEnabled) {
-		if (auto* module = ps->GetModule<SpawnModuleCS>()) {
-			if (!templateConfig.spawnModuleData.empty() && templateConfig.spawnModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.spawnModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.colorEnabled) {
-		if (auto* module = ps->GetModule<ColorModuleCS>()) {
-			if (!templateConfig.colorModuleData.empty() && templateConfig.colorModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.colorModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.movementEnabled) {
-		if (auto* module = ps->GetModule<MovementModuleCS>()) {
-			if (!templateConfig.movementModuleData.empty() && templateConfig.movementModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.movementModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.sizeEnabled) {
-		if (auto* module = ps->GetModule<SizeModuleCS>()) {
-			if (!templateConfig.sizeModuleData.empty() && templateConfig.sizeModuleData.contains("data")) {
-				//module->DeserializeData(templateConfig.sizeModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.meshSpawnEnabled) {
-		if (auto* module = ps->GetModule<MeshSpawnModuleCS>()) {
-			if (!templateConfig.meshSpawnModuleData.empty() && templateConfig.meshSpawnModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.meshSpawnModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.trailGenerateEnable) {
-		if (auto* module = ps->GetModule<TrailGenerateModule>()) {
-			if (!templateConfig.trailGenerateModuleData.empty() && templateConfig.trailGenerateModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.trailGenerateModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	// RenderModule 데이터 적용 + 활성화
-	if (templateConfig.moduleConfig.billboardEnabled) {
-		if (auto* module = ps->GetRenderModule<BillboardModuleGPU>()) {
-			if (!templateConfig.billboardModuleData.empty() && templateConfig.billboardModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.billboardModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.meshEnabled) {
-		if (auto* module = ps->GetRenderModule<MeshModuleGPU>()) {
-			if (!templateConfig.meshModuleData.empty() && templateConfig.meshModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.meshModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-
-	if (templateConfig.moduleConfig.trailEnable) {
-		if (auto* module = ps->GetRenderModule<TrailRenderModule>()) {
-			if (!templateConfig.trailRenderModuleData.empty() && templateConfig.trailRenderModuleData.contains("data")) {
-				module->DeserializeData(templateConfig.trailRenderModuleData["data"]);
-			}
-			module->SetEnabled(true);
-		}
-	}
-}
-
 void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJson)
 {
 	// 기본값으로 초기화
-	moduleConfig = ModuleConfig{};
-	maxParticles = 1000;
-	dataType = ParticleDataType::Standard;
-
+	particleSystemConfigs.clear();
 	name = "";
 	duration = 1.0f;
 	loop = false;
@@ -494,7 +392,6 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 	originalJson = effectJson;
 
 	try {
-
 		if (effectJson.contains("name")) {
 			name = effectJson["name"];
 		}
@@ -507,47 +404,39 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 
 		if (effectJson.contains("particleSystems") && effectJson["particleSystems"].is_array()) {
 			for (const auto& psJson : effectJson["particleSystems"]) {
+				ParticleSystemConfig psConfig;
 
-				// maxParticles, dataType 설정 (기존 로직)
+				// maxParticles, dataType 설정
 				if (psJson.contains("maxParticles")) {
-					maxParticles = (int)psJson["maxParticles"];
+					psConfig.maxParticles = (int)psJson["maxParticles"];
 				}
 				if (psJson.contains("particleDataType")) {
-					dataType = static_cast<ParticleDataType>(psJson["particleDataType"]);
+					psConfig.dataType = static_cast<ParticleDataType>(psJson["particleDataType"]);
 				}
 
-				// 모듈 활성화 플래그 설정 + 모듈 데이터 저장
+				// 모듈 활성화 플래그만 설정
 				if (psJson.contains("modules")) {
 					for (const auto& moduleJson : psJson["modules"]) {
 						if (moduleJson.contains("type")) {
 							std::string moduleType = moduleJson["type"];
 
-							// 활성화 플래그 설정
 							if (moduleType == "SpawnModuleCS") {
-								moduleConfig.spawnEnabled = true;
-								spawnModuleData = moduleJson; // 데이터 저장
+								psConfig.moduleConfig.spawnEnabled = true;
 							}
 							else if (moduleType == "ColorModuleCS") {
-								moduleConfig.colorEnabled = true;
-								colorModuleData = moduleJson;
+								psConfig.moduleConfig.colorEnabled = true;
 							}
 							else if (moduleType == "MovementModuleCS") {
-								moduleConfig.movementEnabled = true;
-								movementModuleData = moduleJson;
+								psConfig.moduleConfig.movementEnabled = true;
 							}
 							else if (moduleType == "SizeModuleCS") {
-								moduleConfig.sizeEnabled = true;
-								sizeModuleData = moduleJson;
+								psConfig.moduleConfig.sizeEnabled = true;
 							}
-							else if (moduleType == "MeshSpawnModuleCS")
-							{
-								moduleConfig.meshSpawnEnabled = true;
-								meshSpawnModuleData = moduleJson;
+							else if (moduleType == "MeshSpawnModuleCS") {
+								psConfig.moduleConfig.meshSpawnEnabled = true;
 							}
-							else if (moduleType == "TrailGenerateModule")
-							{
-								moduleConfig.trailGenerateEnable = true;
-								trailGenerateModuleData = moduleJson;
+							else if (moduleType == "TrailGenerateModule") {
+								psConfig.moduleConfig.trailGenerateEnable = true;
 							}
 						}
 					}
@@ -560,26 +449,109 @@ void UniversalEffectTemplate::LoadConfigFromJSON(const nlohmann::json& effectJso
 							std::string renderModuleType = renderModuleJson["type"];
 
 							if (renderModuleType == "BillboardModuleGPU") {
-								moduleConfig.billboardEnabled = true;
-								billboardModuleData = renderModuleJson;
+								psConfig.moduleConfig.billboardEnabled = true;
 							}
 							else if (renderModuleType == "MeshModuleGPU") {
-								moduleConfig.meshEnabled = true;
-								meshModuleData = renderModuleJson;
+								psConfig.moduleConfig.meshEnabled = true;
 							}
 							else if (renderModuleType == "TrailRenderModule") {
-								moduleConfig.trailEnable = true;
-								trailRenderModuleData = renderModuleJson;
+								psConfig.moduleConfig.trailEnable = true;
 							}
 						}
 					}
 				}
+
+				particleSystemConfigs.push_back(psConfig);
 			}
 		}
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Error parsing effect JSON: " << e.what() << std::endl;
-		//moduleConfig.spawnEnabled = true;
-		//moduleConfig.billboardEnabled = true;
+	}
+}
+
+void EffectManager::ConfigureInstance(EffectBase* effect, const UniversalEffectTemplate& templateConfig)
+{
+	// EffectSerializer로 완전한 이펙트 구조 생성
+	auto deserializedEffect = EffectSerializer::DeserializeEffect(templateConfig.originalJson);
+	if (deserializedEffect) {
+		// 기본 이펙트 설정 복사
+		effect->SetDuration(deserializedEffect->GetDuration());
+		effect->SetLoop(deserializedEffect->IsLooping());
+		effect->SetName(deserializedEffect->GetName());
+		effect->SetPosition(deserializedEffect->GetPosition());
+		effect->SetTimeScale(deserializedEffect->GetTimeScale());
+
+		// ParticleSystem 교체
+		effect->ClearParticleSystems();
+		for (const auto& ps : deserializedEffect->GetAllParticleSystems()) {
+			effect->AddParticleSystem(ps);
+		}
+	}
+
+	// 모든 ParticleSystem에 대해 모듈 비활성화
+	DisableAllModules(effect);
+
+	// 각 ParticleSystem별로 개별 설정 적용
+	auto& particleSystems = effect->GetAllParticleSystems();
+	for (int i = 0; i < particleSystems.size() && i < templateConfig.particleSystemConfigs.size(); ++i) {
+		auto& ps = particleSystems[i];
+		const auto& psConfig = templateConfig.particleSystemConfigs[i];
+
+		// 해당 ParticleSystem의 모듈 활성화
+		if (psConfig.moduleConfig.spawnEnabled) {
+			if (auto* module = ps->GetModule<SpawnModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.colorEnabled) {
+			if (auto* module = ps->GetModule<ColorModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.movementEnabled) {
+			if (auto* module = ps->GetModule<MovementModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.sizeEnabled) {
+			if (auto* module = ps->GetModule<SizeModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.meshSpawnEnabled) {
+			if (auto* module = ps->GetModule<MeshSpawnModuleCS>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.trailGenerateEnable) {
+			if (auto* module = ps->GetModule<TrailGenerateModule>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		// RenderModule도 동일하게
+		if (psConfig.moduleConfig.billboardEnabled) {
+			if (auto* module = ps->GetRenderModule<BillboardModuleGPU>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.meshEnabled) {
+			if (auto* module = ps->GetRenderModule<MeshModuleGPU>()) {
+				module->SetEnabled(true);
+			}
+		}
+
+		if (psConfig.moduleConfig.trailEnable) {
+			if (auto* module = ps->GetRenderModule<TrailRenderModule>()) {
+				module->SetEnabled(true);
+			}
+		}
 	}
 }

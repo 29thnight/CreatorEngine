@@ -21,29 +21,21 @@ public:
 		bool trailEnable = false;
 	};
 	
+	struct ParticleSystemConfig {
+		ModuleConfig moduleConfig;
+		int maxParticles = 1000;
+		ParticleDataType dataType = ParticleDataType::Standard;
+	};
+
 	// 원본 설정
 	nlohmann::json originalJson;
 
-	ModuleConfig moduleConfig;
-	int maxParticles = 1000;
-	ParticleDataType dataType = ParticleDataType::Standard;
+	std::vector<ParticleSystemConfig> particleSystemConfigs;
 
 	std::string name{};
 	float duration = 1.0f;
 	bool loop = false;
 	float timeScale = 1.0f;
-
-	// 모듈별 데이터 (한 번만 파싱해서 저장)
-	nlohmann::json spawnModuleData;
-	nlohmann::json meshSpawnModuleData;
-	nlohmann::json colorModuleData;
-	nlohmann::json movementModuleData;
-	nlohmann::json sizeModuleData;
-	nlohmann::json trailGenerateModuleData;
-
-	nlohmann::json billboardModuleData;
-	nlohmann::json meshModuleData;
-	nlohmann::json trailRenderModuleData;
 
 	// JSON에서 설정 로드
 	void LoadConfigFromJSON(const nlohmann::json& effectJson);

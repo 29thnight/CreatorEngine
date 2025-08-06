@@ -258,6 +258,9 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\DestroyEffect.h">
+			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -445,6 +448,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
+			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
