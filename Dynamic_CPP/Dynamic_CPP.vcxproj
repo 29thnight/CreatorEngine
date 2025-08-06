@@ -187,6 +187,7 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h" />
 		<ClInclude Include="Assets\Script\AsisMove.h" />
+		<ClInclude Include="Assets\Script\CameraMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
 		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
@@ -240,6 +241,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
+		<ClCompile Include="Assets\Script\CameraMove.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
