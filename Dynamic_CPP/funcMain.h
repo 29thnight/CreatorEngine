@@ -192,6 +192,7 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("DestroyEffect", []() { return new DestroyEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
 		CreateFactory::GetInstance()->RegisterFactory("Weapon", []() { return new Weapon(); });
@@ -209,6 +210,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
+		CreateFactory::GetInstance()->RegisterFactory("CameraMove", []() { return new CameraMove(); });
 	}
 
 	EXPORT_API void InitActionFactory()

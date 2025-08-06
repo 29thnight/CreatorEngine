@@ -20,8 +20,12 @@
 #include "Weapon.h"
 #include "GameManager.h"
 #include "EntityEnemy.h"
+
+#include "CameraComponent.h"
 void Player::Start()
 {
+	std::cout << Mathf::Vector3::Forward.z << std::endl;
+
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
 	for (auto& child : childred)
@@ -42,7 +46,7 @@ void Player::Start()
 	}
 
 
-	handSocket= m_animator->MakeSocket("handsocket","hand.R", aniOwener);
+	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwener);
 
 	
 
@@ -50,7 +54,6 @@ void Player::Start()
 	auto obj = GameObject::Find(gumName);
 	if (obj && handSocket)
 	{
-		handSocket->AttachObject(obj);
 		auto curweapon = obj->GetComponent<Weapon>();
 		AddWeapon(curweapon);
 
@@ -61,12 +64,13 @@ void Player::Start()
 
 
 	
-
-	//handsocket.
-
+	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
+	dashEffect = dashObj->AddComponent<EffectComponent>();
+	dashEffect->Awake();
+	dashEffect->m_effectTemplateName ="Dash";
 
 	player->m_collisionType = 2;
-	//m_animator->m_Skeleton->m_animations[5].SetEvent("Throw", "Player", "ThrowEvent", 0.25);
+
 
 
 	auto gmobj = GameObject::Find("GameManager");
@@ -82,6 +86,11 @@ void Player::Start()
 
 void Player::Update(float tick)
 {
+	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
+	pos.y += 0.5;
+	dashObj->m_transform.SetPosition(pos);
+
+
 	if (isDead)
 	{
 		m_animator->SetParameter("OnDead", true);
@@ -140,9 +149,6 @@ void Player::Update(float tick)
 		}
 	}
 
-	auto dash1 = GameObject::Find("Dash1");
-	Mathf::Vector3 pos = player->m_transform.GetWorldPosition();
-	dash1->m_transform.SetPosition(pos);
 
 	if (isDashing)
 	{
@@ -153,20 +159,14 @@ void Player::Update(float tick)
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
+			dashEffect->StopEffect();
 		}
 		else
 		{
 			auto forward = player->m_transform.GetForward();
 			auto controller = player->GetComponent<CharacterControllerComponent>();
 			controller->Move({ -forward.x ,-forward.z });
-			if (dash1)
-			{
-				auto dasheffect = dash1->GetComponent<EffectComponent>();
-				if (dasheffect)
-				{
-					dasheffect->Apply();
-				}
-			}
+			
 
 
 		}
@@ -199,6 +199,35 @@ void Player::Update(float tick)
 		}
 	}
 
+}
+
+void Player::LateUpdate(float tick)
+{
+	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	auto cam = camComponent->GetCamera();
+	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+
+	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	float w = XMVectorGetW(clipSpacePos);
+	if (w < 0.001f) {
+		// 원래 위치 반환.
+		GetOwner()->m_transform.SetPosition(worldpos);
+		return;
+	}
+	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+
+	float clamp_limit = 0.9f;
+	XMVECTOR clampedNdcPos = XMVectorClamp(
+		ndcPos,
+		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	);
+	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+
+	GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::Attack(Entity* sender, int damage)
@@ -320,7 +349,7 @@ void Player::Dash()
 {
 	if (m_curDashCount >= dashAmount) return;   //최대 대시횟수만큼했으면 못함
 	if (m_curDashCount != 0 && m_dubbleDashElapsedTime >= dubbleDashTime) return; //이미 대시했을떄 더블대시타임안에 다시안하면 못함
-
+	dashEffect->Apply();
 	if (m_curDashCount == 0)
 	{
 		std::cout << "Dash  " << std::endl;
@@ -371,16 +400,25 @@ void Player::Attack1()
 		{
 			int gumNumber = playerIndex + 1;
 			std::string gumName = "GumGi" + std::to_string(gumNumber);
+			std::string effectName;
+			if (m_curWeapon->itemType== ItemType::Basic)
+			{
+				effectName = "gg";
+			}
+			else
+			{
+				effectName = "LargeGG";
+			}
 			auto obj = GameObject::Find(gumName);
 			if (obj)
 			{
-				auto pos = GetOwner()->m_transform.GetWorldPosition();
+				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 				auto forward2 = GetOwner()->m_transform.GetForward();
 				auto offset{ 2 };
 				auto offset2 = -forward2 * offset;
-				pos.m128_f32[0] = pos.m128_f32[0] + offset2.x;
-				pos.m128_f32[1] = 1;
-				pos.m128_f32[2] = pos.m128_f32[2] + offset2.z;
+				pos.x = pos.x + offset2.x;
+				pos.y = 1;
+				pos.z = pos.z + offset2.z;
 
 				XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
 				Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
@@ -393,7 +431,8 @@ void Player::Attack1()
 					auto effect = obj->GetComponent<EffectComponent>();
 					if (effect)
 					{
-						effect->Apply();
+						effect->ChangeEffect(effectName);
+						//effect->Apply();
 					}
 				}
 			}
@@ -401,7 +440,7 @@ void Player::Attack1()
 			auto world = player->m_transform.GetWorldPosition();
 			world.m128_f32[1] += 0.5f;
 			auto forward = player->m_transform.GetForward();
-			int size = RaycastAll(world, -forward, 10.f, 1u, hits);
+			int size = RaycastAll(world, -forward, 3.f, 1u, hits);
 
 			for (int i = 0; i < size; i++)
 			{
@@ -438,35 +477,58 @@ void Player::Attack1()
 
 void Player::SwapWeaponLeft()
 {
-	//m_weaponIndex--;
-	//std::cout << "left weapon equipped" << std::endl;
-	/*if (m_curWeapon != nullptr)
+	m_weaponIndex--;
+	if (m_weaponIndex <= 0)
+	{
+		m_weaponIndex = 0;
+	}
+	if (m_curWeapon != nullptr)
 	{
 		m_curWeapon->SetEnabled(false);
 		m_curWeapon = m_weaponInventory[m_weaponIndex];
 		m_curWeapon->SetEnabled(true);
-	}*/
+	}
 }
 
 void Player::SwapWeaponRight()
 {
-	//m_weaponIndex++;
-	////std::cout << "right weapon equipped" << std::endl;
-	//if (m_curWeapon != nullptr)
-	//{
-	//	m_curWeapon->SetEnabled(false);
-	//	m_curWeapon = m_weaponInventory[m_weaponIndex];
-	//	m_curWeapon->SetEnabled(true);
-	//}
+	m_weaponIndex++;
+	if (m_weaponIndex >= 3)
+	{
+		m_weaponIndex = 3;
+	}
+
+	if ( m_weaponInventory.size() <= m_weaponIndex)
+	{
+		m_weaponIndex--;
+	}
+	if (m_curWeapon != nullptr)
+	{
+		m_curWeapon->SetEnabled(false);
+		m_curWeapon = m_weaponInventory[m_weaponIndex];
+		m_curWeapon->SetEnabled(true);
+	}
 }
 
 void Player::AddWeapon(Weapon* weapon)
 {
-	if (m_weaponInventory.size() >= 4) return;
+	if (m_weaponInventory.size() >= 4)
+	{
+		weapon->GetOwner()->Destroy();
+		return;
 
+
+		//리턴하고 던져진무기 죽이기
+	}
+
+	if (m_curWeapon)
+	{
+		m_curWeapon->SetEnabled(false);
+	}
 	m_weaponInventory.push_back(weapon);
 	m_curWeapon = weapon;
 	m_curWeapon->SetEnabled(true);
+	handSocket->AttachObject(m_curWeapon->GetOwner());
 
 }
 
@@ -528,6 +590,32 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
+void Player::OnRay()
+{
+	std::vector<HitResult> hits;
+	auto world = player->m_transform.GetWorldPosition();
+	world.m128_f32[1] += 0.35f;
+	auto forward = player->m_transform.GetForward();
+	int size = RaycastAll(world, -forward, 3.f, 1u, hits);
+	//부채꼴로 여러방
+	for (int i = 0; i < size; i++)
+	{
+		auto object = hits[i].hitObject;
+		if (object == GetOwner()) continue;
+
+		auto enemy = object->GetComponent<EntityEnemy>();
+		if (enemy)
+		{
+			enemy->Attack(this, 100);
+		}
+
+		auto entityItem = object->GetComponent<EntityResource>();
+		if (entityItem) {
+			entityItem->Attack(this, 100);
+		}
+	}
+}
+
 
 
 
@@ -535,6 +623,18 @@ void Player::OnTriggerEnter(const Collision& collision)
 {
 	if (collision.thisObj == collision.otherObj)
 		return;
+
+	auto weapon = collision.otherObj->GetComponent<Weapon>();
+	if (weapon && weapon->OwnerPlayerIndex == playerIndex)
+	{
+		AddWeapon(weapon);
+		weapon->ownerPlayer = nullptr;
+		auto weaponrigid = weapon->GetOwner()->GetComponent<RigidBodyComponent>();
+		if (weaponrigid)
+		{
+			weaponrigid->SetEnabled(false);
+		}
+	}
 
 
 }

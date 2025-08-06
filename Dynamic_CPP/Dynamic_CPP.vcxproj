@@ -187,6 +187,7 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\Phase3.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsGroggy.h" />
 		<ClInclude Include="Assets\Script\AsisMove.h" />
+		<ClInclude Include="Assets\Script\CameraMove.h" />
 		<ClInclude Include="Assets\Script\TestBehavior.h" />
 		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
@@ -236,9 +237,11 @@
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h" />
+		<ClInclude Include="Assets\Script\DestroyEffect.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
+		<ClCompile Include="Assets\Script\CameraMove.cpp" />
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
@@ -455,6 +458,10 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

@@ -1,5 +1,6 @@
 #include "ShaderSystem.h"
 #include "MovementModuleCS.h"
+#include "EffectSerializer.h"
 
 MovementModuleCS::MovementModuleCS()
     : m_computeShader(nullptr), m_movementParamsBuffer(nullptr),
@@ -33,20 +34,8 @@ MovementModuleCS::MovementModuleCS()
 
 void MovementModuleCS::Initialize()
 {
-    m_velocityMode = VelocityMode::Constant;
+    //m_velocityMode = VelocityMode::Constant;
     m_currentTime = 0.0f; // 시간 초기화
-
-    // Wind 기본값
-    m_windData.direction = Mathf::Vector3(1, 0, 0);
-    m_windData.baseStrength = 1.0f;
-    m_windData.turbulence = 0.5f;
-    m_windData.frequency = 1.0f;
-
-    // Orbital 기본값
-    m_orbitalData.center = Mathf::Vector3(0, 0, 0);
-    m_orbitalData.radius = 5.0f;
-    m_orbitalData.speed = 1.0f;
-    m_orbitalData.axis = Mathf::Vector3(0, 1, 0);
 
     m_computeShader = ShaderSystem->ComputeShaders["MovementModule"].GetShader();
     InitializeCompute();
@@ -401,7 +390,7 @@ nlohmann::json MovementModuleCS::SerializeData() const
     {
         json["velocityCurve"].push_back({
             {"time", point.time},
-            {"velocity", {point.velocity.x, point.velocity.y, point.velocity.z}},
+            {"velocity", EffectSerializer::SerializeVector3(point.velocity)},
             {"strength", point.strength}
             });
     }
@@ -412,7 +401,7 @@ nlohmann::json MovementModuleCS::SerializeData() const
     {
         json["impulses"].push_back({
             {"triggerTime", impulse.triggerTime},
-            {"direction", {impulse.direction.x, impulse.direction.y, impulse.direction.z}},
+            {"direction", EffectSerializer::SerializeVector3(impulse.direction)},
             {"force", impulse.force},
             {"duration", impulse.duration}
             });
@@ -420,7 +409,7 @@ nlohmann::json MovementModuleCS::SerializeData() const
 
     // Wind 데이터 직렬화
     json["windData"] = {
-        {"direction", {m_windData.direction.x, m_windData.direction.y, m_windData.direction.z}},
+        {"direction", EffectSerializer::SerializeVector3(m_windData.direction)},
         {"baseStrength", m_windData.baseStrength},
         {"turbulence", m_windData.turbulence},
         {"frequency", m_windData.frequency}
@@ -428,17 +417,17 @@ nlohmann::json MovementModuleCS::SerializeData() const
 
     // Orbital 데이터 직렬화
     json["orbitalData"] = {
-        {"center", {m_orbitalData.center.x, m_orbitalData.center.y, m_orbitalData.center.z}},
+        {"center", EffectSerializer::SerializeVector3(m_orbitalData.center)},
         {"radius", m_orbitalData.radius},
         {"speed", m_orbitalData.speed},
-        {"axis", {m_orbitalData.axis.x, m_orbitalData.axis.y, m_orbitalData.axis.z}}
+        {"axis", EffectSerializer::SerializeVector3(m_orbitalData.axis)}
     };
 
     json["explosiveData"] = {
-    {"initialSpeed", m_explosiveData.initialSpeed},
-    {"speedDecay", m_explosiveData.speedDecay},
-    {"randomFactor", m_explosiveData.randomFactor},
-    {"sphereRadius", m_explosiveData.sphereRadius}
+        {"initialSpeed", m_explosiveData.initialSpeed},
+        {"speedDecay", m_explosiveData.speedDecay},
+        {"randomFactor", m_explosiveData.randomFactor},
+        {"sphereRadius", m_explosiveData.sphereRadius}
     };
 
     // 상태 정보
@@ -452,26 +441,25 @@ nlohmann::json MovementModuleCS::SerializeData() const
 
 void MovementModuleCS::DeserializeData(const nlohmann::json& json)
 {
-    // Movement 파라미터 복원
+    // Movement 파라미터 복원 (기존과 동일)
     if (json.contains("movementParams"))
     {
         const auto& movementJson = json["movementParams"];
 
         if (movementJson.contains("useGravity"))
             m_gravity = movementJson["useGravity"];
-
         if (movementJson.contains("gravityStrength"))
             m_gravityStrength = movementJson["gravityStrength"];
-
         if (movementJson.contains("easingEnabled"))
             m_easingEnabled = movementJson["easingEnabled"];
-
         if (movementJson.contains("easingType"))
             m_easingType = movementJson["easingType"];
-
         if (movementJson.contains("velocityMode"))
+        {
+            SetVelocityMode(static_cast<VelocityMode>(movementJson["velocityMode"]));
             m_velocityMode = static_cast<VelocityMode>(movementJson["velocityMode"]);
-
+        }
+            
         if (movementJson.contains("currentTime"))
             m_currentTime = movementJson["currentTime"];
     }
@@ -479,123 +467,121 @@ void MovementModuleCS::DeserializeData(const nlohmann::json& json)
     // VelocityCurve 데이터 복원
     if (json.contains("velocityCurve"))
     {
-        m_velocityCurve.clear();
+        ClearVelocityCurve();
         for (const auto& pointJson : json["velocityCurve"])
         {
-            VelocityPoint point;
+            float time = 0.0f;
+            Mathf::Vector3 velocity;
+            float strength = 1.0f;
+
             if (pointJson.contains("time"))
-                point.time = pointJson["time"];
+                time = pointJson["time"];
             if (pointJson.contains("velocity"))
-            {
-                auto vel = pointJson["velocity"];
-                point.velocity = Mathf::Vector3(vel[0], vel[1], vel[2]);
-            }
+                velocity = EffectSerializer::DeserializeVector3(pointJson["velocity"]);
             if (pointJson.contains("strength"))
-                point.strength = pointJson["strength"];
+                strength = pointJson["strength"];
 
-            m_velocityCurve.push_back(point);
+            AddVelocityPoint(time, velocity, strength);
         }
-
-        // 시간순으로 정렬
-        std::sort(m_velocityCurve.begin(), m_velocityCurve.end(),
-            [](const VelocityPoint& a, const VelocityPoint& b) {
-                return a.time < b.time;
-            });
     }
 
     // Impulse 데이터 복원
     if (json.contains("impulses"))
     {
-        m_impulses.clear();
+        ClearImpulses();
         for (const auto& impulseJson : json["impulses"])
         {
-            ImpulseData impulse;
+            float triggerTime = 0.0f;
+            Mathf::Vector3 direction;
+            float force = 1.0f;
+            float duration = 1.0f;
+
             if (impulseJson.contains("triggerTime"))
-                impulse.triggerTime = impulseJson["triggerTime"];
+                triggerTime = impulseJson["triggerTime"];
             if (impulseJson.contains("direction"))
-            {
-                auto dir = impulseJson["direction"];
-                impulse.direction = Mathf::Vector3(dir[0], dir[1], dir[2]);
-            }
+                direction = EffectSerializer::DeserializeVector3(impulseJson["direction"]);
             if (impulseJson.contains("force"))
-                impulse.force = impulseJson["force"];
+                force = impulseJson["force"];
             if (impulseJson.contains("duration"))
-                impulse.duration = impulseJson["duration"];
+                duration = impulseJson["duration"];
 
-            m_impulses.push_back(impulse);
+            AddImpulse(triggerTime, direction, force, duration);
         }
-
-        // 시간순으로 정렬
-        std::sort(m_impulses.begin(), m_impulses.end(),
-            [](const ImpulseData& a, const ImpulseData& b) {
-                return a.triggerTime < b.triggerTime;
-            });
     }
 
     // Wind 데이터 복원
     if (json.contains("windData"))
     {
         const auto& windJson = json["windData"];
+        Mathf::Vector3 direction = Mathf::Vector3(1, 0, 0);
+        float strength = 1.0f;
+        float turbulence = 0.5f;
+        float frequency = 1.0f;
+
         if (windJson.contains("direction"))
-        {
-            auto dir = windJson["direction"];
-            m_windData.direction = Mathf::Vector3(dir[0], dir[1], dir[2]);
-        }
+            direction = EffectSerializer::DeserializeVector3(windJson["direction"]);
         if (windJson.contains("baseStrength"))
-            m_windData.baseStrength = windJson["baseStrength"];
+            strength = windJson["baseStrength"];
         if (windJson.contains("turbulence"))
-            m_windData.turbulence = windJson["turbulence"];
+            turbulence = windJson["turbulence"];
         if (windJson.contains("frequency"))
-            m_windData.frequency = windJson["frequency"];
+            frequency = windJson["frequency"];
+
+        SetWindEffect(direction, strength, turbulence, frequency);
     }
 
     // Orbital 데이터 복원
     if (json.contains("orbitalData"))
     {
         const auto& orbitalJson = json["orbitalData"];
+        Mathf::Vector3 center = Mathf::Vector3(0, 0, 0);
+        float radius = 5.0f;
+        float speed = 1.0f;
+        Mathf::Vector3 axis = Mathf::Vector3(0, 1, 0);
+
         if (orbitalJson.contains("center"))
-        {
-            auto center = orbitalJson["center"];
-            m_orbitalData.center = Mathf::Vector3(center[0], center[1], center[2]);
-        }
+            center = EffectSerializer::DeserializeVector3(orbitalJson["center"]);
         if (orbitalJson.contains("radius"))
-            m_orbitalData.radius = orbitalJson["radius"];
+            radius = orbitalJson["radius"];
         if (orbitalJson.contains("speed"))
-            m_orbitalData.speed = orbitalJson["speed"];
+            speed = orbitalJson["speed"];
         if (orbitalJson.contains("axis"))
-        {
-            auto axis = orbitalJson["axis"];
-            m_orbitalData.axis = Mathf::Vector3(axis[0], axis[1], axis[2]);
-        }
+            axis = EffectSerializer::DeserializeVector3(orbitalJson["axis"]);
+
+        SetOrbitalMotion(center, radius, speed, axis);
     }
 
+    // Explosive 데이터 복원
     if (json.contains("explosiveData"))
     {
         const auto& explosiveJson = json["explosiveData"];
+        float initialSpeed = 50.0f;
+        float speedDecay = 2.0f;
+        float randomFactor = 0.4f;
+        float sphereRadius = 1.0f;
+
         if (explosiveJson.contains("initialSpeed"))
-            m_explosiveData.initialSpeed = explosiveJson["initialSpeed"];
+            initialSpeed = explosiveJson["initialSpeed"];
         if (explosiveJson.contains("speedDecay"))
-            m_explosiveData.speedDecay = explosiveJson["speedDecay"];
+            speedDecay = explosiveJson["speedDecay"];
         if (explosiveJson.contains("randomFactor"))
-            m_explosiveData.randomFactor = explosiveJson["randomFactor"];
+            randomFactor = explosiveJson["randomFactor"];
         if (explosiveJson.contains("sphereRadius"))
-            m_explosiveData.sphereRadius = explosiveJson["sphereRadius"];
+            sphereRadius = explosiveJson["sphereRadius"];
+
+        SetExplosiveEffect(initialSpeed, speedDecay, randomFactor, sphereRadius);
     }
 
     // 상태 정보 복원
     if (json.contains("state"))
     {
         const auto& stateJson = json["state"];
-
         if (stateJson.contains("particleCapacity"))
             m_particleCapacity = stateJson["particleCapacity"];
     }
 
     if (!m_isInitialized)
         Initialize();
-
-    // 변경사항을 적용하기 위해 더티 플래그 설정
-    m_paramsDirty = true;
 }
 
 std::string MovementModuleCS::GetModuleType() const

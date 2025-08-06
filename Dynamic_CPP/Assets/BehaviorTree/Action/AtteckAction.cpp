@@ -3,6 +3,15 @@
 
 NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 {
+	Transform* selfTransform = m_owner->GetComponent<Transform>();
+	Mathf::Vector3 pos = selfTransform->GetWorldPosition();
+
+	GameObject* target = blackBoard.GetValueAsGameObject("Target");
+	Transform* targetTransform = target->GetComponent<Transform>();
+	Mathf::Vector3 targetPos = targetTransform->GetWorldPosition();
+	Mathf::Vector3 dir = targetPos - pos;
+	dir.Normalize(); // Normalize direction vector
+
 	CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();
 	if (movement)
 	{
@@ -25,7 +34,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 	{
 		atkDelayTime = atkDelay; // Default attack delay time if not set in blackboard
 	}
-	 
+	
 	static float elapsedTime = 0.0f;
 	if (hasState)
 	{
@@ -39,7 +48,10 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 				elapsedTime = 0.0f; // Reset elapsed time after attack
 				//animation->SetParameter("AtteckOn", false); // Reset attack parameter
 				//std::cout << "AtteckAction executed!" << m_owner->GetHashedName().ToString() << std::endl;
+
+				blackBoard.SetValueAsInt("AttackCount", 1); // Set Enemy attack count to 1
 				std::cout << "Attack completed." << std::endl;
+				blackBoard.SetValueAsString("State", "AtteckDelay");
 				return NodeStatus::Success; // Attack action completed successfully
 			}
 			else
@@ -56,6 +68,7 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 			//movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during attack
 			blackBoard.SetValueAsString("State", "Atteck");
 			std::cout << "Switching to Atteck state." << std::endl;
+			blackBoard.SetValueAsVector3("AttackDirection", dir); // Set attack delay
 			blackBoard.SetValueAsFloat("AtkDelay", atkDelay); // Set attack delay
 			elapsedTime = 0.0f; // Reset elapsed time when switching to attack state
 			// Here you can add any additional logic needed when switching to the attack state

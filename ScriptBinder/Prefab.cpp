@@ -168,6 +168,18 @@ GameObject* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         }
     }
 
+    if(SceneManagers->m_isGameStart)
+    {
+        for (auto& comp : obj->m_components)
+        {
+            auto script = std::dynamic_pointer_cast<ModuleBehavior>(comp);
+            if (script)
+            {
+                ScriptManager->BindScriptEvents(script.get(), script->m_name.ToString());
+            }
+        }
+    }
+
     if (node["children"])
     {
         for (const auto& childNode : node["children"])

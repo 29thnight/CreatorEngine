@@ -64,7 +64,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 		{
 			scriptComponent->MakeInstanceID();
 		}
-
 		return;
 	}
 
@@ -81,10 +80,6 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
         using namespace TypeTrait;
         if (componentType->typeID == type_guid(MeshRenderer))
         {
-			if (component->GetOwner()->m_name == "Sphere.004-0");
-			{
-				int b = 5;
-			}
             auto meshRenderer = static_cast<MeshRenderer*>(component);
             Model* model = nullptr;
             Meta::Deserialize(meshRenderer, itNode);

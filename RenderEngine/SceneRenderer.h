@@ -76,6 +76,7 @@ private:
 	void Clear(const float color[4], float depth, uint8_t stencil);
 	void SetRenderTargets(Texture& texture, bool enableDepthTest = true);
 	void ApplyNewCubeMap(std::string_view filename);
+	void ApplyNewColorGrading(std::string_view filename);
 	void UnbindRenderTargets();
 	void ReloadShaders();
 	void ResourceTrim();

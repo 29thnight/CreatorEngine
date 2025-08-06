@@ -10,8 +10,11 @@
 #include "BoxColliderComponent.h"
 
 #include "Player.h"
-
+#include "PrefabUtility.h"
 #include "GameManager.h"
+#include "GameObject.h"
+#include "Weapon.h"
+#include "AsisMove.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -61,6 +64,7 @@ void EntityAsis::Start()
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
+	//m_asismove = GetOwner()->GetComponent<AsisMove>();
 
 	/*auto fakeObjects = GameObject::Find("fake");
 	if (fakeObjects) {
@@ -108,7 +112,7 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 		auto owner = item->GetThrowOwner();
 		if (owner) {
 			bool result = AddItem(item);
-
+			item->GetOwner()->GetComponent<RigidBodyComponent>()->SetColliderEnabled(false);
 			if (!result) {
 				// 획득을 실패했을 때.
 			}
@@ -141,6 +145,13 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
+	if (asisTail) {
+		Debug->Log(asisTail->m_name.data());
+	}
+	if (m_asismove) {
+		Debug->Log(m_asismove->m_name.data());
+	}
+
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
 		Attack(nullptr, 10);
 	}
@@ -229,27 +240,64 @@ void EntityAsis::Purification(float tick)
 	}
 
 	// 꼬리에 아이템이 있다면 정화를 진행.
-	if (m_currentEntityItemCount > 0) {
+	if (m_currentEntityItemCount > 0) 
+	{
 		m_currentTailPurificationDuration += tick;
-		if (m_currentTailPurificationDuration >= tailPurificationDuration) {
+		if (m_currentTailPurificationDuration >= tailPurificationDuration) 
+		{
 			// 정화 시간 완료 시
 			auto item = GetPurificationItemInEntityItemQueue();
 			m_currentTailPurificationDuration = 0;
 
-			//auto weapon = GameObject::Find("Sword");	// 이부분은 아이템에 등록된 정화무기가 될것.
-			//if (weapon)
+			// 이부분은 아이템에 등록된 정화무기가 될것.
+			auto player = item->GetThrowOwner();
+				
+			item->SetThrowOwner(nullptr);
+			item->GetOwner()->Destroy();
+			//file::path prefabPath = "C:\\Users\\user\\Documents\\GitHub\\LastProject\\Dynamic_CPP\\Assets\\Prefabs\\MeleeWeapon.prefab";
+			//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab(prefabPath.string());
+			//if (meleeweapon && player)
 			//{
-			//	auto player = item->GetThrowOwner();
-			//	
-			//	//item->GetComponent<Transform>().SetPosition({2000,0,2000});
-			//	//item->GetOwner()->SetEnabled(false);
-			//	item->SetThrowOwner(nullptr);
-			//	//item->GetOwner()->Destroy();
-			//	if (player)
-			//	{
-			//		player->AddWeapon(weapon);
-			//	}
+			//	GameObject* weaponObj = meleeweapon->Instantiate("meleeWeapon");
+			//	//플레이어 방향으로 웨폰날리기
+			//	auto weaponcom = weaponObj->GetComponent<Weapon>();
+			//	weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+
 			//}
+			static int index = 1;
+			std::string weaponName = "MeleeWeapon";
+			auto curweapon = GameObject::Find(weaponName);
+			if (curweapon)
+			{
+				auto weapon2 = curweapon->GetComponent<Weapon>();
+				
+				if (weapon2->OwnerPlayerIndex != -1)
+				{
+					curweapon = nullptr;
+				}
+					
+			}
+			if (!curweapon)
+			{
+				while (!curweapon && index <= 35)
+				{
+					std::string realWeaponName = weaponName + " (" + std::to_string(index) + ")";
+					curweapon = GameObject::Find(realWeaponName);
+					if (curweapon)
+					{
+						break;
+					}
+				}
+			}
+
+
+			if (curweapon)
+			{
+				auto weaponcom = curweapon->GetComponent<Weapon>();
+				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+
+			}
+			
 		}
 	}
 }
@@ -264,8 +312,8 @@ void EntityAsis::PathMove(float tick)
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
 	Vector3 dir = Mathf::Normalize(points[nextPointIndex] - points[currentPointIndex]);
-	Vector3 endResult = points[nextPointIndex] - dir * m_pathRadius;
-	Vector3 startResult = points[currentPointIndex] + dir * m_pathRadius;
+	Vector3 endResult = points[nextPointIndex] - dir * m_pathEndRadius;
+	Vector3 startResult = points[currentPointIndex] + dir * m_pathEndRadius;
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
 	Vector3 predictClosestPosition = GetBothPointAndLineClosestPoint(closestPoint + dir * m_predictNextTime * moveSpeed, startResult, endResult);
 
@@ -307,7 +355,7 @@ void EntityAsis::PathMove(float tick)
 	GetOwner()->m_transform.SetPosition(newPosition);
 
 	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
-	if (newDistance <= m_pathRadius) {
+	if (newDistance <= m_pathEndRadius) {
 		currentPointIndex = nextPointIndex; // Loop through the points
 	}
 }

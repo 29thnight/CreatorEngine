@@ -17,6 +17,7 @@
 #include "TagManager.h"
 #include <execution>
 
+#include "Profiler.h"
 Scene::Scene()
 {
 	resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedSceneObject);
@@ -243,17 +244,28 @@ void Scene::Start()
 void Scene::FixedUpdate(float deltaSecond)
 {
 #ifndef BUILD_FLAG
+	PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
 	AllUpdateWorldMatrix();	// render 단계에서 imgui를 통해 transform의 변경이 있으므로 디버그모드에서만 사용.
+	PROFILE_CPU_END();
 #endif // BUILD_FLAG
 
+	PROFILE_CPU_BEGIN("SetInternalPhysicData");
 	SetInternalPhysicData();
-
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("fixedBroadcast");
     FixedUpdateEvent.Broadcast(deltaSecond);
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("internalfixedBroadcast");
 	InternalPhysicsUpdateEvent.Broadcast(deltaSecond);
+	PROFILE_CPU_END();
 	// Internal Physics Update 작성
+	PROFILE_CPU_BEGIN("physxUpdate");
 	PhysicsManagers->Update(deltaSecond);
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("yield_WaitForFixedUpdate");
 	// OnTriggerEvent.Broadcast(); 작성
 	CoroutineManagers->yield_WaitForFixedUpdate();
+	PROFILE_CPU_END();
 }
 
 void Scene::OnTriggerEnter(const Collision& collider)
@@ -379,10 +391,18 @@ void Scene::OnDisable()
 
 void Scene::OnDestroy()
 {
+	PROFILE_CPU_BEGIN("OnDestroyBroadcast");
     OnDestroyEvent.Broadcast();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("DestroyLight");
     DestroyLight();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("DestroyComponents");
     DestroyComponents();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("DestroyGameObjects");
     DestroyGameObjects();
+	PROFILE_CPU_END();
 }
 
 void Scene::AllDestroyMark()
@@ -1056,12 +1076,14 @@ void Scene::DestroyComponents()
 	{
 		if (obj)
 		{
+			bool isDirty = false;
 			for (auto& component : obj->m_components)
 			{
 				if (!component || !component->IsDestroyMark() || component->IsDontDestroyOnLoad())
 				{
 					continue;
 				}
+				isDirty = true;
 
 				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
 				if (behavior)
@@ -1076,18 +1098,17 @@ void Scene::DestroyComponents()
 				component.reset();
 			}
 
+			if (false == isDirty) continue;
 			std::erase_if(obj->m_components, [](const auto& component)
 			{
-				auto behavior = std::dynamic_pointer_cast<ModuleBehavior>(component);
 				return component == nullptr;
 			});
-
 			obj->RefreshComponentIdIndices();
 		}
 	}
 }
 
-std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
+std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
 {
 	std::string uniqueName{ name.data() };
 	std::string baseName{ name.data() };
@@ -1100,12 +1121,12 @@ std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
 	return uniqueName;
 }
 
-void Scene::RemoveGameObjectName(std::string_view name)
+void Scene::RemoveGameObjectName(const std::string_view& name)
 {
 	m_gameObjectNameSet.erase(name.data());
 }
 
-void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
+void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive)
 {
 	const auto& obj = GetGameObject(objIndex);
 	
@@ -1141,7 +1162,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
-		UpdateModelRecursive(childIndex, model);
+		UpdateModelRecursive(childIndex, model, recursive);
 	}
 }
 

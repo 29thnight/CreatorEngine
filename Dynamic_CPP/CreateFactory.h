@@ -3,6 +3,7 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "DestroyEffect.h"
 #include "TestEffect.h"
 #include "EntityEnemy.h"
 #include "Weapon.h"
@@ -20,6 +21,7 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "AsisMove.h"
+#include "CameraMove.h"
 
 class CreateFactory : public Singleton<CreateFactory>
 {

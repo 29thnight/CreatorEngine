@@ -24,13 +24,15 @@ Texture2D Normals : register(t3);
 
 Texture2D prevSSR : register(t4);
 
+Texture2D<uint> BitflagTexture : register(t5);
+
 struct PixelShaderInput // see Fullscreen.vs.hlsl
 {
     float4 position : SV_POSITION;
     float2 texCoord : TEXCOORD0;
 };
 
-cbuffer DeferredCBuffer : register(b0)
+cbuffer CBuffer : register(b0)
 {
     float4x4 InvProjMatrix;
     float4x4 InvViewMatrix;
@@ -40,6 +42,8 @@ cbuffer DeferredCBuffer : register(b0)
     float MaxThickness;
     float Time;
     int MaxRayCount;
+
+    float2 screenSize;
 }
 
 struct SSROutput
@@ -126,6 +130,14 @@ SSROutput main(PixelShaderInput IN)
     
     float4 color = Diffuse.Sample(LinearSampler, IN.texCoord);
     
+    
+    if (BitflagTexture.Load(int3(int2(IN.texCoord * screenSize), 0)) & 1 << 9)
+    {
+        Out.prevOutput = color;
+        Out.output = color;
+        return Out; // skip if no bitflag
+    }
+    
     //uint width, height;
     //GbufferExtra2Texture.GetDimensions(width, height);
     
@@ -145,14 +157,13 @@ SSROutput main(PixelShaderInput IN)
     float3 normal = Normals.Sample(LinearSampler, IN.texCoord).xyz;
     normal = normalize(normal * 2.0 - 1.0);
     
-    float metallic = MetalRough.Sample(LinearSampler, IN.texCoord).b; // B 채널이 metallic
-    float roughness = MetalRough.Sample(LinearSampler, IN.texCoord).g; // G 채널이 roughness
+    float2 metalRough = MetalRough.Sample(LinearSampler, IN.texCoord).rg;
     
     float4 worldSpacePosition = float4(ReconstructWorldPosFromDepth(IN.texCoord, depth, InvProjMatrix, InvViewMatrix), 1.0f);
     float3 camDir = normalize(worldSpacePosition.xyz - CameraPosition.xyz);
     float3 refDir = (normalize(reflect(camDir, normal))).rgb;
     
-    float reflectFactor = (1.0 - roughness) * (0.04 * (1.0 - metallic) + metallic);
+    float reflectFactor = (1.0 - metalRough.y) * (0.04 * (1.0 - metalRough.x) + metalRough.x);
     
     float4 reflectedColor = Raytrace(refDir, MaxRayCount, StepSize, worldSpacePosition.rgb, IN.texCoord);
     
@@ -161,7 +172,18 @@ SSROutput main(PixelShaderInput IN)
     
     Out.prevOutput = reflectedColor;
     
+
+    //float3 F0 = lerp(0.04f, color.rgb, metalRough.x); // albedo는 Diffuse 텍스처에서 가져와야 함
+    //float3 F = fresnelSchlick(max(dot(normal, camDir), 0.0), F0);
+   
+    //float3 specular = reflectedColor.rgb * F;
+    //float3 diffuse = color.rgb * (1.0 - F) * (1.0 - metalRough.x); // 금속은 diffuse 없음
+   
+    //Out.output = float4(diffuse + specular, 1);
+
+
     //return float4(depth, depth, depth, 1);
-    Out.output = lerp(prevSSR.Sample(LinearSampler, IN.texCoord) + color + reflectedColor * reflectFactor, color + reflectedColor * reflectFactor, 0.9);
+    Out.output = lerp(color, color + reflectedColor, metalRough.x);
+    //Out.output = lerp(prevSSR.Sample(LinearSampler, IN.texCoord) + color + reflectedColor * reflectFactor, color + reflectedColor * reflectFactor, 0.9);
     return Out;
 }

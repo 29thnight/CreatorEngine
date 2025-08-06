@@ -12,4 +12,6 @@ struct ColorGradingPassSetting
     bool isOn{ true };
 	[[Property]]
     float lerp{ 0.f };
+    [[Property]]
+    HashingString textureFilePath{"None"};
 };

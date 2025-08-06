@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <Windows.h>
 #include <iostream>
+#include "DLLAcrossSingleton.h"
 
 inline constexpr const char* VSWHERE_PATH = R"(C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe)";
 
@@ -54,29 +55,35 @@ inline std::string ExecuteVsWhere()
 
 namespace file = std::filesystem;
 
-namespace InternalPath
+class InternalPath : public DLLCore::Singleton<InternalPath>
 {
-    inline file::path ExecuteablePath{};
-    inline file::path DataPath{};
-	inline file::path IconPath{};
-    inline file::path ShaderSourcePath{};
-	inline file::path ModelSourcePath{};
-	inline file::path TextureSourcePath{};
-	inline file::path UISourcePath{};
-	inline file::path PrefabSourcePath{};
-	inline file::path MaterialSourcePath{};
-	inline file::path PrecompiledShaderPath{};
-	inline std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
-	inline std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
-    inline file::path DynamicSolutionDir{};
-	inline file::path BaseProjectPath{};
-	inline file::path ProjectSettingsPath{};
-	inline file::path TerrainSourcePath{};
-	inline file::path DumpPath{};
-	inline file::path NodeEditorPath{};
-	inline file::path volumeProfilePath{};
-	inline file::path InputMapPath{};
-	inline file::path GameBuildSlnPath{};
+private:
+	friend class DLLCore::Singleton<InternalPath>;
+	InternalPath() = default;
+	~InternalPath() = default;
+public:
+    file::path ExecuteablePath{};
+    file::path DataPath{};
+	file::path IconPath{};
+    file::path ShaderSourcePath{};
+	file::path ModelSourcePath{};
+	file::path TextureSourcePath{};
+	file::path UISourcePath{};
+	file::path PrefabSourcePath{};
+	file::path MaterialSourcePath{};
+	file::path PrecompiledShaderPath{};
+	std::wstring MsbuildPreviewExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Preview\\MSBuild\\Current\\Bin\\MSBuild.exe";
+	std::wstring MsbuildExe = L"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
+    file::path DynamicSolutionDir{};
+	file::path BaseProjectPath{};
+	file::path ProjectSettingsPath{};
+	file::path TerrainSourcePath{};
+	file::path DumpPath{};
+	file::path NodeEditorPath{};
+	file::path volumeProfilePath{};
+	file::path InputMapPath{};
+	file::path GameBuildSlnPath{};
+
     inline void Initialize()
     {
         HMODULE hModule = GetModuleHandleW(NULL);
@@ -143,160 +150,164 @@ class PathFinder
 public:
 	static inline void Initialize() noexcept
     {
-        InternalPath::Initialize();
+        InternalPath::GetInstance()->Initialize();
     }
 
 	static inline file::path Relative()
 	{
-		return InternalPath::DataPath;
+		return InternalPath::GetInstance()->DataPath;
 	}
 
 	static inline file::path DumpPath()
 	{
-		return InternalPath::DumpPath;
+		return InternalPath::GetInstance()->DumpPath;
 	}
 
 	static inline file::path Relative(std::string_view path)
     {
-        return file::path(InternalPath::DataPath) / path;
+        return file::path(InternalPath::GetInstance()->DataPath) / path;
     }
 
 	static inline file::path RelativeToShader()
 	{
-		return file::path(InternalPath::ShaderSourcePath);
+		return file::path(InternalPath::GetInstance()->ShaderSourcePath);
 	}
 
 	static inline file::path RelativeToShader(std::string_view path)
 	{
-		return file::path(InternalPath::ShaderSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->ShaderSourcePath) / path;
 	}
 
 	static inline file::path RelativeToPrecompiledShader()
 	{
-		return file::path(InternalPath::PrecompiledShaderPath);
+		return file::path(InternalPath::GetInstance()->PrecompiledShaderPath);
 	}
 
     static inline file::path RelativeToExecutable(std::string_view path)
     {
-        return file::path(InternalPath::ExecuteablePath) / path;
+        return file::path(InternalPath::GetInstance()->ExecuteablePath) / path;
     }
 
 	static inline file::path RelativeToMaterial(std::string_view path)
 	{
-		return file::path(InternalPath::MaterialSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->MaterialSourcePath) / path;
 	}
 
     static inline file::path ShaderPath()
     {
-        return InternalPath::ShaderSourcePath;
+        return InternalPath::GetInstance()->ShaderSourcePath;
     }
 
 	static inline file::path IconPath()
 	{
-		return InternalPath::IconPath;
+		return InternalPath::GetInstance()->IconPath;
 	}
 
 	static inline std::wstring MsbuildPreviewPath()
 	{
-		return InternalPath::MsbuildPreviewExe;
+		return InternalPath::GetInstance()->MsbuildPreviewExe;
 	}
 
     static inline std::wstring MsbuildPath()
     {
-        return InternalPath::MsbuildExe;
+        return InternalPath::GetInstance()->MsbuildExe;
     }
 
 	static inline file::path ModelSourcePath()
 	{
-		return InternalPath::ModelSourcePath;
+		return InternalPath::GetInstance()->ModelSourcePath;
 	}
 
 	static inline file::path TextureSourcePath()
 	{
-		return InternalPath::TextureSourcePath;
+		return InternalPath::GetInstance()->TextureSourcePath;
 	}
 
 	static inline file::path UISourcePath()
 	{
-		return InternalPath::UISourcePath;
+		return InternalPath::GetInstance()->UISourcePath;
 	}
 
 	static inline file::path PrefabSourcePath()
 	{
-		return InternalPath::PrefabSourcePath;
+		return InternalPath::GetInstance()->PrefabSourcePath;
 	}
 
 	static inline file::path MaterialSourcePath()
 	{
-		return InternalPath::MaterialSourcePath;
+		return InternalPath::GetInstance()->MaterialSourcePath;
 	}
 
 	static inline file::path BaseProjectPath()
 	{
-		return InternalPath::BaseProjectPath;
+		return InternalPath::GetInstance()->BaseProjectPath;
 	}
 
 	static inline file::path VolumeProfilePath()
 	{
-		return InternalPath::volumeProfilePath;
+		return InternalPath::GetInstance()->volumeProfilePath;
 	}
 
 	static inline file::path GameBuildSlnPath()
 	{
-		return InternalPath::GameBuildSlnPath;
+		return InternalPath::GetInstance()->GameBuildSlnPath;
 	}
 
 	static inline file::path DynamicSolutionPath(std::string_view path)
 	{
-		return file::path(InternalPath::DynamicSolutionDir) / path;
+		return file::path(InternalPath::GetInstance()->DynamicSolutionDir) / path;
 	}
 
 	static inline file::path ProjectSettingPath(std::string_view path)
 	{
-		return file::path(InternalPath::ProjectSettingsPath) / path;
+		return file::path(InternalPath::GetInstance()->ProjectSettingsPath) / path;
 	}
 
 	static inline file::path TerrainSourcePath(std::string_view path)
 	{
-		return file::path(InternalPath::TerrainSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->TerrainSourcePath) / path;
 	}
 
 	static inline file::path NodeEditorPath(std::string_view path)
 	{
-		return file::path(InternalPath::NodeEditorPath) / path;
+		return file::path(InternalPath::GetInstance()->NodeEditorPath) / path;
 	}
 
 	static inline file::path RelativeToModel(std::string_view path)
 	{
-		return file::path(InternalPath::ModelSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->ModelSourcePath) / path;
 	}
 
 	static inline file::path RelativeToTexture(std::string_view path)
 	{
-		return file::path(InternalPath::TextureSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->TextureSourcePath) / path;
 	}
 
 	static inline file::path RelativeToUISource(std::string_view path)
 	{
-		return file::path(InternalPath::UISourcePath) / path;
+		return file::path(InternalPath::GetInstance()->UISourcePath) / path;
 	}
 
 	static inline file::path RelativeToPrefab(std::string_view path)
 	{
-		return file::path(InternalPath::PrefabSourcePath) / path;
+		return file::path(InternalPath::GetInstance()->PrefabSourcePath) / path;
 	}
 
 	static inline file::path RelativeToBaseProject(std::string_view path)
 	{
-		return file::path(InternalPath::BaseProjectPath) / path;
+		return file::path(InternalPath::GetInstance()->BaseProjectPath) / path;
 	}
 
 	static inline file::path RelativeToVolumeProfile(std::string_view path)
 	{
-		return file::path(InternalPath::volumeProfilePath) / path;
+		return file::path(InternalPath::GetInstance()->volumeProfilePath) / path;
+	}
+	static inline file::path InputMapPath()
+	{
+		return InternalPath::GetInstance()->InputMapPath;
 	}
 	static inline file::path InputMapPath(std::string_view path)
 	{
-		return file::path(InternalPath::InputMapPath) / path;
+		return file::path(InternalPath::GetInstance()->InputMapPath) / path;
 	}
 };

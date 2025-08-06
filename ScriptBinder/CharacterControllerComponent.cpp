@@ -56,8 +56,9 @@ void CharacterControllerComponent::OnFixedUpdate(float fixedDeltaTime)
 		if (flatInput.LengthSquared() >= rotationOffsetSquare) {
 			flatInput.Normalize();
 
-			// yaw 계산: Z가 앞이므로 (x, z) 순서 주의
-			float targetYaw = std::atan2(flatInput.x, flatInput.z);  // 라디안 값
+			// yaw 계산: Z가 앞이므로 (z, x) 순서 주의
+			float targetYaw = std::atan2(flatInput.z,flatInput.x) - (XM_PI / 2.0);  // 라디안 값
+			targetYaw = -targetYaw;
 
 			// 현재 회전에서 yaw만 추출
 			DirectX::SimpleMath::Quaternion quator = m_transform->GetWorldQuaternion();

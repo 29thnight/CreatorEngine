@@ -37,6 +37,7 @@ cbuffer CloudShadowMapConstants : register(b1)
     float2 direction;
     uint frameIndex;
     float moveSpeed;
+    float alpha;
     int isOn;
 }
 
@@ -79,7 +80,7 @@ float GetCloudVisibility(float4 worldPosition)
     float shadow = 0;
     shadow = closestDepth;
     
-    return shadow;
+    return shadow * alpha;
 }
 
 [numthreads(8, 8, 1)]

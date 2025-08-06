@@ -351,4 +351,15 @@ void SSGIPass::ApplySettings(const SSGIPassSetting& setting)
     thickness = setting.thickness;
     intensity = setting.intensity;
     ssratio = setting.ssratio;
+
+    m_pTempTexture->SetSizeRatio({ float(ssratio), float(ssratio) });
+    m_pTempTexture2->SetSizeRatio({ float(ssratio * 2), float(ssratio * 2) });
+    m_pTempTexture3->SetSizeRatio({ float(ssratio * 4), float(ssratio * 4) });
+    m_pTempTexture->ResizeRelease();
+    m_pTempTexture2->ResizeRelease();
+    m_pTempTexture3->ResizeRelease();
+
+    m_pTempTexture->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+    m_pTempTexture2->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
+    m_pTempTexture3->ResizeViews(DeviceState::g_Viewport.Width, DeviceState::g_Viewport.Height);
 }

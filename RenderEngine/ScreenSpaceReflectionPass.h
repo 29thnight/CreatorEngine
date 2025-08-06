@@ -9,7 +9,7 @@ public:
 	ScreenSpaceReflectionPass();
 	~ScreenSpaceReflectionPass();
 
-	void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive);
+	void Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitflag);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -18,6 +18,7 @@ private:
 	Texture* m_MetalRoughTexture{};
 	Texture* m_NormalTexture{};
 	Texture* m_EmissiveTexture{};
+	Texture* m_BitflagTexture{};
 
 	Texture* m_CopiedTexture{};
 	Texture* m_prevCopiedSSRTexture{};

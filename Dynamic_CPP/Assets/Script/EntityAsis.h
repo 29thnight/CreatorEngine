@@ -4,12 +4,13 @@
 #include "Entity.h"
 #include "EntityAsis.generated.h"
 
+class AsisMove;
 class EntityItem;
 class EntityAsis : public Entity
 {
 public:
    ReflectEntityAsis
-		[[ScriptReflectionField]]
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityAsis)
 		virtual void Awake() override {}
 	virtual void Start() override;
@@ -38,8 +39,13 @@ private:
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
 
 	int								m_currentEntityItemCount = 0;
+	[[Property]]
 	GameObject* asisTail{ nullptr };
+	[[Property]]
 	GameObject* asisHead{ nullptr };
+	[[Property]]
+	AsisMove* m_asismove{ nullptr };
+	[[Property]]
 	float m_purificationAngle = 0.f;
 	[[Property]]
 	float m_purificationRadius = 5.f;
@@ -82,7 +88,7 @@ private:
 	int		pollutionCoreAmount{ 1 };			// 오염도 게이지 최대치 도달 시 생성되는 오염 결정 개수
 
 private:
-	float	m_currentTailPurificationDuration; // 꼬리 정화 연출 소요 시간
+	float	m_currentTailPurificationDuration{}; // 꼬리 정화 연출 소요 시간
 	float	m_currentStaggerDuration{ 0 };	// 현재 경직 시간
 	float	m_currentGracePeriod{ 0 };	// 현재 무적 시간
 
@@ -100,6 +106,8 @@ private:
 private:
 	[[Property]]
 	float m_pathRadius = 1.f;
+	[[Property]]
+	float m_pathEndRadius = 3.f;
 	[[Property]]
 	float m_predictNextTime = 2.0f; // 예측 시간
 	[[Property]]

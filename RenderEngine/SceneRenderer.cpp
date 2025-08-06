@@ -35,6 +35,8 @@
 #include "EffectComponent.h"
 #include "EffectProxyController.h"
 
+#include "Profiler.h"
+
 using namespace lm;
 
 SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& deviceResources) :
@@ -150,7 +152,8 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pScreenSpaceReflectionPass->Initialize(m_diffuseTexture.get(),
 		m_metalRoughTexture.get(),
 		m_normalTexture.get(),
-		m_emissiveTexture.get()
+		m_emissiveTexture.get(),
+		m_bitmaskTexture.get()
 	);
 
 	//SSS
@@ -165,8 +168,9 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//ColorGrading
 	m_pColorGradingPass = std::make_unique<ColorGradingPass>();
-	m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
+	m_pColorGradingPass->Initialize();
     m_pColorGradingPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().colorGrading);
+	//m_pColorGradingPass->Initialize(PathFinder::Relative("ColorGrading\\LUT_3.png").string());
 
 	//VolumetricFog
 	m_pVolumetricFogPass = std::make_unique<VolumetricFogPass>();
@@ -460,10 +464,18 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
+	PROFILE_CPU_BEGIN("EraseRenderPassData");
 	m_renderScene->EraseRenderPassData();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("RenderUpdate");
 	m_renderScene->Update(deltaTime);
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("OnProxyDestroy");
 	m_renderScene->OnProxyDestroy();
+	PROFILE_CPU_END();
+	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
+	PROFILE_CPU_END();
 }
 
 void SceneRenderer::SceneRendering()
@@ -1116,6 +1128,11 @@ void SceneRenderer::ApplyNewCubeMap(std::string_view filename)
 
 	m_pDeferredPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
 	m_pForwardPass->UseEnvironmentMap(envMap, preFilter, brdfLUT);
+}
+
+void SceneRenderer::ApplyNewColorGrading(std::string_view filename)
+{
+	m_pColorGradingPass->SetColorGradingTexture(filename);
 }
 
 void SceneRenderer::UnbindRenderTargets()

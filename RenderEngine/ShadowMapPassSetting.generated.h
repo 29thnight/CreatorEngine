@@ -10,6 +10,7 @@ ReflectionField(ShadowMapPassSetting) \
 		meta_property(cloudSize) \
 		meta_property(cloudDirection) \
 		meta_property(cloudMoveSpeed) \
+		meta_property(cloudAlpha) \
 		meta_property(epsilon) \
 	}); \
 	FieldEnd(ShadowMapPassSetting, PropertyOnly) \
