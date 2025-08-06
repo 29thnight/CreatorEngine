@@ -11,6 +11,9 @@ using namespace DirectX;
 
 namespace Mathf
 {
+    const static float pi = XM_PIDIV2 - 0.01f;
+    const static float pi2 = XM_PI * 2.f;
+
     using xMatrix = XMMATRIX;
     using xVector = XMVECTOR;
     using Color3 = SimpleMath::Vector3;

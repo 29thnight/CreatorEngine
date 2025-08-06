@@ -1087,7 +1087,7 @@ void Scene::DestroyComponents()
 	}
 }
 
-std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
+std::string Scene::GenerateUniqueGameObjectName(const std::string_view& name)
 {
 	std::string uniqueName{ name.data() };
 	std::string baseName{ name.data() };
@@ -1100,12 +1100,12 @@ std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
 	return uniqueName;
 }
 
-void Scene::RemoveGameObjectName(std::string_view name)
+void Scene::RemoveGameObjectName(const std::string_view& name)
 {
 	m_gameObjectNameSet.erase(name.data());
 }
 
-void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model)
+void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive)
 {
 	const auto& obj = GetGameObject(objIndex);
 	
@@ -1141,7 +1141,7 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 
 	for (auto& childIndex : obj->m_childrenIndices)
 	{
-		UpdateModelRecursive(childIndex, model);
+		UpdateModelRecursive(childIndex, model, recursive);
 	}
 }
 

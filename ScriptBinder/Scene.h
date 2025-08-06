@@ -196,9 +196,9 @@ public:
 private:
     void DestroyGameObjects();
 	void DestroyComponents();
-    std::string GenerateUniqueGameObjectName(std::string_view name);
-	void RemoveGameObjectName(std::string_view name);
-    void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model);
+    std::string GenerateUniqueGameObjectName(const std::string_view& name);
+	void RemoveGameObjectName(const std::string_view& name);
+    void UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix model, bool recursive = false);
 
 private:
 	void SetInternalPhysicData();

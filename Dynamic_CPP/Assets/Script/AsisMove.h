@@ -6,6 +6,8 @@
 class AsisMove : public ModuleBehavior
 {
 public:
+   ReflectAsisMove
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(AsisMove)
 
 public:
@@ -20,4 +22,6 @@ public:
 	virtual void Update(float tick) override;
 	virtual void LateUpdate(float tick) override;
 
+	[[Property]]
+	float test = 0.4f;
 };

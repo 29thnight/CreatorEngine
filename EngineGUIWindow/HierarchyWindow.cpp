@@ -365,7 +365,7 @@ void HierarchyWindow::DrawSceneObject(const std::shared_ptr<GameObject>& obj)
 
     if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
     {
-        if (ImGui::IsItemHovered() && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+        if (ImGui::IsItemHovered() && (ImGui::IsMouseReleased(ImGuiMouseButton_Right) || ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
         {
 			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
             std::vector<GameObject*> prevList = selectedObjects;

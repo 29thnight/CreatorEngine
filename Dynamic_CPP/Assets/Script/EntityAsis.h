@@ -4,6 +4,7 @@
 #include "Entity.h"
 #include "EntityAsis.generated.h"
 
+class AsisMove;
 class EntityItem;
 class EntityAsis : public Entity
 {
@@ -38,8 +39,13 @@ private:
 	CircularQueue<EntityItem*>		m_EntityItemQueue;
 
 	int								m_currentEntityItemCount = 0;
+	[[Property]]
 	GameObject* asisTail{ nullptr };
+	[[Property]]
 	GameObject* asisHead{ nullptr };
+	[[Property]]
+	AsisMove* m_asismove{ nullptr };
+	[[Property]]
 	float m_purificationAngle = 0.f;
 	[[Property]]
 	float m_purificationRadius = 5.f;
@@ -100,6 +106,8 @@ private:
 private:
 	[[Property]]
 	float m_pathRadius = 1.f;
+	[[Property]]
+	float m_pathEndRadius = 3.f;
 	[[Property]]
 	float m_predictNextTime = 2.0f; // 예측 시간
 	[[Property]]

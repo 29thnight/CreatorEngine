@@ -364,6 +364,12 @@ void TerrainComponent::PaintLayer(uint32_t layerId, int x, int y, float strength
 			m_layerHeightMap[layerId][idx] = 1.0f;
 		}
 	}
+
+	XMVECTOR splat = XMVectorSet(m_layerHeightMap[layerId][0], m_layerHeightMap[layerId][1], m_layerHeightMap[layerId][2], m_layerHeightMap[layerId][3]);
+	splat = XMVector4Normalize(splat);
+	for (int i = 0; i < 4; i++) {
+		m_layerHeightMap[layerId][i] = splat.m128_f32[i];
+	}
 }
 
 void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& name)
@@ -571,18 +577,27 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		desc.tilling = layerData["tilling"].get<float>();
 		
 		//diffuseTexture 로드
-		ID3D11Resource* diffuseResource = nullptr;
-		ID3D11Texture2D* diffuseTexture = nullptr;
-		ID3D11ShaderResourceView* diffuseSRV = nullptr;
-		if (CreateTextureFromFile(DeviceState::g_pDevice, desc.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK) {
-			diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
-			TerrainLayer newLayer;
-			desc.diffuseTexture = diffuseTexture;
-			desc.diffuseSRV = diffuseSRV;
-			//m_layerHeightMap.push_back(std::vector<float>(tmpWidth * tmpHeight, 0.0f)); // 레이어별 높이 맵 초기화 => loadLoadEditorSplatMap() 이미 로드
+		//ID3D11Resource* diffuseResource = nullptr;
+		//ID3D11Texture2D* diffuseTexture = nullptr;
+		//ID3D11ShaderResourceView* diffuseSRV = nullptr;
+		//if (CreateTextureFromFile(DeviceState::g_pDevice, desc.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK) {
+		//	diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
+		//	TerrainLayer newLayer;
+		//	desc.diffuseTexture = diffuseTexture;
+		//	desc.diffuseSRV = diffuseSRV;
+		//	//m_layerHeightMap.push_back(std::vector<float>(tmpWidth * tmpHeight, 0.0f)); // 레이어별 높이 맵 초기화 => loadLoadEditorSplatMap() 이미 로드
+		//}
+		//else {
+		//	Debug->LogError("Failed to load diffuse texture: " + diffusePath.string());
+		//	continue; // 로드 실패시 해당 레이어는 무시
+		//}
+		file::path path = file::path(desc.diffuseTexturePath);
+		if (file::exists(path))
+		{
+			desc.diffuseTexture = Texture::LoadFormPath(desc.diffuseTexturePath);
 		}
 		else {
-			Debug->LogError("Failed to load diffuse texture: " + diffusePath.string());
+			Debug->LogError("Failed to load diffuse texture: " + desc.layerName);
 			continue; // 로드 실패시 해당 레이어는 무시
 		}
 
@@ -638,12 +653,10 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	tmpLayerHeightMap.clear();
 	for (auto& layer : tmpLayerDescs) {
 		if (layer.diffuseTexture) {
-			layer.diffuseTexture->Release();
+			//DeallocateResource<Texture>(layer.diffuseTexture);
+			delete layer.diffuseTexture;
+			//layer.diffuseTexture->Release();
 			layer.diffuseTexture = nullptr;
-		}
-		if (layer.diffuseSRV) {
-			layer.diffuseSRV->Release();
-			layer.diffuseSRV = nullptr;
 		}
 	}
 	tmpLayerDescs.clear();

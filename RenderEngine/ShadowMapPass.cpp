@@ -22,6 +22,7 @@ cbuffer CloudShadowMapBuffer
 	Mathf::Vector2 direction;
 	UINT frameIndex;
 	float moveSpeed;
+	float alpha;
 	bool32 isOn;
 };
 
@@ -101,22 +102,26 @@ void ShadowMapPass::ControlPanel()
         setting.useCascade = g_useCascade;
     }
 
-    if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
-    {
-        setting.isCloudOn = isCloudOn;
-    }
-    if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
-    {
-        setting.cloudSize = cloudSize;
-    }
-    if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
-    {
-        setting.cloudDirection = cloudDirection;
-    }
-    if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
-    {
-        setting.cloudMoveSpeed = cloudMoveSpeed;
-    }
+        if (ImGui::Checkbox("Is Cloud On", &isCloudOn))
+        {
+                setting.isCloudOn = isCloudOn;
+        }
+        if (ImGui::DragFloat2("CloudSize", &cloudSize.x, 0.075f, 0.f, 10.f))
+        {
+                setting.cloudSize = cloudSize;
+        }
+        if (ImGui::DragFloat2("CloudDirection Based Direction Light", &cloudDirection.x, 0.075f, -1.f, 1.f))
+        {
+                setting.cloudDirection = cloudDirection;
+        }
+        if (ImGui::DragFloat("Cloud MoveSpeed", &cloudMoveSpeed, 0.0001f, 0.f, 1.f, "%.5f"))
+        {
+                setting.cloudMoveSpeed = cloudMoveSpeed;
+        }
+		if (ImGui::DragFloat("CloudAlpha", &cloudAlpha, 0.01f, 0.f, 10.f, "%.2f"))
+		{
+				setting.cloudAlpha = cloudAlpha;
+		}
 
 	static auto& cameras = CameraManagement->m_cameras;
 	static std::vector<RenderPassData*> dataPtrs{};
@@ -437,6 +442,7 @@ void ShadowMapPass::UpdateCloudBuffer(ID3D11DeviceContext* defferdContext, Light
 	buffer.direction = cloudDirection;
 	buffer.frameIndex = Time->GetFrameCount();
 	buffer.moveSpeed = cloudMoveSpeed;
+	buffer.alpha = cloudAlpha;
 	buffer.isOn = isCloudOn;
 	DirectX11::UpdateBuffer(defferdPtr, m_cloudShadowMapBuffer, &buffer);
 }
@@ -498,5 +504,6 @@ void ShadowMapPass::ApplySettings(const ShadowMapPassSetting& setting)
     cloudSize = setting.cloudSize;
     cloudDirection = setting.cloudDirection;
     cloudMoveSpeed = setting.cloudMoveSpeed;
+	cloudAlpha = setting.cloudAlpha;
     m_settingConstant._epsilon = setting.epsilon;
 }

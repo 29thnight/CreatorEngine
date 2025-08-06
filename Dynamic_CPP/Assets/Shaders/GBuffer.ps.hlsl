@@ -93,6 +93,8 @@ GBufferOutput main(PixelShaderInput IN)
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
+        
+        albedo *= gAlbedo;
     }
     
         
@@ -150,15 +152,11 @@ GBufferOutput main(PixelShaderInput IN)
         
         
         float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
+        splat = normalize(splat);
         
-        float weigt0 = splat.r;
-        float weigt1 = splat.g;
-        float weigt2 = splat.b;
-        float weigt3 = splat.a;
+        //layer0 = layer0 * (layer0 * (layer0 * 0.305306011f + 0.682171111f) + 0.012522878f);
         
-        
-        
-        float3 color = layer0 * weigt0 + layer1 * weigt1 + layer2 * weigt2 + layer3 * weigt3;
+        float3 color = layer0 * splat.r + layer1 * splat.g + layer2 * splat.b + layer3 * splat.a;
         //color = layer0;
         
         //color.r = gLayerTiling.r - 1.0;
@@ -171,8 +169,8 @@ GBufferOutput main(PixelShaderInput IN)
         occlusion = 1;
         metallic = 0.0;
         roughness = 1.0;
-        surf.N = float3(0, 1, 0);
         bit = 1 << 8;
+        bit |= 1 << 9; // Set bit 8 and 9 for terrain layers
     }
     
 

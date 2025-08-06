@@ -12,6 +12,7 @@
 #include "Player.h"
 
 #include "GameManager.h"
+#include "AsisMove.h"
 using namespace Mathf;
 inline static Mathf::Vector3 GetBothPointAndLineClosestPoint(const Mathf::Vector3& point, const Mathf::Vector3& lineStart, const Mathf::Vector3& lineEnd)
 {
@@ -61,6 +62,7 @@ void EntityAsis::Start()
 
 	asisTail = GameObject::Find("AsisTail");
 	asisHead = GameObject::Find("AsisHead");
+	//m_asismove = GetOwner()->GetComponent<AsisMove>();
 
 	/*auto fakeObjects = GameObject::Find("fake");
 	if (fakeObjects) {
@@ -141,6 +143,13 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 
 void EntityAsis::Update(float tick)
 {
+	if (asisTail) {
+		Debug->Log(asisTail->m_name.data());
+	}
+	if (m_asismove) {
+		Debug->Log(m_asismove->m_name.data());
+	}
+
 	if (InputManagement->IsKeyDown((unsigned int)KeyBoard::N)) {
 		Attack(nullptr, 10);
 	}
@@ -264,8 +273,8 @@ void EntityAsis::PathMove(float tick)
 	Vector3 currentForward = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), currentRotation);
 
 	Vector3 dir = Mathf::Normalize(points[nextPointIndex] - points[currentPointIndex]);
-	Vector3 endResult = points[nextPointIndex] - dir * m_pathRadius;
-	Vector3 startResult = points[currentPointIndex] + dir * m_pathRadius;
+	Vector3 endResult = points[nextPointIndex] - dir * m_pathEndRadius;
+	Vector3 startResult = points[currentPointIndex] + dir * m_pathEndRadius;
 	Vector3 closestPoint = GetBothPointAndLineClosestPoint(currentPosition, startResult, endResult);
 	Vector3 predictClosestPosition = GetBothPointAndLineClosestPoint(closestPoint + dir * m_predictNextTime * moveSpeed, startResult, endResult);
 
@@ -307,7 +316,7 @@ void EntityAsis::PathMove(float tick)
 	GetOwner()->m_transform.SetPosition(newPosition);
 
 	float newDistance = Mathf::Distance(newPosition, points[nextPointIndex]);
-	if (newDistance <= m_pathRadius) {
+	if (newDistance <= m_pathEndRadius) {
 		currentPointIndex = nextPointIndex; // Loop through the points
 	}
 }

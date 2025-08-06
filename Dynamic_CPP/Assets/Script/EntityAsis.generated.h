@@ -5,6 +5,10 @@ ReflectionScriptField(EntityAsis) \
 { \
 	PropertyField \
 	({ \
+		meta_property(asisTail) \
+		meta_property(asisHead) \
+		meta_property(m_asismove) \
+		meta_property(m_purificationAngle) \
 		meta_property(m_purificationRadius) \
 		meta_property(maxHP) \
 		meta_property(moveSpeed) \
@@ -21,6 +25,7 @@ ReflectionScriptField(EntityAsis) \
 		meta_property(maxPollutionGauge) \
 		meta_property(pollutionCoreAmount) \
 		meta_property(m_pathRadius) \
+		meta_property(m_pathEndRadius) \
 		meta_property(m_predictNextTime) \
 		meta_property(m_rotateSpeed) \
 	}); \

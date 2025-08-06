@@ -134,7 +134,7 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
     ambient *= occlusion;
     float3 colour = ambient + Lo + emissive; //(ambient + Lo) * ao + emissive;// + GI * ao; //(albedo * GI * ao);
     
-    float3 debugCascade = overlayCascadeDebug(surf.posW);
+    //float3 debugCascade = overlayCascadeDebug(surf.posW);
     
     gOutput output;
     output.Default = float4(colour.rgb, 1.0);
