@@ -50,6 +50,7 @@ public:
 	Mathf::Vector2 cloudSize = { 4,4 };
 	Mathf::Vector2 cloudDirection = { 1,1 };
 	float cloudMoveSpeed = 0.0003f;
+	float cloudAlpha = 1.f;
 	bool isCloudOn = true;
 
 	void DevideCascadeEnd(Camera& camera);

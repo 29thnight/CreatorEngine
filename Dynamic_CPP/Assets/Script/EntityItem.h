@@ -44,7 +44,9 @@ public:
 	Player* GetThrowOwner();
 	void ClearThrowOwner();
 public:
+	[[Property]]
 	GameObject* asisTail{ nullptr };
+	[[Property]]
 	RigidBodyComponent* m_rigid = nullptr;
 	Mathf::Vector3 startPos{ 0.f, 0.f, 0.f };
 	Mathf::Vector3 endPos{ 0.f, 0.f, 0.f };

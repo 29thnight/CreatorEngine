@@ -19,5 +19,7 @@ struct ShadowMapPassSetting
     [[Property]]
     float cloudMoveSpeed{ 0.0003f };
     [[Property]]
+	float cloudAlpha{ 1.f };
+    [[Property]]
     float epsilon{ 0.001f };
 };

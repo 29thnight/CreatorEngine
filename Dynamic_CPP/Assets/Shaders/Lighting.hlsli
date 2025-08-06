@@ -71,6 +71,7 @@ cbuffer CloudShadowMapConstants : register(b4)
     float2 direction;
     uint frameIndex;
     float moveSpeed;
+    float alpha;
     int isOn;
 }
 
@@ -124,7 +125,7 @@ float CloudShadowFactor(float4 worldPosition)
         float shadow = 0;
         shadow = closestDepth;
     
-        return shadow;
+        return saturate(shadow * alpha);
     }
     else 
         return 1;

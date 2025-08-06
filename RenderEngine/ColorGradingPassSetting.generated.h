@@ -7,6 +7,7 @@ ReflectionField(ColorGradingPassSetting) \
 	({ \
 		meta_property(isOn) \
 		meta_property(lerp) \
+		meta_property(textureFilePath) \
 	}); \
 	FieldEnd(ColorGradingPassSetting, PropertyOnly) \
 };

@@ -28,6 +28,7 @@ cbuffer TerrainLayerBuffer
 // TerrainBrush / TerrainLayer 정의 (변경 없음)
 //-----------------------------------------------------------------------------
 
+class Texture;
 struct TerrainBrush
 {
     struct BrushMask 
@@ -69,7 +70,8 @@ struct TerrainLayer
     uint32_t m_layerID{ 0 };
     std::string layerName;
     std::wstring diffuseTexturePath;
-    ID3D11Texture2D* diffuseTexture{ nullptr };
-    ID3D11ShaderResourceView* diffuseSRV{ nullptr };
+    Texture* diffuseTexture{ nullptr };
+    //ID3D11Texture2D* diffuseTexture{ nullptr };
+    //ID3D11ShaderResourceView* diffuseSRV{ nullptr };
     float tilling;
 };

@@ -15,6 +15,8 @@ struct alignas(16) CBData
 	float MaxThickness;
 	float Time;
 	int maxRayCount;
+
+	Mathf::Vector2 screenSize;
 };
 
 ID3D11ShaderResourceView* nullSRV[4] = {
@@ -55,12 +57,13 @@ ScreenSpaceReflectionPass::~ScreenSpaceReflectionPass()
 {
 }
 
-void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive)
+void ScreenSpaceReflectionPass::Initialize(Texture* diffuse, Texture* metalRough, Texture* normals, Texture* emissive, Texture* bitflag)
 {
 	m_DiffuseTexture = diffuse;
 	m_MetalRoughTexture = metalRough;
 	m_NormalTexture = normals;
 	m_EmissiveTexture = emissive;
+	m_BitflagTexture = bitflag;
 
 	m_CopiedTexture = Texture::Create(
 		DeviceState::g_ClientRect.width,

@@ -1,5 +1,5 @@
 #include "TerrainMaterial.h"
-
+#include "Texture.h"
 void TerrainMaterial::Initialize(UINT width, UINT height)
 {
 	m_width = static_cast<int>(width);
@@ -63,24 +63,34 @@ void TerrainMaterial::AddLayer(TerrainLayer& newLayer)
 
 	DirectX11::UpdateBuffer(m_layerBuffer.Get(), &m_layerBufferData);
 
-	ID3D11Resource* diffuseResource = nullptr;
-	ID3D11Texture2D* diffuseTexture = nullptr;
-	ID3D11ShaderResourceView* diffuseSRV = nullptr;
+	//ID3D11Resource* diffuseResource = nullptr;
+	//ID3D11Texture2D* diffuseTexture = nullptr;
+	//ID3D11ShaderResourceView* diffuseSRV = nullptr;
 	if (newLayer.diffuseTexturePath.empty()) {
 		Debug->LogError("Diffuse texture path is empty for layer: " + newLayer.layerName);
 		return; // diffuseTexturePath가 비어있으면 레이어 추가를 중단
 	}
 
-	if (CreateTextureFromFile(DeviceState::g_pDevice, newLayer.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK)
+	file::path path = file::path(newLayer.diffuseTexturePath);
+	if (file::exists(path))
 	{
-		diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
-		newLayer.diffuseTexture = diffuseTexture;
-		newLayer.diffuseSRV = diffuseSRV;
+		newLayer.diffuseTexture = Texture::LoadFormPath(newLayer.diffuseTexturePath);
 	}
 	else {
 		Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
 		return; // 로드 실패시 해당 레이어는 무시
 	}
+
+	//if (CreateTextureFromFile(DeviceState::g_pDevice, newLayer.diffuseTexturePath, &diffuseResource, &diffuseSRV) == S_OK)
+	//{
+	//	diffuseResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&diffuseTexture));
+	//	newLayer.diffuseTexture = diffuseTexture;
+	//	newLayer.diffuseSRV = diffuseSRV;
+	//}
+	//else {
+	//	Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
+	//	return; // 로드 실패시 해당 레이어는 무시
+	//}
 
 
 	DirectX11::CSSetShader(m_computeShader->GetShader(), nullptr, 0);
@@ -96,7 +106,7 @@ void TerrainMaterial::AddLayer(TerrainLayer& newLayer)
 	DirectX11::CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
 	//ID3D11ShaderResourceView* srvs = { m_layers[newLayer.m_layerID].diffuseSRV,m_layers[1].diffuseSRV, m_layers[2].diffuseSRV, m_layers[3].diffuseSRV };
 	ID3D11ShaderResourceView* nullSRVs[]{ nullptr };
-	DirectX11::CSSetShaderResources(0, 1, &newLayer.diffuseSRV);
+	DirectX11::CSSetShaderResources(0, 1, &newLayer.diffuseTexture->m_pSRV);
 	DirectX11::CSSetConstantBuffer(0, 1, m_AddLayerBuffer.GetAddressOf());
 
 	uint32 threadGroupCountX = (uint32)ceilf(512 / 16.0f);
@@ -196,13 +206,25 @@ void TerrainMaterial::InitSplatMapTexture(UINT width, UINT height)
 	hr = DeviceState::g_pDeviceContext->Map(m_splatMapTexture.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
 
 	{
-		BYTE* dest = reinterpret_cast<BYTE*>(mapped.pData);
+		BYTE* pData = static_cast<BYTE*>(mapped.pData);
 
 		for (UINT y = 0; y < height; ++y)
 		{
-			BYTE* row = dest + y * mapped.RowPitch;
-			// 각 행의 패딩까지 포함해 전부 0으로
-			memset(row, 0, mapped.RowPitch);
+			// 현재 행(row)의 시작 주소를 계산합니다.
+			BYTE* pRow = pData + y * mapped.RowPitch;
+
+			for (UINT x = 0; x < width; ++x)
+			{
+				// 현재 픽셀의 주소를 계산합니다.
+				// DXGI_FORMAT_R8G8B8A8_UNORM은 픽셀당 4바이트입니다.
+				BYTE* pPixel = pRow + x * 4;
+
+				// 픽셀 값을 설정합니다 (R, G, B, A 순서)
+				pPixel[0] = 255; // R
+				pPixel[1] = 0;   // G
+				pPixel[2] = 0;   // B
+				pPixel[3] = 0;   // A
+			}
 		}
 	}
 
