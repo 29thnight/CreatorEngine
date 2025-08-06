@@ -210,6 +210,7 @@ extern "C"
 		CreateFactory::GetInstance()->RegisterFactory("Player", []() { return new Player(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestBehavior", []() { return new TestBehavior(); });
 		CreateFactory::GetInstance()->RegisterFactory("AsisMove", []() { return new AsisMove(); });
+		CreateFactory::GetInstance()->RegisterFactory("CameraMove", []() { return new CameraMove(); });
 	}
 
 	EXPORT_API void InitActionFactory()

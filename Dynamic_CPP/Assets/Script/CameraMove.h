@@ -1,10 +1,13 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
+#include "CameraMove.generated.h"
 
 class CameraMove : public ModuleBehavior
 {
 public:
+   ReflectCameraMove
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(CameraMove)
 	virtual void Awake() override {}
 	virtual void Start() override;
@@ -21,5 +24,9 @@ public:
 	virtual void OnDestroy() override  {}
 
 private:
-	GameObject* asis = nullptr;
+	GameObject* target = nullptr;
+	[[Property]]
+	float followSpeed{ 2.0f };
+	[[Property]]
+	Mathf::Vector3 offset{ 20.f, 20.f, -7.f };
 };
