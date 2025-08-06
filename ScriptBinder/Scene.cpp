@@ -1085,7 +1085,6 @@ void Scene::DestroyComponents()
 			obj->RefreshComponentIdIndices();
 		}
 	}
-
 }
 
 std::string Scene::GenerateUniqueGameObjectName(std::string_view name)
@@ -1230,14 +1229,10 @@ void Scene::SetInternalPhysicData()
 void Scene::AllUpdateWorldMatrix()
 {
 	auto& rootObjects = m_SceneObjects[0]->m_childrenIndices;
-	auto updateModel = [this](GameObject::Index index){ UpdateModelRecursive(index, XMMatrixIdentity()); };
-
-	if (rootObjects.empty())
+	for (auto index : rootObjects)
 	{
-		return;
+		UpdateModelRecursive(index, XMMatrixIdentity());
 	}
-
-	std::ranges::for_each(rootObjects, updateModel);
 
 	// Update DontDestroyOnLoad objects
 	size_t size = SceneManagers->GetDontDestroyOnLoadObjects().size();

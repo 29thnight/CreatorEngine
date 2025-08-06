@@ -7,7 +7,7 @@ namespace Core
 	template<typename Ret, typename ...Args>
 	inline Delegate<Ret, Args...>::~Delegate()
 	{
-		Clear();
+		//Clear();
 	}
 	template <typename Ret, typename... Args>
 	auto Delegate<Ret, Args...>::AddLambda(CallableWithSignature<Ret, Args...> auto&& func, int priority) -> DelegateHandle

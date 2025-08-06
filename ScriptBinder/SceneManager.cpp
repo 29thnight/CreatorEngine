@@ -151,6 +151,7 @@ void SceneManager::DisableOrEnable()
 
 void SceneManager::Decommissioning()
 {
+    m_ActiveRenderScene.load()->Finalize();
     for (auto& scene : m_scenes)
     {
         if (scene)
