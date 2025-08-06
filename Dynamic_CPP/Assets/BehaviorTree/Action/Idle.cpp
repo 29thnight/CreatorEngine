@@ -144,7 +144,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 			std::cout << "Idle action already in progress." << std::endl;
 			//return NodeStatus::Running; // Continue running if already in idle state
 			//dead test code
-			blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
+			//blackBoard.SetValueAsInt("CurrHP", 0); // Set current HP to 0 for testing dead state
 			//
 		}
 		else

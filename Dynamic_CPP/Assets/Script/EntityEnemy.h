@@ -4,6 +4,7 @@
 
 class BehaviorTreeComponent;
 class BlackBoard;
+class HitResult;
 enum class CriticalMark
 {
 	P1,
@@ -36,4 +37,8 @@ public:
 	BehaviorTreeComponent* enemyBT;
 	BlackBoard* blackBoard;
 	bool isDamage = false;
+
+	int attackCount = 0;
+
+	void MeleeAttack();
 };
