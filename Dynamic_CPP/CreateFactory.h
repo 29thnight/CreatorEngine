@@ -21,6 +21,7 @@
 #include "Player.h"
 #include "TestBehavior.h"
 #include "AsisMove.h"
+#include "CameraMove.h"
 
 class CreateFactory : public Singleton<CreateFactory>
 {

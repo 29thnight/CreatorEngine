@@ -8,6 +8,7 @@
 #include "DataSystem.h"
 #include "DebugStreamBuf.h"
 #include "EngineSetting.h"
+#include "HotLoadSystem.h"
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
@@ -48,6 +49,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		app.Finalize();
 	}
 
+	HotLoadSystem::Destroy();
 	SceneManager::Destroy();
 	PhysicsManager::Destroy();
 	PhysicX::Destroy();
@@ -78,6 +80,7 @@ void Core::App::Initialize(HINSTANCE hInstance, const wchar_t* title, int width,
 	PhysicX::GetInstance();
 	PhysicsManager::GetInstance();
 	SceneManager::GetInstance();
+	HotLoadSystem::GetInstance();
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
     g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);

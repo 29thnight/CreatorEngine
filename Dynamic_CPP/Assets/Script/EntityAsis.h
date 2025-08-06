@@ -10,7 +10,7 @@ class EntityAsis : public Entity
 {
 public:
    ReflectEntityAsis
-		[[ScriptReflectionField]]
+	[[ScriptReflectionField]]
 	MODULE_BEHAVIOR_BODY(EntityAsis)
 		virtual void Awake() override {}
 	virtual void Start() override;
@@ -88,7 +88,7 @@ private:
 	int		pollutionCoreAmount{ 1 };			// 오염도 게이지 최대치 도달 시 생성되는 오염 결정 개수
 
 private:
-	float	m_currentTailPurificationDuration; // 꼬리 정화 연출 소요 시간
+	float	m_currentTailPurificationDuration{}; // 꼬리 정화 연출 소요 시간
 	float	m_currentStaggerDuration{ 0 };	// 현재 경직 시간
 	float	m_currentGracePeriod{ 0 };	// 현재 무적 시간
 

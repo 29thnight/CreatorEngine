@@ -22,7 +22,7 @@ public:
 public:
 	virtual void Interact() {}
 	virtual void Attack(Entity* sender, int damage) {}
-
+	virtual void OnRay() {};
 	[[Property]]
 	int m_currentHP{ 100 };
 	[[Property]]

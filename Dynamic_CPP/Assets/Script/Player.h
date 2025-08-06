@@ -6,6 +6,7 @@ class Animator;
 class Weapon;
 class EntityItem;
 class Socket;
+class EffectComponent;
 class Player : public Entity
 {
 public:
@@ -26,13 +27,13 @@ public:
 	virtual void OnCollisionExit(const Collision& collision) override;
 
 	virtual void Update(float tick) override;
-	virtual void LateUpdate(float tick) override {}
+	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override {}
 	virtual void OnDestroy() override {}
 
 
 	virtual void Attack(Entity* sender, int damage) override;
-
+	virtual void OnRay() override;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	[[Method]]
@@ -60,6 +61,7 @@ public:
 	void DeleteWeapon(int index);
 	void DeleteWeapon(Weapon* weapon);
 	void FindNearObject(GameObject* gameObject);
+	
 	[[Property]]
 	int playerIndex = 0;
 
@@ -126,6 +128,9 @@ public:
 	GameObject* m_preNearObject = nullptr;
 	Animator* m_animator = nullptr;
 
+
+	GameObject* dashObj = nullptr;
+	EffectComponent* dashEffect = nullptr;
 	GameObject* camera = nullptr;
 
 	Socket* handSocket;

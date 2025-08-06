@@ -52,10 +52,10 @@ typedef void (*SetPhysicsManagerFunc)(Singleton<PhysicsManager>::FGetInstance);
 typedef void (*SetPhysxFunc)(Singleton<PhysicX>::FGetInstance);
 #pragma endregion
 
-class HotLoadSystem : public Singleton<HotLoadSystem>
+class HotLoadSystem : public DLLCore::Singleton<HotLoadSystem>
 {
 private:
-	friend Singleton;
+	friend DLLCore::Singleton<HotLoadSystem>;
 
 	HotLoadSystem() = default;
 	~HotLoadSystem() = default;
@@ -298,5 +298,5 @@ private:
 	file::file_time_type					m_lastWriteFileTime{};
 };
 
-static auto& ScriptManager = HotLoadSystem::GetInstance();
+static auto ScriptManager = HotLoadSystem::GetInstance();
 #endif // !DYNAMICCPP_EXPORTS

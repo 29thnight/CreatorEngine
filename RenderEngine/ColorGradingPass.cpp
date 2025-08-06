@@ -238,8 +238,11 @@ void ColorGradingPass::ControlPanel()
 			const char* droppedFilePath = (const char*)colorGradingPayload->Data;
 			file::path filename = droppedFilePath;
 			file::path filepath = PathFinder::Relative("ColorGrading\\") / filename.filename();
-			if (!filename.filename().empty())
+			m_textureFilePath = filepath.string();
+			if (!filename.filename().empty()) {
 				SetColorGradingTexture(filepath.string());
+				setting.textureFilePath = m_textureFilePath.ToString();
+			}
 			else {
 				Debug->Log("Empty Color Grading File Name");
 			}
