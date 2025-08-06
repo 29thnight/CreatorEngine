@@ -42,7 +42,7 @@ void Player::Start()
 	}
 
 
-	handSocket= m_animator->MakeSocket("handsocket","hand.R", aniOwener);
+	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwener);
 
 	
 
