@@ -60,16 +60,30 @@ void TrailGenerateModule::Update(float delta)
 
     m_currentTime += delta;
 
-    // 자동 트레일 포인트 생성 수정
-    if (m_autoGenerateFromPosition &&
-        (m_currentTime - m_lastAutoAddTime) >= m_autoAddInterval)
+    if (m_autoGenerateFromPosition)
     {
-        // 위치가 변했거나 처음 추가하는 경우
-        if (m_trailPoints.empty() ||
-            Mathf::Vector3::Distance(m_position + m_positionOffset, m_lastPosition) >= m_minDistance)
+        bool shouldAdd = false;
+
+        // 첫 번째 포인트이거나 시간 간격 조건을 만족하는 경우
+        if (m_trailPoints.empty())
         {
-            AddPoint(m_position + m_positionOffset, m_startWidth, m_startColor);  // positionOffset 적용
-            m_lastPosition = m_position + m_positionOffset;
+            shouldAdd = true;
+        }
+        else if ((m_currentTime - m_lastAutoAddTime) >= m_autoAddInterval)
+        {
+            // 위치가 충분히 변했는지 확인
+            Mathf::Vector3 currentPos = m_position + m_positionOffset;
+            if (Mathf::Vector3::Distance(currentPos, m_lastPosition) >= m_minDistance)
+            {
+                shouldAdd = true;
+            }
+        }
+
+        if (shouldAdd)
+        {
+            Mathf::Vector3 newPos = m_position + m_positionOffset;
+            AddPoint(newPos, m_startWidth, m_startColor);
+            m_lastPosition = newPos;
             m_lastAutoAddTime = m_currentTime;
         }
     }
@@ -455,6 +469,7 @@ void TrailGenerateModule::ResetForReuse()
 
     Clear();
     m_currentTime = 0.0f;
+    m_lastAutoAddTime = 0.0f;
     m_lastUpVector = Mathf::Vector3(0.0f, 1.0f, 0.0f);
 }
 
@@ -491,13 +506,6 @@ nlohmann::json TrailGenerateModule::SerializeData() const
     json["endColor"] = EffectSerializer::SerializeVector4(m_endColor);
     json["position"] = EffectSerializer::SerializeVector3(m_position);
     json["positionOffset"] = EffectSerializer::SerializeVector3(m_positionOffset);
-    json["lastUpVector"] = EffectSerializer::SerializeVector3(m_lastUpVector);
-
-    json["state"] = {
-        {"isInitialized", m_isInitialized},
-        {"currentTime", m_currentTime},
-        {"meshDirty", m_meshDirty}
-    };
 
     return json;
 }
@@ -552,18 +560,6 @@ void TrailGenerateModule::DeserializeData(const nlohmann::json& json)
 
         if (json.contains("positionOffset"))
             m_positionOffset = EffectSerializer::DeserializeVector3(json["positionOffset"]);
-
-        if (json.contains("lastUpVector"))
-            m_lastUpVector = EffectSerializer::DeserializeVector3(json["lastUpVector"]);
-
-        if (json.contains("state"))
-        {
-            const auto& state = json["state"];
-            if (state.contains("currentTime"))
-                m_currentTime = state["currentTime"];
-            if (state.contains("meshDirty"))
-                m_meshDirty = state["meshDirty"];
-        }
 
         if (!m_isInitialized)
             Initialize();

@@ -20,5 +20,5 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	void SetKey();
+	float currentT = 0;
 };

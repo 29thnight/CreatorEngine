@@ -27,9 +27,6 @@ void EffectComponent::Awake()
             m_loop = templateLoop;
             m_duration = templateDuration;
         }
-
-        // 이제 동기화된 설정으로 Effect 재생
-        PlayEffectByName(m_effectTemplateName);
     }
 }
 
@@ -37,10 +34,11 @@ void EffectComponent::Update(float tick)
 {
     m_currentTime += tick;
 
-    if (m_currentTime > m_duration)
+    if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
     {
-        m_isPlaying = false;
+        StopEffect();
     }
+
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
@@ -48,10 +46,6 @@ void EffectComponent::Update(float tick)
     if (!proxy->GetInstanceName().empty() && m_effectInstanceName != proxy->GetInstanceName())
     {
         m_effectInstanceName = proxy->GetInstanceName();
-
-#ifdef _DEBUG
-        std::cout << "Synced instance name: " << m_effectInstanceName << std::endl;
-#endif
     }
 
     // 인스턴스 이름이 있을 때만 position/rotation 업데이트
@@ -89,15 +83,16 @@ void EffectComponent::Update(float tick)
     }
     else
     {
-//#ifdef _DEBUG
-//        static int debugCount = 0;
-//        if (++debugCount % 60 == 0) {
-//            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
-//                << proxy->GetInstanceName() << "'" << std::endl;
-//        }
-//#endif
+        //#ifdef _DEBUG
+        //        static int debugCount = 0;
+        //        if (++debugCount % 60 == 0) {
+        //            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
+        //                << proxy->GetInstanceName() << "'" << std::endl;
+        //        }
+        //#endif
     }
 }
+
 
 void EffectComponent::OnDestroy()
 {
@@ -285,12 +280,6 @@ void EffectComponent::ForeceUpdatePosition()
         EffectProxyController::GetInstance()->PushEffectCommand(std::move(positionCommand));
         m_lastPosition = currentPos;
     }
-}
-
-std::string EffectComponent::GenerateInstanceName(const std::string& templateName)
-{
-    size_t instanceId = GetOwner()->GetInstanceID();
-    return templateName + "_id" + std::to_string(instanceId);
 }
 
 void EffectComponent::ApplyEffectSettings()

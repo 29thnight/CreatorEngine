@@ -187,13 +187,17 @@ float3 GetOrbitalVelocity(float3 position, float time)
     return tangent * orbitalSpeed;
 }
 
-float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex)
+float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleIndex, float particleAge)
 {
-    // 파티클별 고유한 방향 생성 (시간 + 인덱스 기반으로 진짜 랜덤하게)
-    float2 seed = float2(particleIndex * 0.1 + currentTime * 1.5, particleIndex * 0.3 + currentTime * 0.7);
+    // 파티클 생성 시점 계산 (현재시간 - 나이)
+    float birthTime = currentTime - particleAge;
+    
+    // 파티클별 고유한 시드 (생성 시점 + 인덱스로 랜덤하지만 고정)
+    float2 seed = float2(particleIndex * 0.1537 + birthTime * 0.7321, particleIndex * 0.2891 + birthTime * 1.2345);
     float angle = noise(seed) * 6.28318; // 0~2π
     float elevation = (noise(seed + 100.0) - 0.5) * 3.14159 * explosiveSphere; // 구형 분포 조절
     
+    // 파티클별 고정 방향 (생성 시점에서 결정되고 변하지 않음)
     float3 explosionDir = float3(
         cos(angle) * cos(elevation),
         sin(elevation),
@@ -203,8 +207,8 @@ float3 GetExplosiveMovement(float3 position, float normalizedAge, uint particleI
     // 초기 폭발 속도 (시간에 따라 감소)
     float speedDecay = 1.0 - pow(normalizedAge, explosiveDecay);
     
-    // 랜덤성 추가 (시간도 포함해서 더 랜덤하게)
-    float2 noiseInput = float2(particleIndex * 0.1 + currentTime, currentTime * 0.5 + particleIndex * 0.07);
+    // 랜덤성 추가 (파티클별 고정값)
+    float2 noiseInput = float2(particleIndex * 0.0731 + birthTime * 0.4567, particleIndex * 0.1234 + birthTime * 0.8901);
     float randomFactor = 1.0 + (noise(noiseInput) - 0.5) * explosiveRandom;
     
     return explosionDir * explosiveSpeed * speedDecay * randomFactor;
@@ -247,7 +251,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (velocityMode == 5) // explosive
         {
-            additionalVelocity += GetExplosiveMovement(particle.position, normalizedAge, particleIndex);
+            additionalVelocity += GetExplosiveMovement(particle.position, normalizedAge, particleIndex, particle.age);
         }
         
         // 기존 velocity에 추가 velocity 더하기
