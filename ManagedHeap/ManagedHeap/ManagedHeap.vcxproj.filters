@@ -21,10 +21,10 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Managed::HeapObject.h">
+    <ClInclude Include="MemoryManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="MemoryManager.h">
+    <ClInclude Include="ManagedHeapObject.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

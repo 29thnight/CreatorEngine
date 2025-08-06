@@ -53,6 +53,10 @@ bool EngineSetting::SaveSettings()
 	rootNode["msvcVersion"] = static_cast<int>(m_msvcVersion);
 	rootNode["renderPassSettings"] = Meta::Serialize(&m_renderPassSettings);
 	rootNode["m_contentsBrowserStyle"] = (int)m_contentsBrowserStyle;
+	file::path buildGameProjectName = m_buildGameName;
+	file::path startupSceneName = m_startupSceneName;
+	rootNode["buildGameName"] = buildGameProjectName.string();
+	rootNode["startupSceneName"] = startupSceneName.string();
 
 	settingsFile << rootNode;
 
@@ -92,6 +96,10 @@ bool EngineSetting::LoadSettings()
 	{
 		m_contentsBrowserStyle = ContentsBrowserStyle::Tile; // Default style if not set
 	}
+	file::path buildGameProjectName = rootNode["buildGameName"].as<std::string>("Train Your Asis");
+	file::path startupSceneName = rootNode["startupSceneName"].as<std::string>("SampleScene");
+	m_buildGameName = buildGameProjectName.wstring();
+	m_startupSceneName = startupSceneName.wstring();
 
 	return isSuccess;
 }

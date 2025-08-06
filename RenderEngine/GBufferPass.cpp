@@ -94,7 +94,7 @@ GBufferPass::GBufferPass()
 
 	// Create a dynamic structured buffer for instance data (world matrices)
    // This buffer is created once and updated each frame.
-	constexpr uint32 MAX_INSTANCES = 2048; // Max number of instances per draw call
+	constexpr uint32 MAX_INSTANCES = 16'384; // Max number of instances per draw call
 	m_maxInstanceCount = MAX_INSTANCES;
 
 	D3D11_BUFFER_DESC instanceBufferDesc{};

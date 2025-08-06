@@ -121,7 +121,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//skyBoxPass
 	m_pSkyBoxPass = std::make_unique<SkyBoxPass>();
-	m_currentSkyTextureName = PathFinder::Relative("HDR\\rosendal_park_sunset_puresky_4k.hdr").string();
+	m_currentSkyTextureName = PathFinder::Relative("HDR\\rustig_koppie_puresky_8k.hdr").string();
 	m_pSkyBoxPass->Initialize(m_currentSkyTextureName);
 	
 	//toneMapPass

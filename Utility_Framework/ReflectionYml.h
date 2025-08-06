@@ -154,6 +154,18 @@ namespace Meta
 			{
 				prop.setter(instance, node[prop.name].as<bool>());
 			}
+			else if (prop.typeID == type_guid(uint32_t))
+			{
+				prop.setter(instance, node[prop.name].as<uint32_t>());
+			}
+			else if (prop.typeID == type_guid(int64_t))
+			{
+				prop.setter(instance, node[prop.name].as<int64_t>());
+			}
+			else if (prop.typeID == type_guid(uint64_t))
+			{
+				prop.setter(instance, node[prop.name].as<uint64_t>());
+			}
 			else if (prop.typeID == type_guid(std::string))
 			{
 				prop.setter(instance, node[prop.name].as<std::string>());

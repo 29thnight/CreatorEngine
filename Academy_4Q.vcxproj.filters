@@ -122,7 +122,7 @@
     <ClInclude Include="EngineGUIWindow\ExternUI.h">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClInclude>
-    <ClInclude Include="GameBuilderSystem.h">
+    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
       <Filter>Builder</Filter>
     </ClInclude>
   </ItemGroup>
@@ -172,7 +172,7 @@
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
       <Filter>Window\InspectorWindow\CustomInspector</Filter>
     </ClCompile>
-    <ClCompile Include="GameBuilderSystem.cpp">
+    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
       <Filter>Builder</Filter>
     </ClCompile>
   </ItemGroup>

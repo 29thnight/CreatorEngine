@@ -18,6 +18,7 @@
 #include "TagManager.h"
 #include "EngineSetting.h"
 #include "ToggleUI.h"
+#include "GameBuilderSystem.h"
 
 constexpr int MAX_LAYER_SIZE = 32;
 
@@ -336,8 +337,6 @@ void MenuBarWindow::RenderMenuBar()
                 if (ImGui::MenuItem("Load Scene"))
                 {
 					SceneManagers->resetSelectedObjectEvent.Broadcast();
-                    //SceneManagers->LoadSceneImmediate();
-
 					file::path fileName = ShowOpenFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
 						L"Load Scene",
@@ -352,6 +351,16 @@ void MenuBarWindow::RenderMenuBar()
                         Debug->LogError("Failed to load scene.");
                     }
 
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("GameBuild"))
+                {
+					std::wstring startupSceneName = EngineSettingInstance->GetStartupSceneName();
+                    if(!startupSceneName.empty())
+                    {
+						GameBuilderSystem::GetInstance()->Initialize();
+                        GameBuilderSystem::GetInstance()->BuildGame();
+                    }
                 }
                 if (ImGui::MenuItem("Exit"))
                 {
@@ -421,9 +430,14 @@ void MenuBarWindow::RenderMenuBar()
 
                 if (ImGui::MenuItem("Collision Matrix"))
                 {
-
                     m_bCollisionMatrixWindow = true;
                 }
+
+                if (ImGui::MenuItem("Build Settings"))
+                {
+                    m_bShowBuildSceneSettingWindow = true;
+				}
+
                 ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
@@ -510,6 +524,8 @@ void MenuBarWindow::RenderMenuBar()
     ShowBehaviorTreeWindow();
     ShowBlackBoardWindow();
     SHowInputActionMap();
+	ShowBuildSceneSettingWindow();
+
     if (m_bShowProfileWindow)
     {
         ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);
@@ -2406,5 +2422,32 @@ void MenuBarWindow::SHowInputActionMap()
 
         ImGui::End();
     }
+}
+void MenuBarWindow::ShowBuildSceneSettingWindow()
+{
+    if (m_bShowBuildSceneSettingWindow)
+    {
+        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Build Scene Setting", &m_bShowBuildSceneSettingWindow);
+		static char sceneName[128] = "";
+        static file::path sceneFileName{};
+        if (ImGui::InputText("Scene Name", sceneName, sizeof(sceneName), ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            sceneFileName = std::string(sceneName) + ".creator";
+		}
+        ImGui::SameLine();
+        if (ImGui::Button("Save"))
+        {
+            if (!sceneFileName.empty())
+            {
+                EngineSettingInstance->SetStartupSceneName(sceneFileName.wstring());
+                EngineSettingInstance->SaveSettings();
+				memset(sceneName, 0, sizeof(sceneName)); // Clear the input field
+                sceneFileName.clear();
+                m_bShowBuildSceneSettingWindow = false;
+            }
+        }
+        ImGui::End();
+	}
 }
 #endif // DYNAMICCPP_EXPORTS

@@ -26,6 +26,10 @@ namespace Mathf
 	static xVector xVectorZero = XMVectorZero();
 	static xVector xVectorOne = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
 	static xVector xVectorUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	static xVector xVectorDown = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
+	static xVector xVectorRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+	static xVector xVectorLeft = XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f);
+	static xVector xVectorForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
     template<class T> inline T lerp(T low, T high, float t)
     {

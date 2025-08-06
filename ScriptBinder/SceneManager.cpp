@@ -312,25 +312,41 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
         for (const auto& objNode : sceneNode["m_SceneObjects"])
         {
-			const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-			if (!type)
-			{
-				Debug->LogError("Failed to extract type from YAML node.");
-				continue;
-			}
+            try
+            {
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type)
+                {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
 
-            DesirealizeGameObject(type, objNode);
+                DesirealizeGameObject(type, objNode);
+            }
+            catch (const std::exception& e)
+            {
+                Debug->LogError(std::string("Failed to deserialize GameObject: ") + e.what());
+                continue;
+			}
         }
 
         for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
         {
-            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-            if (!type)
+            try
             {
-                Debug->LogError("Failed to extract type from YAML node.");
-                continue;
+                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                if (!type)
+                {
+                    Debug->LogError("Failed to extract type from YAML node.");
+                    continue;
+                }
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
             }
-            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode);
+            catch (const std::exception& e)
+            {
+                Debug->LogError(std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
+                continue;
+			}
 		}
 
         RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
