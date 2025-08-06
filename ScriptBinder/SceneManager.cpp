@@ -364,6 +364,10 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		m_activeSceneIndex = m_scenes.size() - 1;
 		activeSceneChangedEvent.Broadcast();
 		sceneLoadedEvent.Broadcast();
+#ifdef BUILD_FLAG
+        SceneManagers->m_isGameStart = true;
+		std::cout << "Scene loaded: " << loadSceneName << std::endl;
+#endif
         m_activeScene.load()->Reset();
 	}
 	catch (const std::exception& e)

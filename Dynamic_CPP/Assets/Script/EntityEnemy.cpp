@@ -5,17 +5,33 @@
 #include "BehaviorTreeComponent.h"
 #include "Blackboard.h"
 #include "RaycastHelper.h"
+#include "Animator.h"
 void EntityEnemy::Start()
 {
 	enemyBT =GetOwner()->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
+	auto childred = GetOwner()->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
 
+		if (animator)
+		{
+			m_animator = animator;
+			break;
+		}
+
+	}
+	if (!m_animator)
+	{
+		m_animator = GetOwner()->GetComponent<Animator>();
+	}
 }
 
 void EntityEnemy::Update(float tick)
 {
-	/*Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;*/
+	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
 	if (criticalMark != CriticalMark::None)
 	{
@@ -119,18 +135,6 @@ void EntityEnemy::MeleeAttack()
 	}
 
 	pos.y = 0.5f; // ray cast height 
-	//forward.y = 0.5f; // ray cast height
-
-	//debug용
-	//Mathf::Vector3 endpos = pos + forward * 10.f;
-	//std::cout << "Start Pos: " << pos.x << " " << pos.y << " " << pos.z << std::endl;
-	//forward.Normalize();
-	//std::cout << forward.x << " " << forward.y << " " << forward.z << std::endl;
-	
-	//std::cout << "End Pos: " << endpos.x << " " << endpos.y << " " << endpos.z << std::endl;
-
-
-	
 
 	std::vector<HitResult> hits;
 	int size = RaycastAll(pos, dir, 2.f, ~0, hits);
@@ -146,7 +150,40 @@ void EntityEnemy::MeleeAttack()
 
 	//std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
 	std::cout << "Hit Count: " << size << std::endl;
-	
+	m_animator->SetParameter("Attack", true);
+	/*GameObject* gumgiobj=nullptr;
+	EffectComponent* gumgi = nullptr;
+	auto childred = GetOwner()->m_childrenIndices;
+	for (auto& child : childred)
+	{
+		gumgi = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+		if (gumgi)
+		{
+			gumgiobj = GameObject::FindIndex(child);
+			break;
+		}
+	}*/
+
+	/*Mathf::Vector3 pos2 = GetOwner()->m_transform.GetWorldPosition();
+	auto forward2 = GetOwner()->m_transform.GetForward();
+	auto offset{ 2 };
+	auto offset2 = -forward2 * offset;
+	pos2.x = offset2.x;
+	pos2.y = 1;
+	pos2.z = offset2.z;
+	XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
+	Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
+	if (gumgiobj)
+	{
+		gumgiobj->m_transform.SetPosition(pos2);
+		gumgiobj->m_transform.SetRotation(swordRotation);
+		gumgiobj->m_transform.UpdateWorldMatrix();
+		if (gumgi)
+		{
+			gumgi->Apply();
+		}
+
+	}*/
 	for (auto& hit : hits)
 	{
 		auto object = hit.hitObject;
@@ -154,7 +191,11 @@ void EntityEnemy::MeleeAttack()
 		std::cout << object->m_name.data() << std::endl;
 
 		//todo : 알아서 바꾸셈 player 인지 확인 하고 데미지를 주든 알아서하셈
-		//object->Destroy();
+		Player* player = object->GetComponent<Player>();
+		if (player)
+		{
+			player->Attack(this, 0);
+		}
 	}
 	
 	attackCount -= 1;

@@ -80,7 +80,7 @@ void DirectX11::GameMain::Initialize()
     SceneManagers->ManagerInitialize();
     PhysicsManagers->Initialize();
 
-    std::wstring sceneName = /*EngineSettingInstance->GetStartupSceneName()*/L"TestPresentation8.creator";
+    std::wstring sceneName = /*EngineSettingInstance->GetStartupSceneName()*/L"real8pre.creator";
     file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
     SceneManagers->LoadSceneImmediate(scenePath.string());
 
@@ -132,8 +132,6 @@ void DirectX11::GameMain::Initialize()
 
     m_CB_Thread.detach();
     m_CE_Thread.detach();
-
-    SceneManagers->m_isGameStart = true;
 }
 
 void DirectX11::GameMain::Finalize()
