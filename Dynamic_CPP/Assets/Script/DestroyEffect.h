@@ -2,10 +2,11 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 
-class TestEffect : public ModuleBehavior
+class EffectComponent;
+class DestroyEffect : public ModuleBehavior
 {
 public:
-	MODULE_BEHAVIOR_BODY(TestEffect)
+	MODULE_BEHAVIOR_BODY(DestroyEffect)
 	virtual void Awake() override {}
 	virtual void Start() override;
 	virtual void FixedUpdate(float fixedTick) override {}
@@ -20,5 +21,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	float currentT = 0;
+private:
+	EffectComponent* m_effectComp;
+	float m_currentT = 0;
 };

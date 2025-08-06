@@ -4,16 +4,16 @@
     "isPaused": false,
     "isPlaying": false,
     "loop": true,
-    "name": "Dash",
+    "name": "1234",
     "particleSystems": [
         {
-            "isRunning": true,
+            "isRunning": false,
             "maxParticles": 1,
             "modules": [
                 {
                     "data": {
                         "autoGeneration": {
-                            "autoAddInterval": 0.05000000074505806,
+                            "autoAddInterval": 0.0010000000474974513,
                             "autoGenerateFromPosition": true
                         },
                         "easing": {
@@ -26,11 +26,6 @@
                             "x": 0.0,
                             "y": 0.20000000298023224,
                             "z": 1.0
-                        },
-                        "lastUpVector": {
-                            "x": 0.0,
-                            "y": 0.8949329257011414,
-                            "z": -0.4462006688117981
                         },
                         "position": {
                             "x": 0.0,
@@ -48,17 +43,12 @@
                             "y": 0.5,
                             "z": 1.0
                         },
-                        "state": {
-                            "currentTime": 57.9528694152832,
-                            "isInitialized": true,
-                            "meshDirty": true
-                        },
                         "trailParams": {
-                            "endWidth": 0.10000000149011612,
-                            "maxTrailPoints": 100,
-                            "minDistance": 0.10000000149011612,
-                            "startWidth": 1.0,
-                            "trailLifetime": 2.0,
+                            "endWidth": 0.150999999046325684,
+                            "maxTrailPoints": 150,
+                            "minDistance": 0.0010000000474974513,
+                            "startWidth": 0.550000023841858,
+                            "trailLifetime": 1.0,
                             "useLengthBasedUV": true
                         }
                     },
@@ -91,10 +81,10 @@
                         "texture": {
                             "assigned": true,
                             "hasTexture": true,
-                            "name": "Eff_PC_charge_DefaultMaterial_BaseColor"
+                            "name": "test"
                         },
                         "trailModule": {
-                            "connected": true
+                            "connected": false
                         }
                     },
                     "type": "TrailRenderModule"

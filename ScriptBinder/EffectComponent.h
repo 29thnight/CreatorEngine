@@ -75,8 +75,6 @@ public:
     [[Property]]
     std::string m_effectInstanceName;
 
-    std::string GenerateInstanceName(const std::string& templateName);
-
 private:
 
     float m_currentTime = 0;

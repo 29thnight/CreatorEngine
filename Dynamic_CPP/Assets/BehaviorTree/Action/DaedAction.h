@@ -8,4 +8,7 @@ class DaedAction : public ActionNode
 public:
 	BT_ACTION_BODY(DaedAction)
 	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;
+
+private:
+	Mathf::Quaternion finalRotation = Mathf::Quaternion::Identity;
 };
