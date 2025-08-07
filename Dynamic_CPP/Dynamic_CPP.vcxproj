@@ -166,7 +166,6 @@
 		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
-		<ClInclude Include="AniBehaviourFactory.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h" />

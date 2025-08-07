@@ -272,7 +272,6 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
-		AniBehaviorFactory::GetInstance()->RegisterFactory("NewAniBehavior", []() { return new NewAniBehavior(); });
 
 	}
 #pragma endregion

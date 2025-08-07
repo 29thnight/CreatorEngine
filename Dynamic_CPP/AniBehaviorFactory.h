@@ -3,7 +3,6 @@
 #include "Export.h"
 
 // Automation include AniScriptClass header
-#include "NewAniBehavior.h"
 
 class AniBehaviorFactory : public Singleton<AniBehaviorFactory>
 {
