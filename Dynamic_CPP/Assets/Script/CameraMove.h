@@ -19,14 +19,19 @@ public:
 	virtual void OnCollisionStay(const Collision& collision) override {}
 	virtual void OnCollisionExit(const Collision& collision) override {}
 	virtual void Update(float tick) override;
-	virtual void LateUpdate(float tick) override {}
+	virtual void LateUpdate(float tick) override;
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
 private:
 	GameObject* target = nullptr;
 	[[Property]]
-	float followSpeed{ 2.0f };
+	float followSpeed{ 1.0f };
 	[[Property]]
-	Mathf::Vector3 offset{ 0.f, 20.f, -7.f };
+	Mathf::Vector3 offset{ 0.f, 20.f, -11.5f };
+	[[Property]]
+	float detectRange{ 1.f };
+
+	float followTimer{ 0.f };
+	Mathf::Vector3 targetPosition{ 0.f, 0.f, 0.f };
 };

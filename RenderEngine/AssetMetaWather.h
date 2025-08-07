@@ -363,7 +363,7 @@ private:
         ".hlsl", ".cpp", ".glb",
         ".cs", ".wav", ".mp3", ".ogg",
         ".terrain", ".bt", ".blackboard",
-        ".prefab", ".volume"
+        ".prefab", ".volume", ".foliage"
     };
     bool m_isStartUp{ false };
 };

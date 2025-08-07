@@ -243,6 +243,7 @@ public:
 
 private:
 	void Compile();
+	void LoadForceDLL();
 
 private:
 	// DLL 함수 포인터

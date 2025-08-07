@@ -27,7 +27,8 @@ void HotLoadSystem::Initialize()
 	msbuildPath = EngineSettingInstance->GetMsbuildPath();
 	if (msbuildPath.empty())
 	{
-		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation.");
+		Debug->LogError("MSBuild path is not set. Please check your Visual Studio installation. [Force Load Compiled DLL]");
+		LoadForceDLL();
 		return;
 	}
 
@@ -1714,6 +1715,7 @@ void HotLoadSystem::Compile()
 				{
 					m_isReloading = false;
 					g_progressWindow->SetStatusText(L"Build failed...");
+					LoadForceDLL();
 					throw std::runtime_error("Build failed after 4 attempts");
 				}
 				else
@@ -1868,5 +1870,180 @@ void HotLoadSystem::Compile()
 
 	m_isCompileEventInvoked = false;
 	m_isReloading = true;
+}
+
+void HotLoadSystem::LoadForceDLL()
+{
+	file::path dllPath = PathFinder::RelativeToExecutable("Dynamic_CPP.dll");
+	hDll = LoadLibraryA(dllPath.string().c_str());
+	if (!hDll)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to load library...");
+		throw std::runtime_error("Failed to load library");
+	}
+	// 스크립트 팩토리 함수 가져오기
+	m_scriptFactoryFunc = reinterpret_cast<ModuleBehaviorFunc>(GetProcAddress(hDll, "CreateModuleBehavior"));
+	if (!m_scriptFactoryFunc)
+
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	// 스크립트 힙영역 할당 해제 함수 가져오기
+	m_scriptDeleteFunc = reinterpret_cast<ModuleBehaviorDeleteFunc>(GetProcAddress(hDll, "DeleteModuleBehavior"));
+	if (!m_scriptDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+
+	// 스크립트 이름 함수 가져오기
+	m_scriptNamesFunc = reinterpret_cast<GetScriptNamesFunc>(GetProcAddress(hDll, "ListModuleBehavior"));
+	if (!m_scriptNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address");
+	}
+	// 행동 트리 노드 함수 가져오기
+	m_btActionNodeFunc = reinterpret_cast<BTActionNodeFunc>(GetProcAddress(hDll, "CreateBTActionNode"));
+	if (!m_btActionNodeFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 할당 채제 함수 가져오기
+	m_btActionNodeDeleteFunc = reinterpret_cast<BTActionNodeDeleteFunc>(GetProcAddress(hDll, "DeleteBTActionNode"));
+	if (!m_btActionNodeDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 행동 트리 조건 노드 함수 가져오기
+	m_btConditionNodeFunc = reinterpret_cast<BTConditionNodeFunc>(GetProcAddress(hDll, "CreateBTConditionNode"));
+	if (!m_btConditionNodeFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 조건 노드 할당 해제 함수 가져오기
+	m_btConditionNodeDeleteFunc = reinterpret_cast<BTConditionNodeDeleteFunc>(GetProcAddress(hDll, "DeleteBTConditionNode"));
+	if (!m_btConditionNodeDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 행동 트리 스크립트 데코레이터 할당 함수 가져오기
+	m_btConditionDecoratorNodeFunc = reinterpret_cast<BTConditionDecoratorNodeFunc>(GetProcAddress(hDll, "CreateBTConditionDecoratorNode"));
+	if (!m_btConditionDecoratorNodeFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 스크립트 데코레이터 할당 해제 함수 가져오기
+	m_btConditionDecoratorNodeDeleteFunc = reinterpret_cast<BTConditionDecoratorNodeDeleteFunc>(GetProcAddress(hDll, "DeleteBTConditionDecoratorNode"));
+	if (!m_btConditionDecoratorNodeDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get funcion address...");
+		throw std::runtime_error("Failed to get funcion address...");
+	}
+
+	// 행동 트리 액션 노드 이름 함수 가져오기
+	m_listBTActionNodeNamesFunc = reinterpret_cast<ListBTActionNodeNamesFunc>(GetProcAddress(hDll, "ListBTActionNode"));
+	if (!m_listBTActionNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 조건 노드 이름 함수 가져오기
+	m_listBTConditionNodeNamesFunc = reinterpret_cast<ListBTConditionNodeNamesFunc>(GetProcAddress(hDll, "ListBTConditionNode"));
+	if (!m_listBTConditionNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 행동 트리 데코레이터 노드 이름 함수 가져오기
+	m_listBTConditionDecoratorNodeNamesFunc = reinterpret_cast<ListBTConditionDecoratorNodeNamesFunc>(GetProcAddress(hDll, "ListBTConditionDecoratorNode"));
+	if (!m_listBTConditionDecoratorNodeNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+	// 에니메이션 행동 스크립트 이름 함수 가져오기
+	m_listAniBehaviorNamesFunc = reinterpret_cast<ListAniBehaviorNamesFunc>(GetProcAddress(hDll, "ListAniBehavior"));
+	if (!m_listAniBehaviorNamesFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 에니메이션 행동 스크립트 함수 가져오기
+	m_AniBehaviorFunc = reinterpret_cast<AniBehaviorFunc>(GetProcAddress(hDll, "CreateAniBehavior"));
+	if (!m_AniBehaviorFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	// 에니메이션 행동 스크립트 할당 해제 함수 가져오기
+	m_AniBehaviorDeleteFunc = reinterpret_cast<AniBehaviorDeleteFunc>(GetProcAddress(hDll, "DeleteAniBehavior"));
+	if (!m_AniBehaviorDeleteFunc)
+	{
+		m_isReloading = false;
+		g_progressWindow->SetStatusText(L"Failed to get function address...");
+		throw std::runtime_error("Failed to get function address...");
+	}
+
+	m_isCompileEventInvoked = false;
+	m_isReloading = true;
+
+	const char** scriptNames = nullptr;
+	int scriptCount = 0;
+	scriptNames = m_scriptNamesFunc(&scriptCount);
+
+	for (int i = 0; i < scriptCount; ++i)
+	{
+		std::string scriptName = scriptNames[i];
+		m_scriptNames.push_back(scriptName);
+	}
+
+	for (auto& scriptName : m_scriptNames)
+	{
+		auto tempPtr = std::shared_ptr<ModuleBehavior>(CreateMonoBehavior(scriptName.c_str()));
+		if (nullptr == tempPtr)
+		{
+			Debug->LogError("Failed to create script: " + scriptName);
+			continue;
+		}
+		RegisterScriptReflection(scriptName, tempPtr.get());
+	}
+
+	AIManagers->InitalizeBehaviorTreeSystem();
+
+	const char** aniBehaviorNames = nullptr;
+	int aniBehaviorCount = 0;
+	aniBehaviorNames = m_listAniBehaviorNamesFunc(&aniBehaviorCount);
+	for (int i = 0; i < aniBehaviorCount; ++i)
+	{
+		std::string aniBehaviorName = aniBehaviorNames[i];
+		m_aniBehaviorNames.push_back(aniBehaviorName);
+	}
 }
 #endif // !DYNAMICCPP_EXPORTS

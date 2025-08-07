@@ -73,18 +73,6 @@
             "scpritName": "Player"
         },
         {
-            "actionName": "DeleteWeapon",
-            "actionType": "Button",
-            "funName": "DeleteCurWeapon",
-            "inputType": "GamePad",
-            "key0": "Y",
-            "key1": "A",
-            "key2": "A",
-            "key3": "A",
-            "keystate": "Down",
-            "scpritName": "Player"
-        },
-        {
             "actionName": "SwapWeaponLeft",
             "actionType": "Button",
             "funName": "SwapWeaponLeft",

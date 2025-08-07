@@ -7,6 +7,7 @@ ReflectionScriptField(CameraMove) \
 	({ \
 		meta_property(followSpeed) \
 		meta_property(offset) \
+		meta_property(detectRange) \
 	}); \
 	FieldEnd(CameraMove, PropertyOnly) \
 };
