@@ -233,7 +233,6 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
 		<ClInclude Include="Assets\Script\EntityEnemy.h" />
-		<ClInclude Include="Assets\Script\NewAniBehavior.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h" />
@@ -442,10 +441,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

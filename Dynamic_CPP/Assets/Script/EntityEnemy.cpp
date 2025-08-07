@@ -194,7 +194,7 @@ void EntityEnemy::MeleeAttack()
 		Player* player = object->GetComponent<Player>();
 		if (player)
 		{
-			player->Attack(this, 0);
+			player->SendDamage(this, 0);
 		}
 	}
 	

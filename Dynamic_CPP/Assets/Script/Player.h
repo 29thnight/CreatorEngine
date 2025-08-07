@@ -32,7 +32,7 @@ public:
 	virtual void OnDestroy() override {}
 
 
-	virtual void Attack(Entity* sender, int damage) override;
+	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override;
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
@@ -135,4 +135,6 @@ public:
 
 	Socket* handSocket;
 	GameObject* aniOwener = nullptr;
+
+	std::unordered_set<Entity*> AttackTarget;
 };

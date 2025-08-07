@@ -21,8 +21,9 @@ public:
 	virtual void OnDestroy() override  {}
 public:
 	virtual void Interact() {}
-	virtual void Attack(Entity* sender, int damage) {}
+	virtual void SendDamage(Entity* sender, int damage) {}
 	virtual void OnRay() {};
+	virtual void AttakRay() {};
 	[[Property]]
 	int m_currentHP{ 100 };
 	[[Property]]

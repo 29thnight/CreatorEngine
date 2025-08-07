@@ -285,6 +285,7 @@ void EntityAsis::Purification(float tick)
 					curweapon = GameObject::Find(realWeaponName);
 					if (curweapon)
 					{
+						//index++;
 						break;
 					}
 				}

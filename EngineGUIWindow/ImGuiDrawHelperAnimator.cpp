@@ -1018,6 +1018,9 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
 					static char scriptName[64] = "NewAniBehavior";
 					ImGui::InputText("Name", scriptName, sizeof(scriptName));
+
+
+
 					std::string scriptNameStr(scriptName);
 					auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
 					bool isDisabled = false;
