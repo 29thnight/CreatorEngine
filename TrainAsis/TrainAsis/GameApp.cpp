@@ -27,7 +27,6 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return hr;
 	}
 
-
 	PathFinder::Initialize();
 	Log::Initialize();
 
@@ -44,7 +43,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 
 	{
 		GameBuilder::App app;
-		app.Initialize(hInstance, L"Creator Editor", 1920, 1080);
+		app.Initialize(hInstance, L"How To Train Asis", 2560, 1600);
 		app.Finalize();
 	}
 

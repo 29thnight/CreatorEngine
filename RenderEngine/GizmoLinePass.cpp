@@ -248,6 +248,77 @@ void GizmoLinePass::DrawWireSphere(const Mathf::Vector3& center, float radius, c
     DrawWireCircle(center, radius, Mathf::Vector3(0, 0, 1), color); // XY plane
 }
 
+void GizmoLinePass::DrawWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents, const Mathf::Color4& color)
+{
+    std::array<Mathf::Vector3, 8> corners = {
+    Mathf::Vector3(-extents.x, -extents.y, -extents.z),
+    Mathf::Vector3(extents.x, -extents.y, -extents.z),
+    Mathf::Vector3(extents.x,  extents.y, -extents.z),
+    Mathf::Vector3(-extents.x,  extents.y, -extents.z),
+    Mathf::Vector3(-extents.x, -extents.y,  extents.z),
+    Mathf::Vector3(extents.x, -extents.y,  extents.z),
+    Mathf::Vector3(extents.x,  extents.y,  extents.z),
+    Mathf::Vector3(-extents.x,  extents.y,  extents.z)
+    };
+
+    for (auto& corner : corners)
+    {
+        corner = XMVector3TransformCoord(corner, transform);
+    }
+
+    std::array<uint32_t, 24> indices = {
+        0,1, 1,2, 2,3, 3,0,
+        4,5, 5,6, 6,7, 7,4,
+        0,4, 1,5, 2,6, 3,7
+    };
+
+    std::vector<LineVertex> verts;
+    verts.reserve(indices.size());
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        verts.push_back({ corners[indices[i]], color });
+        verts.push_back({ corners[indices[i + 1]], color });
+    }
+
+    DrawLines(verts.data(), static_cast<uint32_t>(verts.size()));
+}
+
+void GizmoLinePass::DrawWireCapsule(const Mathf::Matrix& transform, float radius, float height, const Mathf::Color4& color)
+{
+    using namespace Mathf;
+    const int segmentCount = 16;
+    Vector3 up = transform.Up();
+    up.Normalize();
+    Vector3 right = transform.Right();
+    right.Normalize();
+    Vector3 forward = transform.Forward();
+    forward.Normalize();
+
+    float halfHeight = height * 0.5f;
+    Vector3 center = transform.Translation();
+    Vector3 topCenter = center + up * halfHeight;
+    Vector3 bottomCenter = center - up * halfHeight;
+
+    std::vector<LineVertex> vertices;
+    vertices.reserve(segmentCount * 2);
+    for (int i = 0; i < segmentCount; ++i)
+    {
+        float angle = XM_2PI * (static_cast<float>(i) / segmentCount);
+        Vector3 dir = cosf(angle) * right + sinf(angle) * forward;
+        Vector3 p0 = bottomCenter + dir * radius;
+        Vector3 p1 = topCenter + dir * radius;
+        vertices.push_back(LineVertex{ p0, color });
+        vertices.push_back(LineVertex{ p1, color });
+    }
+
+    DrawLines(vertices.data(), static_cast<uint32_t>(vertices.size()));
+
+    DrawWireSphere(topCenter, radius, color);
+    DrawWireSphere(bottomCenter, radius, color);
+    DrawWireCircle(topCenter, radius, up, color);
+    DrawWireCircle(bottomCenter, radius, up, color);
+}
+
 void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color)
 {
     using namespace Mathf;

@@ -24,7 +24,7 @@ bool editWindow = true;
 int gizmoCount = 1;
 float camDistance = 8.f;
 static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-TerrainBrush* terrainBrush = nullptr;
+
 
 static const float identityMatrix[16] = {
 	1.f, 0.f, 0.f, 0.f,
@@ -534,133 +534,139 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		gizmoTimer = 0.f;
 	}
 
-	if (!useGizmo && ImGui::IsWindowHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+	
+	if(nullptr == EngineSettingInstance->terrainBrush || false == EngineSettingInstance->terrainBrush->m_isEditMode)
 	{
-		float closest = FLT_MAX;
-		ImVec2 mousePos = ImGui::GetMousePos();
-		ImVec2 imagePos = imageMin; // 이미지 좌상단 위치
-		ImVec2 imageSize = imageMax;
-
-		Ray ray = CreateRayFromCamera(cam, mousePos, imagePos, imageSize);
-
-		auto sceneObjects = SceneManagers->GetActiveScene()->m_SceneObjects;
-		auto hits = PickObjectsFromRay(ray, sceneObjects);
-
-		if (!hits.empty())
+		if (!useGizmo &&
+			ImGui::IsWindowHovered() &&
+			ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 		{
-            m_hitResults = hits;
+			float closest = FLT_MAX;
+			ImVec2 mousePos = ImGui::GetMousePos();
+			ImVec2 imagePos = imageMin; // 이미지 좌상단 위치
+			ImVec2 imageSize = imageMax;
 
-            GameObject* selected = m_hitResults[m_currentHitIndex].object;
-            bool shift = ImGui::GetIO().KeyShift;
-            auto prevList = selectedObjects;
-            GameObject* prevSelection = sceneSelectedObj;
-            if (shift)
-            {
-                if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
-                        scene->RemoveSelectedSceneObject(selected);
-                else
-                        scene->AddSelectedSceneObject(selected);
-            }
-            else
-            {
-                scene->ClearSelectedSceneObjects();
-                scene->AddSelectedSceneObject(selected);
-            }
+			Ray ray = CreateRayFromCamera(cam, mousePos, imagePos, imageSize);
 
-            auto newList = scene->m_selectedSceneObjects;
-            GameObject* newSelection = scene->m_selectedSceneObject;
-            Meta::MakeCustomChangeCommand(
-                [scene, prevList, prevSelection]() {
-                        scene->m_selectedSceneObjects = prevList;
-                        scene->m_selectedSceneObject = prevSelection;
-                },
-                [scene, newList, newSelection]() {
-                        scene->m_selectedSceneObjects = newList;
-                        scene->m_selectedSceneObject = newSelection;
-                }
-            );
-		}
-		else
-		{
-			m_hitResults.clear();
-			m_currentHitIndex = 0;
-		}
-	}
+			auto sceneObjects = SceneManagers->GetActiveScene()->m_SceneObjects;
+			auto hits = PickObjectsFromRay(ray, sceneObjects);
 
-	ImRect dropRect = ImRect(imageMin, imageMax);
-	static file::path previewModelPath;
-	static GameObject* dragPreviewObject = nullptr;
-	static ImGuiPayload* dragPayload = nullptr;
-
-	if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
-	{
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery);
-		if (!dragPayload || dragPayload != payload)
-		{
-			dragPayload = const_cast<ImGuiPayload*>(payload);
-			if (previewModelPath.empty() && !dragPreviewObject && dragPayload)
+			if (!hits.empty())
 			{
-				const char* droppedFilePath = static_cast<const char*>(dragPayload->Data);
-				file::path filename = file::path(droppedFilePath).filename();
-				previewModelPath = PathFinder::Relative("Models\\") / filename;
+				m_hitResults = hits;
 
-				GameObject* createdObj = nullptr;
-				Meta::UndoCommandManager->Execute(
-					std::make_unique<Meta::LoadModelToSceneObjCommand>(
-						scene,
-						DataSystems->LoadCashedModel(previewModelPath.string()),
-						&createdObj));
-				dragPreviewObject = createdObj;
+				GameObject* selected = m_hitResults[m_currentHitIndex].object;
+				bool shift = ImGui::GetIO().KeyShift;
+				auto prevList = selectedObjects;
+				GameObject* prevSelection = sceneSelectedObj;
+				if (shift)
+				{
+					if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
+						scene->RemoveSelectedSceneObject(selected);
+					else
+						scene->AddSelectedSceneObject(selected);
+				}
+				else
+				{
+					scene->ClearSelectedSceneObjects();
+					scene->AddSelectedSceneObject(selected);
+				}
+
+				auto newList = scene->m_selectedSceneObjects;
+				GameObject* newSelection = scene->m_selectedSceneObject;
+				Meta::MakeCustomChangeCommand(
+					[scene, prevList, prevSelection]() {
+						scene->m_selectedSceneObjects = prevList;
+						scene->m_selectedSceneObject = prevSelection;
+					},
+					[scene, newList, newSelection]() {
+						scene->m_selectedSceneObjects = newList;
+						scene->m_selectedSceneObject = newSelection;
+					}
+				);
+			}
+			else
+			{
+				m_hitResults.clear();
+				m_currentHitIndex = 0;
 			}
 		}
-		else
+
+		ImRect dropRect = ImRect(imageMin, imageMax);
+		static file::path previewModelPath;
+		static GameObject* dragPreviewObject = nullptr;
+		static ImGuiPayload* dragPayload = nullptr;
+
+		if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
 		{
-			ImVec2 mousePos = ImGui::GetMousePos();
-			Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
-
-			float distance;
-			if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery);
+			if (!dragPayload || dragPayload != payload)
 			{
-				Mathf::Vector3 worldPos = ray.origin + Mathf::Vector3(ray.direction) * distance;
-
-				if (payload->IsPreview() && dragPreviewObject)
+				dragPayload = const_cast<ImGuiPayload*>(payload);
+				if (previewModelPath.empty() && !dragPreviewObject && dragPayload)
 				{
-					dragPreviewObject->m_transform.SetPosition(worldPos);
+					const char* droppedFilePath = static_cast<const char*>(dragPayload->Data);
+					file::path filename = file::path(droppedFilePath).filename();
+					previewModelPath = PathFinder::Relative("Models\\") / filename;
+
+					GameObject* createdObj = nullptr;
+					Meta::UndoCommandManager->Execute(
+						std::make_unique<Meta::LoadModelToSceneObjCommand>(
+							scene,
+							DataSystems->LoadCashedModel(previewModelPath.string()),
+							&createdObj));
+					dragPreviewObject = createdObj;
+				}
+			}
+			else
+			{
+				ImVec2 mousePos = ImGui::GetMousePos();
+				Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
+
+				float distance;
+				if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
+				{
+					Mathf::Vector3 worldPos = ray.origin + Mathf::Vector3(ray.direction) * distance;
+
+					if (payload->IsPreview() && dragPreviewObject)
+					{
+						dragPreviewObject->m_transform.SetPosition(worldPos);
+					}
+				}
+
+				if (!dragPayload->IsPreview() && dragPreviewObject)
+				{
+					dragPreviewObject = nullptr;
+					dragPayload = nullptr;
+					previewModelPath.clear();
 				}
 			}
 
-			if (!dragPayload->IsPreview() && dragPreviewObject)
+			if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
 			{
-				dragPreviewObject = nullptr;
-				dragPayload = nullptr;
-				previewModelPath.clear();
+				const char* droppedFilePath = (const char*)HDRPayload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+				EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
+				m_sceneRenderer->ApplyNewCubeMap(filepath.string());
 			}
-		}
 
-		if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
-		{
-			const char* droppedFilePath = (const char*)HDRPayload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
-			EngineSettingInstance->GetRenderPassSettingsRW().skyboxTextureName = filepath.string();
-			m_sceneRenderer->ApplyNewCubeMap(filepath.string());
-		}
-
-		if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
-		{
-			const char* droppedFilePath = (const char*)prefabPayload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
-			auto prefab = PrefabUtilitys->LoadPrefab(filepath.string().c_str());
-			if (prefab)
+			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
 			{
-				PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());
+				const char* droppedFilePath = (const char*)prefabPayload->Data;
+				file::path filename = droppedFilePath;
+				file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
+				auto prefab = PrefabUtilitys->LoadPrefab(filepath.string().c_str());
+				if (prefab)
+				{
+					PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());
+				}
 			}
+
+			ImGui::EndDragDropTarget();
 		}
 
-		ImGui::EndDragDropTarget(); 
 	}
-	
 	//====================
 	// 선택 아이템 있을시 처리
 	if (sceneSelectedObj != nullptr) 
@@ -668,16 +674,16 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		//터레인 일때	
 		if (sceneSelectedObj->HasComponent<TerrainComponent>()) 
 		{
-			if (terrainBrush == nullptr) 
+			if (EngineSettingInstance->terrainBrush == nullptr)
 			{
-				terrainBrush = new TerrainBrush();
+				EngineSettingInstance->terrainBrush = new TerrainBrush();
 			}
 
 			TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
 			if (terrainComponent != nullptr) 
 			{
-				terrainComponent->SetTerrainBrush(terrainBrush);
-				if (terrainBrush->m_isEditMode)
+				terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
+				if (EngineSettingInstance->terrainBrush->m_isEditMode)
 				{
 
 					if (ImGui::IsWindowHovered()) 
@@ -706,22 +712,22 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 								int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
 								int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
 
-								terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
+								EngineSettingInstance->terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
 
 								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 								{
-									if (terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
+									if (EngineSettingInstance->terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
 									{
 										FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
 										if (foliage)
 										{
-											if (terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
+											if (EngineSettingInstance->terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
 											{
-												foliage->AddRandomInstancesInBrush(terrainComponent, *terrainBrush, terrainBrush->m_foliageTypeID, terrainBrush->m_foliageDensity);
+												foliage->AddRandomInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush, EngineSettingInstance->terrainBrush->m_foliageTypeID, EngineSettingInstance->terrainBrush->m_foliageDensity);
 											}
 											else
 											{
-												foliage->RemoveInstancesInBrush(terrainComponent, *terrainBrush);
+												foliage->RemoveInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush);
 											}
 
 											auto renderScene = SceneManagers->GetRenderScene();
@@ -730,7 +736,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 									}
 									else
 									{
-										terrainComponent->ApplyBrush(*terrainBrush);
+										terrainComponent->ApplyBrush(*EngineSettingInstance->terrainBrush);
 									}
 								}
 							}
