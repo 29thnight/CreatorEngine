@@ -139,7 +139,16 @@ void FoliageComponent::RemoveFoliageType(uint32 typeID)
 
 void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
 {
-    m_foliageInstances.push_back(instance);
+    auto found = std::ranges::find_if(m_foliageInstances,
+        [&](const FoliageInstance& existing)
+        {
+            return existing.m_position == instance.m_position;
+        });
+
+    if (found == m_foliageInstances.end())
+    {
+        m_foliageInstances.push_back(instance);
+    }
 }
 
 void FoliageComponent::RemoveFoliageInstance(size_t index)
@@ -159,7 +168,7 @@ void FoliageComponent::AddInstanceFromTerrain(TerrainComponent* terrain, const F
     int y = static_cast<int>(std::clamp(instance.m_position.z, 0.f, static_cast<float>(height-1)));
     int idx = y * width + x;
     inst.m_position.y = heightMap[idx];
-    m_foliageInstances.push_back(inst);
+    AddFoliageInstance(inst);
 }
 
 void FoliageComponent::AddRandomInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush, uint32 typeID, int count)

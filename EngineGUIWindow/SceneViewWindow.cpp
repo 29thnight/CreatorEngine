@@ -685,7 +685,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
 				if (EngineSettingInstance->terrainBrush->m_isEditMode)
 				{
-
 					if (ImGui::IsWindowHovered()) 
 					{
 						ImVec2 mousePos = ImGui::GetMousePos();
