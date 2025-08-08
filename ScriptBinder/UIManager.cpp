@@ -9,7 +9,7 @@
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
-	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Empty);
+	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
 	newObj->AddComponent<Canvas>();
 	Canvases.emplace_back(newObj);
 	needSort = true;
@@ -33,7 +33,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* 
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
+	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	if (texture == nullptr)
 	{
@@ -70,7 +70,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
 		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
 		return nullptr;
 	}
-	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
+	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newImage->AddComponent<ImageComponent>()->Load(texture);
 	canvas->GetComponent<Canvas>()->AddUIObject(newImage.get());
@@ -96,7 +96,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<ImageComponent>()->Load(texture);
 	auto component = newButton->AddComponent<UIButton>();
@@ -128,7 +128,7 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture
 		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
 		return nullptr;
 	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<ImageComponent>()->Load(texture);
 	auto component = newButton->AddComponent<UIButton>();
@@ -152,7 +152,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 			return nullptr;
 	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::TypeMax, canvas->m_index);
+	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
 	canvasCom->AddUIObject(newText.get());
@@ -179,7 +179,7 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 		std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
 		return nullptr;
 	}
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Empty, canvas->m_index);
+	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
 	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
 	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());

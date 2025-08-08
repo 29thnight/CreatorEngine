@@ -25,6 +25,8 @@ public:
 		Light,
 		Mesh,
 		Bone,
+		UI,
+		Canvas,
 		TypeMax
 	};
     ReflectGameObject
