@@ -4,6 +4,7 @@
 #include "SceneManager.h"
 #include "RenderableComponents.h"
 #include "TagManager.h"
+#include "RectTransformComponent.h"
 
 GameObject::GameObject() :
 	Object("GameObject"),
@@ -16,6 +17,7 @@ GameObject::GameObject() :
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(0);
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
+	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 }
 
 GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -29,6 +31,12 @@ GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type,
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
+	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
+
+	if (type == GameObjectType::UI)
+	{
+		AddComponent<RectTransformComponent>();
+	}
 }
 
 GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, GameObject::Index index, GameObject::Index parentIndex) :
@@ -42,6 +50,12 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 	m_transform.SetOwner(this);
 	m_transform.SetParentID(parentIndex);
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
+	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
+
+	if (type == GameObjectType::UI)
+	{
+		AddComponent<RectTransformComponent>();
+	}
 }
 
 const std::string& GameObject::RemoveSuffixNumberTag() const

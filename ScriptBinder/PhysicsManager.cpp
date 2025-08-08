@@ -576,7 +576,7 @@ void PhysicsManager::SetPhysicData()
 
 		auto& transform = colliderInfo.gameObject->m_transform;
 		//colliderInfo.collider.
-		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>(type_guid(RigidBodyComponent));
+		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
 		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
@@ -584,7 +584,7 @@ void PhysicsManager::SetPhysicData()
 		{
 			//Benchmark bm;
 			
-			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>(type_guid(CharacterControllerComponent));
+			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			CharacterControllerGetSetData data;
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 			data.position = position+controller->GetPositionOffset();

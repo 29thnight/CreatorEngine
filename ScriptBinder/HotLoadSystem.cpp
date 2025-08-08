@@ -375,7 +375,8 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 		{
 			gameObject->m_components.push_back(sharedScript);
 			size_t backIndex = gameObject->m_components.size() - 1;
-			gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+			//gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+			gameObject->m_componentIds.emplace(newScript->m_scriptTypeID, backIndex);
 
 			void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
 			const auto& scriptType = newScript->ScriptReflect();

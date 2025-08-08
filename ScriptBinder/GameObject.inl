@@ -10,14 +10,6 @@ inline T* GameObject::AddComponent()
         return nullptr;
     }
 
-    if constexpr (std::derived_from<T, UIComponent>)
-    {
-        if (!HasComponent<RectTransformComponent>())
-        {
-            AddComponent<RectTransformComponent>();
-        }
-    }
-
     std::shared_ptr<T> component = shared_alloc<T>();
     if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
     {
@@ -38,14 +30,6 @@ inline T* GameObject::AddComponent(Args && ...args)
         return nullptr;
     }
 
-    if constexpr (std::derived_from<T, UIComponent>)
-    {
-        if (!HasComponent<RectTransformComponent>())
-        {
-            AddComponent<RectTransformComponent>();
-        }
-    }
-
     std::shared_ptr<T> component = shared_alloc<T>(std::forward<Args>(args)...);
     if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
     {
@@ -59,12 +43,9 @@ inline T* GameObject::AddComponent(Args && ...args)
 }
 
 template<typename T>
-inline T* GameObject::GetComponent(uint32 id)
+inline T* GameObject::GetComponent(uint32 index)
 {
-    auto it = m_componentIds.find(id);
-    if (it == m_componentIds.end())
-        return nullptr;
-    return std::static_pointer_cast<T>(m_components[it->second]).get();
+    return std::static_pointer_cast<T>(m_components[index]).get();
 }
 
 template<typename T>
@@ -85,14 +66,9 @@ inline Transform* GameObject::GetComponent()
 template<typename T>
 inline bool GameObject::HasComponent()
 {
-	for (auto& [typeID, index] : m_componentIds)
-	{
-		if (typeID == TypeTrait::GUIDCreator::GetTypeID<T>())
-		{
-			return true;
-		}
-	}
-	return false;
+	m_componentIds.find(type_guid(T));
+	return m_componentIds.find(type_guid(T)) != m_componentIds.end();
+
 }
 
 template<typename T>
