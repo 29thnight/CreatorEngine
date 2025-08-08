@@ -22,12 +22,18 @@ public:
 public:
 	virtual void Interact() {}
 	virtual void SendDamage(Entity* sender, int damage) {}
+	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce) {}
 	virtual void OnRay() {};
 	virtual void AttakRay() {};
 	[[Property]]
 	int m_currentHP{ 100 };
 	[[Property]]
 	int m_maxHP{ 100 };
+
+
+	bool isKnockBack = false;
+	float KnockBackElapsedTime = 0.f;
+	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 
 	Core::Delegate<void> m_onDeathEvent;
 	Core::Delegate<void> m_onDamageEvent;

@@ -33,7 +33,8 @@ public:
 
 	void SetCriticalMark(int playerIndex);
 	CriticalMark criticalMark = CriticalMark::None;
-	virtual void Attack(Entity* sender, int damage);
+	virtual void SendDamage(Entity* sender, int damage) override;
+	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce);
 	bool isDead;
 	BehaviorTreeComponent* enemyBT;
 	BlackBoard* blackBoard;
@@ -41,5 +42,6 @@ public:
 
 	int attackCount = 0;
 	Animator* m_animator;
+	GameObject* enemy;
 	void MeleeAttack();
 };

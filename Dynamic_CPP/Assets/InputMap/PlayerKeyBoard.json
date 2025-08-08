@@ -71,6 +71,18 @@
             "key3": "A",
             "keystate": "Down",
             "scpritName": "Player"
+        },
+        {
+            "actionName": "TestKnockBack",
+            "actionType": "Button",
+            "funName": "TestKnockBack",
+            "inputType": "KeyBoard",
+            "key0": "P",
+            "key1": "Unknown",
+            "key2": "Unknown",
+            "key3": "Unknown",
+            "keystate": "Down",
+            "scpritName": "Player"
         }
     ],
     "mapName": "PlayerKeyBoard"

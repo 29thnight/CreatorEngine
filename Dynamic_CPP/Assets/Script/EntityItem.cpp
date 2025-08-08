@@ -68,6 +68,8 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 		m_state = EItemState::FALLED;
 		std::cout << collision.otherObj->m_name.ToString() << "OnTriggerEnter Item" << std::endl;
 	}
+
+	
 	//std::cout << "OnTriggerEnter Item" << std::endl;
 }
 
@@ -147,7 +149,7 @@ void EntityItem::Update(float tick)
 			}
 			Transform* myTr = GetOwner()->GetComponent<Transform>();
 			Vector3 pB = ((endPos - startPos) / 2) + startPos;
-			pB.y += 7.f;
+			pB.y += throwDistacneY;
 			Vector3 pA = startPos;
 			auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 			timer += tick * speed; // 10sec
@@ -160,6 +162,7 @@ void EntityItem::Update(float tick)
 			else
 			{
 				GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+				//()->GetComponent<RigidBodyComponent>()->UseGravity(false);
 				speed = 2.f;
 				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -178,7 +181,7 @@ void EntityItem::Update(float tick)
 				Transform* myTr = GetOwner()->GetComponent<Transform>();
 				Mathf::Vector3 tailPos = tailTransform->GetWorldPosition();
 				Vector3 pB = ((tailPos - startPos) / 2) + startPos;
-				pB.y += 10.f;
+				pB.y += throwDistacneY;
 				Vector3 pA = startPos;
 				auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 				timer += tick * speed; // 10sec
@@ -192,6 +195,7 @@ void EntityItem::Update(float tick)
 				{
 
 					GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+					//GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
 					speed = 2.f;
 					rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 					rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -213,6 +217,7 @@ void EntityItem::Update(float tick)
 
 		Vector3 pB = ((endPos - startPos) / 2) + startPos;
 		Vector3 pA = startPos;
+		pB.y += throwDistacneY;
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		timer += tick * speed;
 		timer = std::min(timer, 1.0f); // 1.0 이상 못 넘어가게 제한
@@ -248,22 +253,24 @@ void EntityItem::Update(float tick)
 		
 	
 }
-void EntityItem::Drop(Mathf::Vector3 ownerForward, float distance)
+void EntityItem::Drop(Mathf::Vector3 ownerForward, Mathf::Vector2 distance)
 {
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::DROPPED;
 	timer = 0.f;
 	speed = 4.0f;
-	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
+	Mathf::Vector3 offset = {-ownerForward.x * distance.x,0, -ownerForward.z * distance.x };
+	throwDistacneY = distance.y;
 	endPos = startPos + offset;
 	endPos.y = 0.2f;
 }
-void EntityItem::Throw(Mathf::Vector3 ownerForward,float distance)
+void EntityItem::Throw(Mathf::Vector3 ownerForward,Mathf::Vector2 distance)
 {
 	startPos = GetOwner()->GetComponent<Transform>()->GetWorldPosition();
 	m_state = EItemState::THROWN;
 	timer = 0.f;
-	Mathf::Vector3 offset = {-ownerForward.x * distance,0, -ownerForward.z * distance };
+	Mathf::Vector3 offset = {-ownerForward.x * distance.x,0, -ownerForward.z * distance.x};
+	throwDistacneY = distance.y;
 	endPos = startPos + offset;
 	endPos.y = 0.2f;
 }

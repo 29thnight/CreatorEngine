@@ -13,8 +13,7 @@ void EntityResource::Start()
 void EntityResource::Update(float tick)
 {
 }
-
-void EntityResource::Attack(Entity* sender, int damage)
+void EntityResource::SendDamage(Entity* sender, int damage)
 {
 	//std::cout << "EntityResource Attack" << std::endl;
 	if (sender)

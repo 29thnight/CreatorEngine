@@ -72,9 +72,17 @@ public:
 	float maxHP = 100;
 	float curHP = maxHP;
 	[[Property]]
-	float ThrowPowerX = 0.0001;
+	float ThrowPowerX = 6.f;
 	[[Property]]
-	float ThrowPowerY = 0.0001;
+	float ThrowPowerY = 7.f;
+
+	[[Property]]
+	float DropPowerX = 2.f;
+	[[Property]]
+	float DropPowerY = 0.f;
+
+
+
 	int m_comboCount = 0;            //현재 콤보횟수
 	[[Property]]
 	float m_comboTime = 0.5f;        //콤보유지시간
@@ -98,10 +106,6 @@ public:
 	int   dashAmount = 1;   //최대대시가능 횟수
 	int   m_curDashCount = 0;   //지금 연속대시한 횟수
 
-	[[Property]]
-	float AttackPowerX = 500.f;
-	[[Property]]
-	float AttackPowerY = 20.f;
 
 	[[Property]]
 	float detectAngle = 30.f;
@@ -110,17 +114,16 @@ public:
 	float attackTime = 0.980f;
 	float attackElapsedTime = 0.f;
 	void TestStun();
+	[[Method]]
 	void TestKnockBack();
 	bool isDead = false;
 	bool isStun = false;
 	float stunTime = 0.f;
-	bool isKnockBack = false;
-	[[Property]]
+	//bool isKnockBack = false;
 	float KnockBackForceY = 0.1f;
-	[[Property]]
 	float KnockBackForce = 0.05f; //때린애가 나한테 줄 넉백힘
-	float KnockBackElapsedTime = 0.f;
-	float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
+	//float KnockBackElapsedTime = 0.f;
+	//float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 	float m_nearDistance = FLT_MAX;
 	std::vector<Weapon*> m_weaponInventory;
 	Weapon* m_curWeapon = nullptr;

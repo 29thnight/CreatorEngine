@@ -38,8 +38,8 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	void Drop(Mathf::Vector3 ownerForward, float distance);
-	void Throw(Mathf::Vector3 ownerForward, float distance);
+	void Drop(Mathf::Vector3 ownerForward,Mathf::Vector2 distacne);
+	void Throw(Mathf::Vector3 ownerForward,Mathf::Vector2 distacne);
 	void SetThrowOwner(Player* player);
 	Player* GetThrowOwner();
 	void ClearThrowOwner();
@@ -50,7 +50,8 @@ public:
 	RigidBodyComponent* m_rigid = nullptr;
 	Mathf::Vector3 startPos{ 0.f, 0.f, 0.f };
 	Mathf::Vector3 endPos{ 0.f, 0.f, 0.f };
-	float throwDistacne = 6.f;
+	float throwDistacneX = 0.f; 
+	float throwDistacneY = 0.f;
 	float timer = 0.f;
 	float speed = 2.f;
 	

@@ -63,10 +63,10 @@ void Player::Start()
 
 
 	
-	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
-	//dashEffect = dashObj->AddComponent<EffectComponent>();
-	//dashEffect->Awake();
-	//dashEffect->m_effectTemplateName ="Dash";
+	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
+	dashEffect = dashObj->AddComponent<EffectComponent>();
+	dashEffect->Awake();
+	dashEffect->m_effectTemplateName ="Dash";
 
 	player->m_collisionType = 2;
 
@@ -87,7 +87,9 @@ void Player::Update(float tick)
 {
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
-	//dashObj->m_transform.SetPosition(pos);
+	dashObj->m_transform.SetPosition(pos);
+
+
 
 	if (isDead)
 	{
@@ -193,7 +195,7 @@ void Player::Update(float tick)
 		{
 			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
 			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ -forward.x ,-forward.z });
+			controller->Move({ forward.x ,forward.z });
 		}
 	}
 
@@ -319,7 +321,7 @@ void Player::DropCatchItem()
 	if (catchedObject != nullptr)
 	{
 		if (catchedObject) {
-			catchedObject->Drop(player->m_transform.GetForward(), 2.0f);
+			catchedObject->Drop(player->m_transform.GetForward(), {DropPowerX,DropPowerY});
 		}
 
 		catchedObject = nullptr;
@@ -335,7 +337,7 @@ void Player::ThrowEvent()
 	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
 		catchedObject->SetThrowOwner(this);
-		catchedObject->Throw(player->m_transform.GetForward(), 6.0f);
+		catchedObject->Throw(player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY });
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
@@ -580,7 +582,7 @@ void Player::TestStun()
 void Player::TestKnockBack()
 {
 	isKnockBack = true;
-	KnockBackTime = 0.5f;
+	KnockBackTime = 0.1f;
 	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce, KnockBackForceY);
 	m_animator->SetParameter("OnMove", false);
 }
@@ -642,12 +644,16 @@ void Player::MeleeAttack()
 		XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
 		Mathf::Vector3 handPos = handlocal.r[3];
 		Mathf::Vector3 direction = handPos - rayOrigin;
+		direction.y = 0;
 		direction.Normalize();
 		std::vector<HitResult> hits;
-		rayOrigin.y = 0.3f;
-		direction.y = 0.3f;
-		int size = RaycastAll(rayOrigin, direction, 3.f, 1u, hits);
+		rayOrigin.y = 0.2f;
+		int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
 
+		if (size > 0)
+		{
+			std::cout << "abaca" << std::endl;
+		}
 		for (int i = 0; i < size; i++)
 		{
 			auto object = hits[i].hitObject;
@@ -659,7 +665,8 @@ void Player::MeleeAttack()
 			{
 				if (*iter) 
 				{
-					(*iter)->SendDamage(this, 100);
+					(*iter)->SendDamage(this, 1);
+					(*iter)->SendKnockBack(this, {100,0});
 				}
 			}
 		}

@@ -6,11 +6,13 @@
 #include "Blackboard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
+#include "CharacterControllerComponent.h"
 void EntityEnemy::Start()
 {
-	enemyBT =GetOwner()->GetComponent<BehaviorTreeComponent>();
+	enemy = GetOwner();
+	enemyBT = enemy->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
-	auto childred = GetOwner()->m_childrenIndices;
+	auto childred = enemy->m_childrenIndices;
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
@@ -24,13 +26,13 @@ void EntityEnemy::Start()
 	}
 	if (!m_animator)
 	{
-		m_animator = GetOwner()->GetComponent<Animator>();
+		m_animator = enemy->GetComponent<Animator>();
 	}
 }
 
 void EntityEnemy::Update(float tick)
 {
-	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
+	Mathf::Vector3 forward = enemy->m_transform.GetForward();
 	//std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
 	if (criticalMark != CriticalMark::None)
@@ -60,6 +62,30 @@ void EntityEnemy::Update(float tick)
 		MeleeAttack();
 	//}
 
+	
+	if (isKnockBack)
+	{
+		KnockBackElapsedTime += tick;
+		if (KnockBackElapsedTime >= KnockBackTime)
+		{
+			isKnockBack = false;
+			KnockBackElapsedTime = 0.f;
+			GetOwner()->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+		}
+		else
+		{
+			auto forward = GetOwner()->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+			auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+			controller->Move({ forward.x ,forward.z });
+
+		}
+	}
+	
+
+
+
+
+
 
 	if (isDead)
 	{
@@ -80,7 +106,7 @@ void EntityEnemy::SetCriticalMark(int playerIndex)
 	}
 }
 
-void EntityEnemy::Attack(Entity* sender, int damage)
+void EntityEnemy::SendDamage(Entity* sender, int damage)
 {
 
 	if (sender)
@@ -96,6 +122,21 @@ void EntityEnemy::Attack(Entity* sender, int damage)
 			{
 				isDead = true;
 			}
+		}
+	}
+}
+
+void EntityEnemy::SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce)
+{
+	if (sender)
+	{
+
+		Player* _player = dynamic_cast<Player*>(sender);
+		if (_player)
+		{
+			isKnockBack = true;
+			KnockBackTime = 0.1f;
+			GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
 		}
 	}
 }

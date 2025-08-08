@@ -9,17 +9,15 @@ ReflectionScriptField(Player) \
 		meta_property(maxHP) \
 		meta_property(ThrowPowerX) \
 		meta_property(ThrowPowerY) \
+		meta_property(DropPowerX) \
+		meta_property(DropPowerY) \
 		meta_property(m_comboTime) \
 		meta_property(m_dashPower) \
 		meta_property(m_dashTime) \
 		meta_property(dashCooldown) \
 		meta_property(dubbleDashTime) \
 		meta_property(dashAmount) \
-		meta_property(AttackPowerX) \
-		meta_property(AttackPowerY) \
 		meta_property(detectAngle) \
-		meta_property(KnockBackForceY) \
-		meta_property(KnockBackForce) \
 	}); \
 	MethodField \
 	({ \
@@ -33,6 +31,7 @@ ReflectionScriptField(Player) \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(DeleteCurWeapon) \
+		meta_method(TestKnockBack) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \
 };
