@@ -280,6 +280,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BlackBoardEnum.h" />
     <ClInclude Include="BLackBoardValue.h" />

@@ -27,6 +27,7 @@
 #include "FoliageComponent.h"
 #include "FunctionRegistry.h"
 #include "VolumeComponent.h"
+#include "RectTransformComponent.h"
 //----------------------------
 
 #include "IconsFontAwesome6.h"
@@ -103,331 +104,14 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 		if (scene && selectedSceneObject)
 		{
-			std::string name = selectedSceneObject->m_name.ToString();
-			ImGui::Checkbox("##Enabled", &selectedSceneObject->m_isEnabled);
-			ImGui::SameLine();
-
-			selectedSceneObject->SetEnabled(selectedSceneObject->m_isEnabled);
-
-			if (ImGui::InputText("##name",
-				&name[0],
-				name.capacity() + 1,
-				ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
-				Meta::InputTextCallback,
-				static_cast<void*>(&name)))
+			ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
+			if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
 			{
-				selectedSceneObject->m_name.SetString(name);
+				ImGuiDrawHelperRectTransformComponent(rectTransform);
 			}
-
-			ImGui::SameLine();
-			ImGui::Checkbox("Static", &selectedSceneObject->m_isStatic);
-			
-			auto& tags = TagManagers->GetTags();
-			auto& layers = TagManagers->GetLayers();
-			int tagCount = static_cast<int>(tags.size());
-			int layerCount = static_cast<int>(layers.size());
-			static int prevTagCount = 0;
-			static int prevLayerCount = 0;
-			static int selectedTagIndex = 0;
-			static int selectedLayerIndex = 0;
-
-			static const char* tagNames[64]{};
-			if(0 == prevTagCount || tagCount != prevTagCount)
+			else
 			{
-				memset(tagNames, 0, sizeof(tagNames));
-				for (int i = 0; i < tagCount; ++i) {
-					tagNames[i] = tags[i].c_str(); // Assuming TagManager::GetTags() returns a vector of strings
-				}
-			}
-
-			static const char* layerNames[64]{};
-			if(0 == prevLayerCount || layerCount != prevLayerCount)
-			{
-				memset(layerNames, 0, sizeof(layerNames));
-				for (int i = 0; i < layerCount; ++i) {
-					layerNames[i] = layers[i].c_str(); // Assuming TagManager::GetLayers() returns a vector of strings
-				}
-			}
-
-			auto& selectedTag = selectedSceneObject->m_tag;
-			auto& selectedLayer = selectedSceneObject->m_layer;
-
-			selectedTagIndex = TagManagers->GetTagIndex(selectedTag.ToString());
-			selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
-			if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
-			{
-				selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
-			}
-			// Tag 콤보박스
-			ImGui::Text("Tag");
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
-			if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
-			{
-				for (int i = 0; i <= tagCount; ++i)
-				{
-					bool isSelected = false;
-					if (i == tagCount) // "Add Tag" 항목
-					{
-						if (ImGui::Selectable("Add Tag"))
-						{
-							m_openNewTagPopup = true; // 팝업 열기 플래그 설정
-						}
-					}
-					else
-					{
-						isSelected = (selectedTag == tagNames[i]);
-						if (ImGui::Selectable(tagNames[i], isSelected))
-						{
-							TagManagers->RemoveTagFromObject(selectedTag.ToString(), selectedSceneObject);
-							selectedTag = tagNames[i];
-							TagManagers->AddTagToObject(selectedTag.ToString(), selectedSceneObject);
-							selectedTagIndex = i; // 선택된 인덱스 업데이트
-						}
-					}
-
-					if (isSelected)
-						ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-			ImGui::SameLine();
-			ImGui::Text("Layer");
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(160.0f); // 픽셀 단위로 너비 설정
-			if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
-			{
-				for (int i = 0; i < layerCount; ++i)
-				{
-					bool isSelected = false;
-					if (i == layerCount - 1) // "Add Layer" 항목
-					{
-						if (ImGui::Selectable("Add Layer"))
-						{
-							m_openNewLayerPopup = true; // 팝업 열기 플래그 설정
-						}
-					}
-					else
-					{
-						isSelected = (selectedLayer == layerNames[i]);
-						if (ImGui::Selectable(layerNames[i], isSelected))
-						{
-							TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), selectedSceneObject);
-							selectedLayer = layerNames[i];
-							selectedSceneObject->SetCollisionType(); // 충돌 타입 업데이트
-							TagManagers->AddObjectToLayer(selectedLayer.ToString(), selectedSceneObject);
-							selectedLayerIndex = i; // 선택된 인덱스 업데이트
-						}
-					}
-
-					if (isSelected)
-						ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-			
-			prevTagCount = tagCount;
-			prevLayerCount = layerCount;
-
-			if (m_openNewTagPopup)
-			{
-				ImGui::OpenPopup("New Tag");
-				m_openNewTagPopup = false; // 팝업 열기 플래그 초기화
-			}
-
-			if (m_openNewLayerPopup)
-			{
-				ImGui::OpenPopup("New Layer");
-				m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
-			}
-
-			// New Tag 팝업
-			if (ImGui::BeginPopup("New Tag"))
-			{
-				static char newTagName[64] = "";
-				ImGui::InputText("Tag Name", newTagName, sizeof(newTagName));
-				if (ImGui::Button("Add"))
-				{
-					if (strlen(newTagName) > 0)
-					{
-						TagManagers->AddTag(newTagName);
-						selectedTag = newTagName;
-						selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
-						tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel"))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
-
-			// New Layer 팝업
-			if (ImGui::BeginPopup("New Layer"))
-			{
-				static char newLayerName[64] = "";
-				ImGui::InputText("Layer Name", newLayerName, sizeof(newLayerName));
-				if (ImGui::Button("Add"))
-				{
-					if (strlen(newLayerName) > 0)
-					{
-						TagManagers->AddLayer(newLayerName);
-						selectedLayer = newLayerName;
-						selectedLayerIndex = layerCount; // 새로 추가된 레이어 인덱스
-						layerCount = TagManagers->GetLayers().size(); // 레이어 개수 업데이트
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel"))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
-
-			// 현재 트랜스폼 값
-			Mathf::Vector4& position = selectedSceneObject->m_transform.position;
-			Mathf::Vector4& rotation = selectedSceneObject->m_transform.rotation;
-			Mathf::Vector4& scale = selectedSceneObject->m_transform.scale;
-
-			// ===== POSITION =====
-			static bool editingPosition = false;
-			static Mathf::Vector4 prevPosition{};
-
-			float pyr[3]; // pitch yaw roll
-			Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
-
-			for (float& i : pyr)
-			{
-				i *= Mathf::Rad2Deg;
-			}
-
-			bool menuClicked = false;
-			if (ImGui::DrawCollapsingHeaderWithButton("Transform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
-			{
-				ImGui::Text("Position ");
-				ImGui::SameLine();
-				if (ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000))
-				{
-					if (!editingPosition)
-					{
-						prevPosition = position;
-						editingPosition = true;
-					}
-					selectedSceneObject->m_transform.SetDirty();
-				}
-				if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
-				{
-					if (prevPosition != position)
-					{
-						Meta::MakeCustomChangeCommand([=]
-						{
-							selectedSceneObject->m_transform.position = prevPosition;
-							selectedSceneObject->m_transform.SetDirty();
-						},
-						[=]
-						{
-							selectedSceneObject->m_transform.position = position;
-							selectedSceneObject->m_transform.SetDirty();
-						});
-					}
-					editingPosition = false;
-				}
-
-				static bool editingRotation = false;
-				static Mathf::Vector4 prevRotation{};
-				static float prevEuler[3] = {};
-
-				float pyr[3];
-				float deltaEuler[3] = { 0, 0, 0 };
-				Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
-
-				float prevPYR[3];
-				prevRotation = rotation;
-
-				for (float& i : pyr) i *= Mathf::Rad2Deg;
-				prevPYR[0] = pyr[0];
-				prevPYR[1] = pyr[1];
-				prevPYR[2] = pyr[2];
-
-				ImGui::Text("Rotation ");
-				ImGui::SameLine();
-				if (ImGui::DragFloat3("##Rotation", pyr, 0.1f))
-				{
-					if (!editingRotation)
-					{
-						prevRotation = rotation;
-						prevEuler[0] = pyr[0];
-						prevEuler[1] = pyr[1];
-						prevEuler[2] = pyr[2];
-						editingRotation = true;
-					}
-					Mathf::Vector3 radianEuler(
-						pyr[0] - prevPYR[0],
-						pyr[1] - prevPYR[1],
-						pyr[2] - prevPYR[2]);
-					rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
-					selectedSceneObject->m_transform.SetDirty();
-				}
-				if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
-				{
-					Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
-					Mathf::Vector4 compare = XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
-					if (compare != rotation)
-					{
-						Meta::MakeCustomChangeCommand([=]
-						{
-							selectedSceneObject->m_transform.rotation = prevRotation;
-							selectedSceneObject->m_transform.SetDirty();
-						},
-						[=]
-						{
-							selectedSceneObject->m_transform.rotation = rotation;
-							selectedSceneObject->m_transform.SetDirty();
-						});
-					}
-					editingRotation = false;
-				}
-
-				static bool editingScale = false;
-				static Mathf::Vector4 prevScale{};
-
-				ImGui::Text("Scale     ");
-				ImGui::SameLine();
-				if (ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
-				{
-					if (!editingScale)
-					{
-						prevScale = scale;
-						editingScale = true;
-					}
-					selectedSceneObject->m_transform.SetDirty();
-				}
-				if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
-				{
-					if (prevScale != scale)
-					{
-						Meta::MakeCustomChangeCommand([=]
-						{
-							selectedSceneObject->m_transform.scale = prevScale;
-							selectedSceneObject->m_transform.SetDirty();
-						},
-						[=]
-						{
-							selectedSceneObject->m_transform.scale = scale;
-							selectedSceneObject->m_transform.SetDirty();
-						});
-					}
-					editingScale = false;
-				}
-
-				{
-					selectedSceneObject->m_transform.UpdateLocalMatrix();
-				}
+				ImGuiDrawHelperTransformComponent(selectedSceneObject);
 			}
 
 			static bool isOpen = false;
@@ -435,7 +119,7 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 
 			for (auto& component : selectedSceneObject->m_components)
 			{
-				if(nullptr == component)
+				if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
 					continue;
 
 				const auto& type = Meta::Find(component->ToString());
@@ -618,10 +302,6 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				ImGui::OpenPopup("ComponentMenu");
 				isOpen = false;
 			}
-			if (menuClicked) {
-				ImGui::OpenPopup("TransformMenu");
-				menuClicked = false;
-			}
 
 			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("NewScript"))
@@ -694,18 +374,6 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 				}
 				ImGui::EndPopup();
 			}
-			if (ImGui::BeginPopup("TransformMenu")) {
-				if (ImGui::MenuItem("Reset Transform"))
-				{
-					selectedSceneObject->m_transform.position = { 0, 0, 0, 1 };
-					selectedSceneObject->m_transform.rotation = XMQuaternionIdentity();
-					selectedSceneObject->m_transform.scale = { 1, 1, 1, 1 };
-					selectedSceneObject->m_transform.SetDirty();
-					selectedSceneObject->m_transform.UpdateLocalMatrix();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
 			ImGui::PopStyleVar();
 			ImGui::PopStyleColor(2);
 		}
@@ -754,6 +422,481 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 		wasMetaSelectedLastFrame = isSelectedNode;
 
 	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
+}
+
+void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
+{
+	std::string name = gameObject->m_name.ToString();
+	ImGui::Checkbox("##Enabled", &gameObject->m_isEnabled);
+	ImGui::SameLine();
+
+	gameObject->SetEnabled(gameObject->m_isEnabled);
+
+	if (ImGui::InputText("##name",
+		&name[0],
+		name.capacity() + 1,
+		ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
+		Meta::InputTextCallback,
+		static_cast<void*>(&name)))
+	{
+		gameObject->m_name.SetString(name);
+	}
+
+	ImGui::SameLine();
+	ImGui::Checkbox("Static", &gameObject->m_isStatic);
+
+	auto& tags = TagManagers->GetTags();
+	auto& layers = TagManagers->GetLayers();
+	int tagCount = static_cast<int>(tags.size());
+	int layerCount = static_cast<int>(layers.size());
+	static int prevTagCount = 0;
+	static int prevLayerCount = 0;
+	static int selectedTagIndex = 0;
+	static int selectedLayerIndex = 0;
+
+	static const char* tagNames[64]{};
+	if (0 == prevTagCount || tagCount != prevTagCount)
+	{
+		memset(tagNames, 0, sizeof(tagNames));
+		for (int i = 0; i < tagCount; ++i) {
+			tagNames[i] = tags[i].c_str(); // Assuming TagManager::GetTags() returns a vector of strings
+		}
+	}
+
+	static const char* layerNames[64]{};
+	if (0 == prevLayerCount || layerCount != prevLayerCount)
+	{
+		memset(layerNames, 0, sizeof(layerNames));
+		for (int i = 0; i < layerCount; ++i) {
+			layerNames[i] = layers[i].c_str(); // Assuming TagManager::GetLayers() returns a vector of strings
+		}
+	}
+
+	auto& selectedTag = gameObject->m_tag;
+	auto& selectedLayer = gameObject->m_layer;
+
+	selectedTagIndex = TagManagers->GetTagIndex(selectedTag.ToString());
+	selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
+	if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
+	{
+		selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
+	}
+	// Tag 콤보박스
+	ImGui::Text("Tag");
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
+	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
+	{
+		for (int i = 0; i <= tagCount; ++i)
+		{
+			bool isSelected = false;
+			if (i == tagCount) // "Add Tag" 항목
+			{
+				if (ImGui::Selectable("Add Tag"))
+				{
+					m_openNewTagPopup = true; // 팝업 열기 플래그 설정
+				}
+			}
+			else
+			{
+				isSelected = (selectedTag == tagNames[i]);
+				if (ImGui::Selectable(tagNames[i], isSelected))
+				{
+					TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
+					selectedTag = tagNames[i];
+					TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
+					selectedTagIndex = i; // 선택된 인덱스 업데이트
+				}
+			}
+
+			if (isSelected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::SameLine();
+	ImGui::Text("Layer");
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
+	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
+	{
+		for (int i = 0; i < layerCount; ++i)
+		{
+			bool isSelected = false;
+			if (i == layerCount - 1) // "Add Layer" 항목
+			{
+				if (ImGui::Selectable("Add Layer"))
+				{
+					m_openNewLayerPopup = true; // 팝업 열기 플래그 설정
+				}
+			}
+			else
+			{
+				isSelected = (selectedLayer == layerNames[i]);
+				if (ImGui::Selectable(layerNames[i], isSelected))
+				{
+					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
+					selectedLayer = layerNames[i];
+					gameObject->SetCollisionType(); // 충돌 타입 업데이트
+					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
+					selectedLayerIndex = i; // 선택된 인덱스 업데이트
+				}
+			}
+
+			if (isSelected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
+
+	prevTagCount = tagCount;
+	prevLayerCount = layerCount;
+
+	if (m_openNewTagPopup)
+	{
+		ImGui::OpenPopup("New Tag");
+		m_openNewTagPopup = false; // 팝업 열기 플래그 초기화
+	}
+
+	if (m_openNewLayerPopup)
+	{
+		ImGui::OpenPopup("New Layer");
+		m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
+	}
+
+	// New Tag 팝업
+	if (ImGui::BeginPopup("New Tag"))
+	{
+		static char newTagName[64] = "";
+		ImGui::InputText("Tag Name", newTagName, sizeof(newTagName));
+		if (ImGui::Button("Add"))
+		{
+			if (strlen(newTagName) > 0)
+			{
+				TagManagers->AddTag(newTagName);
+				selectedTag = newTagName;
+				selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
+				tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
+			}
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	// New Layer 팝업
+	if (ImGui::BeginPopup("New Layer"))
+	{
+		static char newLayerName[64] = "";
+		ImGui::InputText("Layer Name", newLayerName, sizeof(newLayerName));
+		if (ImGui::Button("Add"))
+		{
+			if (strlen(newLayerName) > 0)
+			{
+				TagManagers->AddLayer(newLayerName);
+				selectedLayer = newLayerName;
+				selectedLayerIndex = layerCount; // 새로 추가된 레이어 인덱스
+				layerCount = TagManagers->GetLayers().size(); // 레이어 개수 업데이트
+			}
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransformComponent)
+{
+	if (!rectTransformComponent) return;
+
+	struct PresetInfo
+	{
+		AnchorPreset preset;
+		Mathf::Vector2 anchorMin;
+		Mathf::Vector2 anchorMax;
+		const char* name;
+	};
+
+	static constexpr std::array<PresetInfo, 16> presets{ {
+			{ AnchorPreset::TopLeft,      {0.f, 1.f}, {0.f, 1.f}, "TopLeft"},
+			{ AnchorPreset::TopCenter,    {0.5f, 1.f}, {0.5f, 1.f}, "TopCenter"},
+			{ AnchorPreset::TopRight,     {1.f, 1.f}, {1.f, 1.f}, "TopRight"},
+			{ AnchorPreset::MiddleLeft,   {0.f, 0.5f}, {0.f, 0.5f}, "MiddleLeft"},
+			{ AnchorPreset::MiddleCenter, {0.5f, 0.5f}, {0.5f, 0.5f}, "MiddleCenter"},
+			{ AnchorPreset::MiddleRight,  {1.f, 0.5f}, {1.f, 0.5f}, "MiddleRight"},
+			{ AnchorPreset::BottomLeft,   {0.f, 0.f}, {0.f, 0.f}, "BottomLeft"},
+			{ AnchorPreset::BottomCenter, {0.5f, 0.f}, {0.5f, 0.f}, "BottomCenter"},
+			{ AnchorPreset::BottomRight,  {1.f, 0.f}, {1.f, 0.f}, "BottomRight"},
+			{ AnchorPreset::StretchLeft,  {0.f, 0.5f}, {1.f, 0.5f}, "StretchLeft"},
+			{ AnchorPreset::StretchCenter,{0.f, 0.5f}, {1.f, 0.5f}, "StretchCenter"},
+			{ AnchorPreset::StretchRight, {0.f, 0.5f}, {1.f, 0.5f}, "StretchRight"},
+			{ AnchorPreset::StretchTop,   {0.5f, 0.f}, {0.5f, 1.f}, "StretchTop"},
+			{ AnchorPreset::StretchMiddle,{0.5f, 0.f}, {0.5f, 1.f}, "StretchMiddle"},
+			{ AnchorPreset::StretchBottom,{0.5f, 0.f}, {0.5f, 1.f}, "StretchBottom"},
+			{ AnchorPreset::StretchAll,   {0.f, 0.f}, {1.f, 1.f}, "StretchAll"},
+	} };
+
+	bool menuClicked = false;
+	if (ImGui::DrawCollapsingHeaderWithButton("RectTransform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
+	{
+		auto anchorMin = rectTransformComponent->GetAnchorMin();
+		auto anchorMax = rectTransformComponent->GetAnchorMax();
+
+		auto nearEqual = [](float a, float b) { return std::fabs(a - b) < 0.0001f; };
+		auto vecEqual = [&](const Mathf::Vector2& a, const Mathf::Vector2& b)
+			{
+				return nearEqual(a.x, b.x) && nearEqual(a.y, b.y);
+			};
+
+		int currentIndex = -1;
+		for (std::size_t i = 0; i < presets.size(); ++i)
+		{
+			if (vecEqual(anchorMin, presets[i].anchorMin) && vecEqual(anchorMax, presets[i].anchorMax))
+			{
+				currentIndex = static_cast<int>(i);
+				break;
+			}
+		}
+
+		const char* preview = currentIndex >= 0 ? presets[currentIndex].name : "Custom";
+		if (ImGui::BeginCombo("Anchor Preset", preview))
+		{
+			for (std::size_t i = 0; i < presets.size(); ++i)
+			{
+				bool selected = (currentIndex == static_cast<int>(i));
+				if (ImGui::Selectable(presets[i].name, selected))
+				{
+					rectTransformComponent->SetAnchorPreset(presets[i].preset);
+					anchorMin = rectTransformComponent->GetAnchorMin();
+					anchorMax = rectTransformComponent->GetAnchorMax();
+					currentIndex = static_cast<int>(i);
+				}
+				if (selected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
+		if (ImGui::DragFloat2("Anchor Min", &anchorMin.x, 0.01f, 0.f, 1.f))
+			rectTransformComponent->SetAnchorMin(anchorMin);
+		if (ImGui::DragFloat2("Anchor Max", &anchorMax.x, 0.01f, 0.f, 1.f))
+			rectTransformComponent->SetAnchorMax(anchorMax);
+
+		auto anchoredPos = rectTransformComponent->GetAnchoredPosition();
+		if (ImGui::DragFloat2("Anchored Position", &anchoredPos.x, 1.f))
+			rectTransformComponent->SetAnchoredPosition(anchoredPos);
+
+		auto sizeDelta = rectTransformComponent->GetSizeDelta();
+		if (ImGui::DragFloat2("Size Delta", &sizeDelta.x, 1.f))
+			rectTransformComponent->SetSizeDelta(sizeDelta);
+
+		auto pivot = rectTransformComponent->GetPivot();
+		if (ImGui::DragFloat2("Pivot", &pivot.x, 0.01f, 0.f, 1.f))
+			rectTransformComponent->SetPivot(pivot);
+
+		const auto& worldRect = rectTransformComponent->GetWorldRect();
+		ImGui::Text("World Rect: (%.1f, %.1f, %.1f, %.1f)", worldRect.x, worldRect.y, worldRect.width, worldRect.height);
+	}
+
+	//if (menuClicked) {
+	//	ImGui::OpenPopup("TransformMenu");
+	//	menuClicked = false;
+	//}
+
+	//ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
+	//ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+	//ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
+	//if (ImGui::BeginPopup("TransformMenu"))
+	//{
+	//	if (ImGui::MenuItem("Reset Transform"))
+	//	{
+	//		gameObject->m_transform.position = { 0, 0, 0, 1 };
+	//		gameObject->m_transform.rotation = XMQuaternionIdentity();
+	//		gameObject->m_transform.scale = { 1, 1, 1, 1 };
+	//		gameObject->m_transform.SetDirty();
+	//		gameObject->m_transform.UpdateLocalMatrix();
+	//		ImGui::CloseCurrentPopup();
+	//	}
+	//	ImGui::EndPopup();
+	//}
+	//ImGui::PopStyleVar();
+	//ImGui::PopStyleColor(2);
+}
+
+void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
+{
+	// 현재 트랜스폼 값
+	Mathf::Vector4& position = gameObject->m_transform.position;
+	Mathf::Vector4& rotation = gameObject->m_transform.rotation;
+	Mathf::Vector4& scale = gameObject->m_transform.scale;
+
+	// ===== POSITION =====
+	static bool editingPosition = false;
+	static Mathf::Vector4 prevPosition{};
+
+	float pyr[3]; // pitch yaw roll
+	Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+	for (float& i : pyr)
+	{
+		i *= Mathf::Rad2Deg;
+	}
+
+	bool menuClicked = false;
+	if (ImGui::DrawCollapsingHeaderWithButton("Transform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
+	{
+		ImGui::Text("Position ");
+		ImGui::SameLine();
+		if (ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000))
+		{
+			if (!editingPosition)
+			{
+				prevPosition = position;
+				editingPosition = true;
+			}
+			gameObject->m_transform.SetDirty();
+		}
+		if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
+		{
+			if (prevPosition != position)
+			{
+				Meta::MakeCustomChangeCommand([=]
+					{
+						gameObject->m_transform.position = prevPosition;
+						gameObject->m_transform.SetDirty();
+					},
+					[=]
+					{
+						gameObject->m_transform.position = position;
+						gameObject->m_transform.SetDirty();
+					});
+			}
+			editingPosition = false;
+		}
+
+		static bool editingRotation = false;
+		static Mathf::Vector4 prevRotation{};
+		static float prevEuler[3] = {};
+
+		float pyr[3];
+		float deltaEuler[3] = { 0, 0, 0 };
+		Mathf::QuaternionToEular(rotation, pyr[0], pyr[1], pyr[2]);
+
+		float prevPYR[3];
+		prevRotation = rotation;
+
+		for (float& i : pyr) i *= Mathf::Rad2Deg;
+		prevPYR[0] = pyr[0];
+		prevPYR[1] = pyr[1];
+		prevPYR[2] = pyr[2];
+
+		ImGui::Text("Rotation ");
+		ImGui::SameLine();
+		if (ImGui::DragFloat3("##Rotation", pyr, 0.1f))
+		{
+			if (!editingRotation)
+			{
+				prevRotation = rotation;
+				prevEuler[0] = pyr[0];
+				prevEuler[1] = pyr[1];
+				prevEuler[2] = pyr[2];
+				editingRotation = true;
+			}
+			Mathf::Vector3 radianEuler(
+				pyr[0] - prevPYR[0],
+				pyr[1] - prevPYR[1],
+				pyr[2] - prevPYR[2]);
+			rotation = XMQuaternionMultiply(XMQuaternionRotationRollPitchYaw(radianEuler.x * Mathf::Deg2Rad, radianEuler.y * Mathf::Deg2Rad, radianEuler.z * Mathf::Deg2Rad), rotation);
+			gameObject->m_transform.SetDirty();
+		}
+		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
+		{
+			Mathf::Vector3 prevEulerRad(prevEuler[0] * Mathf::Deg2Rad, prevEuler[1] * Mathf::Deg2Rad, prevEuler[2] * Mathf::Deg2Rad);
+			Mathf::Vector4 compare = XMQuaternionRotationRollPitchYaw(prevEulerRad.x, prevEulerRad.y, prevEulerRad.z);
+			if (compare != rotation)
+			{
+				Meta::MakeCustomChangeCommand([=]
+				{
+					gameObject->m_transform.rotation = prevRotation;
+					gameObject->m_transform.SetDirty();
+				},
+				[=]
+				{
+					gameObject->m_transform.rotation = rotation;
+					gameObject->m_transform.SetDirty();
+				});
+			}
+			editingRotation = false;
+		}
+
+		static bool editingScale = false;
+		static Mathf::Vector4 prevScale{};
+
+		ImGui::Text("Scale     ");
+		ImGui::SameLine();
+		if (ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
+		{
+			if (!editingScale)
+			{
+				prevScale = scale;
+				editingScale = true;
+			}
+			gameObject->m_transform.SetDirty();
+		}
+		if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
+		{
+			if (prevScale != scale)
+			{
+				Meta::MakeCustomChangeCommand([=]
+				{
+					gameObject->m_transform.scale = prevScale;
+					gameObject->m_transform.SetDirty();
+				},
+				[=]
+				{
+					gameObject->m_transform.scale = scale;
+					gameObject->m_transform.SetDirty();
+				});
+			}
+			editingScale = false;
+		}
+
+		{
+			gameObject->m_transform.UpdateLocalMatrix();
+		}
+	}
+
+	if (menuClicked) {
+		ImGui::OpenPopup("TransformMenu");
+		menuClicked = false;
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
+	if (ImGui::BeginPopup("TransformMenu")) 
+	{
+		if (ImGui::MenuItem("Reset Transform"))
+		{
+			gameObject->m_transform.position = { 0, 0, 0, 1 };
+			gameObject->m_transform.rotation = XMQuaternionIdentity();
+			gameObject->m_transform.scale = { 1, 1, 1, 1 };
+			gameObject->m_transform.SetDirty();
+			gameObject->m_transform.UpdateLocalMatrix();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(2);
 }
 
 void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)

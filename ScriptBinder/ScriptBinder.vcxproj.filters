@@ -172,6 +172,15 @@
     <Filter Include="Managers\InputManager\Helper">
       <UniqueIdentifier>{d694ed34-b81e-4dee-8544-f2efb39a76f5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Classes\Components\Transform">
+      <UniqueIdentifier>{228fc1fb-f64b-47d8-b157-3fbc4cd691cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\Transform\3D">
+      <UniqueIdentifier>{f1352eb5-088a-4fd2-bc1d-4ea730c996df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\Components\Transform\2D">
+      <UniqueIdentifier>{e6e1a773-6424-4361-9436-843af99d9eac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scene.cpp">
@@ -185,9 +194,6 @@
     </ClCompile>
     <ClCompile Include="GameObject.cpp">
       <Filter>Classes\GameObject</Filter>
-    </ClCompile>
-    <ClCompile Include="Transform.cpp">
-      <Filter>Classes\Components</Filter>
     </ClCompile>
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
@@ -315,8 +321,11 @@
     <ClCompile Include="VolumeComponent.cpp">
       <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Classes\Components\Transform\3D</Filter>
+    </ClCompile>
     <ClCompile Include="RectTransformComponent.cpp">
-      <Filter>Classes\Components</Filter>
+      <Filter>Classes\Components\Transform\2D</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -343,9 +352,6 @@
     </ClInclude>
     <ClInclude Include="GameObject.h">
       <Filter>Classes\GameObject</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform.h">
-      <Filter>Classes\Components</Filter>
     </ClInclude>
     <ClInclude Include="Object.h">
       <Filter>Classes\Object</Filter>
@@ -602,8 +608,14 @@
     <ClInclude Include="KeyArray.h">
       <Filter>Managers\InputManager\Helper</Filter>
     </ClInclude>
+    <ClInclude Include="Transform.h">
+      <Filter>Classes\Components\Transform\3D</Filter>
+    </ClInclude>
     <ClInclude Include="RectTransformComponent.h">
-      <Filter>Classes\Components</Filter>
+      <Filter>Classes\Components\Transform\2D</Filter>
+    </ClInclude>
+    <ClInclude Include="AnchorPreset.h">
+      <Filter>Classes\Components\Transform\2D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
