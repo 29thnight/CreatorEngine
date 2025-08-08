@@ -31,7 +31,7 @@ void EntityEnemy::Start()
 void EntityEnemy::Update(float tick)
 {
 	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
+	//std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
 	if (criticalMark != CriticalMark::None)
 	{
@@ -64,7 +64,7 @@ void EntityEnemy::Update(float tick)
 	if (isDead)
 	{
 		//effect
-		Destroy();
+		//Destroy();
 	}
 }
 
@@ -92,7 +92,7 @@ void EntityEnemy::Attack(Entity* sender, int damage)
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);
-			if (m_currentHP >= 0)
+			if (m_currentHP <= 0)
 			{
 				isDead = true;
 			}
@@ -149,7 +149,7 @@ void EntityEnemy::MeleeAttack()
 
 
 	//std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
-	std::cout << "Hit Count: " << size << std::endl;
+	//std::cout << "Hit Count: " << size << std::endl;
 	m_animator->SetParameter("Attack", true);
 	/*GameObject* gumgiobj=nullptr;
 	EffectComponent* gumgi = nullptr;

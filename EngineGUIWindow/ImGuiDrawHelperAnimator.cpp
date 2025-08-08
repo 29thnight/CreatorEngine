@@ -1006,76 +1006,82 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					{
 						ImGui::OpenPopup("New AniBehavior");
 					}
+
+
+					ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
+
+					ImGui::SetNextWindowSize(ImVec2(350, 0)); // 원하는 사이즈 지정
+					if (ImGui::BeginPopup("New AniBehavior"))
+					{
+						float availableWidth = ImGui::GetContentRegionAvail().x;
+						searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+						static char scriptName[64] = "NewAniBehavior";
+						ImGui::InputText("Name", scriptName, sizeof(scriptName));
+
+
+
+						std::string scriptNameStr(scriptName);
+						auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
+						bool isDisabled = false;
+						if (file::exists(scriptBodyFilePath))
+						{
+							ImGui::Text("Script already exists.");
+							isDisabled = true;
+						}
+						else if (scriptNameStr.empty())
+						{
+							ImGui::Text("Script name cannot be empty.");
+							isDisabled = true;
+						}
+						else if (scriptNameStr.find_first_of("0123456789") == 0)
+						{
+							ImGui::Text("Script name cannot start with a number.");
+							isDisabled = true;
+						}
+						else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
+						{
+							ImGui::Text("Script name contains invalid characters.");
+							isDisabled = true;
+						}
+
+						ImGui::BeginDisabled(isDisabled);
+						if (ImGui::Button("Create and Add"))
+						{
+							if (!scriptNameStr.empty())
+							{
+								try
+								{
+									ScriptManager->CreateAniBehaviorScript(scriptNameStr);
+									ScriptManager->SetCompileEventInvoked(true);
+									ScriptManager->ReloadDynamicLibrary();
+								}
+								catch (const std::exception& e)
+								{
+									Debug->LogError("Failed to create script: " + std::string(e.what()));
+									ImGui::EndDisabled();
+									ImGui::EndPopup();
+									return;
+								}
+
+								selectedState->SetBehaviour(scriptNameStr);
+								scriptNameStr.clear();
+							}
+							else
+							{
+								Debug->LogError("Script name cannot be empty.");
+							}
+						}
+						ImGui::EndDisabled();
+
+						ImGui::EndPopup();
+					}
+
+
+
 					ImGui::EndPopup();
 				}
 
-				ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
 
-				ImGui::SetNextWindowSize(ImVec2(350, 0)); // 원하는 사이즈 지정
-				if (ImGui::BeginPopup("New AniBehavior"))
-				{
-					float availableWidth = ImGui::GetContentRegionAvail().x;
-					searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-					static char scriptName[64] = "NewAniBehavior";
-					ImGui::InputText("Name", scriptName, sizeof(scriptName));
-
-
-
-					std::string scriptNameStr(scriptName);
-					auto scriptBodyFilePath = PathFinder::Relative("Script\\" + scriptNameStr + ".h");
-					bool isDisabled = false;
-					if (file::exists(scriptBodyFilePath))
-					{
-						ImGui::Text("Script already exists.");
-						isDisabled = true;
-					}
-					else if (scriptNameStr.empty())
-					{
-						ImGui::Text("Script name cannot be empty.");
-						isDisabled = true;
-					}
-					else if (scriptNameStr.find_first_of("0123456789") == 0)
-					{
-						ImGui::Text("Script name cannot start with a number.");
-						isDisabled = true;
-					}
-					else if (scriptNameStr.find_first_of("!@#$%^&*()_+[]{}|;':\",.<>?`~") != std::string::npos)
-					{
-						ImGui::Text("Script name contains invalid characters.");
-						isDisabled = true;
-					}
-
-					ImGui::BeginDisabled(isDisabled);
-					if (ImGui::Button("Create and Add"))
-					{
-						if (!scriptNameStr.empty())
-						{
-							try
-							{
-								ScriptManager->CreateAniBehaviorScript(scriptNameStr);
-								ScriptManager->SetCompileEventInvoked(true);
-								ScriptManager->ReloadDynamicLibrary();
-							}
-							catch (const std::exception& e)
-							{
-								Debug->LogError("Failed to create script: " + std::string(e.what()));
-								ImGui::EndDisabled();
-								ImGui::EndPopup();
-								return;
-							}
-
-							selectedState->SetBehaviour(scriptNameStr);
-							scriptNameStr.clear();
-						}
-						else
-						{
-							Debug->LogError("Script name cannot be empty.");
-						}
-					}
-					ImGui::EndDisabled();
-
-					ImGui::EndPopup();
-				}
 
 				ImGui::End();
 			}

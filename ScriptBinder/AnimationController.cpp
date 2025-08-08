@@ -241,7 +241,7 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	if (isAny == true)
 		state->m_isAny = true;
 	state->AnimationIndex = animationIndex;
-	state->SetBehaviour(stateName);
+	//state->SetBehaviour(stateName);
 	States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;

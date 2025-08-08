@@ -7,6 +7,7 @@ class Weapon;
 class EntityItem;
 class Socket;
 class EffectComponent;
+class Entity;
 class Player : public Entity
 {
 public:
@@ -34,6 +35,7 @@ public:
 
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void OnRay() override;
+	void MeleeAttack();
 	[[Method]]
 	void Move(Mathf::Vector2 dir);
 	[[Method]]

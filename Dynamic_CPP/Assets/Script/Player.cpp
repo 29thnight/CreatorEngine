@@ -24,7 +24,6 @@
 #include "CameraComponent.h"
 void Player::Start()
 {
-	std::cout << Mathf::Vector3::Forward.z << std::endl;
 
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
@@ -64,10 +63,10 @@ void Player::Start()
 
 
 	
-	dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
-	dashEffect = dashObj->AddComponent<EffectComponent>();
-	dashEffect->Awake();
-	dashEffect->m_effectTemplateName ="Dash";
+	//dashObj = SceneManagers->GetActiveScene()->CreateGameObject("Dashef").get();
+	//dashEffect = dashObj->AddComponent<EffectComponent>();
+	//dashEffect->Awake();
+	//dashEffect->m_effectTemplateName ="Dash";
 
 	player->m_collisionType = 2;
 
@@ -88,8 +87,7 @@ void Player::Update(float tick)
 {
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
-	dashObj->m_transform.SetPosition(pos);
-
+	//dashObj->m_transform.SetPosition(pos);
 
 	if (isDead)
 	{
@@ -159,7 +157,7 @@ void Player::Update(float tick)
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-			dashEffect->StopEffect();
+			//dashEffect->StopEffect();
 		}
 		else
 		{
@@ -203,31 +201,31 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	auto cam = camComponent->GetCamera();
-	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//auto cam = camComponent->GetCamera();
+	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	float w = XMVectorGetW(clipSpacePos);
-	if (w < 0.001f) {
-		// 원래 위치 반환.
-		GetOwner()->m_transform.SetPosition(worldpos);
-		return;
-	}
-	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//float w = XMVectorGetW(clipSpacePos);
+	//if (w < 0.001f) {
+	//	// 원래 위치 반환.
+	//	GetOwner()->m_transform.SetPosition(worldpos);
+	//	return;
+	//}
+	//XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	float clamp_limit = 0.9f;
-	XMVECTOR clampedNdcPos = XMVectorClamp(
-		ndcPos,
-		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	);
-	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	//float clamp_limit = 0.9f;
+	//XMVECTOR clampedNdcPos = XMVectorClamp(
+	//	ndcPos,
+	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//);
+	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
 void Player::SendDamage(Entity* sender, int damage)
@@ -390,7 +388,7 @@ void Player::Charging()
 
 void Player::Attack1()
 {
-	AttackTarget.clear();
+	//AttackTarget.clear();
 
 
 
@@ -402,7 +400,7 @@ void Player::Attack1()
 		isAttacking = true;
 		//if (m_comboCount == 0)
 		{
-			int gumNumber = playerIndex + 1;
+			/*int gumNumber = playerIndex + 1;
 			std::string gumName = "GumGi" + std::to_string(gumNumber);
 			std::string effectName;
 			effectName = "gg";
@@ -429,11 +427,16 @@ void Player::Attack1()
 						effect->ChangeEffect(effectName);
 					}
 				}
-			}
-			std::vector<HitResult> hits;
+			}*/
+
+
+		/*	std::vector<HitResult> hits;
 			auto world = player->m_transform.GetWorldPosition();
 			world.m128_f32[1] += 0.5f;
 			auto forward = player->m_transform.GetForward();
+			
+
+
 			Mathf::Vector3 dir = world;
 			Mathf::Vector3 dir1 = dir;
 			Mathf::Vector3 dir2 = dir;
@@ -458,10 +461,10 @@ void Player::Attack1()
 			int size2 = RaycastAll(world, dir2, 3.0f, 1u, hits2);
 
 			hits.insert(hits.end(), hits1.begin(), hits1.end());
-			hits.insert(hits.end(), hits2.begin(), hits2.end());
+			hits.insert(hits.end(), hits2.begin(), hits2.end());*/
 
 
-			for (int i = 0; i < size; i++)
+			/*for (int i = 0; i < size; i++)
 			{
 				auto object = hits[i].hitObject;
 				if (object == GetOwner()) continue;
@@ -469,19 +472,19 @@ void Player::Attack1()
 				{
 					AttackTarget.insert(entity);
 				}
-			}
+			}*/
 		}
 
 
-		{
-			for (auto& target : AttackTarget)
-			{
-				if (target)
-				{
-					target->SendDamage(this, 100);   //확인은 받는사람이 한다?
-				}
-			}
-		}
+		
+		//for (auto& target : AttackTarget)
+		//{
+		//	if (target)
+		//	{
+		//		target->SendDamage(this, 100);   //확인은 받는사람이 한다?
+		//	}
+		//}
+		
 
 		m_animator->SetParameter("Attack", true);
 		std::cout << "Attack!!" << std::endl;
@@ -631,6 +634,35 @@ void Player::OnRay()
 			entityItem->SendDamage(this, 100);
 		}
 	}
+}
+
+void Player::MeleeAttack()
+{
+		Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+		XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
+		Mathf::Vector3 handPos = handlocal.r[3];
+		Mathf::Vector3 direction = handPos - rayOrigin;
+		direction.Normalize();
+		std::vector<HitResult> hits;
+		rayOrigin.y = 0.3f;
+		direction.y = 0.3f;
+		int size = RaycastAll(rayOrigin, direction, 3.f, 1u, hits);
+
+		for (int i = 0; i < size; i++)
+		{
+			auto object = hits[i].hitObject;
+			if (object == GetOwner()) continue;
+
+			auto entity = object->GetComponent<Entity>();
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			if (inserted)  
+			{
+				if (*iter) 
+				{
+					(*iter)->SendDamage(this, 100);
+				}
+			}
+		}
 }
 
 
