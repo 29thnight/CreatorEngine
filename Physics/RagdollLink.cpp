@@ -20,13 +20,21 @@ bool RagdollLink::Initialize(const LinkInfo& linkInfo, RagdollLink* parentLink, 
 	if (parentLink == nullptr) {
 		//부모가 없는 경우
 		dxTransform *= DirectX::SimpleMath::Matrix::CreateRotationZ(3.14f);
-		CopyMatrixDxToPx(dxTransform, pxLocalTransform);
+		dxTransform.Decompose(scale, rotation, position);
+
+		ConvertVectorDxToPx(position, pxLocalTransform.p);
+		ConvertQuaternionDxToPx(rotation, pxLocalTransform.q);
+		//CopyMatrixDxToPx(dxTransform, pxLocalTransform);
 
 		m_pxLink = pxArtriculation->createLink(nullptr, pxLocalTransform);
 	}
 	else {
 		//부모가 있는 경우
-		CopyMatrixDxToPx(dxTransform, pxLocalTransform);
+		dxTransform.Decompose(scale, rotation, position);
+		ConvertVectorDxToPx(position, pxLocalTransform.p);
+		ConvertQuaternionDxToPx(rotation, pxLocalTransform.q);
+		//CopyMatrixDxToPx(dxTransform, pxLocalTransform);
+
 
 		m_pxLink = pxArtriculation->createLink(parentLink->GetPxLink(), pxLocalTransform);
 		m_myJoint->Initialize(parentLink, this, linkInfo.jointInfo);
@@ -45,7 +53,15 @@ bool RagdollLink::Update()
 	physx::PxTransform pxTransform;
 	pxTransform = m_pxLink->getGlobalPose();
 
-	CopyMatrixDxToPx(m_worldTransform, pxTransform);
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rotation;
+	DirectX::SimpleMath::Vector3 position;
+	m_worldTransform.Decompose(scale, rotation, position);
+
+	ConvertVectorDxToPx(position, pxTransform.p);
+	ConvertQuaternionDxToPx(rotation, pxTransform.q);
+	
+	//CopyMatrixDxToPx(m_worldTransform, pxTransform);
 
 	return m_myJoint->Update(m_parentLink->GetPxLink());
 }
@@ -132,7 +148,10 @@ void RagdollLink::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldTran
 		m_myJoint->GetLocalTransform().Invert();
 
 	physx::PxTransform pxTransform;
-	CopyMatrixDxToPx(dxTransform, pxTransform);
+	dxTransform.Decompose(scale, rotation, position);
+	ConvertVectorDxToPx(position, pxTransform.p);
+	ConvertQuaternionDxToPx(rotation, pxTransform.q);
+	//CopyMatrixDxToPx(dxTransform, pxTransform);
 
 	//physx::PxTransform prevTransform = m_pxLink->getGlobalPose(); //임시 변수로 prev 받아서 어따씀?
 

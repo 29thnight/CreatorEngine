@@ -27,13 +27,24 @@ bool RagdollJoint::Initialize(RagdollLink* paranthLink,RagdollLink* ownerLink, c
 	m_localTransform = DirectX::SimpleMath::Matrix::CreateScale(scale) * DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	physx::PxTransform pxLocalTransform;
+	ConvertVectorDxToPx(position, pxLocalTransform.p);
+	ConvertQuaternionDxToPx(rotation, pxLocalTransform.q);
 	
-	DirectX::SimpleMath::Matrix parentLocalTransform = m_localTransform * ownerLink->GetLocalTransform();
-
-	CopyMatrixDxToPx(m_localTransform, pxLocalTransform);
+	//CopyMatrixDxToPx(m_localTransform, pxLocalTransform);
 	m_pxJoint->setChildPose(pxLocalTransform);
 
-	CopyMatrixDxToPx(parentLocalTransform, pxLocalTransform);
+	DirectX::SimpleMath::Matrix parentLocalTransform = m_localTransform * ownerLink->GetLocalTransform();
+	physx::PxTransform pxParentLocalTransform;
+	DirectX::SimpleMath::Vector3 parentscale;
+	DirectX::SimpleMath::Quaternion parentrotation;
+	DirectX::SimpleMath::Vector3 parentposition;
+	m_localTransform.Decompose(parentscale, parentrotation, parentposition);
+	
+	ConvertVectorDxToPx(parentposition, pxParentLocalTransform.p);
+	ConvertQuaternionDxToPx(parentrotation, pxParentLocalTransform.q);
+
+
+	//CopyMatrixDxToPx(parentLocalTransform, pxLocalTransform);
 	m_pxJoint->setParentPose(pxLocalTransform);
 
 	if (info.xAxisInfo.motion == EArticulationMotion::LOCKED && info.yAxisInfo.motion==EArticulationMotion::LOCKED&&info.zAxisInfo.motion==EArticulationMotion::LOCKED)
@@ -99,9 +110,30 @@ bool RagdollJoint::Update(const physx::PxArticulationLink* paranthLink)
 	//physX global 포즈를 dx 트렌스폼으로 변환
 	DirectX::SimpleMath::Matrix dxParentJointGlobalTransform;
 	DirectX::SimpleMath::Matrix dxChildJointGlobalTransform;
+	{
+		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Quaternion rotation;
+		DirectX::SimpleMath::Vector3 position;
+		ConvertVectorPxToDx(parentJointGlobalPose.p, position);
+		ConvertQuaternionPxToDx(parentJointGlobalPose.q, rotation);
+		dxParentJointGlobalTransform = DirectX::SimpleMath::Matrix::CreateScale(scale) *
+			DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+			DirectX::SimpleMath::Matrix::CreateTranslation(position);
+	}
 
-	CopyMatrixPxToDx(parentJointGlobalPose, dxParentJointGlobalTransform);
-	CopyMatrixPxToDx(JointGlobalPose, dxChildJointGlobalTransform);
+	{
+		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Quaternion rotation;
+		DirectX::SimpleMath::Vector3 position;
+		ConvertVectorPxToDx(JointGlobalPose.p, position);
+		ConvertQuaternionPxToDx(JointGlobalPose.q, rotation);
+		dxChildJointGlobalTransform = DirectX::SimpleMath::Matrix::CreateScale(scale) *
+			DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+			DirectX::SimpleMath::Matrix::CreateTranslation(position);
+	}
+
+	//CopyMatrixPxToDx(parentJointGlobalPose, dxParentJointGlobalTransform);
+	//CopyMatrixPxToDx(JointGlobalPose, dxChildJointGlobalTransform);
 
 	//부모 조인트의 인버트 트랜스폼으로 자식 조인트의 로커 트랜스폼 계산
 	m_simulLocalTransform = dxChildJointGlobalTransform * dxParentJointGlobalTransform.Invert();

@@ -185,11 +185,11 @@ void RagdollPhysics::SetWorldTransform(const DirectX::SimpleMath::Matrix& worldT
 	DirectX::SimpleMath::Vector3 position;
 	m_worldTransform.Decompose(scale, rotation, position);
 
-	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(position);
 
 	physx::PxTransform pxTransform;
-	CopyMatrixDxToPx(dxTransform, pxTransform);
+	ConvertVectorDxToPx(position, pxTransform.p);
+	ConvertQuaternionDxToPx(rotation, pxTransform.q);
+	//CopyMatrixDxToPx(dxTransform, pxTransform);
 	m_pxArticulation->setRootGlobalPose(pxTransform);
 }
 
@@ -205,12 +205,12 @@ bool RagdollPhysics::SetLinkTransformUpdate(const std::string& name, const Direc
 	DirectX::SimpleMath::Vector3 position;
 	m_worldTransform.Decompose(scale, rotation, position);
 
-	DirectX::SimpleMath::Matrix dxTransform = DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(position);
-
+	
 	physx::PxTransform pxTransform;
+	ConvertVectorDxToPx(position, pxTransform.p);
+	ConvertQuaternionDxToPx(rotation, pxTransform.q);
 
-	CopyMatrixDxToPx(dxTransform, pxTransform);
+	//CopyMatrixDxToPx(dxTransform, pxTransform);
 
 	m_pxArticulation->setRootGlobalPose(pxTransform);
 

@@ -466,8 +466,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
-	CopyVectorDxToPx(in.origin, pxOrgin);
-	CopyVectorDxToPx(in.direction, pxDirection);
+	ConvertVectorDxToPx(in.origin, pxOrgin);
+	ConvertVectorDxToPx(in.direction, pxDirection);
 
 	// RaycastHit 
 	const physx::PxU32 maxHits = 20;
@@ -512,8 +512,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 			const physx::PxRaycastHit& blockHit = hitBufferStruct.block;
 			if (blockHit.shape && blockHit.shape->userData != nullptr) {
 				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
-				CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
-				CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+				ConvertVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
+				ConvertVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
 			}
 			else {
 				out.hasBlock = false; // userData가 유효하지 않으면 블록 처리 안함
@@ -532,8 +532,8 @@ RayCastOutput PhysicX::RayCast(const RayCastInput& in, bool isStatic)
 			{
 				DirectX::SimpleMath::Vector3 position;
 				DirectX::SimpleMath::Vector3 normal;
-				CopyVectorPxToDx(hit.position, position);
-				CopyVectorPxToDx(hit.normal, normal);
+				ConvertVectorPxToDx(hit.position, position);
+				ConvertVectorPxToDx(hit.normal, normal);
 				unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
 				unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
@@ -556,8 +556,8 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
-	CopyVectorDxToPx(in.origin, pxOrgin);
-	CopyVectorDxToPx(in.direction, pxDirection);
+	ConvertVectorDxToPx(in.origin, pxOrgin);
+	ConvertVectorDxToPx(in.direction, pxDirection);
 
 	// RaycastHit 
 	physx::PxRaycastBuffer hitBufferStruct;
@@ -598,8 +598,8 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 			if (blockHit.shape && blockHit.shape->userData != nullptr) {
 				out.id = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisId;
 				out.blockLayerNumber = static_cast<CollisionData*>(hitBufferStruct.block.shape->userData)->thisLayerNumber;
-				CopyVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
-				CopyVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
+				ConvertVectorPxToDx(hitBufferStruct.block.position, out.blockPosition);
+				ConvertVectorPxToDx(hitBufferStruct.block.normal, out.blockNormal);
 			}
 			else {
 				out.hasBlock = false;
@@ -616,8 +616,8 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 {
 	physx::PxVec3 pxOrgin;
 	physx::PxVec3 pxDirection;
-	CopyVectorDxToPx(in.origin, pxOrgin);
-	CopyVectorDxToPx(in.direction, pxDirection);
+	ConvertVectorDxToPx(in.origin, pxOrgin);
+	ConvertVectorDxToPx(in.direction, pxDirection);
 
 	// RaycastHit 
 	const physx::PxU32 maxHits = 20;
@@ -671,8 +671,8 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 			if (shape && shape->userData != nullptr) { // 추가: shape 및 userData 유효성 확인
 			DirectX::SimpleMath::Vector3 position;
 			DirectX::SimpleMath::Vector3 normal;
-			CopyVectorPxToDx(hit.position, position);
-			CopyVectorPxToDx(hit.normal, normal);
+			ConvertVectorPxToDx(hit.position, position);
+			ConvertVectorPxToDx(hit.normal, normal);
 			unsigned int id = static_cast<CollisionData*>(shape->userData)->thisId;
 			unsigned int layerNumber = static_cast<CollisionData*>(shape->userData)->thisLayerNumber;
 
@@ -773,11 +773,13 @@ void PhysicX::CreateStaticBody(const HeightFieldColliderInfo & info, const EColl
 	physx::PxShape* shape = m_physics->createShape(PxHeightFieldGeometry(pxHeightField,physx::PxMeshGeometryFlag::eDOUBLE_SIDED), *material, true);
 
 	StaticRigidBody* staticBody = SettingStaticBody(shape, info.colliderInfo, colliderType, m_collisionMatrix);
-	staticBody->SetOffsetRotation(DirectX::SimpleMath::Matrix::CreateRotationZ(180.0f / 180.0f * 3.14f));
-	staticBody->SetOffsetTranslation(DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3(info.rowScale * info.numRows * 0.5f, 0.0f, -info.colScale * info.numCols * 0.5f)));
-
+	
+	DirectX::SimpleMath::Vector3 offsetPosition( info.rowScale * info.numRows * 0.5f,0.0f,- info.colScale * info.numCols * 0.5f);
+	const float pi = 3.1415926535f;
 	shape->release();
-
+	DirectX::SimpleMath::Quaternion offsetRotation = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::UnitZ, pi);
+	staticBody->SetOffsetPosition(offsetPosition);
+	staticBody->SetOffsetRotation(offsetRotation);
 }
 
 void PhysicX::CreateDynamicBody(const BoxColliderInfo & info, const EColliderType & colliderType,  bool isKinematic)
@@ -972,10 +974,28 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	if (dynamicBody)
 	{
 		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
-		DirectX::SimpleMath::Matrix dxMatrix;
-		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
-		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(dynamicBody->GetScale()) * dxMatrix * dynamicBody->GetOffsetTranslation();
-		CopyVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
+		
+		physx::PxTransform pxTransform = pxBody->getGlobalPose();
+		DirectX::SimpleMath::Vector3 position;
+		DirectX::SimpleMath::Quaternion rotation;
+		
+		DirectX::SimpleMath::Vector3 scale = dynamicBody->GetScale();
+		DirectX::SimpleMath::Vector3 offsetPos = dynamicBody->GetOffsetPosition();//ridid body의 오프셋 위치
+		DirectX::SimpleMath::Quaternion offsetRotate = dynamicBody->GetOffsetRotation();//ridid body의 오프셋 회전
+
+		ConvertVectorPxToDx(pxTransform.p, position);
+		ConvertQuaternionPxToDx(pxTransform.q, rotation);
+
+		DirectX::SimpleMath::Quaternion finalrotation = rotation * offsetRotate; //오프셋 회전 적용
+		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offsetPos,rotation);
+
+		DirectX::SimpleMath::Vector3 finalPosition = position + rotatedOffsetPos; //오프셋 위치 적용
+		
+		rigidBodyData.transform =	DirectX::SimpleMath::Matrix::CreateScale(scale) *
+									DirectX::SimpleMath::Matrix::CreateFromQuaternion(finalrotation) *
+									DirectX::SimpleMath::Matrix::CreateTranslation(finalPosition);
+		
+		ConvertVectorPxToDx(pxBody->getLinearVelocity(), rigidBodyData.linearVelocity);
 		DirectX::SimpleMath::Vector3& velocity = rigidBodyData.linearVelocity;
 
 		if (std::abs(velocity.x) < 0.01f)
@@ -987,7 +1007,7 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 		{
 			velocity.z = 0.0f;
 		}
-		CopyVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
+		ConvertVectorPxToDx(pxBody->getAngularVelocity(), rigidBodyData.angularVelocity);
 
 		physx::PxRigidDynamicLockFlags flags = pxBody->getRigidDynamicLockFlags();
 
@@ -1020,9 +1040,24 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	if (staticBody)
 	{
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
-		DirectX::SimpleMath::Matrix dxMatrix;
-		CopyMatrixPxToDx(pxBody->getGlobalPose(), dxMatrix);
-		rigidBodyData.transform = DirectX::SimpleMath::Matrix::CreateScale(staticBody->GetScale()) * staticBody->GetOffsetRotation() *dxMatrix * staticBody->GetOffsetTranslation();
+		physx::PxTransform pxTransform = pxBody->getGlobalPose();
+		DirectX::SimpleMath::Vector3 position;
+		DirectX::SimpleMath::Quaternion rotation;
+
+		DirectX::SimpleMath::Vector3 scale = staticBody->GetScale();
+		DirectX::SimpleMath::Vector3 offsetPos = staticBody->GetOffsetPosition();//ridid body의 오프셋 위치
+		DirectX::SimpleMath::Quaternion offsetRotate = staticBody->GetOffsetRotation();//ridid body의 오프셋 회전
+
+		ConvertVectorPxToDx(pxTransform.p, position);
+		ConvertQuaternionPxToDx(pxTransform.q, rotation);
+
+		DirectX::SimpleMath::Quaternion finalrotation = rotation * offsetRotate; //오프셋 회전 적용
+		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offsetPos, rotation);
+
+		DirectX::SimpleMath::Vector3 finalPosition = position + rotatedOffsetPos; //오프셋 위치 적용
+		rigidBodyData.transform =	DirectX::SimpleMath::Matrix::CreateScale(scale) * 
+									DirectX::SimpleMath::Matrix::CreateFromQuaternion(finalrotation) * 
+									DirectX::SimpleMath::Matrix::CreateTranslation(finalPosition);
 	}
 
 	return rigidBodyData;
@@ -1093,8 +1128,8 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		{
 			physx::PxVec3 pxLinearVelocity;
 			physx::PxVec3 pxAngularVelocity;
-			CopyVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
-			CopyVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
+			ConvertVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
+			ConvertVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
 			pxBody->setLinearVelocity(pxLinearVelocity);
 			pxBody->setAngularVelocity(pxAngularVelocity);
 		}
@@ -1102,7 +1137,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		if (rigidBodyData.forceMode != 4) 
 		{
 			PxVec3 velocity;
-			CopyVectorDxToPx(rigidBodyData.velocity, velocity);
+			ConvertVectorDxToPx(rigidBodyData.velocity, velocity);
 			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
 			rigidBodyData.forceMode = 4;
 		}
@@ -1127,13 +1162,29 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxTransform;
 		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Vector3 scale;
 		DirectX::SimpleMath::Quaternion rotation;
 		dxMatrix.Decompose(scale, rotation, position);
-		dxMatrix = DirectX::SimpleMath::Matrix::CreateScale(1.0f) * DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * DirectX::SimpleMath::Matrix::CreateTranslation(position);
+		
+		DirectX::SimpleMath::Vector3 offPos = dynamicBody->GetOffsetPosition();
+		DirectX::SimpleMath::Quaternion offRot = dynamicBody->GetOffsetRotation();
+		
+		DirectX::SimpleMath::Quaternion invOffsetRot;
+		offRot.Inverse(invOffsetRot);
+		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
 
-		CopyMatrixDxToPx(dxMatrix, pxTransform);
-		pxBody->setGlobalPose(pxTransform);
+		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos,bodyRotation);
+		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
+
+		ConvertVectorDxToPx(bodyPosition,pxTransform.p);
+		ConvertQuaternionDxToPx(bodyRotation,pxTransform.q);
+
+		//CopyMatrixDxToPx(dxMatrix, pxTransform);
+		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
+		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+			pxBody->setGlobalPose(pxTransform);
+		}
+		//pxBody->setGlobalPose(pxTransform);
 		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
 
 		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)
@@ -1151,19 +1202,31 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		physx::PxRigidStatic* pxBody = staticBody->GetRigidStatic();
 		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-		physx::PxTransform pxCurrTransform;
 		
+		physx::PxTransform pxTransform;
 		DirectX::SimpleMath::Vector3 position;
-		DirectX::SimpleMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		DirectX::SimpleMath::Vector3 scale;
 		DirectX::SimpleMath::Quaternion rotation;
-
 		dxMatrix.Decompose(scale, rotation, position);
-		dxMatrix = DirectX::SimpleMath::Matrix::CreateScale(1.0f) * 
-			DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) * staticBody->GetOffsetRotation().Invert() *
-			DirectX::SimpleMath::Matrix::CreateTranslation(position) * staticBody->GetOffsetTranslation().Invert();
 
-		CopyMatrixDxToPx(dxMatrix, pxCurrTransform);
-		pxBody->setGlobalPose(pxCurrTransform);
+		DirectX::SimpleMath::Vector3 offPos = staticBody->GetOffsetPosition();
+		DirectX::SimpleMath::Quaternion offRot = staticBody->GetOffsetRotation();
+
+		DirectX::SimpleMath::Quaternion invOffsetRot;
+		offRot.Inverse(invOffsetRot);
+		DirectX::SimpleMath::Quaternion bodyRotation = rotation * invOffsetRot;
+
+		DirectX::SimpleMath::Vector3 rotatedOffsetPos = DirectX::SimpleMath::Vector3::Transform(offPos, bodyRotation);
+		DirectX::SimpleMath::Vector3 bodyPosition = position - rotatedOffsetPos;
+
+		ConvertVectorDxToPx(bodyPosition, pxTransform.p);
+		ConvertQuaternionDxToPx(bodyRotation, pxTransform.q);
+
+		//CopyMatrixDxToPx(dxMatrix, pxTransform);
+
+		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+			pxBody->setGlobalPose(pxTransform);
+		}
 	}
 }
 
@@ -1511,10 +1574,25 @@ ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
 	auto ragdoll = articulationIter->second;
 
 	physx::PxTransform pxTransform = ragdoll->GetPxArticulation()->getRootGlobalPose();
-	DirectX::SimpleMath::Matrix dxMatrix;
-	CopyMatrixPxToDx(pxTransform, dxMatrix);
+	DirectX::SimpleMath::Matrix prevDxMatrix= ragdoll->GetWorldTransform();
+	DirectX::SimpleMath::Matrix newDxMatrix = DirectX::SimpleMath::Matrix::Identity;
 
-	data.WorldTransform = dxMatrix;
+
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Vector3 position;
+	DirectX::SimpleMath::Quaternion rotation;
+	prevDxMatrix.Decompose(scale, rotation, position);
+
+	ConvertVectorPxToDx(pxTransform.p, position);
+	ConvertQuaternionPxToDx(pxTransform.q, rotation);
+
+	newDxMatrix = DirectX::SimpleMath::Matrix::CreateScale(scale) *
+		DirectX::SimpleMath::Matrix::CreateFromQuaternion(rotation) *
+		DirectX::SimpleMath::Matrix::CreateTranslation(position);
+
+	
+
+	data.WorldTransform = newDxMatrix;
 	data.bIsRagdollSimulation = ragdoll->GetIsRagdoll();
 
 	for (auto& [name, link] : ragdoll->GetLinkContainer()) {
@@ -1693,8 +1771,8 @@ void PhysicX::DrawPVDLine(DirectX::SimpleMath::Vector3 ori, DirectX::SimpleMath:
 		PxVec3 origin;
 		PxVec3 endpoint;
 
-		CopyVectorDxToPx(ori, origin);
-		CopyVectorDxToPx(end, endpoint);
+		ConvertVectorDxToPx(ori, origin);
+		ConvertVectorDxToPx(end, endpoint);
 
 		// 선 하나를 그리는 것이므로 lineCount = 1
 		PxDebugLine line(origin, endpoint, color);
