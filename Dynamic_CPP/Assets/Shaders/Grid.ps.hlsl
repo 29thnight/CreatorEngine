@@ -22,53 +22,56 @@ struct VS_OUTPUT
     float3 worldPos : TEXCOORD0;
 };
 
-float grid(float2 pos, float unit, float thickness)
+// fwidth 대용 (파생값 절댓값 합)
+static float2 fwidth2(float2 v)
 {
-    // fwidth는 HLSL에서도 동일하게 사용 가능
-    float2 threshold = fwidth(pos) * thickness * 0.5 / unit;
-    float2 posWrapped = pos / unit;
-    // HLSL에서는 step가 없으므로 삼항 연산자로 구현
-    float2 step_line = (frac(-posWrapped) < threshold) ? float2(1.0, 1.0) : float2(0.0, 0.0);
-    step_line += (frac(posWrapped) < threshold) ? float2(1.0, 1.0) : float2(0.0, 0.0);
-    return max(step_line.x, step_line.y);
+    return abs(ddx(v)) + abs(ddy(v));
 }
 
-float checker(float2 pos, float unit)
+// 절대 좌표 기반 그리드 라인 마스크(0~1)
+float grid_mask(float2 posAbs, float unit, float thickness)
 {
-    float square1 = (frac(pos.x / unit * 0.5) >= 0.5) ? 1.0 : 0.0;
-    float square2 = (frac(pos.y / unit * 0.5) >= 0.5) ? 1.0 : 0.0;
-    return max(square1, square2) - square1 * square2;
+    unit = max(unit, 1e-6); // 0 나눗셈 방지
+    float2 fw = fwidth2(posAbs);
+    float2 threshold = fw * thickness * 0.5 / unit;
+
+    float2 coord = posAbs / unit;
+    float2 fracP = frac(coord);
+    float2 fracN = frac(-coord);
+
+    float2 hit;
+    hit.x = ((fracP.x < threshold.x) ? 1.0 : 0.0) + ((fracN.x < threshold.x) ? 1.0 : 0.0);
+    hit.y = ((fracP.y < threshold.y) ? 1.0 : 0.0) + ((fracN.y < threshold.y) ? 1.0 : 0.0);
+
+    return saturate(max(hit.x, hit.y));
 }
 
 float4 main(VS_OUTPUT input) : SV_TARGET
 {
-    float3 posWorld = input.worldPos;
-    
-    // 평면상의 거리 계산 (XZ 평면)
-    float distPlanar = distance(posWorld.xz, (int)cameraPos.xz);
-    
-    float absY = 1;//max(1 - saturate(distPlanar / 70.0), 0.0);
-    
-    // 메이저 라인과 서브 디비전(마이너) 라인 계산
-    float step_line = grid(posWorld.xz, unitSize, majorLineThickness * absY);
-    step_line += grid(posWorld.xz, unitSize / subdivisions, minorLineThickness * absY) * minorLineAlpha;
-    step_line = saturate(step_line); // clamp(0.0,1.0)와 동일
-    
-    // 체커보드 패턴 계산
-    //float chec = checker(posWorld.xz, unitSize);
-    
-    // 거리 페이드 계산
-    float fadeFactor = 1.0 - saturate((distPlanar - fadeStart) / (fadeEnd - fadeStart));
-    
-    // 최종 알파값 (각각의 패턴에 따른 알파 합산 후 페이드 적용)
-    float alphaGrid = step_line * gridColor.a;
-    //float alphaChec = chec * checkerColor.a;
-    float alpha = saturate(alphaGrid /*+ alphaChec*/) * fadeFactor * (1 - saturate(distPlanar / 100.f));
-    
-    // 최종 색상 (프리멀티플라이드 알파 블렌딩)
-    float3 color = (checkerColor.rgb /** alphaChec*/) * (1.0 - alphaGrid) + (gridColor.rgb * alphaGrid);
+// ---- 절대 좌표로 그리드 계산 (월드 원점 + centerOffset 기준) ----
+    float2 posAbs = input.worldPos.xz - centerOffset.xz;
 
-    //if (alpha < 0.1)
-    //    discard;
+    float fSubs = max((float) subdivisions, 1.0);
+    float minorUnit = unitSize / fSubs;
+
+    float major = grid_mask(posAbs, unitSize, majorLineThickness);
+    float minor = grid_mask(posAbs, minorUnit, minorLineThickness) * minorLineAlpha;
+    float lineMask = saturate(major + minor);
+
+    // ---- 카메라 기준으로 가시 범위 페이드 (절대 좌표 패턴은 유지) ----
+    float distPlanar = length(input.worldPos.xz - cameraPos.xz); // ← 절대/float 계산, int 캐스팅 금지
+    float denom = max(fadeEnd - fadeStart, 1e-5);
+    float fadeFactor = 1.0 - saturate((distPlanar - fadeStart) / denom);
+
+    // 추가로 너무 멀면 살짝 더 감쇠하고 싶다면 (옵션)
+     fadeFactor *= (1.0 - saturate(distPlanar / 100.0));
+
+    // ---- 색/알파 합성 ----
+    float alphaGrid = lineMask * gridColor.a;
+    float alpha = saturate(alphaGrid) * fadeFactor;
+
+    // 배경(checkerColor) 위에 라인(gridColor)만 섞기
+    float3 color = lerp(checkerColor.rgb, gridColor.rgb, lineMask);
+
     return float4(color, alpha);
 }
