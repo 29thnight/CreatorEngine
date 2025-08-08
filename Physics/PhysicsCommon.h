@@ -107,6 +107,8 @@ struct RigidBodyGetSetData
 	bool isKinematic = false; // 키네마틱 여부
 	bool isDisabled = false;  // 시뮬레이션 비활성화 여부
 	bool useGravity = true; // 중력 사용 여부
+
+	bool isDirty = false;
 };
 
 //CharacterController의 GetSetData를 위한 구조체

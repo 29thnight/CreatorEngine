@@ -768,7 +768,6 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 	int editHeight = terrainComponent->m_height;
 	file::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
 	FileGuid& terrainAssetGuid = terrainComponent->m_trrainAssetGuid;
-
 	if (terrainAssetGuid == nullFileGuid && !terrainAssetPath.empty())
 	{
 		terrainAssetGuid = DataSystems->GetFileGuid(terrainAssetPath);
@@ -803,17 +802,17 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		terrainComponent->Resize(editWidth, editHeight);
 	}
 
-	g_CurrentBrush->m_isEditMode = false;
+	EngineSettingInstance->terrainBrush->m_isEditMode = false;
 	// ImGui UI 예시 (에디터 툴 패널 내부)
 	if (ImGui::CollapsingHeader("Terrain Editor", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		//inspector가 화면에 뜨는 경우 브러시가 활성화된 상태로 설정
-		g_CurrentBrush->m_isEditMode = true; // 브러시가 활성화된 상태로 설정
+		EngineSettingInstance->terrainBrush->m_isEditMode = true; // 브러시가 활성화된 상태로 설정
 		// 모드 선택
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
 		if (ImGui::Combo("Edit Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
-			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);
+			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);	
 
 		if(g_CurrentBrush->m_mode != TerrainBrush::Mode::FoliageMode)
 		{
@@ -937,7 +936,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		{
 			if (ImGui::CollapsingHeader("Paint Foliage", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				g_CurrentBrush->m_isEditMode = true;
+				EngineSettingInstance->terrainBrush->m_isEditMode = true;
 				GameObject* owner = terrainComponent->GetOwner();
 				FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 				if (!foliage)

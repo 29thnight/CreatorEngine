@@ -3,6 +3,10 @@
 #include "ShaderSystem.h"
 #include "LightComponent.h"
 #include "CameraComponent.h"
+#include "BoxColliderComponent.h"
+#include "SphereColliderComponent.h"
+#include "CapsuleColliderComponent.h"
+#include "CharacterControllerComponent.h"
 
 float GetGizmoScale(Mathf::Vector3 gizmoPosition, const Camera& camera, float targetScreenHeightRatio)
 {
@@ -73,9 +77,9 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
 	m_pso->Apply();
 
     auto activeScene = SceneManagers->GetActiveScene();
+    m_isShowPhysicsDebugInfo = EngineSettingInstance->IsDebugMode();
 
 	auto selectedObject = activeScene->GetSelectSceneObject();
-	if (nullptr == selectedObject) return;
 
     ID3D11RenderTargetView* rtv = renderData->m_renderTarget->GetRTV();
     DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
@@ -88,43 +92,91 @@ void GizmoLinePass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::VSSetConstantBuffer(0, 1, m_gizmoCameraBuffer.GetAddressOf());
     DirectX11::UpdateBuffer(m_gizmoCameraBuffer.Get(), &cameraBuffer);
 
-    switch (selectedObject->m_gameObjectType)
+    if (m_isShowPhysicsDebugInfo)
     {
-	case GameObjectType::Light:
-	{
-		auto lightComponent = selectedObject->GetComponent<LightComponent>();
-		if (nullptr == lightComponent) return;
-
-        const Mathf::Vector3 worldPosition = selectedObject->m_transform.GetWorldPosition();
-        const Mathf::Vector3 lightDirection = Mathf::Vector3(lightComponent->m_direction);
-
-        float gizmoScale = GetGizmoScale(worldPosition, camera, 0.05f);
-
-        switch (lightComponent->m_lightType)
+        for (auto* box : activeScene->GetBoxColliderComponents())
         {
-        case LightType::DirectionalLight:
-            DrawWireCircleAndLines(worldPosition, gizmoScale, lightDirection, lightDirection, { 1, 0, 1, 1 });
-			break;
-        case LightType::PointLight:
-            DrawWireSphere(worldPosition, lightComponent->m_range, { 1, 1, 0, 1 });
-            break;
-        case LightType::SpotLight:
-            DrawWireCone(worldPosition, lightDirection, lightComponent->m_range, lightComponent->m_spotLightAngle, { 0, 1, 1, 1 });
-            break;
+            if (!box) continue;
+            const auto world = box->GetOwner()->m_transform.GetWorldMatrix();
+            const auto offset = Mathf::Matrix::CreateFromQuaternion(box->GetRotationOffset()) * Mathf::Matrix::CreateTranslation(box->GetPositionOffset());
+            const auto transformMatrix = offset * world;
+            DrawWireBox(transformMatrix, box->GetExtents(), { 1.f, 0.f, 0.f, 1.f });
         }
-	}
-	break;
-    case GameObjectType::Camera:
-    {
-        auto cameraComponent = selectedObject->GetComponent<CameraComponent>();
-        if(nullptr == cameraComponent) return;
-
-        auto camera = cameraComponent->GetCamera();
-		if (nullptr == camera || camera->m_isOrthographic) return; // 카메라가 orthographic일 경우나 없을 경우 throughpass
-        
-        DrawBoundingFrustum(cameraComponent->GetFrustum(), { 1, 0, 1, 1 });
+        for (auto* sphere : activeScene->GetSphereColliderComponents())
+        {
+            if (!sphere) continue;
+            const auto world = sphere->GetOwner()->m_transform.GetWorldMatrix();
+            const auto offset = Mathf::Matrix::CreateFromQuaternion(sphere->GetRotationOffset()) * Mathf::Matrix::CreateTranslation(sphere->GetPositionOffset());
+            const auto transformMatrix = offset * world;
+            const auto center = transformMatrix.Translation();
+            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const float radius = sphere->GetRadius() * std::max({ scale.x, scale.y, scale.z });
+            DrawWireSphere(center, radius, { 0.f, 1.f, 0.f, 1.f });
+        }
+        for (auto* capsule : activeScene->GetCapsuleColliderComponents())
+        {
+            if (!capsule) continue;
+            const auto world = capsule->GetOwner()->m_transform.GetWorldMatrix();
+            const auto offset = Mathf::Matrix::CreateFromQuaternion(capsule->GetRotationOffset()) * Mathf::Matrix::CreateTranslation(capsule->GetPositionOffset());
+            const auto transformMatrix = offset * world;
+            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const float radius = capsule->GetRadius() * std::max({ scale.x, scale.z });
+            const float height = capsule->GetHeight() * scale.y;
+            DrawWireCapsule(transformMatrix, radius, height, { 0.f, 0.f, 1.f, 1.f });
+        }
+        for (auto* characterController : activeScene->GetCharacterControllerComponents())
+        {
+            if (!characterController) continue;
+            const auto world = characterController->GetOwner()->m_transform.GetWorldMatrix();
+            const auto offset = Mathf::Matrix::CreateFromQuaternion(characterController->GetRotationOffset()) * Mathf::Matrix::CreateTranslation(characterController->GetPositionOffset());
+            const auto transformMatrix = offset * world;
+            const auto scale = Mathf::ExtractScale(transformMatrix);
+            const float radius = characterController->m_radius * std::max({ scale.x, scale.z });
+            const float height = characterController->m_height * scale.y;
+            DrawWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
+		}
     }
-    break;
+
+    if (selectedObject)
+    {
+        switch (selectedObject->m_gameObjectType)
+        {
+        case GameObjectType::Light:
+        {
+            auto lightComponent = selectedObject->GetComponent<LightComponent>();
+            if (nullptr == lightComponent) return;
+
+            const Mathf::Vector3 worldPosition = selectedObject->m_transform.GetWorldPosition();
+            const Mathf::Vector3 lightDirection = Mathf::Vector3(lightComponent->m_direction);
+
+            float gizmoScale = GetGizmoScale(worldPosition, camera, 0.05f);
+
+            switch (lightComponent->m_lightType)
+            {
+            case LightType::DirectionalLight:
+                DrawWireCircleAndLines(worldPosition, gizmoScale, lightDirection, lightDirection, { 1, 0, 1, 1 });
+                break;
+            case LightType::PointLight:
+                DrawWireSphere(worldPosition, lightComponent->m_range, { 1, 1, 0, 1 });
+                break;
+            case LightType::SpotLight:
+                DrawWireCone(worldPosition, lightDirection, lightComponent->m_range, lightComponent->m_spotLightAngle, { 0, 1, 1, 1 });
+                break;
+            }
+        }
+        break;
+        case GameObjectType::Camera:
+        {
+            auto cameraComponent = selectedObject->GetComponent<CameraComponent>();
+            if (nullptr == cameraComponent) return;
+
+            auto camera = cameraComponent->GetCamera();
+            if (nullptr == camera || camera->m_isOrthographic) return; // 카메라가 orthographic일 경우나 없을 경우 throughpass
+
+            DrawBoundingFrustum(cameraComponent->GetFrustum(), { 1, 0, 1, 1 });
+        }
+        break;
+        }
     }
 
     m_pso->Reset();
@@ -246,6 +298,77 @@ void GizmoLinePass::DrawWireSphere(const Mathf::Vector3& center, float radius, c
     DrawWireCircle(center, radius, Mathf::Vector3(0, 1, 0), color); // XZ plane
     DrawWireCircle(center, radius, Mathf::Vector3(1, 0, 0), color); // YZ plane
     DrawWireCircle(center, radius, Mathf::Vector3(0, 0, 1), color); // XY plane
+}
+
+void GizmoLinePass::DrawWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents, const Mathf::Color4& color)
+{
+    std::array<Mathf::Vector3, 8> corners = {
+    Mathf::Vector3(-extents.x, -extents.y, -extents.z),
+    Mathf::Vector3(extents.x, -extents.y, -extents.z),
+    Mathf::Vector3(extents.x,  extents.y, -extents.z),
+    Mathf::Vector3(-extents.x,  extents.y, -extents.z),
+    Mathf::Vector3(-extents.x, -extents.y,  extents.z),
+    Mathf::Vector3(extents.x, -extents.y,  extents.z),
+    Mathf::Vector3(extents.x,  extents.y,  extents.z),
+    Mathf::Vector3(-extents.x,  extents.y,  extents.z)
+    };
+
+    for (auto& corner : corners)
+    {
+        corner = XMVector3TransformCoord(corner, transform);
+    }
+
+    std::array<uint32_t, 24> indices = {
+        0,1, 1,2, 2,3, 3,0,
+        4,5, 5,6, 6,7, 7,4,
+        0,4, 1,5, 2,6, 3,7
+    };
+
+    std::vector<LineVertex> verts;
+    verts.reserve(indices.size());
+    for (size_t i = 0; i < indices.size(); i += 2)
+    {
+        verts.push_back({ corners[indices[i]], color });
+        verts.push_back({ corners[indices[i + 1]], color });
+    }
+
+    DrawLines(verts.data(), static_cast<uint32_t>(verts.size()));
+}
+
+void GizmoLinePass::DrawWireCapsule(const Mathf::Matrix& transform, float radius, float height, const Mathf::Color4& color)
+{
+    using namespace Mathf;
+    const int segmentCount = 16;
+    Vector3 up = transform.Up();
+    up.Normalize();
+    Vector3 right = transform.Right();
+    right.Normalize();
+    Vector3 forward = transform.Forward();
+    forward.Normalize();
+
+    float halfHeight = height * 0.5f;
+    Vector3 center = transform.Translation();
+    Vector3 topCenter = center + up * halfHeight;
+    Vector3 bottomCenter = center - up * halfHeight;
+
+    std::vector<LineVertex> vertices;
+    vertices.reserve(segmentCount * 2);
+    for (int i = 0; i < segmentCount; ++i)
+    {
+        float angle = XM_2PI * (static_cast<float>(i) / segmentCount);
+        Vector3 dir = cosf(angle) * right + sinf(angle) * forward;
+        Vector3 p0 = bottomCenter + dir * radius;
+        Vector3 p1 = topCenter + dir * radius;
+        vertices.push_back(LineVertex{ p0, color });
+        vertices.push_back(LineVertex{ p1, color });
+    }
+
+    DrawLines(vertices.data(), static_cast<uint32_t>(vertices.size()));
+
+    DrawWireSphere(topCenter, radius, color);
+    DrawWireSphere(bottomCenter, radius, color);
+    DrawWireCircle(topCenter, radius, up, color);
+    DrawWireCircle(bottomCenter, radius, up, color);
 }
 
 void GizmoLinePass::DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color)

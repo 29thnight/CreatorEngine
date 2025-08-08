@@ -20,7 +20,7 @@ RigidBody::~RigidBody()
 
 void RigidBody::UpdateShapeGeometry(physx::PxRigidActor* Actor, const physx::PxGeometry& newGeometry, physx::PxPhysics* physics, physx::PxMaterial* material, unsigned int* collisionMatrix, void* userData)
 {
-	physx::PxShape* newShape = physics->createShape(newGeometry, *material,true);
+	physx::PxShape* newShape = physics->createShape(newGeometry, *material, true);
 	physx::PxFilterData filterData;
 	filterData.word0 = m_layerNumber;
 	filterData.word1 = collisionMatrix[m_layerNumber];

@@ -502,13 +502,45 @@ void MenuBarWindow::RenderMenuBar()
 
             if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
-                m_bShowLogWindow = !m_bShowProfileWindow;
+                m_bShowLogWindow = !m_bShowLogWindow;
             }
 
             ImGui::SameLine();
-            if (ImGui::Button(ICON_FA_BUG " ProfileFrame "))
+            if (ImGui::Button(ICON_FA_CHART_GANTT " ProfileFrame "))
             {
                 m_bShowProfileWindow = !m_bShowProfileWindow;
+            }
+
+            {
+                const char* kDebugLabel = ICON_FA_BUG;
+                ImVec2 text = ImGui::CalcTextSize(kDebugLabel);
+                const ImGuiStyle& style = ImGui::GetStyle();
+                ImVec2 btn = { text.x + style.FramePadding.x * 2.0f,
+                               text.y + style.FramePadding.y * 2.0f };
+
+                // 남은 폭(avail)만큼 오른쪽으로 이동하되, 버튼 너비만큼 빼서 오른쪽 끝에 정렬
+                float avail = ImGui::GetContentRegionAvail().x;
+                if (avail > btn.x) {
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - btn.x));
+                }
+                else {
+                    ImGui::SameLine(); // 공간이 없으면 같은 라인에라도 붙이기
+                }
+
+                bool wasDebug = EngineSettingInstance->IsDebugMode();
+
+                // 활성화 색상 토글(선택)
+                if (wasDebug) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                }
+
+                if (ImGui::Button(kDebugLabel, btn)) {
+                    EngineSettingInstance->SetIsDebugMode(!EngineSettingInstance->IsDebugMode());
+                }
+
+                if (wasDebug) ImGui::PopStyleColor(3);
             }
 
             ImGui::EndMenuBar();

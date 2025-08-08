@@ -1064,7 +1064,6 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 	{
 		physx::PxRigidDynamic* pxBody = dynamicBody->GetRigidDynamic();
 		if (!pxBody) return;
-
 		// Actor 및 Body 플래그 설정
 		pxBody->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, !rigidBodyData.useGravity);
 		pxBody->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, rigidBodyData.isDisabled);
@@ -1092,35 +1091,38 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 		// 속도 및 기타 데이터 설정
 		if (!rigidBodyData.isKinematic)
 		{
-		physx::PxVec3 pxLinearVelocity;
-		physx::PxVec3 pxAngularVelocity;
-		CopyVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
-		CopyVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
+			physx::PxVec3 pxLinearVelocity;
+			physx::PxVec3 pxAngularVelocity;
+			CopyVectorDxToPx(rigidBodyData.linearVelocity, pxLinearVelocity);
+			CopyVectorDxToPx(rigidBodyData.angularVelocity, pxAngularVelocity);
 			pxBody->setLinearVelocity(pxLinearVelocity);
 			pxBody->setAngularVelocity(pxAngularVelocity);
 		}
 
-		if (rigidBodyData.forceMode != 4) {
+		if (rigidBodyData.forceMode != 4) 
+		{
 			PxVec3 velocity;
 			CopyVectorDxToPx(rigidBodyData.velocity, velocity);
 			pxBody->addForce(velocity, static_cast<physx::PxForceMode::Enum>(rigidBodyData.forceMode));
 			rigidBodyData.forceMode = 4;
 		}
 
-		pxBody->setMaxLinearVelocity(rigidBodyData.maxLinearVelocity);
-		pxBody->setMaxAngularVelocity(rigidBodyData.maxAngularVelocity);
-		pxBody->setMaxContactImpulse(rigidBodyData.maxContactImpulse);
-		pxBody->setMaxDepenetrationVelocity(rigidBodyData.maxDepenetrationVelocity);
+		if (rigidBodyData.isDirty) {
+			pxBody->setMaxLinearVelocity(rigidBodyData.maxLinearVelocity);
+			pxBody->setMaxAngularVelocity(rigidBodyData.maxAngularVelocity);
+			pxBody->setMaxContactImpulse(rigidBodyData.maxContactImpulse);
+			pxBody->setMaxDepenetrationVelocity(rigidBodyData.maxDepenetrationVelocity);
 
-		pxBody->setAngularDamping(rigidBodyData.AngularDamping);
-		pxBody->setLinearDamping(rigidBodyData.LinearDamping);
-		pxBody->setMass(rigidBodyData.mass);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X, rigidBodyData.isLockAngularX);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y, rigidBodyData.isLockAngularY);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z, rigidBodyData.isLockAngularZ);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_X, rigidBodyData.isLockLinearX);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
-		pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
+			pxBody->setAngularDamping(rigidBodyData.AngularDamping);
+			pxBody->setLinearDamping(rigidBodyData.LinearDamping);
+			pxBody->setMass(rigidBodyData.mass);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_X, rigidBodyData.isLockAngularX);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Y, rigidBodyData.isLockAngularY);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_ANGULAR_Z, rigidBodyData.isLockAngularZ);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_X, rigidBodyData.isLockLinearX);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Y, rigidBodyData.isLockLinearY);
+			pxBody->setRigidDynamicLockFlag(physx::PxRigidDynamicLockFlag::eLOCK_LINEAR_Z, rigidBodyData.isLockLinearZ);
+		}
 
 		DirectX::SimpleMath::Matrix dxMatrix = rigidBodyData.transform;
 		physx::PxTransform pxTransform;
