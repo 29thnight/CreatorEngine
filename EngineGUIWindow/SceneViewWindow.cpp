@@ -669,83 +669,88 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	}
 	//====================
 	// 선택 아이템 있을시 처리
-	if (sceneSelectedObj != nullptr) 
+	static TerrainComponent* prevTerrain = nullptr;
+	if (sceneSelectedObj && sceneSelectedObj->HasComponent<TerrainComponent>())
 	{
-		//터레인 일때	
-		if (sceneSelectedObj->HasComponent<TerrainComponent>()) 
+		if (EngineSettingInstance->terrainBrush == nullptr)
 		{
-			if (EngineSettingInstance->terrainBrush == nullptr)
-			{
-				EngineSettingInstance->terrainBrush = new TerrainBrush();
-			}
+			EngineSettingInstance->terrainBrush = new TerrainBrush();
+		}
 
-			TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
-			if (terrainComponent != nullptr) 
+		TerrainComponent* terrainComponent = sceneSelectedObj->GetComponent<TerrainComponent>();
+		if (terrainComponent)
+		{
+			if (EngineSettingInstance->terrainBrush->m_isEditMode)
 			{
 				terrainComponent->SetTerrainBrush(EngineSettingInstance->terrainBrush);
-				if (EngineSettingInstance->terrainBrush->m_isEditMode)
+				if (ImGui::IsWindowHovered())
 				{
-
-					if (ImGui::IsWindowHovered()) 
+					ImVec2 mousePos = ImGui::GetMousePos();
+					Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
+					//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
+					XMFLOAT3 origin = ray.origin;
+					XMFLOAT3 direction = ray.direction;
+					// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
+					if (direction.y < 0.0f)
 					{
-						ImVec2 mousePos = ImGui::GetMousePos();
-						Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
-						//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
-						XMFLOAT3 origin = ray.origin;
-						XMFLOAT3 direction = ray.direction;
-						// 절대로 방향 벡터의 y 성분이 0이면 나눌 수 없으므로 먼저 체크
-						if (direction.y < 0.0f)
+						// t 계산: Y=0 평면 얻기
+						float t = -origin.y / direction.y;
+						if (t >= 0.0f)
 						{
-							// t 계산: Y=0 평면 얻기
-							float t = -origin.y / direction.y;
-							if (t >= 0.0f)
+							// 충돌 지점 P = origin + t * direction
+							XMFLOAT3 hitPos;
+							hitPos.x = origin.x + t * direction.x;
+							hitPos.y = 0.0f; // 당연히 y=0
+							hitPos.z = origin.z + t * direction.z;
+
+							// 4) 충돌 지점(P)의 XZ → HeightMap 인덱스(격자) 변환
+							//    TerrainComponent의 m_width, m_height, m_gridSize가 필요
+							float gridSize = 1.0f; // 예: 1.0f, 2.0f 등
+							int   tileX = static_cast<int>(floorf(hitPos.x / gridSize));
+							int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
+
+							EngineSettingInstance->terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
+
+							if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 							{
-								// 충돌 지점 P = origin + t * direction
-								XMFLOAT3 hitPos;
-								hitPos.x = origin.x + t * direction.x;
-								hitPos.y = 0.0f; // 당연히 y=0
-								hitPos.z = origin.z + t * direction.z;
-
-								// 4) 충돌 지점(P)의 XZ → HeightMap 인덱스(격자) 변환
-								//    TerrainComponent의 m_width, m_height, m_gridSize가 필요
-								float gridSize = 1.0f; // 예: 1.0f, 2.0f 등
-								int   tileX = static_cast<int>(floorf(hitPos.x / gridSize)); 
-								int   tileY = static_cast<int>(floorf(hitPos.z / gridSize));
-
-								EngineSettingInstance->terrainBrush->m_center = { static_cast<float>(tileX), static_cast<float>(tileY) };
-
-								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+								if (EngineSettingInstance->terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
 								{
-									if (EngineSettingInstance->terrainBrush->m_mode == TerrainBrush::Mode::FoliageMode)
+									FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
+									if (foliage)
 									{
-										FoliageComponent* foliage = sceneSelectedObj->GetComponent<FoliageComponent>();
-										if (foliage)
+										if (EngineSettingInstance->terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
 										{
-											if (EngineSettingInstance->terrainBrush->m_foliageMode == TerrainBrush::FoliageMode::Paint)
-											{
-												foliage->AddRandomInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush, EngineSettingInstance->terrainBrush->m_foliageTypeID, EngineSettingInstance->terrainBrush->m_foliageDensity);
-											}
-											else
-											{
-												foliage->RemoveInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush);
-											}
-
-											auto renderScene = SceneManagers->GetRenderScene();
-											if (renderScene) renderScene->UpdateCommand(foliage);
+											foliage->AddRandomInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush, EngineSettingInstance->terrainBrush->m_foliageTypeID, EngineSettingInstance->terrainBrush->m_foliageDensity);
 										}
+										else
+										{
+											foliage->RemoveInstancesInBrush(terrainComponent, *EngineSettingInstance->terrainBrush);
+										}
+
+										auto renderScene = SceneManagers->GetRenderScene();
+										if (renderScene) renderScene->UpdateCommand(foliage);
 									}
-									else
-									{
-										terrainComponent->ApplyBrush(*EngineSettingInstance->terrainBrush);
-									}
+								}
+								else
+								{
+									terrainComponent->ApplyBrush(*EngineSettingInstance->terrainBrush);
 								}
 							}
 						}
 					}
 				}
 			}
+			else
+			{
+				terrainComponent->SetTerrainBrush(nullptr);
+			}
+			prevTerrain = terrainComponent;
 		}
-
+	}
+	else if (prevTerrain)
+	{
+		prevTerrain->SetTerrainBrush(nullptr);
+		prevTerrain = nullptr;
 	}
 
 	//=========================

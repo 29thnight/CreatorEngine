@@ -812,7 +812,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
 		if (ImGui::Combo("Edit Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
-			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);
+			g_CurrentBrush->m_mode = static_cast<TerrainBrush::Mode>(currentMode);	
 
 		if(g_CurrentBrush->m_mode != TerrainBrush::Mode::FoliageMode)
 		{
@@ -936,7 +936,7 @@ void InspectorWindow::ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainC
 		{
 			if (ImGui::CollapsingHeader("Paint Foliage", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				g_CurrentBrush->m_isEditMode = true;
+				EngineSettingInstance->terrainBrush->m_isEditMode = true;
 				GameObject* owner = terrainComponent->GetOwner();
 				FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 				if (!foliage)

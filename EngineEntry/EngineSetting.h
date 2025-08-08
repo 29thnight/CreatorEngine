@@ -75,6 +75,9 @@ public:
 	bool SaveSettings();
 	bool LoadSettings();
 
+	void SetIsDebugMode(bool isDebugMode) { m_isDebugMode = isDebugMode; }
+	bool IsDebugMode() const { return m_isDebugMode; }
+
 	std::wstring GetBuildGameName() const { return m_buildGameName; }
 	void SetBuildGameName(const std::wstring& name) { m_buildGameName = name; }
 
@@ -97,6 +100,8 @@ private:
 	ContentsBrowserStyle m_contentsBrowserStyle{ ContentsBrowserStyle::Tile };
     bool m_isEditorMode{ true };
 	bool m_isMinimized{ false };
+	bool m_isDebugMode{ false };
+
 	MSVCVersion m_msvcVersion{ MSVCVersion::None };
     RenderPassSettings m_renderPassSettings{};
 	Mathf::Vector2 m_lastWindowSize{ 0.0f, 0.0f };
