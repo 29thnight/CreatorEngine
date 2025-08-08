@@ -2,6 +2,7 @@
 #include "../RenderEngine/DeviceState.h"
 #include "InputManager.h"
 #include "ImageComponent.h"
+#include "RectTransformComponent.h"
 
 void UIButton::Update(float deltaSecond)
 {
@@ -11,19 +12,17 @@ void UIButton::Update(float deltaSecond)
 void UIButton::UpdateCollider()
 {
 	
-	Transform transform = m_pOwner->m_transform;
-	Mathf::Vector4 pos = transform.position;
-	Mathf::Vector4 scale = transform.scale;
-	ImageComponent* Image = m_pOwner->GetComponent<ImageComponent>();
-	obBox.Center = Mathf::Vector3{ pos.x, pos.y, 0 };
-	if (Image)
-	{
-		obBox.Extents.x = Image->uiinfo.size.x / 2 * scale.x;
-		obBox.Extents.y = Image->uiinfo.size.y / 2 * scale.y;
-	}
-	Mathf::Vector4 quater = transform.GetWorldQuaternion();
-	obBox.Orientation = quater;
-	//obBox.Orientation = { XMVectorGetX(quater), XMVectorGetY(quater),XMVectorGetZ(quater) ,XMVectorGetW(quater) };
+        if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+        {
+                const auto& worldRect = rect->GetWorldRect();
+                obBox.Center = { worldRect.x + worldRect.width * 0.5f,
+                                 worldRect.y + worldRect.height * 0.5f,
+                                 0.0f };
+                obBox.Extents.x = worldRect.width * 0.5f;
+                obBox.Extents.y = worldRect.height * 0.5f;
+        }
+        auto quater = m_pOwner->m_transform.GetWorldQuaternion();
+        obBox.Orientation = quater;
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)
