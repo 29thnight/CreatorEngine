@@ -1,65 +1,54 @@
 #include "PhysicsHelper.h"
 
-void CopyMatrixPxToDx(const physx::PxTransform & pxTransform, DirectX::SimpleMath::Matrix & dxMatrix)
-{
-	DirectX::SimpleMath::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
-	DirectX::SimpleMath::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
-	dxMatrix = DirectX::XMMatrixAffineTransformation(DirectX::XMVectorSet(1.0f, 1.0f, 1.0f, 0.0f), DirectX::XMVectorZero(), rotation, translation);
-}
 
-void CopyMatrixXYZPxToDx(const physx::PxTransform& pxTransform, DirectX::SimpleMath::Matrix& dxMatrix)
-{
-	DirectX::SimpleMath::Vector3 translation = { pxTransform.p.x, pxTransform.p.y, pxTransform.p.z };
-	DirectX::SimpleMath::Quaternion rotation = { pxTransform.q.x, pxTransform.q.y, pxTransform.q.z, pxTransform.q.w };
-	DirectX::SimpleMath::Vector3 scale = { 1.f, 1.f, 1.f };
-	dxMatrix = DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) * DirectX::XMMatrixRotationQuaternion(rotation) * DirectX::XMMatrixTranslation(translation.x, translation.y, translation.z);
 
-}
-
-void CopyVectorPxToDx(const physx::PxVec3& pxVector, DirectX::SimpleMath::Vector3& dxVector)
+void ConvertVectorPxToDx(const physx::PxVec3& pxVector, DirectX::SimpleMath::Vector3& dxVector)
 {
 	dxVector.x = pxVector.x;
 	dxVector.y = pxVector.y;
-	dxVector.z = pxVector.z;
+	dxVector.z = -pxVector.z;
 }
 
-void CopyMatrixDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform)
+
+void ConvertQuaternionPxToDx(const physx::PxQuat& pxQuat, DirectX::SimpleMath::Quaternion& dxQuat)
 {
-	pxTransform.p.x = dxMatrix._41;
-	pxTransform.p.y = dxMatrix._42;
-	pxTransform.p.z = dxMatrix._43;
-
-	DirectX::XMVECTOR rotation = DirectX::XMQuaternionRotationMatrix(dxMatrix);
-	pxTransform.q.x = DirectX::XMVectorGetX(rotation);
-	pxTransform.q.y = DirectX::XMVectorGetY(rotation);
-	pxTransform.q.z = DirectX::XMVectorGetZ(rotation);
-	pxTransform.q.w = DirectX::XMVectorGetW(rotation);
-
+	dxQuat.x = -pxQuat.x;
+	dxQuat.y = -pxQuat.y;
+	dxQuat.z = pxQuat.z; // PhysX는 오른손 좌표계, DirectX는 왼손 좌표계
+	dxQuat.w = pxQuat.w;
 }
 
-void CopyMatrixXYZDxToPx(const DirectX::SimpleMath::Matrix& dxMatrix, physx::PxTransform& pxTransform)
-{
-	DirectX::SimpleMath::Matrix copyMatrix = dxMatrix;
-
-	DirectX::SimpleMath::Vector3 position;
-	DirectX::SimpleMath::Quaternion rotation;
-	DirectX::SimpleMath::Vector3 scale;
-
-	copyMatrix.Decompose(scale, rotation, position);
-
-	pxTransform.p.x = position.x;
-	pxTransform.p.y = position.y;
-	pxTransform.p.z = position.z;
-	pxTransform.q.x = rotation.x;
-	pxTransform.q.y = rotation.y;
-	pxTransform.q.z = rotation.z;
-	pxTransform.q.w = rotation.w;
-
-}
-
-void CopyVectorDxToPx(const DirectX::SimpleMath::Vector3& dxVector, physx::PxVec3& pxVector)
+void ConvertVectorDxToPx(const DirectX::SimpleMath::Vector3& dxVector, physx::PxVec3& pxVector)
 {
 	pxVector.x = dxVector.x;
 	pxVector.y = dxVector.y;
-	pxVector.z = dxVector.z;
+	pxVector.z = -dxVector.z;
 }
+
+
+void ConvertQuaternionDxToPx(const DirectX::SimpleMath::Quaternion& dxQuat, physx::PxQuat& pxQuat) {
+	pxQuat.x = -dxQuat.x;
+	pxQuat.y = -dxQuat.y;
+	pxQuat.z = dxQuat.z;
+	pxQuat.w = dxQuat.w;
+}
+
+bool IsTransformDifferent(const physx::PxTransform& t1, const physx::PxTransform& t2, float epsilon)
+{
+	// 위치 비교
+	if ((t1.p - t2.p).magnitudeSquared() > epsilon * epsilon) {
+		return true;
+	}
+
+	// 회전 비교 (Dot Product 사용)
+	// 두 쿼터니언이 같으면 내적(dot) 결과는 1 또는 -1
+	if (abs(t1.q.dot(t2.q)) < 1.0f - epsilon) {
+		return true;
+	}
+
+	return false;
+}
+
+
+
+
