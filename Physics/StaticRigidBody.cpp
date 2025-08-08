@@ -38,10 +38,16 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 	shape->setRestOffset(0.01f);
 
 	DirectX::SimpleMath::Matrix transform = colliderInfo.collsionTransform.worldMatrix;
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rot;
+	DirectX::SimpleMath::Vector3 pos;
+	transform.Decompose(scale, rot, pos); // 스케일, 회전, 위치 분해
 
 	physx::PxTransform transformPx;
+	ConvertVectorDxToPx(pos, transformPx.p);
+	ConvertQuaternionDxToPx(rot, transformPx.q); // 회전 변환
 
-	CopyMatrixDxToPx(transform, transformPx);
+	//CopyMatrixDxToPx(transform, transformPx);
 
 	m_rigidStatic = physics->createRigidStatic(transformPx);
 	m_rigidStatic->userData = data;

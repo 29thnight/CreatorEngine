@@ -37,7 +37,13 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 
 	DirectX::SimpleMath::Matrix transform = colliderInfo.collsionTransform.worldMatrix;
 	physx::PxTransform transformPx;
-	CopyMatrixDxToPx(transform, transformPx);
+	//CopyMatrixDxToPx(transform, transformPx);
+	DirectX::SimpleMath::Vector3 scale;
+	DirectX::SimpleMath::Quaternion rot;
+	DirectX::SimpleMath::Vector3 pos;
+	transform.Decompose(scale, rot, pos); // 스케일, 회전, 위치 분해
+	ConvertVectorDxToPx(pos, transformPx.p);
+	ConvertQuaternionDxToPx(rot, transformPx.q); // 회전 변환
 
 	m_rigidDynamic = physics->createRigidDynamic(transformPx);
 
@@ -66,6 +72,9 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 		Debug->LogError("DynamicRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
+
+	m_rigidDynamic->setSleepThreshold(0.01f); // sleep threshold 설정
+
 	data->thisId = m_id;
 	data->thisLayerNumber = m_layerNumber;
 	shape->userData = data; // 이 위치로 이동

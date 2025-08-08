@@ -217,6 +217,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
 							Meta::Deserialize(sharedState.get(), state);
 							animationController->StateVec.push_back(sharedState);
+							animationController->StateNameSet.insert(sharedState->m_name);
 							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
 							sharedState->m_ownerController = animationController.get();
 							sharedState->SetBehaviour(sharedState->behaviourName);

@@ -22,16 +22,16 @@ public:
 
 	virtual void SetConvertScale(const DirectX::SimpleMath::Vector3& scale, physx::PxPhysics* physics, unsigned int* collisionMatrix) abstract;
 
-	inline void SetOffsetTranslation(const DirectX::SimpleMath::Matrix offsetTranslation) {
-		m_offsetTranslation = offsetTranslation;
+	inline void SetOffsetPosition(const DirectX::SimpleMath::Vector3 offsetTranslation) {
+		m_offsetPsition = offsetTranslation;
 	}
-	inline const DirectX::SimpleMath::Matrix& GetOffsetTranslation() const {
-		return m_offsetTranslation;
+	inline const DirectX::SimpleMath::Vector3& GetOffsetPosition() const {
+		return m_offsetPsition;
 	}
-	inline void SetOffsetRotation(const DirectX::SimpleMath::Matrix& offsetRotation) {
+	inline void SetOffsetRotation(const DirectX::SimpleMath::Quaternion& offsetRotation) {
 		m_offsetRotation = offsetRotation;
 	}
-	inline const DirectX::SimpleMath::Matrix& GetOffsetRotation() const {
+	inline const DirectX::SimpleMath::Quaternion& GetOffsetRotation() const {
 		return m_offsetRotation;
 	}
 
@@ -47,9 +47,12 @@ protected:
 	unsigned int m_layerNumber;// 충돌 레이어 넘버
 	EColliderType m_colliderType;//shape collider type
 
-	DirectX::SimpleMath::Matrix m_offsetRotation; // 모델 기준 회전
-	DirectX::SimpleMath::Matrix m_offsetTranslation; // 모델 기준 위치
+	
+	//DirectX::SimpleMath::Matrix m_offsetRotation; // 모델 기준 회전
+	//DirectX::SimpleMath::Matrix m_offsetTranslation; // 모델 기준 위치
 	DirectX::SimpleMath::Vector3 m_scale; // 배율
+	DirectX::SimpleMath::Quaternion m_offsetRotation; // 모델 기준 회전
+	DirectX::SimpleMath::Vector3 m_offsetPsition; // 모델 기준 위치
 	float m_radius; // 원형,캡슐 경우 반지름
 	float m_halfHeight; // 캡슐일경우 기둥 높이
 	DirectX::SimpleMath::Vector3 m_Extent; //박스일 경우 크기

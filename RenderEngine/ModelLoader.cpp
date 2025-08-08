@@ -509,7 +509,8 @@ void ModelLoader::ParseSkeleton(std::ofstream& outfile)
 
         outfile.write(reinterpret_cast<const char*>(&anim.m_duration), sizeof(anim.m_duration));
         outfile.write(reinterpret_cast<const char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
-        outfile.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
+		outfile.write(reinterpret_cast<const char*>(&anim.m_totalKeyFrames), sizeof(anim.m_totalKeyFrames));
+		outfile.write(reinterpret_cast<const char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
 
         uint32_t nodeAnimCount = static_cast<uint32_t>(anim.m_nodeAnimations.size());
         outfile.write(reinterpret_cast<char*>(&nodeAnimCount), sizeof(nodeAnimCount));
@@ -777,6 +778,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
 
         infile.read(reinterpret_cast<char*>(&anim.m_duration), sizeof(anim.m_duration));
         infile.read(reinterpret_cast<char*>(&anim.m_ticksPerSecond), sizeof(anim.m_ticksPerSecond));
+		infile.read(reinterpret_cast<char*>(&anim.m_totalKeyFrames), sizeof(anim.m_totalKeyFrames));
         infile.read(reinterpret_cast<char*>(&anim.m_isLoop), sizeof(anim.m_isLoop));
 
         uint32_t nodeAnimCount{};
@@ -791,6 +793,7 @@ void ModelLoader::LoadSkeleton(std::ifstream& infile)
             infile.read(nodeName.data(), nodeNameSize);
 
             NodeAnimation nodeAnim{};
+			nodeAnim.m_name = nodeName;
 
             uint32_t posKeyCount{};
             infile.read(reinterpret_cast<char*>(&posKeyCount), sizeof(posKeyCount));

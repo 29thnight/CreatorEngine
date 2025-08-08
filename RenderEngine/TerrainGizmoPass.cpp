@@ -83,7 +83,6 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
         if (obj->IsDestroyMark()) continue;
         if (obj->HasComponent<TerrainComponent>()) 
         {
-
             auto terrain = obj->GetComponent<TerrainComponent>();
             auto terrainMesh = terrain->GetMesh();
 
@@ -91,7 +90,7 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
             {
                 TerrainGizmoBuffer terrainGizmoBuffer = {};
                 auto terrainBrush = terrain->GetCurrentBrush();
-                if (terrainBrush != nullptr) 
+                if (terrainBrush && terrainBrush->m_isEditMode)
                 {
 					uint32_t maskID = terrainBrush->m_maskID;
 					ID3D11ShaderResourceView* nullSRV = nullptr;
@@ -121,7 +120,6 @@ void TerrainGizmoPass::CreateRenderCommandList(ID3D11DeviceContext* deferredCont
                     terrainGizmoBuffer.gBrushRadius = terrain->GetCurrentBrush()->m_radius;
 					terrainGizmoBuffer.isEditMode = terrain->GetCurrentBrush()->m_isEditMode;
                     DirectX11::UpdateBuffer(deferredPtr, m_Buffer.Get(), &terrainGizmoBuffer);
-
 
                     scene.UpdateModel(obj->m_transform.GetWorldMatrix(), deferredPtr);
                     terrainMesh->Draw(deferredPtr);
