@@ -38,6 +38,7 @@ public:
 	[[Property]]
 	std::string m_name{};
 	std::map<std::string, NodeAnimation> m_nodeAnimations;
+	size_t m_totalKeyFrames = 0;
 	float m_duration{};
 	double m_ticksPerSecond{};
 	[[Property]]
@@ -56,7 +57,6 @@ public:
 	KeyFrameEvent* FindEvent(const std::string& _eventName, const std::string& _scriptName, const std::string& _funName, float progressPercent);
 	bool FindEventName(std::string Name);
 	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
-
 
 	[[Property]]
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
