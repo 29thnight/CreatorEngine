@@ -10,6 +10,14 @@ inline T* GameObject::AddComponent()
         return nullptr;
     }
 
+    if constexpr (std::derived_from<T, UIComponent>)
+    {
+        if (!HasComponent<RectTransformComponent>())
+        {
+            AddComponent<RectTransformComponent>();
+        }
+    }
+
     std::shared_ptr<T> component = shared_alloc<T>();
     if (auto receiver = std::dynamic_pointer_cast<IRegistableEvent>(component))
     {
@@ -28,6 +36,14 @@ inline T* GameObject::AddComponent(Args && ...args)
     if (std::ranges::find_if(m_components, [&](std::shared_ptr<Component> component) { return component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<T>(); }) != m_components.end())
     {
         return nullptr;
+    }
+
+    if constexpr (std::derived_from<T, UIComponent>)
+    {
+        if (!HasComponent<RectTransformComponent>())
+        {
+            AddComponent<RectTransformComponent>();
+        }
     }
 
     std::shared_ptr<T> component = shared_alloc<T>(std::forward<Args>(args)...);
