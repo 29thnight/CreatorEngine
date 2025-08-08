@@ -48,7 +48,7 @@ inline T* GameObject::GetComponent(uint32 id)
     auto it = m_componentIds.find(id);
     if (it == m_componentIds.end())
         return nullptr;
-    return static_cast<T*>(&m_components[it->second].get());
+    return std::static_pointer_cast<T>(m_components[it->second]).get();
 }
 
 template<typename T>

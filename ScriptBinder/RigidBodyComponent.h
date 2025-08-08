@@ -27,12 +27,12 @@ public:
 	Mathf::Vector3 GetAngularVelocity() const { return m_angularVelocity; }
 	void SetAngularVelocity(const Mathf::Vector3& angularVelocity) { m_angularVelocity = angularVelocity; }
 
-	void SetLockLinearX(bool isLock) { m_isLockLinearX = isLock; }
-	void SetLockLinearY(bool isLock) { m_isLockLinearY = isLock; }
-	void SetLockLinearZ(bool isLock) { m_isLockLinearZ = isLock; }
-	void SetLockAngularX(bool isLock) { m_isLockAngularX = isLock; }
-	void SetLockAngularY(bool isLock) { m_isLockAngularY = isLock; }
-	void SetLockAngularZ(bool isLock) { m_isLockAngularZ = isLock; }
+	void SetLockLinearX(bool isLock) { isRigidbodyDirty = true; m_isLockLinearX = isLock; }
+	void SetLockLinearY(bool isLock) { isRigidbodyDirty = true; m_isLockLinearY = isLock; }
+	void SetLockLinearZ(bool isLock) { isRigidbodyDirty = true; m_isLockLinearZ = isLock; }
+	void SetLockAngularX(bool isLock) { isRigidbodyDirty = true; m_isLockAngularX = isLock; }
+	void SetLockAngularY(bool isLock) { isRigidbodyDirty = true; m_isLockAngularY = isLock; }
+	void SetLockAngularZ(bool isLock) { isRigidbodyDirty = true; m_isLockAngularZ = isLock; }
 
 	void LockLinearXZ();
 	void UnLockLinearXZ();
@@ -77,6 +77,9 @@ public:
 
 	void UseGravity(bool useGravity);
 	bool IsUsingGravity() const { return m_useGravity; } // 자신의 상태를 직접 반환
+	
+	void DevelopOnlyDirtySet(bool dirty) { isRigidbodyDirty = dirty; }
+	bool IsRigidbodyDirty() const { return isRigidbodyDirty; }
 private:
 	// 모든 상태 변경을 PhysicsManager에 알리는 헬퍼 함수
 	void NotifyPhysicsStateChange();
@@ -119,5 +122,5 @@ private:
 	bool m_isLockAngularY = false;
 	bool m_isLockAngularZ = false;
 
-
+	bool isRigidbodyDirty = false;
 };
