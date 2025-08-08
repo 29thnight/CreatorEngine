@@ -12,17 +12,19 @@ void UIButton::Update(float deltaSecond)
 void UIButton::UpdateCollider()
 {
 	
-        if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
-        {
-                const auto& worldRect = rect->GetWorldRect();
-                obBox.Center = { worldRect.x + worldRect.width * 0.5f,
-                                 worldRect.y + worldRect.height * 0.5f,
-                                 0.0f };
-                obBox.Extents.x = worldRect.width * 0.5f;
-                obBox.Extents.y = worldRect.height * 0.5f;
-        }
-        auto quater = m_pOwner->m_transform.GetWorldQuaternion();
-        obBox.Orientation = quater;
+    if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+    {
+            const auto& worldRect = rect->GetWorldRect();
+            obBox.Center = { worldRect.x + worldRect.width * 0.5f,
+                             worldRect.y + worldRect.height * 0.5f,
+                             0.0f };
+            obBox.Extents.x = worldRect.width * 0.5f;
+            obBox.Extents.y = worldRect.height * 0.5f;
+    }
+    auto quater = m_pOwner->m_transform.GetWorldQuaternion();
+    /*obBox.Orientation = quater;*/
+	XMStoreFloat4(&obBox.Orientation, quater);
+	obBox.Orientation.w = 1.0f; // Quaternion의 w값을 1로 설정하여 회전이 없음을 나타냄
 }
 
 bool UIButton::CheckClick(Mathf::Vector2 _mousePos)

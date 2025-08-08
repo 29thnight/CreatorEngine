@@ -80,33 +80,35 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
                 rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
         }
 	}
-        auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newButton->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
-        auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newButton->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
 
-        auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newText->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
+	auto newButton0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newButton0->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
+	auto newButton1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newButton1->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
 
+	auto newText0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newText0->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
 
-        auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newText->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
+	auto newText1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newText1->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
+
+       
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
@@ -126,7 +128,7 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
 	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540이 기본값 화면중앙
 	newButton->AddComponent<ImageComponent>()->Load(texture);
 	auto component = newButton->AddComponent<UIButton>();
-	component->SetClickFunction(clickfun);
+	//component->SetClickFunction(clickfun);
 
 	canvasCom->AddUIObject(newButton.get());
 
