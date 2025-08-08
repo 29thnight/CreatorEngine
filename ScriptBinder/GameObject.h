@@ -13,7 +13,7 @@ class RenderScene;
 class ModelLoader;
 class ModuleBehavior;
 class Prefab;
-class GameObject : public Object
+class GameObject : public Object, public std::enable_shared_from_this<GameObject>
 {
 public:
 	using Index = int;

@@ -54,13 +54,10 @@ inline T* GameObject::GetComponent(uint32 id)
 template<typename T>
 inline T* GameObject::GetComponent()
 {
-    for (auto& component : m_components)
-    {
-        std::shared_ptr<T> castedComponent = std::dynamic_pointer_cast<T>(component);
-        if (nullptr != castedComponent.get())
-            return castedComponent.get();
-    }
-    return nullptr;
+    auto it = m_componentIds.find(type_guid(T));
+    if (it == m_componentIds.end())
+        return nullptr;
+    return std::static_pointer_cast<T>(m_components[it->second]).get();
 }
 
 template<>

@@ -9,7 +9,7 @@ void PrefabEditor::Open(const std::string& path)
     if (m_isOpened)
         Close(false);
 
-    m_prefab = PrefabUtilitys->LoadPrefab(path);
+    m_prefab = PrefabUtilitys->LoadPrefabFullPath(path);
     if (!m_prefab)
         return;
 

@@ -656,7 +656,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				const char* droppedFilePath = (const char*)prefabPayload->Data;
 				file::path filename = droppedFilePath;
 				file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
-				auto prefab = PrefabUtilitys->LoadPrefab(filepath.string().c_str());
+				auto prefab = PrefabUtilitys->LoadPrefabFullPath(filepath.string().c_str());
 				if (prefab)
 				{
 					PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());

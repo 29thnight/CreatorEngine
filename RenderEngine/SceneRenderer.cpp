@@ -83,7 +83,6 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pEditorCamera->m_avoidRenderPass.Set((flag)RenderPipelinePass::AutoExposurePass);
 #endif // !BUILD_FLAG
 
-	m_spriteBatch = std::make_shared<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
     //pass 생성
     //shadowMapPass 는 RenderScene의 맴버
     //gBufferPass
@@ -177,7 +176,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_pVolumetricFogPass->Initialize(PathFinder::Relative("VolumetricFog\\blueNoise.dds").string());
 
 	m_pUIPass = std::make_unique<UIPass>();
-	m_pUIPass->Initialize(m_toneMappedColourTexture.get(), m_spriteBatch.get());
+	m_pUIPass->Initialize(m_toneMappedColourTexture.get());
 
 	//AAPass
 	m_pAAPass = std::make_unique<AAPass>();
@@ -897,21 +896,20 @@ void SceneRenderer::CreateCommandListPass()
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
-			{
+		{
 				PROFILE_CPU_BEGIN("BitMaskPassCommandList");
 				m_pBitMaskPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 		});
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
-			{
-				PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
-				m_pScreenSpaceReflectionPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
-				PROFILE_CPU_END();
-			});
+		{
+			PROFILE_CPU_BEGIN("ScreenSpaceReflectionPassCommandList");
+			m_pScreenSpaceReflectionPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
 
 		if (m_pEditorCamera.get() != camera)
 		{
-
 			m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 			{
 				PROFILE_CPU_BEGIN("VolumetricFogPassCommandList");
@@ -928,6 +926,14 @@ void SceneRenderer::CreateCommandListPass()
 				PROFILE_CPU_END();
 			});
 		}
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
+		{
+			PROFILE_CPU_BEGIN("UIPassCommnadList");
+			m_pUIPass->SortUIObjects();
+			m_pUIPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
 
 		m_commandThreadPool->NotifyAllAndWait();
 

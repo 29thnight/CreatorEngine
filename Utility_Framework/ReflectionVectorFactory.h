@@ -2,15 +2,17 @@
 #include <unordered_map>
 #include <functional>
 #include "TypeTrait.h"
+#include "DLLAcrossSingleton.h"
 
 namespace Meta
 {
 	using VectorCreateFunc = std::function<void* ()>;
 
-	class VectorFactoryRegistry : public Singleton<VectorFactoryRegistry>
+	class VectorFactoryRegistry : public DLLCore::Singleton<VectorFactoryRegistry>
 	{
 	private:
 		std::unordered_map<HashedGuid, VectorCreateFunc> _creators;
+		friend DLLCore::Singleton<VectorFactoryRegistry>;
 
 	public:
 		template<typename T>
@@ -32,5 +34,5 @@ namespace Meta
 		}
 	};
 
-	static inline auto& VectorFactory = VectorFactoryRegistry::GetInstance();
+	static auto VectorFactory = VectorFactoryRegistry::GetInstance();
 }

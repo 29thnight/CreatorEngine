@@ -18,30 +18,30 @@ namespace Meta
     static inline void Register()
     {
         const Type& type = T::Reflect();
-        MetaDataRegistry->Register(type.name, type);
-        MetaFactoryRegistry->Register<T>();
-        TypeCast->RegisterMakeAny<T>();
+        Registry::GetInstance()->Register(type.name, type);
+        FactoryRegistry::GetInstance()->Register<T>();
+        TypeCaster::GetInstance()->RegisterMakeAny<T>();
 
         if constexpr (std::is_move_constructible_v<T>)
 		{
-			VectorFactory->Register<T>();
-			VectorInvoker->Register<T>();
+            VectorFactoryRegistry::GetInstance()->Register<T>();
+            VectorInvokerRegistry::GetInstance()->Register<T>();
 		}
     }
 
     static inline const Type* Find(std::string_view name)
     {
-        return MetaDataRegistry->Find(name.data());
+        return Registry::GetInstance()->Find(name.data());
     }
 
 	static inline const EnumType* FindEnum(std::string_view name)
 	{
-		return MetaEnumRegistry->Find(name.data());
+		return EnumRegistry::GetInstance()->Find(name.data());
 	}
 
 	static inline const Type* Find(size_t typeID)
 	{
-		return MetaDataRegistry->Find(typeID);
+		return Registry::GetInstance()->Find(typeID);
 	}
 
     template <typename Enum, std::size_t... Is>
@@ -77,12 +77,12 @@ namespace Meta
         if constexpr (std::is_pointer_v<T>)
         {
             using Pointee = std::remove_pointer_t<T>;
-            TypeCast->Register<T>();
+            TypeCaster::GetInstance()->Register<T>();
         }
         else if constexpr (is_shared_ptr_v<T>)
         {
             using Pointee = typename T::element_type;
-            TypeCast->Register<T>();
+            TypeCaster::GetInstance()->Register<T>();
         }
         else if constexpr (requires { typename VectorElementType<T>::Type; })
         {
@@ -92,14 +92,14 @@ namespace Meta
             {
                 using Pointee = std::remove_pointer_t<ElemType>;
 				isElementPointer = true;
-                TypeCast->Register<Pointee>();
+                TypeCaster::GetInstance()->Register<Pointee>();
             }
             else if constexpr (is_shared_ptr_v<ElemType>)
             {
                 using Pointee = typename ElemType::element_type;
 				isElementPointer = true;
-                TypeCast->Register<Pointee>();
-				TypeCast->RegisterSharedPtr<Pointee>();
+                TypeCaster::GetInstance()->Register<Pointee>();
+                TypeCaster::GetInstance()->RegisterSharedPtr<Pointee>();
             }
         }
 
@@ -344,14 +344,14 @@ namespace Meta
     inline void MakePropChangeCommand(void* instance, const Property& prop, const T& value)
     {
 		T prevValue = std::any_cast<T>(prop.getter(instance));
-		UndoCommandManager->Execute(
+        UndoManager::GetInstance()->Execute(
 			std::make_unique<PropertyChangeCommand<T>>(instance, prop, prevValue, value)
 		);
     }
 
 	inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
 	{
-		UndoCommandManager->Execute(
+        UndoManager::GetInstance()->Execute(
 			std::make_unique<CustomChangeCommand>(undoFunc, redoFunc)
 		);
 	}

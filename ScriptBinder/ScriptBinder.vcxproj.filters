@@ -315,6 +315,9 @@
     <ClCompile Include="VolumeComponent.cpp">
       <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
+    <ClCompile Include="RectTransformComponent.cpp">
+      <Filter>Classes\Components</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IObject.h">
@@ -598,6 +601,9 @@
     </ClInclude>
     <ClInclude Include="KeyArray.h">
       <Filter>Managers\InputManager\Helper</Filter>
+    </ClInclude>
+    <ClInclude Include="RectTransformComponent.h">
+      <Filter>Classes\Components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

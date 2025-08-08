@@ -132,7 +132,6 @@ private:
 	 Managed::SharedPtr<Texture>				m_toneMappedColourTexture{};
 	 Managed::SharedPtr<Texture>				m_lightingTexture{};
 
-	std::shared_ptr<SpriteBatch>				m_spriteBatch = nullptr;
 	ThreadPool<std::function<void()>>*			m_threadPool = nullptr;
 	std::unique_ptr<RenderThreadPool>			m_commandThreadPool = nullptr;
 #endif // !DYNAMICCPP_EXPORTS

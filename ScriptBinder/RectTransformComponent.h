@@ -1,8 +1,10 @@
 #pragma once
-#include "Mathf.h"     // Vector2, Rect 등 수학 관련 클래스 포함
+#include "Core.Mathf.h"     // Vector2, Rect 등 수학 관련 클래스 포함
+#include "Component.h"      // Component 클래스 포함
 
 // Unity의 RectTransform과 유사한 동작을 하는 UI용 트랜스폼 컴포넌트입니다.
-class RectTransformComponent
+class GameObject;
+class RectTransformComponent : public Component
 {
 public:
     // 앵커 프리셋을 쉽게 설정하기 위한 열거형
@@ -24,7 +26,6 @@ public:
     void UpdateLayout(const Mathf::Rect& parentRect);
 
     // --- Getters & Setters ---
-
     const Mathf::Vector2& GetAnchorMin() const { return m_anchorMin; }
     void SetAnchorMin(const Mathf::Vector2& anchorMin) { m_anchorMin = anchorMin; m_isDirty = true; }
 

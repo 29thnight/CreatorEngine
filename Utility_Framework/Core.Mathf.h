@@ -35,6 +35,13 @@ namespace Mathf
 	static xVector xVectorLeft = XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f);
 	static xVector xVectorForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
+    struct Rect
+    {
+        float x, y, width, height;
+        Rect() : x(0), y(0), width(0), height(0) {}
+        Rect(float _x, float _y, float _width, float _height) : x(_x), y(_y), width(_width), height(_height) {}
+	};
+
     template<class T> inline T lerp(T low, T high, float t)
     {
         return low + static_cast<T>((high - low) * t);

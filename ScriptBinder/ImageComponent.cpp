@@ -44,7 +44,7 @@ void ImageComponent::Update(float tick)
 
 }
 
-void ImageComponent::Draw(SpriteBatch* sBatch)
+void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
 {
 	if (_layerorder < 0) _layerorder = 0;
 	if(m_curtexture !=nullptr)

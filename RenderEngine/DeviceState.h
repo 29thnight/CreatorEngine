@@ -22,6 +22,86 @@ namespace DeviceState
 	extern std::atomic<int> g_renderCallCount;
 }
 
+class GPUTimer
+{
+public:
+	explicit GPUTimer(ID3D11Device3* pDevice, ID3D11DeviceContext3* pDeviceContext)
+		: m_device(pDevice), m_context(pDeviceContext) {
+	}
+
+	// 측정을 시작하고 디버그 이벤트도 함께 시작
+	void Begin(const std::wstring_view& name)
+	{
+		m_name = name;
+		if (DeviceState::g_annotation)
+		{
+			DeviceState::g_annotation->BeginEvent(name.data());
+		}
+
+		// 디스조인트와 시작/끝 타임스탬프 쿼리 생성
+		D3D11_QUERY_DESC desc{};
+		desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+		m_device->CreateQuery(&desc, m_disjoint.ReleaseAndGetAddressOf());
+
+		desc.Query = D3D11_QUERY_TIMESTAMP;
+		m_device->CreateQuery(&desc, m_start.ReleaseAndGetAddressOf());
+		m_device->CreateQuery(&desc, m_end.ReleaseAndGetAddressOf());
+
+		// 측정 시작
+		m_context->Begin(m_disjoint.Get());
+		m_context->End(m_start.Get());
+	}
+
+	// 측정을 종료하고 소요 시간을 반환(ms)
+	std::optional<double> End()
+	{
+		// 종료 이벤트
+		m_context->End(m_end.Get());
+		m_context->End(m_disjoint.Get());
+
+		if (DeviceState::g_annotation)
+		{
+			DeviceState::g_annotation->EndEvent();
+		}
+
+		// GPU가 데이터를 쓰기까지 대기
+		auto waitFor = [&](ID3D11Query* q)
+		{
+			while (S_FALSE == m_context->GetData(q, nullptr, 0, 0))
+			{
+				//wait 1ms to avoid busy waiting
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+		};
+
+		waitFor(m_disjoint.Get());
+		waitFor(m_start.Get());
+		waitFor(m_end.Get());
+
+		// 데이터 읽기
+		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint{};
+		UINT64 startTime = 0, endTime = 0;
+		m_context->GetData(m_disjoint.Get(), &disjoint, sizeof disjoint, 0);
+		m_context->GetData(m_start.Get(), &startTime, sizeof startTime, 0);
+		m_context->GetData(m_end.Get(), &endTime, sizeof endTime, 0);
+
+		if (disjoint.Disjoint)    // GPU 타이밍이 유효하지 않으면 nullopt
+			return std::nullopt;
+
+		const double delta = static_cast<double>(endTime - startTime);
+		const double freq = static_cast<double>(disjoint.Frequency);
+		return (delta / freq) * 1000.0;  // ms 단위
+	}
+
+private:
+	ComPtr<ID3D11Device3>		m_device;
+	ComPtr<ID3D11DeviceContext> m_context;
+	ComPtr<ID3D11Query>			m_disjoint;
+	ComPtr<ID3D11Query>			m_start;
+	ComPtr<ID3D11Query>			m_end;
+	std::wstring				m_name;
+};
+
 namespace DirectX11
 {
 	inline void ResetCallCount()

@@ -3,6 +3,7 @@
 #include "ReflectionType.h"
 #include "MetaStateCommand.h"
 #include "ManagedHeapObject.h"
+#include "DLLAcrossSingleton.h"
 #include <functional>
 #include <any>
 #include <typeindex>
@@ -15,12 +16,12 @@ namespace Meta
     // --- TypeCaster: 런타임 타입 -> void* 변환 ---
     using AnyCaster = std::function<void* (const std::any&)>;
 
-    class TypeCaster : public Singleton<TypeCaster>
+    class TypeCaster : public DLLCore::Singleton<TypeCaster>
     {
     private:
 		TypeCaster() = default;
 		~TypeCaster() = default;
-        friend Singleton;
+        friend DLLCore::Singleton<TypeCaster>;
     public:
 
     public:
@@ -87,14 +88,14 @@ namespace Meta
         std::unordered_map<std::type_index, std::function<std::any(void*)>> _makeAny;
     };
 
-    static inline auto& TypeCast = TypeCaster::GetInstance();
+    static auto TypeCast = TypeCaster::GetInstance();
 
-    class Registry : public Singleton<Registry>
+    class Registry : public DLLCore::Singleton<Registry>
     {
     private:
 		Registry() = default;
 		~Registry() = default;
-        friend Singleton;
+        friend DLLCore::Singleton<Registry>;
         friend class ::ComponentFactory;
     public:
         void Register(const std::string& name, const Type& type)
@@ -152,14 +153,14 @@ namespace Meta
 		std::unordered_map<size_t, Type> hashMap;
     };
 
-    static inline auto& MetaDataRegistry = Registry::GetInstance();
+    static auto MetaDataRegistry = Registry::GetInstance();
 
-    class EnumRegistry : public Singleton<EnumRegistry>
+    class EnumRegistry : public DLLCore::Singleton<EnumRegistry>
     {
     private:
 		EnumRegistry() = default;
 		~EnumRegistry() = default;
-		friend Singleton;
+		friend DLLCore::Singleton<EnumRegistry>;
     public:
         void Register(const std::string& name, const EnumType& enumType)
         {
@@ -179,14 +180,14 @@ namespace Meta
         std::unordered_map<std::string, EnumType> enumMap;
     };
 
-    static inline auto& MetaEnumRegistry = EnumRegistry::GetInstance();
+    static auto MetaEnumRegistry = EnumRegistry::GetInstance();
     using FactoryFunction = std::function<void*()>;
 	using SharedFactoryFunction = std::function<std::shared_ptr<void>()>;
     class IRegistableEvent;
-    class FactoryRegistry : public Singleton<FactoryRegistry>
+    class FactoryRegistry : public DLLCore::Singleton<FactoryRegistry>
     {
     private:
-        friend Singleton;
+        friend DLLCore::Singleton<FactoryRegistry>;
 		FactoryRegistry() = default;
 		~FactoryRegistry() = default;
 
@@ -259,14 +260,14 @@ namespace Meta
 		std::unordered_map<std::string, SharedFactoryFunction> _sharedFactories;
     };
 
-    static inline auto& MetaFactoryRegistry = FactoryRegistry::GetInstance();
+    static auto MetaFactoryRegistry = FactoryRegistry::GetInstance();
 
-	class UndoManager : public Singleton<UndoManager>
+	class UndoManager : public DLLCore::Singleton<UndoManager>
 	{
 	private:
 		UndoManager() = default;
 		~UndoManager() = default;
-		friend Singleton;
+		friend DLLCore::Singleton<UndoManager>;
 
 	public:
 		void Execute(std::unique_ptr<IUndoableCommand> cmd)
@@ -347,7 +348,7 @@ namespace Meta
         std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
 	};
 
-	static inline auto& UndoCommandManager = UndoManager::GetInstance();
+	static auto UndoCommandManager = UndoManager::GetInstance();
 
     template <typename Enum>
     struct EnumAutoRegistrar
@@ -365,9 +366,27 @@ namespace Meta
 		ClassAutoRegistrar()
 		{
 			auto type = T::Reflect();
-			MetaDataRegistry->Register(type.name, type);
-			TypeCast->RegisterSharedPtr<T>();
-			TypeCast->Register<T>();
+            Registry::GetInstance()->Register(type.name, type);
+            TypeCaster::GetInstance()->RegisterSharedPtr<T>();
+            TypeCaster::GetInstance()->Register<T>();
 		}
 	};
+
+    inline void RegisterClassInitalize()
+    {
+        TypeCaster::GetInstance();
+        EnumRegistry::GetInstance();
+		Registry::GetInstance();
+        FactoryRegistry::GetInstance();
+		UndoManager::GetInstance();
+    }
+
+    inline void RegisterClassFinalize()
+    {
+        TypeCaster::Destroy();
+        EnumRegistry::Destroy();
+        Registry::Destroy();
+        FactoryRegistry::Destroy();
+        UndoManager::Destroy();
+    }
 }

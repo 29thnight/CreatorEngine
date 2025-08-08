@@ -306,7 +306,6 @@ private:
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 	static constexpr uint32 m_stride = sizeof(UIvertex);
 
-
 	std::vector<UIvertex> UIQuad
 	{
 		{ {-1.0f,  1.0f, 0.0f}, { 0.0f, 0.0f} },  // 좌상단

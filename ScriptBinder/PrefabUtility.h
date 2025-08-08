@@ -21,6 +21,7 @@ public:
     void RegisterInstance(GameObject* instance, const Prefab* prefab);
     void UpdateInstances(const Prefab* prefab);
     bool SavePrefab(const Prefab* prefab, const std::string& path);
+    Prefab* LoadPrefabFullPath(const std::string& path);
     Prefab* LoadPrefab(const std::string& path);
 
 private:

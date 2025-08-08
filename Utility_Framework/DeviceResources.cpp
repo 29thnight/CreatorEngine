@@ -151,17 +151,12 @@ void DirectX11::DeviceResources::Trim()
 
 void DirectX11::DeviceResources::Present()
 {
+    //if (!m_swapChain) { HandleLostSwapChain(); return; }
+
     // 첫 번째 인수는 DXGI에 VSync까지 차단하도록 지시하여 애플리케이션이
     // 다음 VSync까지 대기하도록 합니다. 이를 통해 화면에 표시되지 않는 프레임을
     // 렌더링하는 주기를 낭비하지 않을 수 있습니다.
     DXGI_PRESENT_PARAMETERS parameters = { 0 };
-    if(m_swapChain == nullptr)
-    {
-        //스왑체인 잃었을때 작업
-        HandleLostSwapChain();
-        return;
-	}
-
     HRESULT hr = m_swapChain->Present1(0, 0, &parameters);
 
     // 렌더링 대상의 콘텐츠를 삭제합니다.
@@ -174,7 +169,7 @@ void DirectX11::DeviceResources::Present()
 
     // 연결이 끊기거나 드라이버 업그레이드로 인해 디바이스가 제거되면 
     // 모든 디바이스 리소스를 다시 만들어야 합니다.
-    if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+    if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET || hr == DXGI_ERROR_DEVICE_HUNG)
     {
         HandleDeviceLost();
     }
@@ -387,6 +382,8 @@ void DirectX11::DeviceResources::CreateDeviceResources()
     DirectX11::ThrowIfFailed(
 		m_d3dContext->QueryInterface(IID_PPV_ARGS(&m_annotation))
     );
+
+	m_gpuQueryCollector = std::make_unique<GPUQueryCollector>(m_d3dContext.Get());
 }
 
 void DirectX11::DeviceResources::CreateWindowSizeDependentResources()

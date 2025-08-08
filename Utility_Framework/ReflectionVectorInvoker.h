@@ -3,16 +3,18 @@
 #include <functional>
 #include "TypeTrait.h"
 #include "ReflectionVectorMapper.h"
+#include "DLLAcrossSingleton.h"
 #include "LogSystem.h"
 
 namespace Meta
 {
 	using VectorInvokeFunc = std::function<void(void*, const YAML::Node&, const Type*)>;
 
-	class VectorInvokerRegistry : public Singleton<VectorInvokerRegistry>
+	class VectorInvokerRegistry : public DLLCore::Singleton<VectorInvokerRegistry>
 	{
 	private:
 		std::unordered_map<HashedGuid, VectorInvokeFunc> _handlers;
+		friend DLLCore::Singleton<VectorInvokerRegistry>;
 
 	public:
 		template<typename T>
@@ -39,5 +41,5 @@ namespace Meta
 		}
 	};
 
-	static inline auto& VectorInvoker = VectorInvokerRegistry::GetInstance();
+	static inline auto VectorInvoker = VectorInvokerRegistry::GetInstance();
 }

@@ -17,7 +17,7 @@ GameObject* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_v
     {
         obj->m_prefab = const_cast<Prefab*>(prefab);
         obj->m_prefabFileGuid = prefab->GetFileGuid();
-        //RegisterInstance(obj, prefab);
+        RegisterInstance(obj, prefab);
     }
     return obj;
 }
@@ -109,7 +109,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     return true;
 }
 
-Prefab* PrefabUtility::LoadPrefab(const std::string& path)
+Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 {
     if (path.empty() || !file::exists(path))
         return nullptr;
@@ -119,4 +119,20 @@ Prefab* PrefabUtility::LoadPrefab(const std::string& path)
 	prefab->SetPrefabData(node["PrefabNode"]);
     prefab->SetFileGuid(make_file_guid(path));
     return prefab;
+}
+
+Prefab* PrefabUtility::LoadPrefab(const std::string& path)
+{
+    file::path filepath = PathFinder::Relative("Prefabs\\") / (path + ".prefab");
+    if (!file::exists(filepath))
+		return nullptr;
+
+    auto prefab = LoadPrefabFullPath(filepath.string());
+    if (prefab)
+    {
+        prefab->SetFileGuid(DataSystems->GetFileGuid(filepath.string()));
+        return prefab;
+    }
+
+	return nullptr;
 }
