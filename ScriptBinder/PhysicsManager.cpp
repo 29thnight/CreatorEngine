@@ -46,10 +46,11 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	m_callbacks.clear();
 	SetPhysicData();
 	// 물리 엔진에 변경 사항 적용
+	//Benchmark bm;
 	ApplyPendingChanges();
 	// 물리 엔진 업데이트
 	Physics->Update(fixedDeltaTime);
-
+	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
 	// 물리 엔진에서 씬 데이터 가져오기
 	GetPhysicData();
@@ -563,7 +564,9 @@ void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 
 void PhysicsManager::SetPhysicData()
 {
+	
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	std::cout << "Container size" << Container.size()<<std::endl;
 	for (auto& [id, colliderInfo] : Container) 
 	{
 		if (colliderInfo.bIsDestroyed)
@@ -573,14 +576,15 @@ void PhysicsManager::SetPhysicData()
 
 		auto& transform = colliderInfo.gameObject->m_transform;
 		//colliderInfo.collider.
-		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
+		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>(type_guid(RigidBodyComponent));
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
 		//todo : CCT,Controller,ragdoll,capsule,?섏쨷??deformeSuface
 		if (colliderInfo.id == m_controllerTypeId)
 		{
+			//Benchmark bm;
 			
-			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
+			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>(type_guid(CharacterControllerComponent));
 			CharacterControllerGetSetData data;
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 			data.position = position+controller->GetPositionOffset();
@@ -609,10 +613,11 @@ void PhysicsManager::SetPhysicData()
 
 			Physics->SetMovementData(id, movementData);
 
+			//std::cout << " PhysicsManager::SetPhysicData CCT : " << bm.GetElapsedTime() << std::endl;
 		}
 		else
 		{
-			
+			//Benchmark bm1;
 			RigidBodyGetSetData data;
 			data.transform = transform.GetWorldMatrix();
 			data.angularVelocity = rigidbody->GetAngularVelocity();
@@ -643,6 +648,8 @@ void PhysicsManager::SetPhysicData()
 			data.isKinematic = rigidbody->IsKinematic();
 			data.isDisabled = !rigidbody->IsColliderEnabled();
 
+			data.isDirty = rigidbody->IsRigidbodyDirty();
+			rigidbody->DevelopOnlyDirtySet(false);
 
 			if (offset != DirectX::SimpleMath::Vector3::Zero) 
 			{
@@ -658,15 +665,21 @@ void PhysicsManager::SetPhysicData()
 				data.transform._43 = vecPos.z + offset.z;
 
 			}
-			
+
+			//std::cout << " PhysicsManager::SetPhysicData CCT elses RigidBodyGetSetData Set  : " << bm1.GetElapsedTime() << std::endl;
+
+			//Benchmark bm2;
 			Physics->SetRigidBodyData(id, data);
+			//std::cout << " PhysicsManager::SetPhysicData CCT elses SetRigidBodyData : " << bm2.GetElapsedTime() << std::endl;
 		}
 	}
+	
 }
 
 //PxScene --> GameScene
 void PhysicsManager::GetPhysicData()
 {
+	//Benchmark bm;
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	for (auto& [id, ColliderInfo] : Container) {
 
@@ -747,6 +760,7 @@ void PhysicsManager::GetPhysicData()
 
 		}
 	}
+	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
 void PhysicsManager::SetRigidBodyState(const RigidBodyState& state)

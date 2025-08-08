@@ -61,11 +61,13 @@ void RigidBodyComponent::UnLockAngularXYZ()
 
 void RigidBodyComponent::SetAngularDamping(float _AngularDamping)
 {
+	isRigidbodyDirty = true;
 	AngularDamping = _AngularDamping;
 }
 
 void RigidBodyComponent::SetLinearDamping(float _LinearDamping)
 {
+	isRigidbodyDirty = true;
 	LinearDamping = _LinearDamping;
 }
 
@@ -77,6 +79,7 @@ void RigidBodyComponent::AddForce(const Mathf::Vector3& force, EForceMode mode)
 
 void RigidBodyComponent::SetMass(float _mass)
 {
+	isRigidbodyDirty = true;
 	m_mass = _mass;
 }
 
