@@ -82,22 +82,26 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
         {
             auto meshRenderer = static_cast<MeshRenderer*>(component);
             Model* model = nullptr;
+			MaterialRenderingMode renderingMode = MaterialRenderingMode::Opaque;
             Meta::Deserialize(meshRenderer, itNode);
             if (itNode["m_Material"])
             {
                 auto materialNode = itNode["m_Material"];
                 FileGuid guid = materialNode["m_fileGuid"].as<std::string>();
                 model = DataSystems->LoadModelGUID(guid);
+				if (materialNode["m_renderingMode"])
+				{
+					renderingMode = static_cast<MaterialRenderingMode>(materialNode["m_renderingMode"].as<int>());
+				}
             }
             MetaYml::Node getMeshNode = itNode["m_Mesh"];
             if (model && getMeshNode)
             {
-				
-				if (meshRenderer->m_Material->m_name == "Bush")
-				{
-					int a = 5;
-				}
                 meshRenderer->m_Material = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
+				if (meshRenderer->m_Material)
+				{
+					meshRenderer->m_Material->m_renderingMode = renderingMode;
+				}
 				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
             }
 			meshRenderer->SetOwner(obj);

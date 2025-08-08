@@ -18,6 +18,8 @@ private:
 	void DrawWireCircle(const Mathf::Vector3& center, float radius, const Mathf::Vector3& up, const Mathf::Color4& color);
 	void DrawLines(LineVertex* vertices, uint32_t vertexCount);
 	void DrawWireSphere(const Mathf::Vector3& center, float radius, const Mathf::Color4& color);
+	void DrawWireBox(const Mathf::Matrix& transform, const Mathf::Vector3& extents, const Mathf::Color4& color);
+	void DrawWireCapsule(const Mathf::Matrix& transform, float radius, float height, const Mathf::Color4& color);
 	void DrawWireCone(const Mathf::Vector3& apex, const Mathf::Vector3& direction, float height, float outerConeAngle, const Mathf::Color4& color);
 	void DrawBoundingFrustum(const DirectX::BoundingFrustum& frustum, const Mathf::Color4& color);
 

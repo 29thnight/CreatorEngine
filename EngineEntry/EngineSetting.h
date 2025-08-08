@@ -7,6 +7,8 @@
 #include "RenderPassSettings.h"
 #include "DLLAcrossSingleton.h"
 #include <yaml-cpp/yaml.h>
+#include "TerrainBuffers.h"
+
 namespace MetaYml = YAML;
 
 enum class MSVCVersion
@@ -86,6 +88,7 @@ public:
 	Barrier renderBarrier;
 	Fence RenderCommandFence;
 	Fence RHICommandFence;
+	TerrainBrush* terrainBrush = nullptr;
 
 private:
     std::atomic_bool m_isGameView{ false };
