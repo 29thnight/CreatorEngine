@@ -4,6 +4,7 @@
 #include "GameObject.h"
 #include "AnimationController.h"
 #include "Animator.h"
+#include "CharacterControllerComponent.h"
 void PlayerAttackAH::Enter()
 {
 	if (m_player == nullptr)
@@ -31,6 +32,8 @@ void PlayerAttackAH::Enter()
 	if (m_player)
 	{
 		m_player->AttackTarget.clear();
+		auto controller = m_player->GetOwner()->GetComponent<CharacterControllerComponent>();
+		controller->Move({ 0,0 });
 	}
 }
 
@@ -47,5 +50,5 @@ void PlayerAttackAH::Update(float deltaTime)
 
 void PlayerAttackAH::Exit()
 {
-
+	m_player->isAttacking = false;
 }

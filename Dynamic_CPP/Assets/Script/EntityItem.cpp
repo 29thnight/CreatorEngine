@@ -61,7 +61,7 @@ void EntityItem::OnTriggerEnter(const Collision& collision)
 {
 	if (collision.otherObj->m_tag == "Rock")
 	{
-		GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+		//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
 		auto rigid = GetOwner()->GetComponent<RigidBodyComponent>();
 		rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 		rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -128,7 +128,8 @@ void EntityItem::Update(float tick)
 				if (abs(dx) < indicatorDistacne && abs(dz) < indicatorDistacne)
 				{
 					isTargettingTail = true;
-					std::cout << "On Indeicator " << std::endl;
+					//인디케이터 출력? 플레이어가출력?
+					std::cout << "On indicator " << std::endl;
 					
 				}
 				else
@@ -147,6 +148,7 @@ void EntityItem::Update(float tick)
 			if (speed < 1.f) {
 				speed = 1.f;
 			}
+			canEat = false;
 			Transform* myTr = GetOwner()->GetComponent<Transform>();
 			Vector3 pB = ((endPos - startPos) / 2) + startPos;
 			pB.y += throwDistacneY;
@@ -161,8 +163,8 @@ void EntityItem::Update(float tick)
 			}
 			else
 			{
-				GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-				//()->GetComponent<RigidBodyComponent>()->UseGravity(false);
+				//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+				GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
 				speed = 2.f;
 				rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 				rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -174,6 +176,7 @@ void EntityItem::Update(float tick)
 			Transform* tailTransform = asisTail->GetComponent<Transform>();
 			if (tailTransform)
 			{
+				canEat = true;
 				speed -= tick;
 				if (speed < 1.f) {
 					speed = 1.f;
@@ -194,8 +197,8 @@ void EntityItem::Update(float tick)
 				else
 				{
 
-					GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
-					//GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
+					//GetOwner()->GetComponent<RigidBodyComponent>()->SetIsTrigger(false);
+					GetOwner()->GetComponent<RigidBodyComponent>()->UseGravity(false);
 					speed = 2.f;
 					rigid->SetLinearVelocity(Mathf::Vector3::Zero);
 					rigid->SetAngularVelocity(Mathf::Vector3::Zero);
@@ -242,7 +245,7 @@ void EntityItem::Update(float tick)
 
 	if (m_state == EItemState::FALLED)
 	{
-		//중력에의해 떨어짐
+		//중력에의해 떨어짐 //바닥 plane 객체 전맵에 깔아야 할듯함 
 	}
 	if (m_state == EItemState::NONE)
 	{

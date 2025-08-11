@@ -80,11 +80,13 @@ void Player::Start()
 		gm->PushPlayer(this);
 	}
 
+	m_controller = player->GetComponent<CharacterControllerComponent>();
 	camera = GameObject::Find("Main Camera");
 }
 
 void Player::Update(float tick)
 {
+	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
@@ -96,7 +98,7 @@ void Player::Update(float tick)
 		m_animator->SetParameter("OnDead", true);
 	}
 
-	if (isAttacking)
+	/*if (isAttacking)
 	{
 		attackElapsedTime += tick;
 		auto controller = player->GetComponent<CharacterControllerComponent>();
@@ -106,7 +108,7 @@ void Player::Update(float tick)
 			attackElapsedTime = 0.f;
 			isAttacking = false;
 		}
-	}
+	}*/
 	if (catchedObject)
 	{
 		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
@@ -128,7 +130,7 @@ void Player::Update(float tick)
 	{
 		m_comboElapsedTime += tick;
 
-		if (m_comboElapsedTime > m_comboTime)
+		if (m_comboElapsedTime > comboDuration)
 		{
 			m_comboCount = 0;
 			m_comboElapsedTime = 0.f;
@@ -366,7 +368,7 @@ void Player::Dash()
 	DropCatchItem();
 	isDashing = true;
 
-	controller->SetKnockBack(m_dashPower, 0.f);
+	controller->SetKnockBack(dashDistacne, 0.f);
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_dashElapsedTime = 0.f;
@@ -400,94 +402,6 @@ void Player::Attack1()
 	if (isAttacking == false)
 	{
 		isAttacking = true;
-		//if (m_comboCount == 0)
-		{
-			/*int gumNumber = playerIndex + 1;
-			std::string gumName = "GumGi" + std::to_string(gumNumber);
-			std::string effectName;
-			effectName = "gg";
-			auto obj = GameObject::Find(gumName);
-			if (obj)
-			{
-				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-				auto forward2 = GetOwner()->m_transform.GetForward();
-				auto offset{ 2 };
-				auto offset2 = -forward2 * offset;
-				pos.x = pos.x + offset2.x;
-				pos.y = 1;
-				pos.z = pos.z + offset2.z;
-				XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
-				Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
-				obj->m_transform.SetPosition(pos);
-				obj->m_transform.SetRotation(swordRotation);
-				obj->m_transform.UpdateWorldMatrix();
-				if (obj)
-				{
-					auto effect = obj->GetComponent<EffectComponent>();
-					if (effect)
-					{
-						effect->ChangeEffect(effectName);
-					}
-				}
-			}*/
-
-
-		/*	std::vector<HitResult> hits;
-			auto world = player->m_transform.GetWorldPosition();
-			world.m128_f32[1] += 0.5f;
-			auto forward = player->m_transform.GetForward();
-			
-
-
-			Mathf::Vector3 dir = world;
-			Mathf::Vector3 dir1 = dir;
-			Mathf::Vector3 dir2 = dir;
-
-			if (std::abs(dir.x) > std::abs(dir.z)) 
-			{
-				dir1.x += 0.5f; 
-				dir2.x -= 0.5f; 
-			}
-			else 
-			{
-				dir1.z += 0.5f; 
-				dir2.z -= 0.5f; 
-			}
-
-
-			
-			int size = RaycastAll(world, -forward, 3.f, 1u, hits);
-			std::vector<HitResult> hits1;
-			int size1 = RaycastAll(world, dir1, 3.0f, 1u, hits1);
-			std::vector<HitResult> hits2;
-			int size2 = RaycastAll(world, dir2, 3.0f, 1u, hits2);
-
-			hits.insert(hits.end(), hits1.begin(), hits1.end());
-			hits.insert(hits.end(), hits2.begin(), hits2.end());*/
-
-
-			/*for (int i = 0; i < size; i++)
-			{
-				auto object = hits[i].hitObject;
-				if (object == GetOwner()) continue;
-				if(Entity* entity = object->GetComponent<Entity>())
-				{
-					AttackTarget.insert(entity);
-				}
-			}*/
-		}
-
-
-		
-		//for (auto& target : AttackTarget)
-		//{
-		//	if (target)
-		//	{
-		//		target->SendDamage(this, 100);   //확인은 받는사람이 한다?
-		//	}
-		//}
-		
-
 		m_animator->SetParameter("Attack", true);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
@@ -556,16 +470,15 @@ void Player::AddWeapon(Weapon* weapon)
 
 void Player::DeleteCurWeapon()
 {
-	if (!m_curWeapon)
+	if (!m_curWeapon || m_curWeapon == m_weaponInventory[0]) //기본무기
 		return;
 
 	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
 
 	if (it != m_weaponInventory.end())
 	{
-		m_weaponInventory.erase(it);
-		m_curWeapon->SetEnabled(false);
-		m_curWeapon = nullptr;
+		SwapWeaponLeft();
+		m_weaponInventory.erase(it); 
 	}
 }
 
@@ -612,6 +525,23 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
+void Player::OnBuff()
+{
+	Buff(m_curWeapon);
+}
+
+void Player::Buff(Weapon* weapon)
+{
+	
+	if (weapon)
+	{
+		
+	}
+	
+
+	DeleteCurWeapon();
+}
+
 void Player::OnRay()
 {
 	std::vector<HitResult> hits;
@@ -647,7 +577,7 @@ void Player::MeleeAttack()
 		direction.y = 0;
 		direction.Normalize();
 		std::vector<HitResult> hits;
-		rayOrigin.y = 0.2f;
+		rayOrigin.y = 0.5f;
 		int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
 
 		if (size > 0)
@@ -666,7 +596,7 @@ void Player::MeleeAttack()
 				if (*iter) 
 				{
 					(*iter)->SendDamage(this, 1);
-					(*iter)->SendKnockBack(this, {100,0});
+					(*iter)->SendKnockBack(this, {1,0});
 				}
 			}
 		}
@@ -724,6 +654,7 @@ void Player::OnTriggerExit(const Collision& collision)
 void Player::OnCollisionEnter(const Collision& collision)
 {
 	std::cout << " Player OnCollisionEnter" << std::endl;
+	
 }
 
 void Player::OnCollisionStay(const Collision& collision)

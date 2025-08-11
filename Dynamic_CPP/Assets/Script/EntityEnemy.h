@@ -1,18 +1,12 @@
 #pragma once
 #include "Core.Minimal.h"
 #include "Entity.h"
-
+#include "CriticalMark.h"
 class BehaviorTreeComponent;
 class BlackBoard;
 class HitResult;
 class Animator;
-enum class CriticalMark
-{
-	P1,
-	P2,
-	None,
-};
-
+class EffectComponent;
 class EntityEnemy : public Entity
 {
 public:
@@ -31,8 +25,7 @@ public:
 	virtual void OnDisable() override  {}
 	virtual void OnDestroy() override  {}
 
-	void SetCriticalMark(int playerIndex);
-	CriticalMark criticalMark = CriticalMark::None;
+	CriticalMark criticalMark;
 	virtual void SendDamage(Entity* sender, int damage) override;
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce);
 	bool isDead;
@@ -43,5 +36,7 @@ public:
 	int attackCount = 0;
 	Animator* m_animator;
 	GameObject* enemy;
+
+	EffectComponent* markEffect = nullptr; //크리티컬 마크 
 	void MeleeAttack();
 };

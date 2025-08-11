@@ -108,6 +108,7 @@ void EntityAsis::OnTriggerEnter(const Collision& collision)
 	auto item = collision.otherObj->GetComponent<EntityItem>();
 	if (item) {
 		if (item->m_state != EItemState::THROWN) return;
+		if (item->canEat == false) return;
 		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
 		auto owner = item->GetThrowOwner();
 		if (owner) {
@@ -128,6 +129,7 @@ void EntityAsis::OnCollisionEnter(const Collision& collision)
 	auto item = collision.otherObj->GetComponent<EntityItem>();
 	if (item) {
 		if (item->m_state != EItemState::THROWN) return; 
+		if (item->canEat == false) return;
 		std::cout << "OnCollision Item: " << collision.otherObj->m_name.data() << std::endl;
 		auto owner = item->GetThrowOwner();
 		if (owner) {

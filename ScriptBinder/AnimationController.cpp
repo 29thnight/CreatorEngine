@@ -206,6 +206,7 @@ void AnimationController::Update(float tick)
 
 	if (m_curState == nullptr) return;
 
+	m_curState->UpdateAnimationSpeed();
 	if(m_curState->behaviour != nullptr)
 		m_curState->behaviour->Update(tick);
 }

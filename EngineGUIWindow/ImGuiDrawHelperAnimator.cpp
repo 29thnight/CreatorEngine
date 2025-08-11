@@ -760,10 +760,45 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 
 						}
-						if (ImGui::Button("SetCurState"))
+
+						ImGui::Text("Animation Speed");
+						ImGui::SameLine();
+						if (ImGui::InputFloat("##AnimationSpeed", &state->animationSpeed))
 						{
-							controller->SetCurState(state->m_name);
+
 						}
+						ImGui::Text("MultiplierAnimation Speed");
+						ImGui::SameLine();
+						
+						if (ImGui::Button(state->animationSpeedParameterName.c_str(), ImVec2(140, 0)))
+						{
+							if (state->useMultipler)
+							{
+								ImGui::OpenPopup("animationSpeedParameterSelecet");
+							}
+						}
+						ImGui::SameLine();
+
+						if (ImGui::Checkbox("Parameter", &state->useMultipler))
+							if (ImGui::Button("SetCurState"))
+							{
+								controller->SetCurState(state->m_name);
+							}
+
+						if (ImGui::BeginPopup("animationSpeedParameterSelecet"))
+						{
+							for (auto& param : animator->Parameters)
+							{
+								if (param->vType != ValueType::Float) continue;
+								if (ImGui::MenuItem(param->name.c_str()))
+								{
+									state->animationSpeedParameterName = param->name;
+								}
+							}
+							ImGui::EndPopup();
+						}
+
+						
 					}
 					else
 					{

@@ -55,6 +55,8 @@ public:
 	float timer = 0.f;
 	float speed = 2.f;
 	
+
+	bool canEat = false;
 	[[Property]]
 	float indicatorDistacne = 15.0f; 
 	EItemState m_state = EItemState::FALLED;

@@ -24,9 +24,22 @@ void EntityEnemy::Start()
 		}
 
 	}
+
 	if (!m_animator)
 	{
 		m_animator = enemy->GetComponent<Animator>();
+	}
+
+	for (auto& child : childred)
+	{
+		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+
+		if (criticalmark)
+		{
+			markEffect = criticalmark;
+			break;
+		}
+
 	}
 }
 
@@ -35,76 +48,39 @@ void EntityEnemy::Update(float tick)
 	Mathf::Vector3 forward = enemy->m_transform.GetForward();
 	//std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
-	if (criticalMark != CriticalMark::None)
-	{
-		if (criticalMark == CriticalMark::P1)
-		{
-			auto obj = GameObject::Find("red");
-			Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-			pos.y += 5;
-			obj->m_transform.SetPosition(pos);
-			obj->m_transform.UpdateWorldMatrix();
-			auto effect = obj->GetComponent<EffectComponent>();
-			if (effect)
-			{
-				effect->PlayEffectByName("red");
-			}
-		}
-		else if (criticalMark == CriticalMark::P2)
-		{
-
-		}
-	}
-
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
 
-	//if (attackCount > 0) {
-		MeleeAttack();
+	//MeleeAttack();
+	//if (isKnockBack)
+	//{
+	//	KnockBackElapsedTime += tick;
+	//	if (KnockBackElapsedTime >= KnockBackTime)
+	//	{
+	//		isKnockBack = false;
+	//		KnockBackElapsedTime = 0.f;
+	//		GetOwner()->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+	//	}
+	//	else
+	//	{
+	//		auto forward = GetOwner()->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+	//		auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	//		controller->Move({ forward.x ,forward.z });
+
+	//	}
 	//}
-
-	
-	if (isKnockBack)
-	{
-		KnockBackElapsedTime += tick;
-		if (KnockBackElapsedTime >= KnockBackTime)
-		{
-			isKnockBack = false;
-			KnockBackElapsedTime = 0.f;
-			GetOwner()->GetComponent<CharacterControllerComponent>()->EndKnockBack();
-		}
-		else
-		{
-			auto forward = GetOwner()->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
-			auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
-			controller->Move({ forward.x ,forward.z });
-
-		}
-	}
-	
-
-
-
-
-
-
 	if (isDead)
 	{
 		//effect
 		//Destroy();
 	}
+
+	if (markEffect)
+	{
+		//이펙트 위치를 오브젝트의 회전과 상관없이 카메라쪽에서 보이게끔 옮기기
+	}
 }
 
-void EntityEnemy::SetCriticalMark(int playerIndex)
-{
-	if (playerIndex == 0)
-	{
-		criticalMark = CriticalMark::P1;
-	}
-	else if (playerIndex == 1)
-	{
-		criticalMark = CriticalMark::P2;
-	}
-}
+
 
 void EntityEnemy::SendDamage(Entity* sender, int damage)
 {
@@ -118,6 +94,26 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);
+			if (true == criticalMark.TryCriticalHit(playerIndex))
+			{
+				if (markEffect)
+				{
+					if (criticalMark.markIndex == 0)
+					{
+						markEffect->PlayEffectByName("red");
+					}
+					else if (criticalMark.markIndex == 1)
+					{
+						markEffect->PlayEffectByName("blue");
+					}
+					else
+					{
+						markEffect->StopEffect();
+					}
+				}
+			}
+
+			
 			if (m_currentHP <= 0)
 			{
 				isDead = true;

@@ -261,6 +261,9 @@
 		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
 			<Filter>Script</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
+			<Filter>BehaviorTree\Action</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -451,6 +454,9 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
 			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
