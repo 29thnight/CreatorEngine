@@ -9,4 +9,6 @@ class AtteckAction : public ActionNode
 public:
 	BT_ACTION_BODY(AtteckAction)
 	virtual NodeStatus Tick(float deltatime, BlackBoard& blackBoard) override;
+private:
+	void PerformSweepAttackTest(BlackBoard& blackBoard);
 };

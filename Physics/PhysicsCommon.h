@@ -365,3 +365,62 @@ struct RayCastOutput
 };
 //==========================================================
 //todo : PxDeformableSuface 에 관한 정보
+
+//==========================================================
+// Shape Sweep 객체 정보
+struct SweepInput
+{
+	DirectX::SimpleMath::Vector3 startPosition; // 스윕을 시작할 월드 공간의 위치
+	DirectX::SimpleMath::Quaternion startRotation; // 스윕을 시작할 때의 회전값
+	DirectX::SimpleMath::Vector3 direction; // 스윕을 진행할 방향 벡터
+	float distance = 100.0f; //스윕 거리 기본거리 
+	unsigned int layerMask = ~0; //추출 레이어 마스크 기본은 모두 충돌
+};
+
+struct SweepHitResult {
+	unsigned int hitObjectID;    // 충돌한 게임 오브젝트의 고유 ID
+	unsigned int hitObjectLayer; // 충돌한 게임 오브젝트의 레이어 번호
+	DirectX::SimpleMath::Vector3 hitPoint;  // 충돌이 발생한 정확한 월드 공간 위치
+	DirectX::SimpleMath::Vector3 hitNormal; // 충돌이 발생한 표면의 법선 벡터
+	float distance = 0.0f; // 스윕 시작점으로부터 충돌 지점까지의 거리
+};
+
+struct SweepOutput
+{
+	// 경로를 가로막는 첫 번째 '블로킹' 충돌이 있었는지 여부.
+	// (eBLOCK 플래그 사용 시 유효)
+	bool hasBlock = false;
+
+	// 경로와 겹친 모든 '터치' 충돌 객체들의 정보 리스트.
+	// 근접 공격 판정에서는 이 리스트를 주로 사용하게 됩니다.
+	std::vector<SweepHitResult> touches;
+};
+//==========================================================
+//Shape overlap 객체 정보
+
+struct OverlapInput
+{
+	// 오버랩 영역의 중심 월드 공간 위치
+	DirectX::SimpleMath::Vector3 position;
+
+	// 오버랩 영역의 회전값
+	DirectX::SimpleMath::Quaternion rotation;
+
+	// 충돌을 감지할 레이어를 지정하는 비트마스크.
+	unsigned int layerMask = ~0;
+};
+
+struct OverlapHitResult
+{
+	// 겹친 게임 오브젝트의 고유 ID
+	unsigned int hitObjectID = 0;
+
+	// 겹친 게임 오브젝트의 레이어 번호
+	unsigned int hitObjectLayer = 0;
+};
+
+struct OverlapOutput
+{
+	// 겹친 모든 객체들의 정보 리스트
+	std::vector<OverlapHitResult> touches;
+};

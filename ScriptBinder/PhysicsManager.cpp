@@ -281,6 +281,45 @@ int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 	return result.hitSize;
 }
 
+int PhysicsManager::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits) {
+	SweepOutput pxOut;
+	
+	pxOut = Physics->BoxSweep(in, boxExtent);
+
+	// --- 3. 라이브러리의 출력을 게임 모듈의 출력으로 변환 ---
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const SweepHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+
+			// 좌표계 변환 (왼손 -> 오른손)
+			ConvertVectorPxToDx(hit.hitPoint, finalHit.point);
+            ConvertVectorPxToDx(hit.hitNormal, finalHit.normal);
+            finalHit.distance = hit.distance;
+
+			out_hits.push_back(finalHit);
+		}
+	}
+
+	// --- 4. 최종적으로 감지된 객체의 수를 반환 ---
+	return static_cast<int>(out_hits.size());
+}
+int PhysicsManager::SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits){}
+int PhysicsManager::CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits){}
+
+int PhysicsManager::BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits){}
+int PhysicsManager::SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits){}
+int PhysicsManager::CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits){}
+
+
 void PhysicsManager::AddCollider(BoxColliderComponent* box)
 {
 	if (!box) return;

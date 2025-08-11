@@ -197,6 +197,19 @@ public:
 	//debug data 대응
 
 
+	//===========================================================================================
+	//Shape Sweep 대응
+	SweepOutput BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	SweepOutput SphereSweep(const SweepInput& in, float radius);
+	SweepOutput CapsuleSweep(const SweepInput& in, float radius, float halfHeight);
+	//===========================================================================================
+	//Shape Overlap 대응
+	OverlapOutput BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	OverlapOutput SphereOverlap(const OverlapInput& in, float radius);
+	OverlapOutput CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight);
+	//===========================================================================================
+
+
 private:
 	physx::PxDefaultAllocator		m_allocator{};
 	physx::PxDefaultErrorCallback	m_errorCallback{};

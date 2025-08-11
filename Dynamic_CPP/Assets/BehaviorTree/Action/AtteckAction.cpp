@@ -80,3 +80,54 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 	// If the "AnimeState" key does not exist, we can set it to "Atteck" and start the attack action
 	return NodeStatus::Success;
 }
+
+void AtteckAction::PerformSweepAttackTest(BlackBoard& blackBoard)
+{
+	std::cout << "=========================================" << std::endl;
+	std::cout << "### " << m_owner->GetHashedName().ToString() << ": 캡슐 스윕 공격 테스트 시작 ###" << std::endl;
+
+	Transform* selfTransform = m_owner->GetComponent<Transform>();
+
+	// --- 1. 캐릭터와 무기 위치 설정 ---
+	// 실제 게임에서는 애니메이션 소켓의 Transform을 사용해야 합니다.
+	// 여기서는 캐릭터의 위치와 방향을 기반으로 가상의 공격 궤적을 만듭니다.
+	DirectX::SimpleMath::Vector3 attackStartPosition = selfTransform->GetWorldPosition() + selfTransform->GetUp() * 1.5f + selfTransform->GetForward() * 1.0f;
+	DirectX::SimpleMath::Vector3 attackEndPosition = selfTransform->GetWorldPosition() + selfTransform->GetUp() * 0.8f + selfTransform->GetForward() * 1.5f;
+
+	// --- 2. 스윕 입력(SweepInput) 데이터 준비 ---
+	SweepInput sweepInput;
+	sweepInput.startPosition = attackStartPosition;
+	sweepInput.startRotation = selfTransform->GetWorldQuaternion();
+	sweepInput.direction = attackEndPosition - attackStartPosition;
+	sweepInput.distance = sweepInput.direction.Length();
+	sweepInput.direction.Normalize();
+
+	// 블랙보드에서 타겟의 레이어를 가져오거나, 적 레이어를 하드코딩합니다.
+	// 여기서는 2번 레이어를 'Enemy'라고 가정합니다.
+	const int ENEMY_LAYER = 2;
+	sweepInput.layerMask = (1 << ENEMY_LAYER);
+
+	// --- 3. 칼의 판정 범위(Geometry) 정의 ---
+	const float swordRadius = 0.15f;
+	const float swordHalfHeight = 0.7f;
+
+	// --- 4. PhysicX 모듈의 스윕 함수 호출 ---
+	std::cout << "스윕 실행 (대상 레이어: " << ENEMY_LAYER << ")" << std::endl;
+	SweepOutput sweepResult = PhysicsManagers->CapsuleSweep(sweepInput, swordRadius, swordHalfHeight);
+
+	// --- 5. 결과 분석 및 출력 ---
+	if (!sweepResult.touches.empty())
+	{
+		std::cout << "[성공] " << sweepResult.touches.size() << "개의 충돌을 감지했습니다!" << std::endl;
+		for (const auto& hit : sweepResult.touches)
+		{
+			std::cout << "  - 충돌 객체 ID: " << hit.hitObjectID << std::endl;
+			// 여기에 데미지 처리, 피격 이벤트 전송 등의 로직을 추가할 수 있습니다.
+		}
+	}
+	else
+	{
+		std::cout << "[실패] 아무것도 감지되지 않았습니다." << std::endl;
+	}
+	std::cout << "=========================================" << std::endl;
+}
