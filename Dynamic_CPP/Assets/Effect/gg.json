@@ -13,6 +13,22 @@
                 {
                     "data": {
                         "meshParticleTemplate": {
+                            "InitialRotation": {
+                                "x": 0.0,
+                                "y": 0.0,
+                                "z": 0.0
+                            },
+                            "RotationSpeed": {
+                                "x": 1.0,
+                                "y": 1.0,
+                                "z": 1.0
+                            },
+                            "Scale": {
+                                "x": 1.0,
+                                "y": 1.0,
+                                "z": 1.0
+                            },
+                            "VerticalVelocity": 0.0,
                             "acceleration": {
                                 "x": 0.0,
                                 "y": -9.800000190734863,
@@ -26,38 +42,6 @@
                             },
                             "horizontalVelocityRange": 0.0,
                             "lifeTime": 10.0,
-                            "maxInitialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "maxRotationSpeed": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "maxScale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "maxVerticalVelocity": 0.0,
-                            "minInitialRotation": {
-                                "x": 0.0,
-                                "y": 0.0,
-                                "z": 0.0
-                            },
-                            "minRotationSpeed": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "minScale": {
-                                "x": 1.0,
-                                "y": 1.0,
-                                "z": 1.0
-                            },
-                            "minVerticalVelocity": 0.0,
                             "renderMode": 0,
                             "textureIndex": 0,
                             "velocity": {
@@ -123,7 +107,7 @@
                             "animationSpeed": 5.0,
                             "enabled": true,
                             "params": {
-                                "polarAngleProgress": 0.01329195499420166,
+                                "polarAngleProgress": 0.9628547430038452,
                                 "polarCenter": {
                                     "x": 0.0,
                                     "y": 0.0,
@@ -131,11 +115,11 @@
                                 },
                                 "polarDirection": 1.0,
                                 "polarReferenceDir": {
-                                    "x": 1.0,
+                                    "x": 0.0,
                                     "y": 0.0,
                                     "z": 0.0
                                 },
-                                "polarStartAngle":  3.1415927410125732,
+                                "polarStartAngle": 3.1415927410125732,
                                 "polarUpAxis": {
                                     "x": 0.0,
                                     "y": 1.0,

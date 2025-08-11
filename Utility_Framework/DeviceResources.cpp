@@ -151,7 +151,7 @@ void DirectX11::DeviceResources::Trim()
 
 void DirectX11::DeviceResources::Present()
 {
-    //if (!m_swapChain) { HandleLostSwapChain(); return; }
+    if (!m_swapChain) { HandleLostSwapChain(); return; }
 
     // 첫 번째 인수는 DXGI에 VSync까지 차단하도록 지시하여 애플리케이션이
     // 다음 VSync까지 대기하도록 합니다. 이를 통해 화면에 표시되지 않는 프레임을

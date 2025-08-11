@@ -206,6 +206,15 @@ void EffectProxyController::CommandBehavior(EffectRenderProxy* proxy)
 				}
 				break;
 			}
+			case EffectCommandType::SetScale:
+			{
+				if (!proxy->GetInstanceName().empty())
+				{
+					command = EffectManagerProxy::CreateSetScaleCommand(proxy->GetInstanceName(), proxy->GetScale());
+					PushEffectCommand(std::move(command));
+				}
+				break;
+			}
 			}
 		}
 	}

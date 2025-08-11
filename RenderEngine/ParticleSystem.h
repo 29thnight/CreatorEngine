@@ -132,6 +132,10 @@ public:
 
 	Mathf::Vector3 GetRotation() { return m_rotation; }
 
+	void SetScale(const Mathf::Vector3& scale);
+
+	Mathf::Vector3 GetScale() { return m_scale; }
+
 	void ResizeParticleSystem(UINT newMaxParticles);
 
 	void SetParticleDatatype(ParticleDataType type);
@@ -161,8 +165,6 @@ public:
 	bool IsReadyForReuse();
 
 	void WaitForGPUCompletion();
-
-	void InitializeParticleIndicesLogical();
 
 	void AutoConnectModules();
 
@@ -198,6 +200,7 @@ protected:
 	Mathf::Vector3 m_position = { 0, 0, 0 };
 	Mathf::Vector3 m_effectBasePosition = { 0, 0, 0 };
 	Mathf::Vector3 m_rotation = { 0, 0, 0 };
+	Mathf::Vector3 m_scale = { 0, 0, 0 };
 	std::vector<RenderModules*> m_renderModules;
 
 	// 더블 버퍼링을 위한 멤버들

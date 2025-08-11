@@ -15,6 +15,7 @@ enum class EffectCommandType
     SetDuration,
     ReplaceEffect,
     PlayWithCustomId,
+    SetScale,
 };
 
 AUTO_REGISTER_ENUM(EffectCommandType)
