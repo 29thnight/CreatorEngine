@@ -27,10 +27,13 @@ struct IViewEvent
 using namespace concurrency;
 using CommandQueue = concurrent_queue<ID3D11CommandList*>;
 
+constexpr size_t CameraCount = 10; // 최대 카메라 개수
+constexpr size_t FrameCount = 3; // 프레임 버퍼 개수
+
 class IRenderPass abstract : public IViewEvent
 {
 public:
-	using FrameQueueArray = std::array<std::array<CommandQueue, 10>, 3>;
+	using FrameQueueArray = std::array<std::array<CommandQueue, CameraCount>, FrameCount>;
 public:
 	IRenderPass()
 	{

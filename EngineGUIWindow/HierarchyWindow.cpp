@@ -156,7 +156,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					if (ImGui::MenuItem("		Image"))
 					{
-						UIManagers->MakeImage("NoneImage",nullptr );
+						UIManagers->MakeImage("NoneImage", nullptr);
 					}
 					if (ImGui::MenuItem("		Text"))
 					{

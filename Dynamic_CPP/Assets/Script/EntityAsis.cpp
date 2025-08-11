@@ -254,17 +254,16 @@ void EntityAsis::Purification(float tick)
 				
 			item->SetThrowOwner(nullptr);
 			item->GetOwner()->Destroy();
-			//file::path prefabPath = "C:\\Users\\user\\Documents\\GitHub\\LastProject\\Dynamic_CPP\\Assets\\Prefabs\\MeleeWeapon.prefab";
-			//Prefab* meleeweapon = PrefabUtilitys->LoadPrefab(prefabPath.string());
-			//if (meleeweapon && player)
-			//{
-			//	GameObject* weaponObj = meleeweapon->Instantiate("meleeWeapon");
-			//	//플레이어 방향으로 웨폰날리기
-			//	auto weaponcom = weaponObj->GetComponent<Weapon>();
-			//	weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
+			Prefab* meleeweapon = PrefabUtilitys->LoadPrefab("MeleeWeapon");
+			if (meleeweapon && player)
+			{
+				GameObject* weaponObj = PrefabUtilitys->InstantiatePrefab(meleeweapon, "meleeWeapon");
+				//플레이어 방향으로 웨폰날리기
+				auto weaponcom = weaponObj->GetComponent<Weapon>();
+				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
-			//}
-			static int index = 1;
+			}
+			/*static int index = 1;
 			std::string weaponName = "MeleeWeapon";
 			auto curweapon = GameObject::Find(weaponName);
 			if (curweapon)
@@ -297,7 +296,7 @@ void EntityAsis::Purification(float tick)
 				auto weaponcom = curweapon->GetComponent<Weapon>();
 				weaponcom->Throw(player, GetOwner()->m_transform.GetWorldPosition());
 
-			}
+			}*/
 			
 		}
 	}

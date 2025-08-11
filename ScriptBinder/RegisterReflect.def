@@ -7,7 +7,6 @@
 #include "CameraComponent.h"
 #include "TerrainCollider.h"
 #include "Animation.h"
-#include "TextComponent.h"
 #include "RenderPassSettings.h"
 #include "SSGIPassSetting.h"
 #include "Camera.h"
@@ -65,7 +64,9 @@
 #include "LightMapping.h"
 #include "ModuleBehavior.h"
 #include "Object.h"
+#include "RectTransformComponent.h"
 #include "Terrain.h"
+#include "TextComponent.h"
 #include "TransCondition.h"
 #include "Transform.h"
 #include "UIButton.h"
@@ -122,6 +123,7 @@ REFLECTION_REGISTER()
     AUTO_REGISTER_CLASS(PlayerInputComponent);
     AUTO_REGISTER_CLASS(Prefab);
     AUTO_REGISTER_CLASS(RagdollComponent);
+    AUTO_REGISTER_CLASS(RectTransformComponent);
     AUTO_REGISTER_CLASS(RenderPassSettings);
     AUTO_REGISTER_CLASS(RigidBodyComponent);
     AUTO_REGISTER_CLASS(SSAOPassSetting);

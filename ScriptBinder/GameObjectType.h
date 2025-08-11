@@ -8,6 +8,8 @@ enum class GameObjectType
 	Light,
 	Mesh,
 	Bone,
+	UI,
+	Canvas,
 	TypeMax
 };
 AUTO_REGISTER_ENUM(GameObjectType)

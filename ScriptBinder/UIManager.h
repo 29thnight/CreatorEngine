@@ -1,16 +1,17 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
+#include "DLLAcrossSingleton.h"
 #include "GameObject.h"
 #include <stop_token>
 #include <DirectXTK/SpriteFont.h>
 
 class Canvas;
 class Texture;
-class UIManager : public Singleton<UIManager>
+class UIManager : public DLLCore::Singleton<UIManager>
 {
 
 public:
-	friend class Singleton;
+	friend class DLLCore::Singleton<UIManager>;
 	Core::Delegate<void, Mathf::Vector2> m_clickEvent;
 	std::shared_ptr<GameObject> MakeCanvas(std::string_view name = "Canvas");
 
@@ -22,7 +23,6 @@ public:
 	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, GameObject* canvas = nullptr, Mathf::Vector2 Pos = { 960,540 });
 	std::shared_ptr<GameObject> MakeText(std::string_view name, SpriteFont* Sfont, std::string_view canvasname, Mathf::Vector2 Pos = { 960,540 });
 
-
 	void DeleteCanvas(std::string canvasName);
 	void CheckInput();
 
@@ -31,20 +31,16 @@ public:
 	
 	void SortCanvas();
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
-	std::vector<GameObject*> Canvases;
+	std::vector<std::weak_ptr<GameObject>> Canvases;
 	//이정 캔버스
 	//현재 상호작용할 UI
-	GameObject* CurCanvas = nullptr;
+	std::weak_ptr<GameObject> CurCanvas;
 	GameObject* SelectUI = nullptr;
 
 	bool needSort = false;
-private:
-	
-	
-	
 };
 
-static auto& UIManagers = UIManager::GetInstance();
+static auto UIManagers = UIManager::GetInstance();
 
 interface ICollision2D
 {

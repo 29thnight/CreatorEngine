@@ -124,12 +124,6 @@ public:
 	//등록된 콜백함수 실행
 	void ProcessCallback();
 
-
-	//디버그 정보 드로우 //[[maybe_unused]] todo : DebugSystem 통합
-	[[maybe_unused]] 
-	void DrawDebugInfo();
-
-
 	//============================
 	//raycast 관련 함수들
 	void RayCast(RayEvent& rayEvent);

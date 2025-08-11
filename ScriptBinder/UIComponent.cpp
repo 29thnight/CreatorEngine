@@ -3,16 +3,17 @@
 
 float MaxOreder = 100.0f;
 
-void UIComponent::SetNavi(Direction dir, GameObject* otherUI)
+void UIComponent::SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI)
 {
 	navigation[dir] = otherUI;
 }
 
 GameObject* UIComponent::GetNextNavi(Direction dir)
 {
-	if (navigation[dir] == nullptr)
+	if (navigation.find(dir) != navigation.end() && !navigation[dir].expired())
 	{
-		return m_pOwner;
+		std::shared_ptr<GameObject> sharedPtr = navigation[dir].lock();
+		return sharedPtr.get();
 	}
-	return navigation[dir];
+	return nullptr;
 }

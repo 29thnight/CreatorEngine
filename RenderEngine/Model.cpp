@@ -322,7 +322,6 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 	return model;
 }
 
-
 GameObject* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
 {
 	if (nullptr == model)

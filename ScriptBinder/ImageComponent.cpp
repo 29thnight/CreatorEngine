@@ -4,6 +4,7 @@
 #include "../RenderEngine/mesh.h"
 #include "GameObject.h"
 #include "transform.h"
+#include "RectTransformComponent.h"
 
 ImageComponent::ImageComponent()
 {
@@ -34,17 +35,23 @@ void ImageComponent::SetTexture(int index)
 
 void ImageComponent::Update(float tick)
 {
-	Transform transform = m_pOwner->m_transform;
-	pos = Mathf::Vector3(transform.position);
-	scale = { transform.scale};
-	auto quat = m_pOwner->m_transform.rotation;
-	float pitch, yaw, roll;
-	Mathf::QuaternionToEular(quat, pitch, yaw, roll);
-	rotate = roll;
+        if (auto* rect = m_pOwner->GetComponent<RectTransformComponent>())
+        {
+                const auto& worldRect = rect->GetWorldRect();
+                pos = { worldRect.x + worldRect.width * 0.5f,
+                        worldRect.y + worldRect.height * 0.5f,
+                        0.0f };
+                scale = { worldRect.width / uiinfo.size.x,
+                          worldRect.height / uiinfo.size.y };
+        }
+        auto quat = m_pOwner->m_transform.rotation;
+        float pitch, yaw, roll;
+        Mathf::QuaternionToEular(quat, pitch, yaw, roll);
+        rotate = roll;
 
 }
 
-void ImageComponent::Draw(SpriteBatch* sBatch)
+void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
 {
 	if (_layerorder < 0) _layerorder = 0;
 	if(m_curtexture !=nullptr)

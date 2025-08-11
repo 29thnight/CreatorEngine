@@ -43,24 +43,18 @@ inline T* GameObject::AddComponent(Args && ...args)
 }
 
 template<typename T>
-inline T* GameObject::GetComponent(uint32 id)
+inline T* GameObject::GetComponent(uint32 index)
 {
-    auto it = m_componentIds.find(id);
-    if (it == m_componentIds.end())
-        return nullptr;
-    return std::static_pointer_cast<T>(m_components[it->second]).get();
+    return std::static_pointer_cast<T>(m_components[index]).get();
 }
 
 template<typename T>
 inline T* GameObject::GetComponent()
 {
-    for (auto& component : m_components)
-    {
-        std::shared_ptr<T> castedComponent = std::dynamic_pointer_cast<T>(component);
-        if (nullptr != castedComponent.get())
-            return castedComponent.get();
-    }
-    return nullptr;
+    auto it = m_componentIds.find(type_guid(T));
+    if (it == m_componentIds.end())
+        return nullptr;
+    return std::static_pointer_cast<T>(m_components[it->second]).get();
 }
 
 template<>
@@ -72,14 +66,9 @@ inline Transform* GameObject::GetComponent()
 template<typename T>
 inline bool GameObject::HasComponent()
 {
-	for (auto& [typeID, index] : m_componentIds)
-	{
-		if (typeID == TypeTrait::GUIDCreator::GetTypeID<T>())
-		{
-			return true;
-		}
-	}
-	return false;
+	m_componentIds.find(type_guid(T));
+	return m_componentIds.find(type_guid(T)) != m_componentIds.end();
+
 }
 
 template<typename T>

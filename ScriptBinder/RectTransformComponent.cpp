@@ -1,9 +1,13 @@
 #include "RectTransformComponent.h"
+#include "GameObject.h"
+#include <unordered_set>
 
 // 생성자
 RectTransformComponent::RectTransformComponent()
 {
     // 초기화가 필요한 경우 여기에 작성합니다.
+	m_name = "RectTransformComponent";
+	m_typeID = type_guid(RectTransformComponent);
 }
 
 // 레이아웃 업데이트 함수: 가장 핵심적인 로직입니다.
@@ -31,12 +35,25 @@ void RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
     // 3. 계산이 완료되었으므로 isDirty 플래그를 false로 설정합니다.
     m_isDirty = false;
 
-    // TODO: 이 RectTransform의 변경이 자식 RectTransform들에게도 영향을 주므로,
-    // 자식들의 레이아웃 업데이트를 여기서 촉발시켜야 합니다.
-    // for (auto& child : children)
-    // {
-    //     child->GetComponent<RectTransformComponent>()->UpdateLayout(m_worldRect);
-    // }
+    if (m_pOwner)
+    {
+        static thread_local std::unordered_set<GameObject*> visited;
+        if (!visited.insert(m_pOwner).second)
+            return;
+
+        for (auto childIndex : m_pOwner->m_childrenIndices)
+        {
+            if (GameObject* child = GameObject::FindIndex(childIndex))
+            {
+                if (auto* rect = child->GetComponent<RectTransformComponent>())
+                {
+                    rect->UpdateLayout(m_worldRect);
+                }
+            }
+        }
+
+        visited.erase(m_pOwner);
+    }
 }
 
 // 앵커 프리셋을 설정하는 헬퍼 함수

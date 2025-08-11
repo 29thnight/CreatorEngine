@@ -4,6 +4,7 @@
 #include "UIManager.h"
 #include "TextComponent.h"
 #include "UIButton.h"
+#include "SceneManager.h"
 
 Canvas::Canvas()
 {
@@ -12,16 +13,15 @@ Canvas::Canvas()
 
 void Canvas::OnDestroy()
 {
-	
 	Scene* scene = SceneManagers->GetActiveScene();
-	if (scene != nullptr && m_pOwner->IsDestroyMark())
+	if (scene != nullptr && m_pOwner->IsDestroyMark() && !UIManagers->CurCanvas.expired())
 	{
-		if (UIManagers->CurCanvas == m_pOwner)
-			UIManagers->CurCanvas = nullptr;
+		if (UIManagers->CurCanvas.lock() == m_pOwner->shared_from_this())
+		{
+			UIManagers->CurCanvas.reset();
+		}
 		UIManagers->DeleteCanvas(m_pOwner->ToString());
 	}
-	
-
 }
 
 void Canvas::AddUIObject(GameObject* obj)
