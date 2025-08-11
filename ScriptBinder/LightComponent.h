@@ -19,7 +19,7 @@ public:
 
     void Awake() override
     {
-		Scene* scene = SceneManagers->GetActiveScene();
+		Scene* scene = GetOwner()->GetScene();
 		if (scene == nullptr)
 		{
 			return;
@@ -49,7 +49,7 @@ public:
 
 	void OnDestroy() override
 	{
-		Scene* scene = SceneManagers->GetActiveScene();
+		Scene* scene = GetOwner()->GetScene();
 		if (scene != nullptr && m_pOwner->IsDestroyMark())
 		{
             scene->RemoveLight(m_lightIndex);

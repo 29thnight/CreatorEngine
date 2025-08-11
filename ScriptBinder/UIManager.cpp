@@ -6,30 +6,56 @@
 #include "UIButton.h"
 #include "InputManager.h"
 #include "TextComponent.h"
+#include "RectTransformComponent.h"
+#include "../RenderEngine/DeviceState.h"
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
-	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Empty);
+	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
 	newObj->AddComponent<Canvas>();
-	Canvases.push_back(newObj.get());
+
+	if (auto* rect = newObj->GetComponent<RectTransformComponent>())
+	{
+		const std::array<float, 2> screenSize{
+				static_cast<float>(DirectX11::GetWidth()),
+				static_cast<float>(DirectX11::GetHeight())
+		};
+		rect->SetAnchoredPosition({ -screenSize[0] * 0.5f, -screenSize[1] * 0.5f });
+		rect->SetSizeDelta({ screenSize[0], screenSize[1] });
+		rect->UpdateLayout({ 0.0f, 0.0f, screenSize[0], screenSize[1] });
+	}
+
+	Canvases.emplace_back(newObj);
 	needSort = true;
 	return newObj;
 }
 
-std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* texture, GameObject* canvas,Mathf::Vector2 Pos)
+std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* texture, GameObject* canvas, Mathf::Vector2 Pos)
 {
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
-		canvas = Canvases[0];
+	{
+		if (auto c = Canvases.front().lock())
+			canvas = c.get();
+		else
+			return nullptr;
+	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
-	if(!canvasCom)
+	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+	if(!canvasCom || !canvasRect)
 	{
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
-	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
+    auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newImage->GetComponent<RectTransformComponent>())
+    {
+		rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+		rect->SetPivot({ 0.0f, 0.0f });
+        rect->SetAnchoredPosition(Pos);
+        rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
 	if (texture == nullptr)
 	{
 		newImage->AddComponent<ImageComponent>();
@@ -52,42 +78,72 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
 	int canvasIndex = 0;
 	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
 	{
-		if (Canvases[canvasIndex]->ToString() == canvasname)
-			break;
+		if (auto c = Canvases[canvasIndex].lock())
+		{
+			if (c->ToString() == canvasname)
+				break;
+		}
 	}
 
 	GameObject* canvas = FindCanvasName(canvasname);
 	if (canvas == nullptr)
 	{
-		std::cout << "«ÿ¥Á ¿Ã∏ß¿« ƒµπˆΩ∫∞° æ¯Ω¿¥œ¥Ÿ." << std::endl;
-		return nullptr;
+        auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+        if (auto* rect = newImage->GetComponent<RectTransformComponent>())
+        {
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+        }
 	}
-	auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
-	newImage->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
-	newImage->AddComponent<ImageComponent>()->Load(texture);
-	canvas->GetComponent<Canvas>()->AddUIObject(newImage.get());
 
-	return newImage;
-}
+	auto newButton0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newButton0->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
+	auto newButton1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newButton1->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
 
+	auto newText0 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newText0->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
 
-std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture* texture, std::function<void()> clickfun, Mathf::Vector2 Pos , GameObject* canvas)
-{
+	auto newText1 = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	if (auto* rect = newText1->GetComponent<RectTransformComponent>())
+	{
+		rect->SetAnchoredPosition(Pos);
+		rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+	}
+
+       
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
-		canvas = Canvases[0];
+	{
+		if (auto c = Canvases.front().lock())
+			canvas = c.get();
+		else
+			return nullptr;
+	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	if (!canvasCom)
 	{
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
-	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540Ïù¥ Í∏∞Î≥∏Í∞í ÌôîÎ©¥Ï§ëÏïô
 	newButton->AddComponent<ImageComponent>()->Load(texture);
 	auto component = newButton->AddComponent<UIButton>();
-	component->SetClickFunction(clickfun);
+	//component->SetClickFunction(clickfun);
 
 	canvasCom->AddUIObject(newButton.get());
 
@@ -103,17 +159,20 @@ std::shared_ptr<GameObject> UIManager::MakeButton(std::string_view name, Texture
 	int canvasIndex = 0;
 	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
 	{
-		if (Canvases[canvasIndex]->ToString() == canvasname)
-			break;
+		if (auto c = Canvases[canvasIndex].lock())
+		{
+			if (c->ToString() == canvasname)
+				break;
+		}
 	}
 	GameObject* canvas = FindCanvasName(canvasname);
 	if (canvas == nullptr)
 	{
-		std::cout << "«ÿ¥Á ¿Ã∏ß¿« ƒµπˆΩ∫∞° æ¯Ω¿¥œ¥Ÿ." << std::endl;
+		std::cout << "Ìï¥Îãπ Ïù¥Î¶ÑÏùò Ï∫îÎ≤ÑÏä§Í∞Ä ÏóÜÏäµÎãàÎã§." << std::endl;
 		return nullptr;
 	}
-	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Mesh, canvas->m_index);
-	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
+	auto newButton = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newButton->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540Ïù¥ Í∏∞Î≥∏Í∞í ÌôîÎ©¥Ï§ëÏïô
 	newButton->AddComponent<ImageComponent>()->Load(texture);
 	auto component = newButton->AddComponent<UIButton>();
 	component->SetClickFunction(clickfun);
@@ -129,15 +188,15 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	if (Canvases.empty())
 		MakeCanvas();
 	if (!canvas)
-		canvas = Canvases[0];
-	auto canvasCom = canvas->GetComponent<Canvas>();
-	if (!canvasCom)
 	{
-		std::cout << "This Obj Not Canvas" << std::endl;
-		return nullptr;
+		if (auto c = Canvases.front().lock())
+			canvas = c.get();
+		else
+			return nullptr;
 	}
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::TypeMax, canvas->m_index);
-	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
+	auto canvasCom = canvas->GetComponent<Canvas>();
+	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540Ïù¥ Í∏∞Î≥∏Í∞í ÌôîÎ©¥Ï§ëÏïô
 	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
 	canvasCom->AddUIObject(newText.get());
 
@@ -151,17 +210,20 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 	int canvasIndex = 0;
 	for (canvasIndex = 0; canvasIndex < Canvases.size(); canvasIndex++)
 	{
-		if (Canvases[canvasIndex]->ToString() == canvasname)
-			break;
+		if (auto c = Canvases[canvasIndex].lock())
+		{
+			if (c->ToString() == canvasname)
+				break;
+		}
 	}
 	GameObject* canvas = FindCanvasName(canvasname);
 	if (canvas == nullptr)
 	{
-		std::cout << "«ÿ¥Á ¿Ã∏ß¿« ƒµπˆΩ∫∞° æ¯Ω¿¥œ¥Ÿ." << std::endl;
+		std::cout << "Ìï¥Îãπ Ïù¥Î¶ÑÏùò Ï∫îÎ≤ÑÏä§Í∞Ä ÏóÜÏäµÎãàÎã§." << std::endl;
 		return nullptr;
 	}
-	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Empty, canvas->m_index);
-	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540¿Ã ±‚∫ª∞™ »≠∏È¡ﬂæ”
+	auto newText = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+	newText->m_transform.SetPosition({ Pos.x, Pos.y, 0 }); // 960 540Ïù¥ Í∏∞Î≥∏Í∞í ÌôîÎ©¥Ï§ëÏïô
 	newText->AddComponent<TextComponent>()->LoadFont(Sfont);
 	canvas->GetComponent<Canvas>()->AddUIObject(newText.get());
 
@@ -170,20 +232,18 @@ std::shared_ptr<GameObject> UIManager::MakeText(std::string_view name, SpriteFon
 
 void UIManager::DeleteCanvas(std::string canvasName)
 {
-	auto it = std::find_if(Canvases.begin(), Canvases.end(),
-		[&](const GameObject* canvas)
-		{
-			return canvas->ToString() == canvasName;
-		});
-
-	Canvases.erase(it, Canvases.end());
-
+	std::erase_if(Canvases, [&](const std::weak_ptr<GameObject>& canvas) 
+	{
+		auto c = canvas.lock();
+		return !c || c->ToString() == canvasName;
+	});
 }
 
 void UIManager::CheckInput()
 {
-	if (CurCanvas == nullptr) return;
-	Canvas* curCanvas = CurCanvas->GetComponent<Canvas>();
+	auto curCanvasObj = CurCanvas.lock();
+	if (!curCanvasObj) return;
+	Canvas* curCanvas = curCanvasObj->GetComponent<Canvas>();
 	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
 		for (auto& uiObj : curCanvas->UIObjs)
@@ -198,8 +258,7 @@ void UIManager::CheckInput()
 		}
 	}
 
-
-	//0¿ª 1p,2p∑Œ πŸ≤Ÿ∞≈≥™ µ—¥Ÿµ˚∑Œ ¡÷∞‘ ºˆ¡§« ø‰, ¿Ãµø∏∂¥Ÿ ¥Î±‚Ω√∞£ µÙ∑π¿Ã ¡÷±‚ «—π¯ø° ø©∑Ø∞≥ ∏¯≥—æÓ∞°∞‘ *****
+	//0ÏùÑ 1p,2pÎ°ú Î∞îÍæ∏Í±∞ÎÇò ÎëòÎã§Îî∞Î°ú Ï£ºÍ≤å ÏàòÏ†ïÌïÑÏöî, Ïù¥ÎèôÎßàÎã§ ÎåÄÍ∏∞ÏãúÍ∞Ñ ÎîúÎ†àÏù¥ Ï£ºÍ∏∞ ÌïúÎ≤àÏóê Ïó¨Îü¨Í∞ú Î™ªÎÑòÏñ¥Í∞ÄÍ≤å *****
 	Mathf::Vector2 stickL = InputManagement->GetControllerThumbL(0);
 	if (stickL.x > 0.5)
 	{
@@ -219,10 +278,18 @@ void UIManager::CheckInput()
 
 GameObject* UIManager::FindCanvasName(std::string_view name)
 {
-	for (auto& canvasObj : Canvases)
+	for (auto it = Canvases.begin(); it != Canvases.end();)
 	{
-		if (canvasObj && canvasObj->ToString() == name)
-			return canvasObj;
+		if (auto canvasObj = it->lock())
+		{
+			if (canvasObj->ToString() == name)
+				return canvasObj.get();
+			++it;
+		}
+		else
+		{
+			it = Canvases.erase(it);
+		}
 	}
 	return nullptr;
 }
@@ -231,10 +298,16 @@ void UIManager::Update()
 {
 	SortCanvas();
 	
-	for (int i = Canvases.size() -1; i >= 0; i--)
+	for (int i = static_cast<int>(Canvases.size()) - 1; i >= 0; i--)
 	{
-		if (!Canvases[i]->GetComponent<Canvas>()->IsEnabled()) continue;
-		CurCanvas = Canvases[i];
+		auto canvasPtr = Canvases[i].lock();
+		if (!canvasPtr)
+		{
+			Canvases.erase(Canvases.begin() + i);
+			continue;
+		}
+		if (!canvasPtr->GetComponent<Canvas>()->IsEnabled()) continue;
+		CurCanvas = canvasPtr;
 		break;
 	}
 	CheckInput();
@@ -242,17 +315,24 @@ void UIManager::Update()
 
 void UIManager::SortCanvas()
 {
-	if(needSort == false)return;
+	if (needSort == false)
+	{
+		return;
+	}
 	else
 	{
-		std::sort(Canvases.begin(), Canvases.end(), [](GameObject* a, GameObject* b) {
-			auto aCanvas = a->GetComponent<Canvas>();
-			auto bCanvas = b->GetComponent<Canvas>();
+		std::erase_if(Canvases, [](const std::weak_ptr<GameObject>& canvas) {
+			return canvas.expired() || !canvas.lock()->GetComponent<Canvas>()->IsEnabled();
+		});
 
+		std::ranges::sort(Canvases, [](const std::weak_ptr<GameObject>& a, const std::weak_ptr<GameObject>& b) {
+			auto aCanvas = a.lock();
+			auto bCanvas = b.lock();
 			if (aCanvas && bCanvas)
-				return aCanvas->CanvasOrder < bCanvas->CanvasOrder;
-			return false; // ¡§∑ƒ ±‚¡ÿ æ¯¿Ω
-			});
+				return aCanvas->GetComponent<Canvas>()->GetCanvasOrder() < bCanvas->GetComponent<Canvas>()->GetCanvasOrder();
+			return false; // Îëò Ï§ë ÌïòÎÇòÍ∞Ä nullptrÏù∏ Í≤ΩÏö∞ false Î∞òÌôò
+		});
+
 	}
 	needSort = false;
 }

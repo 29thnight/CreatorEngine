@@ -264,8 +264,19 @@ void HotLoadSystem::ReplaceScriptComponent()
 		auto& gameObjects = activeScene->m_SceneObjects;
 		std::unordered_set<GameObject*> gameObjectSet;
 
-		for(auto& gameObject : gameObjects)
+		for (auto& gameObject : gameObjects)
 			gameObjectSet.insert(gameObject.get());
+
+		auto findMetaNode = [this](GameObject* obj, size_t idx) -> MetaYml::Node*
+		{
+			auto it = std::ranges::find_if(m_scriptComponentMetaIndexs,
+				[obj, idx](const auto& entry)
+				{
+					const auto& [metaGameObject, metaIndex, node] = entry;
+					return metaGameObject == obj && metaIndex == idx;
+				});
+			return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
+		};
 
 		for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 		{
@@ -278,14 +289,14 @@ void HotLoadSystem::ReplaceScriptComponent()
 				continue;
 			}
 
-			if(SceneManagers->m_isGameStart)
+			if (SceneManagers->m_isGameStart)
 			{
 				ScriptManager->BindScriptEvents(newScript, name);
 			}
 
 			newScript->SetOwner(gameObject);
 			auto sharedScript = std::shared_ptr<Component>(newScript);
-			if(index >= gameObject->m_components.size())
+			if (index >= gameObject->m_components.size())
 			{
 				gameObject->m_components.push_back(sharedScript);
 				size_t backIndex = gameObject->m_components.size() - 1;
@@ -294,18 +305,14 @@ void HotLoadSystem::ReplaceScriptComponent()
 				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
 				const auto& scriptType = newScript->ScriptReflect();
 
-				for (auto& [_gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				if (auto* node = findMetaNode(gameObject, index))
 				{
-					if (_gameObject == gameObject && index == idx)
-					{
-						Meta::Deserialize(scriptPtr, scriptType, node);
-						break;
-					}
+					Meta::Deserialize(scriptPtr, scriptType, *node);
 				}
 			}
 			else
 			{
-				if(nullptr != gameObject->m_components[index])
+				if (nullptr != gameObject->m_components[index])
 				{
 					auto node = Meta::Serialize(gameObject->m_components[index].get());
 
@@ -321,13 +328,9 @@ void HotLoadSystem::ReplaceScriptComponent()
 					void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
 					const auto& scriptType = newScript->ScriptReflect();
 
-					for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+					if (auto* node = findMetaNode(gameObject, index))
 					{
-						if (gameObject == gameObject && index == idx)
-						{
-							Meta::Deserialize(scriptPtr, scriptType, node);
-							break;
-						}
+						Meta::Deserialize(scriptPtr, scriptType, *node);
 					}
 				}
 
@@ -337,6 +340,7 @@ void HotLoadSystem::ReplaceScriptComponent()
 		}
 
 		m_scriptComponentIndexs.clear();
+
 
 		m_isReloading = false;
 	}
@@ -352,6 +356,17 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 
 	for (auto& gameObject : gameObjects)
 		gameObjectSet.insert(gameObject.get());
+
+	auto findMetaNode = [this](GameObject* obj, size_t idx) -> MetaYml::Node*
+		{
+			auto it = std::find_if(m_scriptComponentMetaIndexs.begin(), m_scriptComponentMetaIndexs.end(),
+				[obj, idx](const auto& entry)
+				{
+					const auto& [metaGameObject, metaIndex, node] = entry;
+					return metaGameObject == obj && metaIndex == idx;
+				});
+			return it != m_scriptComponentMetaIndexs.end() ? &std::get<2>(*it) : nullptr;
+		};
 
 	for (auto& [gameObject, index, name] : m_scriptComponentIndexs)
 	{
@@ -375,18 +390,15 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 		{
 			gameObject->m_components.push_back(sharedScript);
 			size_t backIndex = gameObject->m_components.size() - 1;
-			gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+			//gameObject->m_componentIds[newScript->m_scriptTypeID] = backIndex;
+			gameObject->m_componentIds.emplace(newScript->m_scriptTypeID, backIndex);
 
 			void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[backIndex].get());
 			const auto& scriptType = newScript->ScriptReflect();
 
-			for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+			if (auto* node = findMetaNode(gameObject, index))
 			{
-				if (gameObject == gameObject && index == idx)
-				{
-					Meta::Deserialize(scriptPtr, scriptType, node);
-					break;
-				}
+				Meta::Deserialize(scriptPtr, scriptType, *node);
 			}
 		}
 		else
@@ -407,13 +419,9 @@ void HotLoadSystem::ReplaceScriptComponentTargetScene(Scene* targetScene)
 				void* scriptPtr = reinterpret_cast<void*>(gameObject->m_components[index].get());
 				const auto& scriptType = newScript->ScriptReflect();
 
-				for (auto& [gameObject, idx, node] : m_scriptComponentMetaIndexs)
+				if (auto* node = findMetaNode(gameObject, index))
 				{
-					if (gameObject == gameObject && index == idx)
-					{
-						Meta::Deserialize(scriptPtr, scriptType, node);
-						break;
-					}
+					Meta::Deserialize(scriptPtr, scriptType, *node);
 				}
 			}
 

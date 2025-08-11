@@ -30,6 +30,9 @@
     <Filter Include="소스 파일\Blueprint">
       <UniqueIdentifier>{c79060ed-c9e0-42fe-9cca-496f0b4d6e7b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\TableAPIHelper">
+      <UniqueIdentifier>{9934a91e-04ca-47a8-89ad-58bbb3f71c72}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImGuiContext.h">
@@ -79,6 +82,9 @@
     </ClInclude>
     <ClInclude Include="ToggleUI.h">
       <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="TableAPIHelper.h">
+      <Filter>소스 파일\TableAPIHelper</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

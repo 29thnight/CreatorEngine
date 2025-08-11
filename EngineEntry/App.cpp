@@ -12,6 +12,9 @@
 #include "EffectProxyController.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
+#include "ReflectionRegister.h"
+#include "ReflectionVectorFactory.h"
+#include "ReflectionVectorInvoker.h"
 #include <imgui_impl_win32.h>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -29,6 +32,9 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		return hr;
 	}
 
+	Meta::RegisterClassInitalize();
+	Meta::VectorFactoryRegistry::GetInstance();
+	Meta::VectorInvokerRegistry::GetInstance();
 	PathFinder::Initialize();
 	Log::Initialize();
 
@@ -60,6 +66,9 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	InputManager::Destroy();
 	DataSystem::Destroy();
 	PrefabUtility::Destroy();
+	Meta::RegisterClassFinalize();
+	Meta::VectorFactoryRegistry::Destroy();
+	Meta::VectorInvokerRegistry::Destroy();
 
 	Log::Finalize();
 

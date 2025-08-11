@@ -47,6 +47,7 @@ using namespace Microsoft::WRL;
 #include <cmath>
 #include <string>
 #include <tuple>
+#include <future>
 #include <utility>
 #include <vector>
 #include <cstdint>

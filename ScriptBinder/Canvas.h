@@ -17,11 +17,14 @@ public:
 
 	void AddUIObject(GameObject* obj);
 	virtual void Update(float tick) override;
+	void SetCanvasOrder(int order) { CanvasOrder = order; }
+	int GetCanvasOrder() const { return CanvasOrder; }
 
 	int PreCanvasOrder = 0;
     [[Property]]
 	int CanvasOrder = 0;
 	std::vector<GameObject*> UIObjs;
+
 
 	//현재 선택중인 UI
 	GameObject* SelectUI = nullptr;

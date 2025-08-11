@@ -22,7 +22,7 @@ public:
 	//한글이 안나올시 sfont 제대로 만들었는지 확인
 	void SetMessage(std::string_view _message) { message = _message.data(); }
 	void LoadFont(SpriteFont* _font) { font = _font; }
-	void Draw(SpriteBatch* Sbatch);
+	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
 	[[Property]]
 	std::string message;
 

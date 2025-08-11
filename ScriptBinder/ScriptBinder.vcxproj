@@ -258,6 +258,7 @@
     <ClCompile Include="Canvas.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FoliageComponent.cpp" />
+    <ClCompile Include="RectTransformComponent.cpp" />
     <ClCompile Include="VolumeComponent.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="HotLoadSystem.cpp" />
@@ -279,6 +280,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="StateMachineComponent.cpp" />
+    <ClInclude Include="AnchorPreset.h" />
     <ClInclude Include="BehaviorTreeComponent.h" />
     <ClInclude Include="BlackBoardEnum.h" />
     <ClInclude Include="BLackBoardValue.h" />
@@ -294,6 +296,7 @@
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />
     <ClInclude Include="MSBuildHelper.h" />
+    <ClInclude Include="RectTransformComponent.h" />
     <ClInclude Include="ScriptStringModule.h" />
     <ClInclude Include="VolumeComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />

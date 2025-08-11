@@ -6,6 +6,7 @@
 
 class SceneRenderer;
 class Matarial;
+class GameObject;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
@@ -14,6 +15,7 @@ class TerrainComponent;
 class StateMachineComponent;
 class BehaviorTreeComponent;
 class VolumeComponent;
+class RectTransformComponent;
 class InspectorWindow
 {
 public:
@@ -29,6 +31,9 @@ private:
 	bool m_openFSMPopup{ false };
 	bool m_openBTPopup{ false };
 
+	void ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject);
+	void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransformComponent);
+	void ImGuiDrawHelperTransformComponent(GameObject* gameObject);
 	void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent);
 	void ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent);

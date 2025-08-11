@@ -33,20 +33,31 @@ public:
 	void SetCanvas(Canvas* canvas) { ownerCanvas = canvas; }
 	Canvas* GetOwnerCanvas() { return ownerCanvas; }
 	void SetOrder(int index) { _layerorder = index; }
-	void SetNavi(Direction dir, GameObject* otherUI);
+	int GetLayerOrder() const { return _layerorder; }
+	void SetNavi(Direction dir, const std::shared_ptr<GameObject>& otherUI);
 	GameObject* GetNextNavi(Direction dir);
 
-    [[Property]]
-	int _layerorder{};
 	Mathf::Vector3 pos{ 960,540,0 };
 	Mathf::Vector2 scale{ 1,1};
 	UItype type = UItype::None;
 
+	static bool CompareLayerOrder(UIComponent* a, UIComponent* b)
+	{
+		if (a->_layerorder != b->_layerorder)
+			return a->_layerorder < b->_layerorder;
+		auto aCanvas = a->GetOwnerCanvas();
+		auto bCanvas = b->GetOwnerCanvas();
+		int aOrder = aCanvas ? aCanvas->GetCanvasOrder() : 0;
+		int bOrder = bCanvas ? bCanvas->GetCanvasOrder() : 0;
+		return aOrder < bOrder;
+	}
+
 private:
-	std::unordered_map<Direction, GameObject*> navigation;
+	std::unordered_map<Direction, std::weak_ptr<GameObject>> navigation;
 	Canvas* ownerCanvas = nullptr;
 
-	//UIComponent* parent;
-	//int layerorder;
+protected:
+    [[Property]]
+	int _layerorder{};
 };
 

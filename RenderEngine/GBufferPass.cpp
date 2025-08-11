@@ -72,8 +72,8 @@ GBufferPass::GBufferPass()
 		)
 	);
 
-	m_pso->m_depthStencilState = DeviceState::g_pDepthStencilState;
-	m_instancePSO->m_depthStencilState = DeviceState::g_pDepthStencilState;
+	m_pso->m_depthStencilState			= DeviceState::g_pDepthStencilState;
+	m_instancePSO->m_depthStencilState	= DeviceState::g_pDepthStencilState;
 
 	auto linearSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	auto pointSampler = std::make_shared<Sampler>(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -306,8 +306,8 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 
-	for (auto& terrainProxy : data->m_terrainQueue) {
-
+	for (auto& terrainProxy : data->m_terrainQueue) 
+	{
 		auto terrainMesh = terrainProxy->m_terrainMesh;
 		auto terrainMaterial = terrainProxy->m_terrainMaterial;
 

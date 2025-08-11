@@ -144,40 +144,6 @@ void PhysicsManager::ProcessCallback()
 	}
 }
 
-
-void PhysicsManager::DrawDebugInfo()
-{
-	//collider ?•ë³´ë¥?ê°€?¸ì???render?ì„œ wireframe??ê·¸ë¦´ ???ˆë„ë¡??œë‹¤.
-	//DebugRender debug;
-
-	//ë¬¼ë¦¬?”ì§„???ˆëŠ” ê°ì²´ë¥?ì¡°íšŒ?˜ë©´ ë¬¼ë¦¬ ?•ë³´ë¥?ê°€?¸ì˜¨??
-
-	//DebugData dd;
-	//// ?¤ë¸Œ?íŠ¸??ë¬¼ë¦¬ ?•ë³´
-	//for (auto* rb : m_rigidBodies)
-	//	rb->FillDebugData(dd);
-
-	//// ë§¤ë‹ˆ?€?ì„œ ì²˜ë¦¬?˜ëŠ” Raycast ?•ë³´ë¥?ì¶”ê?
-	//for (auto& rq : m_raycastSystem->GetRequests())
-	//{
-	//	if (rq.hit)
-	//	{
-	//		dd.lines.push_back({ rq.origin, rq.origin + rq.direction * rq.distance, {1,1,0,1} });
-	//		dd.points.push_back({ rq.hitPosition, {1,0,0,1} });
-	//	}
-	//}
-
-	//// IDebugRenderer???„ë‹¬
-	//for (auto& l : dd.lines)   debug->DrawLine(l);
-	//for (auto& s : dd.spheres) debug->DrawSphere(s);
-	//for (auto& p : dd.points)  debug->DrawPoint(p);
-	//for (auto& b : dd.boxes)   debug->DrawBox(b);
-	//for (auto& c : dd.capsules) debug->DrawCapsule(c);
-	//for (auto& m : dd.convexes) debug->DrawConvexMesh(c);
-	//debug->Flush();
-	
-}
-
 void PhysicsManager::RayCast(RayEvent& rayEvent)
 {
 	
@@ -576,7 +542,7 @@ void PhysicsManager::SetPhysicData()
 
 		auto& transform = colliderInfo.gameObject->m_transform;
 		//colliderInfo.collider.
-		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>(type_guid(RigidBodyComponent));
+		auto rigidbody = colliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto offset = colliderInfo.collider->GetPositionOffset();
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
 		//todo : CCT,Controller,ragdoll,capsule,?˜ì¤‘??deformeSuface
@@ -584,7 +550,7 @@ void PhysicsManager::SetPhysicData()
 		{
 			//Benchmark bm;
 			
-			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>(type_guid(CharacterControllerComponent));
+			auto controller = colliderInfo.gameObject->GetComponent<CharacterControllerComponent>();
 			CharacterControllerGetSetData data;
 			DirectX::SimpleMath::Vector3 position = transform.GetWorldPosition();
 			data.position = position+controller->GetPositionOffset();

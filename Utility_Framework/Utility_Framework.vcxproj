@@ -61,6 +61,7 @@
     <ClInclude Include="DumpHandler.h" />
     <ClInclude Include="FileDialog.h" />
     <ClInclude Include="FileIO.h" />
+    <ClInclude Include="GPUQueryCollector.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
     <ClInclude Include="TypeIO.h" />

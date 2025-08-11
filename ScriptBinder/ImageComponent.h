@@ -32,7 +32,7 @@ public:
     [[Method]]
 	void UpdateTexture();
 	void SetTexture(int index);
-	void Draw(SpriteBatch* sBatch);
+	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
 	
 	ImageInfo uiinfo;
 	Texture* m_curtexture{};

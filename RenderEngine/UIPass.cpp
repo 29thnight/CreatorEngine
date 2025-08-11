@@ -53,91 +53,160 @@ UIPass::UIPass()
 	m_UIBuffer = DirectX11::CreateBuffer(sizeof(ImageInfo), D3D11_BIND_CONSTANT_BUFFER, nullptr);
 }
 
-void UIPass::Initialize(Texture* renderTargetView, SpriteBatch* spriteBatch)
+void UIPass::Initialize(Texture* renderTargetView)
 {
 	m_renderTarget = renderTargetView;
-	m_spriteBatch = spriteBatch;
+	m_spriteBatch = std::make_unique<DirectX::SpriteBatch>(DeviceState::g_pDeviceContext);
+	m_commonStates = std::make_unique<DirectX::CommonStates>(DeviceState::g_pDevice);
 }
 
 
+void UIPass::SortUIObjects()
+{
+	std::vector<Canvas*> canvases;
+	size_t index		= m_frame.load(std::memory_order_relaxed) % 3;
+	auto& imageQueue	= _ImageObjects[index];
+	auto& textQueue		= _TextObjects[index];
+
+	for (auto it = UIManagers->Canvases.begin(); it != UIManagers->Canvases.end(); )
+	{
+		if (auto canvasObj = it->lock())
+		{
+			Canvas* canvas = canvasObj->GetComponent<Canvas>();
+			if (false == canvas->IsEnabled()) { ++it; continue; }
+			for (auto& uiObj : canvas->UIObjs)
+			{
+				std::vector<UIComponent*> uicom = uiObj->GetComponents<UIComponent>();
+				for (auto& ui : uicom)
+				{
+					if (ui->IsEnabled() == false) continue;
+					switch (ui->type)
+					{
+					case UItype::Image:
+					{
+						if (auto* img = dynamic_cast<ImageComponent*>(ui))
+							imageQueue.push_back(img);
+						break;
+					}
+					case UItype::Text:
+					{
+						if (auto* txt = dynamic_cast<TextComponent*>(ui))
+							textQueue.push_back(txt);
+						break;
+					}
+					default:
+						break;
+					}
+				}
+
+			}
+			++it;
+		}
+		else
+		{
+			it = UIManagers->Canvases.erase(it);
+		}
+	}
+
+	std::ranges::sort(imageQueue, UIComponent::CompareLayerOrder);
+	std::ranges::sort(textQueue, UIComponent::CompareLayerOrder);
+}
+
 void UIPass::Execute(RenderScene& scene, Camera& camera)
+{
+	//if (!RenderPassData::VaildCheck(&camera)) return;
+	//auto renderData = RenderPassData::GetData(&camera);
+
+	//m_pso->Apply();
+	//ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
+	//DirectX11::OMSetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
+	//DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
+	//DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	//camera.UpdateBuffer();
+
+	//DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
+	//m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, 
+	//	m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
+	//
+	//size_t prevIndex	= size_t(m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	//auto& imageQueue	= _ImageObjects[prevIndex];
+	//auto& textQueue		= _TextObjects[prevIndex];
+
+	//for (auto& imageObject : imageQueue)
+	//{
+	//	imageObject->Draw(m_spriteBatch);
+	//}
+	//for (auto& textObject : textQueue)
+	//{
+	//	textObject->Draw(m_spriteBatch);
+	//}
+
+	//m_spriteBatch->End();
+	//DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
+	//DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+
+	//ID3D11ShaderResourceView* nullSRV = nullptr;
+	//DirectX11::PSSetShaderResources(0, 1, &nullSRV);
+	//DirectX11::UnbindRenderTargets();
+	//imageQueue.clear();
+	//textQueue.clear();
+
+	ExecuteCommandList(scene, camera);
+}
+
+void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera)
 {
 	if (!RenderPassData::VaildCheck(&camera)) return;
 	auto renderData = RenderPassData::GetData(&camera);
 
-	m_pso->Apply();
+	size_t prevIndex = size_t(m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	auto& imageQueue = _ImageObjects[prevIndex];
+	auto& textQueue = _TextObjects[prevIndex];
+
+	if (imageQueue.empty() && textQueue.empty()) return;
+
+	ID3D11DeviceContext* deferredPtr = deferredContext;
+
+	m_pso->Apply(deferredPtr);
+
+	auto spriteBatch = std::make_unique<SpriteBatch>(deferredPtr);
+
 	ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	DirectX11::OMSetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
-	DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
-	camera.UpdateBuffer();
+	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_renderTarget->m_pDSV);
+	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
+	DirectX11::OMSetDepthStencilState(deferredPtr, m_NoWriteDepthStencilState.Get(), 1);
+	DirectX11::OMSetBlendState(deferredPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	camera.UpdateBuffer(deferredPtr);
 
-	DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-	m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, nullptr, nullptr, nullptr, nullptr, nullptr);
-	std::vector<Canvas*> canvases;
-	for (auto& Canvases : UIManagers->Canvases)
+	DirectX11::VSSetConstantBuffer(deferredPtr, 0, 1, m_UIBuffer.GetAddressOf());
+	spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack,
+		m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
+
+	for (auto& imageObject : imageQueue)
 	{
-		Canvas* canvas = Canvases->GetComponent<Canvas>();
-		if (false == canvas->IsEnabled()) continue;
-		for (auto& uiObj : canvas->UIObjs)
-		{
-			std::vector<UIComponent*> uicom = uiObj->GetComponents<UIComponent>();
-			for (auto& ui : uicom)
-			{
-				if (ui->IsEnabled() == false) continue;
-				switch (ui->type)
-				{
-				case UItype::Image:
-				{
-					if (auto* img = dynamic_cast<ImageComponent*>(ui))
-						_ImageObjects.push_back(img);
-					break;
-				}
-				case UItype::Text:
-				{
-					if (auto* txt = dynamic_cast<TextComponent*>(ui))
-					_TextObjects.push_back(txt);
-					break;
-				}
-				default:
-					break;
-				}
-			}
-		
-		}
+		imageObject->Draw(spriteBatch);
 	}
-	//std::sort(_2DObjects.begin(), _2DObjects.end(), [](ImageComponent* a, ImageComponent* b) {
-	//	if (a->_layerorder != b->_layerorder)
-	//		return a->_layerorder < b->_layerorder;
 
-	//	// 동일한 layer일 경우, CanvasOrder 기준으로 비교
-	//	auto aCanvas = a->GetOwnerCanvas(); 
-	//	auto bCanvas = b->GetOwnerCanvas();
-
-	//	int aOrder = aCanvas ? aCanvas->CanvasOrder : 0;
-	//	int bOrder = bCanvas ? bCanvas->CanvasOrder : 0;
-
-	//	return aOrder < bOrder;
-	//	});
-	//
-	for (auto& Imageobject : _ImageObjects)
+	for (auto& textObject : textQueue)
 	{
-		Imageobject->Draw(m_spriteBatch);
+		textObject->Draw(spriteBatch);
 	}
-	for (auto& Textobject : _TextObjects)
-	{
-		Textobject->Draw(m_spriteBatch);
-	}
-	m_spriteBatch->End();
-	DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
-	DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+
+	spriteBatch->End();
+	DirectX11::OMSetDepthStencilState(deferredPtr, DeviceState::g_pDepthStencilState, 1);
+	DirectX11::OMSetBlendState(deferredPtr, nullptr, nullptr, 0xFFFFFFFF);
 
 	ID3D11ShaderResourceView* nullSRV = nullptr;
-	DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	DirectX11::UnbindRenderTargets();
-	_TextObjects.clear();
-	_ImageObjects.clear();
-	
+	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
+	DirectX11::UnbindRenderTargets(deferredPtr);
+	imageQueue.clear();
+	textQueue.clear();
+
+	ID3D11CommandList* commandList{};
+	DirectX11::ThrowIfFailed(
+		deferredPtr->FinishCommandList(FALSE, &commandList)
+	);
+	PushQueue(camera.m_cameraIndex, commandList);
 }
 
 bool UIPass::compareLayer(int  a, int  b)

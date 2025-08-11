@@ -112,12 +112,6 @@ public:
 	//등록된 콜백함수 실행
 	void ProcessCallback();
 
-
-	//디버그 정보 드로우 //[[maybe_unused]] todo : DebugSystem 통합
-	[[maybe_unused]] 
-	void DrawDebugInfo();
-
-
 	void RayCast(RayEvent& rayEvent);
 	bool Raycast(RayEvent& rayEvent, RaycastHit& hit);
 	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);

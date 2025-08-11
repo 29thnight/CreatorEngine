@@ -103,6 +103,19 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					meshRenderer->m_Material->m_renderingMode = renderingMode;
 				}
 				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
+				if (meshRenderer->m_Mesh)
+				{
+					MetaYml::Node getLOD_Node = getMeshNode["m_LODThresholds"];
+					if (getLOD_Node)
+					{
+						std::vector<float> lodThresholds;
+						for (const auto& threshold : getLOD_Node)
+						{
+							lodThresholds.push_back(threshold.as<float>());
+						}
+						meshRenderer->m_Mesh->GenerateLODs(lodThresholds);
+					}
+				}
             }
 			meshRenderer->SetOwner(obj);
             meshRenderer->SetEnabled(true);
@@ -343,23 +356,20 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					continue;
 
 				Model* model = nullptr;
-				FileGuid guid = DataSystems->GetStemToGuid(type.m_modelName);
-				if (guid != nullFileGuid)
+				std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
+				for (const auto& ext : exts)
 				{
-					model = DataSystems->LoadModelGUID(guid);
+					auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
+					if (std::filesystem::exists(path))
+					{
+						model = DataSystems->LoadCashedModel(path.string());
+						break;
+					}
 				}
 				if (!model)
 				{
-					std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
-					for (const auto& ext : exts)
-					{
-						auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
-						if (std::filesystem::exists(path))
-						{
-							model = DataSystems->LoadCashedModel(path.string());
-							break;
-						}
-					}
+					Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
+					continue;
 				}
 				if (model)
 				{

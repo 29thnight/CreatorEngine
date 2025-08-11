@@ -169,16 +169,8 @@ void RenderPassData::PushRenderQueue(PrimitiveRenderProxy* proxy)
 	case PrimitiveProxyType::MeshRenderer:
 		mat = proxy->m_Material;
 		mesh = proxy->m_Mesh;
-		if (nullptr == mat || nullptr == mesh) {
-			Debug->LogError("Material or Mesh is null in RenderPassData::PushRenderQueue");
-			if (nullptr == mesh)
-			{
-				Debug->LogError("Mesh is null : " +mat->m_name);
-			}
-			if (nullptr == mat)
-			{
-				Debug->LogError("Material is null : "+mesh->GetName());
-			}
+		if (nullptr == mat || nullptr == mesh) 
+		{
 			return;
 		}
 

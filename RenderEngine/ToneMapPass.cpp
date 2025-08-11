@@ -190,7 +190,7 @@ void ToneMapPass::Execute(RenderScene& scene, Camera& camera)
 
     m_pso->Apply();
 
-    ID3D11RenderTargetView* renderTargets[] = { m_DestTexture.lock()->GetRTV()};
+    ID3D11RenderTargetView* renderTargets[] = { m_DestTexture.lock()->GetRTV() };
     DirectX11::OMSetRenderTargets(1, renderTargets, nullptr);
 
     DirectX11::PSSetShaderResources(0, 1, &renderData->m_renderTarget->m_pSRV);

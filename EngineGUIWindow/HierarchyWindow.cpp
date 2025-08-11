@@ -156,7 +156,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				{
 					if (ImGui::MenuItem("		Image"))
 					{
-						UIManagers->MakeImage("NoneImage",nullptr );
+						UIManagers->MakeImage("NoneImage", nullptr);
 					}
 					if (ImGui::MenuItem("		Text"))
 					{
@@ -221,7 +221,7 @@ HierarchyWindow::HierarchyWindow(SceneRenderer* ptr) :
 				else
 				{
 					ImGui::Text("No GameObject Selected");
-					UIManagers->MakeImage(filename.string().c_str(), texture);
+					UIManagers->MakeImage(filename.stem().string().c_str(), texture);
 				}
 
 
