@@ -15,6 +15,7 @@
 #include "TerrainCollider.h"
 #include "RigidBodyComponent.h"
 #include "TagManager.h"
+#include "RectTransformComponent.h"
 #include <execution>
 
 #include "Profiler.h"
@@ -1135,7 +1136,25 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		return;
 	}
 
-	if (GameObjectType::Bone == obj->GetType())
+	switch (obj->GetType())
+	{
+	case GameObjectType::UI:
+	{
+		const auto& RectTransform = obj->GetComponent<RectTransformComponent>();
+		const auto& objParent = m_SceneObjects[obj->m_parentIndex];
+		if (!RectTransform || !RectTransform->IsEnabled() || !objParent)
+		{
+			return;
+		}
+		const auto& ParentRectTransform = objParent->GetComponent<RectTransformComponent>();
+		if (!ParentRectTransform || !ParentRectTransform->IsEnabled())
+		{
+			return;
+		}
+		RectTransform->UpdateLayout(ParentRectTransform->GetWorldRect());
+		break;
+	}
+	case GameObjectType::Bone:
 	{
 		const auto& animator = GetGameObject(obj->m_rootIndex)->GetComponent<Animator>();
 		if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
@@ -1143,10 +1162,11 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 			return;
 		}
 		const auto bone = animator->m_Skeleton->FindBone(obj->RemoveSuffixNumberTag());
-		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ? 
+		obj->m_transform.SetAndDecomposeMatrix(XMMatrixMultiply(bone ?
 			animator->m_localTransforms[bone->m_index] : obj->m_transform.GetLocalMatrix(), model));
+		break;
 	}
-	else
+	default:
 	{
 		if (obj->m_transform.IsDirty())
 		{
@@ -1158,7 +1178,10 @@ void Scene::UpdateModelRecursive(GameObject::Index objIndex, Mathf::xMatrix mode
 		}
 		model = XMMatrixMultiply(obj->m_transform.GetLocalMatrix(), model);
 		obj->m_transform.SetAndDecomposeMatrix(model);
+		break;
 	}
+	}
+
 
 	for (auto& childIndex : obj->m_childrenIndices)
 	{

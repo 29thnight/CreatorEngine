@@ -6,6 +6,7 @@
 
 class SceneRenderer;
 class Matarial;
+class GameObject;
 class MeshRenderer;
 class ModuleBehavior;
 class Animator;
