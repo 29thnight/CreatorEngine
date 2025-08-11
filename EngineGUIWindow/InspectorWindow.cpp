@@ -741,11 +741,14 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 				: IM_COL32(60, 60, 60, 255);
 			dl->AddRectFilled(r.Min, r.Max, bgCol, 4.f);
 
+			Mathf::Vector2 calcMin = { presets[curIndex].anchorMin.x , 1.f - presets[curIndex].anchorMin.y };
+			Mathf::Vector2 calcMax = { presets[curIndex].anchorMax.x , 1.f - presets[curIndex].anchorMax.y };
+
 			if (curIndex >= 0) {
 				const auto& pr = presets[curIndex];
 				// 아이콘 비주얼만 그리기 (selected=false: 이미 현재 버튼이라 테두리 과도 방지)
 				DrawAnchorIconVisual(dl, ImRect(r.Min + ImVec2(4, 4), r.Max - ImVec2(4, 4)),
-					pr.anchorMin, pr.anchorMax, /*selected=*/false);
+					calcMin, calcMax, /*selected=*/false);
 			}
 			else {
 				// Custom 상태: 간단한 십자
