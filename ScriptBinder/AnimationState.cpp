@@ -2,7 +2,9 @@
 #include "AniBehavior.h"
 #include "HotLoadSystem.h"
 #include "AnimationBehviourFatory.h"
-
+#include "AnimationController.h"
+#include "Animator.h"
+#include "ConditionParameter.h"
 AnimationState::AnimationState()
 {
 	ScriptManager->CollectAniBehavior(this);
@@ -61,4 +63,13 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 	if(behaviour == nullptr) return;
 
 	behaviour->m_ownerController = this->m_ownerController;
+}
+
+void AnimationState::UpdateAnimationSpeed()
+{
+	ConditionParameter* parameter = m_ownerController->GetOwner()->FindParameter(animationSpeedParameterName);
+	if (parameter)
+	{
+		multiplerAnimationSpeed = parameter->fValue;
+	}
 }

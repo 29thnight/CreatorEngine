@@ -206,6 +206,7 @@ void AnimationController::Update(float tick)
 
 	if (m_curState == nullptr) return;
 
+	m_curState->UpdateAnimationSpeed();
 	if(m_curState->behaviour != nullptr)
 		m_curState->behaviour->Update(tick);
 }
@@ -241,7 +242,7 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	if (isAny == true)
 		state->m_isAny = true;
 	state->AnimationIndex = animationIndex;
-	state->SetBehaviour(stateName);
+	//state->SetBehaviour(stateName);
 	States.insert(std::make_pair(stateName, StateVec.size()));
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;

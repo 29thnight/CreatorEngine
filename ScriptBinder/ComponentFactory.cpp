@@ -233,7 +233,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							animationController->StateNameSet.insert(sharedState->m_name);
 							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
 							sharedState->m_ownerController = animationController.get();
-							sharedState->SetBehaviour(sharedState->m_name);
+							sharedState->SetBehaviour(sharedState->behaviourName);
 							if (state["Transitions"])
 							{
 								auto& transitionNode = state["Transitions"];

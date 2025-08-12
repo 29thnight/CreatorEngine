@@ -178,6 +178,10 @@ public:
 		return m_fBaseSpeed;
 	}
 
+	void SetBaseSpeed(float speed)
+	{
+		m_fBaseSpeed = speed;
+	}
 	std::array<bool, 4> GetMoveRestrict() const
 	{
 		return m_bMoveRestrict;

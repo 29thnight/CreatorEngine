@@ -216,6 +216,7 @@ extern "C"
 	EXPORT_API void InitActionFactory()
 	{
 		// Register the factory function for BTAction Automation
+		ActionCreateFactory::GetInstance()->RegisterFactory("KnockBackAction", []() { return new KnockBackAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("DetectAndTargetingAction", []() { return new DetectAndTargetingAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("BTEntityInitAction", []() { return new BTEntityInitAction(); });
 		ActionCreateFactory::GetInstance()->RegisterFactory("GroggyAction", []() { return new GroggyAction(); });
@@ -272,7 +273,8 @@ extern "C"
 	EXPORT_API void InitAniBehaviorFactory()
 	{
 		// Register the factory function for AniBehavior Automation
-		AniBehaviorFactory::GetInstance()->RegisterFactory("NewAniBehavior", []() { return new NewAniBehavior(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAH", []() { return new PlayerAttackAH(); });
+		AniBehaviorFactory::GetInstance()->RegisterFactory("PlayerAttackAni", []() { return new PlayerAttackAni(); });
 
 	}
 #pragma endregion

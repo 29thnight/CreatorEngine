@@ -2,23 +2,8 @@
 #include "Core.Minimal.h"
 #include "ModuleBehavior.h"
 #include "Weapon.generated.h"
+#include "ItemType.h"
 
-enum class ItemType
-{
-	Meely,
-	Range,
-	Explosion,
-	Basic,
-	None,
-};
-
-enum class BuffType
-{
-	Meely,
-	Range,
-	Explosion,
-	None,
-};
 
 
 class Player;

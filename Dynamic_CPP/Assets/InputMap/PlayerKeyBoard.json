@@ -71,6 +71,30 @@
             "key3": "A",
             "keystate": "Down",
             "scpritName": "Player"
+        },
+        {
+            "actionName": "TestKnockBack",
+            "actionType": "Button",
+            "funName": "TestKnockBack",
+            "inputType": "KeyBoard",
+            "key0": "P",
+            "key1": "A",
+            "key2": "A",
+            "key3": "A",
+            "keystate": "Down",
+            "scpritName": "Player"
+        },
+        {
+            "actionName": "Buff",
+            "actionType": "Button",
+            "funName": "OnBuff",
+            "inputType": "KeyBoard",
+            "key0": "L",
+            "key1": "Unknown",
+            "key2": "Unknown",
+            "key3": "Unknown",
+            "keystate": "Down",
+            "scpritName": "Player"
         }
     ],
     "mapName": "PlayerKeyBoard"

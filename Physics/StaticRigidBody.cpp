@@ -87,7 +87,7 @@ void StaticRigidBody::ChangeLayerNumber(const unsigned int& layerNumber, int* co
 		filterData.word0 = layerNumber;
 		filterData.word1 = collisionMatrix[layerNumber];
 		shape->setSimulationFilterData(filterData);
-
+		shape->setQueryFilterData(filterData);
 		auto userData = static_cast<CollisionData*>(shape->userData);
 		userData->thisLayerNumber = layerNumber;
 	}

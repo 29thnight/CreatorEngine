@@ -166,7 +166,6 @@
 		</PreBuildEvent>
 	</ItemDefinitionGroup>
 	<ItemGroup>
-		<ClInclude Include="AniBehaviourFactory.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BossIdleAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BP001BodyAtack.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\BP002FireBall.h" />
@@ -192,8 +191,10 @@
 		<ClInclude Include="Assets\Script\TestEffect.h" />
 		<ClInclude Include="Assets\Script\Weapon.h" />
 		<ClInclude Include="BTConditionDecoratorFactory.h" />
+		<ClInclude Include="CriticalMark.h" />
 		<ClInclude Include="Easing.h" />
 		<ClInclude Include="ItemType.h" />
+		<ClInclude Include="PlayerBuff.h" />
 		<ClInclude Include="RaycastHelper.h" />
 		<ClInclude Include="BTActionFactory.h" />
 		<ClInclude Include="BTConditionFactory.h" />
@@ -233,11 +234,13 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\RetreatAction.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\MageActtack.h" />
 		<ClInclude Include="Assets\Script\EntityEnemy.h" />
-		<ClInclude Include="Assets\Script\NewAniBehavior.h" />
 		<ClInclude Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.h" />
 		<ClInclude Include="Assets\BehaviorTree\Condition\IsChase.h" />
 		<ClInclude Include="Assets\BehaviorTree\Action\DetectAndTargetingAction.h" />
 		<ClInclude Include="Assets\Script\DestroyEffect.h" />
+		<ClInclude Include="Assets\Script\PlayerAttackAni.h" />
+		<ClInclude Include="Assets\Script\PlayerAttackAH.h" />
+		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h" />
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="Assets\Script\AsisMove.cpp" />
@@ -245,6 +248,8 @@
 		<ClCompile Include="Assets\Script\TestBehavior.cpp" />
 		<ClCompile Include="Assets\Script\TestEffect.cpp" />
 		<ClCompile Include="Assets\Script\Weapon.cpp" />
+		<ClCompile Include="CriticalMark.cpp" />
+		<ClCompile Include="PlayerBuff.cpp" />
 		<ClCompile Include="RaycastHelper.cpp" />
 		<ClCompile Include="dllmain.cpp" />
 		<ClCompile Include="pch.cpp">
@@ -445,10 +450,6 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
-		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsUseAsis.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -462,6 +463,18 @@
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAni.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 			<AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>

@@ -237,12 +237,6 @@
 		<ClInclude Include="Easing.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\NewAniBehavior2.h">
-			<Filter>Script</Filter>
-		</ClInclude>
-		<ClInclude Include="Assets\Script\NewAniBehavior.h">
-			<Filter>Script</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\EntityEnemy.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
@@ -260,6 +254,15 @@
 		</ClInclude>
 		<ClInclude Include="Assets\Script\DestroyEffect.h">
 			<Filter>Script\ScriptClass</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerAttackAni.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
+			<Filter>Script</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
@@ -428,12 +431,6 @@
 		<ClCompile Include="Assets\BehaviorTree\ConditionDecorator\IsStartBoss.cpp">
 			<Filter>BehaviorTree\ConditionDecorator</Filter>
 		</ClCompile>
-		<ClCompile Include="Assets\Script\NewAniBehavior2.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\NewAniBehavior.cpp">
-			<Filter>Script</Filter>
-		</ClCompile>
 		<ClCompile Include="Assets\Script\EntityEnemy.cpp">
 			<Filter>Script\ScriptClass</Filter>
 		</ClCompile>
@@ -451,6 +448,15 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAni.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
+			<Filter>Script</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
+			<Filter>BehaviorTree\Action</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>
