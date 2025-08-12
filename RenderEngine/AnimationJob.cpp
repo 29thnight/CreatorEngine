@@ -78,10 +78,22 @@ void AnimationJob::Update(float deltaTime)
             {
                 for (auto& sharedanimationcontroller : animator->m_animationControllers)
                 {
+                    float animationspeed = 1;
+                  
                     AnimationController* animationcontroller = sharedanimationcontroller.get();
                     if (animationcontroller == nullptr || !animationcontroller->useController) continue;
+
+                    AnimationState* curState = animationcontroller->m_curState;
+                    if (curState)
+                    {
+                        animationspeed = curState->animationSpeed;
+                        if (curState->useMultipler)
+                        {
+                            animationspeed *= curState->multiplerAnimationSpeed;
+                        }
+                    }
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond;
+                    animationcontroller->m_timeElapsed += delta * animation.m_ticksPerSecond * animationspeed;
                     if (animation.m_isLoop == true)
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&

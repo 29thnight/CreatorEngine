@@ -6,11 +6,13 @@
 #include "Blackboard.h"
 #include "RaycastHelper.h"
 #include "Animator.h"
+#include "CharacterControllerComponent.h"
 void EntityEnemy::Start()
 {
-	enemyBT =GetOwner()->GetComponent<BehaviorTreeComponent>();
+	enemy = GetOwner();
+	enemyBT = enemy->GetComponent<BehaviorTreeComponent>();
 	blackBoard = enemyBT->GetBlackBoard();
-	auto childred = GetOwner()->m_childrenIndices;
+	auto childred = enemy->m_childrenIndices;
 	for (auto& child : childred)
 	{
 		auto animator = GameObject::FindIndex(child)->GetComponent<Animator>();
@@ -22,65 +24,65 @@ void EntityEnemy::Start()
 		}
 
 	}
+
 	if (!m_animator)
 	{
-		m_animator = GetOwner()->GetComponent<Animator>();
+		m_animator = enemy->GetComponent<Animator>();
+	}
+
+	for (auto& child : childred)
+	{
+		auto criticalmark = GameObject::FindIndex(child)->GetComponent<EffectComponent>();
+
+		if (criticalmark)
+		{
+			markEffect = criticalmark;
+			break;
+		}
+
 	}
 }
 
 void EntityEnemy::Update(float tick)
 {
-	Mathf::Vector3 forward = GetOwner()->m_transform.GetForward();
-	std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
-
-	if (criticalMark != CriticalMark::None)
-	{
-		if (criticalMark == CriticalMark::P1)
-		{
-			auto obj = GameObject::Find("red");
-			Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-			pos.y += 5;
-			obj->m_transform.SetPosition(pos);
-			obj->m_transform.UpdateWorldMatrix();
-			auto effect = obj->GetComponent<EffectComponent>();
-			if (effect)
-			{
-				effect->PlayEffectByName("red");
-			}
-		}
-		else if (criticalMark == CriticalMark::P2)
-		{
-
-		}
-	}
+	Mathf::Vector3 forward = enemy->m_transform.GetForward();
+	//std::cout << "Enemy Forward: " << forward.x << " " << forward.y << " " << forward.z << std::endl;
 
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
 
-	//if (attackCount > 0) {
-		MeleeAttack();
+	//MeleeAttack();
+	//if (isKnockBack)
+	//{
+	//	KnockBackElapsedTime += tick;
+	//	if (KnockBackElapsedTime >= KnockBackTime)
+	//	{
+	//		isKnockBack = false;
+	//		KnockBackElapsedTime = 0.f;
+	//		GetOwner()->GetComponent<CharacterControllerComponent>()->EndKnockBack();
+	//	}
+	//	else
+	//	{
+	//		auto forward = GetOwner()->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
+	//		auto controller = GetOwner()->GetComponent<CharacterControllerComponent>();
+	//		controller->Move({ forward.x ,forward.z });
+
+	//	}
 	//}
-
-
 	if (isDead)
 	{
 		//effect
-		Destroy();
+		//Destroy();
+	}
+
+	if (markEffect)
+	{
+		//이펙트 위치를 오브젝트의 회전과 상관없이 카메라쪽에서 보이게끔 옮기기
 	}
 }
 
-void EntityEnemy::SetCriticalMark(int playerIndex)
-{
-	if (playerIndex == 0)
-	{
-		criticalMark = CriticalMark::P1;
-	}
-	else if (playerIndex == 1)
-	{
-		criticalMark = CriticalMark::P2;
-	}
-}
 
-void EntityEnemy::Attack(Entity* sender, int damage)
+
+void EntityEnemy::SendDamage(Entity* sender, int damage)
 {
 
 	if (sender)
@@ -92,10 +94,45 @@ void EntityEnemy::Attack(Entity* sender, int damage)
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);
-			if (m_currentHP >= 0)
+			if (true == criticalMark.TryCriticalHit(playerIndex))
+			{
+				if (markEffect)
+				{
+					if (criticalMark.markIndex == 0)
+					{
+						markEffect->PlayEffectByName("red");
+					}
+					else if (criticalMark.markIndex == 1)
+					{
+						markEffect->PlayEffectByName("blue");
+					}
+					else
+					{
+						markEffect->StopEffect();
+					}
+				}
+			}
+
+			
+			if (m_currentHP <= 0)
 			{
 				isDead = true;
 			}
+		}
+	}
+}
+
+void EntityEnemy::SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce)
+{
+	if (sender)
+	{
+
+		Player* _player = dynamic_cast<Player*>(sender);
+		if (_player)
+		{
+			isKnockBack = true;
+			KnockBackTime = 0.1f;
+			GetOwner()->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce.x, KnockBackForce.y);
 		}
 	}
 }
@@ -149,7 +186,7 @@ void EntityEnemy::MeleeAttack()
 
 
 	//std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
-	std::cout << "Hit Count: " << size << std::endl;
+	//std::cout << "Hit Count: " << size << std::endl;
 	m_animator->SetParameter("Attack", true);
 	/*GameObject* gumgiobj=nullptr;
 	EffectComponent* gumgi = nullptr;
@@ -194,7 +231,7 @@ void EntityEnemy::MeleeAttack()
 		Player* player = object->GetComponent<Player>();
 		if (player)
 		{
-			player->Attack(this, 0);
+			player->SendDamage(this, 0);
 		}
 	}
 	

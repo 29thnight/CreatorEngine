@@ -5,6 +5,7 @@
 #include "TextComponent.h"
 #include "UIButton.h"
 #include "SceneManager.h"
+#include "RectTransformComponent.h"
 
 Canvas::Canvas()
 {
@@ -46,5 +47,14 @@ void Canvas::Update(float tick)
 	{
 		UIManagers->needSort = true;
 		PreCanvasOrder = CanvasOrder;
+	}
+
+	for (auto& obj : UIObjs)
+	{
+		if (obj->IsDestroyMark())
+		{
+			std::erase(UIObjs, obj);
+			continue;
+		}
 	}
 }

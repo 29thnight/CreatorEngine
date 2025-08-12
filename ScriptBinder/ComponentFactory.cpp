@@ -233,7 +233,7 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 							animationController->StateNameSet.insert(sharedState->m_name);
 							animationController->States.insert(std::make_pair(sharedState->m_name, animationController->StateVec.size() - 1));
 							sharedState->m_ownerController = animationController.get();
-							sharedState->SetBehaviour(sharedState->m_name);
+							sharedState->SetBehaviour(sharedState->behaviourName);
 							if (state["Transitions"])
 							{
 								auto& transitionNode = state["Transitions"];
@@ -356,23 +356,20 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
 					continue;
 
 				Model* model = nullptr;
-				FileGuid guid = DataSystems->GetStemToGuid(type.m_modelName);
-				if (guid != nullFileGuid)
+				std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
+				for (const auto& ext : exts)
 				{
-					model = DataSystems->LoadModelGUID(guid);
+					auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
+					if (std::filesystem::exists(path))
+					{
+						model = DataSystems->LoadCashedModel(path.string());
+						break;
+					}
 				}
 				if (!model)
 				{
-					std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
-					for (const auto& ext : exts)
-					{
-						auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
-						if (std::filesystem::exists(path))
-						{
-							model = DataSystems->LoadCashedModel(path.string());
-							break;
-						}
-					}
+					Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
+					continue;
 				}
 				if (model)
 				{

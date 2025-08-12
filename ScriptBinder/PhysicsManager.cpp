@@ -532,7 +532,7 @@ void PhysicsManager::SetPhysicData()
 {
 	
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
-	std::cout << "Container size" << Container.size()<<std::endl;
+	//std::cout << "Container size" << Container.size()<<std::endl;
 	for (auto& [id, colliderInfo] : Container) 
 	{
 		if (colliderInfo.bIsDestroyed)

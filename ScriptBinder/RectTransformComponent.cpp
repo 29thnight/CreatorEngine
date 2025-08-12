@@ -62,9 +62,9 @@ void RectTransformComponent::SetAnchorPreset(AnchorPreset preset)
     switch (preset)
     {
         // 상단
-        case AnchorPreset::TopLeft:      { m_anchorMin = {0.0f, 1.0f}; m_anchorMax = {0.0f, 1.0f}; break; }
-        case AnchorPreset::TopCenter:    { m_anchorMin = {0.5f, 1.0f}; m_anchorMax = {0.5f, 1.0f}; break; }
-        case AnchorPreset::TopRight:     { m_anchorMin = {1.0f, 1.0f}; m_anchorMax = {1.0f, 1.0f}; break; }
+        case AnchorPreset::TopLeft:      { m_anchorMin = {0.0f, 0.0f}; m_anchorMax = {0.0f, 0.0f}; break; }
+        case AnchorPreset::TopCenter:    { m_anchorMin = {0.5f, 0.0f}; m_anchorMax = {0.5f, 0.0f}; break; }
+        case AnchorPreset::TopRight:     { m_anchorMin = {1.0f, 0.0f}; m_anchorMax = {1.0f, 0.0f}; break; }
 
         // 중단
         case AnchorPreset::MiddleLeft:   { m_anchorMin = {0.0f, 0.5f}; m_anchorMax = {0.0f, 0.5f}; break; }
@@ -72,9 +72,9 @@ void RectTransformComponent::SetAnchorPreset(AnchorPreset preset)
         case AnchorPreset::MiddleRight:  { m_anchorMin = {1.0f, 0.5f}; m_anchorMax = {1.0f, 0.5f}; break; }
 
         // 하단
-        case AnchorPreset::BottomLeft:   { m_anchorMin = {0.0f, 0.0f}; m_anchorMax = {0.0f, 0.0f}; break; }
-        case AnchorPreset::BottomCenter: { m_anchorMin = {0.5f, 0.0f}; m_anchorMax = {0.5f, 0.0f}; break; }
-        case AnchorPreset::BottomRight:  { m_anchorMin = {1.0f, 0.0f}; m_anchorMax = {1.0f, 0.0f}; break; }
+        case AnchorPreset::BottomLeft:   { m_anchorMin = {0.0f, 1.0f}; m_anchorMax = {0.0f, 1.0f}; break; }
+        case AnchorPreset::BottomCenter: { m_anchorMin = {0.5f, 1.0f}; m_anchorMax = {0.5f, 1.0f}; break; }
+        case AnchorPreset::BottomRight:  { m_anchorMin = {1.0f, 1.0f}; m_anchorMax = {1.0f, 1.0f}; break; }
 
         // 가로 스트레치
         case AnchorPreset::StretchLeft:   { m_anchorMin = {0.0f, 0.5f}; m_anchorMax = {1.0f, 0.5f}; break; }

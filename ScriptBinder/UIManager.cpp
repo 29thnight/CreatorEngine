@@ -11,8 +11,20 @@
 
 std::shared_ptr<GameObject> UIManager::MakeCanvas(std::string_view name)
 {
-	auto  newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
+	auto newObj = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::Canvas);
 	newObj->AddComponent<Canvas>();
+
+	if (auto* rect = newObj->GetComponent<RectTransformComponent>())
+	{
+		const std::array<float, 2> screenSize{
+				static_cast<float>(DirectX11::GetWidth()),
+				static_cast<float>(DirectX11::GetHeight())
+		};
+		rect->SetAnchoredPosition({ -screenSize[0] * 0.5f, -screenSize[1] * 0.5f });
+		rect->SetSizeDelta({ screenSize[0], screenSize[1] });
+		rect->UpdateLayout({ 0.0f, 0.0f, screenSize[0], screenSize[1] });
+	}
+
 	Canvases.emplace_back(newObj);
 	needSort = true;
 	return newObj;
@@ -30,17 +42,20 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name,Texture* 
 			return nullptr;
 	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
-	if(!canvasCom)
+	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
+	if(!canvasCom || !canvasRect)
 	{
 		std::cout << "This Obj Not Canvas" << std::endl;
 		return nullptr;
 	}
-        auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
-        if (auto* rect = newImage->GetComponent<RectTransformComponent>())
-        {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
-        }
+    auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
+    if (auto* rect = newImage->GetComponent<RectTransformComponent>())
+    {
+		rect->SetAnchorPreset(AnchorPreset::MiddleCenter);
+		rect->SetPivot({ 0.0f, 0.0f });
+        rect->SetAnchoredPosition(Pos);
+        rect->UpdateLayout(canvasRect->GetWorldRect());
+    }
 	if (texture == nullptr)
 	{
 		newImage->AddComponent<ImageComponent>();
@@ -76,8 +91,8 @@ std::shared_ptr<GameObject> UIManager::MakeImage(std::string_view name, Texture*
         auto newImage = SceneManagers->GetActiveScene()->CreateGameObject(name, GameObjectType::UI, canvas->m_index);
         if (auto* rect = newImage->GetComponent<RectTransformComponent>())
         {
-                rect->SetAnchoredPosition(Pos);
-                rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
+            rect->SetAnchoredPosition(Pos);
+            rect->UpdateLayout({ 0.0f, 0.0f, DirectX11::GetWidth(), DirectX11::GetHeight() });
         }
 	}
 

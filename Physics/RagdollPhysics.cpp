@@ -74,7 +74,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	filterData.word1 = collisionMatrix[m_layerNumber];
 	filterData.word2 = 1;
 	shape->setSimulationFilterData(filterData);
-
+	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
 
 	return true;
@@ -109,6 +109,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	filterData.word1 = collisionMatrix[m_layerNumber];
 	filterData.word2 = 1;
 	shape->setSimulationFilterData(filterData);
+	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
 	return true;
 }
@@ -142,6 +143,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	filterData.word1 = collisionMatrix[m_layerNumber];
 	filterData.word2 = 1;
 	shape->setSimulationFilterData(filterData);
+	shape->setQueryFilterData(filterData);
 	m_linkContainer.insert(std::make_pair(linkInfo.boneName, link));
 	return true;
 }

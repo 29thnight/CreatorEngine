@@ -1181,10 +1181,10 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 
 		//CopyMatrixDxToPx(dxMatrix, pxTransform);
 		physx::PxTransform pxPrevTransform = pxBody->getGlobalPose();
-		if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
+		/*if (IsTransformDifferent(pxPrevTransform, pxTransform)) {
 			pxBody->setGlobalPose(pxTransform);
-		}
-		//pxBody->setGlobalPose(pxTransform);
+		}*/
+		pxBody->setGlobalPose(pxTransform);
 		dynamicBody->ChangeLayerNumber(rigidBodyData.LayerNumber, m_collisionMatrix);
 
 		if (scale.x>0.0f&&scale.y>0.0f&&scale.z>0.0f)

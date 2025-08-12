@@ -6,14 +6,14 @@ void ConvertVectorPxToDx(const physx::PxVec3& pxVector, DirectX::SimpleMath::Vec
 {
 	dxVector.x = pxVector.x;
 	dxVector.y = pxVector.y;
-	dxVector.z = -pxVector.z;
+	dxVector.z = pxVector.z;
 }
 
 
 void ConvertQuaternionPxToDx(const physx::PxQuat& pxQuat, DirectX::SimpleMath::Quaternion& dxQuat)
 {
-	dxQuat.x = -pxQuat.x;
-	dxQuat.y = -pxQuat.y;
+	dxQuat.x = pxQuat.x;
+	dxQuat.y = pxQuat.y;
 	dxQuat.z = pxQuat.z; // PhysX´Â ¿À¸¥¼Õ ÁÂÇ¥°è, DirectX´Â ¿Þ¼Õ ÁÂÇ¥°è
 	dxQuat.w = pxQuat.w;
 }
@@ -22,13 +22,13 @@ void ConvertVectorDxToPx(const DirectX::SimpleMath::Vector3& dxVector, physx::Px
 {
 	pxVector.x = dxVector.x;
 	pxVector.y = dxVector.y;
-	pxVector.z = -dxVector.z;
+	pxVector.z = dxVector.z;
 }
 
 
 void ConvertQuaternionDxToPx(const DirectX::SimpleMath::Quaternion& dxQuat, physx::PxQuat& pxQuat) {
-	pxQuat.x = -dxQuat.x;
-	pxQuat.y = -dxQuat.y;
+	pxQuat.x = dxQuat.x;
+	pxQuat.y = dxQuat.y;
 	pxQuat.z = dxQuat.z;
 	pxQuat.w = dxQuat.w;
 }

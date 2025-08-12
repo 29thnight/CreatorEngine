@@ -33,7 +33,7 @@ GameObject::GameObject(Scene* scene, std::string_view name, GameObjectType type,
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 
-	if (type == GameObjectType::UI)
+	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
 		AddComponent<RectTransformComponent>();
 	}
@@ -52,7 +52,7 @@ GameObject::GameObject(Scene* scene, size_t instanceID, std::string_view name, G
 	m_components.reserve(30); // Reserve space for components to avoid frequent reallocations
 	m_componentIds.reserve(30); // Reserve space for component IDs to avoid frequent reallocations
 
-	if (type == GameObjectType::UI)
+	if (type == GameObjectType::UI || type == GameObjectType::Canvas)
 	{
 		AddComponent<RectTransformComponent>();
 	}

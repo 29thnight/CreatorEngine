@@ -10,6 +10,19 @@ NodeStatus AtteckAction::Tick(float deltatime, BlackBoard& blackBoard)
 	Transform* targetTransform = target->GetComponent<Transform>();
 	Mathf::Vector3 targetPos = targetTransform->GetWorldPosition();
 	Mathf::Vector3 dir = targetPos - pos;
+
+	bool hasDamage = blackBoard.HasKey("Damage");
+	int damage = 0;
+	if (hasDamage)
+	{
+		damage = blackBoard.GetValueAsInt("Damage");
+		if (damage >= 0)
+		{
+			return NodeStatus::Failure;
+		}
+	}
+
+
 	dir.Normalize(); // Normalize direction vector
 
 	CharacterControllerComponent* movement = m_owner->GetComponent<CharacterControllerComponent>();

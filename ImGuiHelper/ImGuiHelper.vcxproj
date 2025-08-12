@@ -41,6 +41,7 @@
     <ClInclude Include="NodeEditor.h" />
     <ClInclude Include="PinHelper.h" />
     <ClInclude Include="Profiler.h" />
+    <ClInclude Include="TableAPIHelper.h" />
     <ClInclude Include="ToggleUI.h" />
     <ClInclude Include="widgets.h" />
   </ItemGroup>

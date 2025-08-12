@@ -77,7 +77,7 @@ float3 ApplyACES_Full(float3 linearSRGBColor)
 
     // 4. Clamp the result to the valid [0, 1] range before gamma correction.
     // This prevents negative colors or values over 1 from causing issues.
-    linearOutput = saturate(linearOutput);
+    linearOutput = max(linearOutput, 0.0.xxx);
 
     // 5. Apply the sRGB OETF (gamma correction) for the final display color.
     float3 displayColor = OETF_sRGB(linearOutput);

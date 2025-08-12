@@ -24,7 +24,6 @@
 #include "CameraComponent.h"
 void Player::Start()
 {
-	std::cout << Mathf::Vector3::Forward.z << std::endl;
 
 	player = GetOwner();
 	auto childred = player->m_childrenIndices;
@@ -81,14 +80,17 @@ void Player::Start()
 		gm->PushPlayer(this);
 	}
 
+	m_controller = player->GetComponent<CharacterControllerComponent>();
 	camera = GameObject::Find("Main Camera");
 }
 
 void Player::Update(float tick)
 {
+	m_controller->SetBaseSpeed(moveSpeed);
 	Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
 	pos.y += 0.5;
 	dashObj->m_transform.SetPosition(pos);
+
 
 
 	if (isDead)
@@ -96,7 +98,7 @@ void Player::Update(float tick)
 		m_animator->SetParameter("OnDead", true);
 	}
 
-	if (isAttacking)
+	/*if (isAttacking)
 	{
 		attackElapsedTime += tick;
 		auto controller = player->GetComponent<CharacterControllerComponent>();
@@ -106,7 +108,7 @@ void Player::Update(float tick)
 			attackElapsedTime = 0.f;
 			isAttacking = false;
 		}
-	}
+	}*/
 	if (catchedObject)
 	{
 		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
@@ -128,7 +130,7 @@ void Player::Update(float tick)
 	{
 		m_comboElapsedTime += tick;
 
-		if (m_comboElapsedTime > m_comboTime)
+		if (m_comboElapsedTime > comboDuration)
 		{
 			m_comboCount = 0;
 			m_comboElapsedTime = 0.f;
@@ -159,7 +161,7 @@ void Player::Update(float tick)
 			isDashing = false;
 			m_dashElapsedTime = 0.f;
 			player->GetComponent<CharacterControllerComponent>()->EndKnockBack(); //&&&&&  넉백이랑같이  쓸함수 이름수정할거
-			dashEffect->StopEffect();
+			//dashEffect->StopEffect();
 		}
 		else
 		{
@@ -195,7 +197,7 @@ void Player::Update(float tick)
 		{
 			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
 			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ -forward.x ,-forward.z });
+			controller->Move({ forward.x ,forward.z });
 		}
 	}
 
@@ -203,34 +205,34 @@ void Player::Update(float tick)
 
 void Player::LateUpdate(float tick)
 {
-	CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
-	auto cam = camComponent->GetCamera();
-	auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
-	auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
+	//CameraComponent* camComponent = camera->GetComponent<CameraComponent>();
+	//auto cam = camComponent->GetCamera();
+	//auto camViewProj = cam->CalculateView() * cam->CalculateProjection();
+	//auto invCamViewProj = XMMatrixInverse(nullptr, camViewProj);
 
-	XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
-	XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
-	float w = XMVectorGetW(clipSpacePos);
-	if (w < 0.001f) {
-		// 원래 위치 반환.
-		GetOwner()->m_transform.SetPosition(worldpos);
-		return;
-	}
-	XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
+	//XMVECTOR worldpos = GetOwner()->m_transform.GetWorldPosition();
+	//XMVECTOR clipSpacePos = XMVector3TransformCoord(worldpos, camViewProj);
+	//float w = XMVectorGetW(clipSpacePos);
+	//if (w < 0.001f) {
+	//	// 원래 위치 반환.
+	//	GetOwner()->m_transform.SetPosition(worldpos);
+	//	return;
+	//}
+	//XMVECTOR ndcPos = XMVectorScale(clipSpacePos, 1.0f / w);
 
-	float clamp_limit = 0.9f;
-	XMVECTOR clampedNdcPos = XMVectorClamp(
-		ndcPos,
-		XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
-		XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
-	);
-	XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
-	XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
+	//float clamp_limit = 0.9f;
+	//XMVECTOR clampedNdcPos = XMVectorClamp(
+	//	ndcPos,
+	//	XMVectorSet(-clamp_limit, -clamp_limit, 0.0f, 0.0f), // Z는 클램핑하지 않음
+	//	XMVectorSet(clamp_limit, clamp_limit, 1.0f, 1.0f)
+	//);
+	//XMVECTOR clampedClipSpacePos = XMVectorScale(clampedNdcPos, w);
+	//XMVECTOR newWorldPos = XMVector3TransformCoord(clampedClipSpacePos, invCamViewProj);
 
-	GetOwner()->m_transform.SetPosition(newWorldPos);
+	//GetOwner()->m_transform.SetPosition(newWorldPos);
 }
 
-void Player::Attack(Entity* sender, int damage)
+void Player::SendDamage(Entity* sender, int damage)
 {
 	if (sender)
 	{
@@ -321,7 +323,7 @@ void Player::DropCatchItem()
 	if (catchedObject != nullptr)
 	{
 		if (catchedObject) {
-			catchedObject->Drop(player->m_transform.GetForward(), 2.0f);
+			catchedObject->Drop(player->m_transform.GetForward(), {DropPowerX,DropPowerY});
 		}
 
 		catchedObject = nullptr;
@@ -337,7 +339,7 @@ void Player::ThrowEvent()
 	std::cout << "ThrowEvent" << std::endl;
 	if (catchedObject) {
 		catchedObject->SetThrowOwner(this);
-		catchedObject->Throw(player->m_transform.GetForward(), 6.0f);
+		catchedObject->Throw(player->m_transform.GetForward(), { ThrowPowerX,ThrowPowerY });
 	}
 	catchedObject = nullptr;
 	m_nearObject = nullptr; //&&&&&
@@ -366,7 +368,7 @@ void Player::Dash()
 	DropCatchItem();
 	isDashing = true;
 
-	controller->SetKnockBack(m_dashPower, 0.f);
+	controller->SetKnockBack(dashDistacne, 0.f);
 	m_dashCoolElapsedTime = 0.f;
 	m_dubbleDashElapsedTime = 0.f;
 	m_dashElapsedTime = 0.f;
@@ -390,111 +392,16 @@ void Player::Charging()
 
 void Player::Attack1()
 {
+	//AttackTarget.clear();
+
+
+
 	isCharging = false;
 	m_chargingTime = 0.f;
 
 	if (isAttacking == false)
 	{
 		isAttacking = true;
-		//if (m_comboCount == 0)
-		{
-			int gumNumber = playerIndex + 1;
-			std::string gumName = "GumGi" + std::to_string(gumNumber);
-			std::string effectName;
-			if (m_curWeapon->itemType == ItemType::Basic)
-			{
-				effectName = "gg";
-			}
-			else
-			{
-				effectName = "LargeGG";
-			}
-			auto obj = GameObject::Find(gumName);
-			if (obj)
-			{
-				Mathf::Vector3 pos = GetOwner()->m_transform.GetWorldPosition();
-				auto forward2 = GetOwner()->m_transform.GetForward();
-				auto offset{ 2 };
-				auto offset2 = -forward2 * offset;
-				pos.x = pos.x + offset2.x;
-				pos.y = 1;
-				pos.z = pos.z + offset2.z;
-
-				XMMATRIX lookAtMat = XMMatrixLookToRH(XMVectorZero(), forward2, XMVectorSet(0, 1, 0, 0));
-				Quaternion swordRotation = Quaternion::CreateFromRotationMatrix(lookAtMat);
-				obj->m_transform.SetPosition(pos);
-
-				obj->m_transform.SetRotation(swordRotation);
-				obj->m_transform.UpdateWorldMatrix();
-				if (obj)
-				{
-					auto effect = obj->GetComponent<EffectComponent>();
-					if (effect)
-					{
-						effect->ChangeEffect(effectName);
-						//effect->Apply();
-					}
-				}
-			}
-			std::vector<HitResult> hits;
-			auto world = player->m_transform.GetWorldPosition();
-			world.m128_f32[1] += 0.5f;
-			auto forward = player->m_transform.GetForward();
-
-		
-
-			Mathf::Vector3 dir = world;
-
-			Mathf::Vector3 dir1 = dir;
-			Mathf::Vector3 dir2 = dir;
-
-			//지금 바라보는 방향에서 좌우가 x인가 z인가 판별
-			if (std::abs(dir.x) > std::abs(dir.z)) // x축이 더 크면 좌우
-			{
-				dir1.x += 0.5f; // 오른쪽으로 약간 이동
-				dir2.x -= 0.5f; // 왼쪽으로 약간 이동
-			}
-			else // z축이 더 크면 앞뒤
-			{
-				dir1.z += 0.5f; // 앞으로 약간 이동
-				dir2.z -= 0.5f; // 뒤로 약간 이동
-			}
-
-
-			
-			int size = RaycastAll(world, -forward, 3.f, 1u, hits);
-			std::vector<HitResult> hits1;
-			int size1 = RaycastAll(world, dir1, 3.0f, 1u, hits1);
-			std::vector<HitResult> hits2;
-			int size2 = RaycastAll(world, dir2, 3.0f, 1u, hits2);
-
-			hits.insert(hits.end(), hits1.begin(), hits1.end());
-			hits.insert(hits.end(), hits2.begin(), hits2.end());
-
-			for (int i = 0; i < size; i++)
-			{
-				auto object = hits[i].hitObject;
-				if (object == GetOwner()) continue;
-
-				std::cout << object->m_name.data() << std::endl;
-				auto enemy = object->GetComponent<EntityEnemy>();
-				if (enemy)
-				{
-					enemy->Attack(this, 100);
-				}
-
-				auto entityItem = object->GetComponent<EntityResource>();
-				if (entityItem) {
-					entityItem->Attack(this, 100);
-				}
-
-				/*auto otherPlayer = object->GetComponent<Player>();
-				if (otherPlayer)
-				{
-					otherPlayer->Attack(this, 100);
-				}*/
-			}
-		}
 		m_animator->SetParameter("Attack", true);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
@@ -563,16 +470,15 @@ void Player::AddWeapon(Weapon* weapon)
 
 void Player::DeleteCurWeapon()
 {
-	if (!m_curWeapon)
+	if (!m_curWeapon || m_curWeapon == m_weaponInventory[0]) //기본무기
 		return;
 
 	auto it = std::find(m_weaponInventory.begin(), m_weaponInventory.end(), m_curWeapon);
 
 	if (it != m_weaponInventory.end())
 	{
-		m_weaponInventory.erase(it);
-		m_curWeapon->SetEnabled(false);
-		m_curWeapon = nullptr;
+		SwapWeaponLeft();
+		m_weaponInventory.erase(it); 
 	}
 }
 
@@ -589,7 +495,7 @@ void Player::TestStun()
 void Player::TestKnockBack()
 {
 	isKnockBack = true;
-	KnockBackTime = 0.5f;
+	KnockBackTime = 0.1f;
 	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce, KnockBackForceY);
 	m_animator->SetParameter("OnMove", false);
 }
@@ -619,6 +525,23 @@ void Player::FindNearObject(GameObject* gameObject)
 
 }
 
+void Player::OnBuff()
+{
+	Buff(m_curWeapon);
+}
+
+void Player::Buff(Weapon* weapon)
+{
+	
+	if (weapon)
+	{
+		
+	}
+	
+
+	DeleteCurWeapon();
+}
+
 void Player::OnRay()
 {
 	std::vector<HitResult> hits;
@@ -635,14 +558,48 @@ void Player::OnRay()
 		auto enemy = object->GetComponent<EntityEnemy>();
 		if (enemy)
 		{
-			enemy->Attack(this, 100);
+			enemy->SendDamage(this, 100);
 		}
 
 		auto entityItem = object->GetComponent<EntityResource>();
 		if (entityItem) {
-			entityItem->Attack(this, 100);
+			entityItem->SendDamage(this, 100);
 		}
 	}
+}
+
+void Player::MeleeAttack()
+{
+		Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+		XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
+		Mathf::Vector3 handPos = handlocal.r[3];
+		Mathf::Vector3 direction = handPos - rayOrigin;
+		direction.y = 0;
+		direction.Normalize();
+		std::vector<HitResult> hits;
+		rayOrigin.y = 0.5f;
+		int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
+
+		if (size > 0)
+		{
+			std::cout << "abaca" << std::endl;
+		}
+		for (int i = 0; i < size; i++)
+		{
+			auto object = hits[i].hitObject;
+			if (object == GetOwner()) continue;
+
+			auto entity = object->GetComponent<Entity>();
+			auto [iter, inserted] = AttackTarget.insert(entity);
+			if (inserted)  
+			{
+				if (*iter) 
+				{
+					(*iter)->SendDamage(this, 1);
+					(*iter)->SendKnockBack(this, {1,0});
+				}
+			}
+		}
 }
 
 
@@ -697,6 +654,7 @@ void Player::OnTriggerExit(const Collision& collision)
 void Player::OnCollisionEnter(const Collision& collision)
 {
 	std::cout << " Player OnCollisionEnter" << std::endl;
+	
 }
 
 void Player::OnCollisionStay(const Collision& collision)
