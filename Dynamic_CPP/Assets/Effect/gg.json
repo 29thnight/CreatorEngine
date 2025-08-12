@@ -113,7 +113,7 @@
                                     "y": 0.0,
                                     "z": 0.0
                                 },
-                                "polarDirection": 1.0,
+                                "polarDirection": -1.0,
                                 "polarReferenceDir": {
                                     "x": 0.0,
                                     "y": 0.0,

@@ -12,6 +12,12 @@ enum class MeshType
 	Model
 };
 
+struct TimeParams
+{
+	float time;
+	float3 pad1;
+};
+
 struct MeshConstantBuffer
 {
 	Mathf::Matrix world;
@@ -128,4 +134,7 @@ private:
 	float m_polarClippingAnimationSpeed = 1.0f;
 
 	std::mutex m_resetMutex;
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_timeBuffer;
+	TimeParams m_timeParams = {};
 };
