@@ -302,7 +302,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		DirectX11::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
-				WIC_FLAGS_NONE,
+				WIC_FLAGS_IGNORE_SRGB,
 				&metadata,
 				image
 			)
@@ -415,7 +415,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 		DirectX11::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
-				WIC_FLAGS_NONE,
+				WIC_FLAGS_IGNORE_SRGB,
 				&metadata,
 				image
 			)
@@ -450,11 +450,16 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	auto texture = shared_alloc<Texture>();
 
 	DirectX11::ThrowIfFailed(
-		CreateShaderResourceView(
+		CreateShaderResourceViewEx(
 			DeviceState::g_pDevice,
 			image.GetImages(),
 			image.GetImageCount(),
 			image.GetMetadata(),
+			D3D11_USAGE_DEFAULT,
+			D3D11_BIND_SHADER_RESOURCE,
+			0,
+			0,
+			CREATETEX_IGNORE_SRGB,
 			&texture->m_pSRV
 		)
 	);
@@ -528,7 +533,7 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 		DirectX11::ThrowIfFailed(
 			LoadFromWICFile(
 				preparePath.c_str(),
-				WIC_FLAGS_NONE,
+				WIC_FLAGS_IGNORE_SRGB,
 				&metadata,
 				image
 			)
@@ -563,11 +568,16 @@ Managed::UniquePtr<Texture> Texture::LoadManagedFromPath(const file::path& path,
 	auto texture = unique_alloc<Texture>();
 
 	DirectX11::ThrowIfFailed(
-		CreateShaderResourceView(
+		CreateShaderResourceViewEx(
 			DeviceState::g_pDevice,
 			image.GetImages(),
 			image.GetImageCount(),
 			image.GetMetadata(),
+			D3D11_USAGE_DEFAULT,
+			D3D11_BIND_SHADER_RESOURCE,
+			0,
+			0,
+			CREATETEX_IGNORE_SRGB,
 			&texture->m_pSRV
 		)
 	);
