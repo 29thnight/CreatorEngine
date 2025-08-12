@@ -495,7 +495,7 @@ void SceneRenderer::SceneRendering()
 		std::string_view currSkyboxName = Settings.skyboxTextureName;
 		if(!currSkyboxName.empty() && prevSkyboxName != currSkyboxName)
 		{
-			std::string fullPath = PathFinder::Relative("HDR\\").string() + currSkyboxName.data();
+			std::string fullPath = currSkyboxName.data();
 			ApplyNewCubeMap(fullPath);
 			m_currentSkyTextureName = currSkyboxName;
 		}
@@ -607,6 +607,17 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
+		//[5] skyBoxPass
+		{
+			PROFILE_CPU_BEGIN("SkyBoxPass");
+			DirectX11::BeginEvent(L"SkyBoxPass");
+			Benchmark banch;
+			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+			PROFILE_CPU_END();
+		}
+
 		{
 			PROFILE_CPU_BEGIN("ForwardPass");
 			DirectX11::BeginEvent(L"ForwardPass");
@@ -628,16 +639,6 @@ void SceneRenderer::SceneRendering()
 			PROFILE_CPU_END();
 		}
 
-		//[5] skyBoxPass
-		{
-			PROFILE_CPU_BEGIN("SkyBoxPass");
-			DirectX11::BeginEvent(L"SkyBoxPass");
-			Benchmark banch;
-			m_pSkyBoxPass->Execute(*m_renderScene, *camera);
-			RenderStatistics->UpdateRenderState("SkyBoxPass", banch.GetElapsedTime());
-			DirectX11::EndEvent();
-			PROFILE_CPU_END();
-		}
 		//SSR
 		PROFILE_CPU_BEGIN("ScreenSpaceReflectionPass");
 		DirectX11::BeginEvent(L"ScreenSpaceReflectionPass");
@@ -940,6 +941,8 @@ void SceneRenderer::CreateCommandListPass()
 		data->ClearRenderQueue();
 		data->ClearShadowRenderQueue();
 	}
+
+	m_pUIPass->ClearFrameQueue();
 }
 
 void SceneRenderer::ReApplyCurrCubeMap()

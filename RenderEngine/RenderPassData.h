@@ -7,6 +7,7 @@
 using namespace concurrency;
 class Camera;
 class PrimitiveRenderProxy;
+
 class RenderPassData
 {
 public:

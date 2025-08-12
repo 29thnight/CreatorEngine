@@ -55,8 +55,10 @@ void ImageComponent::Draw(std::unique_ptr<SpriteBatch>& sBatch)
 	if (_layerorder < 0) _layerorder = 0;
 	//TODO : m_curtextureÀÇ expired Ã¼Å©
 	if(m_curtexture != nullptr)
-	sBatch->Draw(m_curtexture->m_pSRV, { pos.x, pos.y }, nullptr, Colors::White, rotate, origin, scale,
-		SpriteEffects_None, _layerorder / MaxOreder);
+	{
+		sBatch->Draw(m_curtexture->m_pSRV, { pos.x, pos.y }, nullptr, Colors::White, rotate, origin, scale,
+			SpriteEffects_None, _layerorder / MaxOreder);
+	}
 
 }
 

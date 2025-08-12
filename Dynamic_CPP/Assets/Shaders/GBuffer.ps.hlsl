@@ -89,7 +89,6 @@ GBufferOutput main(PixelShaderInput IN)
     [branch]
     if (gUseAlbedoMap)
     {
-
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
@@ -97,10 +96,6 @@ GBufferOutput main(PixelShaderInput IN)
         albedo *= gAlbedo;
     }
     
-        
-    
-    
-
     float occlusion = 1;
 
     float metallic = gMetallic;
@@ -153,19 +148,11 @@ GBufferOutput main(PixelShaderInput IN)
         
         float4 splat = SplatTexture.Sample(LinearSampler, IN.texCoord);
         splat = normalize(splat);
-        
-        //layer0 = layer0 * (layer0 * (layer0 * 0.305306011f + 0.682171111f) + 0.012522878f);
-        
+
         float3 color = layer0 * splat.r + layer1 * splat.g + layer2 * splat.b + layer3 * splat.a;
-        //color = layer0;
-        
-        //color.r = gLayerTiling.r - 1.0;
-        //color.bg = 0;
+
         albedo = float4(color, 1.0);
 
-        //if (gConvertToLinear)
-            //albedo = SRGBtoLINEAR(albedo);
-        
         occlusion = 1;
         metallic = 0.0;
         roughness = 1.0;
@@ -173,23 +160,13 @@ GBufferOutput main(PixelShaderInput IN)
         bit |= 1 << 9; // Set bit 8 and 9 for terrain layers
     }
     
-
+    roughness = max(roughness, 0.1f);
     OUT.diffuse = (float4(albedo.rgb, 0));
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 0);
     OUT.normal = float4(surf.N * 0.5 + 0.5, 1);
     OUT.emissive = emissive;
-    
-    //uint lo = bitflag & 0xFFFF;
-    //uint hi = (bitflag >> 16) & 0xFFFF;
-    //float fLo = asfloat(lo); // float 하위 16비트에 lo 저장
-    //float fHi = asfloat(hi); // float 하위 16비트에 hi 저장
-    OUT.bitmask = bit; //float4(fLo, fHi, 0, 1);
-    
-    //uint u = asuint(bitflag);
-    //float2 packed = float2(
-    //(u & 0xFFFF), // 하위 16비트를 [0,1]로
-    //((u >> 16) & 0xFFFF) // 상위 16비트를 [0,1]로
-    //);
-    //OUT.bitmask = float4(packed, 0, 0);
+
+    OUT.bitmask = bit;
+
     return OUT;
 }

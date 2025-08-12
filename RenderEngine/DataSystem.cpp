@@ -516,7 +516,8 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 	Managed::SharedPtr<Model> model{};
     try
     {
-        model = Model::LoadModelShared(destination.string());
+		std::string modelPath = destination.string();
+        model = Model::LoadModelShared(modelPath);
     }
     catch (const std::exception& e)
     {
@@ -537,6 +538,17 @@ void DataSystem::LoadTextures()
 
 void DataSystem::LoadMaterials()
 {
+}
+
+Material* DataSystem::LoadMaterial(std::string_view name)
+{
+	std::string materialName = name.data();
+	if (Materials.find(materialName) != Materials.end())
+	{
+		Debug->Log("MaterialLoader::LoadMaterial : Material already loaded");
+		return Materials[materialName].get();
+	}
+	return nullptr;
 }
 
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)

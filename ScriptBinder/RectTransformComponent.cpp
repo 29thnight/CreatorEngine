@@ -47,6 +47,7 @@ void RectTransformComponent::UpdateLayout(const Mathf::Rect& parentRect)
             {
                 if (auto* rect = child->GetComponent<RectTransformComponent>())
                 {
+					rect->m_isDirty = true; // 자식 RectTransform도 업데이트 필요
                     rect->UpdateLayout(m_worldRect);
                 }
             }

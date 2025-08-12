@@ -203,7 +203,7 @@ float4 SRGBtoLINEAR(float4 srgbIn)
         SRGBToLinearColorChannel(srgbIn.r),
         SRGBToLinearColorChannel(srgbIn.g),
         SRGBToLinearColorChannel(srgbIn.b),
-        srgbIn.w
+        srgbIn.a
     );
 }
 

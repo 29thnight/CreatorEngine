@@ -12,7 +12,8 @@ Material::Material(const Material& material) :
 	m_pOccRoughMetal(material.m_pOccRoughMetal),
 	m_AOMap(material.m_AOMap),
 	m_pEmissive(material.m_pEmissive),
-	m_materialInfo(material.m_materialInfo)
+	m_materialInfo(material.m_materialInfo),
+	m_fileGuid(material.m_fileGuid)
 {
 }
 
@@ -24,6 +25,7 @@ Material::Material(Material&& material) noexcept
 	std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
 	std::exchange(m_AOMap, material.m_AOMap);
 	std::exchange(m_pEmissive, material.m_pEmissive);
+	std::exchange(m_fileGuid, material.m_fileGuid);
 
 	m_materialInfo = material.m_materialInfo;
 }
@@ -55,7 +57,19 @@ std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, st
 		cloneMaterial->m_name = std::string(newName);
 	}
 
-	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+	if(DataSystems->Materials.find(cloneMaterial->m_name) == DataSystems->Materials.end())
+	{
+		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+	}
+	else
+	{
+		int cloneIndex = 1;
+		while(DataSystems->Materials.find(cloneMaterial->m_name) != DataSystems->Materials.end())
+		{
+			cloneMaterial->m_name += "_Clone" + std::to_string(cloneIndex++);
+		}
+		DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
+	}
 
 	return cloneMaterial;
 }

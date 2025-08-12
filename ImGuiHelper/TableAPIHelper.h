@@ -23,7 +23,8 @@ static inline bool DrawAnchorIconButton(const char* id, const Mathf::Vector2& aM
 
 	// 좌상(0,1)~우하(1,0) 좌표 변환
 	auto X = [&](float nx) { return ImLerp(r.Min.x + 4, r.Max.x - 4, nx); };
-	auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y는 위가 1, 아래가 0
+	//auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y는 위가 1, 아래가 0
+	auto Y = [&](float ny) { return ImLerp(r.Min.y + 4, r.Max.y - 4, ny); }; // y: 0 top, 1 bottom
 
 	bool stretchX = !NearEq(aMin.x, aMax.x);
 	bool stretchY = !NearEq(aMin.y, aMax.y);

@@ -20,6 +20,9 @@ float3 fresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
 
 float DistributionGGX(float NdotH, float roughness)
 {
+    if (NdotH <= 0.0f)
+        return 0.0f;
+    
     float a = roughness * roughness;
     float a2 = a * a;
     float NdotH2 = NdotH * NdotH;
@@ -28,7 +31,7 @@ float DistributionGGX(float NdotH, float roughness)
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
     denom = PI * denom * denom;
     
-    denom = max(denom, 0.001);
+    denom = max(denom, 0.00000001);
 
     return num / denom;
 }

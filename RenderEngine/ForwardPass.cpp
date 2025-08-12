@@ -91,6 +91,31 @@ ForwardPass::ForwardPass()
 	DirectX11::ThrowIfFailed(
 		DeviceState::g_pDevice->CreateShaderResourceView(m_instanceBuffer.Get(), &srvDesc, &m_instanceBufferSRV)
 	);
+
+	CD3D11_DEPTH_STENCIL_DESC depthStencilDesc2(D3D11_DEFAULT);
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateDepthStencilState(
+			&depthStencilDesc2,
+			&m_depthNoWrite
+		)
+	);
+
+	CD3D11_BLEND_DESC1 blendDesc = CD3D11_BLEND_DESC1(CD3D11_DEFAULT());
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+	DirectX11::ThrowIfFailed(
+		DeviceState::g_pDevice->CreateBlendState1(
+			&blendDesc,
+			&m_blendPassState
+		)
+	);
 }
 
 ForwardPass::~ForwardPass()
@@ -164,8 +189,10 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 	DirectX11::OMSetRenderTargets(deferredPtr, 1, &view, renderData->m_depthStencil->m_pDSV);
 	DirectX11::RSSetViewports(deferredPtr, 1, &DeviceState::g_Viewport);
 	scene.UseModel(deferredPtr);
-	DirectX11::OMSetDepthStencilState(deferredPtr, DeviceState::g_pDepthStencilState, 1);
-	DirectX11::OMSetBlendState(deferredPtr, DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
+	DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
+	float blend_factor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	UINT sample_mask = 0xffffffff;
+	DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
 	DirectX11::PSSetConstantBuffer(deferredPtr, 1, 1, &scene.m_LightController->m_pLightBuffer);
 	DirectX11::VSSetConstantBuffer(deferredPtr, 3, 1, m_boneBuffer.GetAddressOf());
 	DirectX11::PSSetConstantBuffer(deferredPtr, 0, 1, m_materialBuffer.GetAddressOf());
@@ -219,6 +246,8 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 	m_instancePSO->Apply(deferredPtr);
 	// Bind the pre-created instance buffer SRV to the vertex shader once.
+	DirectX11::OMSetDepthStencilState(deferredPtr, m_depthNoWrite.Get(), 1);
+	DirectX11::OMSetBlendState(deferredPtr, m_blendPassState.Get(), blend_factor, sample_mask);
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, m_instanceBufferSRV.GetAddressOf());
 
 	for (auto const& [groupKey, proxies] : instanceGroups)

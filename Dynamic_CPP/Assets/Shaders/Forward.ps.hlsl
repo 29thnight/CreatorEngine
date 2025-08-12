@@ -80,10 +80,13 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         albedo = Albedo.Sample(LinearSampler, IN.texCoord);
         if (gConvertToLinear)
             albedo = SRGBtoLINEAR(albedo);
-
-        if (albedo.a == 0.f) {
-            discard;
-        }
+        albedo.a *= gAlbedo.a;
+        //albedo.a = lerp(albedo.a, 1, surf.NdotV);
+        //albedo.a = pow(albedo.a, 1 / 1.2);  
+    }
+    
+    if (albedo.a == 0.f) {
+        discard;
     }
     
     float occlusion = 1;
@@ -108,6 +111,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             emissive = SRGBtoLINEAR(emissive);
 
     }
+    
+    roughness = max(roughness, 0.01f);
     
     float3 Lo = float3(0, 0, 0);
     float3 F0 = float3(0.04, 0.04, 0.04);

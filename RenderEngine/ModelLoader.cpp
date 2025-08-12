@@ -684,31 +684,31 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
         readString(aoName);
         readString(emissiveName);
 
-        if (mat->m_materialInfo.m_useBaseColor)
-        {
-            if (Texture* tex = GenerateTexture(baseColorName, true))
-                mat->UseBaseColorMap(tex);
-        }
-        if (mat->m_materialInfo.m_useNormalMap)
-        {
-            if (Texture* tex = GenerateTexture(normalName))
-                mat->UseNormalMap(tex);
-        }
-        if (mat->m_materialInfo.m_useOccRoughMetal)
-        {
-            if (Texture* tex = GenerateTexture(ormName))
-                mat->UseOccRoughMetalMap(tex);
-        }
-        if (mat->m_materialInfo.m_useAOMap)
-        {
-            if (Texture* tex = GenerateTexture(aoName))
-                mat->UseAOMap(tex);
-        }
-        if (mat->m_materialInfo.m_useEmissive)
-        {
-            if (Texture* tex = GenerateTexture(emissiveName))
-                mat->UseEmissiveMap(tex);
-        }
+		if (mat->m_materialInfo.m_useBaseColor)
+		{
+			if (Texture* tex = GenerateTexture(baseColorName, true))
+				mat->UseBaseColorMap(tex);
+		}
+		if (mat->m_materialInfo.m_useNormalMap)
+		{
+			if (Texture* tex = GenerateTexture(normalName))
+				mat->UseNormalMap(tex);
+		}
+		if (mat->m_materialInfo.m_useOccRoughMetal)
+		{
+			if (Texture* tex = GenerateTexture(ormName))
+				mat->UseOccRoughMetalMap(tex);
+		}
+		if (mat->m_materialInfo.m_useAOMap)
+		{
+			if (Texture* tex = GenerateTexture(aoName))
+				mat->UseAOMap(tex);
+		}
+		if (mat->m_materialInfo.m_useEmissive)
+		{
+			if (Texture* tex = GenerateTexture(emissiveName))
+				mat->UseEmissiveMap(tex);
+		}
 
 		DataSystems->Materials[mat->m_name] = mat;
 
@@ -905,6 +905,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			uint32 meshId = node->m_meshes[0];
 			Mesh* mesh = m_model->m_Meshes[meshId];
 			Material* material = m_model->m_Materials[mesh->m_materialIndex];
+			Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
@@ -918,7 +919,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
+			meshRenderer->m_Material = instanceMaterial;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
@@ -934,6 +935,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		uint32 meshId			= node->m_meshes[i];
 		Mesh* mesh				= m_model->m_Meshes[meshId];
 		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
+		Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
 		Mathf::Matrix transform = node->m_transform;
 		Model* model = m_model;
 
@@ -952,7 +954,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
+			meshRenderer->m_Material = instanceMaterial;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			object->m_transform.SetLocalMatrix(transform);
 		});
@@ -1015,6 +1017,7 @@ void ModelLoader::GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* 
 
 GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoot, int parentIndex)
 {
+	static int modelSeparator = 0;
 	int nextIndex = parentIndex;
 	std::shared_ptr<GameObject> rootObject;
 
@@ -1041,6 +1044,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			uint32 meshId = node->m_meshes[0];
 			Mesh* mesh = m_model->m_Meshes[meshId];
 			Material* material = m_model->m_Materials[meshId];
+			Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
@@ -1054,7 +1058,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
+			meshRenderer->m_Material = instanceMaterial;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 
@@ -1070,6 +1074,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[mesh->m_materialIndex];
+		Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
 		Mathf::Matrix transform = node->m_transform;
 
 		SceneManagers->m_threadPool->Enqueue([=]
@@ -1087,7 +1092,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
+			meshRenderer->m_Material = instanceMaterial;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			object->m_transform.SetLocalMatrix(transform);
 		});

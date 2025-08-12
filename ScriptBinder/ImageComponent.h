@@ -34,7 +34,7 @@ public:
 	void SetTexture(int index);
 	void Draw(std::unique_ptr<SpriteBatch>& sBatch);
 	
-	ImageInfo uiinfo;
+	ImageInfo uiinfo{};
 	Texture* m_curtexture{};
     [[Property]]
 	int curindex = 0;

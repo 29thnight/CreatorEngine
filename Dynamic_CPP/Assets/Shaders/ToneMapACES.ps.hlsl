@@ -53,7 +53,6 @@ float3 LinearToPQ(float3 color)
 
 float3 aces_approx(float3 color)
 {
-    color *= 0.6f;
     float a = 2.51f;
     float b = 0.03f;
     float c = 2.43f;
@@ -99,16 +98,17 @@ float3 ACESFilmic(float3 color)
 {
     const float3x3 ACESInputMat =
     {
-        0.59719, 0.35458, 0.04823,
-        0.07600, 0.90834, 0.01566,
-        0.02840, 0.13383, 0.83777
+        0.575961650, 0.344143820, 0.079952030,
+        0.070806820, 0.827392350, 0.101774690,
+        0.028035252, 0.131523770, 0.840242300
     };
     const float3x3 ACESOutputMat =
     {
-        1.60475, -0.53108, -0.07367,
-        -0.10208,  1.10813, -0.00605,
-        -0.00327, -0.07276,  1.07602
+        1.666954300, -0.601741150, -0.065202855,
+        -0.106835220, 1.237778600, -0.130948950,
+        -0.004142626, -0.087411870, 1.091555000
     };
+    
     color = mul(ACESInputMat, color);
     color = RRTAndODTFit(color);
     color = mul(ACESOutputMat, color);
@@ -166,7 +166,8 @@ float4 main(PixelShaderInput IN) : SV_TARGET
             toneMapped = ReinhardToneMapping(colour.rgb * toneMapExposure);
         break;
     case ToneMap_ACES:
-            toneMapped = ApplyACES_Full(colour.rgb * toneMapExposure);
+            toneMapped = aces_approx(colour.rgb * toneMapExposure);
+            //toneMapped = LINEARtoSRGB(toneMapped);
         break;
     case ToneMap_Uncharted2:
             toneMapped = uncharted2_filmic(colour.rgb * toneMapExposure);
@@ -174,7 +175,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         break;
     case ToneMap_Unreal:
             toneMapped = ACESFilmic(colour.rgb * toneMapExposure);
-            toneMapped = LINEARtoSRGB(toneMapped);
+            //toneMapped = LINEARtoSRGB(toneMapped);
         break;
     case ToneMap_HDR10:
             toneMapped = LinearToPQ(colour.rgb * toneMapExposure);

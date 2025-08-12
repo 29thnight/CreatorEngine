@@ -14,7 +14,7 @@ namespace DirectX
 
 class GameObject;
 class Camera;
-
+class RenderPassData;
 class UIPass : public IRenderPass
 {
 	using UIRenderQueue = std::array<std::vector<ImageComponent*>, FrameCount>;
@@ -28,6 +28,7 @@ public:
 	void SortUIObjects();
 	virtual void Execute(RenderScene& scene,Camera& camera) override;
 	virtual void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
+	void ClearFrameQueue();
 	static bool compareLayer(int a, int b);
 
 	void ControlPanel() override;

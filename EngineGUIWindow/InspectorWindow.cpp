@@ -741,8 +741,10 @@ void InspectorWindow::ImGuiDrawHelperRectTransformComponent(RectTransformCompone
 				: IM_COL32(60, 60, 60, 255);
 			dl->AddRectFilled(r.Min, r.Max, bgCol, 4.f);
 
-			Mathf::Vector2 calcMin = { presets[curIndex].anchorMin.x , 1.f - presets[curIndex].anchorMin.y };
-			Mathf::Vector2 calcMax = { presets[curIndex].anchorMax.x , 1.f - presets[curIndex].anchorMax.y };
+			//Mathf::Vector2 calcMin = { presets[curIndex].anchorMin.x , 1.f - presets[curIndex].anchorMin.y };
+			//Mathf::Vector2 calcMax = { presets[curIndex].anchorMax.x , 1.f - presets[curIndex].anchorMax.y };
+			Mathf::Vector2 calcMin = presets[curIndex].anchorMin;
+			Mathf::Vector2 calcMax = presets[curIndex].anchorMax;
 
 			if (curIndex >= 0) {
 				const auto& pr = presets[curIndex];
@@ -871,15 +873,15 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(GameObject* gameObject)
 			if (prevPosition != position)
 			{
 				Meta::MakeCustomChangeCommand([=]
-					{
-						gameObject->m_transform.position = prevPosition;
-						gameObject->m_transform.SetDirty();
-					},
-					[=]
-					{
-						gameObject->m_transform.position = position;
-						gameObject->m_transform.SetDirty();
-					});
+				{
+					gameObject->m_transform.position = prevPosition;
+					gameObject->m_transform.SetDirty();
+				},
+				[=]
+				{
+					gameObject->m_transform.position = position;
+					gameObject->m_transform.SetDirty();
+				});
 			}
 			editingPosition = false;
 		}

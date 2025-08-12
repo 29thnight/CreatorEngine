@@ -60,13 +60,12 @@ void UIPass::Initialize(Texture* renderTargetView)
 	m_commonStates = std::make_unique<DirectX::CommonStates>(DeviceState::g_pDevice);
 }
 
-
 void UIPass::SortUIObjects()
 {
 	std::vector<Canvas*> canvases;
-	size_t index		= m_frame.load(std::memory_order_relaxed) % 3;
-	auto& imageQueue	= _ImageObjects[index];
-	auto& textQueue		= _TextObjects[index];
+	size_t index = m_frame.load(std::memory_order_relaxed) % 3;
+	auto& imageQueue = _ImageObjects[index];
+	auto& textQueue = _TextObjects[index];
 
 	for (auto it = UIManagers->Canvases.begin(); it != UIManagers->Canvases.end(); )
 	{
@@ -114,43 +113,6 @@ void UIPass::SortUIObjects()
 
 void UIPass::Execute(RenderScene& scene, Camera& camera)
 {
-	//if (!RenderPassData::VaildCheck(&camera)) return;
-	//auto renderData = RenderPassData::GetData(&camera);
-
-	//m_pso->Apply();
-	//ID3D11RenderTargetView* view = renderData->m_renderTarget->GetRTV();
-	//DirectX11::OMSetRenderTargets(1, &view, renderData->m_renderTarget->m_pDSV);
-	//DirectX11::OMSetDepthStencilState(m_NoWriteDepthStencilState.Get(), 1);
-	//DirectX11::OMSetBlendState(DeviceState::g_pBlendState, nullptr, 0xFFFFFFFF);
-	//camera.UpdateBuffer();
-
-	//DirectX11::VSSetConstantBuffer(0,1,m_UIBuffer.GetAddressOf());
-	//m_spriteBatch->Begin(DirectX::SpriteSortMode_FrontToBack, 
-	//	m_commonStates->NonPremultiplied(), m_commonStates->LinearClamp());
-	//
-	//size_t prevIndex	= size_t(m_frame.load(std::memory_order_relaxed) + 1) % 3;
-	//auto& imageQueue	= _ImageObjects[prevIndex];
-	//auto& textQueue		= _TextObjects[prevIndex];
-
-	//for (auto& imageObject : imageQueue)
-	//{
-	//	imageObject->Draw(m_spriteBatch);
-	//}
-	//for (auto& textObject : textQueue)
-	//{
-	//	textObject->Draw(m_spriteBatch);
-	//}
-
-	//m_spriteBatch->End();
-	//DirectX11::OMSetDepthStencilState(DeviceState::g_pDepthStencilState, 1);
-	//DirectX11::OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-
-	//ID3D11ShaderResourceView* nullSRV = nullptr;
-	//DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-	//DirectX11::UnbindRenderTargets();
-	//imageQueue.clear();
-	//textQueue.clear();
-
 	ExecuteCommandList(scene, camera);
 }
 
@@ -199,14 +161,22 @@ void UIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Rende
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	DirectX11::PSSetShaderResources(deferredPtr, 0, 1, &nullSRV);
 	DirectX11::UnbindRenderTargets(deferredPtr);
-	imageQueue.clear();
-	textQueue.clear();
 
 	ID3D11CommandList* commandList{};
 	DirectX11::ThrowIfFailed(
 		deferredPtr->FinishCommandList(FALSE, &commandList)
 	);
 	PushQueue(camera.m_cameraIndex, commandList);
+}
+
+void UIPass::ClearFrameQueue()
+{
+	size_t prevIndex = size_t(m_frame.load(std::memory_order_relaxed) + 1) % 3;
+	auto& imageQueue = _ImageObjects[prevIndex];
+	auto& textQueue = _TextObjects[prevIndex];
+
+	imageQueue.clear();
+	textQueue.clear();
 }
 
 bool UIPass::compareLayer(int  a, int  b)
