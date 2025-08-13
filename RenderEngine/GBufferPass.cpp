@@ -10,6 +10,7 @@
 #include "Benchmark.hpp"
 #include "MeshRendererProxy.h"
 #include "Terrain.h"
+#include "RenderDebugManager.h"
 
 ID3D11ShaderResourceView* nullSRVs[5]{
 	nullptr,
@@ -270,6 +271,14 @@ void GBufferPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
 	}
 
+	if(0 == data->m_index)
+	{
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[0], "00:G_BUFFER_BASE_COLOR");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[1], "00:G_BUFFER_NORMAL");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[2], "00:G_BUFFER_METAL_ROUGH");
+		RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr, m_renderTargetViews[3], "00:G_BUFFER_EMISSIVE");
+	}
+
 	// --- 4. CLEANUP AND FINISH COMMAND LIST ---
 	ID3D11ShaderResourceView* nullSRV[] = { nullptr };
 	DirectX11::VSSetShaderResources(deferredPtr, 0, 1, nullSRV); // Unbind instance buffer
@@ -319,6 +328,8 @@ void GBufferPass::TerrainRenderCommandList(ID3D11DeviceContext* deferredContext,
 			DirectX11::PSSetShaderResources(deferredPtr, 6, 1, terrainMaterial->GetLayerSRV());
 			DirectX11::PSSetShaderResources(deferredPtr, 7, 1, terrainMaterial->GetSplatMapSRV());
 			terrainMesh->Draw(deferredPtr);
+
+
 		}
 	}
 

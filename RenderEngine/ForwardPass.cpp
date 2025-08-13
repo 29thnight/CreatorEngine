@@ -9,6 +9,7 @@
 #include "LightProperty.h"
 #include "Benchmark.hpp"
 #include "MeshRendererProxy.h"
+#include "RenderDebugManager.h"
 
 struct alignas(16) ForwardBuffer
 {
@@ -297,6 +298,15 @@ void ForwardPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, 
 
 		// --- Draw all instances in one call ---
 		firstProxy->DrawInstanced(deferredPtr, proxies.size());
+	}
+
+	if (0 == renderData->m_index)
+	{
+		RenderDebugManager::GetInstance()->CaptureRenderPass(
+			deferredPtr,
+			renderData->m_renderTarget->GetRTV(),
+			"02:FORWARD_PASS"
+		);
 	}
 
 	ID3D11DepthStencilState* nullDepthStencilState = nullptr;

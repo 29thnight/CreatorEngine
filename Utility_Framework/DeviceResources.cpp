@@ -151,7 +151,7 @@ void DirectX11::DeviceResources::Trim()
 
 void DirectX11::DeviceResources::Present()
 {
-    //if (!m_swapChain) { HandleLostSwapChain(); return; }
+    if (!m_swapChain) { HandleLostSwapChain(); return; }
 
     // 첫 번째 인수는 DXGI에 VSync까지 차단하도록 지시하여 애플리케이션이
     // 다음 VSync까지 대기하도록 합니다. 이를 통해 화면에 표시되지 않는 프레임을
@@ -382,8 +382,6 @@ void DirectX11::DeviceResources::CreateDeviceResources()
     DirectX11::ThrowIfFailed(
 		m_d3dContext->QueryInterface(IID_PPV_ARGS(&m_annotation))
     );
-
-	m_gpuQueryCollector = std::make_unique<GPUQueryCollector>(m_d3dContext.Get());
 }
 
 void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
@@ -456,9 +454,9 @@ void DirectX11::DeviceResources::CreateWindowSizeDependentResources()
 
         DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
 
-        swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+        swapChainFullscreenDesc.RefreshRate.Numerator = 0;
         swapChainFullscreenDesc.RefreshRate.Denominator = 1;
-        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+        swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
         swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         swapChainFullscreenDesc.Windowed = TRUE;
 
@@ -666,9 +664,9 @@ void DirectX11::DeviceResources::HandleLostSwapChain()
 
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFullscreenDesc = { 0 };
 
-    swapChainFullscreenDesc.RefreshRate.Numerator = 60;
+    swapChainFullscreenDesc.RefreshRate.Numerator = 0;
     swapChainFullscreenDesc.RefreshRate.Denominator = 1;
-    swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_CENTERED;
+    swapChainFullscreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
     swapChainFullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     swapChainFullscreenDesc.Windowed = TRUE;
 

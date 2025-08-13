@@ -155,6 +155,7 @@ void PostProcessingPass::TextureInitialization()
 	);
 	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_CopiedTexture->m_textureType = TextureType::ImageTexture;
 
 	m_BloomFilterSRV1 = Texture::Create(
 		2u,
@@ -167,6 +168,7 @@ void PostProcessingPass::TextureInitialization()
 	);
 	m_BloomFilterSRV1->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BloomFilterSRV1->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomFilterSRV1->m_textureType = TextureType::ImageTexture;
 
 	m_BloomFilterSRV2 = Texture::Create(
 		2u,
@@ -179,6 +181,7 @@ void PostProcessingPass::TextureInitialization()
 	);
 	m_BloomFilterSRV2->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BloomFilterSRV2->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomFilterSRV2->m_textureType = TextureType::ImageTexture;
 
 	m_BloomResult = Texture::Create(
 		DeviceState::g_ClientRect.width,
@@ -189,6 +192,7 @@ void PostProcessingPass::TextureInitialization()
 	);
 	m_BloomResult->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
 	m_BloomResult->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+	m_BloomResult->m_textureType = TextureType::ImageTexture;
 
 }
 

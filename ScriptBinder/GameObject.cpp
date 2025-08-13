@@ -375,6 +375,15 @@ void GameObject::SetEnabled(bool able)
 			component->SetEnabled(able);
 		}
 	}
+
+	for (auto& childObjIndex : m_childrenIndices)
+	{
+		if(m_ownerScene)
+		{
+			auto& childObj = m_ownerScene->m_SceneObjects[childObjIndex];
+			childObj->SetEnabled(able);
+		}
+	}
 }
 
 void GameObject::SetCollisionType()

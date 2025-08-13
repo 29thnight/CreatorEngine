@@ -42,23 +42,23 @@ cbuffer TerrainLayerConstants : register(b12)
 
 struct PixelShaderInput
 {
-    float4 position : SV_POSITION;
-    float4 pos : POSITION0;
-    float4 wPosition : POSITION1;
-    float3 normal : NORMAL;
-    float3 tangent : TANGENT;
-    float3 binormal : BINORMAL;
-    float2 texCoord : TEXCOORD0;
-    float2 texCoord1 : TEXCOORD1;
+    float4 position     : SV_POSITION;
+    float4 pos          : POSITION0;
+    float4 wPosition    : POSITION1;
+    float3 normal       : NORMAL;
+    float3 tangent      : TANGENT;
+    float3 binormal     : BINORMAL;
+    float2 texCoord     : TEXCOORD0;
+    float2 texCoord1    : TEXCOORD1;
 };
 
 struct GBufferOutput
 {
-    float4 diffuse : SV_TARGET0;
-    float4 metalRoughOcclusion : SV_TARGET1;
-    float4 normal : SV_TARGET2;
-    float4 emissive : SV_TARGET3;
-    uint bitmask : SV_TARGET4;
+    float4 diffuse              : SV_TARGET0;
+    float4 metalRoughOcclusion  : SV_TARGET1;
+    float4 normal               : SV_TARGET2;
+    float4 emissive             : SV_TARGET3;
+    uint bitmask                : SV_TARGET4;
 };
 
 GBufferOutput main(PixelShaderInput IN)
@@ -96,24 +96,27 @@ GBufferOutput main(PixelShaderInput IN)
         albedo *= gAlbedo;
     }
     
-    float occlusion = 1;
-
+    float occlusion = 1.f;
+    float ormAO = 1.f;
+    float texAO = 1.f;
     float metallic = gMetallic;
     float roughness = gRoughness;
     [branch]
     if (gUseOccMetalRough)
     {
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
-        occlusion = occRoughMetal.r;
-        roughness = occRoughMetal.g;
+        ormAO = occRoughMetal.r;
+        roughness = 1 - occRoughMetal.g;
         metallic = occRoughMetal.b;
     }
 
     [branch]
     if (gUseAoMap)
     {
-        occlusion = AoMap.Sample(LinearSampler, IN.texCoord).r;
+        texAO = AoMap.Sample(LinearSampler, IN.texCoord).r;
     }
+    
+    occlusion = saturate(ormAO * texAO);
 
     float4 emissive = float4(0.0, 0.0, 0.0, 0.0);
     [branch]
@@ -125,7 +128,6 @@ GBufferOutput main(PixelShaderInput IN)
 
     }
 
-    
     if (useTerrainLayers)
     {
         float2 uv = IN.texCoord;
@@ -161,9 +163,10 @@ GBufferOutput main(PixelShaderInput IN)
     }
     
     roughness = max(roughness, 0.1f);
-    OUT.diffuse = (float4(albedo.rgb, 0));
-    OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 0);
-    OUT.normal = float4(surf.N * 0.5 + 0.5, 1);
+    OUT.diffuse = float4(albedo.rgb, 1);
+    OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 1);
+    float3 normalResult = surf.N * 0.5 + 0.5;
+    OUT.normal = float4(normalResult, 1);
     OUT.emissive = emissive;
 
     OUT.bitmask = bit;

@@ -3,6 +3,7 @@
 #include "../EngineEntry/RenderPassSettings.h"
 #include "Scene.h"
 #include <random>
+#include "RenderDebugManager.h"
 
 SSAOPass::SSAOPass()
 {
@@ -149,6 +150,13 @@ void SSAOPass::Execute(RenderScene& scene, Camera& camera)
     DirectX11::PSSetShaderResources(0, 4, srvs);
 
     DirectX11::Draw(4, 0);
+
+	//Warn : 1 프레임 밀림이 발생할 수 있음
+    if (0 == renderData->m_index)
+    {
+        RenderDebugManager::GetInstance()->CaptureRenderPass(DeviceState::g_pDeviceContext, 
+			renderTarget->GetRTV(), "SSAO_PASS");
+    }
 
     ID3D11ShaderResourceView* nullSRV[4] = { nullptr, nullptr, nullptr, nullptr };
     DirectX11::PSSetShaderResources(0, 4, nullSRV);

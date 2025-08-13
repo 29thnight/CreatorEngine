@@ -98,7 +98,7 @@ float4 main(PixelShaderInput IN) : SV_TARGET
     {
         float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
         occlusion = occRoughMetal.r;
-        roughness = occRoughMetal.g;
+        roughness = 1 - occRoughMetal.g;
         metallic = occRoughMetal.b;
     }
     
@@ -155,8 +155,10 @@ float4 main(PixelShaderInput IN) : SV_TARGET
         float3 diffuse = irradiance * albedo.rgb;
 
         float3 R = normalize(reflect(-surf.V, surf.N));
-        float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * 5.0).rgb;
-        float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(saturate(surf.NdotV), roughness)).rg;
+        uint w, h, mips;
+        PrefilteredSpecMap.GetDimensions(0, w, h, mips);
+        float3 prefilterdColour = PrefilteredSpecMap.SampleLevel(LinearSampler, R, roughness * (mips - 1)).rgb;
+        float2 envBrdf = BrdfLUT.Sample(PointSampler, float2(max(surf.NdotV, 0.f), roughness)).rg;
         float3 specular = prefilterdColour * (kS * envBrdf.x + envBrdf.y);
         ambient = (kD * diffuse + specular);
     }

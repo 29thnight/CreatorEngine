@@ -15,6 +15,7 @@ public:
 	void ShowBlackBoardWindow();
 	void SHowInputActionMap();
 	void ShowBuildSceneSettingWindow();
+	void ShowRenderDebugWindow();
 private:
     ImFont* m_koreanFont{ nullptr };
 	SceneRenderer* m_sceneRenderer{ nullptr };
@@ -28,6 +29,7 @@ private:
 	bool m_bShowBlackBoardWindow{ false };
 	bool m_bShowInputActionMapWindow{ false };
 	bool m_bShowBuildSceneSettingWindow{ false };
+	bool m_bShowRenderDebugWindow{ false };
 	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 };
 #endif // !DYNAMICCPP_EXPORTS

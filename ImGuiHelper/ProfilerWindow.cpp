@@ -1,8 +1,11 @@
 #ifndef BUILD_FLAG
 #include "Profiler.h"
+#include "GpuProfilerD3D11.h"
 #include "ImGui.h"
 #include "IconsFontAwesome4.h"
-
+#include "../RenderEngine/DeviceState.h"
+// Forward declarations for DX11 device/context (avoid heavy headers here)
+struct ID3D11Device; struct ID3D11DeviceContext; 
 struct StyleOptions
 {
 	int MaxDepth = 10;
@@ -318,6 +321,58 @@ static void DrawProfilerTimeline(const ImVec2& size = ImVec2(0, 0))
 			};
 
 		// Split between GPU and CPU tracks
+
+		// ---- GPU Track (DX11 Timestamp) ----
+		{
+			// Initialize once (lazy) to avoid header dependencies
+			static bool sGpuInit = false;
+			if (!sGpuInit && DeviceState::g_pDevice && DeviceState::g_pDeviceContext)
+			{
+				gGpuProfiler.Initialize(DeviceState::g_pDevice, DeviceState::g_pDeviceContext, 240, 4096);
+				sGpuInit = true;
+			}
+
+			// Resolve N-frames-late to avoid stalls
+			if (sGpuInit) gGpuProfiler.ResolvePending(2);
+
+			// Draw GPU track header + bars
+			const auto& gpuEvents = gGpuProfiler.GetResolved(gGpuProfiler.CurHistoryIndex() - 2);
+			if (!gpuEvents.empty())
+			{
+				const char* pHeaderText = "GPU";
+				bool isOpen = TrackHeader(pHeaderText, ImGui::GetID("GPUTrack"));
+				uint32_t maxDepth = isOpen ? (uint32_t)style.MaxDepth : 1u;
+				uint32_t trackDepth = 1u;
+
+				ImVec2 trackStart = cursor;
+				const float barH = style.BarHeight - style.BarPadding * 2.0f;
+
+				for (const auto& e : gpuEvents)
+				{
+					const uint16_t depth = (uint16_t)((e.depth < maxDepth) ? e.depth : (maxDepth - 1));
+					const float y = trackStart.y + style.BarHeight * depth + style.BarPadding;
+
+					const float xBegin = timelineRect.Min.x + (float)(e.beginMs * MsToTicks * TicksToPixels);
+					const float xEnd = timelineRect.Min.x + (float)(e.endMs * MsToTicks * TicksToPixels);
+					if (xEnd <= timelineRect.Min.x || xBegin >= timelineRect.Max.x)
+						continue;
+
+					ImColor fill = ImColor(0.27f, 0.55f, 1.0f, 0.80f);
+					ImColor outline = ImColor(0.06f, 0.06f, 0.06f, 0.90f);
+					pDraw->AddRectFilled(ImVec2(xBegin, y), ImVec2(xEnd, y + barH), fill, 3.0f);
+					pDraw->AddRect(ImVec2(xBegin, y), ImVec2(xEnd, y + barH), outline, 3.0f);
+
+					if (ImGui::IsMouseHoveringRect(ImVec2(xBegin, y), ImVec2(xEnd, y + barH)))
+					{
+						ImGui::SetTooltip("%s\n%.3f ms", e.name.c_str(), float(e.endMs - e.beginMs));
+					}
+				}
+
+				trackDepth = maxDepth;
+				cursor.y += trackDepth * style.BarHeight;
+				pDraw->AddLine(ImVec2(timelineRect.Min.x, cursor.y), ImVec2(timelineRect.Max.x, cursor.y), ImColor(style.BGTextColor));
+			}
+		}
 		pDraw->AddLine(ImVec2(timelineRect.Min.x, cursor.y), ImVec2(timelineRect.Max.x, cursor.y), ImColor(style.BGTextColor), 4);
 
 		// Draw each CPU thread track

@@ -428,10 +428,11 @@ InspectorWindow::InspectorWindow(SceneRenderer* ptr) :
 void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(GameObject* gameObject)
 {
 	std::string name = gameObject->m_name.ToString();
-	ImGui::Checkbox("##Enabled", &gameObject->m_isEnabled);
+	bool isEnabled = gameObject->m_isEnabled;
+	ImGui::Checkbox("##Enabled", &isEnabled);
 	ImGui::SameLine();
 
-	gameObject->SetEnabled(gameObject->m_isEnabled);
+	gameObject->SetEnabled(isEnabled);
 
 	if (ImGui::InputText("##name",
 		&name[0],

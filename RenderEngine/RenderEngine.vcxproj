@@ -258,6 +258,7 @@
     <ClCompile Include="ParticleModule.cpp" />
     <ClCompile Include="ParticleSystem.cpp" />
     <ClCompile Include="ProxyCommand.cpp" />
+    <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderModules.cpp" />
     <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
@@ -351,6 +352,7 @@
     <ClInclude Include="ParticleSystem.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
+    <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderModules.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
     <ClInclude Include="SizeModuleCS.h" />

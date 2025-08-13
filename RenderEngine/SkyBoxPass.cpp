@@ -221,7 +221,9 @@ void SkyBoxPass::GenerateCubeMap(std::string_view fileName, RenderScene& scene)
 	m_fileName = fileName;
 	m_skyBoxTexture.reset();
 
-	m_skyBoxTexture = Texture::LoadManagedFromPath(fileName);
+	file::path fullPath = PathFinder::Relative("HDR") / m_fileName.filename();
+
+	m_skyBoxTexture = Texture::LoadManagedFromPath(fullPath);
 	m_skyBoxCubeMap = Texture::CreateManagedCube(
 		m_cubeMapSize,
 		"CubeMap",
