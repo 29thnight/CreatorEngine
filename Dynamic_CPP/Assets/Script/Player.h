@@ -61,6 +61,8 @@ public:
 	[[Method]]
 	void TestKnockBack();
 
+	[[Method]]
+	void TestEffect();
 
 	//플레이어 기본
 	[[Property]]

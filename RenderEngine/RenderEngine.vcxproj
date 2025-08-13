@@ -278,6 +278,7 @@
     <ClCompile Include="SubsurfaceScatteringPass.cpp" />
     <ClCompile Include="TerrainGizmoPass.cpp" />
     <ClCompile Include="TerrainMaterial.cpp" />
+    <ClCompile Include="TestEffect.cpp" />
     <ClCompile Include="TrailGenerateModule.cpp" />
     <ClCompile Include="TrailRenderModule.cpp" />
     <ClCompile Include="UIPass.cpp" />
@@ -383,6 +384,7 @@
     <ClInclude Include="TerrainGizmoPass.h" />
     <ClInclude Include="TerrainMaterial.h" />
     <ClInclude Include="TerrainMesh.h" />
+    <ClInclude Include="TestEffect.h" />
     <ClInclude Include="ToneMapPassSetting.h" />
     <ClInclude Include="TrailGenerateModule.h" />
     <ClInclude Include="TrailRenderModule.h" />

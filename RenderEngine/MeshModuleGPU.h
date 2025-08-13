@@ -38,6 +38,7 @@ public:
 	void SetParticleData(ID3D11ShaderResourceView* particleSRV, UINT instanceCount) override;
 	void SetupRenderTarget(RenderPassData* renderData) override;
 	void SetTexture(Texture* texture) override;
+	void SetDissolveTexture(Texture* texture) override;
 
 	virtual void ResetForReuse() override;
 	virtual bool IsReadyForReuse() const override;

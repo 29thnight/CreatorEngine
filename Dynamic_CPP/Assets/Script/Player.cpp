@@ -500,6 +500,11 @@ void Player::TestKnockBack()
 	m_animator->SetParameter("OnMove", false);
 }
 
+void Player::TestEffect()
+{
+	GameObject::Find("asd")->GetComponent<EffectComponent>()->StopEffect();
+}
+
 void Player::FindNearObject(GameObject* gameObject)
 {
 	if (gameObject->GetComponent<EntityItem>() == nullptr) return;
@@ -573,6 +578,7 @@ void Player::MeleeAttack()
 		Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
 		XMMATRIX handlocal = handSocket->transform.GetLocalMatrix();
 		Mathf::Vector3 handPos = handlocal.r[3];
+
 		Mathf::Vector3 direction = handPos - rayOrigin;
 		direction.y = 0;
 		direction.Normalize();

@@ -499,6 +499,7 @@ void MeshModuleGPU::DeserializeData(const nlohmann::json& json)
             }
 
             m_assignedTexture = DataSystems->LoadTexture(textureName);
+            m_dissolveTexture = DataSystems->LoadTexture("noiseTex.png");
 
             if (m_assignedTexture) {
                 std::string nameWithoutExtension = file::path(textureName).stem().string();
@@ -745,6 +746,7 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
         if (m_assignedTexture->m_pSRV)
         {
             deviceContext->PSSetShaderResources(0, 1, &m_assignedTexture->m_pSRV);
+            deviceContext->PSSetShaderResources(1, 1, &m_dissolveTexture->m_pSRV);
         }
     }
     else if (m_meshType == MeshType::Model && m_model)
@@ -785,6 +787,11 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
 void MeshModuleGPU::SetTexture(Texture* texture)
 {
     m_assignedTexture = texture;
+}
+
+void MeshModuleGPU::SetDissolveTexture(Texture* texture)
+{
+    m_dissolveTexture = texture;
 }
 
 void MeshModuleGPU::Release()

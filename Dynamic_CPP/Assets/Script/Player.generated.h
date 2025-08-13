@@ -37,6 +37,7 @@ ReflectionScriptField(Player) \
 		meta_method(SwapWeaponRight) \
 		meta_method(DeleteCurWeapon) \
 		meta_method(TestKnockBack) \
+		meta_method(TestEffect) \
 		meta_method(Move, "dir") \
 		meta_method(CatchAndThrow) \
 		meta_method(ThrowEvent) \
