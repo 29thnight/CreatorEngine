@@ -2514,56 +2514,29 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 	}
 
 	// 3D 스케일 범위
-	float minScale[3] = { currentTemplate.minScale.x, currentTemplate.minScale.y, currentTemplate.minScale.z };
-	float maxScale[3] = { currentTemplate.maxScale.x, currentTemplate.maxScale.y, currentTemplate.maxScale.z };
+	float Scale[3] = { currentTemplate.Scale.x, currentTemplate.Scale.y, currentTemplate.Scale.z };
 
-	if (ImGui::DragFloat3("Min Scale", minScale, 0.01f, 0.01f, 10.0f)) {
-		meshSpawnModule->SetParticleScaleRange(
-			XMFLOAT3(minScale[0], minScale[1], minScale[2]),
-			XMFLOAT3(maxScale[0], maxScale[1], maxScale[2])
-		);
-	}
-
-	if (ImGui::DragFloat3("Max Scale", maxScale, 0.01f, 0.01f, 10.0f)) {
-		meshSpawnModule->SetParticleScaleRange(
-			XMFLOAT3(minScale[0], minScale[1], minScale[2]),
-			XMFLOAT3(maxScale[0], maxScale[1], maxScale[2])
+	if (ImGui::DragFloat3("Min Scale", Scale, 0.01f, 0.01f, 10.0f)) {
+		meshSpawnModule->SetParticleScale(
+			XMFLOAT3(Scale[0], Scale[1], Scale[2])
 		);
 	}
 
 	// 3D 회전 속도 범위
-	float minRotSpeed[3] = { currentTemplate.minRotationSpeed.x, currentTemplate.minRotationSpeed.y, currentTemplate.minRotationSpeed.z };
-	float maxRotSpeed[3] = { currentTemplate.maxRotationSpeed.x, currentTemplate.maxRotationSpeed.y, currentTemplate.maxRotationSpeed.z };
+	float RotSpeed[3] = { currentTemplate.RotationSpeed.x, currentTemplate.RotationSpeed.y, currentTemplate.RotationSpeed.z };
 
-	if (ImGui::DragFloat3("Min Rotation Speed", minRotSpeed, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleRotationSpeedRange(
-			XMFLOAT3(minRotSpeed[0], minRotSpeed[1], minRotSpeed[2]),
-			XMFLOAT3(maxRotSpeed[0], maxRotSpeed[1], maxRotSpeed[2])
-		);
-	}
-
-	if (ImGui::DragFloat3("Max Rotation Speed", maxRotSpeed, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleRotationSpeedRange(
-			XMFLOAT3(minRotSpeed[0], minRotSpeed[1], minRotSpeed[2]),
-			XMFLOAT3(maxRotSpeed[0], maxRotSpeed[1], maxRotSpeed[2])
+	if (ImGui::DragFloat3("Min Rotation Speed", RotSpeed, 0.1f, -360.0f, 360.0f)) {
+		meshSpawnModule->SetParticleRotationSpeed(
+			XMFLOAT3(RotSpeed[0], RotSpeed[1], RotSpeed[2])
 		);
 	}
 
 	// 3D 초기 회전 범위
-	float minInitRot[3] = { currentTemplate.minInitialRotation.x, currentTemplate.minInitialRotation.y, currentTemplate.minInitialRotation.z };
-	float maxInitRot[3] = { currentTemplate.maxInitialRotation.x, currentTemplate.maxInitialRotation.y, currentTemplate.maxInitialRotation.z };
+	float InitRot[3] = { currentTemplate.InitialRotation.x, currentTemplate.InitialRotation.y, currentTemplate.InitialRotation.z };
 
-	if (ImGui::DragFloat3("Min Initial Rotation", minInitRot, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleInitialRotationRange(
-			XMFLOAT3(minInitRot[0], minInitRot[1], minInitRot[2]),
-			XMFLOAT3(maxInitRot[0], maxInitRot[1], maxInitRot[2])
-		);
-	}
-
-	if (ImGui::DragFloat3("Max Initial Rotation", maxInitRot, 0.1f, -360.0f, 360.0f)) {
-		meshSpawnModule->SetParticleInitialRotationRange(
-			XMFLOAT3(minInitRot[0], minInitRot[1], minInitRot[2]),
-			XMFLOAT3(maxInitRot[0], maxInitRot[1], maxInitRot[2])
+	if (ImGui::DragFloat3("Min Initial Rotation", InitRot, 0.1f, -360.0f, 360.0f)) {
+		meshSpawnModule->SetParticleInitialRotation(
+			XMFLOAT3(InitRot[0], InitRot[1], InitRot[2])
 		);
 	}
 
@@ -2586,18 +2559,14 @@ void EffectEditor::RenderMeshSpawnModuleEditor(MeshSpawnModuleCS* meshSpawnModul
 	}
 
 	// 속도 범위
-	float minVertical = currentTemplate.minVerticalVelocity;
-	float maxVertical = currentTemplate.maxVerticalVelocity;
+	float Vertical = currentTemplate.VerticalVelocity;
 	float horizontalRange = currentTemplate.horizontalVelocityRange;
 
-	if (ImGui::DragFloat("Min Vertical Velocity", &minVertical, 0.1f, -100.0f, 100.0f)) {
-		meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
-	}
-	if (ImGui::DragFloat("Max Vertical Velocity", &maxVertical, 0.1f, -100.0f, 100.0f)) {
-		meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
+	if (ImGui::DragFloat("Min Vertical Velocity", &Vertical, 0.1f, -100.0f, 100.0f)) {
+		meshSpawnModule->SetVelocity(Vertical, horizontalRange);
 	}
 	if (ImGui::DragFloat("Horizontal Velocity Range", &horizontalRange, 0.1f, 0.0f, 100.0f)) {
-		meshSpawnModule->SetVelocityRange(minVertical, maxVertical, horizontalRange);
+		meshSpawnModule->SetVelocity(Vertical, horizontalRange);
 	}
 
 	const char* renderModes[] = { "Emissive", "Lit" };

@@ -18,6 +18,7 @@ protected:
     std::string m_name;
     Mathf::Vector3 m_position = Mathf::Vector3(0, 0, 0);
     Mathf::Vector3 m_rotation = Mathf::Vector3(0, 0, 0);
+    Mathf::Vector3 m_scale = Mathf::Vector3(0, 0, 0);
     EffectState m_state = EffectState::Stopped;
 
     // Effect 전체 설정
@@ -131,6 +132,17 @@ public:
         for (auto& ps : m_particleSystems) {
             if (ps) {
                 ps->SetRotation(m_rotation);
+            }
+        }
+    }
+
+    virtual void SetScale(const Mathf::Vector3& newScale) {
+        m_scale = newScale;
+
+        // 모든 ParticleSystem에 회전 적용
+        for (auto& ps : m_particleSystems) {
+            if (ps) {
+                ps->SetScale(m_scale);
             }
         }
     }

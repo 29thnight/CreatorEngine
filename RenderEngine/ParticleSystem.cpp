@@ -426,6 +426,29 @@ size_t ParticleSystem::GetParticleStructSize() const
 	return m_particleStructSize;
 }
 
+void ParticleSystem::SetScale(const Mathf::Vector3& scale)
+{
+	m_scale = scale;
+
+	// SpawnModule들에 회전값 전달
+	for (auto it = m_moduleList.begin(); it != m_moduleList.end(); ++it)
+	{
+		ParticleModule& module = *it;
+
+		// SpawnModuleCS인지 확인
+		if (SpawnModuleCS* spawnModule = dynamic_cast<SpawnModuleCS*>(&module))
+		{
+
+			spawnModule->SetEmitterScale(scale);
+		}
+		// MeshSpawnModuleCS인지 확인
+		else if (MeshSpawnModuleCS* meshSpawnModule = dynamic_cast<MeshSpawnModuleCS*>(&module))
+		{
+			meshSpawnModule->SetEmitterScale(scale);
+		}
+	}
+}
+
 void ParticleSystem::ResizeParticleSystem(UINT newMaxParticles)
 {
 	if (newMaxParticles == m_maxParticles)

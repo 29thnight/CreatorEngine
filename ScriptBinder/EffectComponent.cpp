@@ -10,6 +10,7 @@ void EffectComponent::Awake()
 
     // Awake에서는 기본 설정만 하고 이펙트는 생성하지 않음
     m_lastPosition = GetOwner()->m_transform.GetWorldPosition();
+    m_lastScale = GetOwner()->m_transform.GetWorldScale();
     auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
     float pitch, yaw, roll;
     Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
@@ -36,12 +37,10 @@ void EffectComponent::Update(float tick)
     {
         m_currentTime += tick;
     }
-
     if (m_duration > 0 && m_currentTime > m_duration && m_isPlaying)
     {
         StopEffect();
     }
-
     EffectRenderProxy* proxy = EffectCommandQueue->GetProxy(this);
     if (!proxy) return;
 
@@ -51,13 +50,15 @@ void EffectComponent::Update(float tick)
         m_effectInstanceName = proxy->GetInstanceName();
     }
 
-    // 인스턴스 이름이 있을 때만 position/rotation 업데이트
+    // 인스턴스 이름이 있을 때만 position/rotation/scale 업데이트
     if (!m_effectInstanceName.empty())
     {
         auto worldPos = GetOwner()->m_transform.GetWorldPosition();
         auto worldQuat = GetOwner()->m_transform.GetWorldQuaternion();
+        auto worldScale = GetOwner()->m_transform.GetWorldScale();  // 추가
 
         Mathf::Vector3 currentPos = Mathf::Vector3(worldPos.m128_f32[0], worldPos.m128_f32[1], worldPos.m128_f32[2]);
+        Mathf::Vector3 currentScale = Mathf::Vector3(worldScale.m128_f32[0], worldScale.m128_f32[1], worldScale.m128_f32[2]);  // 추가
 
         float pitch, yaw, roll;
         Mathf::QuaternionToEular(worldQuat, pitch, yaw, roll);
@@ -71,7 +72,6 @@ void EffectComponent::Update(float tick)
             proxy->UpdatePosition(currentPos);
             proxy->PushCommand(EffectCommandType::SetPosition);
             m_lastPosition = currentPos;
-
         }
 
         float rotThreshold = 0.01f;
@@ -83,16 +83,17 @@ void EffectComponent::Update(float tick)
             proxy->PushCommand(EffectCommandType::SetRotation);
             m_lastRotation = currentRot;
         }
-    }
-    else
-    {
-        //#ifdef _DEBUG
-        //        static int debugCount = 0;
-        //        if (++debugCount % 60 == 0) {
-        //            std::cout << "Warning: m_effectInstanceName is empty! Proxy instance: '"
-        //                << proxy->GetInstanceName() << "'" << std::endl;
-        //        }
-        //#endif
+
+        // Scale 변화 감지 추가
+        float scaleThreshold = 0.01f;
+        float scaleDistance = (m_lastScale - currentScale).Length();
+        if (scaleDistance > scaleThreshold)
+        {
+            proxy->UpdateInstanceName(m_effectInstanceName);
+            proxy->UpdateScale(currentScale);
+            proxy->PushCommand(EffectCommandType::SetScale);
+            m_lastScale = currentScale;
+        }
     }
 }
 

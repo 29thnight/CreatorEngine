@@ -6,30 +6,21 @@
 struct alignas(16) MeshParticleTemplateParams
 {
 	float lifeTime;
-	float3 minScale;
+	float3 Scale;
 
-	float3 maxScale;
-	float pad1;
-
-	float3 minRotationSpeed;
+	float3 RotationSpeed;
 	float pad2;
 
-	float3 maxRotationSpeed;
-	float pad3;
-
-	float3 minInitialRotation;
+	float3 InitialRotation;
 	float pad4;
-
-	float3 maxInitialRotation;
-	float pad5;
 
 	float4 color;
 
 	float3 velocity;
-	float minVerticalVelocity;
+	float VerticalVelocity;
 
 	float3 acceleration;
-	float maxVerticalVelocity;
+	float pad5;
 
 	float horizontalVelocityRange;
 	UINT textureIndex;
@@ -68,6 +59,8 @@ private:
 
 	std::mutex m_resetMutex;
 
+	XMFLOAT3 m_originalEmitterSize;
+	XMFLOAT3 m_originalParticleScale;
 public:
 	MeshSpawnModuleCS();
 	virtual ~MeshSpawnModuleCS();
@@ -84,6 +77,7 @@ public:
 
 	void SetEmitterPosition(const Mathf::Vector3& position);
 	void SetEmitterRotation(const Mathf::Vector3& rotation);
+	void SetEmitterScale(const Mathf::Vector3& scale);
 
 	// 스폰 설정 메서드들
 	void SetSpawnRate(float rate);
@@ -93,17 +87,18 @@ public:
 
 	// 3D 메시 관련 설정 메서드들
 	void SetParticleLifeTime(float lifeTime);
-	void SetParticleScaleRange(const XMFLOAT3& minScale, const XMFLOAT3& maxScale);
-	void SetParticleRotationSpeedRange(const XMFLOAT3& minSpeed, const XMFLOAT3& maxSpeed);
-	void SetParticleInitialRotationRange(const XMFLOAT3& minRot, const XMFLOAT3& maxRot);
+	void SetParticleScale(const XMFLOAT3& Scale);
+	void SetParticleRotationSpeed(const XMFLOAT3& Speed);
+	void SetParticleInitialRotation(const XMFLOAT3& Rot);
 	void SetParticleColor(const XMFLOAT4& color);
 	void SetParticleVelocity(const XMFLOAT3& velocity);
 	void SetParticleAcceleration(const XMFLOAT3& acceleration);
-	void SetVelocityRange(float minVertical, float maxVertical, float horizontalRange);
+	void SetVelocity(float Vertical, float horizontalRange);
 	void SetTextureIndex(UINT textureIndex);
 	void SetRenderMode(UINT mode);
 	
 	// 상태 조회
+	const SpawnParams& GetSpawnParams() const { return m_spawnParams; }
 	float GetSpawnRate() const { return m_spawnParams.spawnRate; }
 	EmitterType GetEmitterType() const { return static_cast<EmitterType>(m_spawnParams.emitterType); }
 	MeshParticleTemplateParams GetTemplate() const { return m_meshParticleTemplate; }

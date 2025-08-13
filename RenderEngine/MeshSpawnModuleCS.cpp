@@ -36,26 +36,25 @@ MeshSpawnModuleCS::MeshSpawnModuleCS()
     m_meshParticleTemplate.lifeTime = 10.0f;
 
     // 3D 스케일 범위
-    m_meshParticleTemplate.minScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
-    m_meshParticleTemplate.maxScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_meshParticleTemplate.Scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 회전 속도 범위
-    m_meshParticleTemplate.minRotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
-    m_meshParticleTemplate.maxRotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_meshParticleTemplate.RotationSpeed = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
     // 3D 초기 회전 범위
-    m_meshParticleTemplate.minInitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
-    m_meshParticleTemplate.maxInitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    m_meshParticleTemplate.InitialRotation = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
     // 기존과 동일한 속성들
     m_meshParticleTemplate.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     m_meshParticleTemplate.velocity = XMFLOAT3(0.0f, 0.0f, 0.0f);
     m_meshParticleTemplate.acceleration = XMFLOAT3(0.0f, -9.8f, 0.0f);
-    m_meshParticleTemplate.minVerticalVelocity = 0.0f;
-    m_meshParticleTemplate.maxVerticalVelocity = 0.0f;
+    m_meshParticleTemplate.VerticalVelocity = 0.0f;
     m_meshParticleTemplate.horizontalVelocityRange = 0.0f;
     m_meshParticleTemplate.textureIndex = 0;
     m_meshParticleTemplate.textureIndex = 0;
+
+    m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    m_originalParticleScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 }
 
 MeshSpawnModuleCS::~MeshSpawnModuleCS()
@@ -399,6 +398,25 @@ void MeshSpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
     }
 }
 
+void MeshSpawnModuleCS::SetEmitterScale(const Mathf::Vector3& scale)
+{
+    // 원본값에 직접 스케일 적용
+    m_spawnParams.emitterSize = XMFLOAT3(
+        m_originalEmitterSize.x * scale.x,
+        m_originalEmitterSize.y * scale.y,
+        m_originalEmitterSize.z * scale.z
+    );
+
+    m_meshParticleTemplate.Scale = XMFLOAT3(
+        m_originalParticleScale.x * scale.x,
+        m_originalParticleScale.y * scale.y,
+        m_originalParticleScale.z * scale.z
+    );
+
+    m_spawnParamsDirty = true;
+    m_templateDirty = true;
+}
+
 void MeshSpawnModuleCS::SetSpawnRate(float rate)
 {
     if (m_spawnParams.spawnRate != rate)
@@ -420,6 +438,7 @@ void MeshSpawnModuleCS::SetEmitterType(EmitterType type)
 
 void MeshSpawnModuleCS::SetEmitterSize(const XMFLOAT3& size)
 {
+    m_originalEmitterSize = size;
     m_spawnParams.emitterSize = size;
     m_spawnParamsDirty = true;
 }
@@ -434,24 +453,22 @@ void MeshSpawnModuleCS::SetEmitterRadius(float radius)
 }
 
 // 3D 설정 메서드들
-void MeshSpawnModuleCS::SetParticleScaleRange(const XMFLOAT3& minScale, const XMFLOAT3& maxScale)
+void MeshSpawnModuleCS::SetParticleScale(const XMFLOAT3& Scale)
 {
-    m_meshParticleTemplate.minScale = minScale;
-    m_meshParticleTemplate.maxScale = maxScale;
+    m_originalParticleScale = Scale;
+    m_meshParticleTemplate.Scale = Scale;
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleRotationSpeedRange(const XMFLOAT3& minSpeed, const XMFLOAT3& maxSpeed)
+void MeshSpawnModuleCS::SetParticleRotationSpeed(const XMFLOAT3& Speed)
 {
-    m_meshParticleTemplate.minRotationSpeed = minSpeed;
-    m_meshParticleTemplate.maxRotationSpeed = maxSpeed;
+    m_meshParticleTemplate.RotationSpeed = Speed;
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetParticleInitialRotationRange(const XMFLOAT3& minRot, const XMFLOAT3& maxRot)
+void MeshSpawnModuleCS::SetParticleInitialRotation(const XMFLOAT3& Rot)
 {
-    m_meshParticleTemplate.minInitialRotation = minRot;
-    m_meshParticleTemplate.maxInitialRotation = maxRot;
+    m_meshParticleTemplate.InitialRotation = Rot;
     m_templateDirty = true;
 }
 
@@ -482,10 +499,9 @@ void MeshSpawnModuleCS::SetParticleAcceleration(const XMFLOAT3& acceleration)
     m_templateDirty = true;
 }
 
-void MeshSpawnModuleCS::SetVelocityRange(float minVertical, float maxVertical, float horizontalRange)
+void MeshSpawnModuleCS::SetVelocity(float Vertical, float horizontalRange)
 {
-    m_meshParticleTemplate.minVerticalVelocity = minVertical;
-    m_meshParticleTemplate.maxVerticalVelocity = maxVertical;
+    m_meshParticleTemplate.VerticalVelocity = Vertical;
     m_meshParticleTemplate.horizontalVelocityRange = horizontalRange;
     m_templateDirty = true;
 }
@@ -525,17 +541,13 @@ nlohmann::json MeshSpawnModuleCS::SerializeData() const
     // MeshParticleTemplateParams 직렬화
     json["meshParticleTemplate"] = {
         {"lifeTime", m_meshParticleTemplate.lifeTime},
-        {"minScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minScale)},
-        {"maxScale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxScale)},
-        {"minRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minRotationSpeed)},
-        {"maxRotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxRotationSpeed)},
-        {"minInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.minInitialRotation)},
-        {"maxInitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.maxInitialRotation)},
+        {"Scale", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.Scale)},
+        {"RotationSpeed", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.RotationSpeed)},
+        {"InitialRotation", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.InitialRotation)},
         {"color", EffectSerializer::SerializeXMFLOAT4(m_meshParticleTemplate.color)},
         {"velocity", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.velocity)},
         {"acceleration", EffectSerializer::SerializeXMFLOAT3(m_meshParticleTemplate.acceleration)},
-        {"minVerticalVelocity", m_meshParticleTemplate.minVerticalVelocity},
-        {"maxVerticalVelocity", m_meshParticleTemplate.maxVerticalVelocity},
+        {"VerticalVelocity", m_meshParticleTemplate.VerticalVelocity},
         {"horizontalVelocityRange", m_meshParticleTemplate.horizontalVelocityRange},
         {"textureIndex", m_meshParticleTemplate.textureIndex},
         {"renderMode", m_meshParticleTemplate.renderMode}
@@ -567,6 +579,8 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
         if (spawnJson.contains("emitterSize"))
             m_spawnParams.emitterSize = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterSize"]);
 
+        m_originalEmitterSize = m_spawnParams.emitterSize;
+
         if (spawnJson.contains("emitterRadius"))
             m_spawnParams.emitterRadius = spawnJson["emitterRadius"];
 
@@ -582,23 +596,16 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
         if (templateJson.contains("lifeTime"))
             m_meshParticleTemplate.lifeTime = templateJson["lifeTime"];
 
-        if (templateJson.contains("minScale"))
-            m_meshParticleTemplate.minScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["minScale"]);
+        if (templateJson.contains("Scale"))
+            m_meshParticleTemplate.Scale = EffectSerializer::DeserializeXMFLOAT3(templateJson["Scale"]);
 
-        if (templateJson.contains("maxScale"))
-            m_meshParticleTemplate.maxScale = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxScale"]);
+        m_originalParticleScale = m_meshParticleTemplate.Scale;
 
-        if (templateJson.contains("minRotationSpeed"))
-            m_meshParticleTemplate.minRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["minRotationSpeed"]);
+        if (templateJson.contains("RotationSpeed"))
+            m_meshParticleTemplate.RotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["RotationSpeed"]);
 
-        if (templateJson.contains("maxRotationSpeed"))
-            m_meshParticleTemplate.maxRotationSpeed = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxRotationSpeed"]);
-
-        if (templateJson.contains("minInitialRotation"))
-            m_meshParticleTemplate.minInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["minInitialRotation"]);
-
-        if (templateJson.contains("maxInitialRotation"))
-            m_meshParticleTemplate.maxInitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["maxInitialRotation"]);
+        if (templateJson.contains("InitialRotation"))
+            m_meshParticleTemplate.InitialRotation = EffectSerializer::DeserializeXMFLOAT3(templateJson["InitialRotation"]);
 
         if (templateJson.contains("color"))
             m_meshParticleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);
@@ -609,11 +616,8 @@ void MeshSpawnModuleCS::DeserializeData(const nlohmann::json& json)
         if (templateJson.contains("acceleration"))
             m_meshParticleTemplate.acceleration = EffectSerializer::DeserializeXMFLOAT3(templateJson["acceleration"]);
 
-        if (templateJson.contains("minVerticalVelocity"))
-            m_meshParticleTemplate.minVerticalVelocity = templateJson["minVerticalVelocity"];
-
-        if (templateJson.contains("maxVerticalVelocity"))
-            m_meshParticleTemplate.maxVerticalVelocity = templateJson["maxVerticalVelocity"];
+        if (templateJson.contains("VerticalVelocity"))
+            m_meshParticleTemplate.VerticalVelocity = templateJson["VerticalVelocity"];
 
         if (templateJson.contains("horizontalVelocityRange"))
             m_meshParticleTemplate.horizontalVelocityRange = templateJson["horizontalVelocityRange"];
