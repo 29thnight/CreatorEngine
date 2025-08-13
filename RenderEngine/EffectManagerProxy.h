@@ -136,6 +136,17 @@ public:
         return cmd;
     }
 
+    static EffectManagerProxy CreateSetScaleCommand(const std::string& instanceId, const Mathf::Vector3& scale)
+    {
+        EffectManagerProxy cmd;
+        cmd.m_executeFunction = [instanceId, scale]() {
+            if (auto* effect = EffectManagers->GetEffectInstance(instanceId)) {
+                effect->SetScale(scale);
+            }
+            };
+        return cmd;
+    }
+
     //static uint32_t GetCurrentInstanceCounter() {
     //    return EffectManagers->GetInstanceId();
     //}

@@ -19,6 +19,7 @@ public:
 	void UpdateInstanceName(std::string_view instnaceedName) { m_instanceName = instnaceedName; }
 	void UpdatePosition(const Mathf::Vector3& pos) { m_commandPosition = pos; }
 	void UpdateRotation(const Mathf::Vector3& rot) { m_commandRotation = rot;  }
+	void UpdateScale(const Mathf::Vector3& sca) { m_commandScale = sca; }
 	void UpdateTimeScale(const float& timeScale) { m_timeScale = timeScale; }
 	void UpdateLoop(bool isLoop) { m_loop = isLoop; }
 	void UpdateDuration(const float& duration) { m_duration = duration; }
@@ -47,6 +48,7 @@ public:
 	const std::string& GetInstanceName() const { return m_instanceName; }
 	const Mathf::Vector3& GetPosition() const { return m_commandPosition; }
 	const Mathf::Vector3& GetRotation() const { return m_commandRotation; }
+	const Mathf::Vector3& GetScale() const { return m_commandScale; }
 	const float& GetTimeScale() const { return m_timeScale; }
 	bool& GetLoop() { return m_loop; }
 	const float& GetDuration() const { return m_duration; }
@@ -57,6 +59,7 @@ private:
 	std::string				m_instanceName;
 	Mathf::Vector3			m_commandPosition{ 0.f, 0.f, 0.f };
 	Mathf::Vector3			m_commandRotation{ 0.f, 0.f, 0.f };
+	Mathf::Vector3			m_commandScale{ 0.f, 0.f, 0.f };
 	float                   m_timeScale{ 1.f };
 	bool					m_loop{ false };
 	float                   m_duration{ 0.f };

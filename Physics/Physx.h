@@ -15,8 +15,9 @@
 #include "RagdollPhysics.h"
 
 class PhysicsEventCallback;
+class QueryBlockFilterCallback;
+class QueryTouchFilterCallback;
 struct ColliderInfo;
- 
 class PhysicX : public DLLCore::Singleton<PhysicX>
 {
 private:
@@ -197,6 +198,19 @@ public:
 	//debug data 대응
 
 
+	//===========================================================================================
+	//Shape Sweep 대응
+	SweepOutput BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	SweepOutput SphereSweep(const SweepInput& in, float radius);
+	SweepOutput CapsuleSweep(const SweepInput& in, float radius, float halfHeight);
+	//===========================================================================================
+	//Shape Overlap 대응
+	OverlapOutput BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent);
+	OverlapOutput SphereOverlap(const OverlapInput& in, float radius);
+	OverlapOutput CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight);
+	//===========================================================================================
+
+
 private:
 	physx::PxDefaultAllocator		m_allocator{};
 	physx::PxDefaultErrorCallback	m_errorCallback{};
@@ -216,6 +230,8 @@ private:
 	
 	//===========================================================================================
 	PhysicsEventCallback* m_eventCallback{};
+	QueryBlockFilterCallback* m_blockCallback{}; //쿼리 블록 필터 콜백
+	QueryTouchFilterCallback* m_touchCallback{}; //쿼리 터치 필터 콜백
 
 	unsigned int m_collisionMatrix[32]{};
 

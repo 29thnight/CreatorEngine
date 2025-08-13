@@ -37,6 +37,9 @@
 			<UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
 			<Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
 		</Filter>
+		<Filter Include="Script\ScriptClass\Bullet">
+			<UniqueIdentifier>{d867b0dd-5ce3-49c4-8312-b79aded8e198}</UniqueIdentifier>
+		</Filter>
 	</ItemGroup>
 	<ItemGroup>
 		<ClInclude Include="framework.h">
@@ -49,9 +52,6 @@
 			<Filter>Common\HeaderFile</Filter>
 		</ClInclude>
 		<ClInclude Include="CreateFactory.h">
-			<Filter>Script\CreateFactory</Filter>
-		</ClInclude>
-		<ClInclude Include="AniBehaviourFactory.h">
 			<Filter>Script\CreateFactory</Filter>
 		</ClInclude>
 		<ClInclude Include="Assets\Script\TestBehavior.h">
@@ -264,6 +264,24 @@
 		<ClInclude Include="Assets\BehaviorTree\Action\KnockBackAction.h">
 			<Filter>BehaviorTree\Action</Filter>
 		</ClInclude>
+		<ClInclude Include="Assets\Script\CameraMove.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="CriticalMark.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="ItemType.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="PlayerBuff.h">
+			<Filter>Common\HeaderFile</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\Bullet.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
+		<ClInclude Include="Assets\Script\SpecialBullet.h">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
 		<ClCompile Include="dllmain.cpp">
@@ -457,6 +475,21 @@
 		</ClCompile>
 		<ClCompile Include="Assets\BehaviorTree\Action\KnockBackAction.cpp">
 			<Filter>BehaviorTree\Action</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\CameraMove.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="CriticalMark.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="PlayerBuff.cpp">
+			<Filter>Common\SourceFile</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\Bullet.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
+		</ClCompile>
+		<ClCompile Include="Assets\Script\SpecialBullet.cpp">
+			<Filter>Script\ScriptClass\Bullet</Filter>
 		</ClCompile>
 	</ItemGroup>
 </Project>

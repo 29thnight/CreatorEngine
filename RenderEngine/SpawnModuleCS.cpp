@@ -42,6 +42,9 @@ SpawnModuleCS::SpawnModuleCS()
 	m_particleTemplate.minVerticalVelocity = 0.0f;
 	m_particleTemplate.maxVerticalVelocity = 0.0f;
 	m_particleTemplate.horizontalVelocityRange = 0.0f;
+
+	m_originalEmitterSize = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	m_originalParticleScale = XMFLOAT2(1.0f, 1.0f);
 }
 
 SpawnModuleCS::~SpawnModuleCS()
@@ -370,6 +373,23 @@ void SpawnModuleCS::SetEmitterRotation(const Mathf::Vector3& rotation)
 	}
 }
 
+void SpawnModuleCS::SetEmitterScale(const Mathf::Vector3& scale)
+{
+	m_spawnParams.emitterSize = XMFLOAT3(
+		m_originalEmitterSize.x * scale.x,
+		m_originalEmitterSize.y * scale.y,
+		m_originalEmitterSize.z * scale.z
+	);
+
+	m_particleTemplate.size = XMFLOAT2(
+		m_originalParticleScale.x * scale.x,
+		m_originalParticleScale.y * scale.y
+	);
+
+	m_spawnParamsDirty = true;
+	m_templateDirty = true;
+}
+
 
 void SpawnModuleCS::SetSpawnRate(float rate)
 {
@@ -392,6 +412,7 @@ void SpawnModuleCS::SetEmitterType(EmitterType type)
 
 void SpawnModuleCS::SetEmitterSize(const XMFLOAT3& size)
 {
+	m_originalEmitterSize = size;
 	m_spawnParams.emitterSize = size;
 	m_spawnParamsDirty = true;
 }
@@ -416,7 +437,7 @@ void SpawnModuleCS::SetParticleLifeTime(float lifeTime)
 
 void SpawnModuleCS::SetParticleSize(const XMFLOAT2& size)
 {
-	m_particleTemplate.size = size;
+	m_particleTemplate.size = size;  // 그냥 바로 설정
 	m_templateDirty = true;
 }
 
@@ -527,6 +548,8 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 		if (spawnJson.contains("emitterSize"))
 			m_spawnParams.emitterSize = EffectSerializer::DeserializeXMFLOAT3(spawnJson["emitterSize"]);
 
+		m_originalEmitterSize = m_spawnParams.emitterSize;
+
 		if (spawnJson.contains("emitterRadius"))
 			m_spawnParams.emitterRadius = spawnJson["emitterRadius"];
 
@@ -551,6 +574,8 @@ void SpawnModuleCS::DeserializeData(const nlohmann::json& json)
 			m_particleTemplate.size.x = sizeJson.value("x", 1.0f);
 			m_particleTemplate.size.y = sizeJson.value("y", 1.0f);
 		}
+
+		m_originalParticleScale = m_particleTemplate.size;
 
 		if (templateJson.contains("color"))
 			m_particleTemplate.color = EffectSerializer::DeserializeXMFLOAT4(templateJson["color"]);

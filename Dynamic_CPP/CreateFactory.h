@@ -3,6 +3,8 @@
 #include "Export.h"
 
 // Automation include ScriptClass header
+#include "SpecialBullet.h"
+#include "Bullet.h"
 #include "DestroyEffect.h"
 #include "TestEffect.h"
 #include "EntityEnemy.h"

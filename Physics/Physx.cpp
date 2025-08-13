@@ -13,7 +13,6 @@
 #include <mutex>
 #include <iostream>
 
-#include "ICollider.h"
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
@@ -52,7 +51,8 @@ public:
 		const physx::PxRigidActor* actor,
 		physx::PxHitFlags& queryFlags) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
@@ -67,7 +67,8 @@ public:
 		const physx::PxShape* shape,
 		const physx::PxRigidActor* actor) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
@@ -85,7 +86,8 @@ public:
 		const physx::PxRigidActor* actor,
 		physx::PxHitFlags& queryFlags) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
@@ -100,13 +102,40 @@ public:
 		const physx::PxShape* shape,
 		const physx::PxRigidActor* actor) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
 		}
 		return physx::PxQueryHitType::eNONE;
 	}
+};
+
+
+// 내부 구현용 쿼리 필터 콜백 클래스
+class QueryBlockFilterCallback : public physx::PxQueryFilterCallback
+{
+public:
+	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
+	{
+		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
+		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eBLOCK;
+		return physx::PxQueryHitType::eNONE;
+	}
+	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eBLOCK; }
+};
+
+class QueryTouchFilterCallback : public physx::PxQueryFilterCallback
+{
+public:
+	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
+	{
+		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
+		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eTOUCH;
+		return physx::PxQueryHitType::eNONE;
+	}
+	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }
 };
 
 bool PhysicX::Initialize()
@@ -193,7 +222,8 @@ bool PhysicX::Initialize()
 
 	//충돌 처리를 위한 콜백 등록
 	m_eventCallback = new PhysicsEventCallback();
-
+	m_blockCallback = new QueryBlockFilterCallback();
+	m_touchCallback = new QueryTouchFilterCallback();
 
 	// Scene 생성
 	physx::PxSceneDesc sceneDesc(m_physics->getTolerancesScale());
@@ -258,8 +288,17 @@ void PhysicX::RemoveActors()
 	m_removeActorList.clear();
 }
 void PhysicX::UnInitialize() {
+	if (m_scene) m_scene->release();
+	if (gDispatcher) gDispatcher->release();
+	if (m_physics) m_physics->release();
+	/*if (m_pvd) {
+		m_pvd->release();
+	}*/
 	if (m_foundation) m_foundation->release();
-	
+	delete m_eventCallback;
+	delete m_blockCallback;
+	delete m_touchCallback;
+
 }
 
 
@@ -333,7 +372,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			
 			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
-			//shape->setQueryFilterData(filterData);
+			shape->setQueryFilterData(filterData);
 			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 			//shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
 
@@ -1882,4 +1921,367 @@ bool PhysicX::IsUseGravity(unsigned int id) const
 		}
 	}
 	return false; // 혹은 기본값
+}
+
+
+/**
+ * @brief 지정된 박스(Box) 형태를 특정 경로로 스윕하여 충돌하는 객체를 찾습니다.
+ * @param in 스윕 시작 위치, 방향, 거리 등의 입력 정보
+ * @param boxExtent 박스의 절반 크기 (중심에서 각 면까지의 거리)
+ * @return 스윕 결과를 담은 SweepOutput 구조체
+ */
+SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent)
+{
+	// --- 1. 입력 데이터를 PhysX가 사용하는 형태로 변환 ---
+	// 엔진(오른손) 좌표계의 위치/회전/방향을 PhysX(왼손) 좌표계로 변환합니다.
+	physx::PxTransform startPose;
+	ConvertVectorDxToPx(in.startPosition, startPose.p);
+	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+
+	physx::PxVec3 unitDir;
+	ConvertVectorDxToPx(in.direction, unitDir);
+	unitDir.normalize(); // 방향 벡터는 항상 정규화해야 합니다.
+
+	// --- 2. 스윕할 셰이프의 모양(Geometry)을 정의 ---
+	physx::PxBoxGeometry boxGeometry(boxExtent.x, boxExtent.y, boxExtent.z);
+
+	// --- 3. 결과를 받을 버퍼를 준비 ---
+	const physx::PxU32 maxHits = 20; // 한 번의 스윕으로 감지할 수 있는 최대 객체 수
+	physx::PxSweepHit hitBuffer[maxHits];
+	physx::PxSweepBuffer sweepResult(hitBuffer, maxHits);
+
+	// --- 4. 충돌 필터 설정 ---
+	physx::PxQueryFilterData filterData;
+	// eSTATIC, eDYNAMIC: 정적/동적 객체 모두와 충돌을 검사합니다.
+	// ePREFILTER: 성능을 위해 사전 필터링을 사용합니다.
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+
+	// --- 5. 스윕 실행 ---
+	bool isHit = m_scene->sweep(
+		boxGeometry,      // 스윕할 셰이프의 모양
+		startPose,        // 시작 위치 및 회전
+		unitDir,          // 스윕 방향
+		in.distance,      // 스윕 거리
+		sweepResult,      // 결과를 저장할 버퍼
+		// eDEFAULT: 기본 충돌 처리.
+		// eMESH_MULTIPLE: 삼각형 메쉬와 충돌 시, 여러 개의 삼각형과 충돌을 감지하도록 허용.
+		physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE,
+		filterData        // 위에서 설정한 충돌 필터
+	);
+
+	// --- 6. PhysX 결과(왼손)를 게임 로직이 사용할 형태(오른손)로 변환하여 반환 ---
+	SweepOutput out;
+	if (isHit)
+	{
+		out.hasBlock = sweepResult.hasBlock;
+		for (physx::PxU32 i = 0; i < sweepResult.nbTouches; ++i)
+		{
+			const physx::PxSweepHit& hit = sweepResult.touches[i];
+			// 충돌한 액터나 유저 데이터가 없으면 유효하지 않은 충돌이므로 건너뜁니다.
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			SweepHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+			hitResult.distance = hit.distance;
+
+			// 충돌 지점과 법선 벡터도 왼손 좌표계에서 오른손 좌표계로 변환합니다.
+			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
+			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out;
+}
+
+/**
+ * @brief 지정된 구(Sphere) 형태를 특정 경로로 스윕하여 충돌하는 객체를 찾습니다.
+ * @param in 스윕 시작 위치, 방향, 거리 등의 입력 정보
+ * @param radius 구의 반지름
+ * @return 스윕 결과를 담은 SweepOutput 구조체
+ */
+SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
+{
+	// BoxSweep과 거의 동일하며, Geometry 정의 부분만 다릅니다.
+	physx::PxTransform startPose;
+	ConvertVectorDxToPx(in.startPosition, startPose.p);
+	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+
+	physx::PxVec3 unitDir;
+	ConvertVectorDxToPx(in.direction, unitDir);
+	unitDir.normalize();
+
+	// 스윕할 셰이프를 구(Sphere)로 정의합니다.
+	physx::PxSphereGeometry sphereGeometry(radius);
+
+	const physx::PxU32 maxHits = 20;
+	physx::PxSweepHit hitBuffer[maxHits];
+	physx::PxSweepBuffer sweepResult(hitBuffer, maxHits);
+
+	physx::PxQueryFilterData filterData;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+
+	bool isHit = m_scene->sweep(sphereGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
+
+	SweepOutput out;
+	if (isHit)
+	{
+		out.hasBlock = sweepResult.hasBlock;
+		for (physx::PxU32 i = 0; i < sweepResult.nbTouches; ++i)
+		{
+			const physx::PxSweepHit& hit = sweepResult.touches[i];
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			SweepHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+			hitResult.distance = hit.distance;
+
+			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
+			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out;
+}
+
+/**
+ * @brief 지정된 캡슐(Capsule) 형태를 특정 경로로 스윕하여 충돌하는 객체를 찾습니다.
+ * @param in 스윕 시작 위치, 방향, 거리 등의 입력 정보
+ * @param radius 캡슐의 반지름
+ * @param halfHeight 캡슐의 반쪽 높이 (중심에서 한쪽 끝까지의 거리)
+ * @return 스윕 결과를 담은 SweepOutput 구조체
+ */
+SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float halfHeight)
+{
+	// BoxSweep과 거의 동일하며, Geometry 정의 부분만 다릅니다.
+	physx::PxTransform startPose;
+	ConvertVectorDxToPx(in.startPosition, startPose.p);
+	ConvertQuaternionDxToPx(in.startRotation, startPose.q);
+
+	physx::PxVec3 unitDir;
+	ConvertVectorDxToPx(in.direction, unitDir);
+	unitDir.normalize();
+
+	// 스윕할 셰이프를 캡슐(Capsule)로 정의합니다.
+	physx::PxCapsuleGeometry capsuleGeometry(radius, halfHeight);
+
+	const physx::PxU32 maxHits = 20;
+	physx::PxSweepHit hitBuffer[maxHits];
+	physx::PxSweepBuffer sweepResult(hitBuffer, maxHits);
+
+	physx::PxQueryFilterData filterData;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+
+	bool isHit = m_scene->sweep(capsuleGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
+
+	SweepOutput out;
+	if (isHit)
+	{
+		out.hasBlock = sweepResult.hasBlock;
+		for (physx::PxU32 i = 0; i < sweepResult.nbTouches; ++i)
+		{
+			const physx::PxSweepHit& hit = sweepResult.touches[i];
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			SweepHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+			hitResult.distance = hit.distance;
+
+			ConvertVectorPxToDx(hit.position, hitResult.hitPoint);
+			ConvertVectorPxToDx(hit.normal, hitResult.hitNormal);
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out.touches.empty() ? SweepOutput{} : out;
+}
+
+
+/**
+ * @brief 지정된 위치에 박스(Box) 형태의 영역을 생성하여 겹치는 모든 객체를 찾습니다.
+ * @param in 오버랩 영역의 위치, 회전 등 입력 정보
+ * @param boxExtent 박스의 절반 크기 (중심에서 각 면까지의 거리)
+ * @return 오버랩 결과를 담은 OverlapOutput 구조체
+ */
+OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent)
+{
+	// --- 1. 입력 데이터를 PhysX가 사용하는 형태로 변환 ---
+	// 엔진(오른손) 좌표계의 위치/회전을 PhysX(왼손) 좌표계로 변환합니다.
+	physx::PxTransform pose;
+	ConvertVectorDxToPx(in.position, pose.p);
+	ConvertQuaternionDxToPx(in.rotation, pose.q);
+
+	// --- 2. 오버랩할 셰이프의 모양(Geometry)을 정의 ---
+	physx::PxBoxGeometry boxGeometry(boxExtent.x, boxExtent.y, boxExtent.z);
+
+	// --- 3. 결과를 받을 버퍼를 준비 ---
+	const physx::PxU32 maxHits = 30; // 한 번의 오버랩으로 감지할 수 있는 최대 객체 수
+	physx::PxOverlapHit hitBuffer[maxHits];
+	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
+
+	TouchRaycastQueryFilter filter;
+	// --- 4. 충돌 필터 설정 ---
+	physx::PxQueryFilterData filterData;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+
+	// --- 5. 오버랩 실행 ---
+	bool isHit = m_scene->overlap(
+		boxGeometry,    // 오버랩할 셰이프의 모양
+		pose,           // 영역의 위치 및 회전
+		overlapResult,  // 결과를 저장할 버퍼
+		filterData,      // 위에서 설정한 충돌 필터
+		&filter
+	);
+
+	// --- 6. PhysX 결과를 게임 로직이 사용할 형태로 변환하여 반환 ---
+	OverlapOutput out;
+	if (isHit)
+	{
+		for (physx::PxU32 i = 0; i < overlapResult.nbTouches; ++i)
+		{
+			const physx::PxOverlapHit& hit = overlapResult.touches[i];
+			// 충돌한 액터나 유저 데이터가 없으면 유효하지 않은 충돌이므로 건너뜁니다.
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			OverlapHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out;
+}
+
+/**
+ * @brief 지정된 위치에 구(Sphere) 형태의 영역을 생성하여 겹치는 모든 객체를 찾습니다.
+ * @param in 오버랩 영역의 위치, 회전 등 입력 정보
+ * @param radius 구의 반지름
+ * @return 오버랩 결과를 담은 OverlapOutput 구조체
+ */
+OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
+{
+	// BoxOverlap과 거의 동일하며, Geometry 정의 부분만 다릅니다.
+	physx::PxTransform pose;
+	ConvertVectorDxToPx(in.position, pose.p);
+	ConvertQuaternionDxToPx(in.rotation, pose.q);
+
+	// 오버랩할 셰이프를 구(Sphere)로 정의합니다.
+	physx::PxSphereGeometry sphereGeometry(radius);
+
+	const physx::PxU32 maxHits = 30;
+	physx::PxOverlapHit hitBuffer[maxHits];
+	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
+
+	physx::PxQueryFilterData filterData;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	//filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	//filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		filterData.data.word1 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		filterData.data.word1 = m_collisionMatrix[in.layerMask];
+	}
+
+	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);
+
+	OverlapOutput out;
+	if (isHit)
+	{
+		for (physx::PxU32 i = 0; i < overlapResult.nbTouches; ++i)
+		{
+			const physx::PxOverlapHit& hit = overlapResult.touches[i];
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			OverlapHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out;
+}
+
+/**
+ * @brief 지정된 위치에 캡슐(Capsule) 형태의 영역을 생성하여 겹치는 모든 객체를 찾습니다.
+ * @param in 오버랩 영역의 위치, 회전 등 입력 정보
+ * @param radius 캡슐의 반지름
+ * @param halfHeight 캡슐의 반쪽 높이 (중심에서 한쪽 끝까지의 거리)
+ * @return 오버랩 결과를 담은 OverlapOutput 구조체
+ */
+OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight)
+{
+	// BoxOverlap과 거의 동일하며, Geometry 정의 부분만 다릅니다.
+	physx::PxTransform pose;
+	ConvertVectorDxToPx(in.position, pose.p);
+	ConvertQuaternionDxToPx(in.rotation, pose.q);
+
+	// 오버랩할 셰이프를 캡슐(Capsule)로 정의합니다.
+	physx::PxCapsuleGeometry capsuleGeometry(radius, halfHeight);
+
+	const physx::PxU32 maxHits = 30;
+	physx::PxOverlapHit hitBuffer[maxHits];
+	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
+
+	physx::PxQueryFilterData filterData;
+	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+
+	bool isHit = m_scene->overlap(capsuleGeometry, pose, overlapResult, filterData);
+
+	OverlapOutput out;
+	if (isHit)
+	{
+		for (physx::PxU32 i = 0; i < overlapResult.nbTouches; ++i)
+		{
+			const physx::PxOverlapHit& hit = overlapResult.touches[i];
+			if (!hit.actor || !hit.actor->userData) continue;
+
+			OverlapHitResult hitResult;
+			CollisionData* userData = static_cast<CollisionData*>(hit.actor->userData);
+
+			hitResult.hitObjectID = userData->thisId;
+			hitResult.hitObjectLayer = userData->thisLayerNumber;
+
+			out.touches.push_back(hitResult);
+		}
+	}
+
+	return out;
 }

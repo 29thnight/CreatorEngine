@@ -45,6 +45,18 @@ struct RaycastHit {
 	unsigned int hitObjectLayer = 0;
 };
 
+struct HitResult {
+	// 모든 쿼리에서 공통적으로 제공되는 정보
+	GameObject* gameObject = nullptr;
+	unsigned int layer = 0;
+
+	// Raycast와 Sweep 쿼리에서만 유효한 정보입니다.
+	// (Overlap의 경우 기본값으로 유지됩니다.)
+	DirectX::SimpleMath::Vector3 point = DirectX::SimpleMath::Vector3::Zero;
+	DirectX::SimpleMath::Vector3 normal = DirectX::SimpleMath::Vector3::Zero;
+	float distance = -1.0f;
+};
+
 class BoxColliderComponent;
 class SphereColliderComponent;
 class CapsuleColliderComponent;
@@ -112,9 +124,22 @@ public:
 	//등록된 콜백함수 실행
 	void ProcessCallback();
 
+	//============================
+	//raycast 관련 함수들
 	void RayCast(RayEvent& rayEvent);
 	bool Raycast(RayEvent& rayEvent, RaycastHit& hit);
 	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);
+	//============================
+	//Shape Sweep 관련 함수들
+	int BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
+	int SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits);
+	int CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
+	//============================
+	//Shape Overlap 관련 함수들
+	int BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits);
+	int SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits);
+	int CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
+	//============================
 	
 	//충돌 메트릭스 변경
 	void SetCollisionMatrix(std::vector<std::vector<uint8_t>> collisionGrid) {

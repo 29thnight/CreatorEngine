@@ -81,6 +81,7 @@ private:
 
     Mathf::Vector3 m_lastPosition;
     Mathf::Vector3 m_lastRotation;
+    Mathf::Vector3 m_lastScale;
 
     void ApplyEffectSettings();
     void DestroyCurrentEffect();

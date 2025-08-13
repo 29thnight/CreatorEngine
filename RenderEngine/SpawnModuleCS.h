@@ -58,7 +58,10 @@ private:
     Mathf::Vector3 m_previousEmitterPosition;
     bool m_forcePositionUpdate;
 
-    std::mutex m_resetMutex;
+    std::mutex m_resetMutex;    
+
+    XMFLOAT3 m_originalEmitterSize;
+    XMFLOAT2 m_originalParticleScale;
 
 public:
     SpawnModuleCS();
@@ -83,6 +86,7 @@ public:
     // 스폰 설정 메서드들
     void SetEmitterPosition(const Mathf::Vector3& position);
     void SetEmitterRotation(const Mathf::Vector3& rotation);
+    void SetEmitterScale(const Mathf::Vector3& scale);
 
     void SetSpawnRate(float rate);
     void SetEmitterType(EmitterType type);

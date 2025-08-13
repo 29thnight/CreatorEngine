@@ -24,4 +24,7 @@ public:
 	std::string m_funName    = "NoneF";
 	[[Property]]
 	float key = 0;
+	
+	[[Property]]
+	int  frameKey = 1; //애니메이션 프레임 int값
 };

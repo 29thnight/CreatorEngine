@@ -20,6 +20,7 @@
 #include "Weapon.h"
 #include "GameManager.h"
 #include "EntityEnemy.h"
+#include "Entity.h"
 
 #include "CameraComponent.h"
 void Player::Start()
@@ -75,9 +76,9 @@ void Player::Start()
 	auto gmobj = GameObject::Find("GameManager");
 	if (gmobj)
 	{
-		auto gm = gmobj->GetComponent<GameManager>();
-		gm->PushEntity(this);
-		gm->PushPlayer(this);
+		GM = gmobj->GetComponent<GameManager>();
+		GM->PushEntity(this);
+		GM->PushPlayer(this);
 	}
 
 	m_controller = player->GetComponent<CharacterControllerComponent>();
@@ -98,28 +99,39 @@ void Player::Update(float tick)
 		m_animator->SetParameter("OnDead", true);
 	}
 
-	/*if (isAttacking)
-	{
-		attackElapsedTime += tick;
-		auto controller = player->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0,0 });
-		if (attackElapsedTime >= attackTime)
-		{
-			attackElapsedTime = 0.f;
-			isAttacking = false;
-		}
-	}*/
 	if (catchedObject)
 	{
-		auto forward = GetOwner()->m_transform.GetForward(); // Vector3
-		auto world = GetOwner()->m_transform.GetWorldPosition(); // XMVECTOR
-
-		XMVECTOR forwardVec = XMLoadFloat3(&forward); // Vector3 → XMVECTOR
-
+		auto forward = GetOwner()->m_transform.GetForward();
+		auto world = GetOwner()->m_transform.GetWorldPosition(); 
+		XMVECTOR forwardVec = XMLoadFloat3(&forward); 
 		XMVECTOR offsetPos = world + -forwardVec * 1.0f;
-		offsetPos.m128_f32[1] = 1.0f; // Y 고정
-
+		offsetPos.m128_f32[1] = 1.0f; 
 		catchedObject->GetOwner()->GetComponent<Transform>()->SetPosition(offsetPos);
+
+
+		//asis와 거리계속 갱신
+		auto& asiss = GM->GetAsis();
+		if (!asiss.empty())
+		{
+			auto asis = asiss[0]->GetOwner();
+			Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+			Mathf::Vector3 directionToAsis = asisPos - myPos;
+			float distance = directionToAsis.Length();
+			directionToAsis.Normalize();
+
+			float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+			if (dot > cosf(Mathf::Deg2Rad * detectAngle * 0.5f))
+			{
+				onIndicate = true;
+				std::cout << "onIndicate!!!!!!!!!" << std::endl;
+			}
+			else
+			{
+				onIndicate = false;
+			}
+		}
+
 	}
 	if (m_nearObject) {
 		auto nearMesh = m_nearObject->GetComponent<MeshRenderer>();
@@ -174,32 +186,7 @@ void Player::Update(float tick)
 		}
 
 	}
-	if (isStun)
-	{
-		stunTime -= tick;
-		auto controller = player->GetComponent<CharacterControllerComponent>();
-		controller->Move({ 0,0 });
-		if (0.f >= stunTime)
-		{
-			isStun = false;
-		}
-	}
-	if (isKnockBack)
-	{
-		KnockBackElapsedTime += tick;
-		if (KnockBackElapsedTime >= KnockBackTime)
-		{
-			isKnockBack = false;
-			KnockBackElapsedTime = 0.f;
-			player->GetComponent<CharacterControllerComponent>()->EndKnockBack();
-		}
-		else
-		{
-			auto forward = player->m_transform.GetForward(); //맞은 방향에서 밀리게끔 수정
-			auto controller = player->GetComponent<CharacterControllerComponent>();
-			controller->Move({ forward.x ,forward.z });
-		}
-	}
+
 
 }
 
@@ -242,7 +229,6 @@ void Player::SendDamage(Entity* sender, int damage)
 			// hit
 			m_currentHP -= std::max(damage, 0);
 			DropCatchItem();
-			//TestKnockBack();
 			if (m_currentHP <= 0)
 			{
 				isDead = true;
@@ -318,22 +304,6 @@ void Player::Throw()
 	m_animator->SetParameter("OnThrow", true);
 }
 
-void Player::DropCatchItem()
-{
-	if (catchedObject != nullptr)
-	{
-		if (catchedObject) {
-			catchedObject->Drop(player->m_transform.GetForward(), {DropPowerX,DropPowerY});
-		}
-
-		catchedObject = nullptr;
-		m_nearObject = nullptr; //&&&&&
-		if (m_curWeapon)
-			m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
-		m_animator->SetParameter("OnDrop", true);
-	}
-}
-
 void Player::ThrowEvent()
 {
 	std::cout << "ThrowEvent" << std::endl;
@@ -345,6 +315,54 @@ void Player::ThrowEvent()
 	m_nearObject = nullptr; //&&&&&
 	if (m_curWeapon)
 		m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+
+
+
+
+
+	Mathf::Vector3 myPos = GetOwner()->m_transform.GetWorldPosition();
+	auto asis = GameObject::Find("Asis");
+	Mathf::Vector3 asisPos = asis->m_transform.GetWorldPosition();
+	Mathf::Vector3 directionToAsis = asisPos - myPos;
+	float distance = directionToAsis.Length();
+	directionToAsis.Normalize();
+
+	float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
+	if (onIndicate) 
+	{
+		if (catchedObject)
+		{
+			auto item = catchedObject->GetOwner()->GetComponent<EntityItem>();
+			if (item) {
+				item->SetThrowOwner(this);
+			}
+			catchedObject = nullptr;
+			m_nearObject = nullptr; //&&&&&
+			if (m_curWeapon)
+				m_curWeapon->SetEnabled(true);
+		}
+	}
+	else //유도없이 투척
+	{
+
+	}
+}
+
+
+void Player::DropCatchItem()
+{
+	if (catchedObject != nullptr)
+	{
+		if (catchedObject) {
+			catchedObject->Drop(player->m_transform.GetForward(), { DropPowerX,DropPowerY });
+		}
+
+		catchedObject = nullptr;
+		m_nearObject = nullptr; //&&&&&
+		if (m_curWeapon)
+			m_curWeapon->SetEnabled(true); //이건 해당상태 state ->exit 쪽으로 이동필요
+		m_animator->SetParameter("OnDrop", true);
+	}
 }
 
 void Player::Dash()
@@ -392,11 +410,9 @@ void Player::Charging()
 
 void Player::Attack1()
 {
-	//AttackTarget.clear();
-
-
 
 	isCharging = false;
+	std::cout << m_chargingTime << " second charging" << std::endl;
 	m_chargingTime = 0.f;
 
 	if (isAttacking == false)
@@ -410,6 +426,7 @@ void Player::Attack1()
 		attackElapsedTime = 0;
 	}
 }
+
 
 void Player::SwapWeaponLeft()
 {
@@ -484,21 +501,7 @@ void Player::DeleteCurWeapon()
 
 
 
-void Player::TestStun()
-{
-	isStun = true;
-	stunTime = 1.5f;
-	m_animator->SetParameter("OnMove", false);
 
-}
-
-void Player::TestKnockBack()
-{
-	isKnockBack = true;
-	KnockBackTime = 0.1f;
-	player->GetComponent<CharacterControllerComponent>()->SetKnockBack(KnockBackForce, KnockBackForceY);
-	m_animator->SetParameter("OnMove", false);
-}
 
 void Player::FindNearObject(GameObject* gameObject)
 {
@@ -542,30 +545,43 @@ void Player::Buff(Weapon* weapon)
 	DeleteCurWeapon();
 }
 
-void Player::OnRay()
+
+void Player::ChangeAutoTarget(Mathf::Vector2 dir)
 {
-	std::vector<HitResult> hits;
-	auto world = player->m_transform.GetWorldPosition();
-	world.m128_f32[1] += 0.35f;
-	auto forward = player->m_transform.GetForward();
-	int size = RaycastAll(world, -forward, 3.f, 1u, hits);
-	//부채꼴로 여러방
-	for (int i = 0; i < size; i++)
+	if (inRangeEnemy.empty()) //비었으면 단순 캐릭터 회전
 	{
-		auto object = hits[i].hitObject;
-		if (object == GetOwner()) continue;
 
-		auto enemy = object->GetComponent<EntityEnemy>();
-		if (enemy)
+	}
+	else //들어있으면 입력방향에따라 다음 가까운적 타겟으로
+	{
+
+		for (auto& enemy : inRangeEnemy)
 		{
-			enemy->SendDamage(this, 100);
-		}
-
-		auto entityItem = object->GetComponent<EntityResource>();
-		if (entityItem) {
-			entityItem->SendDamage(this, 100);
+			if (curTarget == enemy) continue;
+			if (dir.x > 0.1f)
+			{
+				//
+			}
+			if (dir.x < -0.1f)
+			{
+				//
+			}
+			if (dir.y > 0.1f)
+			{
+				//
+			}
+			if (dir.y < -0.1f)
+			{
+				//
+			}
 		}
 	}
+	
+}
+
+void Player::MoveBombThrowPosition(Mathf::Vector2 dir)
+{
+
 }
 
 void Player::MeleeAttack()
@@ -580,10 +596,6 @@ void Player::MeleeAttack()
 		rayOrigin.y = 0.5f;
 		int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
 
-		if (size > 0)
-		{
-			std::cout << "abaca" << std::endl;
-		}
 		for (int i = 0; i < size; i++)
 		{
 			auto object = hits[i].hitObject;
@@ -596,7 +608,7 @@ void Player::MeleeAttack()
 				if (*iter) 
 				{
 					(*iter)->SendDamage(this, 1);
-					(*iter)->SendKnockBack(this, {1,0});
+					//(*iter)->SendKnockBack(this, {1,0});
 				}
 			}
 		}
@@ -627,16 +639,7 @@ void Player::OnTriggerEnter(const Collision& collision)
 void Player::OnTriggerStay(const Collision& collision)
 {
 	//std::cout << "player muunga boodit him trigger" << collision.otherObj->m_name.ToString().c_str() << std::endl;
-	if (collision.otherObj->m_tag == "Respawn")
-	{
-
-	}
-	else
-	{
-
-		FindNearObject(collision.otherObj);
-
-	}
+	FindNearObject(collision.otherObj);
 }
 
 void Player::OnTriggerExit(const Collision& collision)
@@ -652,23 +655,12 @@ void Player::OnTriggerExit(const Collision& collision)
 }
 
 void Player::OnCollisionEnter(const Collision& collision)
-{
-	std::cout << " Player OnCollisionEnter" << std::endl;
-	
+{	
 }
 
 void Player::OnCollisionStay(const Collision& collision)
 {
-	//std::cout << "player muunga boodit him" << collision.otherObj->m_name.ToString().c_str() << std::endl;
-	if (collision.otherObj->m_tag == "Respawn")
-	{
-
-	}
-	else
-	{
-		FindNearObject(collision.otherObj);
-
-	}
+	FindNearObject(collision.otherObj);
 }
 
 void Player::OnCollisionExit(const Collision& collision)

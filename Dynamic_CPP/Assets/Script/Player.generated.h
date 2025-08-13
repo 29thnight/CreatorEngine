@@ -24,6 +24,10 @@ ReflectionScriptField(Player) \
 		meta_property(AttackSpeed) \
 		meta_property(comboDuration) \
 		meta_property(atkFwDistacne) \
+		meta_property(rangedAtkCountMax) \
+		meta_property(rangedAtkDelay) \
+		meta_property(rangedAtkCooldown) \
+		meta_property(rangedAutoAimRange) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
@@ -36,7 +40,6 @@ ReflectionScriptField(Player) \
 		meta_method(SwapWeaponLeft) \
 		meta_method(SwapWeaponRight) \
 		meta_method(DeleteCurWeapon) \
-		meta_method(TestKnockBack) \
 		meta_method(Move, "dir") \
 		meta_method(CatchAndThrow) \
 		meta_method(ThrowEvent) \

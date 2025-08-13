@@ -42,7 +42,7 @@ struct PolarClippingParams
     float polarDirection = 1.0f;          // 1: 시계방향, -1: 반시계방향
 
     Mathf::Vector3 polarCenter = Mathf::Vector3::Zero;    // 극좌표 중심점 (월드 좌표)
-    float pad2 = 0.0f;
+    float pad1 = 0.0f;
 
     Mathf::Vector3 polarUpAxis = Mathf::Vector3::Up;      // 극좌표 위쪽 축
     float pad3 = 0.0f;
@@ -60,6 +60,7 @@ public:
     virtual void Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matrix projection) {}
     virtual void Release() {}
     virtual void SetTexture(Texture* texture) {}
+    virtual void SetDissolveTexture(Texture* texture) {}
     virtual void BindResource() {}
     virtual void SetupRenderTarget(RenderPassData* renderData) {}
 
@@ -125,6 +126,7 @@ protected:
     virtual void UpdateClippingBuffer() {}
 
     Texture* m_assignedTexture;
+    Texture* m_dissolveTexture;
 
     float m_effectProgress = 0.0f;
     bool m_useEffectProgress = false;
