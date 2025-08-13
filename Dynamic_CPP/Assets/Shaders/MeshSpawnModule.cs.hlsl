@@ -59,22 +59,13 @@ cbuffer SpawnParameters : register(b0)
 cbuffer MeshParticleTemplateParams : register(b1)
 {
     float gLifeTime;
-    float3 gMinScale;
+    float3 gScale;
 
-    float3 gMaxScale;
-    float templatePad1;
-
-    float3 gMinRotationSpeed;
+    float3 gRotationSpeed;
     float templatePad2;
 
-    float3 gMaxRotationSpeed;
-    float templatePad3;
-
-    float3 gMinInitialRotation;
+    float3 gInitialRotation;
     float templatePad4;
-
-    float3 gMaxInitialRotation;
-    float templatePad5;
 
     float4 gColor;
 
@@ -275,14 +266,15 @@ void InitializeMeshParticle(inout MeshParticleData particle, uint seed)
     particle.velocity = GenerateInitialVelocity(seed + 100);
     particle.acceleration = gAcceleration;
     
-    particle.scale = RandomRange3D(seed + 200, gMinScale, gMaxScale);
-    particle.rotationSpeed = RandomRange3D(seed + 300, gMinRotationSpeed, gMaxRotationSpeed);
-    particle.rotation = RandomRange3D(seed + 400, gMinInitialRotation, gMaxInitialRotation);
+    // Range 제거 - 단일 값 사용
+    particle.scale = gScale; // RandomRange3D 제거
+    particle.rotationSpeed = gRotationSpeed; // RandomRange3D 제거  
+    particle.rotation = gInitialRotation; // RandomRange3D 제거
     
     particle.age = 0.0;
     particle.lifeTime = gLifeTime;
     particle.color = gColor;
-    particle.textureIndex = 0; // 기본값으로 0 설정
+    particle.textureIndex = 0;
     particle.renderMode = gRenderMode;
     particle.isActive = 1;
 }
@@ -322,38 +314,28 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint particleIndex = DTid.x;
     
-    // 범위 체크
     if (particleIndex >= gMaxParticles)
         return;
     
-    // 파티클 데이터 복사
     MeshParticleData particle = gParticlesInput[particleIndex];
-    
-    // 에미터 위치가 변경되었다면 즉시 파티클 위치 업데이트
-    if (gForcePositionUpdate == 1)
-    {
-        UpdateExistingMeshParticlePosition(particle);
-    }
-    else
-    {
-        particle.position = gEmitterPosition;
-    }
-    
-    // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
-    if (gForceRotationUpdate == 1)
-    {
-        UpdateExistingMeshParticleRotation(particle);
-    }
-    else
-    {
-        // 위치처럼 회전도 항상 에미터 회전 유지
-        // (forceRotationUpdate가 0이어도 계속 적용)
-        particle.rotation = gEmitterRotation;
-    }
     
     // 기존 활성 파티클 업데이트
     if (particle.isActive == 1)
     {
+        // 에미터 위치가 변경되었다면 즉시 파티클 위치 업데이트
+        if (gForcePositionUpdate == 1)
+        {
+            UpdateExistingMeshParticlePosition(particle);
+        }
+        // else 블록 제거 - 위치 고정 문제 해결
+
+        // 에미터 회전이 변경되었다면 즉시 파티클 회전 업데이트  
+        if (gForceRotationUpdate == 1)
+        {
+            UpdateExistingMeshParticleRotation(particle);
+        }
+        // else 블록 제거 - 회전 고정 문제 해결
+
         // 나이 증가
         particle.age += gDeltaTime;
 
@@ -367,19 +349,16 @@ void main(uint3 DTid : SV_DispatchThreadID)
     // 비활성 파티클 - 스폰 체크
     else
     {
-        // 각 파티클의 스폰 시간 계산
         float particleSpawnTime = float(particleIndex) / gSpawnRate;
         float spawnCycle = float(gMaxParticles) / gSpawnRate;
         float cycleTime = fmod(gCurrentTime, spawnCycle * 2.0);
         
         bool shouldSpawn = false;
         
-        // 첫 번째 사이클에서 스폰 체크
         if (cycleTime >= particleSpawnTime && cycleTime < particleSpawnTime + (1.0 / gSpawnRate))
         {
             shouldSpawn = true;
         }
-        // 두 번째 사이클에서 스폰 체크 (재스폰)
         else if (cycleTime >= (spawnCycle + particleSpawnTime) &&
                  cycleTime < (spawnCycle + particleSpawnTime + (1.0 / gSpawnRate)))
         {
@@ -388,16 +367,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
         
         if (shouldSpawn)
         {
-            // 고품질 랜덤 시드 생성
             uint seed = WangHash(particleIndex + uint(gCurrentTime * 1000.0) + gRandomSeed[0]);
             InitializeMeshParticle(particle, seed);
         }
     }
     
-    // 결과 저장
     gParticlesOutput[particleIndex] = particle;
     
-    // 첫 번째 스레드에서만 글로벌 랜덤 시드 업데이트
     if (DTid.x == 0)
     {
         gRandomSeed[0] = WangHash(gRandomSeed[0] + 1);

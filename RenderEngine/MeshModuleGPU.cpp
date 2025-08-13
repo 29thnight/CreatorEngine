@@ -249,6 +249,13 @@ void MeshModuleGPU::CreateClippingBuffer()
     {
         m_polarClippingBuffer.Reset();
     }
+
+    bufferDesc.ByteWidth = sizeof(TimeParams);
+    hr = DeviceState::g_pDevice->CreateBuffer(&bufferDesc, nullptr, &m_timeBuffer);
+    if (FAILED(hr))
+    {
+        m_timeBuffer.Reset();
+    }
 }
 
 void MeshModuleGPU::UpdateClippingBuffer()
@@ -711,6 +718,22 @@ void MeshModuleGPU::Render(Mathf::Matrix world, Mathf::Matrix view, Mathf::Matri
     {
         UpdateClippingBuffer();
         deviceContext->PSSetConstantBuffers(2, 1, m_polarClippingBuffer.GetAddressOf());
+    }
+
+    if (m_timeBuffer)
+    {
+        m_timeParams.time = Time->GetTotalSeconds();
+
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = deviceContext->Map(m_timeBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED(hr))
+        {
+            TimeParams* params = static_cast<TimeParams*>(mappedResource.pData);
+            *params = m_timeParams;
+            deviceContext->Unmap(m_timeBuffer.Get(), 0);
+        }
+
+        deviceContext->PSSetConstantBuffers(3, 1, m_timeBuffer.GetAddressOf());
     }
 
     // 파티클 SRV 바인딩
