@@ -3,15 +3,20 @@
 #include "Entity.h"
 #include "Player.generated.h"
 #include "ItemType.h"
+
 class Animator;
-class Weapon;
-class EntityItem;
 class Socket;
 class EffectComponent;
-class Entity;
 class CharacterControllerComponent;
 
-enum class playerState
+
+class GameManager;
+class Weapon;
+class Entity;
+class EntityItem;
+class EntityEnemy;
+
+enum class playerState 
 {
 	Idle,
 	Attack,
@@ -46,7 +51,7 @@ public:
 
 
 	virtual void SendDamage(Entity* sender, int damage) override;
-	virtual void OnRay() override;
+	virtual void OnRay() override {}
 
 	[[Method]]
 	void SwapWeaponLeft();
@@ -56,11 +61,6 @@ public:
 	[[Method]]
 	void DeleteCurWeapon();  //쓰던무기 다쓰면 쓸꺼
 	void FindNearObject(GameObject* gameObject);
-
-	void TestStun();
-	[[Method]]
-	void TestKnockBack();
-
 
 	//플레이어 기본
 	[[Property]]
@@ -91,6 +91,7 @@ public:
 	EntityItem* catchedObject = nullptr;
 	GameObject* m_nearObject = nullptr;
 	GameObject* m_preNearObject = nullptr;
+	bool    onIndicate = false;
 	[[Method]]
 	void CatchAndThrow();
 	void Catch();
@@ -135,14 +136,30 @@ public:
 	float m_comboElapsedTime = 0.f;  //콤보유지시간 체크
 	[[Property]]
 	float atkFwDistacne = 2.0f;      //기본공격시 전진거리
+	[[Property]]
+	int  rangedAtkCountMax = 5.0f;   //원거리공격 최대 연타횟수
+	[[Property]]
+	float rangedAtkDelay = 0.3f;     //연속공격중 발사간 간격
+	[[Property]]
+	float rangedAtkCooldown = 1.0f;   //연속공격 종료후 발사대기시간
+	[[Property]]
+	float rangedAutoAimRange = 10.f; //자동조준 거리 
+
+
+
 	float m_chargingTime = 0.f;      //차징중인 시간
 	bool isCharging = false;
 	bool isAttacking = false;
-	float attackTime = 0.980f;
+	float attackTime = 0.765f;
 	float attackElapsedTime = 0.f;
-	std::unordered_set<Entity*> AttackTarget;
-
-	void MeleeAttack();
+	std::unordered_set<Entity*> AttackTarget; //내가 떄린,때릴 애들
+	std::vector<EntityEnemy*>   inRangeEnemy; //내 공격 사거리안 적들
+	EntityEnemy* curTarget = nullptr;
+	
+	void ChangeAutoTarget(Mathf::Vector2 dir); //사격중 Lstick 으로 타겟변경                 //연속사격중일때 실행 
+	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
+	Mathf::Vector3 bombThrowPosition = {0,0,0};                                                                        
+ 	void MeleeAttack();
 	[[Method]]
 	void StartAttack();
 	[[Method]]
@@ -159,8 +176,6 @@ public:
 	//bool isKnockBack = false;
 	float KnockBackForceY = 0.1f;
 	float KnockBackForce = 0.05f; //때린애가 나한테 줄 넉백힘
-	//float KnockBackElapsedTime = 0.f;
-	//float KnockBackTime = 0.f;  //넉백지속시간 //  총거리는같지만 빨리끝남
 	[[Property]]
 	float GracePeriod = 1.0f;       //피격시 무적시간
 	[[Property]]
@@ -185,6 +200,8 @@ public:
 	[[Property]]
 	float SlotChangeCooldown = 2.0f;
 	float SlotChangeCooldownElapsedTime = 0.f;
+	bool  canChangeSlot = true;
+
 	int m_weaponIndex = 0;
 	std::vector<Weapon*> m_weaponInventory;
 	Weapon* m_curWeapon = nullptr;
@@ -198,11 +215,12 @@ public:
 
 
 
+	GameManager* GM = nullptr;
 	GameObject* player = nullptr; // ==GetOwner() 스크립트 주인
 	Animator* m_animator = nullptr;
 	GameObject* aniOwener = nullptr;
-	Socket* handSocket;
-	CharacterControllerComponent* m_controller;
+	Socket* handSocket = nullptr;
+	CharacterControllerComponent* m_controller = nullptr;
 
 
 	GameObject* camera = nullptr;

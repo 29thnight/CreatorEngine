@@ -129,7 +129,7 @@ void EntityItem::Update(float tick)
 				{
 					isTargettingTail = true;
 					//인디케이터 출력? 플레이어가출력?
-					std::cout << "On indicator " << std::endl;
+					//std::cout << "On indicator " << std::endl;
 					
 				}
 				else
