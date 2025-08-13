@@ -110,10 +110,22 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						ImGui::SameLine();
 						ImGui::Dummy(ImVec2(10.0f, 0));
 						ImGui::SameLine();
-						ImGui::Text("progress");
+						ImGui::Text("Frame Key");
 						ImGui::SameLine();
 						ImGui::PushItemWidth(80);
-						ImGui::DragFloat(("Key##" + event.m_eventName).c_str(), &event.key, 0.01f,0.0f, 1.0f);
+
+
+
+						if (ImGui::InputInt("##frame key", &event.frameKey, 0, 0))
+						{
+							if (event.frameKey < 1) event.frameKey = 1;
+							if (event.frameKey > animation.m_totalKeyFrames)
+								event.frameKey = animation.m_totalKeyFrames;
+
+							event.key = float(event.frameKey) / float(animation.m_totalKeyFrames);
+						}
+
+						//ImGui::DragFloat(("Key##" + event.m_eventName).c_str(), &event.key, 0.01f,0.0f, 1.0f);
 						ImGui::PopItemWidth();
 						ImGui::SameLine();
 						if(ImGui::Button("delete"))

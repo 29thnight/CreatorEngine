@@ -192,6 +192,8 @@ extern "C"
 	EXPORT_API void InitModuleFactory()
 	{
 		// Register the factory function for TestBehavior Automation
+		CreateFactory::GetInstance()->RegisterFactory("SpecialBullet", []() { return new SpecialBullet(); });
+		CreateFactory::GetInstance()->RegisterFactory("Bullet", []() { return new Bullet(); });
 		CreateFactory::GetInstance()->RegisterFactory("DestroyEffect", []() { return new DestroyEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("TestEffect", []() { return new TestEffect(); });
 		CreateFactory::GetInstance()->RegisterFactory("EntityEnemy", []() { return new EntityEnemy(); });
