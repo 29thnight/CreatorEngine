@@ -50,6 +50,10 @@ void EntityEnemy::Update(float tick)
 
 	attackCount = blackBoard->GetValueAsInt("AttackCount");
 
+	if (hittimer > 0.f) {
+		hittimer -= tick;
+		m_animator->GetOwner()->m_transform.SetPosition(Mathf::Vector3::Lerp(Mathf::Vector3::Zero, hitPos, hittimer));
+	}
 	//MeleeAttack();
 	//if (isKnockBack)
 	//{
@@ -91,6 +95,15 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 		//CurrHP - damae;
 		if (player)
 		{
+			Mathf::Vector3 curPos = GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 senderPos = sender->GetOwner()->m_transform.GetWorldPosition();
+			Mathf::Vector3 dir = curPos - senderPos;
+			dir.Normalize();
+			Mathf::Vector3 p = XMVector3Rotate(dir, sender->GetOwner()->m_transform.GetWorldQuaternion());
+			hittimer = 1.f;
+			hitPos = p;
+
+
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);

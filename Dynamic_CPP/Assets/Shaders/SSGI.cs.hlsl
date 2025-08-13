@@ -1,4 +1,5 @@
 #include "Sampler.hlsli"
+#include "BRDF.hlsli"
 #define Nd 4       // 방향 개수
 #define Ns 4       // 각 방향당 샘플 개수
 #define Nb 32      // 비트마스크 크기
@@ -11,6 +12,7 @@ Texture2D<float> gDepthTex : register(t0);
 Texture2D<float4> gColor : register(t1);
 Texture2D<float4> gNormalTex : register(t2);
 Texture2D<float4> gLightEmissive : register(t3);
+Texture2D<float4> MetalRough : register(t4);
 
 RWTexture2D<float4> gOutput : register(u0);
 
@@ -117,6 +119,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float sampleOffset = 0.01;
     float jitter = randf(DTid.x, DTid.y) - 0.5;
 
+    float3 albedo = gColor.SampleLevel(LinearSampler, uv, 0);
+    float2 metalrough = MetalRough.SampleLevel(LinearSampler, uv, 0).rg;
+    float metallic = metalrough.x;
+    float roughness = metalrough.y;
+    float3 F0 = float3(0.04, 0.04, 0.04);
+    F0 = lerp(F0, albedo, metallic);
+    
     for (float slice = 0.0; slice < Nd + 0.5; slice += 1.0)
     {
         float phi = sliceRotation * (slice + jitter) + PI;
@@ -143,7 +152,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
             float3 sampleDistance = samplePosition - position;
             float sampleLength = length(sampleDistance);
             float3 sampleHorizon = sampleDistance / sampleLength;
-
+            float3 L = normalize(sampleDistance);
+            float3 H = normalize(camera + L);
+            
             frontBackHorizon.x = dot(sampleHorizon, camera);
             frontBackHorizon.y = dot(normalize(sampleDistance - camera * thickness), camera);
 
@@ -151,9 +162,24 @@ void main(uint3 DTid : SV_DispatchThreadID)
             frontBackHorizon = clamp((frontBackHorizon + n + halfPI) / PI, 0.0, 1.0);
 
             indirect = updateSectors(frontBackHorizon.x, frontBackHorizon.y, 0u);
-            lighting += (1.0 - float(countbits(indirect & ~occlusion)) / float(sectorCount)) *
-                sampleLight * saturate(dot(normal, sampleHorizon)) *
-                saturate(dot(sampleNormal, -sampleHorizon));
+            if (dot(normal, L) > 0)
+            {
+                float NDF = DistributionGGX(dot(normal, H), roughness);
+                float G = GeometrySmith(max(dot(normal, camera), 0.0), max(dot(normal, L), 0.0), roughness);
+                float3 F = fresnelSchlick(max(dot(H, camera), 0.0), F0);
+                float3 kS = F;
+                float3 kD = float3(1, 1, 1) - kS;
+                kD *= 1.0 - metallic;
+                float NdotL = max(dot(normal, L), 0.0);
+                float3 numerator = NDF * G * F;
+                float denominator = 4.0 * max(dot(normal, camera), 0.0) * NdotL + 0.001;
+                float3 specular = numerator / denominator;
+                
+                lighting += (1.0 - float(countbits(indirect & ~occlusion)) / float(sectorCount)) *
+                (kD * albedo / PI + specular) * NdotL;
+                //sampleLight * saturate(dot(normal, sampleHorizon)) *
+                //saturate(dot(sampleNormal, -sampleHorizon));
+            }
             occlusion |= indirect;
         }
 
@@ -161,21 +187,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
 
     visibility /= Nd;
-    lighting /= Nd;
+    lighting /= Nd * Ns;
     
-    
-    //float phi = sliceRotation * (4.0 + jitter) + PI;
-    //float2 omega = float2(cos(phi), sin(phi));
-    //float sampleStep = (3.0 + jitter) / Ns + sampleOffset;
-    //float2 sampleUV = uv - sampleStep * sampleScale * omega * aspect;
-    //float sDepth = gDepthTex.SampleLevel(LinearSampler, sampleUV, 0);
-    //float3 samplePosition = CalculateViewSpaceFromDepth(sDepth, sampleUV); //screenPosition.Sample(samplerLinear, sampleUV).rgb;
-    //float3 sampleNormal = normalize(gNormalTex.SampleLevel(LinearSampler, sampleUV, 0).rgb * 2 - 1);
-    //float3 sampleLight = gLightEmissive.SampleLevel(LinearSampler, sampleUV, 0).rgb; //screenLight.Sample(samplerLinear, sampleUV).rgb;
-    //float3 sampleDistance = samplePosition - position;
-    //float sampleLength = length(sampleDistance);
-    //float3 sampleHorizon = sampleDistance / sampleLength;
-    
-    //gOutput[DTid.xy] = float4(position, visibility);
     gOutput[DTid.xy] = float4(lighting * intensity, visibility);
 }

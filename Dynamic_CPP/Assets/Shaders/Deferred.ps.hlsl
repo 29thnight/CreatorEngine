@@ -89,13 +89,13 @@ gOutput main(PixelShaderInput IN) : SV_TARGET
         if (light.status == LIGHT_DISABLED)
             continue;
         LightingInfo li = EvalLightingInfo(surf, light);
-        float NdotL = saturate(li.NdotL); // clamped n dot l
-        float NdotV = saturate(surf.NdotV);
+        float NdotL = max(li.NdotL, 0.0); // clamped n dot l
+        float NdotV = max(surf.NdotV, 0.0);
         
         // cook-torrance brdf
-        float NDF = DistributionGGX(saturate(li.NdotH), roughness);
+        float NDF = DistributionGGX(max(li.NdotH, 0.0), roughness);
         float G = GeometrySmith(NdotV, NdotL, roughness);
-        float3 F = fresnelSchlick(saturate(dot(li.H, surf.V)), F0);
+        float3 F = fresnelSchlick(max(dot(li.H, surf.V), 0.0), F0);
         float3 kS = F;
         float3 kD = float3(1.0, 1.0, 1.0) - kS;
         kD *= 1.0 - metallic;

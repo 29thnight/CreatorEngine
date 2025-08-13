@@ -63,6 +63,11 @@ public:
 	FrameProxyFindInstanceIDs& GetShadowRenderDataBuffer();
 	void ClearShadowRenderDataBuffer();
 
+	void UpdateData(Camera* pCamera) {
+		m_frameCalculatedView = pCamera->CalculateView();
+		m_frameCalculatedProjection = pCamera->CalculateProjection();
+	}
+
 	void AddFrame()
 	{
 		m_frame.fetch_add(1, std::memory_order_relaxed);

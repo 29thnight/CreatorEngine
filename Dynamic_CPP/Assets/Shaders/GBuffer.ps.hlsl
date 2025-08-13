@@ -104,7 +104,8 @@ GBufferOutput main(PixelShaderInput IN)
     [branch]
     if (gUseOccMetalRough)
     {
-        float3 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord).rgb;
+        float4 occRoughMetal = OcclusionRoughnessMetal.Sample(LinearSampler, IN.texCoord);
+        //occRoughMetal = SRGBtoLINEAR(occRoughMetal);
         ormAO = occRoughMetal.r;
         roughness = 1 - occRoughMetal.g;
         metallic = occRoughMetal.b;
@@ -166,7 +167,7 @@ GBufferOutput main(PixelShaderInput IN)
     OUT.diffuse = float4(albedo.rgb, 1);
     OUT.metalRoughOcclusion = float4(metallic, roughness, occlusion, 1);
     float3 normalResult = surf.N * 0.5 + 0.5;
-    OUT.normal = float4(normalResult, 1);
+    OUT.normal = float4(normalResult, 1); // 여기 나중에 normal.w 까지 받아서 행렬변환한곳 오류날 가능성 있음.
     OUT.emissive = emissive;
 
     OUT.bitmask = bit;

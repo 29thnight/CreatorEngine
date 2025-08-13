@@ -172,7 +172,7 @@ struct MaterialResourceInfo
 {
 	float staticFriction = 1.0f;	//정적 물체 마찰 계수
 	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
-	float restitution = 1.0f;	//탄성 계수
+	float restitution = 0.0f;	//탄성 계수
 	float density = 1.0f;	//밀도
 };
 
@@ -188,7 +188,7 @@ struct ColliderInfo
 	PhysicsTransform collsionTransform;	//콜리전 트렌스폼
 	float staticFriction = 1.0f;	//정적 물체 마찰 계수
 	float dynamicFriction = 1.0f;	//동적 물체 마찰 계수
-	float restitution = 1.0f;	//탄성 계수
+	float restitution = 0.0f;	//탄성 계수
 	float density = 1.0f;	//밀도
 
 };

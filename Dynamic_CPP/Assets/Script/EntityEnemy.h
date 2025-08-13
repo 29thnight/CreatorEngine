@@ -30,7 +30,7 @@ public:
 	virtual void SendKnockBack(Entity* sender, Mathf::Vector2 KnockBackForce);
 	bool isDead;
 	BehaviorTreeComponent* enemyBT;
-	BlackBoard* blackBoard;
+	BlackBoard* blackBoard = nullptr;
 	bool isDamage = false;
 
 	int attackCount = 0;
@@ -39,4 +39,9 @@ public:
 
 	EffectComponent* markEffect = nullptr; //크리티컬 마크 
 	void MeleeAttack();
+
+
+	float hittimer = 0.f;
+	Mathf::Vector3 hitPos;
+	Mathf::Quaternion hitrot;
 };

@@ -29,6 +29,7 @@
 #include "SSGIPass.h"
 #include "BitMaskPass.h"
 #include "TerrainGizmoPass.h"
+#include "DecalPass.h"
 //작업자 규철 관련
 #include "EffectEditor.h"
 #endif // !DYNAMICCPP_EXPORTS
@@ -118,6 +119,7 @@ private:
 	std::unique_ptr<SSGIPass>					m_pSSGIPass{};
 	std::unique_ptr<BitMaskPass>				m_pBitMaskPass{};
 	std::unique_ptr<TerrainGizmoPass>			m_pTerrainGizmoPass{};
+	std::unique_ptr<DecalPass>					m_pDecalPass{};
 
 	//Resources
 	//buffers

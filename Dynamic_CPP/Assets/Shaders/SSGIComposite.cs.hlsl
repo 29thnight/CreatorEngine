@@ -2,6 +2,7 @@
 
 Texture2D<float4> SSGITexture : register(t0);
 Texture2D<float4> ColorTexture : register(t1);
+Texture2D<float4> SSAOTexture : register(t2);
 RWTexture2D<float4> resultTexture : register(u0);
 
 cbuffer CompositeParams : register(b0)
@@ -32,8 +33,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
     
     float4 indirect = SSGITexture.SampleLevel(LinearSampler, uv, 0);
     float3 color = ColorTexture.Load(int3(DTid.xy, 0)).rgb;
+    float ssao = SSAOTexture.SampleLevel(LinearSampler, uv, 0).r;
     
-    resultTexture[DTid.xy] = float4(((destColor + (indirect.rgb)) * indirect.a), 1.0f);
+    resultTexture[DTid.xy] = float4(((destColor + (indirect.rgb)) * indirect.a * ssao * ssao), 1.0f);
     
     //resultTexture[DTid.xy] = float4(indirect.rgb, 1.0);
 }
