@@ -15,8 +15,9 @@
 #include "RagdollPhysics.h"
 
 class PhysicsEventCallback;
+class QueryBlockFilterCallback;
+class QueryTouchFilterCallback;
 struct ColliderInfo;
- 
 class PhysicX : public DLLCore::Singleton<PhysicX>
 {
 private:
@@ -229,6 +230,8 @@ private:
 	
 	//===========================================================================================
 	PhysicsEventCallback* m_eventCallback{};
+	QueryBlockFilterCallback* m_blockCallback{}; //쿼리 블록 필터 콜백
+	QueryTouchFilterCallback* m_touchCallback{}; //쿼리 터치 필터 콜백
 
 	unsigned int m_collisionMatrix[32]{};
 

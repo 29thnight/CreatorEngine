@@ -13,7 +13,6 @@
 #include <mutex>
 #include <iostream>
 
-#include "ICollider.h"
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
@@ -52,7 +51,8 @@ public:
 		const physx::PxRigidActor* actor,
 		physx::PxHitFlags& queryFlags) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
@@ -67,7 +67,8 @@ public:
 		const physx::PxShape* shape,
 		const physx::PxRigidActor* actor) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eBLOCK;
@@ -85,7 +86,8 @@ public:
 		const physx::PxRigidActor* actor,
 		physx::PxHitFlags& queryFlags) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
@@ -100,13 +102,40 @@ public:
 		const physx::PxShape* shape,
 		const physx::PxRigidActor* actor) override {
 
-		auto data = shape->getSimulationFilterData();
+		//auto data = shape->getSimulationFilterData();
+		auto data = shape->getQueryFilterData();
 
 		if (filterData.word1 & (1 << data.word0)) {
 			return physx::PxQueryHitType::eTOUCH;
 		}
 		return physx::PxQueryHitType::eNONE;
 	}
+};
+
+
+// 내부 구현용 쿼리 필터 콜백 클래스
+class QueryBlockFilterCallback : public physx::PxQueryFilterCallback
+{
+public:
+	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
+	{
+		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
+		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eBLOCK;
+		return physx::PxQueryHitType::eNONE;
+	}
+	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eBLOCK; }
+};
+
+class QueryTouchFilterCallback : public physx::PxQueryFilterCallback
+{
+public:
+	virtual physx::PxQueryHitType::Enum preFilter(const physx::PxFilterData& queryFilterData, const physx::PxShape* shape, const physx::PxRigidActor* actor, physx::PxHitFlags& queryFlags) override
+	{
+		const physx::PxFilterData& shapeFilterData = shape->getQueryFilterData();
+		if (queryFilterData.word1 & shapeFilterData.word0) return physx::PxQueryHitType::eTOUCH;
+		return physx::PxQueryHitType::eNONE;
+	}
+	virtual physx::PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override { return physx::PxQueryHitType::eTOUCH; }
 };
 
 bool PhysicX::Initialize()
@@ -193,7 +222,8 @@ bool PhysicX::Initialize()
 
 	//충돌 처리를 위한 콜백 등록
 	m_eventCallback = new PhysicsEventCallback();
-
+	m_blockCallback = new QueryBlockFilterCallback();
+	m_touchCallback = new QueryTouchFilterCallback();
 
 	// Scene 생성
 	physx::PxSceneDesc sceneDesc(m_physics->getTolerancesScale());
@@ -258,8 +288,17 @@ void PhysicX::RemoveActors()
 	m_removeActorList.clear();
 }
 void PhysicX::UnInitialize() {
+	if (m_scene) m_scene->release();
+	if (gDispatcher) gDispatcher->release();
+	if (m_physics) m_physics->release();
+	/*if (m_pvd) {
+		m_pvd->release();
+	}*/
 	if (m_foundation) m_foundation->release();
-	
+	delete m_eventCallback;
+	delete m_blockCallback;
+	delete m_touchCallback;
+
 }
 
 
@@ -333,7 +372,7 @@ void PhysicX::Update(float fixedDeltaTime)
 			
 			//filterData.word1 = m_collisionMatrix[contrllerInfo.layerNumber];
 			shape->setSimulationFilterData(filterData);
-			//shape->setQueryFilterData(filterData);
+			shape->setQueryFilterData(filterData);
 			//shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 			//shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true); //&&&&&sehwan
 
@@ -1917,7 +1956,8 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::V
 	// ePREFILTER: 성능을 위해 사전 필터링을 사용합니다.
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
 	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
-	filterData.data.word0 = in.layerMask;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 
 	// --- 5. 스윕 실행 ---
 	bool isHit = m_scene->sweep(
@@ -1987,7 +2027,8 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = in.layerMask;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 
 	bool isHit = m_scene->sweep(sphereGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2044,7 +2085,8 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = in.layerMask;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 
 	bool isHit = m_scene->sweep(capsuleGeometry, startPose, unitDir, in.distance, sweepResult, physx::PxHitFlag::eDEFAULT | physx::PxHitFlag::eMESH_MULTIPLE, filterData);
 
@@ -2097,17 +2139,20 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const DirectX::SimpleM
 	physx::PxOverlapHit hitBuffer[maxHits];
 	physx::PxOverlapBuffer overlapResult(hitBuffer, maxHits);
 
+	TouchRaycastQueryFilter filter;
 	// --- 4. 충돌 필터 설정 ---
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = in.layerMask;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 
 	// --- 5. 오버랩 실행 ---
 	bool isHit = m_scene->overlap(
 		boxGeometry,    // 오버랩할 셰이프의 모양
 		pose,           // 영역의 위치 및 회전
 		overlapResult,  // 결과를 저장할 버퍼
-		filterData      // 위에서 설정한 충돌 필터
+		filterData,      // 위에서 설정한 충돌 필터
+		&filter
 	);
 
 	// --- 6. PhysX 결과를 게임 로직이 사용할 형태로 변환하여 반환 ---
@@ -2155,9 +2200,21 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = in.layerMask;
+	//filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	//filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
+	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
 
-	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData);
+	if (in.layerMask == ALL_LAYER) {
+		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
+		filterData.data.word1 = 0xFFFFFFFF;
+	}
+	else {
+		// 특정 레이어에 대해서만 raycast
+		filterData.data.word0 = in.layerMask;
+		filterData.data.word1 = m_collisionMatrix[in.layerMask];
+	}
+
+	bool isHit = m_scene->overlap(sphereGeometry, pose, overlapResult, filterData, m_touchCallback);
 
 	OverlapOutput out;
 	if (isHit)
@@ -2203,7 +2260,8 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 
 	physx::PxQueryFilterData filterData;
 	filterData.flags = physx::PxQueryFlag::eSTATIC | physx::PxQueryFlag::eDYNAMIC | physx::PxQueryFlag::ePREFILTER;
-	filterData.data.word0 = in.layerMask;
+	filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
+	filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
 
 	bool isHit = m_scene->overlap(capsuleGeometry, pose, overlapResult, filterData);
 
