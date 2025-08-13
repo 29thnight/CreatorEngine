@@ -247,6 +247,164 @@ int PhysicsManager::Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits)
 	return result.hitSize;
 }
 
+int PhysicsManager::BoxSweep(const SweepInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits) {
+	SweepOutput pxOut;
+	
+	pxOut = Physics->BoxSweep(in, boxExtent);
+
+	
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const SweepHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+
+			//// ÁÂÇ¥°è º¯È¯ (¿Þ¼Õ -> ¿À¸¥¼Õ)
+			//ConvertVectorPxToDx(hit.hitPoint, finalHit.point);
+			// ConvertVectorPxToDx(hit.hitNormal, finalHit.normal);
+			finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;
+            finalHit.distance = hit.distance;
+
+			out_hits.push_back(finalHit);
+		}
+	}
+
+	
+	return static_cast<int>(out_hits.size());
+}
+
+int PhysicsManager::SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits){
+	SweepOutput pxOut;
+
+	pxOut = Physics->SphereSweep(in, radius);
+
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const SweepHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+
+			finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;
+			finalHit.distance = hit.distance;
+
+			out_hits.push_back(finalHit);
+		}
+	}
+
+
+	return static_cast<int>(out_hits.size());
+}
+
+int PhysicsManager::CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits){
+	SweepOutput pxOut;
+
+	pxOut = Physics->CapsuleSweep(in, radius, halfHeight);
+
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const SweepHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+			
+			finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;
+			finalHit.distance = hit.distance;
+			out_hits.push_back(finalHit);
+		}
+	}
+	return static_cast<int>(out_hits.size());
+}
+
+int PhysicsManager::BoxOverlap(const OverlapInput& in, const DirectX::SimpleMath::Vector3& boxExtent, std::vector<HitResult>& out_hits){
+	OverlapOutput pxOut;
+	pxOut = Physics->BoxOverlap(in, boxExtent);
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const OverlapHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+			// overlap none hit point and normal
+			/*finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;*/
+			out_hits.push_back(finalHit);
+		}
+	}
+	return static_cast<int>(out_hits.size());
+}
+int PhysicsManager::SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits){
+	OverlapOutput pxOut;
+	pxOut = Physics->SphereOverlap(in, radius);
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const OverlapHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+			// overlap none hit point and normal
+			/*finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;*/
+			out_hits.push_back(finalHit);
+		}
+	}
+	return static_cast<int>(out_hits.size());
+}
+int PhysicsManager::CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits){
+	OverlapOutput pxOut;
+	pxOut = Physics->CapsuleOverlap(in, radius, halfHeight);
+	out_hits.clear();
+	out_hits.reserve(pxOut.touches.size());
+	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	for (const OverlapHitResult& hit : pxOut.touches)
+	{
+		auto it = Container.find(hit.hitObjectID);
+		if (it != Container.end())
+		{
+			HitResult finalHit;
+			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
+			finalHit.layer = hit.hitObjectLayer;
+			// overlap none hit point and normal
+			/*finalHit.point = hit.hitPoint;
+			finalHit.normal = hit.hitNormal;*/
+			out_hits.push_back(finalHit);
+		}
+	}
+	return static_cast<int>(out_hits.size());
+}
+
+
 void PhysicsManager::AddCollider(BoxColliderComponent* box)
 {
 	if (!box) return;
