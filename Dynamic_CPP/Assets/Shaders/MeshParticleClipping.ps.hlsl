@@ -43,7 +43,6 @@ struct PixelOutput
 };
 
 Texture2D gDiffuseTexture : register(t0);
-Texture2D gNoiseTexture : register(t1);
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler : register(s1);
 
@@ -103,37 +102,12 @@ bool shouldClipPolarAngle(PixelInput input)
 
 bool shouldClipTextureBasedSword(PixelInput input)
 {
+    // 기본 검기 이펙트 - 왼쪽에서 오른쪽으로 순차적 클리핑
     float progress = polarAngleProgress;
-    float2 uv = input.texCoord;
     
-    // 초승달 호의 중심선 계산 (더 자연스러운 곡선)
-    float2 center = float2(0.3, 0.5);
-    float2 toPixel = uv - center;
-    
-    // 원형 호를 따라 각도 계산
-    float angle = atan2(toPixel.y, toPixel.x);
-    float radius = length(toPixel);
-    
-    // 초승달 호의 중심 반지름 (대략적)
-    float targetRadius = 0.3;
-    float radiusThickness = 0.12; // 호의 두께
-    
-    // 각도를 0~1로 정규화 (초승달 범위에 맞게)
-    float normalizedAngle = (angle + 3.14159) / 6.28318; // -π~π를 0~1로
-    
-    // 진행도에 따른 클리핑
-    float clipPosition = progress;
-    if (normalizedAngle > clipPosition)
+    // 현재 픽셀의 UV.x가 progress보다 크면 클리핑
+    if (input.texCoord.x > progress)
         return true;
-    
-    // 검기 끝부분 페이드
-    float fadeLength = 0.1;
-    if (normalizedAngle > clipPosition - fadeLength)
-    {
-        float fade = (clipPosition - normalizedAngle) / fadeLength;
-        if (fade < frac(time * 6.0 + angle * 3.0))
-            return true;
-    }
     
     return false;
 }
@@ -147,41 +121,35 @@ PixelOutput main(PixelInput input)
         discard;
     }
     
-    float3 normal = normalize(input.normal);
-    float3 viewDir = normalize(input.viewDir);
+    float2 uv = input.texCoord;
     
-    float4 diffuseColor = gDiffuseTexture.Sample(gLinearSampler, input.texCoord);
-    
-    if (diffuseColor.a < 0.1)
-        discard;
-    
-    if (input.alpha <= 0.01)
-        discard;
-    
-    float3 finalColor;
-    
-    if (input.renderMode == 0)
+    // time이 0인지 확인
+    if (time < 0.01)
     {
-        finalColor = input.color.rgb * diffuseColor.rgb;
-    }
-    else
-    {
-        float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
-        float NdotL = max(0.0, dot(normal, lightDir));
-        
-        float3 ambient = float3(0.3, 0.3, 0.3);
-        float3 diffuse = float3(0.7, 0.7, 0.7) * NdotL;
-        
-        float3 reflectDir = reflect(-lightDir, normal);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-        float3 specular = float3(0.2, 0.2, 0.2) * spec;
-        
-        float3 lighting = ambient + diffuse + specular;
-        finalColor = input.color.rgb * diffuseColor.rgb * lighting;
+        output.color = float4(1.0, 0.0, 0.0, 1.0); // 빨간색으로 표시
+        return output;
     }
     
-    float finalAlpha = input.alpha * diffuseColor.a;
-    output.color = float4(finalColor, finalAlpha);
+    // 상하 구조 파동
+    //float timeOffset = uv.x * 3.0 + uv.y * 1.5;
+    float timeOffset = uv.y * 3.0 + uv.x * 1.5;
+    float animatedTime = time + timeOffset;
+    
+    //float wave1 = sin(animatedTime * 4.0 + uv.x * 10.0) * 0.5 + 0.5;
+    float wave1 = sin(animatedTime * 4.0 + uv.y * 10.0) * 0.5 + 0.5;
+    float wave2 = cos(animatedTime * 3.0 + uv.y * 8.0) * 0.5 + 0.5;
+    float wave3 = sin(animatedTime * 5.0 + (uv.x + uv.y) * 6.0) * 0.5 + 0.5;
+    
+    float wavePattern = (wave1 * 0.4 + wave2 * 0.3 + wave3 * 0.3);
+    
+    // 하늘색 기본 색상 (고정)
+    float3 baseColor = float3(0.3, 0.7, 1.0);
+    float3 brightColor = float3(0.9, 0.3, 3.0);
+    
+    // 파동에 따라 두 색상 사이를 보간
+    float3 finalColor = lerp(baseColor, brightColor, wavePattern);
+    
+    output.color = float4(finalColor, 0.8);
     
     return output;
 }

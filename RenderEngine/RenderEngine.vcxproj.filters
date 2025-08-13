@@ -509,9 +509,6 @@
     <ClCompile Include="TrailRenderModule.cpp">
       <Filter>RenderPass\EffectPass\333.Rendermodule</Filter>
     </ClCompile>
-    <ClCompile Include="TestEffect.cpp">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IRenderPass.h">
@@ -840,9 +837,6 @@
     </ClInclude>
     <ClInclude Include="SubsurfaceScatteringPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\SubSurfaceScatteringPass</Filter>
-    </ClInclude>
-    <ClInclude Include="TestEffect.h">
-      <Filter>RenderPass\EffectPass\0.Example</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
