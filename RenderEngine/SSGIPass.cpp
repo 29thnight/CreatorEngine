@@ -8,7 +8,6 @@
 int ssratio = 4;
 int ssthreads = 16;
 
-
 cbuffer SSGIParams
 {
     XMMATRIX view;

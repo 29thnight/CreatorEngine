@@ -8,7 +8,7 @@ cbuffer ThresholdParams
 	float knee{ 0.5f };
 };
 
-cbuffer CompositeParams
+cbuffer BloomCompositeParams
 {
 	float coefficient{ 0.3f };
 };

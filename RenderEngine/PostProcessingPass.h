@@ -47,7 +47,7 @@ private:
 
 	ThresholdParams m_bloomThreshold;
 	BlurParams m_bloomBlur;
-	CompositeParams m_bloomComposite;
+	BloomCompositeParams m_bloomComposite;
 
 	ComPtr<ID3D11Buffer> m_bloomThresholdBuffer;
 	ComPtr<ID3D11Buffer> m_bloomBlurBuffer;
