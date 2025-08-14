@@ -166,8 +166,11 @@ public:
 	void Charging();
 	[[Method]]
 	void Attack1();
-	
-
+	[[Method]]
+	void StartRay();
+	[[Method]]
+	void EndRay();
+	bool startRay = false;
 
 	//피격,죽음
 	bool isDead = false;
@@ -218,7 +221,7 @@ public:
 	GameManager* GM = nullptr;
 	GameObject* player = nullptr; // ==GetOwner() 스크립트 주인
 	Animator* m_animator = nullptr;
-	GameObject* aniOwener = nullptr;
+	GameObject* aniOwner = nullptr;
 	Socket* handSocket = nullptr;
 	CharacterControllerComponent* m_controller = nullptr;
 

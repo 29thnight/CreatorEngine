@@ -40,12 +40,11 @@ void PlayerAttackAH::Enter()
 void PlayerAttackAH::Update(float deltaTime)
 {
 	
-	if (m_player)
+	if (m_player && m_player->startRay)
 	{
 		m_player->MeleeAttack();
 	}
 
-	std::cout << "Attack behavior Test" << std::endl;
 }
 
 void PlayerAttackAH::Exit()

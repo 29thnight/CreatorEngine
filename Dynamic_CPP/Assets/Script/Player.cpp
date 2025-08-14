@@ -35,7 +35,7 @@ void Player::Start()
 		if (animator)
 		{
 			m_animator = animator;
-			aniOwener = GameObject::FindIndex(child);
+			aniOwner = GameObject::FindIndex(child);
 			break;
 		}
 
@@ -46,7 +46,7 @@ void Player::Start()
 	}
 
 
-	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwener);
+	handSocket= m_animator->MakeSocket("handsocket","hand.R.002", aniOwner);
 
 	
 
@@ -425,6 +425,16 @@ void Player::Attack1()
 		m_comboElapsedTime = 0;
 		attackElapsedTime = 0;
 	}
+}
+
+void Player::StartRay()
+{
+	startRay = true;
+}
+
+void Player::EndRay()
+{
+	startRay = false;
 }
 
 
