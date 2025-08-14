@@ -152,7 +152,7 @@ void GameManager::CheatMiningResource()
 
 	bool size = Raycast(cam->m_transform.GetWorldPosition(), currentForward, 10.f, 1, hit);
 	for (int i = 0; i < size; i++) {
-		std::cout << hit.hitObject->m_name.data() << std::endl;
+		std::cout << hit.gameObject->m_name.data() << std::endl;
 	}
 
 	/*for (auto& resource : m_resourcePool) {
