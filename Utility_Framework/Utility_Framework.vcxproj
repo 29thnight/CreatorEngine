@@ -63,6 +63,7 @@
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="HashingString.h" />
     <ClInclude Include="HLSLCompiler.h" />
+    <ClInclude Include="Paklib.hpp" />
     <ClInclude Include="TypeIO.h" />
     <ClInclude Include="LinkedListLib.hpp" />
     <ClInclude Include="LogEntry.h" />
