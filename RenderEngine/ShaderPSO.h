@@ -1,12 +1,22 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
 #include "PSO.h"
+#include <d3d11.h>
 #include <d3d11shader.h>
 #include <wrl/client.h>
 #include <vector>
 #include <string>
 #include <string_view>
 #include <cstdint>
+
+enum class ShaderStage
+{
+    Vertex,
+    Pixel,
+    Geometry,
+    Hull,
+    Domain
+};
 
 class ShaderPSO : public PipelineStateObject
 {
@@ -17,8 +27,14 @@ public:
     // Reflect all attached shaders and create constant buffers automatically.
     void ReflectConstantBuffers();
 
-    // Apply pipeline state and bind constant buffers to the GPU.
+    // Apply pipeline state and bind constant buffers and resources to the GPU.
     void Apply();
+
+    // Bind a shader resource view to a specific shader stage and slot.
+    void BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view);
+
+    // Bind an unordered access view to a specific shader stage and slot.
+    void BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view);
 
     // Update a reflected constant buffer by name. Returns false when not found or size mismatch.
     bool UpdateConstantBuffer(std::string_view name, const void* data, size_t size);
@@ -30,16 +46,6 @@ public:
     }
 
 private:
-    enum class ShaderStage
-    {
-        Vertex,
-        Pixel,
-        Geometry,
-        Hull,
-        Domain,
-        Compute
-    };
-
     struct ConstantBuffer
     {
         std::string name;
@@ -49,9 +55,25 @@ private:
         uint32_t size;
     };
 
+    struct ShaderResource
+    {
+        ShaderStage stage;
+        uint32_t slot;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> view;
+    };
+
+    struct UnorderedAccess
+    {
+        ShaderStage stage;
+        uint32_t slot;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> view;
+    };
+
     void ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage);
 
     std::vector<ConstantBuffer> m_constantBuffers;
+    std::vector<ShaderResource> m_shaderResources;
+    std::vector<UnorderedAccess> m_unorderedAccessViews;
 };
 
 #endif // !DYNAMICCPP_EXPORTS
