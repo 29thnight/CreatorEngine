@@ -213,7 +213,7 @@ void SSAOPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
 	//Warn : 1 프레임 밀림이 발생할 수 있음
     if (0 == renderData->m_index)
     {
-        RenderDebugManager::GetInstance()->CaptureRenderPass(DeviceState::g_pDeviceContext, 
+        RenderDebugManager::GetInstance()->CaptureRenderPass(deferredPtr,
 			renderTarget->GetRTV(), "SSAO_PASS");
     }
 

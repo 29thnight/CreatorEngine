@@ -86,9 +86,6 @@
     <ClInclude Include="TableAPIHelper.h">
       <Filter>소스 파일\TableAPIHelper</Filter>
     </ClInclude>
-    <ClInclude Include="GpuProfilerD3D11.h">
-      <Filter>소스 파일\Profiler</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="drawing.cpp">
@@ -108,9 +105,6 @@
     </ClCompile>
     <ClCompile Include="BlueprintBuilder.cpp">
       <Filter>소스 파일\Blueprint</Filter>
-    </ClCompile>
-    <ClCompile Include="GpuProfilerD3D11.cpp">
-      <Filter>소스 파일\Profiler</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

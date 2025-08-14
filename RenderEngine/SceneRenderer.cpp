@@ -27,7 +27,6 @@
 #include "Profiler.h"
 #include "SwapEvent.h"
 #include "RenderDebugManager.h"
-#include "GpuProfilerD3D11.h"
 
 #include <iostream>
 #include <string>
@@ -49,8 +48,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_commandThreadPool = std::make_unique<RenderThreadPool>(DeviceState::g_pDevice);
 	m_renderScene = std::make_shared<RenderScene>();
 	SceneManagers->SetRenderScene(m_renderScene.get());
-	gGpuProfiler.Initialize(DeviceState::g_pDevice, DeviceState::g_pDeviceContext);
-
+	
 	//sampler 생성
 	//m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	//m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -476,8 +474,6 @@ void SceneRenderer::EndOfFrame(float deltaTime)
 
 void SceneRenderer::SceneRendering()
 {
-	PROFILE_GPU_FRAME_START(DeviceState::g_pDeviceContext);
-	gGpuProfiler.StartDeferredStream();
 #ifndef BUILD_FLAG
 	if (ShaderSystem->IsReloading())
 	{
@@ -528,7 +524,6 @@ void SceneRenderer::SceneRendering()
 		//[1] ShadowMapPass
 		{
 			PROFILE_CPU_BEGIN("ShadowMapPass");
-			PROFILE_GPU_SCOPE(DeviceState::g_pDeviceContext, "ShadowMapPass");
 			DirectX11::BeginEvent(L"ShadowMapPass");
 			Benchmark banch;
 			//TODO : 여기 한번 정리 해보자
@@ -790,14 +785,6 @@ void SceneRenderer::SceneRendering()
 		PROFILE_CPU_END();
 
 	}
-
-	auto s = gGpuProfiler.EndDeferredStream();
-	gGpuProfiler.AttachStream(std::move(s));
-
-	PROFILE_GPU_FRAME_END(DeviceState::g_pDeviceContext);
-#ifndef BUILD_FLAG
-	gGpuProfiler.ResolvePending(2);
-#endif
 }
 
 void SceneRenderer::CreateCommandListPass()

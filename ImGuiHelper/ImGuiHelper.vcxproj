@@ -31,7 +31,6 @@
     <ClInclude Include="CustomCollapsingHeader.h" />
     <ClInclude Include="drawing.h" />
     <ClInclude Include="fa.h" />
-    <ClInclude Include="GpuProfilerD3D11.h" />
     <ClInclude Include="HorizontalLayout.h" />
     <ClInclude Include="IconsFontAwesome4.h" />
     <ClInclude Include="IconsFontAwesome6.h" />
@@ -49,7 +48,6 @@
   <ItemGroup>
     <ClCompile Include="BlueprintBuilder.cpp" />
     <ClCompile Include="drawing.cpp" />
-    <ClCompile Include="GpuProfilerD3D11.cpp" />
     <ClCompile Include="NodeEditor.cpp" />
     <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="ProfilerWindow.cpp" />
