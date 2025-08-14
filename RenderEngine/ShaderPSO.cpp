@@ -26,7 +26,6 @@ void ShaderPSO::ReflectConstantBuffers()
     reflectStage(m_geometryShader, ShaderStage::Geometry);
     reflectStage(m_hullShader, ShaderStage::Hull);
     reflectStage(m_domainShader, ShaderStage::Domain);
-    reflectStage(m_computeShader, ShaderStage::Compute);
 }
 
 void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage stage)
@@ -43,7 +42,6 @@ void ShaderPSO::ReflectShader(ID3D11ShaderReflection* reflection, ShaderStage st
         D3D11_SHADER_BUFFER_DESC cbDesc{};
         new_cbuffer->GetDesc(&cbDesc);
 
-        // cbDesc.Name이 nullptr일 수 있으므로 체크
         if (!cbDesc.Name)
             continue;
 
@@ -98,8 +96,48 @@ void ShaderPSO::Apply()
         case ShaderStage::Domain:
             DeviceState::g_pDeviceContext->DSSetConstantBuffers(cb.slot, 1, &buf);
             break;
-        case ShaderStage::Compute:
-            DeviceState::g_pDeviceContext->CSSetConstantBuffers(cb.slot, 1, &buf);
+        }
+    }
+
+    for (const auto& srv : m_shaderResources)
+    {
+        ID3D11ShaderResourceView* view = srv.view.Get();
+        switch (srv.stage)
+        {
+        case ShaderStage::Vertex:
+            DeviceState::g_pDeviceContext->VSSetShaderResources(srv.slot, 1, &view);
+            break;
+        case ShaderStage::Pixel:
+            DeviceState::g_pDeviceContext->PSSetShaderResources(srv.slot, 1, &view);
+            break;
+        case ShaderStage::Geometry:
+            DeviceState::g_pDeviceContext->GSSetShaderResources(srv.slot, 1, &view);
+            break;
+        case ShaderStage::Hull:
+            DeviceState::g_pDeviceContext->HSSetShaderResources(srv.slot, 1, &view);
+            break;
+        case ShaderStage::Domain:
+            DeviceState::g_pDeviceContext->DSSetShaderResources(srv.slot, 1, &view);
+            break;
+        }
+    }
+
+    for (const auto& uav : m_unorderedAccessViews)
+    {
+        ID3D11UnorderedAccessView* view = uav.view.Get();
+        switch (uav.stage)
+        {
+        case ShaderStage::Pixel:
+            DeviceState::g_pDeviceContext->OMSetRenderTargetsAndUnorderedAccessViews(
+                D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
+                nullptr,
+                nullptr,
+                uav.slot,
+                1,
+                &view,
+                nullptr);
+            break;
+        default:
             break;
         }
     }
@@ -114,6 +152,36 @@ bool ShaderPSO::UpdateConstantBuffer(std::string_view name, const void* data, si
 
     DeviceState::g_pDeviceContext->UpdateSubresource(it->buffer.Get(), 0, nullptr, data, 0, 0);
     return true;
+}
+
+void ShaderPSO::BindShaderResource(ShaderStage stage, uint32_t slot, ID3D11ShaderResourceView* view)
+{
+    auto it = std::find_if(m_shaderResources.begin(), m_shaderResources.end(),
+        [&](const ShaderResource& sr) { return sr.stage == stage && sr.slot == slot; });
+    if (it != m_shaderResources.end())
+    {
+        it->view = view;
+    }
+    else
+    {
+        ShaderResource resource{ stage, slot, view };
+        m_shaderResources.push_back(resource);
+    }
+}
+
+void ShaderPSO::BindUnorderedAccess(ShaderStage stage, uint32_t slot, ID3D11UnorderedAccessView* view)
+{
+    auto it = std::find_if(m_unorderedAccessViews.begin(), m_unorderedAccessViews.end(),
+        [&](const UnorderedAccess& u) { return u.stage == stage && u.slot == slot; });
+    if (it != m_unorderedAccessViews.end())
+    {
+        it->view = view;
+    }
+    else
+    {
+        UnorderedAccess ua{ stage, slot, view };
+        m_unorderedAccessViews.push_back(ua);
+    }
 }
 
 #endif // !DYNAMICCPP_EXPORTS
