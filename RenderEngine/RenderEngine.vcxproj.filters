@@ -288,6 +288,9 @@
     <Filter Include="DebugSystem">
       <UniqueIdentifier>{be0c0528-f7a9-4e49-8a1b-6295c693aeb7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\PSO\ShaderPSO">
+      <UniqueIdentifier>{0bbb48b0-4e85-4176-82d4-401aec0885bc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimationLoader.cpp">
@@ -523,6 +526,9 @@
     </ClCompile>
     <ClCompile Include="RenderDebugManager.cpp">
       <Filter>DebugSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderPSO.cpp">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -861,6 +867,9 @@
     </ClInclude>
     <ClInclude Include="RenderDebugManager.h">
       <Filter>DebugSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderPSO.h">
+      <Filter>Resources\PSO\ShaderPSO</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

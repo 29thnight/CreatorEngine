@@ -262,6 +262,7 @@
     <ClCompile Include="ProxyCommand.cpp" />
     <ClCompile Include="RenderDebugManager.cpp" />
     <ClCompile Include="RenderModules.cpp" />
+    <ClCompile Include="ShaderPSO.cpp" />
     <ClCompile Include="SizeModuleCS.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="SpawnModuleCS.cpp" />
@@ -358,6 +359,7 @@
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="RenderDebugManager.h" />
     <ClInclude Include="RenderModules.h" />
+    <ClInclude Include="ShaderPSO.h" />
     <ClInclude Include="ShadowMapPassSetting.h" />
     <ClInclude Include="SizeModuleCS.h" />
     <ClInclude Include="Socket.h" />
