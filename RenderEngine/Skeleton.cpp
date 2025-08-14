@@ -1,5 +1,6 @@
 #include "Skeleton.h"
 #include "Socket.h"
+
 Skeleton::~Skeleton()
 {
 	for (Bone* bone : m_bones)

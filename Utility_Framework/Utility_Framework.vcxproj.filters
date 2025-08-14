@@ -106,9 +106,6 @@
     <Filter Include="Core.definition\Type">
       <UniqueIdentifier>{82770586-7f15-4429-8c83-84bf5f361838}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX11Common\GPUQueryCollector">
-      <UniqueIdentifier>{341e34b7-d206-410a-9f8e-168c8fcca8e3}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassProperty.h">
@@ -311,9 +308,6 @@
     </ClInclude>
     <ClInclude Include="TypeIO.h">
       <Filter>Core.definition\Type</Filter>
-    </ClInclude>
-    <ClInclude Include="GPUQueryCollector.h">
-      <Filter>DirectX11Common\GPUQueryCollector</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

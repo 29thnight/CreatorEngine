@@ -40,7 +40,15 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		const auto& mat_info_type = Meta::Find("MaterialInfomation");
 		if (nullptr != meshRenderer->m_Material)
 		{
+			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			Meta::DrawProperties(&meshRenderer->m_Material->m_materialInfo, *mat_info_type);
+			ImGui::ColorEdit4("base color", &mat_info.m_baseColor.x);
+
+			ImGui::SliderFloat("metalic", &mat_info.m_metallic, 0.f, 1.f);
+
+			ImGui::SliderFloat("roughness", &mat_info.m_roughness, 0.f, 1.f);
+
+			ImGui::DragScalar("bitflag", ImGuiDataType_S32, &mat_info.m_bitflag);
 		}
 		else
 		{

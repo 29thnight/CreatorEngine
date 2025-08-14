@@ -608,7 +608,7 @@ void Player::MeleeAttack()
 
 		for (int i = 0; i < size; i++)
 		{
-			auto object = hits[i].hitObject;
+			auto object = hits[i].gameObject;
 			if (object == GetOwner()) continue;
 
 			auto entity = object->GetComponent<Entity>();

@@ -26,6 +26,7 @@
 #include "Trim.h"
 #include "Profiler.h"
 #include "SwapEvent.h"
+#include "RenderDebugManager.h"
 
 #include <iostream>
 #include <string>
@@ -34,8 +35,6 @@
 #include "Animator.h"
 #include "EffectComponent.h"
 #include "EffectProxyController.h"
-
-#include "Profiler.h"
 
 using namespace lm;
 
@@ -49,7 +48,7 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 	m_commandThreadPool = std::make_unique<RenderThreadPool>(DeviceState::g_pDevice);
 	m_renderScene = std::make_shared<RenderScene>();
 	SceneManagers->SetRenderScene(m_renderScene.get());
-
+	
 	//sampler 생성
 	//m_linearSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP);
 	//m_pointSampler = new Sampler(D3D11_FILTER_MIN_MAG_MIP_POINT, D3D11_TEXTURE_ADDRESS_CLAMP);
@@ -191,13 +190,16 @@ SceneRenderer::SceneRenderer(const std::shared_ptr<DirectX11::DeviceResources>& 
 
 	//SSGIPass
 	m_pSSGIPass = std::make_unique<SSGIPass>();
-	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get());
+	m_pSSGIPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get(), m_lightingTexture.get(), m_metalRoughTexture.get(), ao.get());
     m_pSSGIPass->ApplySettings(EngineSettingInstance->GetRenderPassSettings().ssgi);
 
 	//BitmaskPass
 	m_pBitMaskPass = std::make_unique<BitMaskPass>();
 	m_pBitMaskPass->Initialize(m_bitmaskTexture.get());
 
+	//DecalPass
+	m_pDecalPass = std::make_unique<DecalPass>();
+	m_pDecalPass->Initialize(m_diffuseTexture.get(), m_normalTexture.get());
 
 	SceneManagers->sceneLoadedEvent.AddLambda([&]() 
 		{
@@ -286,6 +288,7 @@ void SceneRenderer::Finalize()
 	m_pBitMaskPass.reset();
 	m_pTerrainGizmoPass.reset();
 	m_EffectEditor.reset();
+	m_pDecalPass.reset();
 
 	m_commandThreadPool.reset();
 
@@ -463,18 +466,10 @@ void SceneRenderer::OnWillRenderObject(float deltaTime)
 
 void SceneRenderer::EndOfFrame(float deltaTime)
 {
-	PROFILE_CPU_BEGIN("EraseRenderPassData");
 	m_renderScene->EraseRenderPassData();
-	PROFILE_CPU_END();
-	PROFILE_CPU_BEGIN("RenderUpdate");
 	m_renderScene->Update(deltaTime);
-	PROFILE_CPU_END();
-	PROFILE_CPU_BEGIN("OnProxyDestroy");
 	m_renderScene->OnProxyDestroy();
-	PROFILE_CPU_END();
-	PROFILE_CPU_BEGIN("PrepareRender");
 	PrepareRender();
-	PROFILE_CPU_END();
 }
 
 void SceneRenderer::SceneRendering()
@@ -563,14 +558,14 @@ void SceneRenderer::SceneRendering()
 			//PROFILE_CPU_END();
 		}
 
-		////[3] SSAOPass
-		//{
-		//	DirectX11::BeginEvent(L"SSAOPass");
-		//	Benchmark banch;
-		//	m_pSSAOPass->Execute(*m_renderScene, *camera);
-		//	RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
-		//	DirectX11::EndEvent();
-		//}
+		//[3] SSAOPass
+		{
+			DirectX11::BeginEvent(L"SSAOPass");
+			Benchmark banch;
+			m_pSSAOPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("SSAOPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
+		}
 
 		if (!useTestLightmap)
         {
@@ -584,6 +579,15 @@ void SceneRenderer::SceneRendering()
 				DirectX11::EndEvent();
 				PROFILE_CPU_END();
 			}
+		}
+
+		// DecalPass
+		{
+			DirectX11::BeginEvent(L"DecalPass");
+			Benchmark banch;
+			m_pDecalPass->Execute(*m_renderScene, *camera);
+			RenderStatistics->UpdateRenderState("DecalPass", banch.GetElapsedTime());
+			DirectX11::EndEvent();
 		}
 
 		{
@@ -779,11 +783,16 @@ void SceneRenderer::SceneRendering()
 
 		DirectX11::EndEvent();
 		PROFILE_CPU_END();
+
 	}
 }
 
 void SceneRenderer::CreateCommandListPass()
 {
+#ifndef BUILD_FLAG
+	RenderDebugManager::GetInstance()->AddFrame();
+#endif // !BUILD_FLAG
+
 	auto renderScene = m_renderScene;
 
 	ID3D11RenderTargetView* views[]{
@@ -843,13 +852,17 @@ void SceneRenderer::CreateCommandListPass()
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
 		{
-			PROFILE_CPU_BEGIN("TerrainPassCommandList");
-			m_pGBufferPass->TerrainRenderCommandList(deferredContext, *m_renderScene, *camera);
-			PROFILE_CPU_END();
+			{
+				PROFILE_CPU_BEGIN("TerrainPassCommandList");
+				m_pGBufferPass->TerrainRenderCommandList(deferredContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			}
 
-			PROFILE_CPU_BEGIN("GBufferPassCommandList");
-			m_pGBufferPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
-			PROFILE_CPU_END();
+			{
+				PROFILE_CPU_BEGIN("GBufferPassCommandList");
+				m_pGBufferPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+				PROFILE_CPU_END();
+			}
 
 			if (useTestLightmap)
 			{
@@ -865,6 +878,20 @@ void SceneRenderer::CreateCommandListPass()
 				m_pDeferredPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
 				PROFILE_CPU_END();
 			}
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
+		{
+			PROFILE_CPU_BEGIN("DecalPassCommandList");
+			m_pDecalPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
+		});
+
+		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
+		{
+			PROFILE_CPU_BEGIN("SSAOPassCommandList");
+			m_pSSAOPass->CreateRenderCommandList(deferredContext, *m_renderScene, *camera);
+			PROFILE_CPU_END();
 		});
 
 		m_commandThreadPool->Enqueue([&](ID3D11DeviceContext* deferredContext)
@@ -943,6 +970,11 @@ void SceneRenderer::CreateCommandListPass()
 	}
 
 	m_pUIPass->ClearFrameQueue();
+
+#ifndef BUILD_FLAG
+	RenderDebugManager::GetInstance()->EndFrame();
+#endif // !BUILD_FLAG
+
 }
 
 void SceneRenderer::ReApplyCurrCubeMap()
@@ -1092,6 +1124,8 @@ void SceneRenderer::PrepareRender()
 					}
 				}
 			}
+
+			data->UpdateData(camera);
 
 			data->AddFrame();
 		});

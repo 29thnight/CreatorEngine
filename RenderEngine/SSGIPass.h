@@ -9,7 +9,7 @@ public:
 	SSGIPass();
 	~SSGIPass();
 	
-	void Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive);
+	void Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive, Texture* metalroughocclu, Texture* SSAO);
 	void Execute(RenderScene& scene, Camera& camera) override;
 	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
@@ -20,6 +20,8 @@ private:
 	Texture* m_pDiffuseTexture{ nullptr };
 	Texture* m_pNormalTexture{ nullptr };
 	Texture* m_pLightEmissiveTexture{ nullptr };
+	Texture* m_pMetalRoughOcclu{ nullptr };
+	Texture* m_pSSAOTexture{ nullptr };
 
 	Texture* m_pTempTexture{ nullptr };
 	Texture* m_pTempTexture2{ nullptr };

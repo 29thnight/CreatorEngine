@@ -9,7 +9,7 @@
 #include "CullingManager.h"
 #include "Terrain.h"
 
-constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
+//constexpr size_t TRANSFORM_SIZE = sizeof(Mathf::xMatrix) * MAX_BONES;
 
 PrimitiveRenderProxy::PrimitiveRenderProxy(MeshRenderer* component) :
     m_Material(component->m_Material),

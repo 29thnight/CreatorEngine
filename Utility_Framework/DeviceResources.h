@@ -1,8 +1,6 @@
 #pragma once
 #ifndef DYNAMICCPP_EXPORTS
-#include "GPUQueryCollector.h"
-
-using namespace Microsoft::WRL;
+#include "Core.Definition.h"
 
 class CoreWindow;
 
@@ -85,8 +83,6 @@ namespace DirectX11
 		ComPtr<ID3D11DepthStencilState>		m_depthStencilState;
 		ComPtr<ID3D11BlendState>			m_blendState;
 		D3D11_VIEWPORT m_screenViewport;
-
-		std::unique_ptr<GPUQueryCollector> m_gpuQueryCollector;
 		CoreWindow* m_window;
 
 		D3D_FEATURE_LEVEL m_d3dFeatureLevel;

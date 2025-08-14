@@ -238,6 +238,26 @@ namespace Mathf
             roll = atan2f(-rotationMatrix.r[0].m128_f32[2], rotationMatrix.r[0].m128_f32[0]); // -m13, m11
         }
 	}
+    inline void EularToQuaternion(float pitch, float yaw, float roll, Quaternion& rotation) {
+        float halfDegToRad = 0.5f * Mathf::Deg2Rad;
+        pitch = pitch * halfDegToRad;
+        yaw = yaw * halfDegToRad;
+        roll = roll * halfDegToRad;
+
+        float sinX = std::sin(pitch);
+        float cosX = std::cos(pitch);
+        float sinY = std::sin(yaw);
+        float cosY = std::cos(yaw);
+        float sinZ = std::sin(roll);
+        float cosZ = std::cos(roll);
+
+        rotation = Quaternion(
+            cosY * sinX * cosZ + sinY * cosX * sinZ,
+            sinY * cosX * cosZ - cosY * sinX * sinZ,
+            cosY * cosX * sinZ - sinY * sinX * cosZ,
+            cosY * cosX * cosZ + sinY * sinX * sinZ
+        );
+    }
 
 	inline float Distance(const Mathf::Vector3& a, const Mathf::Vector3& b)
 	{

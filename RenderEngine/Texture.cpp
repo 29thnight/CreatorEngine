@@ -308,7 +308,6 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 			)
 		);
 	}
-
 	if(isCompress)
 	{
 		ScratchImage compressedImage{};
@@ -322,7 +321,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 					image.GetImages(),
 					image.GetImageCount(),
 					metadata,
-					DXGI_FORMAT_BC1_UNORM,
+					DXGI_FORMAT_BC1_UNORM_SRGB,
 					TEX_COMPRESS_PARALLEL,
 					0.5f,
 					compressedImage
@@ -335,7 +334,6 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	}
 
     Texture* texture = new Texture();
-
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceView(
 			DeviceState::g_pDevice,
@@ -422,6 +420,14 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 		);
 	}
 
+	/*file::path tempPath = matPath;
+	tempPath.replace_filename(tempPath.stem().wstring() + L"asd");
+	tempPath.replace_extension(".dds");
+	const wchar_t* name = matPath.filename().c_str();
+	const DirectX::Image* img = image.GetImage(0, 0, 0);
+	DirectX::SaveToDDSFile(image.GetImages(),
+		image.GetImageCount(),
+		image.GetMetadata(), DDS_FLAGS_NONE, tempPath.c_str());*/
 	if (isCompress)
 	{
 		ScratchImage compressedImage{};
@@ -434,9 +440,9 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 				DirectX::Compress(
 					image.GetImages(),
 					image.GetImageCount(),
-					metadata,
+					image.GetMetadata(),
 					DXGI_FORMAT_BC1_UNORM,
-					TEX_COMPRESS_PARALLEL,
+					TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
 					0.5f,
 					compressedImage
 				)
@@ -448,6 +454,14 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	}
 
 	auto texture = shared_alloc<Texture>();
+
+	/*tempPath.replace_filename(tempPath.stem().wstring() + L"aaa");
+	tempPath.replace_extension(".dds");
+
+	const DirectX::Image* img2 = image.GetImage(0, 0, 0);
+	DirectX::SaveToDDSFile(image.GetImages(),
+		image.GetImageCount(),
+		image.GetMetadata(), DDS_FLAGS_NONE, tempPath.c_str());*/
 
 	DirectX11::ThrowIfFailed(
 		CreateShaderResourceViewEx(
@@ -465,7 +479,7 @@ Managed::SharedPtr<Texture> Texture::LoadSharedFromPath(const file::path& path, 
 	);
 
 	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(metadata.width),float(metadata.height) };
+	texture->m_size = { float(image.GetMetadata().width),float(image.GetMetadata().height) };
 	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
 
 	return texture;

@@ -293,10 +293,8 @@ void DirectX11::Dx11Main::Update()
 
     EngineSettingInstance->renderBarrier.ArriveAndWait();
 
-    PROFILE_CPU_BEGIN("DisableOrEnable");
-    DisableOrEnable();
-    PROFILE_CPU_END();
     PROFILE_CPU_BEGIN("EndOfFrame");
+    DisableOrEnable();
     SceneManagers->EndOfFrame();
     PROFILE_CPU_END();
 

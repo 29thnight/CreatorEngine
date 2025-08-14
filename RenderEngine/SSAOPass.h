@@ -25,6 +25,7 @@ public:
 	void Initialize(Managed::SharedPtr<Texture> renderTarget, ID3D11ShaderResourceView* depth, Managed::SharedPtr<Texture> normal, Managed::SharedPtr<Texture> diffuse);
 	void ReloadDSV(ID3D11ShaderResourceView* depth);
 	void Execute(RenderScene& scene, Camera& camera) override;
+	void CreateRenderCommandList(ID3D11DeviceContext* deferredContext, RenderScene& scene, Camera& camera) override;
 	void ControlPanel() override;
         void ApplySettings(const SSAOPassSetting& setting);
 	void Resize(uint32_t width, uint32_t height) override;

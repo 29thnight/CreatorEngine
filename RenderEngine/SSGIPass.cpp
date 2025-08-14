@@ -103,11 +103,13 @@ SSGIPass::~SSGIPass()
     Memory::SafeDelete(pointSample);
 }
 
-void SSGIPass::Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive)
+void SSGIPass::Initialize(Texture* diffuse, Texture* normal, Texture* lightEmissive, Texture* metalroughocclu, Texture* SSAO)
 {
 	m_pDiffuseTexture = diffuse;
 	m_pNormalTexture = normal;
 	m_pLightEmissiveTexture = lightEmissive;
+    m_pMetalRoughOcclu = metalroughocclu;
+    m_pSSAOTexture = SSAO;
 }
 
 void SSGIPass::Execute(RenderScene& scene, Camera& camera)
@@ -123,11 +125,12 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     auto renderData = RenderPassData::GetData(&camera);
 
     // SSGI
-    ID3D11ShaderResourceView* srv[4] = {
+    ID3D11ShaderResourceView* srv[5] = {
     renderData->m_depthStencil->m_pSRV,
-    renderData->m_renderTarget->m_pSRV,
+    m_pDiffuseTexture->m_pSRV,
     m_pNormalTexture->m_pSRV,
-    m_pLightEmissiveTexture->m_pSRV
+    m_pLightEmissiveTexture->m_pSRV,
+    m_pMetalRoughOcclu->m_pSRV
     };
 
     ID3D11DeviceContext* deferredPtr = deferredContext;
@@ -135,7 +138,7 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     DirectX11::CSSetSamplers(deferredPtr, 0, 1, &sample->m_SamplerState); // sampler 0
     DirectX11::CSSetSamplers(deferredPtr, 1, 1, &pointSample->m_SamplerState); // sampler 1
 
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 4, srv);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 5, srv);
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &m_pTempTexture->m_pUAV, nullptr);
 
     SSGIParams params;
@@ -158,9 +161,9 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
         (DeviceState::g_Viewport.Width + ratioMulTread - 1) / (ratioMulTread),
         (DeviceState::g_Viewport.Height + ratioMulTread - 1) / (ratioMulTread), 1);
 
-    ID3D11ShaderResourceView* nullsrv[4] = { nullptr, nullptr, nullptr, nullptr };
+    ID3D11ShaderResourceView* nullsrv[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
     ID3D11UnorderedAccessView* nulluav = nullptr;
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 4, nullsrv);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 5, nullsrv);
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
 
     CompositeParams compositeParams;
@@ -230,11 +233,12 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     // Composite
     DirectX11::CSSetShader(deferredPtr, m_pCompositeShader->GetShader(), nullptr, 0);
 
-    ID3D11ShaderResourceView* srv2[2] = {
+    ID3D11ShaderResourceView* srv2[3] = {
         m_pTempTexture->m_pSRV,
         m_pDiffuseTexture->m_pSRV,
+        m_pSSAOTexture->m_pSRV
     };
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 2, srv2);
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 3, srv2);
 
 
     // Set output texture
@@ -245,8 +249,8 @@ void SSGIPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext, Ren
     DirectX11::CSSetConstantBuffer(deferredPtr, 0, 1, m_CompositeBuffer.GetAddressOf());
     DirectX11::Dispatch(deferredPtr, DeviceState::g_Viewport.Width / 16, DeviceState::g_Viewport.Height / 16, 1);
     // Clear resources
-    ID3D11ShaderResourceView* nullSRV[2] = { nullptr, nullptr };
-    DirectX11::CSSetShaderResources(deferredPtr, 0, 2, nullSRV);
+    ID3D11ShaderResourceView* nullSRV[3] = { nullptr, nullptr, nullptr };
+    DirectX11::CSSetShaderResources(deferredPtr, 0, 3, nullSRV);
     DirectX11::CSSetUnorderedAccessViews(deferredPtr, 0, 1, &nulluav, nullptr);
     
    /* else {

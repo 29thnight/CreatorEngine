@@ -19,6 +19,7 @@
 #include "EngineSetting.h"
 #include "ToggleUI.h"
 #include "GameBuilderSystem.h"
+#include "RenderDebugManager.h"
 
 constexpr int MAX_LAYER_SIZE = 32;
 
@@ -438,6 +439,11 @@ void MenuBarWindow::RenderMenuBar()
                     m_bShowBuildSceneSettingWindow = true;
 				}
 
+                if (ImGui::MenuItem("Render Debug"))
+                {
+                    m_bShowRenderDebugWindow = true;
+				}
+
                 ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
@@ -557,6 +563,7 @@ void MenuBarWindow::RenderMenuBar()
     ShowBlackBoardWindow();
     SHowInputActionMap();
 	ShowBuildSceneSettingWindow();
+    ShowRenderDebugWindow();
 
     if (m_bShowProfileWindow)
     {
@@ -2479,6 +2486,19 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
                 m_bShowBuildSceneSettingWindow = false;
             }
         }
+        ImGui::End();
+	}
+}
+void MenuBarWindow::ShowRenderDebugWindow()
+{
+    if (m_bShowRenderDebugWindow)
+    {
+        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+        ImGui::Begin("RenderPass Debug", &m_bShowRenderDebugWindow);
+        // Render Debug Options
+        RenderDebugManager::GetInstance()->RenderCaptureResultImGui();
+
+        // Add more debug options as needed
         ImGui::End();
 	}
 }

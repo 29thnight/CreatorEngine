@@ -40,4 +40,6 @@ private:
 
     ComPtr<ID3D11Buffer> m_Buffer{};
     ComPtr<ID3D11Buffer> m_shadowcamBuffer{};
+
+    bool showTextures = false;
 };

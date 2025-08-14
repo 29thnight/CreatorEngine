@@ -4,6 +4,7 @@
 #include "LightController.h"
 #include "ShaderSystem.h"
 #include "ImGuiRegister.h"
+#include "RenderDebugManager.h"
 
 struct alignas(16) DeferredBuffer
 {
@@ -187,6 +188,15 @@ void DeferredPass::CreateRenderCommandList(ID3D11DeviceContext* deferredContext,
         lightManager->PSBindCloudShadowMap(deferredPtr);
     }
     DirectX11::Draw(deferredPtr, 4, 0);
+
+    if (0 == renderData->m_index)
+    {
+        RenderDebugManager::GetInstance()->CaptureRenderPass(
+            deferredPtr, 
+            renderData->m_renderTarget->GetRTV(),
+            "01:DEFERRED_PASS"
+		);
+    }
 
     DirectX11::PSSetShaderResources(deferredPtr, 0, 10, nullSRV10);
     DirectX11::OMSetRenderTargets(deferredPtr, 1, nullRTVs, nullptr);
