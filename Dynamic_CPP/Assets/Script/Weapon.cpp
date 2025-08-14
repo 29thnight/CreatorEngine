@@ -55,6 +55,23 @@ void Weapon::SetEnabled(bool able)
 	}
 }
 
+bool Weapon::CheckDur()
+{
+	curDur -= durUseAtk;
+	if (curDur <= 0)
+		return true;
+	return false;
+}
+
+bool Weapon::CheckChargedDur(float chargedTime)
+{
+	int durUsechargeAtk = chargedTime / chgTime * durUseChg;
+	curDur -= durUsechargeAtk;
+	if (curDur)
+		return true;
+	return false;
+}
+
 
 void Weapon::Throw(Player* _player,Mathf::Vector3 statrPos)
 {

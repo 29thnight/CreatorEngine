@@ -144,7 +144,8 @@ public:
 	float rangedAtkCooldown = 1.0f;   //연속공격 종료후 발사대기시간
 	[[Property]]
 	float rangedAutoAimRange = 10.f; //자동조준 거리 
-
+	[[Property]]
+	float minChargedTime = 0.7f; //최소 차지시간
 
 
 	float m_chargingTime = 0.f;      //차징중인 시간
@@ -160,6 +161,7 @@ public:
 	void MoveBombThrowPosition(Mathf::Vector2 dir); //폭탄 도착지점 Lstick 으로변경 폭탄무기장착중 공격키 홀드중일때 실행
 	Mathf::Vector3 bombThrowPosition = {0,0,0};                                                                        
  	void MeleeAttack();
+	void MeleeAttack2(float tick);
 	[[Method]]
 	void StartAttack();
 	[[Method]]
@@ -170,6 +172,9 @@ public:
 	void StartRay();
 	[[Method]]
 	void EndRay();
+	void ShootBullet();
+
+
 	bool startRay = false;
 
 	//피격,죽음

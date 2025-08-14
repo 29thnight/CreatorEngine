@@ -4,7 +4,6 @@
 
 // Automation include AniScriptClass header
 #include "PlayerAttackAH.h"
-#include "PlayerAttackAni.h"
 
 class AniBehaviorFactory : public Singleton<AniBehaviorFactory>
 {

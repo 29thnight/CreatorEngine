@@ -255,9 +255,6 @@
 		<ClInclude Include="Assets\Script\DestroyEffect.h">
 			<Filter>Script\ScriptClass</Filter>
 		</ClInclude>
-		<ClInclude Include="Assets\Script\PlayerAttackAni.h">
-			<Filter>Script</Filter>
-		</ClInclude>
 		<ClInclude Include="Assets\Script\PlayerAttackAH.h">
 			<Filter>Script</Filter>
 		</ClInclude>
@@ -466,9 +463,6 @@
 		</ClCompile>
 		<ClCompile Include="Assets\Script\DestroyEffect.cpp">
 			<Filter>Script\ScriptClass</Filter>
-		</ClCompile>
-		<ClCompile Include="Assets\Script\PlayerAttackAni.cpp">
-			<Filter>Script</Filter>
 		</ClCompile>
 		<ClCompile Include="Assets\Script\PlayerAttackAH.cpp">
 			<Filter>Script</Filter>

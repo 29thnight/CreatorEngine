@@ -104,6 +104,7 @@ void EntityEnemy::SendDamage(Entity* sender, int damage)
 			hitPos = p;
 
 
+			
 			blackBoard->SetValueAsInt("Damage", damage);
 			int playerIndex = player->playerIndex;
 			m_currentHP -= std::max(damage, 0);

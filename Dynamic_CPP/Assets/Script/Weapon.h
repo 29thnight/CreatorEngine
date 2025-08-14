@@ -28,6 +28,8 @@ public:
 	virtual void OnDestroy() override  {}
 
 	void SetEnabled(bool able);
+	bool CheckDur();
+	bool CheckChargedDur(float chargedTime);
 	std::string itemName = "None";
 	[[Property]]
 	int itemtype = 0;

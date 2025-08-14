@@ -792,10 +792,13 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						ImGui::SameLine();
 
 						if (ImGui::Checkbox("Parameter", &state->useMultipler))
-							if (ImGui::Button("SetCurState"))
-							{
-								controller->SetCurState(state->m_name);
-							}
+						{
+
+						}
+						if (ImGui::Button("SetCurState"))
+						{
+							controller->SetCurState(state->m_name);
+						}
 
 						if (ImGui::BeginPopup("animationSpeedParameterSelecet"))
 						{
@@ -999,6 +1002,11 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						}
 					}
 					
+					ImGui::SameLine();
+					if (ImGui::Button("Delete behavior"))
+					{
+						state->ClearBehaviour();
+					}
 					// 커서 위치 이동
 					if (offsetX > 0.0f)
 						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);

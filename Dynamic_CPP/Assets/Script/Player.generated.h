@@ -28,6 +28,7 @@ ReflectionScriptField(Player) \
 		meta_property(rangedAtkDelay) \
 		meta_property(rangedAtkCooldown) \
 		meta_property(rangedAutoAimRange) \
+		meta_property(minChargedTime) \
 		meta_property(GracePeriod) \
 		meta_property(ResurrectionRange) \
 		meta_property(ResurrectionTime) \
@@ -47,6 +48,8 @@ ReflectionScriptField(Player) \
 		meta_method(StartAttack) \
 		meta_method(Charging) \
 		meta_method(Attack1) \
+		meta_method(StartRay) \
+		meta_method(EndRay) \
 		meta_method(OnBuff) \
 	}); \
 	FieldEnd(Player, PropertyAndMethod) \

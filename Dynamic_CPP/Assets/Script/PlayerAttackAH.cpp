@@ -50,4 +50,5 @@ void PlayerAttackAH::Update(float deltaTime)
 void PlayerAttackAH::Exit()
 {
 	m_player->isAttacking = false;
+	std::cout << "attack end" << std::endl;
 }

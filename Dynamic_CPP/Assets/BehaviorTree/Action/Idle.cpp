@@ -14,7 +14,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	if (movement)
 	{
 		movement->Move(Mathf::Vector2(0.0f, 0.0f)); // Stop movement during idle
-		std::cout << "Idle action executed. Stopping movement." << std::endl;
+		//std::cout << "Idle action executed. Stopping movement." << std::endl;
 	}
 	// Return success to indicate that the idle action completed successfully
 	// In a real implementation, you might check conditions or perform actions here
@@ -22,7 +22,7 @@ NodeStatus Idle::Tick(float deltatime, BlackBoard& blackBoard)
 	//idle state Retargeting 
 	//init Target;
 	GameObject* Target = nullptr;
-	std::cout << "Idle action: Starting retargeting process." << std::endl;
+	//std::cout << "Idle action: Starting retargeting process." << std::endl;
 	blackBoard.SetValueAsGameObject("ClosedTarget","");
 
 	//self

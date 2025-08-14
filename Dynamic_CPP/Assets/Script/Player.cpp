@@ -328,7 +328,7 @@ void Player::ThrowEvent()
 	directionToAsis.Normalize();
 
 	float dot = directionToAsis.Dot(GetOwner()->m_transform.GetForward());
-	if (onIndicate) 
+	if (onIndicate)
 	{
 		if (catchedObject)
 		{
@@ -400,7 +400,7 @@ void Player::StartAttack()
 
 void Player::Charging()
 {
-	if (m_chargingTime >= 0.7f)
+	if (m_chargingTime >= minChargedTime)
 	{
 		std::cout << "charginggggggg" << std::endl;
 	}
@@ -413,7 +413,14 @@ void Player::Attack1()
 
 	isCharging = false;
 	std::cout << m_chargingTime << " second charging" << std::endl;
-	m_chargingTime = 0.f;
+
+
+	if (m_chargingTime >= minChargedTime)
+	{
+		//차지공격나감
+	}
+
+
 
 	if (isAttacking == false)
 	{
@@ -421,10 +428,20 @@ void Player::Attack1()
 		m_animator->SetParameter("Attack", true);
 		std::cout << "Attack!!" << std::endl;
 		DropCatchItem();
+		if (m_curWeapon->CheckDur() ==true)
+		{
+			std::cout << "weapon break" << std::endl;
+		}
 		m_comboCount++;
 		m_comboElapsedTime = 0;
 		attackElapsedTime = 0;
 	}
+
+
+
+
+
+	m_chargingTime = 0.f;
 }
 
 void Player::StartRay()
@@ -435,6 +452,11 @@ void Player::StartRay()
 void Player::EndRay()
 {
 	startRay = false;
+}
+
+void Player::ShootBullet()
+{
+	//
 }
 
 
@@ -604,24 +626,90 @@ void Player::MeleeAttack()
 		direction.Normalize();
 		std::vector<HitResult> hits;
 		rayOrigin.y = 0.5f;
-		int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
-
-		for (int i = 0; i < size; i++)
+		
+		float distacne = 2.0f;
+		if (m_curWeapon)
 		{
-			auto object = hits[i].gameObject;
+			distacne = m_curWeapon->itemAckRange;
+		}
+		int size = RaycastAll(rayOrigin, direction, distacne, 1u, hits);
+
+		float angle = XMConvertToRadians(15.0f);
+		Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+		leftDir.Normalize();
+		Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+		rightDir.Normalize();
+		std::vector<HitResult> leftHits;
+		int leftSize = RaycastAll(rayOrigin, leftDir, distacne, 1u, leftHits);
+		std::vector<HitResult> rightHits;
+		int rightSize = RaycastAll(rayOrigin, rightDir, distacne, 1u, rightHits);
+		std::vector<HitResult> allHits;
+		allHits.reserve(size + leftSize + rightSize);
+		allHits.insert(allHits.end(), hits.begin(), hits.end());
+		allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+		allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
+		for (auto& hit : allHits)
+		{
+			auto object = hit.gameObject;
 			if (object == GetOwner()) continue;
 
-			auto entity = object->GetComponent<Entity>();
+			auto entity = object->GetComponent<EntityEnemy>();
 			auto [iter, inserted] = AttackTarget.insert(entity);
-			if (inserted)  
+			if (inserted)
 			{
-				if (*iter) 
+				if (*iter)
 				{
 					(*iter)->SendDamage(this, 1);
 					//(*iter)->SendKnockBack(this, {1,0});
 				}
 			}
 		}
+}
+
+void Player::MeleeAttack2(float tick)
+{
+	//Mathf::Vector3 rayOrigin = GetOwner()->m_transform.GetWorldPosition();
+	//float angle15 = 15.f;
+	//float curangle =
+	//float angle = XMConvertToRadians(angle15);
+	//
+	//Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+	//direction.y = 0;
+	//direction.Normalize();
+	//std::vector<HitResult> hits;
+	//rayOrigin.y = 0.5f;
+	//int size = RaycastAll(rayOrigin, direction, 5.f, 1u, hits);
+
+	//
+	//Vector3 leftDir = Vector3::Transform(direction, Matrix::CreateRotationY(-angle));
+	//leftDir.Normalize();
+	//Vector3 rightDir = Vector3::Transform(direction, Matrix::CreateRotationY(angle));
+	//rightDir.Normalize();
+	//std::vector<HitResult> leftHits;
+	//int leftSize = RaycastAll(rayOrigin, leftDir, 5.f, 1u, leftHits);
+	//std::vector<HitResult> rightHits;
+	//int rightSize = RaycastAll(rayOrigin, rightDir, 5.f, 1u, rightHits);
+	//std::vector<HitResult> allHits;
+	//allHits.reserve(size + leftSize + rightSize);
+	//allHits.insert(allHits.end(), hits.begin(), hits.end());
+	//allHits.insert(allHits.end(), leftHits.begin(), leftHits.end());
+	//allHits.insert(allHits.end(), rightHits.begin(), rightHits.end());
+	//for (auto& hit : allHits)
+	//{
+	//	auto object = hit.gameObject;
+	//	if (object == GetOwner()) continue;
+
+	//	auto entity = object->GetComponent<EntityEnemy>();
+	//	auto [iter, inserted] = AttackTarget.insert(entity);
+	//	if (inserted)
+	//	{
+	//		if (*iter)
+	//		{
+	//			(*iter)->SendDamage(this, 1);
+	//			//(*iter)->SendKnockBack(this, {1,0});
+	//		}
+	//	}
+	//}
 }
 
 
