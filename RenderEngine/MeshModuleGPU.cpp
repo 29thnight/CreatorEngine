@@ -36,12 +36,21 @@ void MeshModuleGPU::Initialize()
     blendDesc.IndependentBlendEnable = FALSE;
     blendDesc.RenderTarget[0].BlendEnable = TRUE;
     blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-    blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
     blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    //blendDesc.RenderTarget[0].BlendEnable = TRUE;
+    //blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    //blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    //blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    //blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    //blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+    //blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    //blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     DirectX11::ThrowIfFailed(
         DeviceState::g_pDevice->CreateBlendState(&blendDesc, &m_pso->m_blendState)
@@ -57,7 +66,7 @@ void MeshModuleGPU::Initialize()
 
     // 깊이 스텐실 스테이트
     CD3D11_DEPTH_STENCIL_DESC depthDesc{ CD3D11_DEFAULT() };
-    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     depthDesc.DepthEnable = true;
     depthDesc.DepthFunc = D3D11_COMPARISON_LESS;
     DeviceState::g_pDevice->CreateDepthStencilState(&depthDesc, &m_pso->m_depthStencilState);
