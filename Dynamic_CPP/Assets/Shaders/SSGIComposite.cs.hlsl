@@ -35,7 +35,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 color = ColorTexture.Load(int3(DTid.xy, 0)).rgb;
     float ssao = SSAOTexture.SampleLevel(LinearSampler, uv, 0).r;
     
-    resultTexture[DTid.xy] = float4(((destColor + (indirect.rgb)) * indirect.a * ssao * ssao), 1.0f);
+    resultTexture[DTid.xy] = float4(((destColor + (indirect.rgb)) * indirect.a * ssao), 1.0f);
     
     //resultTexture[DTid.xy] = float4(indirect.rgb, 1.0);
 }

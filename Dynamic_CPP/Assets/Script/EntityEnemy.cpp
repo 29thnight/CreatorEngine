@@ -236,7 +236,7 @@ void EntityEnemy::MeleeAttack()
 	}*/
 	for (auto& hit : hits)
 	{
-		auto object = hit.hitObject;
+		auto object = hit.gameObject;
 		if (object == GetOwner()) continue;
 		std::cout << object->m_name.data() << std::endl;
 

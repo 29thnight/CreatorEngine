@@ -1,5 +1,4 @@
 #include "RaycastHelper.h"
-#include "PhysicsManager.h"
 
 bool Raycast(Vector3 origin, Vector3 dir, float distance, unsigned int layerMask, HitResult& hit)
 {
