@@ -51,10 +51,20 @@ public:
 public:
     [[Property]]
 	std::string m_name{};
+	[[Property]]
+	std::string m_baseColorTexName{};
 	Texture* m_pBaseColor{ nullptr };
+	[[Property]]
+	std::string m_normalTexName{};
 	Texture* m_pNormal{ nullptr };
+	[[Property]]
+	std::string m_ORM_TexName{};
 	Texture* m_pOccRoughMetal{ nullptr };
+	[[Property]]
+	std::string m_AO_TexName{};
 	Texture* m_AOMap{ nullptr };
+	[[Property]]
+	std::string m_EmissiveTexName{};
 	Texture* m_pEmissive{ nullptr };
     [[Property]]
 	MaterialInfomation m_materialInfo;
