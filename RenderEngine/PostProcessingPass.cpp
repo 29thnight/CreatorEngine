@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Sampler.h"
+#include <string>
 
 #pragma warning(disable: 2398)
 PostProcessingPass::PostProcessingPass()
@@ -52,9 +53,16 @@ PostProcessingPass::PostProcessingPass()
 
 PostProcessingPass::~PostProcessingPass()
 {
-	//Memory::SafeDelete(m_CopiedTexture);
-    delete m_CopiedTexture;
-
+        delete m_CopiedTexture;
+        for (auto* tex : m_bloomMipTextures)
+        {
+                delete tex;
+        }
+        for (auto* tex : m_bloomTempTextures)
+        {
+                delete tex;
+        }
+        delete m_BloomResult;
 }
 
 void PostProcessingPass::Execute(RenderScene& scene, Camera& camera)
@@ -142,132 +150,170 @@ void PostProcessingPass::PrepaerShaderState()
 
 void PostProcessingPass::TextureInitialization()
 {
-	//Bloom Pass
-	BloomBufferWidth = DeviceState::g_ClientRect.width / 2;
-	BloomBufferHeight = DeviceState::g_ClientRect.height / 2;
+        //Bloom Pass
+        BloomBufferWidth = DeviceState::g_ClientRect.width / 2;
+        BloomBufferHeight = DeviceState::g_ClientRect.height / 2;
 
-	m_CopiedTexture = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"CopiedTexture",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
-	);
-	m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_CopiedTexture->m_textureType = TextureType::ImageTexture;
+        m_CopiedTexture = Texture::Create(
+                DeviceState::g_ClientRect.width,
+                DeviceState::g_ClientRect.height,
+                "CopiedTexture",
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+        );
+        m_CopiedTexture->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+        m_CopiedTexture->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+        m_CopiedTexture->m_textureType = TextureType::ImageTexture;
 
-	m_BloomFilterSRV1 = Texture::Create(
-		2u,
-		2u,
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"BloomFilterSRV1",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
-	);
-	m_BloomFilterSRV1->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomFilterSRV1->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomFilterSRV1->m_textureType = TextureType::ImageTexture;
+        for (uint32_t i = 0; i < BLOOM_MIP_LEVELS; ++i)
+        {
+                uint32_t ratio = 1u << (i + 1); // 2,4,8,16
+                std::string name = "BloomMip" + std::to_string(i);
+                m_bloomMipTextures[i] = Texture::Create(
+                        ratio,
+                        ratio,
+                        DeviceState::g_ClientRect.width,
+                        DeviceState::g_ClientRect.height,
+                        name,
+                        DXGI_FORMAT_R16G16B16A16_FLOAT,
+                        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_RENDER_TARGET
+                );
+                m_bloomMipTextures[i]->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomMipTextures[i]->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomMipTextures[i]->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomMipTextures[i]->m_textureType = TextureType::ImageTexture;
 
-	m_BloomFilterSRV2 = Texture::Create(
-		2u,
-		2u,
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"BloomFilterSRV2",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS
-	);
-	m_BloomFilterSRV2->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomFilterSRV2->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomFilterSRV2->m_textureType = TextureType::ImageTexture;
+                std::string tempName = "BloomTemp" + std::to_string(i);
+                m_bloomTempTextures[i] = Texture::Create(
+                        ratio,
+                        ratio,
+                        DeviceState::g_ClientRect.width,
+                        DeviceState::g_ClientRect.height,
+                        tempName,
+                        DXGI_FORMAT_R16G16B16A16_FLOAT,
+                        D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_RENDER_TARGET
+                );
+                m_bloomTempTextures[i]->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomTempTextures[i]->CreateUAV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomTempTextures[i]->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+                m_bloomTempTextures[i]->m_textureType = TextureType::ImageTexture;
+        }
 
-	m_BloomResult = Texture::Create(
-		DeviceState::g_ClientRect.width,
-		DeviceState::g_ClientRect.height,
-		"CopiedTexture",
-		DXGI_FORMAT_R16G16B16A16_FLOAT,
-		D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
-	);
-	m_BloomResult->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomResult->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
-	m_BloomResult->m_textureType = TextureType::ImageTexture;
+        m_BloomResult = Texture::Create(
+                DeviceState::g_ClientRect.width,
+                DeviceState::g_ClientRect.height,
+                "BloomResult",
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET
+        );
+        m_BloomResult->CreateRTV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+        m_BloomResult->CreateSRV(DXGI_FORMAT_R16G16B16A16_FLOAT);
+        m_BloomResult->m_textureType = TextureType::ImageTexture;
 
 }
 
 void PostProcessingPass::BloomPass(RenderScene& scene, Camera& camera)
 {
-	//m_pso->m_vertexShader = m_pFullScreenVS;
-	m_pso->m_pixelShader = m_pBloomCompositePS;
+        //m_pso->m_vertexShader = m_pFullScreenVS;
+        m_pso->m_pixelShader = m_pBloomCompositePS;
 
-	m_pso->Apply();
+        m_pso->Apply();
 
-	// Downsample the copied texture
-	const UINT offsets[]{ 0 };
-	constexpr ID3D11RenderTargetView* nullRTV = nullptr;
-	constexpr ID3D11ShaderResourceView* nullSRV = nullptr;
-	constexpr ID3D11UnorderedAccessView* nullUAV = nullptr;
-	UINT groupX = (DeviceState::g_Viewport.Width + 15) / 16;
-	UINT groupY = (DeviceState::g_Viewport.Height + 15) / 16;
-	{
-		DirectX11::UpdateBuffer(m_bloomThresholdBuffer.Get(), &m_bloomThreshold);
+        const UINT offsets[]{ 0 };
+        constexpr ID3D11RenderTargetView* nullRTV = nullptr;
+        constexpr ID3D11ShaderResourceView* nullSRV = nullptr;
+        constexpr ID3D11UnorderedAccessView* nullUAV = nullptr;
 
-		DirectX11::CSSetShader(m_pBloomDownSampledCS->GetShader(), 0, 0);
-		DirectX11::CSSetShaderResources(0, 1, &m_CopiedTexture->m_pSRV);
-		DirectX11::CSSetUnorderedAccessViews(0, 1, &m_BloomFilterSRV1->m_pUAV, offsets);
-		DirectX11::CSSetConstantBuffer(0, 1, m_bloomThresholdBuffer.GetAddressOf());
+        // Downsample chain
+        DirectX11::UpdateBuffer(m_bloomThresholdBuffer.Get(), &m_bloomThreshold);
+        ID3D11ShaderResourceView* currentSRV = m_CopiedTexture->m_pSRV;
+        for (uint32_t i = 0; i < BLOOM_MIP_LEVELS; ++i)
+        {
+                uint32_t width = DeviceState::g_ClientRect.width >> (i + 1);
+                uint32_t height = DeviceState::g_ClientRect.height >> (i + 1);
+                UINT groupX = (width + 15) / 16;
+                UINT groupY = (height + 15) / 16;
 
-		DirectX11::Dispatch(groupX, groupY, 1);
+                DirectX11::CSSetShader(m_pBloomDownSampledCS->GetShader(), 0, 0);
+                DirectX11::CSSetShaderResources(0, 1, &currentSRV);
+                DirectX11::CSSetUnorderedAccessViews(0, 1, &m_bloomMipTextures[i]->m_pUAV, offsets);
+                DirectX11::CSSetConstantBuffer(0, 1, m_bloomThresholdBuffer.GetAddressOf());
 
-		DirectX11::CSSetShaderResources(0, 1, &nullSRV);
-		DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
-	}
+                DirectX11::Dispatch(groupX, groupY, 1);
 
-	// Blur the downsampled texture
-	{
-		DirectX11::CSSetShader(m_pGaussianBlurCS->GetShader(), 0, 0);
-		DirectX11::CSSetConstantBuffer(0, 1, m_bloomBlurBuffer.GetAddressOf());
+                DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+                DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
 
-		ID3D11ShaderResourceView* csSRVs[]{ m_BloomFilterSRV1->m_pSRV, m_BloomFilterSRV2->m_pSRV };
-		ID3D11UnorderedAccessView* csUAVs[]{ m_BloomFilterSRV2->m_pUAV, m_BloomFilterSRV1->m_pUAV };
+                currentSRV = m_bloomMipTextures[i]->m_pSRV;
+        }
 
-		for (uint32 direction = 0; direction < 2; ++direction)
-		{
-			m_bloomBlur.direction = direction;
-			DirectX11::UpdateBuffer(m_bloomBlurBuffer.Get(), &m_bloomBlur);
+        // Blur each mip level
+        DirectX11::CSSetShader(m_pGaussianBlurCS->GetShader(), 0, 0);
+        DirectX11::CSSetConstantBuffer(0, 1, m_bloomBlurBuffer.GetAddressOf());
+        for (uint32_t i = 0; i < BLOOM_MIP_LEVELS; ++i)
+        {
+                uint32_t width = DeviceState::g_ClientRect.width >> (i + 1);
+                uint32_t height = DeviceState::g_ClientRect.height >> (i + 1);
+                UINT groupX = (width + 15) / 16;
+                UINT groupY = (height + 15) / 16;
 
-			DirectX11::CSSetShaderResources(0, 1, &csSRVs[direction]);
-			DirectX11::CSSetUnorderedAccessViews(0, 1, &csUAVs[direction], offsets);
+                ID3D11ShaderResourceView* srvPing[]{ m_bloomMipTextures[i]->m_pSRV, m_bloomTempTextures[i]->m_pSRV };
+                ID3D11UnorderedAccessView* uavPing[]{ m_bloomTempTextures[i]->m_pUAV, m_bloomMipTextures[i]->m_pUAV };
 
-			DirectX11::Dispatch(groupX, groupY, 1);
+                for (uint32_t dir = 0; dir < 2; ++dir)
+                {
+                        m_bloomBlur.direction = dir;
+                        DirectX11::UpdateBuffer(m_bloomBlurBuffer.Get(), &m_bloomBlur);
 
-			DirectX11::CSSetShaderResources(0, 1, &nullSRV);
-			DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
-		}
-	}
+                        DirectX11::CSSetShaderResources(0, 1, &srvPing[dir]);
+                        DirectX11::CSSetUnorderedAccessViews(0, 1, &uavPing[dir], offsets);
 
-	// Composite the blurred texture with the original texture
-	{
-		ID3D11RenderTargetView* rtv = m_BloomResult->GetRTV();
-		DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+                        DirectX11::Dispatch(groupX, groupY, 1);
 
-		//DirectX11::VSSetShader(m_pFullScreenVS->GetShader(), 0, 0);
-		DirectX11::PSSetShader(m_pBloomCompositePS->GetShader(), 0, 0);
+                        DirectX11::CSSetShaderResources(0, 1, &nullSRV);
+                        DirectX11::CSSetUnorderedAccessViews(0, 1, &nullUAV, offsets);
+                }
+        }
 
-		ID3D11ShaderResourceView* pSRVs[]{ m_CopiedTexture->m_pSRV, m_BloomFilterSRV1->m_pSRV };
-		DirectX11::PSSetShaderResources(0, 2, pSRVs);
+        // Upsample and composite back
+        BloomCompositeParams upsampleComposite{ 1.0f };
+        for (int i = static_cast<int>(BLOOM_MIP_LEVELS) - 1; i > 0; --i)
+        {
+                ID3D11RenderTargetView* rtv = m_bloomMipTextures[static_cast<size_t>(i - 1)]->GetRTV();
+                DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
 
-		DirectX11::UpdateBuffer(m_bloomCompositeBuffer.Get(), &m_bloomComposite);
-		DirectX11::PSSetConstantBuffer(0, 1, m_bloomCompositeBuffer.GetAddressOf());
+                DirectX11::PSSetShader(m_pBloomCompositePS->GetShader(), 0, 0);
 
-		DirectX11::Draw(4, 0);
+                ID3D11ShaderResourceView* psSRVs[]{ m_bloomMipTextures[static_cast<size_t>(i - 1)]->m_pSRV, m_bloomMipTextures[static_cast<size_t>(i)]->m_pSRV };
+                DirectX11::PSSetShaderResources(0, 2, psSRVs);
 
-		DirectX11::PSSetShaderResources(0, 1, &nullSRV);
-		DirectX11::UnbindRenderTargets();
+                DirectX11::UpdateBuffer(m_bloomCompositeBuffer.Get(), &upsampleComposite);
+                DirectX11::PSSetConstantBuffer(0, 1, m_bloomCompositeBuffer.GetAddressOf());
 
-		DirectX11::CopyResource(m_CopiedTexture->m_pTexture, m_BloomResult->m_pTexture);
-	}
+                DirectX11::Draw(4, 0);
+
+                DirectX11::PSSetShaderResources(0, 1, &nullSRV);
+                DirectX11::UnbindRenderTargets();
+        }
+
+        // Final composite with original image
+        ID3D11RenderTargetView* rtv = m_BloomResult->GetRTV();
+        DirectX11::OMSetRenderTargets(1, &rtv, nullptr);
+
+        DirectX11::PSSetShader(m_pBloomCompositePS->GetShader(), 0, 0);
+
+        ID3D11ShaderResourceView* pSRVs[]{ m_CopiedTexture->m_pSRV, m_bloomMipTextures[0]->m_pSRV };
+        DirectX11::PSSetShaderResources(0, 2, pSRVs);
+
+        DirectX11::UpdateBuffer(m_bloomCompositeBuffer.Get(), &m_bloomComposite);
+        DirectX11::PSSetConstantBuffer(0, 1, m_bloomCompositeBuffer.GetAddressOf());
+
+        DirectX11::Draw(4, 0);
+
+        DirectX11::PSSetShaderResources(0, 1, &nullSRV);
+        DirectX11::UnbindRenderTargets();
+
+        DirectX11::CopyResource(m_CopiedTexture->m_pTexture, m_BloomResult->m_pTexture);
 }
 
 void PostProcessingPass::GaussianBlurComputeKernel()

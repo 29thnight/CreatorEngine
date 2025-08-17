@@ -1,6 +1,7 @@
 #pragma once
 #include "cbuffers.h"
 #include "Texture.h"
+#include <array>
 
 struct PostProcessingApply
 {
@@ -34,11 +35,10 @@ private:
 	Texture* m_CopiedTexture;
 #pragma region Bloom Pass
 	//Bloom Pass Begin --------------------------------
-	Texture* m_BloomFilterSRV1;
-	Texture* m_BloomFilterSRV2;
-	Texture* m_BloomFilterUAV1;
-	Texture* m_BloomFilterUAV2;
-	Texture* m_BloomResult;
+        static constexpr uint32_t BLOOM_MIP_LEVELS = 4;
+        std::array<Texture*, BLOOM_MIP_LEVELS> m_bloomMipTextures{};
+        std::array<Texture*, BLOOM_MIP_LEVELS> m_bloomTempTextures{};
+        Texture* m_BloomResult{};
 
 	VertexShader* m_pFullScreenVS;
 	PixelShader* m_pBloomCompositePS;
