@@ -879,6 +879,15 @@
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomThresholdDownsample.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomDownSample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomExtract.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\BloomUpsample.cs.hlsl">
+      <Filter>Shaders\PostProcessShader</Filter>
+    </FxCompile>
     <FxCompile Include="..\Dynamic_CPP\Assets\Shaders\FXAA.cs.hlsl">
       <Filter>Shaders\PostProcessShader</Filter>
     </FxCompile>
