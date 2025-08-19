@@ -900,13 +900,12 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			m_isSkinnedMesh = false;
 		}
 
-		if (1 == node->m_numMeshes && 0 == node->m_numChildren)
-		{
-			uint32 meshId = node->m_meshes[0];
-			Mesh* mesh = m_model->m_Meshes[meshId];
-			Material* material = m_model->m_Materials[mesh->m_materialIndex];
-			Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
-			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
+                if (1 == node->m_numMeshes && 0 == node->m_numChildren)
+                {
+                        uint32 meshId = node->m_meshes[0];
+                        Mesh* mesh = m_model->m_Meshes[meshId];
+                        Material* material = m_model->m_Materials[mesh->m_materialIndex];
+                        MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
 			{
@@ -918,8 +917,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 				convexMesh->SetRestitution(0);
 			}
 
-			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = instanceMaterial;
+                        meshRenderer->m_Mesh = mesh;
+                        meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
@@ -935,7 +934,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		uint32 meshId			= node->m_meshes[i];
 		Mesh* mesh				= m_model->m_Meshes[meshId];
 		Material* material		= m_model->m_Materials[mesh->m_materialIndex];
-		Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
+                
 		Mathf::Matrix transform = node->m_transform;
 		Model* model = m_model;
 
@@ -954,7 +953,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = instanceMaterial;
+			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			object->m_transform.SetLocalMatrix(transform);
 		});
@@ -1044,7 +1043,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			uint32 meshId = node->m_meshes[0];
 			Mesh* mesh = m_model->m_Meshes[meshId];
 			Material* material = m_model->m_Materials[meshId];
-			Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
+
 			MeshRenderer* meshRenderer = rootObject->AddComponent<MeshRenderer>();
 
 			if (m_model->m_isMakeMeshCollider)
@@ -1058,7 +1057,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = instanceMaterial;
+			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->m_transform.SetLocalMatrix(node->m_transform);
 
@@ -1074,7 +1073,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 		uint32 meshId = node->m_meshes[i];
 		Mesh* mesh = m_model->m_Meshes[meshId];
 		Material* material = m_model->m_Materials[mesh->m_materialIndex];
-		Material* instanceMaterial = m_model->m_Materials[mesh->m_materialIndex]->Instantiate(material, material->m_name + std::to_string(modelSeparator++) + "_Instanced");
+
 		Mathf::Matrix transform = node->m_transform;
 
 		SceneManagers->m_threadPool->Enqueue([=]
@@ -1092,7 +1091,7 @@ GameObject* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool i
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = instanceMaterial;
+			meshRenderer->m_Material = material;
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			object->m_transform.SetLocalMatrix(transform);
 		});

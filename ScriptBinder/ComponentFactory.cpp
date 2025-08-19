@@ -99,24 +99,24 @@ void ComponentFactory::LoadComponent(GameObject* obj, const MetaYml::detail::ite
             MetaYml::Node getMeshNode = itNode["m_Mesh"];
             if (model && getMeshNode)
             {
-				Material* matPtr = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
-				if (matPtr)
-				{
-					meshRenderer->m_Material = DataSystems->LoadMaterial(materialName);
-					if (isEditorToGame || !meshRenderer->m_Material)
-					{
-						meshRenderer->m_Material = matPtr->Instantiate(matPtr, materialName.empty() ? "Default Material Instnaced" : materialName);
-						materialName = meshRenderer->m_Material->m_name;
-					}
-					meshRenderer->m_Material->m_renderingMode = renderingMode;
+                                Material* matPtr = model->GetMaterial(getMeshNode["m_materialIndex"].as<int>());
+                                if (matPtr)
+                                {
+                                        meshRenderer->m_Material = DataSystems->LoadMaterial(materialName);
+                                        if (!meshRenderer->m_Material)
+                                        {
+                                                meshRenderer->m_Material = matPtr;
+                                        }
+                                        meshRenderer->m_Material->m_renderingMode = renderingMode;
 
-					if (itNode["m_Material"])
-					{
-						auto& materialNode = itNode["m_Material"];
-						Meta::Deserialize(meshRenderer->m_Material, materialNode);
-						meshRenderer->m_Material->m_name = materialName;
-					}
-				}
+                                        if (itNode["m_Material"])
+                                        {
+                                                auto& materialNode = itNode["m_Material"];
+                                                Meta::Deserialize(meshRenderer->m_Material, materialNode);
+                                                if (!materialName.empty())
+                                                        meshRenderer->m_Material->m_name = materialName;
+                                        }
+                                }
 
 				meshRenderer->m_Mesh = model->GetMesh(getMeshNode["m_name"].as<std::string>());
 				if (meshRenderer->m_Mesh)
