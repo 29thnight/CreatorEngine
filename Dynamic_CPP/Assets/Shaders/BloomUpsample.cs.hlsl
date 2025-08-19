@@ -32,15 +32,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
     inputPreviousUpSampleTexture.GetDimensions(width, height);
     float2 inputTexelSize = 1.0f / float2(width, height);
 
-    float3 A = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2(-1.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 B = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 0.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 C = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 1.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 D = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2(-1.0f,  0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 E = (4.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 0.0f,  0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 F = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 1.0f,  0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 G = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2(-1.0f,  1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 H = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 0.0f,  1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
-    float3 I = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(LinearSampler, uvCoords + float2( 1.0f,  1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 A = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(-1.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 B = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(0.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 C = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(1.0f, -1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 D = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(-1.0f, 0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 E = (4.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(0.0f, 0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 F = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(1.0f, 0.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 G = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(-1.0f, 1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 H = (2.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(0.0f, 1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
+    float3 I = (1.0f / 16.0f) * inputPreviousUpSampleTexture.SampleLevel(ClampSampler, uvCoords + float2(1.0f, 1.0f) * inputTexelSize * radius, inputPreviousUpSampleMipLevel).xyz;
 
     outputCurrentUpSampleTexture[DTid.xy] += float4(A + B + C + D + E + F + G + H + I, 1.0f);
 }

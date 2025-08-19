@@ -20,8 +20,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float2 texelSize = float2(1.0f / width, 1.0f / height);
     float2 uvCoords = (DTid.xy + 0.5f) * texelSize;
 
-    float3 color = inputShadingPassTexture.SampleLevel(LinearSampler, uvCoords, 0).xyz
-                 + inputLightPassTexture.SampleLevel(LinearSampler, uvCoords, 0).xyz;
+    float3 color = inputShadingPassTexture.SampleLevel(ClampSampler, uvCoords, 0).xyz
+                 + inputLightPassTexture.SampleLevel(ClampSampler, uvCoords, 0).xyz;
 
     if (dot(color, float3(0.2126f, 0.7152f, 0.0722f)) > threshHold)
     {

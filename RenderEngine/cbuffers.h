@@ -8,12 +8,12 @@ cbuffer ThresholdParams
 	float knee{ 0.5f };
 };
 
-cbuffer BloomCompositeParams
-{
-	float coefficient{ 0.3f };
-    float2 texelSize{};
-    float _padding{};
-};
+//cbuffer BloomCompositeParams
+//{
+//	float coefficient{ 0.3f };
+//    float2 texelSize{};
+//    float _padding{};
+//};
 
 cbuffer BlurParams
 {

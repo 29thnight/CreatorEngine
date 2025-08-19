@@ -1,65 +1,75 @@
 #pragma once
-#include "cbuffers.h"
+#include "IRenderPass.h"
 #include "Texture.h"
 
 struct PostProcessingApply
 {
-	bool m_Bloom{ true };
+    bool m_Bloom{ true };
 };
 
 struct BloomPassSetting;
 class PostProcessingPass final : public IRenderPass
 {
 public:
-	PostProcessingPass();
-	~PostProcessingPass();
+    PostProcessingPass();
+    ~PostProcessingPass();
 
-	void Execute(RenderScene& scene, Camera& camera) override;
-	void ControlPanel() override;
-	void ApplySettings(const BloomPassSetting& setting);
-	void Resize(uint32_t width, uint32_t height) override;
-
-private:
-	void PrepaerShaderState();
-	void TextureInitialization();
-	void BloomPass(RenderScene& scene, Camera& camera);
-	void GaussianBlurComputeKernel();
+    void Execute(RenderScene& scene, Camera& camera) override;
+    void ControlPanel() override;
+    void ApplySettings(const BloomPassSetting& setting);
+    void Resize(uint32_t width, uint32_t height) override;
 
 private:
-	//***** uint32
-	uint32 BloomBufferWidth = 240;
-	uint32 BloomBufferHeight = 135;
+    void PrepaerShaderState();
+    void TextureInitialization();
+    void BloomPass(RenderScene& scene, Camera& camera);
 
-	std::shared_ptr<Sampler> m_linearClampSampler{};
+private:
+    PostProcessingApply m_PostProcessingApply{};
+    Texture* m_CopiedTexture{};
+	std::shared_ptr<Sampler> m_pSampler{};
+    // Bloom resources
+    static constexpr uint32_t BLOOM_MIP_LEVELS = 4;
+    Texture* m_bloomExtractTexture{};
+    std::array<Texture*, BLOOM_MIP_LEVELS> m_bloomDownSampledTextures{};
+    std::array<Texture*, BLOOM_MIP_LEVELS> m_bloomUpSampledTextures{};
+    Texture* m_BloomResult{};
 
-	PostProcessingApply m_PostProcessingApply;
-	Texture* m_CopiedTexture;
-#pragma region Bloom Pass
-	//Bloom Pass Begin --------------------------------
-	Texture* m_BloomFilterSRV1;
-	Texture* m_BloomFilterSRV2;
-	Texture* m_BloomFilterUAV1;
-	Texture* m_BloomFilterUAV2;
-	Texture* m_BloomResult;
+    VertexShader* m_pFullScreenVS{};
+    PixelShader* m_pBloomCompositePS{};
+    ComputeShader* m_pBloomExtractCS{};
+    ComputeShader* m_pBloomDownSampleCS{};
+    ComputeShader* m_pBloomUpSampleCS{};
 
-	VertexShader* m_pFullScreenVS;
-	PixelShader* m_pBloomCompositePS;
-	ComputeShader* m_pBloomDownSampledCS;
-	ComputeShader* m_pGaussianBlurCS;
+    cbuffer BloomParams
+    {
+        float threshHold{ 5.f };
+        float radius{ 2.f };
+        float padding[2]{};
+    } m_bloomParams{};
 
-	ThresholdParams m_bloomThreshold;
-	BlurParams m_bloomBlur;
-	BloomCompositeParams m_bloomComposite;
+    cbuffer BloomDownSampleParams
+    {
+        DirectX::XMFLOAT2 texelSize{};
+        uint32_t inputTextureMipLevel{};
+        uint32_t bloomPassIndex{};
+    } m_downSampleParams{};
 
-	ComPtr<ID3D11Buffer> m_bloomThresholdBuffer;
-	ComPtr<ID3D11Buffer> m_bloomBlurBuffer;
-	ComPtr<ID3D11Buffer> m_bloomCompositeBuffer;
-	//Bloom Pass End --------------------------------
-#pragma endregion
+    cbuffer BloomUpSampleParams
+    {
+        float radius{ 2.f };
+        uint32_t bloomPassIndex{};
+        uint32_t inputPreviousUpSampleMipLevel{};
+        uint32_t maxBloomPasses{ BLOOM_MIP_LEVELS };
+    } m_upSampleParams{};
 
-#pragma region Color Grading Pass
-	//Color Grading Pass Begin --------------------------------
-	Texture* m_ColorGradingTexture;
-	//Color Grading Pass End --------------------------------
-#pragma endregion
+    cbuffer BloomCompositeParams
+    {
+        float coefficient{ 0.05f };
+    } m_bloomComposite{};
+
+    ComPtr<ID3D11Buffer> m_bloomParamBuffer{};
+    ComPtr<ID3D11Buffer> m_downSampleBuffer{};
+    ComPtr<ID3D11Buffer> m_upSampleBuffer{};
+    ComPtr<ID3D11Buffer> m_bloomCompositeBuffer{};
 };
