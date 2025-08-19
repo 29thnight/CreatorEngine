@@ -27,11 +27,26 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::Button("No Material", ImVec2(250, 0));
 		}
 		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_BOX))
-		{
-			ImGui::GetContext("SelectMaterial").Open();
-		}
-		ImGui::PopStyleVar(2);
+                if (ImGui::Button(ICON_FA_BOX))
+                {
+                        ImGui::GetContext("SelectMaterial").Open();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_FA_ELLIPSIS))
+                {
+                        ImGui::OpenPopup("MaterialMenu");
+                }
+                if (ImGui::BeginPopup("MaterialMenu"))
+                {
+                        if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
+                        {
+                                Material* newMat = Material::Instantiate(meshRenderer->m_Material);
+                                meshRenderer->m_Material = newMat;
+                                DataSystems->SaveMaterial(newMat);
+                        }
+                        ImGui::EndPopup();
+                }
+                ImGui::PopStyleVar(2);
 	}
 
 	if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
@@ -79,29 +94,29 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 	if (ImGui::CollapsingHeader("LODGroupShared", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		// static º¯¼ö´Â ImGui ÄÁÅØ½ºÆ® ³»¿¡¼­ »óÅÂ¸¦ À¯ÁöÇÏ±â À§ÇØ »ç¿ëµË´Ï´Ù.
-		// ¿©·¯ MeshRenderer¸¦ µ¿½Ã¿¡ ÆíÁıÇÏ´Â °æ¿ì, ÀÌ static º¯¼öµéÀ»
-		// °¢ MeshRenderer ÀÎ½ºÅÏ½º¿¡ ¿¬°áµÈ »óÅÂ·Î °ü¸®ÇØ¾ß ÇÒ ¼ö ÀÖ½À´Ï´Ù.
+		// static ë³€ìˆ˜ëŠ” ImGui ì»¨í…ìŠ¤íŠ¸ ë‚´ì—ì„œ ìƒíƒœë¥¼ ìœ ì§€í•˜ê¸° ìœ„í•´ ì‚¬ìš©ë©ë‹ˆë‹¤.
+		// ì—¬ëŸ¬ MeshRendererë¥¼ ë™ì‹œì— í¸ì§‘í•˜ëŠ” ê²½ìš°, ì´ static ë³€ìˆ˜ë“¤ì„
+		// ê° MeshRenderer ì¸ìŠ¤í„´ìŠ¤ì— ì—°ê²°ëœ ìƒíƒœë¡œ ê´€ë¦¬í•´ì•¼ í•  ìˆ˜ ìˆìŠµë‹ˆë‹¤.
 		static Mesh* selectedMesh = nullptr;
-		static std::vector<float> LODThresholdsSetting; // 0.0f (Culled)´Â Æ÷ÇÔÇÏÁö ¾ÊÀ½
+		static std::vector<float> LODThresholdsSetting; // 0.0f (Culled)ëŠ” í¬í•¨í•˜ì§€ ì•ŠìŒ
 
-		// ÇöÀç ¼±ÅÃµÈ Mesh°¡ º¯°æµÇ¾ú´ÂÁö È®ÀÎÇÏ°í LODThresholdsSettingÀ» ¾÷µ¥ÀÌÆ®
+		// í˜„ì¬ ì„ íƒëœ Meshê°€ ë³€ê²½ë˜ì—ˆëŠ”ì§€ í™•ì¸í•˜ê³  LODThresholdsSettingì„ ì—…ë°ì´íŠ¸
 		if (selectedMesh != meshRenderer->m_Mesh)
 		{
 			selectedMesh = meshRenderer->m_Mesh;
-			if (selectedMesh) // Mesh°¡ ÇÒ´çµÈ °æ¿ì¿¡¸¸ LODThresholds¸¦ °¡Á®¿È
+			if (selectedMesh) // Meshê°€ í• ë‹¹ëœ ê²½ìš°ì—ë§Œ LODThresholdsë¥¼ ê°€ì ¸ì˜´
 			{
 				LODThresholdsSetting.clear();
-				// GetLODThresholds´Â 0.0f (Culled)¸¦ Á¦¿ÜÇÑ ½ÇÁ¦ LOD ÀÓ°è°ª¸¸ ¹İÈ¯ÇÑ´Ù°í °¡Á¤
+				// GetLODThresholdsëŠ” 0.0f (Culled)ë¥¼ ì œì™¸í•œ ì‹¤ì œ LOD ì„ê³„ê°’ë§Œ ë°˜í™˜í•œë‹¤ê³  ê°€ì •
 				LODThresholdsSetting = selectedMesh->GetLODThresholds();
 			}
 			else
 			{
-				LODThresholdsSetting.clear(); // Mesh°¡ ¾øÀ¸¸é ÀÓ°è°ªµµ ºñ¿ò
+				LODThresholdsSetting.clear(); // Meshê°€ ì—†ìœ¼ë©´ ì„ê³„ê°’ë„ ë¹„ì›€
 			}
 		}
 
-		if (!selectedMesh) // selectedMesh°¡ ¿©ÀüÈ÷ nullÀÎ °æ¿ì (meshRenderer->m_Mesh°¡ null)
+		if (!selectedMesh) // selectedMeshê°€ ì—¬ì „íˆ nullì¸ ê²½ìš° (meshRenderer->m_Meshê°€ null)
 		{
 			ImGui::Text("No Mesh assigned.");
 		}
@@ -112,39 +127,39 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			if (meshRenderer->m_isEnableLOD)
 			{
-				// --- LOD ÀÓ°è°ª UI ---
+				// --- LOD ì„ê³„ê°’ UI ---
 				float barHeight = 30.0f;
-				float barPadding = 20.0f; // ¸·´ë ÁÂ¿ì ÆĞµù
+				float barPadding = 20.0f; // ë§‰ëŒ€ ì¢Œìš° íŒ¨ë”©
 				float barWidth = ImGui::GetContentRegionAvail().x - barPadding * 2;
-				if (barWidth < 100.0f) barWidth = 100.0f; // ÃÖ¼Ò ³Êºñ
+				if (barWidth < 100.0f) barWidth = 100.0f; // ìµœì†Œ ë„ˆë¹„
 
-				ImVec2 p = ImGui::GetCursorScreenPos(); // ±×¸®±â ¿µ¿ªÀÇ ÁÂ»ó´Ü À§Ä¡
+				ImVec2 p = ImGui::GetCursorScreenPos(); // ê·¸ë¦¬ê¸° ì˜ì—­ì˜ ì¢Œìƒë‹¨ ìœ„ì¹˜
 				ImVec2 barMin = ImVec2(p.x + barPadding, p.y);
 				ImVec2 barMax = ImVec2(barMin.x + barWidth, barMin.y + barHeight);
 
 				ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-				// ¹è°æ ¸·´ë ±×¸®±â
-				draw_list->AddRectFilled(barMin, barMax, IM_COL32(50, 50, 50, 255)); // ¾îµÎ¿î È¸»ö ¹è°æ
-				draw_list->AddRect(barMin, barMax, IM_COL32(100, 100, 100, 255)); // Å×µÎ¸®
+				// ë°°ê²½ ë§‰ëŒ€ ê·¸ë¦¬ê¸°
+				draw_list->AddRectFilled(barMin, barMax, IM_COL32(50, 50, 50, 255)); // ì–´ë‘ìš´ íšŒìƒ‰ ë°°ê²½
+				draw_list->AddRect(barMin, barMax, IM_COL32(100, 100, 100, 255)); // í…Œë‘ë¦¬
 
-				// LODº° »ö»ó (¿¹½Ã)
+				// LODë³„ ìƒ‰ìƒ (ì˜ˆì‹œ)
 				ImU32 lodColors[] = {
-					IM_COL32(0, 200, 0, 255),   // LOD0 (³ì»ö)
-					IM_COL32(200, 200, 0, 255), // LOD1 (³ë¶õ»ö)
-					IM_COL32(200, 0, 0, 255),   // LOD2 (»¡°£»ö)
-					IM_COL32(100, 100, 100, 255) // Culled (È¸»ö) - ¸¶Áö¸· ¼¼±×¸ÕÆ®¿ë
+					IM_COL32(0, 200, 0, 255),   // LOD0 (ë…¹ìƒ‰)
+					IM_COL32(200, 200, 0, 255), // LOD1 (ë…¸ë€ìƒ‰)
+					IM_COL32(200, 0, 0, 255),   // LOD2 (ë¹¨ê°„ìƒ‰)
+					IM_COL32(100, 100, 100, 255) // Culled (íšŒìƒ‰) - ë§ˆì§€ë§‰ ì„¸ê·¸ë¨¼íŠ¸ìš©
 				};
 				const int numLODColors = sizeof(lodColors) / sizeof(lodColors[0]);
 
-				// LOD ¼¼±×¸ÕÆ® ¹× ÅØ½ºÆ® ±×¸®±â
-				// ¸ğµç °æ°è°ªÀ» Æ÷ÇÔÇÏ´Â º¤ÅÍ (1.0f, LOD0_threshold, ..., LOD(N-1)_threshold, 0.0f)
+				// LOD ì„¸ê·¸ë¨¼íŠ¸ ë° í…ìŠ¤íŠ¸ ê·¸ë¦¬ê¸°
+				// ëª¨ë“  ê²½ê³„ê°’ì„ í¬í•¨í•˜ëŠ” ë²¡í„° (1.0f, LOD0_threshold, ..., LOD(N-1)_threshold, 0.0f)
 				std::vector<float> all_boundaries;
-				all_boundaries.push_back(1.0f); // LOD0ÀÇ ½ÃÀÛ (°¡Àå ³ôÀº µğÅ×ÀÏ)
+				all_boundaries.push_back(1.0f); // LOD0ì˜ ì‹œì‘ (ê°€ì¥ ë†’ì€ ë””í…Œì¼)
 				for (float t : LODThresholdsSetting) {
 					all_boundaries.push_back(t);
 				}
-				all_boundaries.push_back(0.0f); // CulledÀÇ ³¡ (°¡Àå ³·Àº µğÅ×ÀÏ)
+				all_boundaries.push_back(0.0f); // Culledì˜ ë (ê°€ì¥ ë‚®ì€ ë””í…Œì¼)
 
 				float currentSegmentStartX = barMin.x;
 				for (int i = 0; i < all_boundaries.size() - 1; ++i)
@@ -152,24 +167,24 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					float leftBoundary = all_boundaries[i];
 					float rightBoundary = all_boundaries[i + 1];
 
-					// ÇöÀç ¹× ´ÙÀ½ ÀÓ°è°ªÀÇ Â÷ÀÌ¸¦ ±â¹İÀ¸·Î ¼¼±×¸ÕÆ® ³Êºñ °è»ê
-					// (leftBoundary´Â Ç×»ó rightBoundaryº¸´Ù Å©°Å³ª °°À½)
+					// í˜„ì¬ ë° ë‹¤ìŒ ì„ê³„ê°’ì˜ ì°¨ì´ë¥¼ ê¸°ë°˜ìœ¼ë¡œ ì„¸ê·¸ë¨¼íŠ¸ ë„ˆë¹„ ê³„ì‚°
+					// (leftBoundaryëŠ” í•­ìƒ rightBoundaryë³´ë‹¤ í¬ê±°ë‚˜ ê°™ìŒ)
 					float segmentPixelWidth = (leftBoundary - rightBoundary) * barWidth;
 
 					ImVec2 segmentMin = ImVec2(currentSegmentStartX, barMin.y);
 					ImVec2 segmentMax = ImVec2(currentSegmentStartX + segmentPixelWidth, barMax.y);
 
-					// LOD ¼¼±×¸ÕÆ® ¹è°æ ±×¸®±â
+					// LOD ì„¸ê·¸ë¨¼íŠ¸ ë°°ê²½ ê·¸ë¦¬ê¸°
 					draw_list->AddRectFilled(segmentMin, segmentMax, lodColors[std::min(i, numLODColors - 1)]);
-					draw_list->AddRect(segmentMin, segmentMax, IM_COL32(255, 255, 255, 100)); // Å×µÎ¸®
+					draw_list->AddRect(segmentMin, segmentMax, IM_COL32(255, 255, 255, 100)); // í…Œë‘ë¦¬
 
-					// LOD ÅØ½ºÆ® ±×¸®±â
+					// LOD í…ìŠ¤íŠ¸ ê·¸ë¦¬ê¸°
 					std::string lodText;
 					if (i < LODThresholdsSetting.size()) {
 						lodText = "LOD" + std::to_string(i);
 					}
 					else {
-						lodText = "Culled"; // ¸¶Áö¸· ¼¼±×¸ÕÆ®
+						lodText = "Culled"; // ë§ˆì§€ë§‰ ì„¸ê·¸ë¨¼íŠ¸
 					}
 					ImVec2 textPos = ImVec2(segmentMin.x + 5, segmentMin.y + (barHeight - ImGui::GetTextLineHeight()) / 2);
 					draw_list->AddText(textPos, IM_COL32(255, 255, 255, 255), lodText.c_str());
@@ -177,50 +192,50 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					currentSegmentStartX += segmentPixelWidth;
 				}
 
-				// µå·¡±× °¡´ÉÇÑ ÀÓ°è°ª ÇÚµé ±×¸®±â ¹× Ã³¸®
-				// ÇÚµéÀº LODThresholdsSettingÀÇ °¢ ¿ä¼Ò¿¡ ÇØ´çÇÏ¸ç, ÀÌ´Â °¢ LODÀÇ ¿À¸¥ÂÊ °æ°èÀÔ´Ï´Ù.
-				for (int i = 0; i < LODThresholdsSetting.size(); ++i) // 0.0f (Culled)´Â ÇÚµéÀÌ ¾øÀ½
+				// ë“œë˜ê·¸ ê°€ëŠ¥í•œ ì„ê³„ê°’ í•¸ë“¤ ê·¸ë¦¬ê¸° ë° ì²˜ë¦¬
+				// í•¸ë“¤ì€ LODThresholdsSettingì˜ ê° ìš”ì†Œì— í•´ë‹¹í•˜ë©°, ì´ëŠ” ê° LODì˜ ì˜¤ë¥¸ìª½ ê²½ê³„ì…ë‹ˆë‹¤.
+				for (int i = 0; i < LODThresholdsSetting.size(); ++i) // 0.0f (Culled)ëŠ” í•¸ë“¤ì´ ì—†ìŒ
 				{
-					float handleWidth = 10.0f; // µå·¡±× °¡´ÉÇÑ ÇÚµéÀÇ ³Êºñ
-					// ÇÚµé À§Ä¡ °è»ê: 1.0f°¡ ¹ÙÀÇ ¿ŞÂÊ ³¡, 0.0f°¡ ¹ÙÀÇ ¿À¸¥ÂÊ ³¡
+					float handleWidth = 10.0f; // ë“œë˜ê·¸ ê°€ëŠ¥í•œ í•¸ë“¤ì˜ ë„ˆë¹„
+					// í•¸ë“¤ ìœ„ì¹˜ ê³„ì‚°: 1.0fê°€ ë°”ì˜ ì™¼ìª½ ë, 0.0fê°€ ë°”ì˜ ì˜¤ë¥¸ìª½ ë
 					float handleX = barMin.x + (1.0f - LODThresholdsSetting[i]) * barWidth;
 
 					ImVec2 handleMin = ImVec2(handleX - handleWidth / 2, barMin.y);
 					ImVec2 handleMax = ImVec2(handleX + handleWidth / 2, barMax.y);
 
-					// µå·¡±×¸¦ À§ÇÑ Åõ¸í ¹öÆ° »ı¼º
+					// ë“œë˜ê·¸ë¥¼ ìœ„í•œ íˆ¬ëª… ë²„íŠ¼ ìƒì„±
 					ImGui::SetCursorScreenPos(handleMin);
 					ImGui::InvisibleButton(("LOD_Handle_" + std::to_string(i)).c_str(), ImVec2(handleWidth, barHeight));
 
 					bool isHovered = ImGui::IsItemHovered();
 					bool isActive = ImGui::IsItemActive();
 
-					// ÇÚµé ±×¸®±â
+					// í•¸ë“¤ ê·¸ë¦¬ê¸°
 					draw_list->AddRectFilled(handleMin, handleMax, isActive ? IM_COL32(255, 255, 0, 255) : (isHovered ? IM_COL32(200, 200, 0, 255) : IM_COL32(150, 150, 0, 255)));
-					draw_list->AddRect(handleMin, handleMax, IM_COL32(255, 255, 255, 255)); // Å×µÎ¸®
+					draw_list->AddRect(handleMin, handleMax, IM_COL32(255, 255, 255, 255)); // í…Œë‘ë¦¬
 
-					// µå·¡±× Ã³¸®
+					// ë“œë˜ê·¸ ì²˜ë¦¬
 					if (isActive && ImGui::IsMouseDragging(0))
 					{
 						float mouseDeltaX = ImGui::GetIO().MouseDelta.x;
-						float deltaThreshold = mouseDeltaX / barWidth; // 0-1 ¹üÀ§ÀÇ µ¨Å¸
+						float deltaThreshold = mouseDeltaX / barWidth; // 0-1 ë²”ìœ„ì˜ ë¸íƒ€
 
-						// À¯´ÏÆ¼Ã³·³ ¿À¸¥ÂÊÀ¸·Î µå·¡±×ÇÏ¸é ÀÓ°è°ªÀÌ °¨¼ÒÇÏµµ·Ï º¯°æ
+						// ìœ ë‹ˆí‹°ì²˜ëŸ¼ ì˜¤ë¥¸ìª½ìœ¼ë¡œ ë“œë˜ê·¸í•˜ë©´ ì„ê³„ê°’ì´ ê°ì†Œí•˜ë„ë¡ ë³€ê²½
 						float newThreshold = LODThresholdsSetting[i] - deltaThreshold;
 
-						// 0.0f ~ 1.0f ¹üÀ§·Î Å¬·¥ÇÁ
+						// 0.0f ~ 1.0f ë²”ìœ„ë¡œ í´ë¨í”„
 						newThreshold = std::max(0.0f, std::min(1.0f, newThreshold));
 
-						// ÀÎÁ¢ÇÑ ÀÓ°è°ª°úÀÇ °ãÄ§ ¹æÁö
-						// newThreshold´Â ¿ŞÂÊ ÀÓ°è°ª(´õ ³ôÀº °ª)º¸´Ù ÀÛ¾Æ¾ß ÇÔ
+						// ì¸ì ‘í•œ ì„ê³„ê°’ê³¼ì˜ ê²¹ì¹¨ ë°©ì§€
+						// newThresholdëŠ” ì™¼ìª½ ì„ê³„ê°’(ë” ë†’ì€ ê°’)ë³´ë‹¤ ì‘ì•„ì•¼ í•¨
 						if (i > 0) {
 							newThreshold = std::min(newThreshold, LODThresholdsSetting[i - 1] - 0.001f);
 						}
-						// newThreshold´Â ¿À¸¥ÂÊ ÀÓ°è°ª(´õ ³·Àº °ª)º¸´Ù Ä¿¾ß ÇÔ
+						// newThresholdëŠ” ì˜¤ë¥¸ìª½ ì„ê³„ê°’(ë” ë‚®ì€ ê°’)ë³´ë‹¤ ì»¤ì•¼ í•¨
 						if (i < LODThresholdsSetting.size() - 1) {
 							newThreshold = std::max(newThreshold, LODThresholdsSetting[i + 1] + 0.001f);
 						}
-						else { // ¸¶Áö¸· LOD ÀÓ°è°ªÀº 0.0fº¸´Ù Ä¿¾ß ÇÔ
+						else { // ë§ˆì§€ë§‰ LOD ì„ê³„ê°’ì€ 0.0fë³´ë‹¤ ì»¤ì•¼ í•¨
 							newThreshold = std::max(newThreshold, 0.0f + 0.001f);
 						}
 
@@ -228,43 +243,43 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					}
 				}
 
-				// ±×¸®±â ¿µ¿ªÀ» Áö³ª Ä¿¼­ À§Ä¡ ÀÌµ¿
+				// ê·¸ë¦¬ê¸° ì˜ì—­ì„ ì§€ë‚˜ ì»¤ì„œ ìœ„ì¹˜ ì´ë™
 				ImGui::Dummy(ImVec2(barWidth + barPadding * 2, barHeight));
 
-				// µğ¹ö±ë/Á¤º¸¸¦ À§ÇÑ ÇöÀç ÀÓ°è°ª Ç¥½Ã
+				// ë””ë²„ê¹…/ì •ë³´ë¥¼ ìœ„í•œ í˜„ì¬ ì„ê³„ê°’ í‘œì‹œ
 				ImGui::Text("LOD Thresholds:");
 				for (int i = 0; i < LODThresholdsSetting.size(); ++i) {
 					ImGui::SameLine();
 					ImGui::Text("LOD%d: %.3f", i, LODThresholdsSetting[i]);
 				}
 
-				// LOD Ãß°¡/Á¦°Å ¹öÆ° (¼±ÅÃ »çÇ×, À¯´ÏÆ¼¿Í À¯»çÇÑ µ¿ÀÛÀ» À§ÇØ À¯¿ë)
+				// LOD ì¶”ê°€/ì œê±° ë²„íŠ¼ (ì„ íƒ ì‚¬í•­, ìœ ë‹ˆí‹°ì™€ ìœ ì‚¬í•œ ë™ì‘ì„ ìœ„í•´ ìœ ìš©)
 				if (ImGui::Button("Add LOD")) {
-					// »õ·Î¿î LOD¸¦ Ãß°¡ÇÕ´Ï´Ù.
+					// ìƒˆë¡œìš´ LODë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
 					float newThreshold;
 					if (LODThresholdsSetting.empty()) {
-						newThreshold = 0.5f; // Ã¹ LOD´Â ±âº»°ª 0.5f
+						newThreshold = 0.5f; // ì²« LODëŠ” ê¸°ë³¸ê°’ 0.5f
 					}
 					else {
-						// ¸¶Áö¸· LOD¿Í Culled (0.0f) »çÀÌÀÇ Áß°£°ª
+						// ë§ˆì§€ë§‰ LODì™€ Culled (0.0f) ì‚¬ì´ì˜ ì¤‘ê°„ê°’
 						newThreshold = (LODThresholdsSetting.back() + 0.0f) / 2.0f;
 					}
 					LODThresholdsSetting.push_back(newThreshold);
-					// ³»¸²Â÷¼ø Á¤·Ä À¯Áö
+					// ë‚´ë¦¼ì°¨ìˆœ ì •ë ¬ ìœ ì§€
 					std::sort(LODThresholdsSetting.rbegin(), LODThresholdsSetting.rend());
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Remove Last LOD")) {
-					if (!LODThresholdsSetting.empty()) { // Culled´Â Á¦°ÅÇÏÁö ¾ÊÀ¸¹Ç·Î, ½ÇÁ¦ LOD°¡ ÇÏ³ª¶óµµ ÀÖ¾î¾ß Á¦°Å °¡´É
+					if (!LODThresholdsSetting.empty()) { // CulledëŠ” ì œê±°í•˜ì§€ ì•Šìœ¼ë¯€ë¡œ, ì‹¤ì œ LODê°€ í•˜ë‚˜ë¼ë„ ìˆì–´ì•¼ ì œê±° ê°€ëŠ¥
 						LODThresholdsSetting.pop_back();
 					}
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Apply LOD Thresholds"))
 				{
-					// LODThresholdsSettingÀ» selectedMesh->GenerateLODs¿¡ Á÷Á¢ Àû¿ë
+					// LODThresholdsSettingì„ selectedMesh->GenerateLODsì— ì§ì ‘ ì ìš©
 					selectedMesh->GenerateLODs(LODThresholdsSetting);
-					// Debug->Log´Â ¿¹½ÃÀÌ¹Ç·Î ½ÇÁ¦ ·Î±ë ½Ã½ºÅÛ¿¡ ¸Â°Ô º¯°æÇÏ¼¼¿ä.
+					// Debug->LogëŠ” ì˜ˆì‹œì´ë¯€ë¡œ ì‹¤ì œ ë¡œê¹… ì‹œìŠ¤í…œì— ë§ê²Œ ë³€ê²½í•˜ì„¸ìš”.
 					// Debug->Log("Applied LOD Thresholds to Mesh: " + selectedMesh->GetName());
 				}
 			}
